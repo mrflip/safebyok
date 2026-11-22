@@ -64,10 +64,8 @@ reverse:
 * **cipher** and **decipher** act on a whisper's serialized bytes: they become a ciphertext bound
   to the box's visible fields, and back.
 * **seal** and **unseal** act on a box. Sealing makes a fresh boxKey, ciphers the whisper under
-  it, and wraps the boxKey under the bankKey, each bound to the box's stamp and its vault's. The lease seals
-  (`lease.seal`) and unseals (`lease.unseal`), under the gate that holds it (`gate.seal`, `gate.unseal`); a bank seals and
-  unseals its own boxes (`bank.sealBox`, `bank.unsealBox`), and a vault writes them. Unsealing unwraps the boxKey and
-  deciphers the whisper. Only a box is sealed: a wayin or a lease is built.
+  it, and wraps the boxKey under the bankKey, each bound to the box's stamp and its vault's. Unsealing
+  unwraps the boxKey and deciphers the whisper. Only a box is sealed: a wayin or a lease is built.
 * **extract** means taking one thing out of another: `box.extractWhisper()` unseals the box and
   returns its whisper, and stores nothing on the box.
 

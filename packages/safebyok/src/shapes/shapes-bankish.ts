@@ -4,24 +4,19 @@ import type * as Z from 'zod'
 import { CX, type Deriver, type EX, type Errors, type Logger, Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
 import type { DefaultOnBadNews, Device } from '../models/device'
+import type { Gate } from '../models/gate'
 import type { VaultDB } from '../storage/vault-db'
-import type { GateDna, StrengthChecker } from './shapes-gateish'
+import type { StrengthChecker } from './shapes-gateish'
 import type { DefaultQueryCacheOpts, QueryCacheOpts } from './shapes-minder'
-import type { BoxCleartexts, LiveOf, ShellOf, UnsealedOf } from './shapes-sealers'
-import type { BankStamp } from './shapes-stamps'
-import type { BoxRecord } from './shapes-thing'
-import type { GetAsk, ListAsk, WorldRecord } from './shapes-asks'
+import type { BoxCleartexts, LiveOf, UnsealedOf } from './shapes-sealers'
+import type { BankRecord, BoxRecord } from './shapes-thing'
+import type { GetAsk, ListAsk } from './shapes-asks'
 import type { EpochMillis, Labelpath } from './primitives'
 
-// == [The bank's forms]: BankMakeRecord, BankDna, BoxUnsealed
+// == [The bank's forms]: BankMakeRecord, BoxUnsealed
 
-/** The record {@link Bank.make} and a bank's birth take: the bank's Thing, with its main gate's Thing at `maingate` and its root box at `rootBox`.
- * The root box is whole, or its shell before the bank is born.
- */
-export type BankMakeRecord = WorldRecord & Readonly<{ rootBox: LiveOf<BoxRecord> | ShellOf<BoxRecord> }>
-
-/** The dna of a new bank: its stamp, and its main gate's dna. */
-export type BankDna = BankStamp & { maingate: GateDna }
+/** The record {@link Bank.make} takes: the bank's Thing, with its root box as stored at `rootBox`. */
+export type BankMakeRecord = BankRecord & Readonly<{ rootBox: LiveOf<BoxRecord> }>
 
 /** A box unsealed: its record with its whisper in place of the sealed one. A tombstone's whisper is empty. */
 export type BoxUnsealed = UnsealedOf<BoxRecord, BoxCleartexts>
@@ -43,6 +38,8 @@ export interface BankOpts {
   device:  Device
   /** Where the bank's boxes are stored. */
   vaultDB: VaultDB
+  /** The bank's main gate, made for this bank's stamp. */
+  gate:    Gate
 }
 
 // `safebyok/core` carries no caching, so the bank knows its vaults by this method alone, not by the Vault class.

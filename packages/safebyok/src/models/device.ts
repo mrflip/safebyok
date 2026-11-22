@@ -1,6 +1,7 @@
 import { isEqual } from 'es-toolkit'
 import { Consts, Deriver, Errors, type GX, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
+import { Gate } from './gate'
 import type { BirthGating } from './gating'
 import { Proving, guardKeyDeriver } from './proving'
 import { Vault } from './vault'
@@ -176,8 +177,10 @@ export class Device implements MinderFriend {
         this.#align()
         return
       }
-      // Bank.make checks the gate and the root box: a tombstone or a shell of either refuses.
-      this.#attachBank(Bank.make({ ...(bankRecord as BankRecord), maingate: maingate as GateRecord, rootBox: rootBox as LiveOf<BoxRecord> }, { device: this, vaultDB: this.vaultDB }))
+      // Gate.make checks the gate and Bank.make the root box: a tombstone or a shell of either refuses.
+      const { vaultDB } = this
+      const gate = Gate.make(maingate as GateRecord, { device: this, vaultDB, bankStamp: bankRecord })
+      this.#attachBank(Bank.make({ ...(bankRecord as BankRecord), rootBox: rootBox as LiveOf<BoxRecord> }, { device: this, vaultDB, gate }))
     } catch (err) {
       this.#banklessSnapshot = Object.freeze({ ...PendingBank, stage: 'failed', lastErr: refusalSnapshotOf(err) })
       this.#align()

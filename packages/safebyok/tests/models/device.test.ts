@@ -331,8 +331,9 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
   })
 
   it("shows its own bank still when another bank is made over the same vaultDB, which it is not told of", async () => {
-    const { bank, device, record } = await TH.buildBornBank()
-    const other = Bank.make(record, { device, vaultDB: device.vaultDB })
+    const born = await TH.buildBornBank()
+    const { bank, device } = born
+    const other = TH.makeStoredBank(born)
     const snapshots = snapshotsOf(device)
     other.lock()
     expect(snapshots).to.have.lengthOf(0)

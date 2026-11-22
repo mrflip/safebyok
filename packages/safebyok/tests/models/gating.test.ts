@@ -6,9 +6,11 @@ import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Errors, GX, SX } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
 import type { Device } from '../../src/models/device'
+import { Gate } from '../../src/models/gate'
 import { BirthGating, Gating, UnlockGating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
 import type { GatingCleartexts } from '../../src/shapes/shapes-gateish'
+import { Shell } from '../../src/shapes/shapes-thing'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -168,6 +170,29 @@ describe("Bank.birth(device, cleartexts)", () => {
     const bank = await birth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase })
     expect([bank.revtok, bank.rootBox.revtok]).to.not.include(SX.VoidRevisionTok)
     expect([bank.revseq, bank.rootBox.revseq]).to.deep.equal([0, 0])
+  })
+
+  it("makes one gate, which seals the root box and is the bank's main gate, unlocked", async () => {
+    const make = vi.spyOn(Gate, 'make')
+    const bank = await birth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase })
+    expect(make).toHaveBeenCalledOnce()
+    expect(make.mock.results[0]!.value).to.equal(bank.gate)
+    expect(bank.gate.isUnlocked).to.be.true
+  })
+
+  it("sweeps its gate, making no bank, where the vaultDB answers a root box that is not live", async () => {
+    const device = TH.makeDevice()
+    const tryBirthBank = device.vaultDB.tryBirthBank.bind(device.vaultDB)
+    const births = TH.spyBirths(device, async (ask) => {
+      const born = await tryBirthBank(ask)
+      return born.ok ? { ...born, val: { ...born.val, root: Shell.of(TH.RootScope) as never } } : born
+    })
+    const make = vi.spyOn(Gate, 'make')
+    await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase }), 'bad_record')
+    expect(births.banks).to.be.empty
+    const gate = make.mock.results[0]!.value as Gate
+    expect(gate.isEnabled).to.be.false
+    expect(gate.isLocked).to.be.true
   })
 })
 

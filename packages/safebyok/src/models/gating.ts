@@ -14,7 +14,8 @@ import {
 } from '../shapes/shapes-gateish'
 import type { PutAskDraft } from '../shapes/shapes-asks'
 import type { StampedGate } from '../shapes/shapes-stamps'
-import type { GateRecord } from '../shapes/shapes-thing'
+import { Labelpath } from '../shapes/primitives'
+import { type GateRecord, Shell } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 import * as Throwers from '../refusals/throwers'
 
@@ -135,24 +136,25 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
 
   const main     = await passphraseProving.buildWayin(NOVEL)
   const passkey0 = await passkeyProving?.buildWayin(passphraseProving) ?? null
-  const { maingate, rootBox, ...bankRecord } = Bank.makeRecord({ ...bankStamp, maingate: { ...gateStamp, wayins: { main, passkey0 } } })
+  const bankRecord = Bank.makeRecord(bankStamp)
+  const rootShell  = BoxChecks.liveOrShell.parse(Shell.of({ ...device.scope, labelpath: Labelpath.RootBox }))
   const { vaultDB } = device
-  // The root box is sealed under the lease of the gate the birth makes. The bank makes its own gate from the gate stored,
-  // so the proving unlocks that one too, and the birth's gate is swept whatever the outcome.
-  const gate = Gate.make(maingate, { device, vaultDB, bankStamp })
+  // The root box is sealed under the lease of the gate the birth makes, and the bank stored is made with that gate,
+  // unlocked. Where the birth refuses, or the vaultDB's answer is broken, the gate is swept, and no bank holds it.
+  const gate = Gate.make(Gate.makeRecord({ ...gateStamp, wayins: { main, passkey0 } }), { device, vaultDB, bankStamp })
   try {
     await friend.unlockByProving(gate, passphraseProving)
-    const root   = await gate.seal(BaseBox, rootBox, { sidecar: {} }, { whisper: {} })
+    const root   = await gate.seal(BaseBox, rootShell, { sidecar: {} }, { whisper: {} })
     const answer = await vaultDB.tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gate.pickle(), root })
     if (! answer.ok) { throw answer.err }
     // The user must hear that their passphrase was not set: the bank stored is another's.
     if (answer.val.bank.revtok !== bankRecord.revtok) { throw Throwers.gateMadeElsewhere() }
-    const bank = Bank.make({ ...answer.val.bank, maingate: answer.val.gate, rootBox: BoxChecks.live.parse(answer.val.root) }, { device, vaultDB })
-    await friend.unlockByProving(bank.gate, passphraseProving)
+    const bank = Bank.make({ ...answer.val.bank, rootBox: BoxChecks.live.parse(answer.val.root) }, { device, vaultDB, gate })
     friend.attachBank(bank)
     return bank
-  } finally {
+  } catch (err) {
     gate.sweep()
+    throw err
   }
 }
 

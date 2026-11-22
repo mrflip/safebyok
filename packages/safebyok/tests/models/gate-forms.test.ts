@@ -26,7 +26,7 @@ async function storedGateOf(bank: Bank): Promise<GateRecord> {
 async function bankAndElsewhere(given: TH.BornBankGiven = {}) {
   const born = await TH.buildBornBank(given)
   born.bank.lock()
-  const elsewhere = Bank.make({ ...born.record, rootBox: born.bank.rootBox }, { device: born.device, vaultDB: born.device.vaultDB })
+  const elsewhere = TH.makeStoredBank(born)
   return { ...born, elsewhere }
 }
 
