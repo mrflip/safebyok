@@ -135,6 +135,16 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     }
   })
 
+  it("reports, called past the adapter, the verdict of the bank's lifetok check that refused its write", async () => {
+    await makeVaultDB()
+    const db = await database()
+    const bank = VT.bankThingOf()
+    await plant(VT.BankScope, bank)
+    const write = `SELECT ok, born_at_ok, lifetok_ok FROM ${VaultFunctionNames.write_bank}($1::text::jsonb, $2::text::jsonb)`
+    const { rows } = await db.query(write, [JSON.stringify(VT.nextOf(bank, { lifetok: VT.OtherLifetok })), JSON.stringify(bank)])
+    expect(rows).to.deep.equal([{ ok: false, born_at_ok: true, lifetok_ok: false }])
+  })
+
   it("refuses in its write function, called past the adapter, a write citing a revision not stored, and one that skips a life", async () => {
     await makeVaultDB()
     const db = await database()

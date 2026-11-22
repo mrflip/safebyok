@@ -132,7 +132,11 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
     labelpath:      bankLabelpath,
     label:          lit('bank'),
     fmt:            lit(ThingFormat),
+    /** Minted at the bank's birth, and kept by each write over the live bank (`Lifetok`). */
+    lifetok:        uuid(Phrases.LifetokShape),
   }).strict()
+  // What a write over a live bank reads of the bank stored to compare its lifetok, beside its storedCited.
+  const storedLifetok = obj({ lifetok: bankBase.shape.lifetok })
   const gateBase     = obj({
     ...sparse.shape,
     labelpath:      gateLabelpath,
@@ -224,7 +228,7 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
     .refine(isLifepathDeep, Phrases.LifepathDepth)
   const boxRecordOrShell = union([boxRecord, boxShell])
   return {
-    bankLabelpath, gateLabelpath, boxLabelpath, wayins, storedWayins,
+    bankLabelpath, gateLabelpath, boxLabelpath, wayins, storedWayins, storedLifetok,
     bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord, boxRecordOrShell,
   }
 }))

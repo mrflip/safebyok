@@ -8,7 +8,7 @@ import { PerKindChecks, ThingChecks, ThingFormat } from './shapes-thing'
 
 /** The checks of the bank's and gate's stamps and a box's stamp. */
 const PlainChecks = Validator.Checkers('bad_record', ({ obj, lit }) => {
-  const bankStamp = ThingChecks.sparse.pick({ userid: true, banklabel: true, lifeseq: true, born_at: true })
+  const bankStamp = ThingChecks.sparse.pick({ userid: true, banklabel: true, lifeseq: true, born_at: true }).extend({ lifetok: PerKindChecks.bankThing.shape.lifetok })
   const gateStamp = ThingChecks.sparse.pick({ userid: true, banklabel: true, labelpath: true, lifeseq: true, born_at: true })
   return {
     bankScope:   ThingChecks.bankScope,
@@ -25,7 +25,7 @@ const PlainChecks = Validator.Checkers('bad_record', ({ obj, lit }) => {
 
 /** A bank's scope: its user and its `banklabel`. */
 export type BankScope   = Z.infer<typeof StampChecks.bankScope>
-/** A bank's stamp: its scope, and the lifeseq and `born_at` of its life. Every ctx under the bank binds it first. */
+/** A bank's stamp: its scope, and the lifeseq, `born_at` and `lifetok` of its life. Every ctx under the bank binds it first. */
 export type BankStamp   = Z.infer<typeof StampChecks.bankStamp>
 /** A gate's stamp: its scope, and the lifeseq and `born_at` of its life. A wayin's wrapped bankKey is bound to it. */
 export type GateStamp   = Z.infer<typeof StampChecks.gateStamp>

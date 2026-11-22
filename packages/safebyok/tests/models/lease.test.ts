@@ -11,7 +11,7 @@ import * as TH from '../test-helpers'
 
 TH.useFakeClock()
 
-const StampFieldnames = ['fmt', 'userid', 'banklabel', 'lifeseq', 'born_at', 'gate_labelpath', 'gate_lifeseq', 'gate_revtok', 'proved_at', 'wayinkind'] as const satisfies readonly (keyof LeaseRecord)[]
+const StampFieldnames = ['fmt', 'userid', 'banklabel', 'lifeseq', 'born_at', 'lifetok', 'gate_labelpath', 'gate_lifeseq', 'gate_revtok', 'proved_at', 'wayinkind'] as const satisfies readonly (keyof LeaseRecord)[]
 
 const Stamped = { ...TH.WorldBankStamp, fmt: LeaseFormat, gate_labelpath: 'gate', gate_lifeseq: TH.WorldGate.lifeseq, gate_revtok: TH.WorldGate.revtok, proved_at: TH.T0, wayinkind: 'passphrase' }
 

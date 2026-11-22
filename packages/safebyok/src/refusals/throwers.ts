@@ -81,10 +81,10 @@ export function bornAtNotNow(ask: WriteAsk): Errors.VaultError { return new Erro
 export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
 // --
 
-// == [Storing Throwers]: PoliciedMeta, gateIssue, bornAtNotStored, rowOfOtherAddress, bankRootsMissing, answerNotMade
+// == [Storing Throwers]: PoliciedMeta, gateIssue, bornAtNotStored, lifetokNotStored, rowOfOtherAddress, bankRootsMissing, answerNotMade
 
 // Big types a refusal's meta.act as its own BadAct, which has no `policied`.
-/** Refusal meta with act `policied`, for a write the put table allows but a storage policy or the born_at check refuses. */
+/** Refusal meta with act `policied`, for a write the act tables allow but a storage policy, the born_at check or the lifetok check refuses. */
 export const PoliciedMeta = { act: 'policied' } as unknown as Errors.RefusalMeta
 
 /** A `gate_issue` refusal of a write over `stored`, saying `why`. */
@@ -95,6 +95,11 @@ export function gateIssue(stored: ThingRecord | null, why: string): Errors.Vault
 /** A `bad_record` refusal of a write over `stored`, the live Thing whose born_at it changes. */
 export function bornAtNotStored(stored: ThingRecord | null): Errors.VaultError {
   return new Errors.VaultError('bad_record', Phrases.BornAtNotStored, { rows: { dbhas: stored }, meta: PoliciedMeta })
+}
+
+/** A `bad_record` refusal of a write of the bank over `stored`, the live bank whose lifetok it changes. */
+export function lifetokNotStored(stored: ThingRecord | null): Errors.VaultError {
+  return new Errors.VaultError('bad_record', Phrases.LifetokNotStored, { rows: { dbhas: stored }, meta: PoliciedMeta })
 }
 
 /** A `storage_issue` refusal: storage answered a row at another address than asked, by the `fieldnames` that disagree. */

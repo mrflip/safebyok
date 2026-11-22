@@ -40,8 +40,10 @@ export const VaultTablesSql = `-- safebyok-postgres: the three tables PostgresVa
 -- No table has a foreign key: a bank's roots are written together by safebyok_birth_roots, and a lone or damaged row
 -- reads as one.
 
--- A bank: its Thing alone.
-CREATE TABLE IF NOT EXISTS safebyok_bank_things (${ThingColumns}${ThingChecks}
+-- A bank: its Thing alone. lifetok is minted at the bank's birth, kept by each write over the live bank, and tells it from
+-- another born under its banklabel.
+CREATE TABLE IF NOT EXISTS safebyok_bank_things (${ThingColumns}
+  lifetok    text    COLLATE "C" NOT NULL,${ThingChecks}
   CHECK (labelpath = 'bank' AND label = 'bank')
 );
 

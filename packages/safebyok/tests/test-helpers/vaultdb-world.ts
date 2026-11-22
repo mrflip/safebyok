@@ -7,7 +7,7 @@ import {
   Shell, ThingFormat,
 } from '../../src/shapes/shapes-thing'
 import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
-import { FirstRevtok, T0, revtokOf } from './models-world'
+import { FirstLifetok, FirstRevtok, T0, revtokOf } from './models-world'
 
 /** The bank the Things stand in. */
 export const ThingBank = Object.freeze({ userid: 'u1', banklabel: 'acme' })
@@ -46,7 +46,7 @@ export function trackOf(bank: ThingRecord = bankThingOf(), gate: ThingRecord = g
 
 /** The bank Thing at revision 0 of life 0, with `overrides` laid over it. */
 export function bankThingOf(overrides: Partial<BankRecord> = {}): BankRecord {
-  return { ...BankScope, label: 'bank', fmt: ThingFormat, ...FirstRevision, lifepath: Life0, ...overrides }
+  return { ...BankScope, label: 'bank', fmt: ThingFormat, lifetok: FirstLifetok, ...FirstRevision, lifepath: Life0, ...overrides }
 }
 
 /** The main gate at revision 0 of life 0, with `overrides` laid over it. */

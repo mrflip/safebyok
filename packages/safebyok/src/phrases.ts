@@ -65,6 +65,9 @@ export const LifeseqShape = "A lifeseq is 10 base-32 digits, 0-9 and a-v."
 /** A revtok not of a UUID's shape. */
 export const RevtokShape = "A revtok is a UUID: hex digits in groups of 8, 4, 4, 4 and 12, joined by '-'."
 
+/** A lifetok not of a UUID's shape. */
+export const LifetokShape = "A lifetok is a UUID: hex digits in groups of 8, 4, 4, 4 and 12, joined by '-'."
+
 /** A lifepath that is not lifeseqs, each after a '/'. */
 export const LifepathShape = "A lifepath is one or more lifeseqs, joined by '/'."
 
@@ -118,6 +121,9 @@ export const BornAtNotNow = "A write over a tombstone or none is a birth: its bo
 
 /** A write over a live Thing that changes its born_at. */
 export const BornAtNotStored = "A write over a live Thing leaves the stored Thing's born_at unchanged."
+
+/** A write of the bank over a live bank that changes its lifetok. */
+export const LifetokNotStored = "A write of the bank over a live bank keeps the stored bank's lifetok."
 
 /** A deleted main gate. */
 export const MainGateDeleted = "The main gate is never deleted: its record is always live (am: 'a')."

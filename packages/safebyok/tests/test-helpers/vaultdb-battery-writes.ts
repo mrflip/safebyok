@@ -1,4 +1,4 @@
-/** The battery's cases of tryGetThing and tryWriteThing, over the main gate and the boxes. */
+/** The battery's cases of tryGetThing and tryWriteThing, over the bank, the main gate and the boxes. */
 import { describe, expect, it } from 'vitest'
 import { BW, expectBad, expectGood } from 'safebyok-big/testing'
 import * as Phrases from '../../src/phrases'
@@ -6,10 +6,10 @@ import { Shell } from '../../src/shapes/shapes-thing'
 import { Thing } from '../../src/models/thing'
 import { delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import {
-  GateScope, Life0, RootScope, ThingBank, WithPasskey, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAskFor, gateThingOf, getAskAt, getGateAskOf,
-  nextGateOf, nextOf, replaceAskOf, rootBoxOf,
+  BankScope, GateScope, Life0, RootScope, ThingBank, WithPasskey, bankThingOf, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAskFor, gateThingOf,
+  getAskAt, getGateAskOf, nextGateOf, nextOf, replaceAskOf, rootBoxOf,
 } from './vaultdb-world'
-import { FirstRevtok, OtherRevtok, T0, revtokOf } from './models-world'
+import { FirstRevtok, OtherLifetok, OtherRevtok, T0, revtokOf } from './models-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 import { Lifeseq } from '../../src/shapes/primitives'
 
@@ -192,6 +192,61 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       const ask = { ...birthAskOf(), options: { policies: ['revoke_passkey' as const] } }
       const vaultDB = await fresh()
       expect(await vaultDB.tryWriteThing(ask)).to.deep.include({ ok: true, act: 'born' })
+    })
+  })
+
+  describe("tryWriteThing(ask), the bank", () => {
+    const stored = bankThingOf()
+    const life1  = Lifeseq.ofLifenum(1)
+    const life2  = Lifeseq.ofLifenum(2)
+    const gone   = nextOf(stored, { am: 'x', lifeseq: life1, lifepath: life1 })
+
+    it("replaces and deletes a live bank, keeping its lifetok", async () => {
+      const vaultDB = await bornBank()
+      const next = nextOf(stored)
+      expect(await vaultDB.tryWriteThing(replaceAskOf(stored, next))).to.deep.include({ ok: true, act: 'replaced', val: next })
+      const tomb = nextOf(next, { am: 'x', lifeseq: life1, lifepath: life1 })
+      expect(await vaultDB.tryWriteThing(delAskFor(next, tomb))).to.deep.include({ ok: true, act: 'deleted', val: tomb })
+    })
+
+    const LifetokCases = [
+      ['a replacement',  replaceAskOf(stored, nextOf(stored, { lifetok: OtherLifetok }))],
+      ['a deletion',     delAskFor(stored, { ...gone, lifetok: OtherLifetok })],
+    ] as const
+
+    for (const [blurb, ask] of LifetokCases) {
+      it(`refuses ${blurb} that changes the live bank's lifetok, leaving it stored`, async () => {
+        const vaultDB = await bornBank()
+        const answer = await vaultDB.tryWriteThing(ask)
+        const err = await expectBad(Promise.resolve(answer), 'bad_record')
+        expect(err.message).to.include(Phrases.LifetokNotStored)
+        expect(answer).to.deep.include({ act: 'policied', dbhas: stored })
+        expect(await gotAt(vaultDB, 'bank')).to.deep.equal(stored)
+      })
+    }
+
+    it("carries a bank damaged outside its lifetok forward, under a put that keeps the lifetok", async () => {
+      const vaultDB = await fresh()
+      await rowsOf(vaultDB).plant(BankScope, { ...stored, auth: { stray: true } })
+      const next = nextOf(stored)
+      expect(await vaultDB.tryWriteThing(replaceAskOf(stored, next))).to.deep.include({ ok: true, act: 'replaced', val: next })
+      expect(await gotAt(vaultDB, 'bank')).to.deep.equal(next)
+    })
+
+    it("rebirths the bank over a tombstone whose lifetok is malformed", async () => {
+      const vaultDB = await fresh()
+      await rowsOf(vaultDB).plant(BankScope, { ...gone, lifetok: 'not-a-uuid' })
+      const reborn = nextOf(gone, { am: 'a', lifeseq: life2, lifepath: life2, born_at: gone.written_at + 1 })
+      const ask = putAskOf({ cited: gone, record: reborn, ifAbsent: 'add' })
+      expect(await vaultDB.tryWriteThing(ask)).to.deep.include({ ok: true, act: 'reborn', val: reborn })
+    })
+
+    it("rebirths the bank over its tombstone with another lifetok", async () => {
+      const vaultDB = await fresh()
+      await rowsOf(vaultDB).plant(BankScope, gone)
+      const reborn = nextOf(gone, { am: 'a', lifeseq: life2, lifepath: life2, born_at: gone.written_at + 1, lifetok: OtherLifetok })
+      const ask = putAskOf({ cited: gone, record: reborn, ifAbsent: 'add' })
+      expect(await vaultDB.tryWriteThing(ask)).to.deep.include({ ok: true, act: 'reborn', val: reborn })
     })
   })
 

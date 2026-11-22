@@ -40,7 +40,7 @@ export const Labelpath = Object.freeze({
 })
 // --
 
-// == [Lives]: Lifeseq, Lifepath, Lifenum, Revtok, VoidLifeseq, Revseq
+// == [Lives]: Lifeseq, Lifepath, Lifenum, Revtok, Lifetok, VoidLifeseq, Revseq
 /** One life of a Thing, in base-32 digits (`0-9a-v`) padded to ten, so that lifeseqs sort in the order of the lives. The shell's is `-000000001`. */
 export type Lifeseq = string
 /** The lifeseq of each life from a root's down to a Thing's own, joined by `/`. */
@@ -49,6 +49,11 @@ export type Lifepath = string
 export type Lifenum = number
 /** A fresh token for each revision of a Thing (`revtok`). */
 export type Revtok = string
+/** A token minted when a bank is born, for each later revision of that life, and the tombstone that ends it, to keep (`lifetok`).
+ * It tells one birth of a bank under its banklabel from another, where storage was emptied and the bank born again at life 0 with the same lifepath.
+ * A vaultDB refuses a write of the bank over a live bank that changes it.
+ */
+export type Lifetok = string
 
 /** How many base-32 digits a stored lifeseq has. */
 const LifeseqDigits = 10

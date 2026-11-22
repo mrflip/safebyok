@@ -17,6 +17,8 @@ TH.useFakeClock()
 
 /** The fields of a bank's Thing, which has no body. */
 const BankFields = Object.keys(TH.bankThingOf())
+/** The fields a bank shows as props: the Thing fields every kind has. Its `lifetok` is a getter. */
+const BankProps = BankFields.filter((fieldname) => fieldname !== 'lifetok')
 
 /** The lifeseqs of a box's first lives: live, gone, live again, gone again. Life 0 is the root box's too. */
 const Life0 = Lifeseq.ofLifenum(0)
@@ -27,7 +29,7 @@ const Life3 = Lifeseq.ofLifenum(3)
 describe("Bank.mintStamps(scope)", () => {
   it("mints the stamp of the bank's first life and its main gate's, of the scope, born now", () => {
     const { bankStamp, gateStamp } = Bank.mintStamps(TH.WorldScope)
-    expect(bankStamp).to.deep.equal({ ...TH.ThingBank, lifeseq: Life0, born_at: TH.T0 })
+    expect(bankStamp).to.deep.equal({ ...TH.ThingBank, lifeseq: Life0, born_at: TH.T0, lifetok: bankStamp.lifetok })
     expect(gateStamp).to.deep.equal({ ...TH.ThingBank, labelpath: 'gate', lifeseq: Life0, born_at: TH.T0 })
   })
 
@@ -37,6 +39,13 @@ describe("Bank.mintStamps(scope)", () => {
     const two = Bank.mintStamps(TH.WorldScope)
     expect([one.bankStamp.lifeseq, two.bankStamp.lifeseq, one.gateStamp.lifeseq, two.gateStamp.lifeseq]).to.deep.equal([Life0, Life0, Life0, Life0])
     expect([two.bankStamp.born_at, two.gateStamp.born_at]).to.deep.equal([TH.T0 + 5, TH.T0 + 5])
+  })
+
+  it("mints a new lifetok on each call, a UUID, in the bank's stamp alone", () => {
+    const [one, two] = [Bank.mintStamps(TH.WorldScope), Bank.mintStamps(TH.WorldScope)]
+    expect(one.bankStamp.lifetok).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+    expect(one.bankStamp.lifetok).to.not.eq(two.bankStamp.lifetok)
+    expect(one.gateStamp).to.not.have.property('lifetok')
   })
 
   it("accepts the scope of anything that has one, such as a device", () => {
@@ -69,8 +78,9 @@ describe("Bank.makeRecord(stamp)", () => {
     expect(Bank.makeRecord(TH.WorldBankStamp).revtok).to.not.eq(Bank.makeRecord(TH.WorldBankStamp).revtok)
   })
 
-  it("refuses a stamp with no lifeseq, or none at all", () => {
+  it("refuses a stamp with no lifeseq, no lifetok, or none at all", () => {
     TH.expectSyncRefusal(() => Bank.makeRecord(TH.omitting(TH.WorldBankStamp, 'lifeseq')), 'bad_record')
+    TH.expectSyncRefusal(() => Bank.makeRecord(TH.omitting(TH.WorldBankStamp, 'lifetok')), 'bad_record')
     TH.expectSyncRefusal(() => Bank.makeRecord(null as never), 'bad_record')
   })
 })
@@ -119,11 +129,16 @@ describe("Bank.make(record, { device, vaultDB, gate })", () => {
 
   it("shows its Thing fields alone, frozen, and serializes no wrapped bankKey", async () => {
     const { bank } = await TH.buildBornBank()
-    expect(Object.keys(bank)).to.have.members(BankFields)
+    expect(Object.keys(bank)).to.have.members(BankProps)
     expect(Object.isFrozen(bank)).to.be.true
     expect(() => { (bank as { lifeseq: Lifeseq }).lifeseq = Life2 }).to.throw(TypeError)
     expect(JSON.stringify(bank)).to.not.include('ciphertext_b64')
     expect(bank.modelkind).to.eq('bank')
+  })
+
+  it("has the lifetok of its record", async () => {
+    const { bank, record } = await TH.buildBornBank()
+    expect(bank.lifetok).to.eq(record.lifetok)
   })
 
   const RecordCases = [
@@ -131,6 +146,8 @@ describe("Bank.make(record, { device, vaultDB, gate })", () => {
     [(record: BankMakeRecord) => ({ ...record, fmt: 3000 }),                  'another fmt'],
     [(record: BankMakeRecord) => TH.omitting(record, 'lifeseq'),              'no lifeseq'],
     [(record: BankMakeRecord) => ({ ...record, lifepath: Life2 }),            'a lifepath not its lifeseq'],
+    [(record: BankMakeRecord) => TH.omitting(record, 'lifetok'),              'no lifetok'],
+    [(record: BankMakeRecord) => ({ ...record, lifetok: 'not-a-uuid' }),      'a lifetok that is not a UUID'],
     [(record: BankMakeRecord) => ({ ...record, labelpath: 'gate' }),          'the labelpath of another kind'],
     [(record: BankMakeRecord) => ({ ...record, vaultlabel: 'main' }),         'a field no bank Thing has'],
     [(record: BankMakeRecord) => TH.omitting(record, 'rootBox'),              'no root box'],
