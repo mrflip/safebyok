@@ -81,3 +81,8 @@ what differs from big, in a sentence or two.
   hand the cleartexts, unread, to a `Gating` subclass's constructor with the friend; its `attempt` runs the body that
   was the attempt function. The entry points export the gating classes as types only, as big exports `Gating`, so the
   published surface has no constructor a host could hand a friend of its own.
+  amended 2026-11-21 (gate_holds, #815): the makers and the private verbs they befriend are the `Gate`'s
+  (`gate.unlockGating` and its siblings, static `Gate.birthGating`, `#unlockByProving`, `#putGate`, in
+  `packages/safebyok/src/models/gate.ts`), and so is the one `Lease`, kept private in the gate's `#lease`: G9's "the
+  Bank keeps its one `Lease` private" reads "the Gate keeps it". A lease is granted to a `LeaseGate` and binds the
+  bank's stamp as before. No public method accepts a proving, and G1 and G9 hold in substance.

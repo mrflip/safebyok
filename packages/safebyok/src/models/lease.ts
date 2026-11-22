@@ -5,7 +5,7 @@ import { Crypto, Helpers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import type { Banklabel, EpochMillis, Labelpath, Lifeseq, Revtok, Userid } from '../shapes/primitives'
 import type { Modelkind, Sparse, ThingRecord } from '../shapes/shapes-thing'
-import { type LeaseBank, type LeaseOpts, type SecretFieldname, GateishChecks } from '../shapes/shapes-gateish'
+import { type LeaseGate, type LeaseOpts, type SecretFieldname, GateishChecks } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type LeaseRecord, type LeaseSparse, type LeaseStamp, StampChecks } from '../shapes/shapes-stamps'
 import { BankChecks } from '../shapes/shapes-thingkinds'
@@ -17,14 +17,14 @@ type AnySealer = Sealers.Sealer<never, never>
 /** The fieldnames that contain a cleartext. */
 const CleartextFieldnames: ReadonlySet<string> = new Set(['whisper'])
 
-/** A grant that lets this device seal and unseal under its bank's key without asking the user, for one revision of the bank's gate.
+/** A grant to a gate that lets this device seal and unseal under its bank's key without asking the user, for one revision of the gate.
  * The bankKey stays wrapped under a non-extractable leaseKey: each seal or unseal unwraps it for that call alone, and nothing hands it out.
  * The sealer passed to each call, such as `BaseBox`, decides what is sealed and how. The lease itself knows only which fieldnames contain secrets.
- * A bankKey that will not unwrap locks the bank, and refuses `damaged_lease`.
- * Once evicted, or once its device is swept, it refuses every seal and unseal, even one in flight.
+ * A bankKey that will not unwrap locks the gate, and refuses `damaged_lease`.
+ * Once evicted, or once its gate is swept or its device ends, it refuses every seal and unseal, even one in flight.
  */
 export class Lease implements LeaseStamp {
-  // == [Props]: fmt, userid, banklabel, lifeseq, born_at, gate_labelpath, gate_lifeseq, gate_revtok, proved_at, wayinkind, #bank, #record, stamp, toJSON
+  // == [Props]: fmt, userid, banklabel, lifeseq, born_at, gate_labelpath, gate_lifeseq, gate_revtok, proved_at, wayinkind, #gate, #record, stamp, toJSON
 
   declare readonly fmt:            LeaseStamp['fmt']
   declare readonly userid:         Userid
@@ -40,12 +40,12 @@ export class Lease implements LeaseStamp {
   declare readonly proved_at:      EpochMillis
   declare readonly wayinkind:      EX.Wayinkind
 
-  readonly #bank: LeaseBank
+  readonly #gate: LeaseGate
 
   /** The record with the leaseKey and the wrapped bankKey; null after eviction. */
   #record: LeaseRecord | null
 
-  /** This lease's stamp: its record without the key material. Every ctx under the lease binds it after the bank's. */
+  /** This lease's stamp: its record without the key material. Every ctx under the lease binds it after the bank's stamp. */
   get stamp(): LeaseStamp { return StampChecks.leaseStamp.parse(this) }
 
   /** This lease's {@link LeaseSparse}, which has no key material. */
@@ -54,22 +54,22 @@ export class Lease implements LeaseStamp {
 
   // == [Construction]: make, constructor
 
-  /** Make the lease of `record`, granted to `opts.bank`, which must be the bank `record` is stamped with. */
+  /** Make the lease of `record`, granted to `opts.gate`, whose bank must be the bank `record` is stamped with. */
   static make(record: Z.input<typeof StampChecks.leaseRecord>, opts: LeaseOpts): Lease { return new Lease(record, opts) }
 
   private constructor(record: Z.input<typeof StampChecks.leaseRecord>, opts: LeaseOpts) {
-    const { record: recordChecked, opts: { bank } } = Checks.leaseMakeArgs.parse({ record, opts })
-    Validator.checkedConsistent(BankChecks.stamp.parse(recordChecked), bank.stamp, { kind: 'damaged_lease' })
+    const { record: recordChecked, opts: { gate } } = Checks.leaseMakeArgs.parse({ record, opts })
+    Validator.checkedConsistent(BankChecks.stamp.parse(recordChecked), gate.bankStamp, { kind: 'damaged_lease' })
     this.#record = recordChecked
     Helpers.tattoo(this, StampChecks.leaseStamp.parse(recordChecked), { configurable: false })
-    this.#bank = opts.bank
+    this.#gate = opts.gate
     Object.freeze(this)
   }
   // --
 
   // == [Ending one]: sweep, evict
 
-  /** Drop the keys for good, as its bank's sweep does. */
+  /** Drop the keys for good, as its gate's sweep does. */
   sweep(): this {
     this.evict()
     return this
@@ -168,7 +168,7 @@ export class Lease implements LeaseStamp {
 
   /** The ctx for `purpose`: the bank's stamp, then `stamp`, with `tags` as its visible header. */
   #ctxOf(stamp: Crypto.CipherCtxRecord, purpose: string, tags: Sealers.SealTags): Uint8Array {
-    return Crypto.cipherCtx([BankChecks.stamp.parse(this.#bank.stamp), stamp], purpose, tags)
+    return Crypto.cipherCtx([BankChecks.stamp.parse(this.#gate.bankStamp), stamp], purpose, tags)
   }
 
   /** The bankKey for this call alone, non-extractable, with `usage` its only usage. Nothing retains it between calls. */
@@ -176,13 +176,13 @@ export class Lease implements LeaseStamp {
     this.demandEnabled()
     // demandEnabled refuses an evicted lease, whose record is null.
     const { lease_key, bank_key_lease_wrapped } = this.#record!
-    const ctx = Crypto.cipherCtx([BankChecks.stamp.parse(this.#bank.stamp), this.stamp], 'bank_key_lease_wrapped')
+    const ctx = Crypto.cipherCtx([BankChecks.stamp.parse(this.#gate.bankStamp), this.stamp], 'bank_key_lease_wrapped')
     // Only this WebCrypto call is trapped: its rejection is how a damaged lease is learned.
     try {
       return await Crypto.unwrapKeyUnder(lease_key, bank_key_lease_wrapped, ctx, { extractable: false, usage: [usage] })
     } catch {
-      // The bank drops its lease as it locks; this one is evicted too, should the bank have another.
-      this.#bank.lock()
+      // The gate drops its lease as it locks; this one is evicted too, should the gate have another.
+      this.#gate.lock()
       this.evict()
       throw Throwers.damagedLease()
     }
@@ -194,12 +194,12 @@ export class Lease implements LeaseStamp {
   /** True once this lease's keys are dropped. */
   get isEvicted(): boolean { return this.#record === null }
 
-  /** True while this lease is not evicted and its bank's device is enabled. */
-  get isEnabled(): boolean { return (this.#record !== null) && this.#bank.isEnabled }
+  /** True while this lease is not evicted and its gate is enabled. */
+  get isEnabled(): boolean { return (this.#record !== null) && this.#gate.isEnabled }
 
   /** Throw unless {@link isEnabled}. */
   demandEnabled(): this {
-    this.#bank.demandEnabled()
+    this.#gate.demandEnabled()
     if (this.#record === null) { throw Throwers.leaseNotInForce() }
     return this
   }
@@ -252,7 +252,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, str, fn, custom }) => {
     recordOf:         fn(),
   })
   return {
-    leaseMakeArgs: obj({ record: StampChecks.leaseRecord, opts: obj({ bank: GateishChecks.leaseBank }) }),
+    leaseMakeArgs: obj({ record: StampChecks.leaseRecord, opts: obj({ gate: GateishChecks.leaseGate }) }),
     sealer:        custom<AnySealer>((val) => sealerMembers.safeParse(sealerMembersOf(val)).success, Phrases.SealerExpected),
   }
 })

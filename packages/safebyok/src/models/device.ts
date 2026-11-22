@@ -134,7 +134,7 @@ export class Device implements MinderFriend {
   // == [Strength]: judgeStrength
 
   /** The strength checker's verdict on a new passphrase: show it as the user types, and disable the submit until it is strong.
-   * `Bank.birth` and `bank.replacePassphrase` ask the same checker, and refuse `weak_passphrase` where it is not.
+   * `Bank.birth` and `bank.gate.replacePassphrase` ask the same checker, and refuse `weak_passphrase` where it is not.
    */
   judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> { return Proving.judgeStrength(this, this.scope, passphraseCleartext) }
   // --

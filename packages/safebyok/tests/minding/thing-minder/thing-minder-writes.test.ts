@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ThingMinder } from '../../../src/minding/thing-minder'
-import { Shell } from '../../../src/shapes/shapes-thing'
+import { type BoxRecord, Shell } from '../../../src/shapes/shapes-thing'
+import { Thing } from '../../../src/models/thing'
 import { MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
@@ -142,17 +143,18 @@ describe("ThingMinder.tryWrite", () => {
     expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
   })
 
-  it("writes a box the bank sealed, then the tombstone it sealed, through the asks it makes", async () => {
+  it("writes a box the bank sealed, then the tombstone it sealed, through the put and del asks the bank makes", async () => {
     const { bank, device } = await TH.buildBornBank()
     const minder = ThingMinder.make({ vaultDB: device.vaultDB }, bank)
     minder.hello()
     const shell  = Shell.of({ ...bank.scope, labelpath: TH.BoxScope.labelpath }, bank.rootBox)
-    const putAsk = await bank.sealBox(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const box    = await bank.sealBox(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const putAsk = bank.makePutAsk<BoxRecord>({ cited: Thing.sparseOf(shell), record: box })
     await TH.expectGood(minder.tryWrite(putAsk))
     await minder.list('box')
-    const { record: tombstone, ...delAsk } = await bank.tombstoneBox(putAsk.record)
-    expect(delAsk).to.include({ op: 'del' })
-    await TH.expectGood(minder.tryWrite({ ...delAsk, record: tombstone }))
+    const tombstone = await bank.sealBox(box, { am: 'x' })
+    const delAsk    = bank.makeDelAsk<BoxRecord>({ cited: Thing.sparseOf(box), record: tombstone })
+    await TH.expectGood(minder.tryWrite(delAsk))
     expect(minder.at(TH.BoxScope)).to.deep.equal(tombstone)
     expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
   })

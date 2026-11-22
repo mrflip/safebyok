@@ -18,7 +18,7 @@ describe("LocalStorageVaultDB", () => {
     await vault.putBoxOnce('box/anthropic', { sidecar: { mask: 'sk-ant-…' } }, { whisper: TH.Whisper })
     const device = TH.makeDevice({}, { vaultDB: new LocalStorageVaultDB() })
     await device.hello()
-    await device.bank!.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await device.bank!.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await device.vault!.withWhisper('box/anthropic', (box) => box.whisper)).to.deep.equal(TH.Whisper)
   })
 

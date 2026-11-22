@@ -38,7 +38,7 @@ async function renderKey(props: Partial<WhisperMaskProps> = {}) {
 /** Unlock the world's bank with the stored passphrase. */
 async function unlock(world: TH.ProviderWorld): Promise<void> {
   const device = world._cheat_device()
-  await act(async () => { await device.bank!.unlock({ passphraseCleartext: TH.TestPassphrase }) })
+  await act(async () => { await device.bank!.gate.unlock({ passphraseCleartext: TH.TestPassphrase }) })
 }
 
 /** The text the mask's element shows. */

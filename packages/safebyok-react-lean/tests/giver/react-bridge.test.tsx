@@ -174,7 +174,7 @@ describe("the bridge's main gate", () => {
     const other = LeanTH.makeDevice({}, { vaultDB: world.vaultDB })
     await act(async () => {
       await other.hello()
-      await other.bank!.addPasskey({ passphraseCleartext: LeanTH.TestPassphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })
+      await other.bank!.gate.addPasskey({ passphraseCleartext: LeanTH.TestPassphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })
     })
     await waitFor(() => { expect(header?.wayinkind).to.eq('passkey') })
     expect(get.mock.contexts.filter((context) => context === minder)).to.have.lengthOf(0)
