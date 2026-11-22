@@ -59,7 +59,7 @@ function EnvEditor({ labelpath }: Readonly<{ labelpath: string }>) {
       </p>
       {draft.isBehind && <p role="status" className="gripe">Changed elsewhere since you started: Undo to see it.</p>}
       {(save.error !== null) && ! isVaultError(save.error, 'dismissed') && <p role="alert" className="gripe">{save.error.message}</p>}
-      {(draft.lastErr !== null) && ! isVaultError(draft.lastErr, 'dismissed') && <p role="alert" className="gripe">{(draft.lastErr as Error).message}</p>}
+      {(draft.lastErr !== null) && ! isVaultError(draft.lastErr, 'dismissed') && <p role="alert" className="gripe">{draft.lastErr.message}</p>}
       {isSetting && <EnvSettingsDialog title={title} env={env} onApply={applySettings} onCancel={() => { setIsSetting(false) }} />}
     </li>
   )

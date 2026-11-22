@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { type BoxRecord, type LiveOf, mask } from 'safebyok'
+import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
 import { useGivenBank } from '../giver/giver-context'
 import type { BankGiver, WithLockableWhisperOpts } from '../giver/react-giver'
@@ -22,7 +23,7 @@ export interface WhisperMaskProps {
   /** The mask to show while the bank is locked, from the box's stored record: its sidecar's `mask` field, when left out. */
   ifLocked?: WithLockableWhisperOpts<string>['ifLocked'] | undefined
   /** Called with the refusal when the mask cannot be shown. The element stays empty. */
-  onError?:  ((err: unknown) => void) | undefined
+  onError?:  ((err: Error) => void) | undefined
 }
 
 /** A field of a box's whisper, masked: its last `tail` characters while the bank is unlocked, the stored mask while it is locked.
@@ -44,7 +45,7 @@ export function WhisperMask({ bank: bankProp, labelpath, field, tail, ifLocked =
       const shown = await bank.withLockableWhisper(labelpath, (whisper) => mask(whisperTextOf(whisper[field]), (tail === undefined) ? {} : { tail }), { ifLocked })
       if (isCurrent()) { el.textContent = shown }
     } catch (err) {
-      if (isCurrent()) { onError?.(err) }
+      if (isCurrent()) { onError?.(sanitizeForeignError(err)) }
     }
   })
   // React's stale-result flag: an answer that lands after the next stage, revision or prop is dropped, so a live mask

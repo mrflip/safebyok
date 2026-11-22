@@ -355,6 +355,25 @@ a `<button type="reset">`.
 Reasoning for wontfix: a host that cancels a reset is rare, the outcome loses typed text and corrupts nothing stored,
 and the fix moves a listener to where React's internals decide its order. Ruled by the Coach, 2026-11-22.
 
+### A form's reset makes a draft forget what was typed into its inputs outside that form
+
+A `useDraft` hears the reset of the form that contains one of its inputs, and then forgets every field typed into, in
+whichever element it sits (`safebyok-react-lean`, `use-draft.ts`). So a host that puts one draft's inputs in two forms,
+or one in a form and one outside any, loses the text typed into both when either form resets.
+
+Current outcome: the typed text is lost from every input of the draft, and nothing is written. The draft and the page agree.
+
+Alternatives: forgetting only the fields whose input is inside the form that reset means a draft that is partly
+forgotten, with a base and an `isDirty` to work out for each part.
+
+Workaround: put all of a draft's inputs in one form, or give each form a draft of its own.
+
+To reproduce: one `useDraft` with `whisperField('a')` inside a `<form>` and `whisperField('b')` outside it; type into
+both; reset the form.
+
+Reasoning for wontfix: one draft split across forms is rare, the outcome loses typed text and corrupts nothing stored,
+and `discard` has always emptied every input of the draft. Ruled by the Coach, 2026-11-22.
+
 ### A stage change that reveals a suspending subtree shows its fallback
 
 The bank's stage reaches React through `useSyncExternalStore` (`safebyok-react-lean`, `useBank`). React's manual: an

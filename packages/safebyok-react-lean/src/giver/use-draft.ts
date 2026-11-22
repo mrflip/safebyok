@@ -3,6 +3,7 @@
 import { isEqual } from 'es-toolkit'
 import { type ChangeEventHandler, type FocusEventHandler, type RefCallback, useEffect, useRef, useState } from 'react'
 import { type BoxRecord, Checkers, type LiveOf, type Sidecar, Thing, type Vault, VaultError, type Whisper, WhisperFieldAttributes, bulletproofHandlerOf } from 'safebyok'
+import { sanitizeForeignError } from 'safebyok/storage'
 import { PartsPhrases } from '../parts/phrases-parts'
 import { liveOf } from './giver-defaults'
 import * as Phrases from './phrases-giver'
@@ -44,7 +45,7 @@ export type Draft = Readonly<{
   /** Drop the draft's edits and empty its inputs, starting again from the box stored. */
   discard:        () => void
   /** Why the last field focused could not be shown, such as `dismissed` when the user closed the unlock form, or null. */
-  lastErr:        unknown
+  lastErr:        Error | null
 }>
 
 /** How a draft's `put` writes. */
@@ -96,7 +97,7 @@ export function makeUseDraft(bank: DraftFriend) {
     const [sidecarSet, setSidecarSet] = useState<Sidecar | null>(null)
     const [dirtyFieldnames, setDirtyFieldnames] = useState<ReadonlySet<string>>(NoFieldnames)
     const reveal = useReveal(bank, labelpath)
-    const [lastErr, setLastErr] = useState<unknown>(null)
+    const [lastErr, setLastErr] = useState<Error | null>(null)
     const inputs = useRef(new Map<string, HTMLInputElement>())
 
     const baseThing = pinned ?? stored
@@ -142,7 +143,7 @@ export function makeUseDraft(bank: DraftFriend) {
         // The unlock form takes the focus while the bank is locked: the field shown is given it back.
         if (input.ownerDocument.activeElement !== input) { input.focus() }
       } catch (err) {
-        setLastErr(err)
+        setLastErr(sanitizeForeignError(err))
       }
     }
 

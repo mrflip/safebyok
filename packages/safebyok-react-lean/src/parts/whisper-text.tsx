@@ -1,6 +1,7 @@
 /** `WhisperText`, a field of a box's whisper, masked until the user asks to see it. */
 
 import { type ReactNode, useRef } from 'react'
+import { sanitizeForeignError } from 'safebyok/storage'
 import { useGivenBank } from '../giver/giver-context'
 import type { BankGiver } from '../giver/react-giver'
 import { useReveal } from '../giver/use-reveal'
@@ -19,7 +20,7 @@ export interface WhisperTextProps {
   /** What shows in place of the text while it is hidden. */
   masked?:   ReactNode
   /** Called with the refusal when the whisper cannot be shown, such as `dismissed` when the user closes the unlock form. The text stays hidden. */
-  onError?:  ((err: unknown) => void) | undefined
+  onError?:  ((err: Error) => void) | undefined
 }
 
 /** One field of a box's whisper, masked, with a Show / Hide button. Show writes the text into the page, never into React's state, and asks for the unlock form first on a locked bank.
@@ -44,7 +45,7 @@ function WhisperTextOf({ bank: bankProp, labelpath, field, masked = PartsPhrases
     try {
       await reveal.showWhisper(field, (text) => { if (textRef.current !== null) { textRef.current.textContent = text } })
     } catch (err) {
-      onError?.(err)
+      onError?.(sanitizeForeignError(err))
     }
   }
 
