@@ -1,4 +1,4 @@
-// eslint.config.mjs -- lint rules for the IndexedDB vaultDB and its minder bridge, copied from the core's (packages/safebyok-big/).
+// eslint.config.mjs -- lint rules for the IndexedDB vaultDB and the persisters of a device's caches, copied from the core's (packages/safebyok-big/).
 // The core's config is the authority on house style: where the two disagree, the core's is right and this
 // one has the bug. This copy has its own config names and no console logger to exempt.
 //
