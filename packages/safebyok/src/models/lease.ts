@@ -3,8 +3,8 @@ import type * as Z from 'zod'
 import type { EX } from 'safebyok-big/internals'
 import { Crypto, Helpers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import type { Banklabel, EpochMillis, Labelpath, Lifeseq, Lifetok, Revtok, Userid } from '../shapes/primitives'
-import type { Modelkind, Sparse, ThingRecord } from '../shapes/shapes-thing'
+import { type Banklabel, type EpochMillis, type Lifeseq, type Lifetok, type Revtok, type Userid, Labelpath } from '../shapes/primitives'
+import type { Modelkind, Sparse, ThingRecord, ThingScope } from '../shapes/shapes-thing'
 import { type LeaseGate, type LeaseOpts, type SecretFieldname, GateishChecks } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type BankStamp, type LeaseRecord, type LeaseSparse, type LeaseStamp, StampChecks } from '../shapes/shapes-stamps'
@@ -24,7 +24,7 @@ const CleartextFieldnames: ReadonlySet<string> = new Set(['whisper'])
  * Once evicted, or once its gate is swept or its device ends, it refuses every seal and unseal, even one in flight.
  */
 export class Lease implements LeaseStamp {
-  // == [Props]: fmt, userid, banklabel, bank_lifeseq, bank_born_at, bank_lifetok, gate_labelpath, gate_lifeseq, gate_revtok, born_at, proved_at, wayinkind, #gate, #record, stamp, toJSON
+  // == [Props]: fmt, userid, banklabel, bank_lifeseq, bank_born_at, bank_lifetok, gate_labelpath, gate_lifeseq, gate_revtok, born_at, proved_at, wayinkind, label, labelpath, scope, am, written_at, #gate, #record, stamp, toJSON
 
   declare readonly fmt:            LeaseStamp['fmt']
   declare readonly userid:         Userid
@@ -46,6 +46,23 @@ export class Lease implements LeaseStamp {
   /** When the proof that granted it was made. */
   declare readonly proved_at:      EpochMillis
   declare readonly wayinkind:      EX.Wayinkind
+
+  /** The label of the gate it was granted under: `passkeys` for `gate/passkeys`, `gate` for the main gate. */
+  get label(): string { return Labelpath.labelOf(this.gate_labelpath) }
+
+  /** Its labelpath, `lease/` and its {@link label}, such as `lease/passkeys`.
+   * It is no Thing's labelpath: a check of a Thing's scope refuses it.
+   */
+  get labelpath(): `lease/${string}` { return `lease/${this.label}` }
+
+  /** Its bank's scope, and its {@link labelpath}. */
+  get scope(): ThingScope { return { userid: this.userid, banklabel: this.banklabel, labelpath: this.labelpath } }
+
+  /** Always `'a'`: a lease is never a tombstone. */
+  get am(): 'a' { return 'a' }
+
+  /** Its {@link proved_at}: each proof grants a lease whole. */
+  get written_at(): EpochMillis { return this.proved_at }
 
   readonly #gate: LeaseGate
 

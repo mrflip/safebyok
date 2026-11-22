@@ -128,6 +128,31 @@ describe("wayin.toJSON()", () => {
   })
 })
 
+describe("a wayin's Thing-like getters", () => {
+  const KindCases = [
+    [passphraseRecord, "wayin/main",      'a passphrase wayin'],
+    [passkeyRecord,    "wayin/passkey0",  'a passkey wayin'],
+  ] as const
+
+  for (const [recordOf, labelpath, blurb] of KindCases) {
+    it(`give ${blurb} its labelpath, am 'a' and written_at its born_at`, () => {
+      const wayin = Wayin.make(recordOf({ born_at: TH.T0 + 7 }) as never)
+      expect(wayin.labelpath).to.eq(labelpath)
+      expect(wayin.am).to.eq('a')
+      expect(wayin.written_at).to.eq(TH.T0 + 7)
+    })
+
+    it(`stay out of the keys, the pickle and the toJSON of ${blurb}`, () => {
+      const record = recordOf()
+      const wayin = Wayin.make(record as never)
+      const { bank_key_wayin_wrapped: _wrapped, ...header } = record
+      expect(Object.keys(wayin)).to.have.members(Object.keys(record))
+      expect(Object.keys(wayin.pickle())).to.have.members(Object.keys(record))
+      expect(Object.keys(wayin.toJSON())).to.have.members(Object.keys(header))
+    })
+  }
+})
+
 describe("wayinCtxOf(bankStamp, gateStamp, header)", () => {
   const BadHeaderCases = [
     [{ wayinkind: 'telepathy' }, 'of an unknown kind'],
