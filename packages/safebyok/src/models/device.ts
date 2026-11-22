@@ -434,7 +434,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
   }),
   tellBadNewsToArgs: obj({
     onBadNews: fn<BadNewsHandler>(),
-    device:    custom<Device>((val) => val instanceof Device, PhrasesX.DeviceExpected),
+    device:    custom<Device>(),
     badnews:   arr(custom<Errors.VaultError>(Errors.isVaultError, PhrasesX.VaultErrorExpected)),
   }),
 }))

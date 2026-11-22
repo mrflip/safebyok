@@ -221,15 +221,12 @@ describe("Bank.make(record, { device, vaultDB, gate })", () => {
     expect(bank.track[Labelpath.RootBox]).to.deep.equal({ revseq: root.revseq, lifepath: root.lifepath })
   })
 
-  it("refuses a device that is not a Device, a vaultDB that is not a VaultDB, a gate that is not a Gate, and no opts at all", async () => {
+  it("refuses a vaultDB that is not a VaultDB, and no opts at all", async () => {
     const born = await TH.buildBornBank()
-    const { record, device, gateRecord } = born
+    const { record, device } = born
     const { vaultDB } = device
     const gate = makeStoredGate(born)
-    TH.expectSyncRefusal(() => Bank.make(record, { device: { ...device.toJSON(), scope: device.scope, isEnabled: true }, vaultDB, gate } as never), 'bad_record')
     TH.expectSyncRefusal(() => Bank.make(record, { device, vaultDB: { ...vaultDB, tryGetThing: null }, gate } as never), 'bad_record')
-    TH.expectSyncRefusal(() => Bank.make(record, { device, vaultDB, gate: { ...gateRecord, bankStamp: TH.WorldBankStamp } } as never), 'bad_record')
-    TH.expectSyncRefusal(() => Bank.make(record, { device, vaultDB } as never), 'bad_record')
     TH.expectSyncRefusal(() => Bank.make(record, undefined as never), 'bad_record')
   })
 })

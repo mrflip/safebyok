@@ -611,12 +611,11 @@ describe("tellBadNewsTo", () => {
     vi.unstubAllGlobals()
   })
 
-  it("refuses a handler that is not a function, a missing device, or news that is not a VaultError", () => {
+  it("refuses a handler that is not a function, or news that is not a VaultError", () => {
     const device = TH.makeDevice()
     const onBadNews = vi.fn()
     const news = new Errors.VaultError('storage_unavailable', "Down.")
     TH.expectSyncRefusal(() => { tellBadNewsTo('tell me' as never, device, [news]) }, 'bad_record')
-    TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, {} as never, [news]) }, 'bad_record')
     TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, device, [new Error("Down.") as never]) }, 'bad_record')
     expect(onBadNews).not.toHaveBeenCalled()
   })

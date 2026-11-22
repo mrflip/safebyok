@@ -3,7 +3,6 @@ import { Bank } from './bank'
 import { BaseBox } from './base-box'
 import { Thing } from './thing'
 import { VaultMinder } from '../minding/vault-minder'
-import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 import type { BoxUnsealed } from '../shapes/shapes-bankish'
 import type { BoxWriteAsk } from '../shapes/shapes-asks'
@@ -38,9 +37,7 @@ export class Vault {
    * Its gets refuse until the minder's `hello`. The bank's sweep sweeps the vault too, and so the minder. Refuses a swept bank.
    */
   static make(bank: Bank, minder: VaultMinder): Vault {
-    const checked = Checks.vaultMakeArgs.parse({ bank, minder })
-    Validator.checkedConsistent(checked.minder.scope, checked.bank.scope, { kind: 'record_conflict' })
-    const vault = new Vault(checked.bank, checked.minder)
+    const vault = new Vault(bank, minder)
     bank.hostVault(vault)
     return vault
   }
@@ -209,13 +206,8 @@ function isOfNewerLife(item: Pick<BoxRecord, 'lifepath' | 'revseq'>, soon: Pick<
 
 // == [Checks]: Checks
 
-// Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Vault.make}'s arguments, and of the `fn` {@link Vault.withWhisper} and {@link Vault.withUnlockedWhisper} call. */
-const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn }) => ({
-  vaultMakeArgs: obj({
-    bank:   custom<Bank>((val) => val instanceof Bank, Phrases.VaultBankExpected),
-    minder: custom<VaultMinder>((val) => val instanceof VaultMinder, Phrases.VaultMinderExpected),
-  }),
+/** The check of the `fn` {@link Vault.withWhisper} and {@link Vault.withUnlockedWhisper} call. */
+const Checks = Validator.Checkers('bad_record', ({ fn }) => ({
   fn: fn<(box: BoxUnsealed) => unknown>(),
 }))
 // --

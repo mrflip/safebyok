@@ -1,21 +1,12 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, PersisterExpected, SealerExpected, NovelOrProvingExpected, WayinExpected, GateExpected, TombstoneSecretsGiven, BoxOfOtherRoot, BankSwept, BankNotBroughtUp, NobodySignedIn, GateSwept, UnlockDismissed, VaultBankExpected, VaultMinderExpected, HostedVaultExpected, BoxSoonestBare
+// == [Models]: VaultDBExpected, PersisterExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, BankSwept, BankNotBroughtUp, NobodySignedIn, GateSwept, UnlockDismissed, HostedVaultExpected, BoxSoonestBare
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
 
 /** A device's persister that lacks one of a TanStack Query Persister's members. */
 export const PersisterExpected = 'Expected a TanStack Query Persister: an object with the functions persistClient, restoreClient and removeClient.'
-
-/** Something other than NOVEL or a Proving, given as a wayin's source. */
-export const NovelOrProvingExpected = 'Expected NOVEL or a proving'
-
-/** Something other than a Wayin, where one is expected. */
-export const WayinExpected = 'Expected a Wayin'
-
-/** Something other than a Gate, where one is expected. */
-export const GateExpected = 'Expected a Gate'
 
 /** A sealer that lacks one of its methods, its tags or its purposes. */
 export const SealerExpected = 'Expected a sealer: its tags, its purposes, and a function for each of its methods.'
@@ -43,12 +34,6 @@ export const UnlockDismissed = 'The unlock was dismissed, so the bank stayed loc
 
 /** A gating attempted a second time. */
 export const GatingSpent = 'This gating was attempted already, and a gating is attempted once: make another for the next try.'
-
-/** A vault made without a bank. */
-export const VaultBankExpected = 'A Vault is made with the Bank whose boxes it carries.'
-
-/** A vault made without a minder. */
-export const VaultMinderExpected = "A Vault is made with the VaultMinder of its bank's Things."
 
 /** Something a bank is asked to host that has no sweep. */
 export const HostedVaultExpected = 'Expected a vault: an object with a sweep function.'

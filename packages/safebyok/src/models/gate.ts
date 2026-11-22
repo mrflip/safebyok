@@ -1,12 +1,11 @@
 import { Clock, Crypto, Errors, Outcome, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { Thing } from './thing'
 import type { Bank } from './bank'
-import { Device } from './device'
+import type { Device } from './device'
 import { AddPasskeyGating, BirthGating, ReplacePassphraseGating, RevokePasskeyGating, UnlockGating } from './gating'
 import type { Lease } from './lease'
 import type { Proving } from './proving'
 import { Wayin } from './wayin'
-import * as Phrases from '../phrases'
 import type {
   BirthCleartexts, GateDna, GateGatingFriend, GateOpts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, PassphraseReplaceCleartexts, UnlockCleartexts,
 } from '../shapes/shapes-gateish'
@@ -411,13 +410,13 @@ function makeWait(): Wait {
 // Defined here, not with the shapes: they name a model class.
 /** The checks of the arguments of {@link Gate.make}, {@link Gate.makeRecord}, {@link Gate.makeNextRecord} and {@link Gate.sweep}, and of {@link Gate.birthGating}'s `attachBank`. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn }) => {
-  const wayin = custom<Wayin>((val) => val instanceof Wayin, Phrases.WayinExpected)
+  const wayin = custom<Wayin>()
   const wayins = obj({ main: wayin, passkey0: wayin.nullable() })
   return {
     gateMakeArgs:   obj({
       record: GateChecks.record,
       opts:   obj({
-        device:    custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
+        device:    custom<Device>(),
         vaultDB:   ThingChecks.vaultDBShape,
         bankStamp: BankChecks.stamp,
       }),

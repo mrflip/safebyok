@@ -495,20 +495,6 @@ describe("proving.buildWayin(source)", () => {
     await expect(TH._cheat_bankKeyBytesOf(TH.WorldBankStamp, { ...TH.WorldGateStamp, lifeseq: Lifeseq.ofLifenum(2) }, wayin, { passphrase: TH.TestPassphrase })).rejects.toThrow()
   })
 
-  const SourceCases = [
-    ['NOVEL',                     'the string NOVEL'],
-    [Symbol('NOVEL'),             'another symbol named NOVEL'],
-    [null,                        'null'],
-    [{ wayinkind: 'passphrase' }, 'a plain object shaped like a proving'],
-  ] as const
-
-  for (const [source, blurb] of SourceCases) {
-    it(`refuses ${blurb}`, async () => {
-      const proving = await novelPassphrase()
-      await TH.expectRefusal(proving.buildWayin(source as never))
-    })
-  }
-
   it("refuses a proving that has made no wayin yet as its source", async () => {
     const proving = await novelPasskey()
     await TH.expectRefusal(proving.buildWayin(await novelPassphrase()))

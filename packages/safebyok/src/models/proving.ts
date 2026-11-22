@@ -1,6 +1,5 @@
 import type { Deriver } from 'safebyok-big/internals'
 import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
-import * as Phrases from '../phrases'
 import { Lease } from './lease'
 import { type GateRevisionedStamp, type GuardedKeyDeriver, type LeaseGate, type ProvingDevice, type ProvingOpts, type ProvingParts, GateishChecks } from '../shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, LeaseStamp, StampedGate } from '../shapes/shapes-stamps'
@@ -84,12 +83,11 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
    */
   async buildWayin(source: Novel | Proving): Promise<Wayin> {
     if (this.#wayin !== null) { throw Throwers.wayinMadeAlready() }
-    const wayinSource = Checks.wayinSource.parse(source)
-    if (wayinSource !== NOVEL) {
-      Validator.checkedConsistent(wayinSource.bankStamp, this.bankStamp, { kind: 'unexpected_error', message: BigPhrases.ProvingOfOtherGate })
-      Validator.checkedConsistent(wayinSource.gateStamp, this.gateStamp, { kind: 'unexpected_error', message: BigPhrases.ProvingOfOtherGate })
+    if (source !== NOVEL) {
+      Validator.checkedConsistent(source.bankStamp, this.bankStamp, { kind: 'unexpected_error', message: BigPhrases.ProvingOfOtherGate })
+      Validator.checkedConsistent(source.gateStamp, this.gateStamp, { kind: 'unexpected_error', message: BigPhrases.ProvingOfOtherGate })
     }
-    const bankKey = wayinSource === NOVEL ? await Crypto.makeBankKey() : await wayinSource.#unwrapBankKey()
+    const bankKey = source === NOVEL ? await Crypto.makeBankKey() : await source.#unwrapBankKey()
     return this.#wrapBankKey(bankKey)
   }
 
@@ -325,10 +323,9 @@ async function passphraseKeyOf(keyDeriver: GuardedKeyDeriver, passphrase: GX.Pas
 
 // Defined here, not with the shapes: they name a model class.
 // The builders' checks are big's, over the lean core's stamps and the lean core's strength checker.
-/** The checks of {@link Proving.buildWayin}'s `source`, {@link Proving.buildLease}'s arguments, and the static builders' and `judgeStrength`'s arguments. */
-const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => {
+/** The checks of {@link Proving.buildLease}'s arguments, and the static builders' and `judgeStrength`'s arguments. */
+const Checks = Validator.Checkers('bad_record', ({ obj }) => {
   return {
-    wayinSource:          custom<Novel | Proving>((val) => (val === NOVEL) || (val instanceof Proving), Phrases.NovelOrProvingExpected),
     provingLeaseArgs:     obj({ gate: GateishChecks.leaseGate, cited: GateishChecks.gateRevisionedStamp, renewed: Stamps.StampChecks.leaseStamp.pick({ born_at: true }).nullable() }),
     passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: BankChecks.stamp, gateStamp: GateChecks.stamp, device: GateishChecks.provingDevice }),
     passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: BankChecks.stamp, gateStamp: GateChecks.stamp, device: GateishChecks.provingDevice }),
