@@ -62,6 +62,9 @@ The design this sprint starts from is in the sprint directory, copied so that a 
 * **Hosts are not the threat model** (the Coach, 2026-11-22): no check that hunts for guessed-at misuse, and no
   preemptive change to what a host is told in an error. The minder's `select` pin goes (thread 2's review); thread 8
   culls the rest.
+* **Core models may call minder code** (the Coach, 2026-11-22): until the design is worked out, Bank, Device, Gate and
+  the rest may call into the minders directly; relax any rule that says otherwise where it simplifies. The giver stays in
+  the React layer.
 * **No goodbye without a caller** (the Coach, 2026-11-22): no goodbye method on a bank, a device or anything else
   until it has a caller and a feature need.
 * **Architecture first** (the Coach, 2026-11-22). The sprint puts the design's architecture in place. No machinery
