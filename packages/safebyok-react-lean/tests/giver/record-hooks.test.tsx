@@ -1,0 +1,295 @@
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { type ReactNode, useEffect, useLayoutEffect } from 'react'
+import { type BoxRecord, type GateRecord, type PasskeyWayinHeader, ThingMinder } from 'safebyok'
+import { storageUnavailable } from 'safebyok/storage'
+import * as LeanTH from 'safebyok/testing'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { type BoxSelected, passkeyHeaderOf } from '../../src/index'
+import * as TH from '../test-helpers'
+
+/** The core's labelpath of the box with the joke service's key. */
+const JokesBoxPath = `box/${TH.JokesPath}`
+
+/** The key the minder caches the jokes box under, which the hooks observe. */
+const JokesKey = ThingMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: JokesBoxPath })
+
+/** The key the minder caches the listing of the root box's children under. */
+const BoxListKey = ThingMinder.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
+
+/** The stage of the world's bank, as a page shows it. */
+function StageShown({ world }: Readonly<{ world: TH.ProviderWorld }>) {
+  return <p>{world.Bank.useBank((bank) => bank.stage)}</p>
+}
+
+/** What `useBox` of the jokes box showed at its latest commit, read in render as a component reads it: React Query re-renders a hook only for the fields it has read. */
+interface BoxSeen {
+  data:        BoxSelected
+  isStale:     boolean
+  fetchStatus: string
+  isError:     boolean
+}
+
+/** A component that renders `useBox` of the jokes box; what it last showed; and how many times it has mounted. */
+function makeBoxProbe(world: TH.ProviderWorld) {
+  const seen: { current: BoxSeen | null, mounts: number } = { current: null, mounts: 0 }
+  function BoxProbe() {
+    const { data, isStale, fetchStatus, isError } = world.Bank.useBox(TH.JokesPath)
+    useLayoutEffect(() => { seen.current = { data, isStale, fetchStatus, isError } })
+    useEffect(() => { seen.mounts += 1 }, [])
+    return null
+  }
+  return { BoxProbe, seen }
+}
+
+/** `children` under the world's provider, signed in as `userid`. */
+function treeOf(world: TH.ProviderWorld, children: ReactNode, userid: string | null = TH.ProviderUser) {
+  return TH.providerTreeOf(world, children, { userid })
+}
+
+/** A world with the jokes box stored, its provider signed in and its bank found locked; then, rendered in the same tree, `useBox` of the jokes box.
+ * Before the hook renders, `beforeShowing` runs: to pause the vaultDB's answers, say.
+ */
+async function setupShowing({ isWatching = true, beforeShowing = () => undefined }: Readonly<{ isWatching?: boolean, beforeShowing?: (world: TH.ProviderWorld) => void }> = {}) {
+  const world = await TH.buildProviderWorld({ stored: 'jokes', isWatching })
+  const { rerender } = render(treeOf(world, <StageShown world={world} />))
+  await screen.findByText('locked')
+  beforeShowing(world)
+  const { BoxProbe, seen } = makeBoxProbe(world)
+  rerender(treeOf(world, <><StageShown world={world} /><BoxProbe /></>))
+  return { world, seen, minder: world._cheat_device().minder }
+}
+
+/** {@link setupShowing}, once the hook shows the first revision, which it returns. */
+async function setupShown(opts: Parameters<typeof setupShowing>[0] = {}) {
+  const shown = await setupShowing(opts)
+  await waitFor(() => { expect(shown.seen.current?.data).to.not.be.undefined })
+  return { ...shown, first: shown.seen.current!.data! }
+}
+
+/** Write the jokes box's next revision, of tier `pro`, from the other device, as another tab would, resolving it. */
+async function putFromOtherTab(world: TH.ProviderWorld): Promise<BoxRecord> {
+  return await world._cheat_otherVault!.putBoxOnce(JokesBoxPath, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: LeanTH.Whisper })
+}
+
+describe("useBox, mounted before anyone is signed in", () => {
+  it("shows the record after sign-in with no remount, and then a revision the watch tells of", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const { BoxProbe, seen } = makeBoxProbe(world)
+    const { rerender } = render(treeOf(world, <BoxProbe />, null))
+    expect([seen.current?.data, seen.current?.fetchStatus]).to.deep.equal([undefined, 'idle'])
+    rerender(treeOf(world, <BoxProbe />))
+    await waitFor(() => { expect(seen.current?.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
+    const second = await act(() => putFromOtherTab(world))
+    await waitFor(() => { expect(seen.current?.data).to.deep.equal(second) })
+    expect(seen.mounts).to.eq(1)
+  })
+
+  it("shows the record with no remount when mounted while the bank is starting, and then a revision the watch tells of", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const release = world.pauseGets()
+    onTestFinished(release)
+    const { BoxProbe, seen } = makeBoxProbe(world)
+    render(treeOf(world, <><StageShown world={world} /><BoxProbe /></>))
+    await screen.findByText('starting')
+    expect(seen.current?.data).to.be.undefined
+    release()
+    await waitFor(() => { expect(seen.current?.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
+    const second = await act(() => putFromOtherTab(world))
+    await waitFor(() => { expect(seen.current?.data).to.deep.equal(second) })
+    expect(seen.mounts).to.eq(1)
+  })
+
+  it("observes a query that has the minder's defaults once the minder minds", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const { BoxProbe, seen } = makeBoxProbe(world)
+    const { rerender } = render(treeOf(world, <BoxProbe />, null))
+    rerender(treeOf(world, <BoxProbe />))
+    await waitFor(() => { expect(seen.current?.data).to.not.be.undefined })
+    const client = world._cheat_device().minder.queryClient
+    const { options } = client.getQueryCache().find({ queryKey: JokesKey, exact: true })!
+    const defaults = client.getQueryDefaults(JokesKey)
+    expect(defaults.queryFn).to.be.a('function')
+    expect([options.queryFn, options.gcTime, options.retry]).to.deep.equal([defaults.queryFn, Infinity, false])
+  })
+})
+
+describe("useBox over the minder's own cache", () => {
+  it("answers on its first render a record the minder already has", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const { rerender } = render(treeOf(world, <StageShown world={world} />))
+    await screen.findByText('locked')
+    const { minder } = world._cheat_device()
+    const record = await act(() => minder.get({ ...minder.scope, labelpath: JokesBoxPath }))
+    const { gets } = world.counts
+    const { BoxProbe, seen } = makeBoxProbe(world)
+    rerender(treeOf(world, <><StageShown world={world} /><BoxProbe /></>))
+    expect(seen.current?.data).to.deep.equal(record)
+    expect(world.counts.gets).to.eq(gets)
+  })
+
+  it("shows a newer revision another device writes, without fetching again", async () => {
+    const { world, seen } = await setupShown()
+    const { gets } = world.counts
+    const second = await act(() => putFromOtherTab(world))
+    await waitFor(() => { expect(seen.current?.data).to.deep.equal(second) })
+    expect(world.counts.gets).to.eq(gets)
+  })
+
+  it("keeps showing the older record, stale, while the newer revision a list told of is fetched whole", async () => {
+    const { world, seen, minder, first } = await setupShown({ isWatching: false })
+    const second = await putFromOtherTab(world)
+    const { gets } = world.counts
+    const release = world.pauseGets()
+    onTestFinished(release)
+    await act(() => minder.list('box'))
+    await waitFor(() => { expect(seen.current?.fetchStatus).to.eq('fetching') })
+    expect([seen.current?.data, seen.current?.isStale]).to.deep.equal([first, true])
+    release()
+    await waitFor(() => { expect(seen.current?.data).to.deep.equal(second) })
+    expect([seen.current?.isStale, world.counts.gets]).to.deep.equal([false, gets + 1])
+  })
+
+  it("shows the refusal of a get of its item, keeping the record and fetching nothing more", async () => {
+    const { world, seen, minder, first } = await setupShown({ isWatching: false })
+    // The vaultDB answers an older revision than the minder has: the get refuses stale_read.
+    await putFromOtherTab(world)
+    await act(() => minder.list('box'))
+    await waitFor(() => { expect(seen.current?.data?.revseq).to.eq(1) })
+    const second = seen.current?.data
+    world.vaultDB._cheat_things(LeanTH.WorldScope).set(JokesBoxPath, first)
+    const { gets } = world.counts
+    await act(async () => { await LeanTH.expectBad(minder.tryGet({ ...minder.scope, labelpath: JokesBoxPath }, { staleTime: 0 }), 'stale_read') })
+    await waitFor(() => { expect(seen.current?.isError).to.eq(true) })
+    expect([seen.current?.data, seen.current?.isStale]).to.deep.equal([second, true])
+    expect(minder.queryClient.getQueryState(JokesKey)).to.deep.include({ isInvalidated: true, data: second })
+    expect(world.counts.gets).to.eq(gets + 1)
+  })
+})
+
+// The hook's fetch reads the first revision and waits; meanwhile the minder hears of the second, from the watch or from a
+// list. Whichever lands first, the hook ends showing the second.
+const OrderCases = [
+  [true,  'answer', 'watched: the late answer, then the watch'],
+  [true,  'news',   'watched: the watch, then the late answer'],
+  [false, 'answer', 'unwatched: the late answer, then a list'],
+  [false, 'news',   'unwatched: a list, then the late answer'],
+] as const
+
+/** Release nothing: no pause has been made yet. */
+function releaseNothing(): void { /* nothing paused */ }
+
+describe("useBox shows the newest record, in either order of a late answer and the news of a newer revision", () => {
+  for (const [isWatching, firstStep, blurb] of OrderCases) {
+    it(blurb, async () => {
+      let release = releaseNothing
+      const { world, seen, minder } = await setupShowing({ isWatching, beforeShowing: (world) => { release = world.pauseAnswers() } })
+      onTestFinished(() => { release() })
+      await waitFor(() => { expect(seen.current?.fetchStatus).to.eq('fetching') })
+      const steps = {
+        answer: async () => {
+          act(() => { release() })
+          await waitFor(() => { expect(seen.current?.data).to.not.be.undefined })
+        },
+        news: async () => { await act(async () => { await (isWatching ? putFromOtherTab(world) : minder.list('box')) }) },
+      }
+      if (! isWatching) { await putFromOtherTab(world) }
+      await steps[firstStep]()
+      await steps[(firstStep === 'answer') ? 'news' : 'answer']()
+      await waitFor(() => { expect(seen.current?.data?.sidecar).to.deep.equal({ service: 'jokes', tier: 'pro' }) })
+    })
+  }
+})
+
+/** A world with the jokes box stored, a count of the lists its vaultDB is asked, and `useBoxList` rendered under its provider, signed in. */
+async function setupListing() {
+  const world = await TH.buildProviderWorld({ stored: 'jokes' })
+  const lists = { count: 0 }
+  const tryListThings = world.vaultDB.tryListThings.bind(world.vaultDB)
+  world.vaultDB.tryListThings = async (ask) => {
+    lists.count += 1
+    return await tryListThings(ask)
+  }
+  function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
+  const rendered = renderHook(() => world.Bank.useBoxList(), { wrapper: Wrapper })
+  return { world, lists, ...rendered }
+}
+
+describe("useBoxList over the minder's own listing", () => {
+  it("lists once, and shows a box another device writes without listing again", async () => {
+    const { world, result, lists } = await setupListing()
+    await waitFor(() => { expect(result.current.data).to.deep.equal([TH.JokesPath]) })
+    expect(lists.count).to.eq(1)
+    await act(() => world._cheat_otherVault!.putBoxOnce('box/puns', { sidecar: { service: 'puns' } }, { whisper: LeanTH.Whisper }))
+    await waitFor(() => { expect(result.current.data).to.deep.equal([TH.JokesPath, 'puns']) })
+    expect(lists.count).to.eq(1)
+  })
+
+  it("lists again when the minder marks its listing stale", async () => {
+    const { world, result, lists } = await setupListing()
+    await waitFor(() => { expect(result.current.data).to.deep.equal([TH.JokesPath]) })
+    const { minder } = world._cheat_device()
+    act(() => { minder.invalidate('box', { list: 'all' }) })
+    await waitFor(() => { expect(minder.queryClient.getQueryState(BoxListKey)?.isInvalidated).to.eq(false) })
+    expect([lists.count, result.current.data]).to.deep.equal([2, [TH.JokesPath]])
+  })
+
+  it("lists after sign-in when mounted while nobody is signed in", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const treeOpts: TH.ProviderTreeOpts = { userid: null }
+    function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, treeOpts) }
+    const { result, rerender } = renderHook(() => world.Bank.useBoxList(), { wrapper: Wrapper })
+    expect([result.current.data, result.current.fetchStatus]).to.deep.equal([undefined, 'idle'])
+    treeOpts.userid = TH.ProviderUser
+    rerender()
+    await waitFor(() => { expect(result.current.data).to.deep.equal([TH.JokesPath]) })
+  })
+
+  it("shows a list refused as its error", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    world.vaultDB.tryListThings = () => Promise.resolve({ ok: false, err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') } as never)
+    function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
+    const { result } = renderHook(() => world.Bank.useBoxList(), { wrapper: Wrapper })
+    await waitFor(() => { expect(result.current.isError).to.eq(true) })
+    expect(result.current.error).to.have.property('refusalkind', 'storage_unavailable')
+  })
+})
+
+describe("useGate over the minder's own cache", () => {
+  it("shows a passkey another device adds, without fetching again, and without the bankKey it wraps", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    let header: PasskeyWayinHeader | null | undefined
+    function GateProbe() {
+      const shown = world.Bank.useGate({ select: passkeyHeaderOf }).data
+      useLayoutEffect(() => { header = shown })
+      return <p>{shown?.wayinkind ?? 'none'}</p>
+    }
+    const { container } = render(TH.providerTreeOf(world, <GateProbe />, { userid: TH.ProviderUser }))
+    await waitFor(() => { expect(header).to.be.null })
+    // The minder freezes, so the spy goes on its class, counting the giver's device's calls alone.
+    const { minder } = world._cheat_device()
+    const get = vi.spyOn(ThingMinder.prototype, 'get')
+    onTestFinished(() => { get.mockRestore() })
+    const other = LeanTH.makeDevice({}, { vaultDB: world.vaultDB })
+    await act(async () => {
+      await other.hello()
+      await other.bank!.gate.addPasskey({ passphraseCleartext: LeanTH.TestPassphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })
+    })
+    await waitFor(() => { expect(header?.wayinkind).to.eq('passkey') })
+    expect(get.mock.contexts.filter((context) => context === minder)).to.have.lengthOf(0)
+    // The minder's own item has the whole gate, by design; the host's cache and the page have none of it.
+    const stored = world.vaultDB._cheat_things(LeanTH.WorldScope).get('gate') as GateRecord
+    TH.expectTextUnheld(stored.wayins.passkey0!.bank_key_wayin_wrapped.ciphertext_b64, container, world.client)
+  })
+})
+
+describe("the record hooks outside every provider", () => {
+  it("show signed_out and fetch nothing", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const { result } = renderHook(() => ({
+      stage: world.Bank.useBank((bank) => bank.stage), box: world.Bank.useBox(TH.JokesPath), gate: world.Bank.useGate(), list: world.Bank.useBoxList(),
+    }))
+    const { stage, box, gate, list } = result.current
+    expect([stage, box.data, box.fetchStatus, gate.data, list.data]).to.deep.equal(['signed_out', undefined, 'idle', undefined, undefined])
+    expect(world.counts.gets).to.eq(0)
+  })
+})

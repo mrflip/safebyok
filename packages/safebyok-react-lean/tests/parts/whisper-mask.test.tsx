@@ -63,12 +63,12 @@ describe("WhisperMask", () => {
     await act(() => world.Bank.putBoxOnce(TH.JokesPath, { sidecar: { service: 'jokes' } }, { whisper: { apiKey: TailedKey } }))
     const liveMask = mask(TailedKey, { tail: 4 })
     await waitFor(() => { expect(maskTextOf(container)).to.eq(liveMask) })
-    TH.expectTextUnheld(TailedKey, container, world.client)
-    TH.expectTextUnheld(liveMask, container, world.client)
+    TH.expectTextUnheld(TailedKey, container, world.clients())
+    TH.expectTextUnheld(liveMask, container, world.clients())
     act(() => { world.Bank.lock() })
     await waitFor(() => { expect(maskTextOf(container)).to.eq('jokes') })
     expect(document.body.textContent.includes(TailedKey.slice(-4))).to.eq(false)
-    TH.expectTextUnheld(TailedKey.slice(-4), container, world.client)
+    TH.expectTextUnheld(TailedKey.slice(-4), container, world.clients())
   })
 
   it("writes the mask again when the box is written", async () => {
