@@ -8,7 +8,7 @@ type SignInResult = Readonly<{ err: Error | null, username: string }>
 
 // React empties the form after its action: a refused username shows again, for the user to mend.
 /** Sign in as the username typed, or say why it will not do. */
-const signInAction = (_prior: SignInResult, form: FormData): SignInResult => {
+function signInAction(_prior: SignInResult, form: FormData): SignInResult {
   const username = formTextOf(form, 'username')
   try {
     signIn(username)
