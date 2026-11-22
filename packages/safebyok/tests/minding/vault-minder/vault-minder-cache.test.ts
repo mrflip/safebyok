@@ -272,7 +272,7 @@ async function listedWorld() {
 
 describe("VaultMinder, a child's first landing", () => {
 
-  it("marks nothing stale for a list's own children, which land while it is under way", async () => {
+  it("leaves the root listing not stale once it has been listed over a stored box", async () => {
     const { minder } = await listedWorld()
     expect(isListingStaleAt(minder, TH.RootScope)).to.be.false
   })
