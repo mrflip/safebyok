@@ -200,18 +200,6 @@ Reasoning for wontfix: it is a crossing of a get and a list or notice, which the
 retry, lock or abort may settle in a primitive's critical path; what each answer says is a revision the vaultDB did store,
 and the cache marks itself behind before any later call reads it. Ruled by the orchestrator, 2026-11-20, soon_item.
 
-### A box joining between the host's listing fetch reading `listingAt` and TanStack storing the answer
-
-* current outcome: `Knock.useBoxList`'s fetch answers `minder.listingAt` as read just after `minder.list`. A box that joins the minder's listing in the microtask or two before TanStack stores that answer is overwritten by it, and shows at the next join or fetch of the listing.
-* alternatives:
-  - read `listingAt` again after the answer lands: a second read on a common path, for a crossing.
-  - order the bridge's copy after the fetch's answer: a state in the host's fetch, which the bridge keeps no knowledge of.
-* workaround: none needed. The next box to join, or the next fetch of the listing, lists it.
-
-Steps to reproduce: sign in with the listing fetch pending; write a box through the device in the microtask between the fetch's `listingAt` and TanStack storing its answer.
-
-Reasoning for wontfix: it is a crossing of a write and a fetch of milliseconds (CLAUDE.md, *Hours separate updates*); the listing holds only labelpaths the vaultDB did store, and the fix puts a guard on a common path. Written by the react_life thread 8 reviewer, 2026-11-21, awaiting a ruling.
-
 ### A box new to a listing that lands while a list read before it is under way
 
 * current outcome: the box's first landing marks its parent's listing stale, which joins the list under way
