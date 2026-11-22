@@ -287,5 +287,7 @@ export interface MinderOpts {
   vaultDB:         VaultDB
   /** The cache's timings ({@link QueryCacheOpts}). A field left out defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?: Partial<QueryCacheOpts>
+  /** The client to cache in, made by `ThingMinder.makeClient`, which minders of other banks may share. Default: a client of its own. */
+  queryClient?:    TSQ.QueryClient | undefined
 }
 // --
