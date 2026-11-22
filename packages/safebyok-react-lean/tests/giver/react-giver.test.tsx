@@ -861,6 +861,7 @@ function makeKeyEditor(world: TH.ProviderWorld, opts: Partial<PutBoxActionOpts> 
     return (
       <form action={putAction}>
         <p>{(typeof mask === 'string') ? `Key ${mask}` : 'No mask'}</p>
+        <input name="title" aria-label="Title" defaultValue={result?.texts['title']} />
         <input name="apiKey" type="password" aria-label="Key" />
         <button disabled={isPutting}>Save</button>
         {(result !== null) && <output>{(result.err === null) ? 'Saved' : 'Refused'}</output>}
@@ -956,6 +957,54 @@ describe("putBoxAction", () => {
     expect([...forms[0]!.keys()]).to.deep.equal([])
   })
 
+  it("deletes only the named secret fields, and a refusal carries the other fields' text back for defaultValue", async () => {
+    const forms: FormData[] = []
+    const { world, seen, container } = await renderKeyEditor({ secretFieldnames: ['apiKey'], whisperOf: (form) => {
+      forms.push(form)
+      return { apiKey: form.get('apiKey') as string }
+    } })
+    act(() => { world.Bank.lock() })
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'My jokes key' } })
+    submitKey()
+    await screen.findByText('Refused')
+    expect(seen.result?.texts).to.deep.equal({ title: 'My jokes key' })
+    expect([...forms[0]!.keys()]).to.deep.equal(['title'])
+    expect(screen.getByLabelText<HTMLInputElement>('Title').value).to.eq('My jokes key')
+    expect(screen.getByLabelText<HTMLInputElement>('Key').value).to.eq('')
+    const retained = [seen.result, forms, TH.reactTreeOf(container), world.client.getQueryCache().getAll(), world.client.getMutationCache().getAll()]
+    expect(retained.map((each) => TH.holdsText(each, TypedKey))).to.deep.equal([false, false, false, false, false])
+  })
+
+  it("carries no text after a write that lands, so the form comes back empty", async () => {
+    const { seen } = await renderKeyEditor({ secretFieldnames: ['apiKey'] })
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'My jokes key' } })
+    submitKey()
+    await screen.findByText('Saved')
+    expect(seen.result?.texts).to.deep.equal({})
+    expect(screen.getByLabelText<HTMLInputElement>('Title').value).to.eq('')
+  })
+
+  it("deletes every field when it is told no secret fieldnames, and carries no text back", async () => {
+    const forms: FormData[] = []
+    const { world, seen } = await renderKeyEditor({ whisperOf: (form) => {
+      forms.push(form)
+      return { apiKey: form.get('apiKey') as string }
+    } })
+    act(() => { world.Bank.lock() })
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'My jokes key' } })
+    submitKey()
+    await screen.findByText('Refused')
+    expect([...forms[0]!.keys()]).to.deep.equal([])
+    expect(seen.result?.texts).to.deep.equal({})
+  })
+
+  it("refuses secretFieldnames that is not an array of names", async () => {
+    const world = await TH.buildProviderWorld()
+    const whisperOf = whisperOfAnyForm
+    TH.expectSyncRefusal(() => world.Bank.putBoxAction(TH.JokesPath, { whisperOf, secretFieldnames: 'apiKey' as never }), 'bad_record')
+    TH.expectSyncRefusal(() => world.Bank.putBoxAction(TH.JokesPath, { whisperOf, secretFieldnames: [''] }), 'bad_record')
+  })
+
   it("keeps the box's sidecar when it has no sidecarOf", async () => {
     const { world } = await renderKeyEditor({ sidecarOf: undefined })
     submitKey()
@@ -993,6 +1042,7 @@ function makeMutationKeyEditor(world: TH.ProviderWorld, opts: Partial<PutBoxActi
     return (
       <form action={(form) => { put.mutate(form) }}>
         <p>{(typeof mask === 'string') ? `Key ${mask}` : 'No mask'}</p>
+        <input name="title" aria-label="Title" />
         <input name="apiKey" type="password" aria-label="Key" />
         <button disabled={put.isPending}>Save</button>
         {put.isSuccess && <output>Saved</output>}
@@ -1056,6 +1106,20 @@ describe("putBoxMutationOptions", () => {
     await screen.findByText('Refused')
     expect(seen.put?.error).to.eq(thrown)
     expect([...forms[0]!.keys()]).to.deep.equal([])
+  })
+
+  it("deletes only the named secret fields", async () => {
+    const forms: FormData[] = []
+    const { world, container } = await renderMutationKeyEditor({ secretFieldnames: ['apiKey'], whisperOf: (form) => {
+      forms.push(form)
+      return { apiKey: form.get('apiKey') as string }
+    } })
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'My jokes key' } })
+    submitKey()
+    await screen.findByText('Saved')
+    expect([...forms[0]!.keys()]).to.deep.equal(['title'])
+    expect(forms[0]!.get('title')).to.eq('My jokes key')
+    TH.expectTextUnheld(TypedKey, container, world.client)
   })
 
   it("wraps a thrown value that is no Error in an Error, the value its cause", async () => {
