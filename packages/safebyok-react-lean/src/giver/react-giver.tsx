@@ -5,7 +5,7 @@
 import { type DataTag, type QueryKey, type UseMutationOptions, type UseMutationResult, type UseQueryOptions, type UseQueryResult, mutationOptions, queryOptions, skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, Labelpath,
+  type AssertEqual, type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, type CheckerInput, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, Labelpath,
   type LiveOf, type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
   PendingBank, type Sidecar, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
 } from 'safebyok'
@@ -762,8 +762,9 @@ const Checks = Checkers('bad_record', ({ obj, arr, str, fn, custom }) => {
     boxScoped:               obj({ labelpath: boxLabelpath }).loose(),
     fn:                      fn(),
     withLockableWhisperOpts: obj({ ifLocked: fn<WithLockableWhisperOpts<unknown>['ifLocked']>() }),
-    putBoxActionOpts:        obj({ whisperOf: fn<PutBoxActionOpts['whisperOf']>(), sidecarOf: fn<NonNullable<PutBoxActionOpts['sidecarOf']>>().optional(), secretFieldnames: arr(str.min(1)).optional() }),
+    putBoxActionOpts:        obj({ whisperOf: fn<PutBoxActionOpts['whisperOf']>(), sidecarOf: fn<NonNullable<PutBoxActionOpts['sidecarOf']>>().optional(), secretFieldnames: arr(str.min(1)).readonly().optional() }),
     form:                    custom<FormData>((val) => val instanceof FormData, 'Expected the FormData a form action is handed'),
   }
 })
+true satisfies AssertEqual<PutBoxActionOpts, Readonly<CheckerInput<typeof Checks.putBoxActionOpts>>>
 // --

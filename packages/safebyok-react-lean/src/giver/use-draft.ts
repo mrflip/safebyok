@@ -2,7 +2,7 @@
 
 import { isEqual } from 'es-toolkit'
 import { type ChangeEventHandler, type FocusEventHandler, type RefCallback, useEffect, useRef, useState } from 'react'
-import { type BoxRecord, Checkers, type LiveOf, type Sidecar, Thing, type Vault, VaultError, type Whisper, WhisperFieldAttributes, bulletproofHandlerOf } from 'safebyok'
+import { type AssertEqual, type BoxRecord, type CheckerInput, Checkers, type LiveOf, type Sidecar, Thing, type Vault, VaultError, type Whisper, WhisperFieldAttributes, bulletproofHandlerOf } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { PartsPhrases } from '../parts/phrases-parts'
 import { liveOf } from './giver-defaults'
@@ -257,4 +257,5 @@ const Checks = Checkers('bad_record', ({ obj, str, fn }) => ({
   fieldname:    str.min(1),
   draftPutOpts: obj({ sidecarOf: fn<NonNullable<DraftPutOpts['sidecarOf']>>().optional() }),
 }))
+true satisfies AssertEqual<DraftPutOpts, Readonly<CheckerInput<typeof Checks.draftPutOpts>>>
 // --

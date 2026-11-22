@@ -1,7 +1,7 @@
 /** The giver's types and checks: the events it reads of a minder, and what a host hands it, and how it wraps a host's callback. */
 
 import type { QueryClient, QueryKey, UseQueryOptions } from '@tanstack/react-query'
-import { type BankSnapshot, type Banklabel, type BulletproofFailOpts, type DeviceOpts, type KeyDeriver, type Userid, type VaultDB, Checkers, PendingBank, isVaultDB } from 'safebyok'
+import { type AssertEqual, type BankSnapshot, type Banklabel, type BulletproofFailOpts, type CheckerInput, type DeviceOpts, type KeyDeriver, type Userid, type VaultDB, Checkers, PendingBank, isVaultDB } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import * as Phrases from './phrases-giver'
 
@@ -57,6 +57,8 @@ export const ConfigChecks = Checkers('bad_record', ({ obj, custom }) => ({
     banks: custom<GiverBanks>(isOneBank, Phrases.OneBankExpected).transform((banks) => Object.entries(banks) as [[Banklabel, Readonly<{ vaultDB: VaultDB }>]]),
   }),
 }))
+// The device's options in a config are left to Device.make, which checks them as it makes each device.
+true satisfies AssertEqual<Omit<GiverConfig, keyof DeviceOpts>, Readonly<CheckerInput<typeof ConfigChecks.giverConfig>>>
 
 /** True when `val` names exactly one bank by a valid banklabel, and its vaultDB. */
 function isOneBank(val: unknown): boolean {
