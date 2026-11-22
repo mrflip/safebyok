@@ -27,7 +27,7 @@ export {
   type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,
 } from './storage/vault-db'
 export {
-  type BadNews, type BadNewsHandler, type BankAskDraft, type BankMakeRecord, type BankOpts, type BankSnapshot, type BankStage, type BoxUnsealed, type DeviceOpts, type DeviceRecord,
+  type BadNews, type BadNewsHandler, type BankAskDraft, type BankOpts, type BankSnapshot, type BankStage, type BoxUnsealed, type DeviceOpts, type DeviceRecord,
   type DeviceSnapshot, type HostedVault, type RefusalSnapshot,
   BankishChecks, PendingBank, bankStageVals,
 } from './shapes/shapes-bankish'

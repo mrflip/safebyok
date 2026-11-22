@@ -3,7 +3,7 @@
 // Import fake-indexeddb first: it installs IndexedDB's globals before the adapter loads.
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MemoryVaultDB, VaultError } from 'safebyok/storage'
+import { MemoryVaultDB, Shell, VaultError } from 'safebyok/storage'
 import { IdbMinderBridge } from '../src/idb-minder-bridge'
 import * as TH from './test-helpers'
 
@@ -118,8 +118,10 @@ describe("IdbMinderBridge", () => {
     await TH.aWhile()
     expect(await rows.rawAt(TH.BoxScope)).to.be.null
     bridge.hello()
-    await minder.get(TH.GateScope)
-    await vi.waitFor(async () => { expect(await rows.rawAt(TH.GateScope)).to.deep.equal(TH.gateThingOf()) })
+    const other = TH.boxThingOf('anthropic')
+    const shell = Shell.of({ ...TH.ThingBank, labelpath: other.labelpath }, TH.rootBoxOf())
+    await minder.write(TH.birthAskOf(other, shell))
+    await vi.waitFor(async () => { expect(await rows.rawAt(other)).to.deep.equal(other) })
   })
 })
 

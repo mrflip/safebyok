@@ -9,15 +9,12 @@ import type { Gate } from '../models/gate'
 import type { VaultDB } from '../storage/vault-db'
 import type { StrengthChecker } from './shapes-gateish'
 import type { DefaultQueryCacheOpts, QueryCacheOpts } from './shapes-minder'
-import type { BoxCleartexts, LiveOf, UnsealedOf } from './shapes-sealers'
-import type { BankRecord, BoxRecord } from './shapes-thing'
+import type { BoxCleartexts, UnsealedOf } from './shapes-sealers'
+import type { BoxRecord } from './shapes-thing'
 import type { GetAsk, ListAsk } from './shapes-asks'
 import type { EpochMillis, Labelpath } from './primitives'
 
-// == [The bank's forms]: BankMakeRecord, BoxUnsealed
-
-/** The record {@link Bank.make} takes: the bank's Thing, with its root box as stored at `rootBox`. */
-export type BankMakeRecord = BankRecord & Readonly<{ rootBox: LiveOf<BoxRecord> }>
+// == [The bank's forms]: BoxUnsealed
 
 /** A box unsealed: its record with its whisper in place of the sealed one. A tombstone's whisper is empty. */
 export type BoxUnsealed = UnsealedOf<BoxRecord, BoxCleartexts>

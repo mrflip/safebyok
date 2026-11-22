@@ -416,7 +416,7 @@ describe("useGate", () => {
     const { result, world } = await renderGate()
     expect(result.current.header).to.be.null
     expect(result.current.gate.data?.wayins.main.wayinkind).to.eq('passphrase')
-    expect(world.Bank.keys.gate()).to.deep.equal(['sok', 'u1', 'acme', 'item', 'gate', '!'])
+    expect(world.Bank.keys.gate()).to.deep.equal(['sok', 'u1', 'acme', 'gate'])
     expect(world.Bank.queryClient().getQueryData(world.Bank.keys.gate())).to.have.property('wayins')
   })
 
@@ -439,7 +439,7 @@ describe("useGate", () => {
     expect(result.current.header).to.eq(header)
   })
 
-  it("holds no wrapped bankKey in the host's cache or the rendered tree, and the passphrase in neither cache", async () => {
+  it("holds no wrapped bankKey or passphrase in the host's cache, the giver's, or the rendered tree", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     function ShowGate() {
       const { data: gate } = world.Bank.useGate()
@@ -452,8 +452,8 @@ describe("useGate", () => {
     await waitFor(() => { expect(container.textContent).to.contain('"wayinkind":"passkey"') })
     const wraps = storedWrapsOf(world)
     expect(wraps).to.have.lengthOf(2)
-    // The giver's own cache has the whole gate, by design: no hook's data shows it.
-    for (const text of wraps) { TH.expectTextUnheld(text, container, world.client) }
+    // The whole gate is in the device's BankMinder, whose client is neither of these.
+    for (const text of wraps) { TH.expectTextUnheld(text, container, world.clients()) }
     TH.expectTextUnheld(Passphrase, container, world.clients())
   })
 })

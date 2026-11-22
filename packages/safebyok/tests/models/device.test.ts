@@ -196,7 +196,7 @@ describe("device.hello()", () => {
     await device.hello()
     const shown = device.getSnapshot().bank
     expect(shown).to.include({ stage: 'failed', isLocked: true })
-    expect(shown.lastErr).to.include({ refusalkind: 'damaged_row' })
+    expect(shown.lastErr).to.include({ refusalkind: 'storage_issue' })
     expect(Object.isFrozen(shown.lastErr)).to.be.true
     expect(device.bank).to.be.null
   })

@@ -145,11 +145,12 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
   try {
     await friend.unlockByProving(gate, passphraseProving)
     const root   = await gate.seal(BaseBox, rootShell, { sidecar: {} }, { whisper: {} })
-    const answer = await vaultDB.tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gate.pickle(), root })
+    // The roots it answers, written or found stored, are then the bank's world in the device's BankMinder.
+    const answer = await device.bankMinder.tryBirthBank(vaultDB, { ...device.scope, op: 'birth', bank: bankRecord, gate: gate.pickle(), root })
     if (! answer.ok) { throw answer.err }
     // The user must hear that their passphrase was not set: the bank stored is another's.
     if (answer.val.bank.revtok !== bankRecord.revtok) { throw Throwers.gateMadeElsewhere() }
-    const bank = Bank.make({ ...answer.val.bank, rootBox: BoxChecks.live.parse(answer.val.root) }, { device, vaultDB, gate })
+    const bank = Bank.make(answer.val.bank, { device, vaultDB, gate })
     friend.attachBank(bank)
     return bank
   } catch (err) {

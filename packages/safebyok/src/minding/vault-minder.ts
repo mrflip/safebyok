@@ -5,13 +5,14 @@
 // Where a ruling, a design note or this code seems to serve one end at the other's expense, report it rather than split
 // the difference.
 
-/** `VaultMinder`, which minds every Thing in one bank in a TanStack Query cache, its own or one it shares with minders of other banks. */
+/** `VaultMinder`, which minds the boxes of one bank in a TanStack Query cache, its own or one it shares with minders of other banks. */
 
 import * as TSQ from '@tanstack/query-core'
 import { deepFreeze, union } from 'es-toolkit'
 import { Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
-import { type Sparse, type ThingRecord, type ThingScope, type Tombstone, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
+import { type BoxRecord, type Sparse, type ThingRecord, type ThingScope, type Tombstone, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
+import type { ShellOf } from '../shapes/shapes-sealers'
 import { Thing } from '../models/thing'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetAsk, type ThingWatchScope, type WriteAsk } from '../shapes/shapes-asks'
@@ -22,6 +23,8 @@ import {
   type MinderInvalidateOpts, type QueryCacheOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingEvent, type SoonEvent, type TsqStaleTime, type ListingEvent, type MinderEventkind, type MinderEventFormat, type TSQQueryAction,
   FixedQueryCacheOpts, MinderChecks,
 } from '../shapes/shapes-minder'
+import { BankMinder } from './bank-minder'
+import { bankKeyHeadOf } from './minder-keys'
 import { newerThingOf } from './newer-thing'
 import { bulletproofHandlerOf } from '../helpers/bulletproof'
 import * as Phrases from '../phrases'
@@ -30,10 +33,11 @@ import * as Throwers from '../refusals/throwers'
 /** Anything naming a labelpath: a scope, an ask or a record. */
 export type Labelpathed = { labelpath: Labelpath }
 
-/** This device's cache of one bank's Things, kept from everything the vaultDB tells of them.
- * Each Thing has an item, with the whole record a host shows: live, its tombstone, or its shell where nothing is stored.
- * A Thing may also have a soon: a sparse record newer than the item, removed once the item catches up. The root box and
- * each Thing listed have a listing of their children.
+/** This device's cache of one bank's boxes, kept from everything the vaultDB tells of them.
+ * Each box under the root box has an item, with the whole record a host shows: live, its tombstone, or its shell where nothing is stored.
+ * A box may also have a soon: a sparse record newer than the item, removed once the item catches up. The root box and
+ * each box listed have a listing of their children. The bank, its main gate and the root box itself are its BankMinder's:
+ * what the watch tells of them lands in their world there.
  * Records arrive from gets, lists, good writes and the watch, in any order, late or more than once. A whole record,
  * tombstone or shell lands in the item and a sparse record in the soon, and each adds the Thing to its parent's listing,
  * where one is cached. A list sets the parent's listing. It caches only from `hello` until `goodbye`, and
@@ -73,18 +77,20 @@ export type Labelpathed = { labelpath: Labelpath }
  *   box always has one cached.
  * - An operation caches only its own good answer: the record got or written, or the labelpaths listed, never a write's
  *   ask. Any other record an answer carries (a refusal's `dbhas`, each Thing a list answers, or a tracked bank, main gate
- *   or root box) is cached only as the watch tells of it, and the watch tells of it before the operation returns.
+ *   or root box) is cached only as the watch tells of it, and the watch tells of it before the operation returns. The
+ *   bank, main gate and root box land in the BankMinder, never here.
  * - A refused write changes no item and marks nothing stale. Its `dbhas`, through the watch, may still change an item.
  * - A write's answer and the watch's notice of the same write leave the same item and listing, in either order: the
  *   later changes nothing.
  * - `invalidate` asks the vaultDB nothing, and marks listings stale, never items: it changes no item, and no listing's labelpaths.
  */
 export class VaultMinder {
-  // == [Props]: userid, banklabel, #bank, #vaultDB, #tsq, #landers, #queryCacheOpts, #unwatch, #isReady
+  // == [Props]: userid, banklabel, #bank, #vaultDB, #bankMinder, #tsq, #landers, #queryCacheOpts, #unwatch, #isReady
   readonly userid:    Userid
   readonly banklabel: Banklabel
   readonly #bank:           MinderFriend
   readonly #vaultDB:        VaultDB
+  readonly #bankMinder:     BankMinder
   readonly #tsq:            TSQ.QueryClient
   /** The minders attached to `#tsq`, this one among them while minding. */
   readonly #landers:        Map<string, Lander>
@@ -96,7 +102,7 @@ export class VaultMinder {
 
   // == [Construction]: make, constructor, makeClient, isClient, #setQueryDefaults
 
-  /** Make a minder of every Thing in `bank`. It does nothing until `hello`. */
+  /** Make a minder of the boxes in `bank`, landing what it hears of the bank's roots in `opts.bankMinder`. It does nothing until `hello`. */
   static make(opts: MinderOpts, bank: MinderFriend): VaultMinder {
     const checked = Checks.minderMakeArgs.parse({ opts, bank })
     return new VaultMinder(checked.opts, checked.bank)
@@ -108,6 +114,7 @@ export class VaultMinder {
     this.banklabel       = banklabel
     this.#bank           = bank
     this.#vaultDB        = opts.vaultDB
+    this.#bankMinder     = opts.bankMinder
     this.#queryCacheOpts = Object.freeze(opts.queryCacheOpts)
     this.#tsq            = opts.queryClient ?? VaultMinder.makeClient()
     this.#landers        = LandersOfClient.get(this.#tsq)!
@@ -191,30 +198,30 @@ export class VaultMinder {
 
   /** The record `scoped`'s item has, however old, or undefined for no item. Never asks the vaultDB. */
   at<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): ThingAt<LabelpathT> | Tombstone<ThingAt<LabelpathT>> | undefined {
-    return this.#itemAt(this.#demandOwnScope(scoped)) as ThingAt<LabelpathT> | Tombstone<ThingAt<LabelpathT>> | undefined
+    return this.#itemAt(this.#demandItemScope(scoped)) as ThingAt<LabelpathT> | Tombstone<ThingAt<LabelpathT>> | undefined
   }
 
   /** The sparse record `scoped`'s soon has, newer than its item, or undefined for no soon. Never asks the vaultDB. */
   soonAt<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): Sparse<ThingAt<LabelpathT>> | undefined {
-    return this.#soonAt(this.#demandOwnScope(scoped)) as Sparse<ThingAt<LabelpathT>> | undefined
+    return this.#soonAt(this.#demandItemScope(scoped)) as Sparse<ThingAt<LabelpathT>> | undefined
   }
 
   /** True when `scoped`'s item is behind: a soon newer than the item is cached, or a soon with no item. Never asks the vaultDB. */
   isBehindAt(scoped: ThingScope): boolean {
-    return this.#isBehindAt(this.#demandOwnScope(scoped))
+    return this.#isBehindAt(this.#demandItemScope(scoped))
   }
 
   /** The cached listing of `scoped`'s children, however old, or undefined for none. Never asks the vaultDB.
    * A bare listing lists only the children received since `hello` ({@link isListingBareAt}).
    */
   listingAt(scoped: ThingScope): readonly Labelpath[] | undefined {
-    return this.#tsq.getQueryData<readonly Labelpath[]>(this.listQueryKey(this.#demandOwnScope(scoped)))
+    return this.#tsq.getQueryData<readonly Labelpath[]>(this.listQueryKey(this.#demandListingScope(scoped)))
   }
 
   /** True when `scoped`'s listing is cached but bare: no list has set it since `hello`, so the vaultDB may have more. */
   isListingBareAt(scoped: ThingScope): boolean {
     // A listing a first list is still fetching, or left refused, is a query with no labelpaths: it is not cached.
-    const listing = this.#tsq.getQueryState(this.listQueryKey(this.#demandOwnScope(scoped)))
+    const listing = this.#tsq.getQueryState(this.listQueryKey(this.#demandListingScope(scoped)))
     return (listing?.data !== undefined) && (listing.dataUpdatedAt === BareListedAt)
   }
 
@@ -226,7 +233,7 @@ export class VaultMinder {
     try {
       MinderChecks.minderTryAtOpts.parse(opts)
       this.#demandReady()
-      const scope = this.#demandOwnScope(scoped)
+      const scope = this.#demandItemScope(scoped)
       if (opts.ifStale === 'refresh') { this.backgroundRefresh(scope, { staleTime: opts.staleTime }) }
       return this.#answerOfTSQ(this.#askAt(scope), opts) as TSQGotAnswer<ThingAt<LabelpathT>>
     } catch (err) {
@@ -237,12 +244,12 @@ export class VaultMinder {
 
   /** Get `scoped`'s whole record, its tombstone or its shell: the cached one if timely, else from the vaultDB. A get already under way is shared.
    * Refuses `stale_read` when the vaultDB answers with a revision older than one cached when the get began. A later get asks again.
-   * With no root box cached, a get of a box the vaultDB has nothing for refuses: get the root box first.
+   * While the BankMinder has no world of the bank, a get of a box the vaultDB has nothing for refuses: fetch the world first.
    */
   async get<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<ThingAt<LabelpathT> | Tombstone<ThingAt<LabelpathT>>> {
     MinderChecks.minderGetOpts.parse(opts)
     this.#demandReady()
-    return await this.#doGet(this.#demandOwnScope(scoped), opts) as ThingAt<LabelpathT> | Tombstone<ThingAt<LabelpathT>>
+    return await this.#doGet(this.#demandItemScope(scoped), opts) as ThingAt<LabelpathT> | Tombstone<ThingAt<LabelpathT>>
   }
 
   /** {@link get}, resolving an `Outcome` instead of throwing: a refusal, misuse included, is its bad outcome. */
@@ -264,7 +271,7 @@ export class VaultMinder {
    * from the cache. A Thing stored damaged is left out, and reported to the bank's `tellBadNews`.
    */
   async list(labelpath: Labelpath): Promise<Labelpath[]> {
-    MinderChecks.minderLabelpath.parse(labelpath)
+    this.#demandListingScope({ ...this.scope, labelpath: MinderChecks.minderLabelpath.parse(labelpath) })
     this.#demandReady()
     // Under staleTime 0 TanStack fetches whatever the listing holds, and shares a fetch under way. Each caller gets its own
     // array: callers sharing a list share the one its fetch returned.
@@ -281,7 +288,7 @@ export class VaultMinder {
    */
   isStaleAt(scoped: ThingScope, opts: MinderGetOpts = {}): boolean {
     MinderChecks.minderGetOpts.parse(opts)
-    const scope = this.#demandOwnScope(scoped)
+    const scope = this.#demandItemScope(scoped)
     return this.#tsqFind(scope)?.isStaleByTime(this.#staleTimeOf(scope, opts)) ?? true
   }
 
@@ -322,14 +329,14 @@ export class VaultMinder {
   // == [Writing]: tryWrite, write
 
   /** Write `ask` through the vaultDB, and return its answer, a refusal included.
-   * The record written is cached before it answers. A refusal's `dbhas`, and the bank, main gate and root box its answer reports, are cached only as the watch tells of them.
-   * Before `hello`, after `goodbye`, or for a scope outside this bank, it answers the refusal without asking the vaultDB.
+   * The record written is cached before it answers. A refusal's `dbhas` is cached only as the watch tells of it, and the bank, main gate and root box the answer reports land in the BankMinder as the watch tells of them.
+   * Before `hello`, after `goodbye`, or for anything but a box of this bank under its root box, it answers the refusal without asking the vaultDB.
    * Rejects, whether or not the write was made, when the answer carries a record of another bank.
    */
   async tryWrite(ask: WriteAsk): Promise<WriteThingAnswer> {
     try {
       this.#demandReady()
-      this.#demandOwnScope(ask)
+      this.#demandItemScope(ask)
     } catch (err) {
       return refusedAnswerOf(ask, err)
     }
@@ -411,12 +418,16 @@ export class VaultMinder {
   // Every record but a get's lands here: TanStack lands a get's record in the item itself, then calls #landedByFetch.
   // A whole record at the item's revision lands, and makes the item fresh as of now, as TanStack counts a confirmation from
   // the server. An older one lands nowhere: it would make the newer record read fresh as of its arrival.
-  /** Cache `record` in its item or soon, and in its parent's listing, while minding.
+  /** Cache `record` in its item or soon, and in its parent's listing, while minding; the bank, its main gate or the root box in the BankMinder.
    * A whole record older than the item, or a sparse one no newer than the soonest cached, joins only the listing.
    */
   #sendToTSQ(record: DeliverableThing): void {
     if (! this.#isReady) { return }
     deepFreeze(this.#checkedDelivered(record, this.scope))
+    if (! isMindedLabelpath(record.labelpath)) {
+      this.#bankMinder.sendToTSQ(record)
+      return
+    }
     if (! Thing.isSparse(record)) {
       if (! isOlder(this.#itemAt(record), record)) { this.#tsq.setQueryData(this.itemQueryKey(record), record) }
     } else if (isNewer(this.#soonestAt(record), record)) {
@@ -525,20 +536,21 @@ export class VaultMinder {
     return this.#bank.makeGetAsk({ labelpath: labelpathed.labelpath, ifAbsent: 'nil' })
   }
 
-  // Boxes are the only Things under a root, for now: one label under the root box.
-  /** The shell at `labelpathed`. Below a root, it lives in the life of the bank's root box. */
+  /** The shell of the box at `labelpathed`, in the life of the bank's root box. */
   #shellAt(labelpathed: Labelpathed): VoidSentinel {
-    return labelpathed.labelpath.includes('/') ? Shell.of(labelpathed, this.rootBox) : Shell.of(labelpathed)
+    return Shell.of(labelpathed, this.rootBox)
   }
   // --
 
-  // == [Checks]: scope, rootBox, queryClient, #rootBoxScope, #demandOwnScope, #checkedDelivered, #demandReady, #scopeOfQueryKey
+  // == [Checks]: scope, rootBox, queryClient, #rootBoxScope, #demandOwnScope, #demandItemScope, #demandListingScope, #checkedDelivered, #demandReady, #scopeOfQueryKey
 
   /** The scope of this minder's bank. */
   get scope(): ThingWatchScope { return { userid: this.userid, banklabel: this.banklabel } }
 
-  /** The bank's root box, the parent of every box: before the bank's birth, its shell. */
-  get rootBox(): MinderFriend['rootBox'] { return this.#bank.rootBox }
+  /** The bank's root box, the parent of every box, from its world in the BankMinder: its shell while none is heard of. */
+  get rootBox(): BoxRecord | ShellOf<BoxRecord> {
+    return this.#bankMinder.worldAt(this.scope)?.root ?? Shell.of(this.#rootBoxScope) as ShellOf<BoxRecord>
+  }
 
   /** The QueryClient this minder caches in: hand it to TanStack's `QueryClientProvider` to observe what it caches. */
   get queryClient(): TSQ.QueryClient { return this.#tsq }
@@ -550,6 +562,20 @@ export class VaultMinder {
   #demandOwnScope(labelpathed: Labelpathed): ThingScope {
     // Its fields alone: an ask or a record passes, and is read as its scope.
     return ThingChecks.thingScope.parseConsistent(labelpathed, this.scope)
+  }
+
+  /** The scope of `labelpathed`, demanding that it is a box of this minder's bank under the root box. */
+  #demandItemScope(labelpathed: Labelpathed): ThingScope {
+    const scope = this.#demandOwnScope(labelpathed)
+    if (! isMindedLabelpath(scope.labelpath)) { throw Throwers.boxesOnly() }
+    return scope
+  }
+
+  /** The scope of `labelpathed`, demanding that it is the root box or a box of this minder's bank. */
+  #demandListingScope(labelpathed: Labelpathed): ThingScope {
+    const scope = this.#demandOwnScope(labelpathed)
+    if (! Labelpath.isBox(scope.labelpath)) { throw Throwers.boxesOnly() }
+    return scope
   }
 
   /** `record`, refused where it is of another bank, or of another labelpath than `scoped` names. */
@@ -595,6 +621,8 @@ export class VaultMinder {
     if (! isTellableTSQEvent(tsqEvent)) { return undefined }
     if (! TSQ.partialMatchKey(tsqEvent.query.queryKey, bankKeyHeadOf(this.scope))) { return undefined }
     const { queryKey, queryHash, state } = tsqEvent.query
+    // A shared client may hold a host's own queries under the bank's key head, such as the giver's main gate.
+    if (! Entrykinds.has(queryKey[EntrykindIdx])) { return undefined }
     const { labelpath } = this.#scopeOfQueryKey(queryKey)
     const told = {
       eventkind: queryKey[EntrykindIdx] as MinderEventkind,
@@ -618,7 +646,7 @@ export class VaultMinder {
   // --
 }
 
-// == [Helpers]: Itemkind, Soonkind, Listkind, EntrykindIdx, Marks, labelsOf, bankKeyHeadOf, bankHashOf, Lander, LandersOfClient, BareListedAt, TellableTSQEvent, isTellableTSQEvent, isNewer, isOlder, gotAnswerOf, isTimelyQuery, listingOf, landedListingOf
+// == [Helpers]: Itemkind, Soonkind, Listkind, EntrykindIdx, Marks, Entrykinds, labelsOf, isMindedLabelpath, bankHashOf, Lander, LandersOfClient, BareListedAt, TellableTSQEvent, isTellableTSQEvent, isNewer, isOlder, gotAnswerOf, isTimelyQuery, listingOf, landedListingOf
 
 /** The entrykind segment of an item's query key. */
 const Itemkind = 'item'
@@ -630,14 +658,18 @@ const Listkind = 'list'
 const EntrykindIdx = 3
 /** The marks a query key's labels end at. */
 const Marks: ReadonlySet<unknown> = new Set(['!', '~', '#'])
+/** The entrykind segments of the minder's own keys. */
+const Entrykinds: ReadonlySet<unknown> = new Set([Itemkind, Soonkind, Listkind])
 
 /** The labels of `labelpath`, with '/' between them, as a query key spells them. */
 function labelsOf(labelpath: Labelpath): string[] {
   return labelpath.split('/').flatMap((label) => ['/', label]).slice(1)
 }
 
-/** The part of a query key that every key of `scope`'s bank has in common. */
-function bankKeyHeadOf({ userid, banklabel }: BankScope): string[] { return ['sok', userid, banklabel] }
+/** True for the labelpath of a box under the root box: a Thing whose item and soon a VaultMinder caches. */
+function isMindedLabelpath(labelpath: Labelpath): boolean {
+  return Labelpath.isBox(labelpath) && (labelpath !== Labelpath.RootBox)
+}
 
 /** The hash of `queryKey`'s first three segments, which are its bank's where it is a minder's key. */
 function bankHashOf(queryKey: TSQ.QueryKey): string { return TSQ.hashKey(queryKey.slice(0, EntrykindIdx)) }
@@ -714,6 +746,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
   minderMakeArgs: obj({
     opts: obj({
       vaultDB:        ThingChecks.vaultDBShape,
+      bankMinder:     custom<BankMinder>((val) => val instanceof BankMinder, Phrases.BankMinderExpected),
       queryCacheOpts: MinderChecks.queryCacheOptsOrDefault,
       queryClient:    custom<TSQ.QueryClient>((val) => VaultMinder.isClient(val), Phrases.MinderClientExpected).optional(),
     }),

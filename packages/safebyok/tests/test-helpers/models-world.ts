@@ -20,9 +20,9 @@ import type { Vault } from '../../src/models/vault'
 import type { VaultMinder } from '../../src/minding/vault-minder'
 import { PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
 import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
-import type { BankMakeRecord, DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
+import type { DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
 import type { ShellOf } from '../../src/shapes/shapes-sealers'
-import type { BoxRecord, GateRecord } from '../../src/shapes/shapes-thing'
+import type { BankRecord, BoxRecord, GateRecord } from '../../src/shapes/shapes-thing'
 import type { GateRevisionedStamp, GatingCleartexts, LeaseGate, ProvingDevice, StrengthChecker } from '../../src/shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { Shell, ThingFormat } from '../../src/shapes/shapes-thing'
@@ -126,8 +126,8 @@ export interface BornBankGiven {
 export interface BornBank {
   device:     Device
   bank:       Bank
-  /** The bank's Thing with its root box, as the birth stored them: what `Bank.make` takes. */
-  record:     BankMakeRecord
+  /** The bank's Thing, as the birth stored it: what `Bank.make` takes. */
+  record:     BankRecord
   /** The main gate's Thing, as the birth stored it. */
   gateRecord: GateRecord
   proving:    PassphraseProving
@@ -142,7 +142,7 @@ export async function buildBornBank({ passkeyCleartext, device = makeDevice() }:
   try {
     const bank = await Bank.birth(device, { passphraseCleartext: TestPassphrase, passkeyCleartext: passkeyCleartext && copyOfAnswer(passkeyCleartext) })
     const proving = await PassphraseProving.buildStored(device, bank.gate, TestPassphrase)
-    return { device, bank, record: { ...bank.pickle(), rootBox: bank.rootBox }, gateRecord: bank.gate.pickle(), proving }
+    return { device, bank, record: bank.pickle(), gateRecord: bank.gate.pickle(), proving }
   } finally {
     mintStamps.mockRestore()
   }

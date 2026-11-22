@@ -130,8 +130,8 @@ export function boxListQueryKeyOf({ userid, banklabel }: Readonly<{ userid: User
   return (userid === null) ? ['sok', null, banklabel, 'box', '#', 'kids'] : VaultMinder.listQueryKeyOf({ userid, banklabel, labelpath: 'box' })
 }
 
-/** The React Query key for the bank's main gate: the key the bank's minder caches its item under, or one of no user's while `userid` is null. */
+/** The host's React Query key for the bank's main gate, `userid` null while nobody is signed in. */
 export function gateQueryKeyOf({ userid, banklabel }: Readonly<{ userid: Userid | null, banklabel: string }>): QueryKey {
-  return (userid === null) ? ['sok', null, banklabel, Labelpath.MainGate] : VaultMinder.itemQueryKeyOf({ userid, banklabel, labelpath: Labelpath.MainGate })
+  return ['sok', userid, banklabel, Labelpath.MainGate]
 }
 // --

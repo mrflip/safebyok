@@ -8,7 +8,7 @@ import { type ReactNode, createContext, useCallback, useContext, useEffect, useM
 import {
   type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, Labelpath,
   type LiveOf, type LivePublicPropsOf, MinderEventFormat, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
-  PendingBank, type Sidecar, VaultMinder, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
+  PendingBank, Shell, type Sidecar, VaultMinder, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
 } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
@@ -197,7 +197,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     const [device, setDevice] = useState<Device | null>(null)
     // Made in the effect, not in render: Device.make checks the secure context, and a server has no device to make.
     // The mount keeps its first device, so StrictMode's second run of the effect starts nothing more. `hello` fetches the
-    // bank, its main gate and root box through the minder, and answers its first call to every later one.
+    // bank, its main gate and root box as its world, and answers its first call to every later one.
     const startDevice = useEffectEvent((signedIn: string) => {
       // Cheat (react_life): a fresh device_tok for each device. Nothing keeps one across a reload yet.
       mount.device ??= Device.make({ userid: signedIn, banklabel, device_tok: globalThis.crypto.randomUUID() }, {
@@ -212,6 +212,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     }, [mount])
     useEffect(() => { if (typeof userid === 'string') { startDevice(userid) } }, [userid])
     useEffect(() => ((device === null) ? undefined : refetchMarked(device.minder)), [device])
+    useEffect(() => ((device === null) ? undefined : refetchGateOnWorld(device, mount.client)), [device, mount])
     const shown = useMemo(() => shownOf(device, userid, mount.client), [device, userid, mount])
     return <ShownContext value={shown}><GiverContext value={given}>{children}</GiverContext></ShownContext>
   }
@@ -300,8 +301,6 @@ function shownOf(device: Device | null, userid: string | null | undefined, clien
 
 /** The hooks and calls of the bank `friend` serves. */
 function makeBankGiver(friend: BankFriend) {
-  /** The main gate as the minder caches it: its whole record, or its shell where none is stored. */
-  type GateStored = GateRecord | Tombstone<GateRecord>
   const { banklabel, signedIn, clientNow, demandDevice, demandBank, demandVault, useShown } = friend
 
   /** The bank's snapshot. Synchronous: it never waits and never suspends.
@@ -391,7 +390,7 @@ function makeBankGiver(friend: BankFriend) {
     return useQuery<BoxShown, Error, SelT>({ ...boxQueryBaseOf(device, labelpath, isUp), select: liveOf as (thing: BoxShown) => SelT, ...shaping }, client)
   }
 
-  // The client caches the whole gate, so each `select` starts from the gate without the bankKeys its wayins wrap.
+  // The client caches the gate without the bankKeys its wayins wrap: the whole gate stays in the device's BankMinder.
   /** The bank's main gate, through React Query: its wayins' headers, never the bankKey they wrap.
    * `data` is the gate, null when no bank is stored, and undefined while pending or until the bank is brought up.
    * Its `wayins.passkey0` is the header of the bank's passkey, or null while it has none: a passkey added or revoked on any device shows here.
@@ -404,15 +403,16 @@ function makeBankGiver(friend: BankFriend) {
     const { device, client } = useShown()
     const isUp = useBank(isBroughtUp)
     const { select = liveGateOf as (gate: GateShown) => SelT, ...shaping } = pick(opts, GateShapingOptnames)
-    return useQuery<GateStored, Error, SelT>({ ...gateQueryBaseOf(device, isUp), select: (gate) => select(gateShownOf(gate)), ...shaping }, client)
+    return useQuery<GateShown, Error, SelT>({ ...gateQueryBaseOf(device, isUp), select, ...shaping }, client)
   }
 
   /** The key, fetch and defaults of the query of `device`'s main gate, skipping the fetch unless `isUp`, the bank brought up. */
-  function gateQueryBaseOf(device: Device | null, isUp: boolean): Pick<UseQueryOptions<GateStored>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
+  function gateQueryBaseOf(device: Device | null, isUp: boolean): Pick<UseQueryOptions<GateShown>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
     return {
-      ...recordQueryDefaults(() => isBehindAt(device, Labelpath.MainGate)),
+      // The bank's world keeps no newer revision apart from the gate it has, so the gate is never behind.
+      ...recordQueryDefaults(() => false),
       queryKey: gateQueryKeyOf({ userid: useridOf(device), banklabel }),
-      ...((! isUp || (device === null)) && { queryFn: skipToken }),
+      queryFn:  (isUp && (device !== null)) ? () => gateShownOfWorld(device) : skipToken,
     }
   }
 
@@ -685,7 +685,7 @@ function makeBankGiver(friend: BankFriend) {
 }
 // --
 
-// == [Helpers]: useridOf, isBroughtUp, isBehindAt, refetchMarked, BoxShapingOptnames, GateShapingOptnames, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
+// == [Helpers]: useridOf, isBroughtUp, isBehindAt, refetchMarked, gateShownOfWorld, refetchGateOnWorld, BoxShapingOptnames, GateShapingOptnames, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
 
 /** `device`'s userid, or null for no device. */
 function useridOf(device: Device | null): Userid | null {
@@ -715,6 +715,20 @@ function refetchMarked(minder: VaultMinder): () => void {
     if (event.action?.type !== (isSoon ? 'success' : 'invalidate')) { return }
     void client.refetchQueries({ queryKey: isSoon ? minder.itemQueryKey(event) : event.queryKey, exact: true, type: 'active' }, { cancelRefetch: false })
   }, MinderEventFormat)
+}
+
+/** `device`'s main gate, from its bank's world, as the giver's client holds it: its shell where no world is heard of. */
+function gateShownOfWorld(device: Device): GateShown {
+  const gate = device.bankMinder.worldAt(device.scope)?.gate ?? Shell.of({ ...device.scope, labelpath: Labelpath.MainGate }) as Tombstone<GateRecord>
+  return gateShownOf(gate)
+}
+
+// The gate's query reads the BankMinder's world, which is cached in a client of its own: each change to a world refetches
+// the query where a hook observes it, and leaves it stale for the next hook to mount.
+/** Refetch the main gate's query in `client` each time `device`'s BankMinder hears of a change to a world. Returns the function that stops it. */
+function refetchGateOnWorld(device: Device, client: QueryClient): () => void {
+  const queryKey = gateQueryKeyOf({ userid: device.userid, banklabel: device.banklabel })
+  return device.bankMinder.subscribe(() => { void client.invalidateQueries({ queryKey, exact: true }) })
 }
 
 /** The options of React Query's that a record hook takes from its caller: those that shape what that one hook shows. */

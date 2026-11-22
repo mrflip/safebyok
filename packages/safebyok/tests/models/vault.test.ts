@@ -41,12 +41,12 @@ async function bumpApicalls(vault: Vault): Promise<BoxRecord> {
 }
 
 /** A vault of `bank` beside the one its device made, with a minder of its own, befriending the bank, that has not said `hello`. */
-function vaultBesideOf(bank: Bank): Vault { return Vault.make(bank, VaultMinder.make({ vaultDB: bank.vaultDB }, bank)) }
+function vaultBesideOf(bank: Bank): Vault { return Vault.make(bank, VaultMinder.make({ vaultDB: bank.vaultDB, bankMinder: bank.device.bankMinder }, bank)) }
 
 describe("Vault.make(bank, minder)", () => {
   it("makes the vault of the bank's boxes, over the minder given, which waits for its hello", async () => {
     const { bank } = await TH.buildBornBank()
-    const minder = VaultMinder.make({ vaultDB: bank.vaultDB }, bank)
+    const minder = VaultMinder.make({ vaultDB: bank.vaultDB, bankMinder: bank.device.bankMinder }, bank)
     const vault = Vault.make(bank, minder)
     expect(vault.bank).to.equal(bank)
     expect(vault.minder).to.equal(minder)
@@ -675,36 +675,3 @@ function refuseGets(bank: Bank) {
   return vi.spyOn(bank.vaultDB, 'tryGetThing').mockImplementation((ask) => Promise.resolve(refusedAnswerOf(ask, refusal)))
 }
 
-/** The revtok of `minder`'s item at `labelpath` at the moment each write the vaultDB answers comes back to its caller. */
-function itemsOnAnswer(bank: Bank, minder: VaultMinder, labelpath: string): (string | undefined)[] {
-  const tryWriteThing = bank.vaultDB.tryWriteThing.bind(bank.vaultDB)
-  const seen: (string | undefined)[] = []
-  vi.spyOn(bank.vaultDB, 'tryWriteThing').mockImplementation(async (ask) => {
-    const answer = await tryWriteThing(ask)
-    seen.push(minder.at(scopeAt(bank, labelpath))?.revtok)
-    return answer
-  })
-  return seen
-}
-
-// Bank.put and the gate verbs write through the vaultDB, not the minder. Every adapter built on AdapterVaultDB (the
-// MemoryVaultDB here, and Postgres's) tells each watch of the bank about the bank, main gate and root box records a write
-// answers with, before the write's answer reaches its caller (VaultDB.watch): so a minder of the bank has the bank or
-// gate record a verb wrote before the verb resumes. A box's good write is no tracked record: the caller lands it.
-describe("a vault's minder, beside the bank's own writes", () => {
-  it("has cached the bank's Thing that bank.put wrote before it resolves", async () => {
-    const { bank, minder } = await TH.buildBornVault()
-    const seen = itemsOnAnswer(bank, minder, 'bank')
-    const written = await bank.put({ cited: bank.pickle(), record: { ...bank.pickle(), revtok: TH.revtokOf('bank1'), revseq: bank.revseq + 1, written_at: bank.written_at + 1 } })
-    expect(seen).to.deep.equal([written.revtok])
-    expect(minder.at(scopeAt(bank, 'bank'))!).to.include({ revtok: written.revtok, revseq: 1 })
-  })
-
-  it("has cached the main gate a gate verb wrote before the verb resolves", async () => {
-    const { bank, minder } = await TH.buildBornVault()
-    const seen = itemsOnAnswer(bank, minder, 'gate')
-    const after = await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'another horse battery staple' })
-    expect(seen).to.deep.equal([after.revtok])
-    expect(minder.at(scopeAt(bank, 'gate'))!).to.include({ revtok: after.revtok })
-  })
-})
