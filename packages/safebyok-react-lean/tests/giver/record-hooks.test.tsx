@@ -254,7 +254,7 @@ describe("useBoxList over the minder's own listing", () => {
   })
 })
 
-describe("useGate over the minder's own cache", () => {
+describe("useGate over the BankMinder's world", () => {
   it("shows a passkey another device adds, without fetching again, and without the bankKey it wraps", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     let header: PasskeyWayinHeader | null | undefined
@@ -276,7 +276,7 @@ describe("useGate over the minder's own cache", () => {
     })
     await waitFor(() => { expect(header?.wayinkind).to.eq('passkey') })
     expect(get.mock.contexts.filter((context) => context === minder)).to.have.lengthOf(0)
-    // The minder's own item has the whole gate, by design; the host's cache and the page have none of it.
+    // The BankMinder's world has the whole gate, by design; the giver's client and the page have none of it.
     const stored = world.vaultDB._cheat_things(LeanTH.WorldScope).get('gate') as GateRecord
     TH.expectTextUnheld(stored.wayins.passkey0!.bank_key_wayin_wrapped.ciphertext_b64, container, world.client)
   })

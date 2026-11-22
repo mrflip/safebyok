@@ -2,7 +2,7 @@
 
 import { type QueryKey, replaceEqualDeep } from '@tanstack/react-query'
 import {
-  type GateRecord, type Gating, Labelpath, type LiveOf, type PasskeyWayinHeader, type Sparse, Thing, type ThingCited, ThingChecks, VaultMinder, type ThingRecord, type Tombstone, type Userid, type WayinHeader, type WayinRecord, newerThingOf,
+  type GateRecord, type Gating, type LiveOf, type PasskeyWayinHeader, type Sparse, Thing, type ThingCited, ThingChecks, VaultMinder, type ThingRecord, type Tombstone, type Userid, type WayinHeader, type WayinRecord, newerThingOf,
 } from 'safebyok'
 import type { GateShown, HeaderedGate } from './react-giver'
 
@@ -103,7 +103,7 @@ async function attemptGating(gating: Gating): Promise<void> { await gating.attem
 function vacateGating(_data: unknown, _err: Error | null, gating: Gating): void { gating.vacate() }
 // --
 
-// == [Keys]: formMutationKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, boxListQueryKeyOf, gateQueryKeyOf
+// == [Keys]: formMutationKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, boxListQueryKeyOf
 
 /** The host's React Query key for the mutation of the form verb `verb` in `userid`'s bank, `userid` null while nobody is signed in. */
 export function formMutationKeyOf({ userid, banklabel, verb }: Readonly<{ userid: Userid | null, banklabel: string, verb: string }>): QueryKey {
@@ -128,10 +128,5 @@ export function boxesQueryKeyUnder({ userid, banklabel, labelpath }: Readonly<{ 
 /** The React Query key for the listing of the root box's children: the key the bank's minder caches it under, or one of no user's while `userid` is null. */
 export function boxListQueryKeyOf({ userid, banklabel }: Readonly<{ userid: Userid | null, banklabel: string }>): QueryKey {
   return (userid === null) ? ['sok', null, banklabel, 'box', '#', 'kids'] : VaultMinder.listQueryKeyOf({ userid, banklabel, labelpath: 'box' })
-}
-
-/** The host's React Query key for the bank's main gate, `userid` null while nobody is signed in. */
-export function gateQueryKeyOf({ userid, banklabel }: Readonly<{ userid: Userid | null, banklabel: string }>): QueryKey {
-  return ['sok', userid, banklabel, Labelpath.MainGate]
 }
 // --

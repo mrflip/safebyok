@@ -402,7 +402,6 @@ describe("useGate", () => {
   it("answers undefined and fetches nothing while nobody is signed in", async () => {
     const { result, world } = await renderUnder((world) => world.Bank.useGate(), { stored: 'jokes' }, { userid: null })
     expect(result.current.data).to.be.undefined
-    expect(result.current.fetchStatus).to.eq('idle')
     expect(world.counts.gets).to.eq(0)
   })
 
@@ -412,12 +411,11 @@ describe("useGate", () => {
     await waitFor(() => { expect(result.current.gate.data).to.be.null })
   })
 
-  it("answers the stored gate with no passkey, keyed by keys.gate()", async () => {
+  it("answers the stored gate with no passkey, and caches nothing of it in the giver's client", async () => {
     const { result, world } = await renderGate()
     expect(result.current.header).to.be.null
     expect(result.current.gate.data?.wayins.main.wayinkind).to.eq('passphrase')
-    expect(world.Bank.keys.gate()).to.deep.equal(['sok', 'u1', 'acme', 'gate'])
-    expect(world.Bank.queryClient().getQueryData(world.Bank.keys.gate())).to.have.property('wayins')
+    expect(world.Bank.queryClient().getQueryCache().findAll().map((tsqQuery) => tsqQuery.queryKey)).to.not.deep.include(['sok', 'u1', 'acme', 'gate'])
   })
 
   // useGate @example
