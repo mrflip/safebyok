@@ -7,7 +7,7 @@ import { Life0, ThingBank, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAs
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 import { Thing } from '../../src/models/thing'
 
-/** A box under the root box that fails its checks, which a store of a row's columns alone can still contain. */
+/** A box under the root box that fails its checks, which a datastore that keeps only a row's columns can still contain. */
 const DamagedBox = Object.freeze({ ...boxThingOf('bad'), whisper_sealed: {} })
 
 /** The children `vaultDB` lists under the Thing at `labelpath`, or throw. */

@@ -37,7 +37,7 @@ export const OtherMainWayin = WayinChecks.passphraseWayinRecord.parse({ ...MainW
 export const MainOnly = Object.freeze({ main: MainWayin, passkey0: null })
 /** The main gate's wayins with a passkey wayin beside its passphrase wayin. */
 export const WithPasskey = Object.freeze({ main: MainWayin, passkey0: Passkey0Wayin })
-/** A sealed whisper with fake ciphertext: the store checks only its shape. */
+/** A sealed whisper with fake ciphertext: the concrete adapter checks only its shape. */
 export const FakeSealed = Object.freeze({ key_wrapped: FakeCiphered, ciphered: FakeCiphered, codectag: 'json_v1', schematag: 'test_v1' })
 
 /** Life 0's lifeseq, which is also a root's lifepath in its first life. */

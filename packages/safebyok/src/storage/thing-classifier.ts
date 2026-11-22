@@ -115,13 +115,13 @@ export function writeActOf(ask: WriteCmpAsk, stored: ThingCited | null): EX.PutA
 /** True when `act` refuses the ask. */
 export function isRefusedAct(act: string): act is EX.RefusedAct { return (EX.refusedActVals as readonly string[]).includes(act) }
 
-/** True when `act` tells the store to write the ask's record. */
+/** True when `act` tells the concrete adapter to write the ask's record. */
 export function isWriteAct(act: string): act is EX.WriteAct { return (EX.writeActVals as readonly string[]).includes(act) }
 // --
 
 // == [Things stored]: RowOfOtherScope, StoredCheck, storedOf, writtenOf, storedCitedOf, storedThingOf, writtenThingOf, writtenRootsOf, listedThingOf, watchedThingOf, BankRootsFetched, WorldFetched, worldOf
 // A Thing that fails its kind's checks is damaged, and refuses `damaged_row`. One that is not an object, or a sound one
-// stored at another scope than the one asked for, means the store or its adapter is broken, and refuses `storage_issue`.
+// stored at another scope than the one asked for, means the datastore or its concrete adapter is broken, and refuses `storage_issue`.
 
 const RowOfOtherScope = { kind: 'storage_issue', message: BigPhrases.rowOfOtherAddress } as const
 
@@ -133,7 +133,7 @@ function storedOf<RecordT extends object>(check: StoredCheck<RecordT>, scope: Th
   return (raw === null) ? null : writtenOf(check, scope, raw)
 }
 
-/** The Thing the store reports writing at `scope`, checked by `check`. */
+/** The Thing the concrete adapter reports writing at `scope`, checked by `check`. */
 function writtenOf<RecordT extends object>(check: StoredCheck<RecordT>, { userid, banklabel, labelpath }: ThingScope, raw: unknown): RecordT {
   if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
   return check.parseConsistent(raw, { userid, banklabel, labelpath }, RowOfOtherScope)
@@ -146,10 +146,10 @@ const storedCitedChecker = ThingChecks.storedCited.refusingAs('damaged_row')
 /** The Thing stored at `scope`, checked, or null for none. */
 export function storedThingOf(scope: ThingScope, raw: unknown): ThingRecord | null { return storedOf<ThingRecord>(ThingkindChecks.ofLabelpath(scope.labelpath).stored, scope, raw) }
 
-/** The Thing the store reports writing at `scope`, checked. */
+/** The Thing the concrete adapter reports writing at `scope`, checked. */
 export function writtenThingOf(scope: ThingScope, raw: unknown): ThingRecord { return writtenOf<ThingRecord>(ThingkindChecks.ofLabelpath(scope.labelpath).stored, scope, raw) }
 
-/** The three roots the store reports writing for a birth's `puts`, checked. */
+/** The three roots the concrete adapter reports writing for a birth's `puts`, checked. */
 export function writtenRootsOf([bankPut, gatePut, rootPut]: BirthPuts, written: BankRootsFetched): BankRoots {
   return {
     bank: writtenOf(BankChecks.stored, bankPut, written.bank),
@@ -174,10 +174,10 @@ export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): ThingR
   return writtenThingOf(scopeReport.data, raw)
 }
 
-/** The raw bank, main gate and root box a store fetched for a bank's birth, each null for none, and its {@link TrackedFetched}. */
+/** The raw bank, main gate and root box a concrete adapter fetched for a bank's birth, each null for none, and its {@link TrackedFetched}. */
 export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: unknown, tracked?: TrackedFetched }>
 
-/** The raw bank and main gate a store fetched for an ask's bank, each null for none, and its {@link TrackedFetched}. */
+/** The raw bank and main gate a concrete adapter fetched for an ask's bank, each null for none, and its {@link TrackedFetched}. */
 export type WorldFetched = Readonly<{ bank: unknown, maingate: unknown, tracked?: TrackedFetched }>
 
 // A world is news, never the verdict: a bank or main gate that fails its checks leaves it null, and the step's answer stands.
@@ -192,16 +192,16 @@ export function worldOf({ userid, banklabel }: ThingWatchScope, fetched: WorldFe
 // --
 
 // == [Tracked]: TrackedFetched, TrackedRows, trackedFetchedOf, trackedFieldOf, trackedEntryOf
-// The store compares what an ask tracks with the bank, main gate and root box it fetched, in the step that fetched them.
-// The adapter checks each row the store reports in place of 'same'.
+// The concrete adapter compares what an ask tracks with the bank, main gate and root box it fetched, in the step that fetched them.
+// `AdapterVaultDB` checks each row the concrete adapter reports in place of 'same'.
 
-/** A store's report on the bank, main gate and root box an ask tracks: for each, `'same'` or the raw Thing. Null or left out for an ask that tracks nothing. */
+/** A concrete adapter's report on the bank, main gate and root box an ask tracks: for each, `'same'` or the raw Thing. Null or left out for an ask that tracks nothing. */
 export type TrackedFetched = Readonly<{ bank: unknown, [Labelpath.MainGate]: unknown, [Labelpath.RootBox]: unknown }> | null
 
-/** The raw bank, main gate and root box a store fetched, each null for none, under its key in a `track`. */
+/** The raw bank, main gate and root box a concrete adapter fetched, each null for none, under its key in a `track`. */
 export type TrackedRows = Readonly<{ bank: unknown, [Labelpath.MainGate]: unknown, [Labelpath.RootBox]: unknown }>
 
-/** The {@link TrackedFetched} report of what `ask` tracks against the raw rows a store fetched, for a store that compares in TypeScript. */
+/** The {@link TrackedFetched} report of what `ask` tracks against the raw rows a concrete adapter fetched, for one that compares in TypeScript. */
 export function trackedFetchedOf({ track }: AnyAsk, rows: TrackedRows): TrackedFetched {
   if (track === undefined) { return null }
   return {
@@ -216,7 +216,7 @@ function trackedRawOf(pair: Track['bank'], raw: unknown): unknown {
   return (CX.isPlainBag(raw) && (raw['revseq'] === pair.revseq) && (raw['lifepath'] === pair.lifepath)) ? 'same' : raw
 }
 
-/** The answer's `tracked`, checked, as a field to spread into it, from the store's report for the bank at `bankScope`: none for an ask that tracks nothing. */
+/** The answer's `tracked`, checked, as a field to spread into it, from the concrete adapter's report for the bank at `bankScope`: none for an ask that tracks nothing. */
 export function trackedFieldOf({ userid, banklabel }: ThingWatchScope, fetched: TrackedFetched | undefined): { tracked?: Tracked } {
   if ((fetched === null) || (fetched === undefined)) { return {} }
   return { tracked: {
@@ -236,7 +236,7 @@ function trackedEntryOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>
 // Each is given the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`;
 // a birth is given the bank's three roots, and where it is born, reports the world its puts wrote.
 
-/** Classify a get against the raw Thing a store fetched at its scope, null for none. */
+/** Classify a get against the raw Thing a concrete adapter fetched at its scope, null for none. */
 export function classifyGetThing(ask: GetAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.GotAct> {
   const stored = storedThingOf(ask, raw)
   const act    = getActOf(ask, stored)
@@ -245,9 +245,9 @@ export function classifyGetThing(ask: GetAsk, raw: unknown, worldFetched: WorldF
   return isRefusedAct(act) ? { ok: false, act, world, record: stored, ...beside } : { ok: true, act, world, record: stored, ...beside }
 }
 
-/** Classify a write against the raw Thing a store fetched at its scope, null for none.
+/** Classify a write against the raw Thing a concrete adapter fetched at its scope, null for none.
  * Where the write would replace a live Thing, it also checks the born_at and the storage policies, and where it puts or deletes
- * the bank over a live bank, the lifetok. Under a write act, `record` is `ask.record`: the store writes it, then reports the
+ * the bank over a live bank, the lifetok. Under a write act, `record` is `ask.record`: the concrete adapter writes it, then reports the
  * Thing it wrote and the world after the write.
  */
 export function classifyWriteThing(ask: WriteAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.PutAct | EX.DelAct> {
@@ -262,7 +262,7 @@ export function classifyWriteThing(ask: WriteAsk, raw: unknown, worldFetched: Wo
   return { ok: true, act, world: worldOf(ask, worldFetched), record: ask.record, ...trackedFieldOf(ask, worldFetched.tracked) }
 }
 
-/** The raw rows a store fetched for a listing: the parent (null for none), and each child one label under it, with its labelpath. */
+/** The raw rows a concrete adapter fetched for a listing: the parent (null for none), and each child one label under it, with its labelpath. */
 export type ThingsFetched = Readonly<{ parent: unknown, children: readonly Readonly<{ labelpath: Labelpath, raw: unknown }>[] }>
 
 /** Classify a listing against the {@link ThingsFetched} rows: the parent's get act, the parent, the children of its live life in labelpath order,
@@ -297,8 +297,8 @@ function isChildLabelpath(ask: ListAsk, labelpath: Labelpath): boolean {
   return labelpath.startsWith(`${ask.labelpath}/`) && (! label.includes('/')) && Labelpath.isOfModelkind(labelpath, ask.modelkind)
 }
 
-/** Classify a bank's birth, by its three `puts`, against the raw roots a store fetched.
- * Under `born`, `things` and `world` are made of the puts' records, for the store to write in one step. The store then reports
+/** Classify a bank's birth, by its three `puts`, against the raw roots a concrete adapter fetched.
+ * Under `born`, `things` and `world` are made of the puts' records, for the concrete adapter to write in one step. It then reports
  * them as written, with any `tracked` read after the write. Otherwise the answer is {@link unwrittenBirthOf}'s.
  */
 export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual {
@@ -311,10 +311,10 @@ export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): B
 // --
 
 // == [Steps]: unwrittenWriteOf, UnwrittenWrite, demandBornAtKept, demandLifetokKept, demandPolicies, unwrittenBirthOf
-// The steps of the classifiers above, for a store that checks some preconditions itself to call in its own order.
+// The steps of the classifiers above, for a concrete adapter that checks some preconditions itself to call in its own order.
 
-/** The answer to a write the act tables leave unwritten, a refusal or `passed`, from the raw Thing a store fetched at its scope.
- * `world` is the raw world the store fetched beside it.
+/** The answer to a write the act tables leave unwritten, a refusal or `passed`, from the raw Thing a concrete adapter fetched at its scope.
+ * `world` is the raw world the concrete adapter fetched beside it.
  */
 export function unwrittenWriteOf(raw: unknown, { ask, act, world }: UnwrittenWrite): Actual<EX.PutAct | EX.DelAct> {
   const record  = storedThingOf(ask, raw)
@@ -323,16 +323,16 @@ export function unwrittenWriteOf(raw: unknown, { ask, act, world }: UnwrittenWri
   return isRefusedAct(act) ? { ok: false, act, world: worldRecord, record, ...beside } : { ok: true, act, world: worldRecord, record, ...beside }
 }
 
-/** An unwritten write, for {@link unwrittenWriteOf}: the write, the act the act tables found, and the raw world the store fetched. */
+/** An unwritten write, for {@link unwrittenWriteOf}: the write, the act the act tables found, and the raw world the concrete adapter fetched. */
 export type UnwrittenWrite = Readonly<{ ask: WriteAsk, act: Exclude<EX.PutAct | EX.DelAct | EX.RefusedAct, EX.WriteAct>, world: WorldFetched }>
 
-/** Throw `bad_record` unless `ask` leaves unchanged the born_at of the live Thing it replaces, the raw Thing a store fetched at its scope. */
+/** Throw `bad_record` unless `ask` leaves unchanged the born_at of the live Thing it replaces, the raw Thing a concrete adapter fetched at its scope. */
 export function demandBornAtKept(ask: WriteAsk, raw: unknown): void {
   if (ask.record.born_at === storedCitedOf(ask, raw)?.born_at) { return }
   throw Throwers.bornAtNotStored(storedThingOf(ask, raw))
 }
 
-/** Throw `bad_record` if `ask` writes the bank, a put or a del, over a live bank stored with another lifetok, the raw Thing a store fetched at its scope.
+/** Throw `bad_record` if `ask` writes the bank, a put or a del, over a live bank stored with another lifetok, the raw Thing a concrete adapter fetched at its scope.
  * A write over a tombstone or none is a birth, and may carry any lifetok.
  */
 export function demandLifetokKept(ask: WriteAsk, raw: unknown): void {
