@@ -4,6 +4,7 @@ import { useId, useRef, useState } from 'react'
 import { useGivenBank } from '../giver/giver-context'
 import type { BankGiver } from '../giver/react-giver'
 import { PassphraseInput } from '../parts/passphrase-input'
+import { SubmitButton } from '../parts/submit-button'
 import { formActionOf } from './form-action'
 import { ModalDialog } from './modal-dialog'
 import { KitPhrases, refusalTextOf } from './phrases-kit'
@@ -61,7 +62,7 @@ export function UnlockForm({ bank: bankProp, username, onCancel }: Readonly<Unlo
         isPending={isUnlocking}
       />
       <div role="alert" id={alertId}>{isRefused && refusalTextOf(unlock.error)}</div>
-      <button type="submit" disabled={isUnlocking}>{isUnlocking ? KitPhrases.unlockingButton : KitPhrases.unlockButton}</button>
+      <SubmitButton isPending={isUnlocking} whilePending={KitPhrases.unlockingButton}>{KitPhrases.unlockButton}</SubmitButton>
       {(onCancel !== undefined) && <button type="button" onClick={onCancel}>{KitPhrases.cancelButton}</button>}
     </form>
   )
