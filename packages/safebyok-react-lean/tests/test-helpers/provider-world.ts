@@ -182,10 +182,10 @@ export async function buildProviderWorld({ stored = 'none', isInConfig = false, 
   onTestFinished(() => { client.clear() })
   return {
     SOK, Bank: SOK.bank('acme'), vaultDB, deriver, checker, client, counts, _cheat_otherVault: otherVault,
-    pauseGets:     () => pauseAt('ask'),
-    pauseAnswers:  () => pauseAt('answer'),
-    clients:       () => [client, ...devices.map((device) => device.minder.queryClient)],
-    _cheat_device: () => devices[0]!,
+    pauseGets:      () => pauseAt('ask'),
+    pauseAnswers:   () => pauseAt('answer'),
+    clients:        () => [client, ...devices.map((device) => device.minder.queryClient)],
+    _cheat_device:  () => devices[0]!,
     _cheat_devices: () => [...devices],
     _cheat_putJokesKey: async (passphraseCleartext) => {
       const device = makeDeviceUnspied({ ...LeanTH.WorldScope, device_tok: globalThis.crypto.randomUUID() }, { keyDeriver: LeanTH.testDeriver, logger: LeanTH.quietLogger, vaultDB })
