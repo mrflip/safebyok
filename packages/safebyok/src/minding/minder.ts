@@ -36,7 +36,7 @@ export type Labelpathed = { labelpath: Labelpath }
  * A subclass says which Things it minds: a VaultMinder the boxes under the root box, a BankMinder the bank, its main gate and its root box.
  * Each Thing minded has an item, with what a host shows: its live whole record, or {@link Absent} where none is stored live.
  * It may also have a soon, a sparse record newer than the item, removed once the item catches up; and a dead entry, its
- * newest tombstone heard of. Each Thing whose children it minds has a listing of them, once listed.
+ * tombstone that last landed. Each Thing whose children it minds has a listing of them, once listed.
  * Records arrive from gets, lists, good writes, the world each answer carries, and the watch, in any order, late or more
  * than once. A live whole record lands in the item, a sparse record in the soon, and a tombstone in the dead entry and
  * then, as Absent, in the item. A listing is the {@link Kids} value a list answered, replaced whole by the next. A record
@@ -206,7 +206,7 @@ export abstract class Minder {
     return this.#soonAt(this.#demandOwnScope(scoped)) as Sparse<ThingAt<LabelpathT>> | undefined
   }
 
-  /** The newest tombstone of `scoped`'s Thing heard of, or undefined for none. It may be of a life older than the item's. Never asks the vaultDB. */
+  /** The tombstone of `scoped`'s Thing that last landed, or undefined for none. It may be of a life older than the item's. Never asks the vaultDB. */
   deadAt<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): Tombstone<ThingAt<LabelpathT>> | undefined {
     return this.#deadAt(this.#demandOwnScope(scoped))
   }

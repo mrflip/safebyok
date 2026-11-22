@@ -260,7 +260,7 @@ export type SoonEvent<KindT extends Thingkind = Thingkind> = KindT extends Thing
   ? MinderEventOf<Sparse<RecordOfKind<KindT>>, 'soon'> & RecordEventFields<KindT>
   : never
 
-/** A dead entry's query changed, its `eventkind` `'dead'`: the Thing's newest tombstone heard of arrived (`success`), just before
+/** A dead entry's query changed, its `eventkind` `'dead'`: a tombstone of the Thing landed (`success`), just before
  * Absent lands in its item, or it was removed at `goodbye`. `state.data` is the tombstone, and its {@link RecordEventFields} are that tombstone's.
  * A Thing born again keeps its dead entry, of the older life.
  */
