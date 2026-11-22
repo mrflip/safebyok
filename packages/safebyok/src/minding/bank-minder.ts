@@ -52,7 +52,8 @@ export class BankMinder extends Minder {
     return Object.freeze({ bank: bank as BankRecord, gate: gate as GateRecord, root: root as BoxRecord })
   }
 
-  /** Get the root box from the vaultDB, whose answer's world brings the bank and main gate, and answer the bank's roots, or null where none is stored.
+  // A get of the root box: its answer's world brings the bank and main gate.
+  /** Fetch the bank's roots from the vaultDB, or null where none is stored.
    * Refuses where a root is stored without the others, or damaged beside them.
    */
   async fetchWorld(): Promise<BankRoots | null> {
@@ -87,8 +88,11 @@ export class BankMinder extends Minder {
   }
   // --
 
+  // == [Scopes]: #scopeAt
+
   /** The scope of the Thing at `labelpath` in this bank. */
   #scopeAt(labelpath: Labelpath): ThingScope { return { ...this.scope, labelpath } }
+  // --
 }
 
 // == [Helpers]: RootLabelpaths, isRootLanding

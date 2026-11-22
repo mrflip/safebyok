@@ -117,7 +117,7 @@ export function answerNotMade(): Errors.VaultError { return new Errors.VaultErro
 /** The refusal of a minder's item or listing of a Thing it does not mind. */
 export function notMinded(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.NotMinded) }
 
-/** The refusal of a Bank whose world its device's BankMinder does not hold, of the bank's life. */
+/** The refusal of a Bank made or read while its device's BankMinder holds no world of its bank. */
 export function worldNotHeard(): Errors.VaultError { return new Errors.VaultError('record_conflict', Phrases.WorldNotHeard) }
 
 /** The refusal of a read or a write on a minder that is not minding. */

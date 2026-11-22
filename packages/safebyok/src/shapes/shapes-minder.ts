@@ -1,4 +1,4 @@
-/** The shapes of a minder's arguments, options and answers, and of the records its items have, with their checks; and the options every minder pins. */
+/** The shapes of a minder's arguments, options and answers, and of the records its items have, with their checks, and the options every minder pins. */
 
 import * as TSQ from '@tanstack/query-core'
 import type * as Z from 'zod'
