@@ -187,14 +187,4 @@ describe("a shared client's cache", () => {
     expect(isListingStaleAt(mine.minder, TH.RootScope)).to.be.false
     expect(toldOf(mine.heard)).to.deep.equal([])
   })
-
-  it("refuses a second minder of a bank at hello while the first is minding", async () => {
-    const vaultDB     = await storedBanksOf(new MemoryVaultDB(), [TH.ThingBank])
-    const [bankMinder] = await sharedBankMindersOf(vaultDB, [TH.ThingBank])
-    const queryClient = VaultMinder.makeClient()
-    const mine        = sharingMinderOf(vaultDB, bankMinder!, queryClient, TH.ThingBank)
-    const twin        = VaultMinder.make({ vaultDB, bankMinder: bankMinder!, queryClient }, fakeBankOf())
-    TH.expectSyncRefusal(() => { twin.hello() }, 'bad_record')
-    expect(await mine.minder.get(TH.BoxScope)).to.deep.equal(boxIn(TH.ThingBank))
-  })
 })

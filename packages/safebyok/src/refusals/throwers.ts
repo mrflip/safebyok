@@ -115,9 +115,9 @@ export function bankRootsMissing(): Errors.VaultError { return new Errors.VaultE
 export function answerNotMade(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerNotMade) }
 // --
 
-// == [Minding Throwers]: notMinded, worldNotHeard, minderNotStarted, bankMindedInClient, staleRead, childrenStoredDamaged, recordsOfOtherThings
+// == [Minding Throwers]: notMinded, worldNotHeard, minderNotStarted, staleRead, childrenStoredDamaged
 
-/** The refusal of a minder's item or listing of a Thing it does not mind. */
+/** The refusal of a write through a minder of a Thing it does not mind. */
 export function notMinded(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.NotMinded) }
 
 /** The refusal of a Bank made or read while its device's BankMinder holds no world of its bank. */
@@ -126,11 +126,6 @@ export function worldNotHeard(): Errors.VaultError { return new Errors.VaultErro
 /** The refusal of a read or a write on a minder that is not minding. */
 export function minderNotStarted(): Errors.VaultError {
   return new Errors.VaultError('disabled', Phrases.MinderNotStarted)
-}
-
-/** The refusal of a minder's hello while another minder of its bank is minding in the same client. */
-export function bankMindedInClient(): Errors.VaultError {
-  return new Errors.VaultError('bad_record', Phrases.BankMindedInClient)
 }
 
 /** The refusal of a get answered with a revision older than one cached when it began. */
@@ -142,7 +137,4 @@ export function staleRead(ask: GetAsk): Errors.VaultError {
 export function childrenStoredDamaged(ask: ListAsk, damaged_rows: readonly DamagedThing[]): Errors.VaultError {
   return new Errors.VaultError('damaged_row', Phrases.ChildrenStoredDamaged, { meta: { ask: loggableAskOf(ask), labelpaths: damaged_rows.map(({ labelpath }) => labelpath) } })
 }
-
-/** The refusal of the records of two different Things, given to `newerThingOf`. */
-export function recordsOfOtherThings(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.RecordsOfOtherThings) }
 // --

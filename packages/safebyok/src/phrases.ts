@@ -156,7 +156,7 @@ export const BankRootsMissing = "A bank is stored without its main gate or its r
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: MinderFriendExpected, BankMinderExpected, NotMinded, WorldNotHeard, MinderClientExpected, BankMindedInClient, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, RecordsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
+// == [Minding]: MinderFriendExpected, BankMinderExpected, NotMinded, WorldNotHeard, MinderClientExpected, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, DeliveredOfOtherScope, ChildrenStoredDamaged
 
 /** A minder made without a friend: a device or a bank. */
 export const MinderFriendExpected = 'A minder is made with its friend: the device or bank whose Things it minds.'
@@ -164,17 +164,14 @@ export const MinderFriendExpected = 'A minder is made with its friend: the devic
 /** A VaultMinder made without the BankMinder it reads its bank's root box from. */
 export const BankMinderExpected = 'A VaultMinder is made with the BankMinder of its bank, which minds the bank, its main gate and its root box.'
 
-/** A minder asked for an item or a listing it does not mind. */
-export const NotMinded = "A VaultMinder minds the boxes under the root box, and their listings and the root box's; a BankMinder minds the bank, its main gate and its root box."
+/** A write through a minder of a Thing it does not mind. */
+export const NotMinded = "A minder writes only the Things it minds: a VaultMinder the boxes under the root box, a BankMinder the bank, its main gate and its root box."
 
 /** A Bank made of a bank whose world its device's BankMinder does not hold. */
 export const WorldNotHeard = "A Bank is made of the bank whose world its device's BankMinder holds: bring the device up, or birth the bank, first."
 
 /** A minder made with a QueryClient that VaultMinder.makeClient did not make. */
 export const MinderClientExpected = 'A minder caches only in a QueryClient made by makeClient, on VaultMinder or BankMinder, whose cache hands each fetched record to its minder.'
-
-/** A minder's hello while another minder of its bank is minding in the same QueryClient. */
-export const BankMindedInClient = "Another minder of this bank is minding in this QueryClient: call its goodbye before this one's hello."
 
 /** A minder read or written through before `hello`, or after `goodbye`. */
 export const MinderNotStarted = 'This minder is not minding: call hello before reading from it or writing through it.'
@@ -187,9 +184,6 @@ export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of mil
 
 /** A minder's `listen` given a feed version other than `MinderEventFormat`. */
 export const FeedVersionOther = "A minder's listen is given the version of the feed its listener reads, MinderEventFormat, and this listener was written for another: its events are not shaped as it expects."
-
-/** Two records of different Things handed to newerThingOf. */
-export const RecordsOfOtherThings = "newerThingOf compares the records of one Thing, and was given the records of two different Things."
 
 /** A record the vaultDB delivered to a minder of another bank, or of another Thing than the minder asked for. */
 export const DeliveredOfOtherScope = "The vaultDB delivered a minder a record of another bank than the minder's, or of another Thing than it asked for: this is a bug in the vaultDB."

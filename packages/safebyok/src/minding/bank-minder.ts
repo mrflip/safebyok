@@ -27,13 +27,10 @@ export class BankMinder extends Minder {
   }
   // --
 
-  // == [What it minds]: mindsItemAt, mindsListingAt, rootBox
+  // == [What it minds]: mindsItemAt, rootBox
 
   /** True for the bank, its main gate and its root box. */
   protected mindsItemAt(labelpath: Labelpath): boolean { return RootLabelpaths.has(labelpath) }
-
-  /** False: the root box's listing is its VaultMinder's. */
-  protected mindsListingAt(): boolean { return false }
 
   /** The bank's root box, the parent of every box, as last heard of live: its shell while none is. */
   get rootBox(): BoxRecord | VoidSentinel {

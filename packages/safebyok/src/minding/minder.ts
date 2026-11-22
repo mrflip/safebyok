@@ -170,15 +170,11 @@ export abstract class Minder {
 
   // == [Starting and ending]: hello, goodbye
 
-  /** Start minding: until `goodbye`, answer gets, and cache each change the vaultDB notifies. A second call does nothing.
-   * Refuses while another minder of this bank is minding in the same client.
-   */
+  /** Start minding: until `goodbye`, answer gets, and cache each change the vaultDB notifies. A second call does nothing. */
   hello(): void {
     if (this.#isReady) { return }
-    const bankHash = bankHashOf(bankKeyHeadOf(this.scope))
-    if (this.#landers.has(bankHash)) { throw Throwers.bankMindedInClient() }
     this.#isReady = true
-    this.#landers.set(bankHash, (val, queryKey) => { this.#landedByFetch(val, queryKey) })
+    this.#landers.set(bankHashOf(bankKeyHeadOf(this.scope)), (val, queryKey) => { this.#landedByFetch(val, queryKey) })
     this.#setQueryDefaults()
     this.#unwatch = this.vaultDB.watch(
       this.scope,
@@ -202,27 +198,27 @@ export abstract class Minder {
 
   /** What `scoped`'s item has, however old: its live record, {@link Absent}, or undefined for no item. Never asks the vaultDB. */
   at<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): ThingAt<LabelpathT> | Absent | undefined {
-    return this.#itemAt(this.#demandItemScope(scoped)) as ThingAt<LabelpathT> | Absent | undefined
+    return this.#itemAt(this.#demandOwnScope(scoped)) as ThingAt<LabelpathT> | Absent | undefined
   }
 
   /** The sparse record `scoped`'s soon has, newer than its item, or undefined for no soon. Never asks the vaultDB. */
   soonAt<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): Sparse<ThingAt<LabelpathT>> | undefined {
-    return this.#soonAt(this.#demandItemScope(scoped)) as Sparse<ThingAt<LabelpathT>> | undefined
+    return this.#soonAt(this.#demandOwnScope(scoped)) as Sparse<ThingAt<LabelpathT>> | undefined
   }
 
   /** The newest tombstone of `scoped`'s Thing heard of, or undefined for none. It may be of a life older than the item's. Never asks the vaultDB. */
   deadAt<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): Tombstone<ThingAt<LabelpathT>> | undefined {
-    return this.#deadAt(this.#demandItemScope(scoped))
+    return this.#deadAt(this.#demandOwnScope(scoped))
   }
 
   /** True when `scoped`'s item is behind: a soon newer than the item is cached, or a soon with no item. Never asks the vaultDB. */
   isBehindAt(scoped: ThingScope): boolean {
-    return this.#isBehindAt(this.#demandItemScope(scoped))
+    return this.#isBehindAt(this.#demandOwnScope(scoped))
   }
 
   /** The cached listing of `scoped`'s children, however old, or undefined for none: the {@link Kids} value a list last answered. Never asks the vaultDB. */
   listingAt(scoped: ThingScope): Kids | undefined {
-    return this.#tsq.getQueryData<Kids>(this.listQueryKey(this.#demandListingScope(scoped)))
+    return this.#tsq.getQueryData<Kids>(this.listQueryKey(this.#demandOwnScope(scoped)))
   }
 
   /** The cache's answer for `scoped`, without waiting on the vaultDB.
@@ -233,7 +229,7 @@ export abstract class Minder {
     try {
       MinderChecks.minderTryAtOpts.parse(opts)
       this.#demandReady()
-      const scope = this.#demandItemScope(scoped)
+      const scope = this.#demandOwnScope(scoped)
       if (opts.ifStale === 'refresh') { this.backgroundRefresh(scope, { staleTime: opts.staleTime }) }
       return this.#answerOfTSQ(this.#askAt(scope), opts) as TSQGotAnswer<ThingAt<LabelpathT>>
     } catch (err) {
@@ -249,7 +245,7 @@ export abstract class Minder {
   async get<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<ThingAt<LabelpathT> | Absent> {
     MinderChecks.minderGetOpts.parse(opts)
     this.#demandReady()
-    return await this.#doGet(this.#demandItemScope(scoped), opts) as ThingAt<LabelpathT> | Absent
+    return await this.#doGet(this.#demandOwnScope(scoped), opts) as ThingAt<LabelpathT> | Absent
   }
 
   /** {@link get}, resolving an `Outcome` instead of throwing: a refusal, misuse included, is its bad outcome. */
@@ -271,7 +267,7 @@ export abstract class Minder {
    * tombstone in its dead entry, and Absent in its item, so a get of it answers from the cache. A Thing stored damaged is left out, and reported to the bank's `tellBadNews`.
    */
   async list(labelpath: Labelpath): Promise<Kids> {
-    this.#demandListingScope({ ...this.scope, labelpath: MinderChecks.minderLabelpath.parse(labelpath) })
+    MinderChecks.minderLabelpath.parse(labelpath)
     this.#demandReady()
     // Under staleTime 0 TanStack fetches whatever the listing holds, and shares a fetch under way.
     return await this.#tsq.query<Kids>({ queryKey: this.listQueryKey({ labelpath }), staleTime: 0 })
@@ -287,7 +283,7 @@ export abstract class Minder {
    */
   isStaleAt(scoped: ThingScope, opts: MinderGetOpts = {}): boolean {
     MinderChecks.minderGetOpts.parse(opts)
-    const scope = this.#demandItemScope(scoped)
+    const scope = this.#demandOwnScope(scoped)
     return this.#tsqFind(scope)?.isStaleByTime(this.#staleTimeOf(scope, opts)) ?? true
   }
 
@@ -562,16 +558,13 @@ export abstract class Minder {
   }
   // --
 
-  // == [What a subclass minds]: mindsItemAt, mindsListingAt
+  // == [What a subclass minds]: mindsItemAt
 
   /** True for the labelpath of a Thing whose item and soon this minder caches. */
   protected abstract mindsItemAt(labelpath: Labelpath): boolean
-
-  /** True for the labelpath of a Thing whose listing of children this minder caches. */
-  protected abstract mindsListingAt(labelpath: Labelpath): boolean
   // --
 
-  // == [Checks]: scope, queryClient, #demandOwnScope, #demandItemScope, #demandListingScope, #checkedDelivered, #demandReady, #scopeOfQueryKey
+  // == [Checks]: scope, queryClient, #demandOwnScope, #demandItemScope, #checkedDelivered, #demandReady, #scopeOfQueryKey
 
   /** The scope of this minder's bank. */
   get scope(): ThingWatchScope { return { userid: this.userid, banklabel: this.banklabel } }
@@ -585,17 +578,11 @@ export abstract class Minder {
     return ThingChecks.thingScope.parseConsistent(labelpathed, this.scope)
   }
 
+  // Only a write demands it: the write of a Thing no minder here caches would land in storage and nowhere in the cache.
   /** The scope of `labelpathed`, demanding that it is a Thing of this minder's bank whose item it minds. */
   #demandItemScope(labelpathed: Labelpathed): ThingScope {
     const scope = this.#demandOwnScope(labelpathed)
     if (! this.mindsItemAt(scope.labelpath)) { throw Throwers.notMinded() }
-    return scope
-  }
-
-  /** The scope of `labelpathed`, demanding that it is a Thing of this minder's bank whose listing it minds. */
-  #demandListingScope(labelpathed: Labelpathed): ThingScope {
-    const scope = this.#demandOwnScope(labelpathed)
-    if (! this.mindsListingAt(scope.labelpath)) { throw Throwers.notMinded() }
     return scope
   }
 

@@ -74,7 +74,6 @@ describe("VaultMinder.isStaleAt", () => {
   const BadArgs = [
     [{ ...TH.BoxScope, labelpath: 'Box/openai' }, {},                "a labelpath that is no Thing's"],
     [{ ...TH.BoxScope, banklabel: 'zz' }, {},                        "another bank's scope"],
-    [TH.GateScope,                         {},                       'the main gate, which is no box'],
     [TH.BoxScope,                         { staleTime: -1 },        'a negative staleTime'],
     [TH.BoxScope,                         { staleTime: 'never' },   'a staleTime of another word'],
     [TH.BoxScope,                         { staleTime: 'static' },  "a staleTime of 'static', which a minder never takes"],
@@ -127,7 +126,7 @@ describe("VaultMinder's watch", () => {
     expect(minder.at(TH.BoxScope)).to.deep.equal(box)
     receive(noticeOf(gate))
     expect(bankMinder.worldAt()?.gate).to.deep.equal(TH.gateThingOf())
-    TH.expectSyncRefusal(() => minder.at(TH.GateScope), 'bad_record')
+    expect(minder.at(TH.GateScope)).to.be.undefined
   })
 
   it("tells a listener nothing when the watch notifies the main gate", async () => {
