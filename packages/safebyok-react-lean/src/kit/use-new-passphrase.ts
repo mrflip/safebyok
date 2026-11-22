@@ -9,9 +9,9 @@ import { type KitPhrases, useKitPhrases } from './phrases-kit'
 
 /** What {@link useNewPassphrase} answers: the props of the two fields, the verdicts on them as data and as the lines shown under them, and whether the form may submit. */
 export type NewPassphrase = Readonly<{
-  /** The props of the new passphrase's field, to spread onto a `PassphraseInput` beside its `name`. Its `id` is for a `<label>`. */
+  /** The props of the new passphrase's field, to spread onto a `PassphraseInput` beside its `name`. Its `id` is for the `<label>` that names it. */
   field:        NewPassphraseFieldProps
-  /** The props of the confirmation's field, to spread onto a `PassphraseInput` beside its `name`. Its `id` is for a `<label>`. */
+  /** The props of the confirmation's field, to spread onto a `PassphraseInput` beside its `name`. Its `id` is for the `<label>` that names it. */
   confirmField: NewPassphraseFieldProps & Readonly<{ "aria-invalid": true | undefined }>
   /** The checker's verdict on the new passphrase as typed, for words or a meter of your own: null while the field is empty, and before the first verdict lands. */
   verdict:      PassphraseVerdict | null
@@ -36,8 +36,6 @@ export type NewPassphraseFieldProps = Readonly<{
   "id":               string
   "ref":              RefObject<HTMLInputElement | null>
   "autoComplete":     'new-password'
-  "aria-label":       string
-  "placeholder":      string
   "required":         true
   "aria-describedby": string
   "onChange":         (event: ChangeEvent<HTMLInputElement>) => void
@@ -86,14 +84,14 @@ export function useNewPassphrase(giver: Pick<ReactGiver, 'useStrengthVerdict'>):
   const isStrong = isChosenTyped && (! strength.isJudging) && (strength.verdict?.strong === true)
   return {
     field: {
-      ...fieldPropsOf(phrases.newPassphraseField),
+      ...SharedFieldProps,
       "id":               chosenId,
       "ref":              chosenRef,
       "aria-describedby": verdictId,
       "onChange":         (event) => { hearChosen(event.target.value) },
     },
     confirmField: {
-      ...fieldPropsOf(phrases.confirmField),
+      ...SharedFieldProps,
       "id":               confirmId,
       "ref":              confirmRef,
       "aria-invalid":     (match === 'differs') || undefined,
@@ -112,12 +110,10 @@ export function useNewPassphrase(giver: Pick<ReactGiver, 'useStrengthVerdict'>):
 }
 // --
 
-// == [Helpers]: fieldPropsOf, strengthTextOf, matchTextOf
+// == [Helpers]: SharedFieldProps, strengthTextOf, matchTextOf
 
-/** The props every field of a new passphrase shares, labelled `label`. */
-function fieldPropsOf(label: string) {
-  return { "autoComplete": 'new-password', "aria-label": label, "placeholder": label, "required": true } as const
-}
+/** The props every field of a new passphrase shares. */
+const SharedFieldProps = { autoComplete: 'new-password', required: true } as const
 
 /** The meter's line for `strength`: the verdict's reason while weak, or that it is strong enough. */
 function strengthTextOf({ verdict }: ReturnType<ReactGiver['useStrengthVerdict']>, phrases: KitPhrases): string {

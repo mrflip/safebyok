@@ -58,7 +58,6 @@ export function UnlockForm({ bank: bankProp, username, onCancel }: Readonly<Unlo
         id={fieldId}
         name="passphrase"
         autoComplete="current-password"
-        placeholder={phrases.passphraseField}
         required
         aria-invalid={isRefused || undefined}
         aria-describedby={isRefused ? alertId : undefined}

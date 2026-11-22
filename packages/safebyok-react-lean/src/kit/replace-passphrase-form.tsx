@@ -58,7 +58,6 @@ export function ReplacePassphraseForm({ giver: giverProp, bank: bankProp, userna
         id={currentId}
         name="passphrase"
         autoComplete="current-password"
-        placeholder={phrases.currentField}
         required
         aria-invalid={isRefused || undefined}
         aria-describedby={isRefused ? alertId : undefined}

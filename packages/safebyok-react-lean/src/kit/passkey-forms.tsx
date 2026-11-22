@@ -58,7 +58,6 @@ export function AddPasskeyForm({ bank: bankProp, passkeyOpts, username }: Readon
         ref={fieldRef}
         id={fieldId}
         name="passphrase"
-        placeholder={phrases.passphraseField}
         required
         aria-invalid={(add.error !== null) || undefined}
         aria-describedby={(refusal === null) ? undefined : alertId}
@@ -109,7 +108,6 @@ export function RevokePasskeyForm({ bank: bankProp, username }: Readonly<RevokeP
         ref={fieldRef}
         id={fieldId}
         name="passphrase"
-        placeholder={phrases.passphraseField}
         required
         aria-invalid={isRefused || undefined}
         aria-describedby={isRefused ? alertId : undefined}
