@@ -41,7 +41,7 @@ what differs from big, in a sentence or two.
   amended 2026-11-21 (gating_instance): the host's answers are zeroed when the gating is made, the cleartexts refused or
   not, and the gating's own copies when its single attempt ends, whatever its outcome, or at `gating.vacate()`.
   amended 2026-11-21 (birth_verb): a refusal made before any gating exists zeroes nothing, and leaves the answer to the
-  host: `Bank.birth` handed no `Device`, and `Bank.birthGating` handed a `keep` that is not a function
+  host: `Bank.birth` handed no `Device`, and `Bank.birthGating` handed an `attachBank` that is not a function
   (`packages/safebyok/src/models/bank.ts`). The giver's makers already refused so before reaching a bank.
 
 * 2026-11-19 (bank_gatings), the leaseKey's access chain: **A device's sweep evicts no lease.** In big, the device's

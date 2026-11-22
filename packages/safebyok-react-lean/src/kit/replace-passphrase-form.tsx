@@ -1,6 +1,6 @@
 /** `ReplacePassphraseForm`, the form that replaces the bank's passphrase, proved by the current one, with a strength meter and a confirmation field. */
 
-import { useId, useRef, useState } from 'react'
+import { useId, useRef } from 'react'
 import { useGivenBank, useGivenGiver } from '../giver/giver-context'
 import type { BankGiver, ReactGiver } from '../giver/react-giver'
 import { PassphraseInput } from '../parts/passphrase-input'
@@ -8,6 +8,7 @@ import { SubmitButton } from '../parts/submit-button'
 import { formActionOf } from './form-action'
 import { KitPhrases, refusalTextOf } from './phrases-kit'
 import { UsernameField } from './unlock-form'
+import { useNewPassphrase } from './use-new-passphrase'
 
 // == [The form]: ReplacePassphraseFormProps, ReplacePassphraseForm
 
@@ -31,15 +32,8 @@ export function ReplacePassphraseForm({ giver: giverProp, bank: bankProp, userna
   const bank = useGivenBank(bankProp)
   const giver = useGivenGiver(giverProp)
   const replace = bank.useReplacePassphrase()
-  const strength = giver.useStrengthVerdict()
+  const newPassphrase = useNewPassphrase(giver)
   const currentRef = useRef<HTMLInputElement>(null)
-  const chosenRef = useRef<HTMLInputElement>(null)
-  const confirmRef = useRef<HTMLInputElement>(null)
-  // Whether the two new fields agree, compared in the page: React keeps the verdict, never the text.
-  const [confirmation, setConfirmation] = useState<'untyped' | 'differs' | 'matches'>('untyped')
-  const [isChosenTyped, setIsChosenTyped] = useState(false)
-  const verdictId = useId()
-  const matchId = useId()
   const alertId = useId()
   const replaceAction = formActionOf(replace, ['passphrase', 'nextPassphrase', 'confirmation'], ({ passphrase, nextPassphrase }) => (
     { passphraseCleartext: passphrase, nextPassphraseCleartext: nextPassphrase }
@@ -51,28 +45,9 @@ export function ReplacePassphraseForm({ giver: giverProp, bank: bankProp, userna
     if (! await replaceAction(form)) { currentRef.current?.focus() }
   }
 
-  /** Compare the two new fields as they now stand. */
-  function compare() {
-    const confirming = confirmRef.current?.value ?? ''
-    if (confirming === '') { setConfirmation('untyped') } else { setConfirmation((confirming === chosenRef.current?.value) ? 'matches' : 'differs') }
-  }
-  /** Judge the new passphrase as typed, and compare it with its confirmation. */
-  function hearChosen(typed: string) {
-    setIsChosenTyped(typed !== '')
-    compare()
-    void strength.judge(typed)
-  }
-  // React empties the fields after each submit without an onChange, so the verdicts are reset by hand.
-  /** Forget the verdicts on what the fields held. */
-  function forget() {
-    setIsChosenTyped(false)
-    setConfirmation('untyped')
-  }
-
-  const isStrong = isChosenTyped && (! strength.isJudging) && (strength.verdict?.strong === true)
   const isRefused = (replace.error !== null)
   return (
-    <form className="sok-replace-passphrase-form" action={action} onReset={forget}>
+    <form className="sok-replace-passphrase-form" action={action} onReset={newPassphrase.forget}>
       <p>{KitPhrases.replaceBlurb}</p>
       {(username !== undefined) && <UsernameField username={username} />}
       <PassphraseInput
@@ -85,44 +60,13 @@ export function ReplacePassphraseForm({ giver: giverProp, bank: bankProp, userna
         aria-invalid={isRefused || undefined}
         aria-describedby={isRefused ? alertId : undefined}
       />
-      <PassphraseInput
-        ref={chosenRef}
-        name="nextPassphrase"
-        autoComplete="new-password"
-        aria-label={KitPhrases.newPassphraseField}
-        placeholder={KitPhrases.newPassphraseField}
-        required
-        aria-describedby={verdictId}
-        onChange={(event) => { hearChosen(event.target.value) }}
-      />
-      <p role="status" id={verdictId}>{isChosenTyped && strengthTextOf(strength)}</p>
-      <PassphraseInput
-        ref={confirmRef}
-        name="confirmation"
-        autoComplete="new-password"
-        aria-label={KitPhrases.confirmField}
-        placeholder={KitPhrases.confirmField}
-        required
-        aria-invalid={(confirmation === 'differs') || undefined}
-        aria-describedby={matchId}
-        onChange={compare}
-      />
-      <p role="status" id={matchId}>{matchTextOf(confirmation)}</p>
+      <PassphraseInput {...newPassphrase.field} name="nextPassphrase" />
+      <p role="status" id={newPassphrase.verdictId}>{newPassphrase.verdictText}</p>
+      <PassphraseInput {...newPassphrase.confirmField} name="confirmation" />
+      <p role="status" id={newPassphrase.matchId}>{newPassphrase.matchText}</p>
       <div role="alert" id={alertId}>{isRefused && refusalTextOf(replace.error)}</div>
-      <SubmitButton whilePending={KitPhrases.replacingButton} disabled={! isStrong || (confirmation !== 'matches')}>{KitPhrases.replaceButton}</SubmitButton>
+      <SubmitButton whilePending={KitPhrases.replacingButton} disabled={! newPassphrase.isReady}>{KitPhrases.replaceButton}</SubmitButton>
     </form>
   )
-}
-
-/** The meter's line for `strength`: the verdict's reason while weak, or that it is strong enough. */
-function strengthTextOf({ verdict }: ReturnType<ReactGiver['useStrengthVerdict']>): string {
-  if (verdict === null) { return '' }
-  return verdict.strong ? KitPhrases.strongEnough : verdict.reason
-}
-
-/** The line under the confirmation field for `confirmation`. */
-function matchTextOf(confirmation: 'untyped' | 'differs' | 'matches'): string {
-  if (confirmation === 'untyped') { return '' }
-  return (confirmation === 'matches') ? KitPhrases.passphrasesMatch : KitPhrases.passphrasesDiffer
 }
 // --

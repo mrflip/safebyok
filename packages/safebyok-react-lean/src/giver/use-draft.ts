@@ -2,12 +2,13 @@
 
 import { isEqual } from 'es-toolkit'
 import { type ChangeEventHandler, type FocusEventHandler, type RefCallback, useEffect, useRef, useState } from 'react'
-import { type BankSnapshot, type BoxRecord, type BoxUnsealed, Checkers, type LiveOf, type Sidecar, Thing, type Vault, VaultError, type Whisper, WhisperFieldAttributes } from 'safebyok'
+import { type BoxRecord, Checkers, type LiveOf, type Sidecar, Thing, type Vault, VaultError, type Whisper, WhisperFieldAttributes } from 'safebyok'
 import { PartsPhrases } from '../parts/phrases-parts'
 import { liveOf } from './giver-defaults'
 import * as Phrases from './phrases-giver'
 import type { BoxSelected, BoxShown } from './react-giver'
 import type { BoxQueryOpts } from './shapes-giver'
+import { type RevealFriend, useReveal } from './use-reveal'
 
 // == [Types]: Draft, DraftPutOpts, WhisperFieldProps, DraftFriend
 
@@ -67,10 +68,8 @@ export type WhisperFieldProps = typeof WhisperFieldAttributes & Readonly<{
 }>
 
 /** What a draft reads of its bank's giver. */
-type DraftFriend = Readonly<{
-  useBank:     <SelT>(select: (snap: BankSnapshot) => SelT) => SelT
+type DraftFriend = RevealFriend & Readonly<{
   useBox:      (labelpath: string, opts: BoxQueryOpts<BoxShown, BoxShown>) => Readonly<{ data: BoxShown | undefined }>
-  withWhisper: <ResultT>(labelpath: string, fn: (whisper: Whisper, box: BoxUnsealed) => ResultT | Promise<ResultT>) => Promise<ResultT>
   /** The vault of the signed-in user's bank, refusing `absent_vault` while there is none. */
   demandVault: () => Vault
 }>
@@ -94,8 +93,7 @@ export function makeUseDraft(bank: DraftFriend) {
     const [pinned, setPinned] = useState<BoxShown | null>(null)
     const [sidecarSet, setSidecarSet] = useState<Sidecar | null>(null)
     const [dirtyFieldnames, setDirtyFieldnames] = useState<ReadonlySet<string>>(NoFieldnames)
-    // The field shown, or on its way while not yet revealed, or null for none.
-    const [reveal, setReveal] = useState<Readonly<{ fieldname: string, isRevealed: boolean }> | null>(null)
+    const reveal = useReveal(bank, labelpath)
     const [lastErr, setLastErr] = useState<unknown>(null)
     const inputs = useRef(new Map<string, HTMLInputElement>())
 
@@ -107,8 +105,7 @@ export function makeUseDraft(bank: DraftFriend) {
     const isDirty = isWhisperDirty || (! isEqual(sidecar, baseSidecar))
     const isBehind = (pinned !== null) && (stored !== undefined) && (Thing.cmp(pinned, stored) > 0)
 
-    // Locking the bank masks the field shown, as it hides a WhisperText, and the effect empties it.
-    if (isLocked && (reveal?.isRevealed === true)) { setReveal(null) }
+    // Locking the bank masks the field shown, and this empties every input not typed into.
     useEffect(() => {
       if (isLocked) { emptyInputs(inputs.current, dirtyFieldnames) }
     }, [isLocked, dirtyFieldnames])
@@ -123,29 +120,26 @@ export function makeUseDraft(bank: DraftFriend) {
 
     /** Show the field `fieldname` in `input`: what was typed there, or else the box's whisper, written into its value. */
     async function revealField(fieldname: string, input: HTMLInputElement): Promise<void> {
-      if (reveal?.fieldname === fieldname) { return }
+      if (reveal.fieldname === fieldname) { return }
       if (dirtyFieldnames.has(fieldname)) {
-        setReveal({ fieldname, isRevealed: true })
+        reveal.showTyped(fieldname)
         return
       }
-      setReveal({ fieldname, isRevealed: false })
       setLastErr(null)
       try {
-        await bank.withWhisper(labelpath, (whisper) => { input.value = whisperTextOf(whisper[fieldname]) })
-        setReveal({ fieldname, isRevealed: true })
+        await reveal.showWhisper(fieldname, (text) => { input.value = text })
         // The unlock form takes the focus while the bank is locked: the field shown is given it back.
         if (input.ownerDocument.activeElement !== input) { input.focus() }
       } catch (err) {
-        setReveal(null)
         setLastErr(err)
       }
     }
 
     /** Mask the field `fieldname`, emptying `input` unless it was typed into. A field on its way stays so: the unlock form took the focus. */
     function maskField(fieldname: string, input: HTMLInputElement): void {
-      if ((reveal?.fieldname === fieldname) && (! reveal.isRevealed)) { return }
+      if ((reveal.fieldname === fieldname) && (! reveal.isRevealed)) { return }
       if (! dirtyFieldnames.has(fieldname)) { input.value = '' }
-      setReveal(null)
+      reveal.mask()
     }
 
     function markDirty(fieldname: string): void {
@@ -155,13 +149,13 @@ export function makeUseDraft(bank: DraftFriend) {
 
     function whisperField(fieldname: string): WhisperFieldProps {
       Checks.fieldname.parse(fieldname)
-      const isRevealed = (reveal?.fieldname === fieldname) && reveal.isRevealed
+      const isRevealed = (reveal.fieldname === fieldname) && reveal.isRevealed
       const isEmpty = (! isRevealed) && (! dirtyFieldnames.has(fieldname))
       return {
         ...WhisperFieldAttributes,
         ref:         (input) => holdInput(inputs.current, fieldname, input),
         type:        isRevealed ? 'text' : 'password',
-        readOnly:    (reveal?.fieldname === fieldname) && (! reveal.isRevealed),
+        readOnly:    (reveal.fieldname === fieldname) && (! reveal.isRevealed),
         placeholder: ((base !== null) && (base !== undefined) && isEmpty) ? PartsPhrases.masked : undefined,
         onFocus:     (event) => { void revealField(fieldname, event.currentTarget) },
         onBlur:      (event) => { maskField(fieldname, event.currentTarget) },
@@ -174,7 +168,7 @@ export function makeUseDraft(bank: DraftFriend) {
       setPinned(null)
       setSidecarSet(null)
       setDirtyFieldnames(NoFieldnames)
-      setReveal(null)
+      reveal.mask()
     }
 
     async function put(opts: DraftPutOpts = {}): Promise<LiveOf<BoxRecord>> {
@@ -197,7 +191,7 @@ export function makeUseDraft(bank: DraftFriend) {
 }
 // --
 
-// == [Helpers]: NoFieldnames, EmptySidecar, wholeThingOf, holdInput, inputOf, emptyInputs, whisperTextOf, Checks
+// == [Helpers]: NoFieldnames, EmptySidecar, wholeThingOf, holdInput, inputOf, emptyInputs, Checks
 
 /** No field typed into. */
 const NoFieldnames: ReadonlySet<string> = new Set()
@@ -227,12 +221,6 @@ function emptyInputs(inputs: ReadonlyMap<string, HTMLInputElement>, keptFieldnam
   for (const [fieldname, input] of inputs) {
     if (! keptFieldnames.has(fieldname)) { input.value = '' }
   }
-}
-
-/** The text of a whisper's field `val`: a string as it is, nothing for none, and anything else as JSON. */
-export function whisperTextOf(val: unknown): string {
-  if (typeof val === 'string') { return val }
-  return (val === undefined) ? '' : JSON.stringify(val)
 }
 
 /** The checks of what a host hands a draft. */

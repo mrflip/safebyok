@@ -139,7 +139,7 @@ export class Device implements MinderFriend {
   judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> { return Proving.judgeStrength(this, this.scope, passphraseCleartext) }
   // --
 
-  // == [Starting]: hello, birthGating, #bringUp, #hold
+  // == [Starting]: hello, birthGating, #bringUp, #attachBank
 
   /** Start the minder and bring up the bank: resolves once the snapshot shows `'locked'`, `'unborn'` or `'failed'` (with `lastErr`). Never rejects.
    * Each later call resolves as the first.
@@ -154,7 +154,7 @@ export class Device implements MinderFriend {
    */
   birthGating(cleartexts: BirthCleartexts): BirthGating {
     // Made before the stage is checked, so a refusal here zeroes the host's passkey answer as every gating does (G2).
-    const gating = Bank.birthGating(this, cleartexts, (bank) => { this.#hold(bank) })
+    const gating = Bank.birthGating(this, cleartexts, (bank) => { this.#attachBank(bank) })
     if (this.#snapshot.bank.stage === 'starting') {
       gating.vacate()
       throw Throwers.bankNotBroughtUp()
@@ -177,7 +177,7 @@ export class Device implements MinderFriend {
         return
       }
       // Bank.make checks the gate and the root box: a tombstone or a shell of either refuses.
-      this.#hold(Bank.make({ ...(bankRecord as BankRecord), maingate: maingate as GateRecord, rootBox: rootBox as LiveOf<BoxRecord> }, { device: this, vaultDB: this.vaultDB }))
+      this.#attachBank(Bank.make({ ...(bankRecord as BankRecord), maingate: maingate as GateRecord, rootBox: rootBox as LiveOf<BoxRecord> }, { device: this, vaultDB: this.vaultDB }))
     } catch (err) {
       this.#banklessSnapshot = Object.freeze({ ...PendingBank, stage: 'failed', lastErr: refusalSnapshotOf(err) })
       this.#align()
@@ -186,7 +186,7 @@ export class Device implements MinderFriend {
 
   // The bank's own sweep clears its subscribers, so nothing here unsubscribes.
   /** Make `bank` this device's bank. */
-  #hold(bank: Bank): void {
+  #attachBank(bank: Bank): void {
     this.#bank  = bank
     this.#vault = Vault.make(bank, this.#minder)
     bank.subscribe(this.#align)

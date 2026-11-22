@@ -9,17 +9,17 @@
  */
 export const WhisperFieldAttributes = Object.freeze({
   // the major third-party password managers, each its own flag
-  'data-1p-ignore':        'true',
-  'data-lpignore':         'true',
-  'data-bwignore':         'true',
-  'data-dashlane-ignore':  'true',
-  'data-rf-ignore':        'true',
-  'data-keeper-ignore':    'true',
-  'data-nordpass-ignore':  'true',
-  'data-zoho-ignore':      'true',
+  "data-1p-ignore":        'true',
+  "data-lpignore":         'true',
+  "data-bwignore":         'true',
+  "data-dashlane-ignore":  'true',
+  "data-rf-ignore":        'true',
+  "data-keeper-ignore":    'true',
+  "data-nordpass-ignore":  'true',
+  "data-zoho-ignore":      'true',
   // the browser's own helpers
-  'autoComplete':          'off',
-  'autoCapitalize':        'none',
-  'autoCorrect':           'off',
-  'spellCheck':            'false',
+  "autoComplete":          'off',
+  "autoCapitalize":        'none',
+  "autoCorrect":           'off',
+  "spellCheck":            'false',
 } as const)

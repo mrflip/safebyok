@@ -6,12 +6,12 @@ import { WhisperText } from '../../src/parts'
 import * as TH from '../test-helpers'
 
 /** The bank's stage as a line of text, the joke service's key as a `WhisperText`, and the unlock dialog. */
-function KeyScreen({ world, onError }: Readonly<{ world: TH.ProviderWorld, onError?: ((err: unknown) => void) | undefined }>) {
+function KeyScreen({ world, field = 'apiKey', onError }: Readonly<{ world: TH.ProviderWorld, field?: string, onError?: ((err: unknown) => void) | undefined }>) {
   const stage = world.Bank.useBank((snap) => snap.stage)
   return (
     <>
       <p>{stage}</p>
-      <WhisperText labelpath={TH.JokesPath} field="apiKey" onError={onError} />
+      <WhisperText labelpath={TH.JokesPath} field={field} onError={onError} />
       <UnlockDialog />
     </>
   )
@@ -20,9 +20,9 @@ function KeyScreen({ world, onError }: Readonly<{ world: TH.ProviderWorld, onErr
 /** A world with the joke service's key stored, rendered under its provider, once it shows the bank locked. */
 async function renderKey(onError?: (err: unknown) => void) {
   const world = await TH.buildProviderWorld({ stored: 'jokes' })
-  const { container } = render(TH.providerTreeOf(world, <KeyScreen world={world} onError={onError} />, { userid: TH.ProviderUser }))
+  const { container, rerender } = render(TH.providerTreeOf(world, <KeyScreen world={world} onError={onError} />, { userid: TH.ProviderUser }))
   await screen.findByText('locked')
-  return { world, container }
+  return { world, container, rerender }
 }
 
 /** True while the page shows the joke service's key. */
@@ -77,6 +77,15 @@ describe("WhisperText", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show' }))
     await waitFor(() => { expect(isKeyShown()).to.eq(true) })
     expect(screen.queryByRole('dialog')).to.be.null
+  })
+
+  it("starts masked again when it is given another field", async () => {
+    const { world, rerender } = await renderKey()
+    await showAndUnlock()
+    rerender(TH.providerTreeOf(world, <KeyScreen world={world} field="other" />, { userid: TH.ProviderUser }))
+    expect(isKeyShown()).to.eq(false)
+    expect(screen.getByText('••••••••')).to.exist
+    expect(screen.getByRole('button', { name: 'Show' })).to.exist
   })
 
   it("stays masked and reports the refusal when the unlock is dismissed", async () => {
