@@ -478,7 +478,7 @@ export abstract class Minder {
 
   // A listing's fetch needs nothing more: the Things it lists landed through the watch before it. A soon or a dead entry is
   // never fetched. A get's live record over Absent is no first landing: only the item's own count of landings tells one.
-  /** Settle what a fetch that just landed `val` under `queryKey`, a key of this bank, brings about, where it is an item's. */
+  /** Settle the item a fetch just landed `val` in, where `queryKey`, a key of this bank, is an item's. */
   #landedByFetch(val: unknown, queryKey: TSQ.QueryKey): void {
     if (queryKey[EntrykindIdx] !== Itemkind) { return }
     const scope   = this.#scopeOfQueryKey(queryKey)
