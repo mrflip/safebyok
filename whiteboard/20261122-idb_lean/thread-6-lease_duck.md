@@ -1,6 +1,6 @@
 # Thread 6: lease_duck (2026-11-22)
 
-Branch `20261122-lease_duck`, PR #PRNUM, stacked on #830. Proved: `pnpm --filter safebyok lint`, `typecheck`, `test` green (29 files, 1403 tests).
+Branch `20261122-lease_duck`, PR [#842](https://github.com/mrflip/safebyok/pull/842), stacked on [#830](https://github.com/mrflip/safebyok/pull/830). Proved: `pnpm --filter safebyok lint`, `typecheck`, `test` green (29 files, 1403 tests).
 
 The Coach (2026-11-22): "can you give lease and wayin getters wherever they don't have it as a direct property -- label (return the gate label) labelpath (`label/${this.label}`), scope, am='a', modelkind -- anything else to make them reasonably duck-typed".
 
@@ -21,5 +21,5 @@ The Coach (2026-11-22): "can you give lease and wayin getters wherever they don'
   * **`label` on a lease as anything but the gate's**: as the Coach asked.
   * **`scope` on a wayin**: it has no `userid` or `banklabel` (it lives inside its gate's record); see *For the Coach*.
 * **For the Coach**:
-  * **Wayin `scope`**: not built. Options: (a) leave it out (today); (b) `Wayin.make(record, { bankScope })` takes its bank's scope, stored in a private field, and `scope` returns `{ ...bankScope, labelpath }`: every `Wayin.make` call (the gate, the proving, the tests) must pass it, about a dozen call sites; (c) the gate hands it out, `gate.scopeOf(wayin)`, no change to `Wayin`. Recommend (a) until a caller wants it.
+  * **Wayin `scope`**: not built. Options: (a) leave it out (today); (b) `Wayin.make(record, { bankScope })` takes its bank's scope, stored in a private field, and `scope` returns `{ ...bankScope, labelpath }`: every `Wayin.make` call must pass it: seven in `gate.ts` and `proving.ts`, and the wayin tests; (c) the gate hands it out, `gate.scopeOf(wayin)`, no change to `Wayin`. Recommend (a) until a caller wants it.
   * **These labelpaths fail a Thing scope check.** Options: (a) leave it (today), duck-typed only in shape; (b) teach `Labelpath`/`isLabelpath` the `lease` and `wayin` heads, which would let a vaultDB's Thing checks accept a labelpath no Thing can have. Recommend (a).
