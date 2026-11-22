@@ -87,3 +87,9 @@ outside a transition, so a form Action waiting on it no longer freezes it after 
 
 * Undo as a second submit (`formAction`) through the same `useActionState`, so it could clear the refusal: it makes
   Undo submit a form, which reads worse than the stale alert it fixes.
+
+### For the Coach
+
+* **A refusal outlives Undo and a lock**: accept it as the `useActionState` way? Recommend yes.
+* **A refused Save drops the dialog's settings**: recommend `useDraft` discard only the typed fields on a form reset, as a later library thread.
+* **The sign-in form** joined the idiom unasked: recommend keeping it.
