@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: running (2026-11-22). The line, restacked and filed, every PR out of draft: main ← #844 ← #847 ← #850 ← #846 ← #848 ← #849 (top, `43c77ec2e`); justify green at the tip; rollback tags `*-prerestack-20261122T215742` in /workspace/byok. Thread 8 (misuse_cull) building from #849. A plan for persisting boxes being drafted (the Coach). Closer Look tab awaits the Coach's replies. *Finally*: take over #833 (vocab_adopt): squash its commits into one, rebase onto the line's tip, further vocabulary changes as a second commit (the Coach).
+* **Status**: running (2026-11-22). The line, filed and out of draft: main ← #844 ← #847 ← #850 ← #846 ← #848 ← #849 (`43c77ec2e`). Thread 8 ready (#851, `42c01ce6a`, on #849), in review (medium, opus). Thread 9 (defaults_at_start) building from #851; it also takes `list`'s per-call `staleTime: 0`. Box-persisting plan on the sprint branch. *Finally*: take over #833 (squash, rebase onto the tip, vocabulary changes as a second commit).
 
 The Coach's request, verbatim:
 
