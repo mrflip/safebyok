@@ -53,7 +53,7 @@ describe("an IdbPersister", () => {
     expect(await new IdbPersister({ recordlabel: 'roots', dbName }).restoreClient()).to.deep.equal(snapshotAt(1))
   })
 
-  it("writes the first snapshot at once and then only the newest, once per throttle", async () => {
+  it("writes the first snapshot at once and holds the rest back", async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
     const persister = new IdbPersister({ recordlabel: 'roots', dbName: freshDbName(), throttleMs: 1000 })
     persister.persistClient(snapshotAt(1))
