@@ -44,7 +44,8 @@ describe("ThingMinder.listen", () => {
     await minder.get(TH.BoxScope)
     const told = heard.mock.calls.map(([event]) => [event.eventkind, event.type, event.action?.type, event.queryKey.at(-1)])
     expect(told).to.deep.equal([
-      ['list', 'updated', 'success', 'kids'], ['soon', 'added', undefined, '~'], ['soon', 'updated', 'success', '~'],
+      ['list', 'updated', 'fetch', 'kids'], ['soon', 'added', undefined, '~'], ['soon', 'updated', 'success', '~'],
+      ['list', 'updated', 'success', 'kids'], ['list', 'updated', 'success', 'kids'],
       ['item', 'added', undefined, '!'], ['item', 'updated', 'fetch', '!'], ['item', 'updated', 'success', '!'], ['soon', 'removed', undefined, '~'],
     ])
   })
@@ -352,11 +353,22 @@ describe("ThingMinder.listen", () => {
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
     await minder.list('box')
+    // The box joins as its record lands, and the list lands after it.
     const listed = heard.mock.calls.map(([event]) => event).filter(isListingEvent)
-    expect(listed).to.have.lengthOf(1)
-    expect(listed[0]).to.deep.nested.include({ eventkind: 'list', type: 'updated', 'action.type': 'success', ...TH.RootScope, modelkind: 'box', queryKey: minder.listQueryKey(TH.RootScope) })
-    expect(listed[0]).to.have.nested.property('state.data', minder.listingAt(TH.RootScope))
-    expect(listed[0]?.state.data).to.deep.equal(['box/openai'])
+    expect(listed).to.have.lengthOf(2)
+    expect(listed[1]).to.deep.nested.include({ eventkind: 'list', type: 'updated', 'action.type': 'success', ...TH.RootScope, modelkind: 'box', queryKey: minder.listQueryKey(TH.RootScope) })
+    expect(listed[1]).to.have.nested.property('state.data', minder.listingAt(TH.RootScope))
+    expect(listed[1]?.state.data).to.deep.equal(['box/openai'])
+  })
+
+  it("tells a refused list as an error, the listing left as it was and marked stale", async () => {
+    const { minder } = minderWorldOf(new MemoryVaultDB())
+    const heard = listenerOf()
+    minder.listen(heard, MinderEventFormat)
+    await TH.expectRefusal(minder.list('box'), 'storage_issue')
+    const listed = heard.mock.calls.map(([event]) => event).filter(isListingEvent)
+    expect(listed.map((event) => [event.action?.type, event.state.isInvalidated, event.state.data])).to.deep.equal([['error', true, []]])
+    expect(minder.isListingBareAt(TH.RootScope)).to.be.true
   })
 
   it("tells the root box's listing, empty, when hello caches it", () => {

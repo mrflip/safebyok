@@ -1,6 +1,7 @@
 /** The provider's world: the real giver over a memory vaultDB, a key deriver and a strength checker a test can hold, and a QueryClient of the test's own. */
 
 import { QueryClient } from '@tanstack/react-query'
+import { noop } from 'es-toolkit'
 import { onTestFinished, vi } from 'vitest'
 import { Device, type KeyDeriver, type PassphraseVerdict, type StrengthChecker, type Vault, MemoryVaultDB } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
@@ -117,13 +118,18 @@ export interface ProviderWorldGiven {
   stored?:         'none' | 'jokes'
   /** Hand the config the world's vaultDB and key deriver, for a provider handed neither. Otherwise the config's are others, never used. */
   isInConfig?:     boolean
-  /** False makes the vaultDB's watch hear nothing, so a device learns of another's writes only by asking. */
+  /** False gives the vaultDB no watch of its own, so a device learns of another's writes only by asking: from what its own gets and lists answer, and the watch tells of them. */
   isWatching?:     boolean
+}
+
+/** A memory vaultDB that reports no change of its own, as a datastore with no watch: its watches hear only what its verbs notify. */
+class UnwatchedVaultDB extends MemoryVaultDB {
+  protected override doWatch(): () => void { return noop }
 }
 
 /** A giver over nothing yet started, and a vaultDB with what `given` stores. */
 export async function buildProviderWorld({ stored = 'none', isInConfig = false, isWatching = true }: ProviderWorldGiven = {}): Promise<ProviderWorld> {
-  const vaultDB = new MemoryVaultDB()
+  const vaultDB = isWatching ? new MemoryVaultDB() : new UnwatchedVaultDB()
   let otherVault: Vault | null = null
   if (stored === 'jokes') {
     const { vault } = await LeanTH.buildBornVault({ device: LeanTH.makeDevice({}, { vaultDB }) })
@@ -134,7 +140,7 @@ export async function buildProviderWorld({ stored = 'none', isInConfig = false, 
   const watch = vaultDB.watch.bind(vaultDB)
   vaultDB.watch = (...args) => {
     counts.watches += 1
-    return isWatching ? watch(...args) : () => undefined
+    return watch(...args)
   }
   const pauses = { ask: null as Promise<void> | null, answer: null as Promise<void> | null }
   const tryGetThing = vaultDB.tryGetThing.bind(vaultDB)

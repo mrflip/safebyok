@@ -328,7 +328,7 @@ describe("ThingMinder.list", () => {
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
     await minder.list('box')
-    expect(toldOf(heard)).to.deep.equal([['listing'], ['soon', 'box/anthropic', 0], ['soon', 'box/openai', box1.revseq], ['box/openai', 'behind']])
+    expect(toldOf(heard)).to.deep.equal([['soon', 'box/anthropic', 0], ['listing'], ['soon', 'box/openai', box1.revseq], ['box/openai', 'behind'], ['listing']])
   })
 
   it("leaves out a box stored damaged, and tells the bank's tellBadNews its labelpath", async () => {
@@ -369,26 +369,12 @@ describe("ThingMinder.list", () => {
 })
 
 describe("ThingMinder.tryList", () => {
-  it("answers as the vaultDB did, with the records listed", async () => {
-    const vaultDB = new MemoryVaultDB()
-    const box     = await storedBoxOf(vaultDB)
-    const { minder } = minderWorldOf(vaultDB)
-    const listed = vi.spyOn(vaultDB, 'tryListThings')
-    const answer = await minder.tryList('box')
-    expect(answer).to.eq(await listed.mock.results[0]?.value)
-    expect(answer).to.deep.include({ ok: true, val: [Thing.sparseOf(box)], damaged_rows: [] })
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal([TH.BoxScope.labelpath])
-  })
-
-  it("answers with the damaged_rows the vaultDB reports, and leaves them out of val", async () => {
+  it("resolves the labelpaths listed as its good outcome", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
-    vaultDB._cheat_things(TH.ThingBank).set('box/bad', { ...TH.boxThingOf('bad'), whisper_sealed: {} })
     const { minder } = minderWorldOf(vaultDB)
-    const answer = await minder.tryList('box')
-    expect(answer.ok).to.be.true
-    expect(answer.damaged_rows.map((row) => row.labelpath)).to.deep.equal(['box/bad'])
-    expect(answer.ok && answer.val.map((record) => record.labelpath)).to.deep.equal([TH.BoxScope.labelpath])
+    expect(await minder.tryList('box')).to.deep.equal({ ok: true, val: [TH.BoxScope.labelpath] })
+    expect(minder.listingAt(TH.RootScope)).to.deep.equal([TH.BoxScope.labelpath])
   })
 
   it("answers the vaultDB's refusal", async () => {

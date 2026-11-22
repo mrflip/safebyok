@@ -44,8 +44,8 @@ export type ListThingsAnswer<RecordT extends ThingRecord = ThingRecord> =
 /** The answer to `tryBirthBank`: the three roots the store wrote (`born`), or found already stored (`passed`). */
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
 
-/** A Thing that a watch reports, shaped like a get's answer: one Thing, without its bank's world. */
-export type ThingNotice = Pick<GoodAnswer<ThingRecord, 'gotlive' | 'gotgone'>, 'ok' | 'act' | 'val'>
+/** A Thing that a watch reports, shaped like a get's answer: one Thing, without its bank's world. A Thing a list answers is reported sparse, as listed. */
+export type ThingNotice = Pick<GoodAnswer<ThingRecord | Sparse<ThingRecord>, 'gotlive' | 'gotgone'>, 'ok' | 'act' | 'val'>
 // --
 
 // == [What a store reports]: Actual, ListThingsActual, BirthBankActual
@@ -97,7 +97,8 @@ export interface VaultDB {
    *   looks for or avoids the repeat.
    * - Every notice a verb causes reaches each watch before the verb's answer reaches its caller, so a handler's synchronous
    *   work is complete by then. Rely on nothing stronger.
-   * - A verb's notices come "out to in": the bank, the main gate, the root box, then the `dbhas`.
+   * - A verb's notices come "out to in": the bank, the main gate, the root box, then the `dbhas`, or each Thing a good list
+   *   answers, in labelpath order.
    * - A notice goes to every watch of the bank, whoever sent the ask.
    * - A watch may be notified of a Thing again at a revision it has notified, or at an older one.
    * - A change the store itself reports arrives when the store delivers it, in no promised order against a verb's answer.

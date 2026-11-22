@@ -252,7 +252,7 @@ describe("ThingMinder.listingAt", () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)
-    const listing = minder.list('box')
+    const listing = minder.tryList('box')
     minder.goodbye()
     await listing
     expect(minder.listingAt(TH.RootScope)).to.be.undefined

@@ -3,7 +3,7 @@ import { type EX, Errors } from 'safebyok-big/internals'
 import { AnswerNotMade } from '../../src/phrases'
 import { AdapterVaultDB, type Received } from '../../src/storage/adapter-vault-db'
 import type { BirthBankAsk, GetAsk, ListAsk, ThingWatchScope, WriteAsk } from '../../src/shapes/shapes-asks'
-import type { ThingRecord } from '../../src/shapes/shapes-thing'
+import { Thing } from '../../src/models/thing'
 import type { Actual, BirthBankActual, ListThingsActual, ThingNotice } from '../../src/storage/vault-db'
 import * as Throwers from '../../src/refusals/throwers'
 import * as TH from '../test-helpers'
@@ -29,8 +29,8 @@ class ScriptedVaultDB extends AdapterVaultDB {
 }
 
 /** The Things a watch of the test bank hears over `vaultDB`. */
-function heardOver(vaultDB: ScriptedVaultDB): ThingRecord[] {
-  const heard: ThingRecord[] = []
+function heardOver(vaultDB: ScriptedVaultDB): ThingNotice['val'][] {
+  const heard: ThingNotice['val'][] = []
   vaultDB.watch(TH.ThingBank, ({ val }) => { heard.push(val) }, () => undefined)
   return heard
 }
@@ -181,7 +181,7 @@ describe("AdapterVaultDB, what a watch hears of a verb's answer", () => {
     expect(heard).to.deep.equal([TH.gateThingOf(), TH.gateThingOf(), TH.gateThingOf()])
   })
 
-  it("tells nothing of a good answer's val, a null dbhas, a throw that carries none, or a refused listing", async () => {
+  it("tells nothing of a good write's val, a null dbhas, a throw that carries none, or a refused listing", async () => {
     const steps: (() => Actual<EX.GoodAct>)[] = [
       () => ({ ok: true, act: 'born', world: null, record: TH.gateThingOf() }),
       () => ({ ok: false, act: 'stale', world: null, record: null }),
@@ -199,5 +199,13 @@ describe("AdapterVaultDB, what a watch hears of a verb's answer", () => {
     expect(await listing.tryListThings(TH.listAskAt('box'))).to.deep.include({ ok: false, dbhas: [] })
     await TH.aWhile()
     expect(heard).to.deep.equal([])
+  })
+
+  it("tells each Thing a good listing answers, sparse and in labelpath order, before the listing answers", async () => {
+    const listed  = [Thing.sparseOf(TH.boxThingOf('anthropic')), Thing.sparseOf(TH.boxThingOf('openai'))]
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotlive', world: null, listed, parent: TH.rootBoxOf(), damaged_rows: [] }) as never)
+    const heard   = heardOver(vaultDB)
+    await vaultDB.tryListThings(TH.listAskAt('box'))
+    expect(heard).to.deep.equal(listed)
   })
 })

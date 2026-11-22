@@ -3,7 +3,7 @@
 import { noop } from 'es-toolkit'
 import { EX, Errors, Outcome, type Helpers } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
-import type { ThingRecord } from '../shapes/shapes-thing'
+import type { Sparse, ThingRecord } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
 import {
   type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
@@ -22,8 +22,8 @@ import * as Throwers from '../refusals/throwers'
  */
 export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
 
-/** One of the adapter's watches: its bank, and the function that tells it of one raw Thing. */
-type Feed = { scope: ThingWatchScope, tell: (raw: unknown) => void }
+/** One of the adapter's watches: its bank, the function that tells it of one raw Thing, and the one that notifies it of a Thing already checked. */
+type Feed = { scope: ThingWatchScope, tell: (raw: unknown) => void, notify: (val: ThingRecord | Sparse<ThingRecord>) => void }
 
 /** The answer a verb gives for its store's report: `record` becomes `val` when good, `dbhas` when refused.
  * Throws `storage_issue` if a good report other than `gotvoid` has no Thing.
@@ -48,7 +48,8 @@ function trackedFieldOf({ tracked }: { tracked?: Tracked }): { tracked?: Tracked
 
 /** The base class of a vaultDB whose Things are in a datastore. A subclass writes the `do*` calls, each one atomic step.
  * The class checks each ask and classifies what a `do*` call fetches, per the act tables in `notes/answer-contract.md`.
- * It notifies the bank's watches of each Thing in an answer's `tracked` that is not `'same'`, and of a refused answer's `dbhas` where it is a Thing.
+ * It notifies the bank's watches of each Thing in an answer's `tracked` that is not `'same'`, of a refused answer's `dbhas` where it is a Thing,
+ * and of each Thing a good list answers.
  */
 export abstract class AdapterVaultDB implements VaultDB {
   // == [Props]: #feeds
@@ -123,6 +124,7 @@ export abstract class AdapterVaultDB implements VaultDB {
         ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, val: actual.listed }
         : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: actual.listed, err: Throwers.actRefused('vault', actual.act, { oplabel: 'listThings', ask: loggableAsk }) }
       this.notifyTrackedRecords(listAsk, answer)
+      this.notifyListed(answer)
       return answer
     } catch (err) { return { ...this.answerForThrown(err, 'listThings', ask), dbhas: null, parent: null, damaged_rows: [] } }
   }
@@ -153,11 +155,14 @@ export abstract class AdapterVaultDB implements VaultDB {
    */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
     const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews })
-    const feed: Feed = { scope: bankScope, tell: (raw) => {
-      let val: ThingRecord
-      try { val = Classifier.watchedThingOf(bankScope, raw) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
+    const notify = (val: ThingRecord | Sparse<ThingRecord>): void => {
       // A notice handler that throws is a bug in the host's code, not trouble in storage.
       try { onNotice({ ok: true, act: Thing.isGone(val) ? 'gotgone' : 'gotlive', val }) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
+    }
+    const feed: Feed = { scope: bankScope, notify, tell: (raw) => {
+      let val: ThingRecord
+      try { val = Classifier.watchedThingOf(bankScope, raw) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
+      notify(val)
     } }
     this.#feeds.add(feed)
     const stop = this.doWatch(bankScope, ({ record }) => { feed.tell(record) }, onBadNews)
@@ -165,7 +170,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
   // --
 
-  // == [Notifying]: notifyTrackedRecords, notifyDbhas, #queueNotices
+  // == [Notifying]: notifyTrackedRecords, notifyDbhas, notifyListed, #queueNotices, #queueListedNotices
 
   // Queued before the verb returns. That means each watcher's synchronous work is done before the verb's caller resumes -- no handler runs inside the operation verb.
   /** Notify each watch of `ask`'s bank of the bank, the main gate and the root box, in that order, each where `tracked` reports it other than `'same'`. */
@@ -177,11 +182,18 @@ export abstract class AdapterVaultDB implements VaultDB {
     }
   }
 
-  // The verb's caller gets the refusal and never lands its dbhas, so the watch notifies it. A good answer's val is the caller's to land, and is not notified.
+  // The verb's caller gets the refusal and never lands its dbhas, so the watch notifies it. A get's or a write's good val is the caller's to land, and is not notified.
   /** Notify each watch of the answer's bank of a refused answer's `dbhas`, where it is a Thing. */
   protected notifyDbhas(answer: Answer<unknown, EX.GoodAct>): void {
     if (answer.ok || (answer.dbhas === null)) { return }
     this.#queueNotices(answer.ask, answer.dbhas)
+  }
+
+  // A list's caller keeps only what it lists, so the watch notifies each Thing listed, after the tracked roots, as it would a dbhas.
+  /** Notify each watch of the answer's bank of each Thing a good list answers, in labelpath order. */
+  protected notifyListed(answer: ListThingsAnswer): void {
+    if (! answer.ok) { return }
+    for (const record of answer.val) { this.#queueListedNotices(answer.ask, record) }
   }
 
   /** Queue one notice of `record` to each watch of `scoped`'s bank. */
@@ -189,6 +201,16 @@ export abstract class AdapterVaultDB implements VaultDB {
     for (const { scope, tell } of this.#feeds) {
       if ((scope.userid === scoped.userid) && (scope.banklabel === scoped.banklabel)) {
         queueMicrotask(() => { tell(structuredClone(record)) })
+      }
+    }
+  }
+
+  // A listed Thing is sparse, which the watch's check of a whole Thing refuses: the classifier checked it before making it sparse.
+  /** Queue one notice of the listed `record` to each watch of `scoped`'s bank, unchecked. */
+  #queueListedNotices(scoped: Pick<LoggableAsk, 'userid' | 'banklabel'>, record: Sparse<ThingRecord>): void {
+    for (const { scope, notify } of this.#feeds) {
+      if ((scope.userid === scoped.userid) && (scope.banklabel === scoped.banklabel)) {
+        queueMicrotask(() => { notify(structuredClone(record)) })
       }
     }
   }
