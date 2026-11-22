@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: thread 1 filed, out of draft (#840); thread 2 building (cut from #840; world keyed on `banklife` until #828 lands).
+* **Status**: thread 1 filed, out of draft (#840); thread 2 building. #828 and #829 merged; #840 rebased onto main at `f3fe4d495`, and thread 2 told to follow it and key the world on `lifetok`.
 
 The Coach's request, verbatim:
 
@@ -52,6 +52,7 @@ The design this sprint starts from is in the sprint directory, copied so that a 
 * **The ordering pins stay** (the Coach): the React layer's stale-time function and the minder's cache-level
   `onSuccess` each settled an ordering problem. A thread that finds one in its way says so; it neither works around it
   nor reopens it.
+* **Git and gh on this sprint's own branches only** (the Coach, 2026-11-22): force-push under a lease on a known SHA, draft in and out, on this sprint's branches and PRs; never another session's or the workshop's, never the `queue` label, never a merge.
 * **Every Agent call names its model.** Check with your orchestrating agent before fanning out.
 
 ## Threads
