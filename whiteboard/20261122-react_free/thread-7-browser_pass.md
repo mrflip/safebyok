@@ -1,6 +1,6 @@
 # Thread 7: browser_pass (2026-11-22)
 
-Branch `20261122-browser_pass`, PR #PR, stacked on #836. Proved: both new demos and the old one walked in headless
+Branch `20261122-browser_pass`, PR [#838](https://github.com/mrflip/safebyok/pull/838), stacked on [#836](https://github.com/mrflip/safebyok/pull/836). Proved: both new demos and the old one walked in headless
 Chromium 159 (Playwright 1.65.1), against each demo's `vite` dev server at 14cc583e6. Nothing broke that is a demo's
 bug to fix, so the thread changes no code.
 
