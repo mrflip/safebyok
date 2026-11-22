@@ -1,6 +1,6 @@
 # Thread 4: device_early, a device that exists before its user (2026-11-22)
 
-Branch `20261122-device_early`, cut from thread 2's `20261122-bank_minder` (#844); PR to come, stacked on #844.
+Branch `20261122-device_early`, PR #846 (draft), stacked on #844 (cut from `20261122-bank_minder`).
 **Paused** by the orchestrator: the Coach is questioning thread 2's BankMinder design, which this thread builds on.
 Proved: `pnpm --filter safebyok test` 33 files, 1496 tests green, lint and typecheck clean; `pnpm --filter
 safebyok-react-lean test` 23 files, 304 tests green, lint and typecheck clean; idb-lean typecheck clean. No `pnpm justify` yet.
