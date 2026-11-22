@@ -1,6 +1,14 @@
 # Thread 3: list_answer (2026-11-22)
 
-Branch `20261122-list_answer`, PR #847, stacked on #844. Proved: `pnpm justify` green after the catch-up onto #844 at `3f44feddc` (safebyok 1441, safebyok-react-lean 304, safebyok-postgres 350, safebyok-idb-lean 123, e2e 576, every other package and demo green).
+Branch `20261122-list_answer`, PR #847, stacked on #844. Proved: `pnpm justify` green after the rebase onto #844's rework at `f5d6f9b3d` (safebyok 1431, safebyok-react-lean 304, safebyok-postgres 350, safebyok-idb-lean 123, e2e 576, every other package and demo green).
+
+Rebased at filing onto #844's rework, which moved the ThingMinder/VaultMinder code into a base class `Minder`
+(`minding/minder.ts`), with `VaultMinder` and `BankMinder` as subclasses. The listing work below now lives in `Minder`,
+where the list path, `#settleLanded` and the structural sharing it extends already were: `listingAt`, `list`/`tryList`,
+`#fetchListing`, `#isFirstStored`, `landedKidsOf`. `VaultMinder` only lost its "`hello` caches the root box's listing"
+line. `#rootBoxScope` went with `#seedListing`, its only reader. A `BankMinder` minds no listing, so the parent's
+listing its roots' first landings invalidate is never cached: a no-op, left unguarded. Where my text said "store" as a
+noun, it now says datastore or concrete adapter, after #845's sweep.
 
 * **Built**:
   * `storage/vault-db.ts`: `Kids` (`{ modelkind: 'kids', parentpath, parentlife, items, gones, read_tc }`), `KidEntry`, `ReadTc`.
@@ -10,8 +18,8 @@ Branch `20261122-list_answer`, PR #847, stacked on #844. Proved: `pnpm justify` 
     checked as a UUID v7, `storage_issue` otherwise); `readTcNow()` makes one with the `uuid` package's `v7`.
   * `AdapterVaultDB.notifyListed`: notifies `parentage` then `deltas`, on good and refused lists (the parentage is what a
     refused list found stored, like a dbhas).
-  * Stores: `MemoryVaultDB`, `IdbVaultDB` (safebyok-idb-lean) and `PostgresVaultDB` call `readTcNow()` in the step.
-  * `VaultMinder`: the listing is the `Kids` value, replaced whole; `landedKidsOf` keeps a prior read later by `read_tc`
+  * Concrete adapters: `MemoryVaultDB`, `IdbVaultDB` (safebyok-idb-lean) and `PostgresVaultDB` call `readTcNow()` in the step.
+  * `Minder` (was `VaultMinder` when built): the listing is the `Kids` value, replaced whole; `landedKidsOf` keeps a prior read later by `read_tc`
     (and gives anything else `replaceEqualDeep`, since TanStack runs it over a host's `select` output too). Gone:
     `#seedListing`, `isListingBareAt`, `#addToParentListing`, `BareListedAt`, `landedListingOf`. `list`/`tryList` resolve `Kids`.
     Rule (A) in `#isFirstStored` and `#settleLanded`.
@@ -48,8 +56,8 @@ Branch `20261122-list_answer`, PR #847, stacked on #844. Proved: `pnpm justify` 
     mark the listing stale and re-list (N lists for N rows).
   * `landedKidsOf` must accept non-Kids values: TanStack runs the query's `structuralSharing` over a host's `select`
     output too (as the giver's `newerOrSharedOf` notes).
-  * `notes/wontfix.md`'s row "A box joining between the host's listing fetch reading `listingAt`..." describes a
-    mechanism already gone; left for whoever rules on it.
+  * `notes/wontfix.md`'s row "A box joining between the host's listing fetch reading `listingAt`..." described a
+    mechanism already gone; struck at filing, in a commit of its own, as the orchestrator directed.
   * Looked up in the plan: thread 3's section and the `parentlife` remark in the design (the handoff was enough otherwise).
 * **Glitches of rule (A)** (Coach ruling 1: recorded, not fixed):
   * A box's death, rebirth or second death on a cached listing lands in its existing item: not a first landing, so the
