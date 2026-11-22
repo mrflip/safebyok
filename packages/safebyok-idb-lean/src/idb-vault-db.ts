@@ -3,9 +3,8 @@
 import type { UseStore } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
 import type {
-  Actual, AnyAsk, BirthBankActual, BirthBankAsk, BirthPuts, DelAct, GetAsk, GotAct, ListAsk, ListThingsActual, PutAct, Received, ThingRecord, ThingWatchScope, Tracked, VaultError, WorldRecord, WriteAsk,
+  Actual, AnyAsk, BirthBankActual, BirthBankAsk, BirthPuts, DelAct, GetAsk, GotAct, ListAsk, ListThingsActual, PutAct, Received, ThingWatchScope, Tracked, VaultError, WorldRecord, WriteAsk,
 } from 'safebyok/storage'
-import type { Tombstone } from 'safebyok'
 import { bellnameOf, childrenIn, shelfOf, thingScopepathOf } from './vault-shelf'
 
 // == [Options]: IdbVaultDBOpts, idbVaultDBOpts
@@ -68,26 +67,6 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
     super()
     this.#shelf    = shelfOf(dbName)
     this.#bellname = bellnameOf(dbName)
-  }
-  // --
-
-  // == [Copying]: overwriteThing
-
-  // A copy of what another vaultDB holds, which no one watches: it cites nothing, classifies nothing and rings nothing.
-  // A stored row that fails its kind's checks is overwritten: the copy is never the ground truth, and the record in hand is sound.
-  // Its read and its put share one readwrite transaction, which IndexedDB runs alone on the object store, so overwrites in any order leave the newest record.
-  /** Store `record` at its scope, if it is newer than the Thing stored there.
-   * Concurrent calls, in any order, leave the newest record stored. It notifies no watch.
-   */
-  async overwriteThing(record: ThingRecord | Tombstone<ThingRecord>): Promise<void> {
-    const { labelpath } = DB.ThingChecks.thingScope.parse(record)
-    const kindChecks = DB.ThingkindChecks.ofLabelpath(labelpath)
-    const thing = kindChecks.record.parse(record)
-    await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const stored = kindChecks.stored.safeParse(await DB.rowAt(store, thingScopepathOf(thing)))
-      if (stored.success && (DB.Thing.cmp(stored.data, thing) <= 0)) { return }
-      store.put(thing, thingScopepathOf(thing))
-    })
   }
   // --
 

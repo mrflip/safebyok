@@ -47,9 +47,6 @@ const device = Device.make(record, { vaultDB, persisters })
   - a write past the origin's storage quota: `vault_full`
   - an aborted transaction, or a database closed under the page: `storage_unavailable`
   - no IndexedDB at all, or storage the browser withholds: `storage_blocked`
-* **`overwriteThing(record)`** stores a live record or tombstone at its scope only where it is newer than the Thing
-  stored there, by life and then revision; an older record, or one at the stored revision, is ignored. A stored row that
-  fails its checks is overwritten. It tells no watch.
 
 ## What is stored
 
