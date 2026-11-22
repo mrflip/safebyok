@@ -31,4 +31,4 @@ export type { IfAbsent, IfPresent, PutIfAbsent, RefusedAct } from 'safebyok-big/
 export { VaultError, isVaultError, type Capacity, type RefusalFamily, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'
 export { fetchFailed, identityRevoked, sanitizeForeignError, storageFailed, storageUnavailable, unexpectedError } from 'safebyok-big/storage'
 export { storageIssue } from 'safebyok-big/refusals/throwers'
-export { Checker, Checkers, objCheck, type ConsistencyRefusal, type ObjCheckOpts, type Refusing, type Story } from 'safebyok-big/storage'
+export { Checker, Checkers, objCheck, type AssertEqual, type CheckerInput, type ConsistencyRefusal, type ObjCheckOpts, type Refusing, type Story } from 'safebyok-big/storage'

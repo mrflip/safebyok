@@ -2,12 +2,13 @@
 
 import { isEqual } from 'es-toolkit'
 import { type ChangeEventHandler, type FocusEventHandler, type RefCallback, useEffect, useRef, useState } from 'react'
-import { type BoxRecord, Checkers, type LiveOf, type Sidecar, Thing, type Vault, VaultError, type Whisper, WhisperFieldAttributes } from 'safebyok'
+import { type AssertEqual, type BoxRecord, type CheckerInput, Checkers, type LiveOf, type Sidecar, Thing, type Vault, VaultError, type Whisper, WhisperFieldAttributes, bulletproofHandlerOf } from 'safebyok'
+import { sanitizeForeignError } from 'safebyok/storage'
 import { PartsPhrases } from '../parts/phrases-parts'
 import { liveOf } from './giver-defaults'
 import * as Phrases from './phrases-giver'
 import type { BoxSelected, BoxShown } from './react-giver'
-import type { BoxQueryOpts } from './shapes-giver'
+import { type BoxQueryOpts, HostCallbackOpts } from './shapes-giver'
 import { type RevealFriend, useReveal } from './use-reveal'
 
 // == [Types]: Draft, DraftPutOpts, WhisperFieldProps, DraftFriend
@@ -44,13 +45,13 @@ export type Draft = Readonly<{
   /** Drop the draft's edits and empty its inputs, starting again from the box stored. */
   discard:        () => void
   /** Why the last field focused could not be shown, such as `dismissed` when the user closed the unlock form, or null. */
-  lastErr:        unknown
+  lastErr:        Error | null
 }>
 
 /** How a draft's `put` writes. */
 export type DraftPutOpts = Readonly<{
   /** The sidecar to write, from the whisper about to be written and the draft's sidecar. Left out, the draft's sidecar is written.
-   * Use the whisper only inside it, and return no part of it.
+   * Use the whisper only inside it, and return no part of it. What it throws rejects `put`, anything that is no `Error` wrapped in one.
    */
   sidecarOf?: ((whisper: Whisper, sidecar: Sidecar) => Sidecar) | undefined
 }>
@@ -81,6 +82,8 @@ type DraftFriend = RevealFriend & Readonly<{
 export function makeUseDraft(bank: DraftFriend) {
   /** A draft of the box at `labelpath`: an editor's sidecar, its whisper's fields as inputs, and `put` and `discard` for its Save and Undo.
    * The fields' text lives only in the inputs: React never holds it, and `put` reads it from there.
+   * The inputs may sit in a form whose action calls `put`. React empties that form once the action ends, and the draft forgets the fields
+   * typed into with it, so a refused put there loses what was typed, but not the draft's sidecar.
    * @example
    *   const draft = Knock.useDraft('jokes')
    *   <input aria-label="API key" {...draft.whisperField('apiKey')} />
@@ -94,7 +97,7 @@ export function makeUseDraft(bank: DraftFriend) {
     const [sidecarSet, setSidecarSet] = useState<Sidecar | null>(null)
     const [dirtyFieldnames, setDirtyFieldnames] = useState<ReadonlySet<string>>(NoFieldnames)
     const reveal = useReveal(bank, labelpath)
-    const [lastErr, setLastErr] = useState<unknown>(null)
+    const [lastErr, setLastErr] = useState<Error | null>(null)
     const inputs = useRef(new Map<string, HTMLInputElement>())
 
     const baseThing = pinned ?? stored
@@ -102,13 +105,22 @@ export function makeUseDraft(bank: DraftFriend) {
     const baseSidecar = base?.sidecar ?? EmptySidecar
     const sidecar = sidecarSet ?? baseSidecar
     const isWhisperDirty = dirtyFieldnames.size > 0
-    const isDirty = isWhisperDirty || (! isEqual(sidecar, baseSidecar))
+    const isSidecarDirty = ! isEqual(sidecar, baseSidecar)
+    const isDirty = isWhisperDirty || isSidecarDirty
     const isBehind = (pinned !== null) && (stored !== undefined) && (Thing.cmp(pinned, stored) > 0)
 
     // Locking the bank masks the field shown, and this empties every input not typed into.
     useEffect(() => {
       if (isLocked) { emptyInputs(inputs.current, dirtyFieldnames) }
     }, [isLocked, dirtyFieldnames])
+
+    // React empties a form's uncontrolled fields once its action ends, firing no change event, so the draft forgets them with it.
+    // An effect listens, not the inputs' ref callbacks: React detaches a ref callback that changed before it resets the form in the same commit.
+    useEffect(() => {
+      const forms = formsOf(inputs.current)
+      for (const form of forms) { form.addEventListener('reset', forgetTyped) }
+      return () => { for (const form of forms) { form.removeEventListener('reset', forgetTyped) } }
+    })
 
     /** Base the draft on the box stored now, unless it already has a base. */
     function pin(): void { setPinned((prior) => prior ?? stored ?? null) }
@@ -131,7 +143,7 @@ export function makeUseDraft(bank: DraftFriend) {
         // The unlock form takes the focus while the bank is locked: the field shown is given it back.
         if (input.ownerDocument.activeElement !== input) { input.focus() }
       } catch (err) {
-        setLastErr(err)
+        setLastErr(sanitizeForeignError(err))
       }
     }
 
@@ -163,6 +175,17 @@ export function makeUseDraft(bank: DraftFriend) {
       }
     }
 
+    /** Forget the fields typed into and mask the field shown, as a form reset empties them. A draft with no sidecar edit left is discarded. */
+    function forgetTyped(): void {
+      if (isSidecarDirty) {
+        emptyInputs(inputs.current, NoFieldnames)
+        setDirtyFieldnames(NoFieldnames)
+        reveal.mask()
+      } else {
+        discard()
+      }
+    }
+
     function discard(): void {
       emptyInputs(inputs.current, NoFieldnames)
       setPinned(null)
@@ -172,7 +195,8 @@ export function makeUseDraft(bank: DraftFriend) {
     }
 
     async function put(opts: DraftPutOpts = {}): Promise<LiveOf<BoxRecord>> {
-      const { sidecarOf } = Checks.draftPutOpts.parse(opts)
+      const { sidecarOf: hostSidecarOf } = Checks.draftPutOpts.parse(opts)
+      const sidecarOf = hostSidecarOf && bulletproofHandlerOf(hostSidecarOf, HostCallbackOpts)
       const edits = Object.fromEntries([...dirtyFieldnames].map((fieldname) => [fieldname, inputOf(inputs.current, fieldname).value]))
       const box = await bank.withWhisper(labelpath, async (whisper, unsealed) => {
         const nextWhisper = { ...whisper, ...edits }
@@ -191,7 +215,7 @@ export function makeUseDraft(bank: DraftFriend) {
 }
 // --
 
-// == [Helpers]: NoFieldnames, EmptySidecar, wholeThingOf, holdInput, inputOf, emptyInputs, Checks
+// == [Helpers]: NoFieldnames, EmptySidecar, wholeThingOf, holdInput, inputOf, formsOf, emptyInputs, Checks
 
 /** No field typed into. */
 const NoFieldnames: ReadonlySet<string> = new Set()
@@ -216,6 +240,11 @@ function inputOf(inputs: ReadonlyMap<string, HTMLInputElement>, fieldname: strin
   return input
 }
 
+/** The forms the inputs of `inputs` belong to. */
+function formsOf(inputs: ReadonlyMap<string, HTMLInputElement>): ReadonlySet<HTMLFormElement> {
+  return new Set([...inputs.values()].flatMap((input) => ((input.form === null) ? [] : [input.form])))
+}
+
 /** Empty every input of `inputs` but those of `keptFieldnames`. */
 function emptyInputs(inputs: ReadonlyMap<string, HTMLInputElement>, keptFieldnames: ReadonlySet<string>): void {
   for (const [fieldname, input] of inputs) {
@@ -228,4 +257,5 @@ const Checks = Checkers('bad_record', ({ obj, str, fn }) => ({
   fieldname:    str.min(1),
   draftPutOpts: obj({ sidecarOf: fn<NonNullable<DraftPutOpts['sidecarOf']>>().optional() }),
 }))
+true satisfies AssertEqual<DraftPutOpts, Readonly<CheckerInput<typeof Checks.draftPutOpts>>>
 // --

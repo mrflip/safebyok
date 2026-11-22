@@ -1,12 +1,12 @@
-import { QueryClient, QueryClientProvider, onlineManager, useMutation, useQuery } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, type UseMutationResult, onlineManager, useMutation, useQuery } from '@tanstack/react-query'
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
-import { type ReactNode, useActionState, useEffect } from 'react'
-import { type BankSnapshot, type BoxRecord, type GateRecord, type Gating, type Whisper, MemoryVaultDB, Thing, ThingMinder, isVaultError } from 'safebyok'
+import { type ReactNode, useActionState, useEffect, useMemo } from 'react'
+import { type BankSnapshot, type BoxRecord, type GateRecord, type Gating, type LiveOf, type Whisper, MemoryVaultDB, Thing, ThingMinder, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { liveOf, passkeyHeaderOf } from '../../src/giver/giver-defaults'
 import { mask } from '../../src/index'
-import { type PutBoxActionOpts, type PutBoxActionResult, reactGiver } from '../../src/giver/react-giver'
+import { type PutBoxActionOpts, type PutBoxActionResult, type PutBoxMutationOptions, reactGiver } from '../../src/giver/react-giver'
 import * as Phrases from '../../src/giver/phrases-giver'
 import * as TH from '../test-helpers'
 
@@ -71,7 +71,7 @@ describe("reactGiver", () => {
     const { SOK } = await TH.buildProviderWorld()
     expect(Object.keys(SOK)).to.deep.equal(['Provider', 'useStrengthVerdict', 'useQueryOptions', 'bank'])
     expect(Object.keys(SOK.bank('acme'))).to.deep.equal([
-      'useBank', 'useStageChange', 'useGate', 'useBox', 'useBoxList', 'boxQuery', 'keys', 'withWhisper', 'withLockableWhisper', 'putBoxOnce', 'delBoxOnce', 'putBoxAction', 'useDraft', 'lock', 'dismissUnlock',
+      'useBank', 'useStageChange', 'useGate', 'useBox', 'useBoxList', 'boxQuery', 'keys', 'withWhisper', 'withLockableWhisper', 'putBoxOnce', 'delBoxOnce', 'putBoxAction', 'putBoxMutationOptions', 'useDraft', 'lock', 'dismissUnlock',
       'useBirth', 'useUnlock', 'useReplacePassphrase', 'useAddPasskey', 'useRevokePasskey',
       'birthGating', 'unlockGating', 'replacePassphraseGating', 'addPasskeyGating', 'revokePasskeyGating',
       'birthMutationOptions', 'unlockMutationOptions', 'replacePassphraseMutationOptions', 'addPasskeyMutationOptions', 'revokePasskeyMutationOptions',
@@ -861,6 +861,7 @@ function makeKeyEditor(world: TH.ProviderWorld, opts: Partial<PutBoxActionOpts> 
     return (
       <form action={putAction}>
         <p>{(typeof mask === 'string') ? `Key ${mask}` : 'No mask'}</p>
+        <input name="title" aria-label="Title" defaultValue={result?.texts['title']} />
         <input name="apiKey" type="password" aria-label="Key" />
         <button disabled={isPutting}>Save</button>
         {(result !== null) && <output>{(result.err === null) ? 'Saved' : 'Refused'}</output>}
@@ -869,6 +870,19 @@ function makeKeyEditor(world: TH.ProviderWorld, opts: Partial<PutBoxActionOpts> 
   }
   return { KeyEditor, seen }
 }
+
+// The editor hands its result to `seen` in an effect, which runs after the render that shows the result: so a test
+// waits on `seen` itself, never on the rendered `Saved` or `Refused`.
+/** Wait for the key editor's action to resolve, and return its result. */
+function resultOf(seen: { result: PutBoxActionResult | null }): Promise<PutBoxActionResult> {
+  return waitFor(() => {
+    expect(seen.result).to.not.be.null
+    return seen.result!
+  })
+}
+
+/** Throw `val`, an `Error` or not, as a host's callback may. */
+function throwValue(val: unknown): never { throw val as Error }
 
 /** Render the key editor over a world with the joke service's key stored, its bank unlocked. */
 async function renderKeyEditor(opts: Partial<PutBoxActionOpts> = {}) {
@@ -894,11 +908,11 @@ describe("putBoxAction", () => {
   it("writes the box from the form, and useBox shows its new sidecar, with the whisper in no action result and neither cache", async () => {
     const { world, seen, container } = await renderKeyEditor()
     submitKey()
-    await screen.findByText('Saved')
+    const result = await resultOf(seen)
     await screen.findByText('Key …4242')
-    expect(seen.result?.box?.sidecar).to.deep.equal({ service: 'jokes', mask: '…4242' })
+    expect(result.box?.sidecar).to.deep.equal({ service: 'jokes', mask: '…4242' })
     expect(await world.Bank.withWhisper(TH.JokesPath, (whisper) => String(whisper['apiKey']))).to.eq(TypedKey)
-    const kept = [seen.result, TH.reactTreeOf(container), world.client.getQueryCache().getAll(), world.client.getMutationCache().getAll()]
+    const kept = [result, TH.reactTreeOf(container), world.client.getQueryCache().getAll(), world.client.getMutationCache().getAll()]
     expect(kept.map((each) => TH.holdsText(each, TypedKey))).to.deep.equal([false, false, false, false])
   })
 
@@ -920,10 +934,10 @@ describe("putBoxAction", () => {
     const { world, seen } = await renderKeyEditor()
     act(() => { world.Bank.lock() })
     submitKey()
-    await screen.findByText('Refused')
-    const { err } = seen.result!
+    const result = await resultOf(seen)
+    const { err } = result
     expect(isVaultError(err) && err.refusalkind).to.eq('bank_locked')
-    expect(TH.holdsText(seen.result, TypedKey)).to.eq(false)
+    expect(TH.holdsText(result, TypedKey)).to.eq(false)
   })
 
   it("resolves what whisperOf throws, as thrown, and empties the form all the same", async () => {
@@ -934,9 +948,71 @@ describe("putBoxAction", () => {
       throw thrown
     } })
     submitKey()
-    await screen.findByText('Refused')
-    expect(seen.result?.err).to.eq(thrown)
+    const { err } = await resultOf(seen)
+    expect(err).to.eq(thrown)
     expect([...forms[0]!.keys()]).to.deep.equal([])
+  })
+
+  it("wraps a thrown value that is no Error in an Error, the value its cause, and empties the form all the same", async () => {
+    const thrown = { code: 42 }
+    const forms: FormData[] = []
+    const { seen } = await renderKeyEditor({ whisperOf: (form) => {
+      forms.push(form)
+      return throwValue(thrown)
+    } })
+    submitKey()
+    const { err } = await resultOf(seen)
+    expect(err).to.be.instanceOf(Error)
+    expect(err?.cause).to.eq(thrown)
+    expect([...forms[0]!.keys()]).to.deep.equal([])
+  })
+
+  it("deletes only the named secret fields, and a refusal carries the other fields' text back for defaultValue", async () => {
+    const forms: FormData[] = []
+    const { world, seen, container } = await renderKeyEditor({ secretFieldnames: ['apiKey'], whisperOf: (form) => {
+      forms.push(form)
+      return { apiKey: form.get('apiKey') as string }
+    } })
+    act(() => { world.Bank.lock() })
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'My jokes key' } })
+    submitKey()
+    const result = await resultOf(seen)
+    expect(result.texts).to.deep.equal({ title: 'My jokes key' })
+    expect([...forms[0]!.keys()]).to.deep.equal(['title'])
+    expect(screen.getByLabelText<HTMLInputElement>('Title').value).to.eq('My jokes key')
+    expect(screen.getByLabelText<HTMLInputElement>('Key').value).to.eq('')
+    const retained = [result, forms, TH.reactTreeOf(container), world.client.getQueryCache().getAll(), world.client.getMutationCache().getAll()]
+    expect(retained.map((each) => TH.holdsText(each, TypedKey))).to.deep.equal([false, false, false, false, false])
+  })
+
+  it("carries no text after a write that lands, so the form comes back empty", async () => {
+    const { seen } = await renderKeyEditor({ secretFieldnames: ['apiKey'] })
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'My jokes key' } })
+    submitKey()
+    const { texts } = await resultOf(seen)
+    expect(texts).to.deep.equal({})
+    expect(screen.getByLabelText<HTMLInputElement>('Title').value).to.eq('')
+  })
+
+  it("deletes every field when it is told no secret fieldnames, and carries no text back", async () => {
+    const forms: FormData[] = []
+    const { world, seen } = await renderKeyEditor({ whisperOf: (form) => {
+      forms.push(form)
+      return { apiKey: form.get('apiKey') as string }
+    } })
+    act(() => { world.Bank.lock() })
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'My jokes key' } })
+    submitKey()
+    const result = await resultOf(seen)
+    expect([...forms[0]!.keys()]).to.deep.equal([])
+    expect(result.texts).to.deep.equal({})
+  })
+
+  it("refuses secretFieldnames that is not an array of names", async () => {
+    const world = await TH.buildProviderWorld()
+    const whisperOf = whisperOfAnyForm
+    TH.expectSyncRefusal(() => world.Bank.putBoxAction(TH.JokesPath, { whisperOf, secretFieldnames: 'apiKey' as never }), 'bad_record')
+    TH.expectSyncRefusal(() => world.Bank.putBoxAction(TH.JokesPath, { whisperOf, secretFieldnames: [''] }), 'bad_record')
   })
 
   it("keeps the box's sidecar when it has no sidecarOf", async () => {
@@ -958,6 +1034,150 @@ describe("putBoxAction", () => {
     const world = await TH.buildProviderWorld()
     const { err } = await world.Bank.putBoxAction(TH.JokesPath, { whisperOf: whisperOfAnyForm })(null, { apiKey: TypedKey } as never)
     expect(isVaultError(err) && err.refusalkind).to.eq('bad_record')
+  })
+})
+
+/** The key editor of a host that writes its form as a mutation: the stored key's mask, a form whose action hands `mutate` the form, and the mutation. */
+function makeMutationKeyEditor(world: TH.ProviderWorld, opts: Partial<PutBoxActionOpts> = {}) {
+  const seen: { options: PutBoxMutationOptions | null, put: UseMutationResult<LiveOf<BoxRecord>, Error, FormData> | null } = { options: null, put: null }
+  function KeyEditor() {
+    const mask = world.Bank.useBox(TH.JokesPath, { select: (thing) => liveOf(thing)?.sidecar['mask'] }).data
+    const options = useMemo(() => world.Bank.putBoxMutationOptions(TH.JokesPath, {
+      whisperOf: (form) => ({ apiKey: form.get('apiKey') as string }),
+      sidecarOf: (whisper) => ({ service: 'jokes', mask: `…${String(whisper['apiKey']).slice(-4)}` }),
+      ...opts,
+    }), [])
+    const put = useMutation(options)
+    useEffect(() => { seen.options = options; seen.put = put })
+    return (
+      <form action={(form) => { put.mutate(form) }}>
+        <p>{(typeof mask === 'string') ? `Key ${mask}` : 'No mask'}</p>
+        <input name="title" aria-label="Title" />
+        <input name="apiKey" type="password" aria-label="Key" />
+        <button disabled={put.isPending}>Save</button>
+        {put.isSuccess && <output>Saved</output>}
+        {put.isError && <output>Refused</output>}
+      </form>
+    )
+  }
+  return { KeyEditor, seen }
+}
+
+// As with resultOf, the mutation reaches `seen` in an effect after the render that shows it.
+/** Wait for the mutation key editor's mutation to succeed or fail, and return it. */
+function settledPutOf(seen: ReturnType<typeof makeMutationKeyEditor>['seen']): Promise<UseMutationResult<LiveOf<BoxRecord>, Error, FormData>> {
+  return waitFor(() => {
+    expect(seen.put?.status).to.be.oneOf(['success', 'error'])
+    return seen.put!
+  })
+}
+
+/** Render the mutation key editor over a world with the joke service's key stored, its bank unlocked. */
+async function renderMutationKeyEditor(opts: Partial<PutBoxActionOpts> = {}) {
+  const world = await TH.buildProviderWorld({ stored: 'jokes' })
+  const editor = makeMutationKeyEditor(world, opts)
+  const rendered = render(TH.providerTreeOf(world, <editor.KeyEditor />, { userid: TH.ProviderUser }))
+  const device = await waitFor(() => world._cheat_device())
+  await act(async () => {
+    await device.hello()
+    await device.bank!.gate.unlock({ passphraseCleartext: Passphrase })
+  })
+  return { world, ...editor, ...rendered }
+}
+
+describe("putBoxMutationOptions", () => {
+  // putBoxMutationOptions @example
+  it("writes the box from the form, and useBox shows its new sidecar, with the whisper in no variable, result or cache", async () => {
+    const { world, seen, container } = await renderMutationKeyEditor()
+    submitKey()
+    const put = await settledPutOf(seen)
+    await screen.findByText('Key …4242')
+    expect(put.data?.sidecar).to.deep.equal({ service: 'jokes', mask: '…4242' })
+    expect(await world.Bank.withWhisper(TH.JokesPath, (whisper) => String(whisper['apiKey']))).to.eq(TypedKey)
+    const mutations = world.client.getMutationCache().getAll()
+    expect(mutations).to.have.lengthOf(1)
+    expect([...(mutations[0]!.state.variables as FormData).keys()]).to.deep.equal([])
+    TH.expectTextUnheld(TypedKey, container, world.client)
+    expect(TH.holdsText(put, TypedKey)).to.eq(false)
+  })
+
+  it("rejects with the refusal, and the form is empty and holds no secret all the same", async () => {
+    const { world, seen, container } = await renderMutationKeyEditor()
+    act(() => { world.Bank.lock() })
+    submitKey()
+    const put = await settledPutOf(seen)
+    const err = put.error
+    expect(isVaultError(err) && err.refusalkind).to.eq('bank_locked')
+    const mutations = world.client.getMutationCache().getAll()
+    expect([...(mutations[0]!.state.variables as FormData).keys()]).to.deep.equal([])
+    TH.expectTextUnheld(TypedKey, container, world.client)
+    expect(TH.holdsText(put, TypedKey)).to.eq(false)
+  })
+
+  it("sets the mutation's error to what whisperOf throws, the same object, and empties the form all the same", async () => {
+    const thrown = new TypeError('The key field is missing')
+    const forms: FormData[] = []
+    const { seen } = await renderMutationKeyEditor({ whisperOf: (form) => {
+      forms.push(form)
+      throw thrown
+    } })
+    submitKey()
+    const { error: err } = await settledPutOf(seen)
+    expect(err).to.eq(thrown)
+    expect([...forms[0]!.keys()]).to.deep.equal([])
+  })
+
+  it("deletes only the named secret fields", async () => {
+    const forms: FormData[] = []
+    const { world, container } = await renderMutationKeyEditor({ secretFieldnames: ['apiKey'], whisperOf: (form) => {
+      forms.push(form)
+      return { apiKey: form.get('apiKey') as string }
+    } })
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'My jokes key' } })
+    submitKey()
+    await screen.findByText('Saved')
+    expect([...forms[0]!.keys()]).to.deep.equal(['title'])
+    expect(forms[0]!.get('title')).to.eq('My jokes key')
+    TH.expectTextUnheld(TypedKey, container, world.client)
+  })
+
+  it("wraps a thrown value that is no Error in an Error, the value its cause", async () => {
+    const thrown = { code: 42 }
+    const { seen } = await renderMutationKeyEditor({ whisperOf: () => throwValue(thrown) })
+    submitKey()
+    const { error: err } = await settledPutOf(seen)
+    expect(err).to.be.instanceOf(Error)
+    expect(err?.cause).to.eq(thrown)
+  })
+
+  it("runs offline and never retries, so a form is never left waiting in the variables", async () => {
+    onlineManager.setOnline(false)
+    onTestFinished(() => { onlineManager.setOnline(true) })
+    const { seen } = await renderMutationKeyEditor()
+    expect([seen.options?.networkMode, seen.options?.retry]).to.deep.equal(['always', false])
+    submitKey()
+    await screen.findByText('Saved')
+  })
+
+  it("keys its mutation under the user's bank, or no user's while nobody is signed in", async () => {
+    const { world } = await renderMutationKeyEditor()
+    expect(world.Bank.putBoxMutationOptions(TH.JokesPath, { whisperOf: whisperOfAnyForm }).mutationKey).to.deep.equal(['sok', TH.ProviderUser, 'acme', 'putBox'])
+    const unsigned = await TH.buildProviderWorld()
+    expect(unsigned.Bank.putBoxMutationOptions(TH.JokesPath, { whisperOf: whisperOfAnyForm }).mutationKey).to.deep.equal(['sok', null, 'acme', 'putBox'])
+  })
+
+  it("refuses what names no box, and a whisperOf or sidecarOf that is not a function", async () => {
+    const world = await TH.buildProviderWorld()
+    const whisperOf = whisperOfAnyForm
+    TH.expectSyncRefusal(() => world.Bank.putBoxMutationOptions('', { whisperOf }), 'bad_record')
+    TH.expectSyncRefusal(() => world.Bank.putBoxMutationOptions(TH.JokesPath, {} as never), 'bad_record')
+    TH.expectSyncRefusal(() => world.Bank.putBoxMutationOptions(TH.JokesPath, { whisperOf, sidecarOf: 'mask' as never }), 'bad_record')
+  })
+
+  it("rejects, handed something other than a FormData", async () => {
+    const world = await TH.buildProviderWorld()
+    const options = world.Bank.putBoxMutationOptions(TH.JokesPath, { whisperOf: whisperOfAnyForm })
+    await TH.expectRefusal(options.mutationFn!({ apiKey: TypedKey } as never, undefined as never), 'bad_record')
   })
 })
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { PasskeySaltSize, PrfAnswerSize, VaultError, fromB64, type WayinHeader } from 'safebyok'
 import { askPasskey, createPasskey, passkeysAvailable } from '../../src/kit/passkey'
-import { KitPhrases } from '../../src/kit/phrases-kit'
+import { CeremonyPhrases } from '../../src/kit/phrases-kit'
 import * as TH from '../test-helpers'
 
 /** The passkey header that a vault with the passkey `credential_id` has on its gate. */
@@ -103,9 +103,9 @@ describe("createPasskey", () => {
   })
 
   it("refuses, in words a form shows, an authenticator without PRF and a browser without WebAuthn", async () => {
-    expect(await refusalOf(createPasskey(Making))).to.include({ refusalkind: 'passkey_unavailable', message: KitPhrases.noWebAuthn })
+    expect(await refusalOf(createPasskey(Making))).to.include({ refusalkind: 'passkey_unavailable', message: CeremonyPhrases.noWebAuthn })
     TH.installFakeAuthenticator({ prf: false })
-    expect(await refusalOf(createPasskey(Making))).to.include({ refusalkind: 'passkey_unavailable', message: KitPhrases.noPrf })
+    expect(await refusalOf(createPasskey(Making))).to.include({ refusalkind: 'passkey_unavailable', message: CeremonyPhrases.noPrf })
   })
 
   it("resolves null when the user dismisses the prompt, at either step", async () => {
@@ -123,7 +123,7 @@ describe("createPasskey", () => {
     expect(await refusalOf(createPasskey(Making))).to.include({ refusalkind: 'bad_record', family: 'misuse' })
     authenticator.refuseNext('UnknownError')
     const failed = await refusalOf(createPasskey(Making))
-    expect(failed).to.include({ refusalkind: 'passkey_unavailable', message: KitPhrases.passkeyAskFailed })
+    expect(failed).to.include({ refusalkind: 'passkey_unavailable', message: CeremonyPhrases.passkeyAskFailed })
     expect(failed.cause).to.be.instanceOf(DOMException)
   })
 })
@@ -143,7 +143,7 @@ describe("askPasskey", () => {
 
   it("refuses a vault with no passkey before the browser is asked", async () => {
     const authenticator = TH.installFakeAuthenticator()
-    expect(await refusalOf(askPasskey(null))).to.include({ refusalkind: 'absent_wayin', message: KitPhrases.noPasskeyToAsk })
+    expect(await refusalOf(askPasskey(null))).to.include({ refusalkind: 'absent_wayin', message: CeremonyPhrases.noPasskeyToAsk })
     expect(authenticator.calls.get).to.have.lengthOf(0)
   })
 
@@ -170,13 +170,13 @@ describe("askPasskey", () => {
     const otherCredential = { type: 'public-key', rawId: new Uint8Array(16).buffer, getClientExtensionResults: () => ({ prf: { results: { first: answer } } }) }
     vi.spyOn(navigator.credentials, 'get').mockResolvedValue(otherCredential as unknown as Credential)
     const asking = askPasskey(headerOf(made?.credential_id ?? '', made?.prf_salt_b64 ?? ''))
-    expect(await refusalOf(asking)).to.include({ refusalkind: 'passkey_unavailable', message: KitPhrases.passkeyAskFailed })
+    expect(await refusalOf(asking)).to.include({ refusalkind: 'passkey_unavailable', message: CeremonyPhrases.passkeyAskFailed })
     expect(answer.every((byte) => byte === 0)).to.be.true
   })
 
   it("refuses, in words a form shows, in a browser without WebAuthn", async () => {
     const passkeyHeader = headerOf('AAAA', 'AAAA')
-    expect(await refusalOf(askPasskey(passkeyHeader))).to.include({ refusalkind: 'passkey_unavailable', message: KitPhrases.noWebAuthn })
+    expect(await refusalOf(askPasskey(passkeyHeader))).to.include({ refusalkind: 'passkey_unavailable', message: CeremonyPhrases.noWebAuthn })
   })
 })
 

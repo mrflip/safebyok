@@ -1,6 +1,6 @@
 // safebyok, the front door: everything `safebyok/core` and `safebyok/storage` export, the ThingMinder and Vault the layers above the
-// core build on, the strength checkers, and what a host or an adapter reaches for that safebyok-big defines, re-exported
-// so that each stays one binding across both packages. The browser's deriver and checker are on `safebyok/browser`.
+// core build on, the strength checkers, the bulletproof wrappers of a host's functions, and what a host or an adapter reaches
+// for that safebyok-big defines, re-exported so that each stays one binding across both packages. The browser's deriver and checker are on `safebyok/browser`.
 // The proving classes are on no entry as values: see core.ts.
 // The two entries share many names, each the same binding (tests/index.test.ts checks every value), which import-x/export
 // reports as a duplicate all the same; TypeScript refuses a name the two export as different bindings.
@@ -17,6 +17,7 @@ export { type Labelpathed, ThingMinder } from './minding/thing-minder'
 export { Vault } from './models/vault'
 export { newerThingOf } from './minding/newer-thing'
 export { DefaultStrengthChecker, guardStrengthChecker } from './helpers/passphrase-strength'
+export { type BulletproofFailOpts, type BulletproofOpts, type BulletproofTellOpts, bulletproofAsyncHandlerOf, bulletproofHandlerOf } from './helpers/bulletproof'
 
 // From safebyok-big, beside what core.ts and storage.ts re-export: the kinds, sizes and patterns a host checks its own input
 // against, and the small helpers of `safebyok-big/utils`.

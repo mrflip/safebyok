@@ -97,4 +97,10 @@ describe("ReplacePassphraseForm", () => {
     expect(screen.getByText('The passphrases do not match')).to.exist
     expect(replaceButton().disabled).to.eq(true)
   })
+
+  it("names each of its fields with a visible label", async () => {
+    await renderReplace()
+    const fields = ['Current passphrase', 'New passphrase', 'Confirm passphrase'].map((text) => TH.expectVisiblyLabelled(text))
+    expect(new Set(fields).size).to.eq(3)
+  })
 })

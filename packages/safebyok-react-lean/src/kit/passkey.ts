@@ -1,7 +1,7 @@
 /** The passkey helpers: `createPasskey` makes a passkey and returns its answer, `askPasskey` asks the bank's passkey for its answer. */
 
 import { Checkers, PasskeySaltSize, VaultError, fromB64, toB64, type PasskeyAnswer, type WayinHeader } from 'safebyok'
-import { KitPhrases } from './phrases-kit'
+import { CeremonyPhrases } from './phrases-kit'
 
 // These passkeys are not used to sign in. Each is a fresh credential under a random user handle, with a random
 // challenge, and no server checks the assertion. The part that matters is the PRF extension's output, which only
@@ -69,7 +69,7 @@ export async function createPasskey(given: CreatePasskeyOpts): Promise<PasskeyAn
 export async function askPasskey(passkeyHeader: WayinHeader | null, given: AskPasskeyOpts = {}): Promise<PasskeyAnswer | null> {
   const { passkeyHeader: header, opts } = PasskeyChecks.askPasskeyArgs.parse({ passkeyHeader, opts: given }, { where: "In askPasskey's arguments" })
   demandWebAuthn()
-  if (header?.wayinkind !== 'passkey') { throw new VaultError('absent_wayin', KitPhrases.noPasskeyToAsk) }
+  if (header?.wayinkind !== 'passkey') { throw new VaultError('absent_wayin', CeremonyPhrases.noPasskeyToAsk) }
   const { credential_id } = header
   const credentialBytes = credentialBytesOf(credential_id)
   const saltBytes = fromB64(header.prf_salt_b64) as Uint8Array<ArrayBuffer>
@@ -90,7 +90,7 @@ export async function askPasskey(passkeyHeader: WayinHeader | null, given: AskPa
   // The browser should respond only with the credential it was asked for. A response from any other credential cannot unlock this vault.
   if (toB64(new Uint8Array(asked.rawId)) !== credential_id) {
     passkeyCleartext.prfBytes.fill(0)
-    throw new VaultError('passkey_unavailable', KitPhrases.passkeyAskFailed)
+    throw new VaultError('passkey_unavailable', CeremonyPhrases.passkeyAskFailed)
   }
   return passkeyCleartext
 }
@@ -181,12 +181,12 @@ function optional<FieldT extends string, ValT>(field: FieldT, val: ValT | undefi
 
 /** Refuse `passkey_unavailable` in a browser without WebAuthn. */
 function demandWebAuthn(): void {
-  if (! passkeysAvailable()) { throw new VaultError('passkey_unavailable', KitPhrases.noWebAuthn) }
+  if (! passkeysAvailable()) { throw new VaultError('passkey_unavailable', CeremonyPhrases.noWebAuthn) }
 }
 
 /** The refusal for an authenticator that gives no PRF output. */
 function noPrf(): VaultError {
-  return new VaultError('passkey_unavailable', KitPhrases.noPrf)
+  return new VaultError('passkey_unavailable', CeremonyPhrases.noPrf)
 }
 
 /** The credential `call` resolves, or null when the user dismissed the prompt. */
@@ -200,7 +200,7 @@ async function askAuthenticator(call: () => Promise<Credential | null>): Promise
     if ((err instanceof DOMException) && (err.name === 'SecurityError')) {
       throw new VaultError('bad_record', "The browser refused the passkey's relying party: its id must be this page's domain, or one it belongs to.", { cause: err })
     }
-    throw new VaultError('passkey_unavailable', KitPhrases.passkeyAskFailed, { cause: err })
+    throw new VaultError('passkey_unavailable', CeremonyPhrases.passkeyAskFailed, { cause: err })
   }
   return (credential === null) ? null : credential as PublicKeyCredential
 }

@@ -1,54 +1,43 @@
 /** `PassphraseInput`, the field a user types a passphrase into. */
 
-import { type ComponentPropsWithRef, type KeyboardEvent, useId, useState } from 'react'
-import { useFormStatus } from 'react-dom'
-import { PartsPhrases } from './phrases-parts'
-import { useRevealToggle } from './reveal-toggle'
+import type { ComponentPropsWithRef } from 'react'
+import { usePartsPhrases } from './phrases-parts'
+import { type PassphraseFieldOpts, usePassphraseField } from './use-passphrase-field'
 
 // == [The input]: PassphraseInputProps, PassphraseInput
 
 /** The props of a {@link PassphraseInput}: its `name` in the form, whether it takes the current passphrase or a new one, and any `<input>` attribute but its value and type. */
-export type PassphraseInputProps = Omit<ComponentPropsWithRef<'input'>, 'name' | 'type' | 'value' | 'defaultValue' | 'autoComplete'> & {
+export type PassphraseInputProps = Omit<ComponentPropsWithRef<'input'>, 'name' | 'type' | 'value' | 'defaultValue' | 'autoComplete'> & PassphraseFieldOpts & {
   /** The field's name in the form's `FormData`, for the form's action to read. */
-  name:          string
-  /** `current-password` (the default) for the passphrase the user has, `new-password` for one being chosen, so a password manager offers or saves it. */
-  autoComplete?: 'current-password' | 'new-password' | undefined
+  name: string
 }
 
 /** A masked, uncontrolled input for a passphrase, with a Show / Hide button and a Caps Lock warning. Read it in the form's action, from the `FormData`.
  * Each submit hides it again, so a password manager sees a password field.
+ * `className` and the other attributes go to the `<input>`, which carries `data-revealed` while the passphrase shows and `data-invalid` while `aria-invalid` is true.
  * @example
  *   <form action={unlockAction}><PassphraseInput name="passphrase" aria-label="Passphrase" /><SubmitButton>Unlock</SubmitButton></form>
  */
-export function PassphraseInput({ id, autoComplete = 'current-password', onKeyDown, onKeyUp, onBlur, ...passed }: PassphraseInputProps) {
-  const { pending } = useFormStatus()
-  const reveal = useRevealToggle(! pending)
-  const [isCapsOn, setIsCapsOn] = useState(false)
-  const ownId = useId()
-  const fieldId = id ?? ownId
-  /** Note whether Caps Lock is on, as of `event`. */
-  function watchCaps(event: KeyboardEvent<HTMLInputElement>) { setIsCapsOn(event.getModifierState('CapsLock')) }
+export function PassphraseInput({ id, autoComplete, isPending, onKeyDown, onKeyUp, onBlur, 'aria-invalid': ariaInvalid, ...passed }: PassphraseInputProps) {
+  const field = usePassphraseField({ id, autoComplete, isPending, onKeyDown, onKeyUp, onBlur })
+  const phrases = usePartsPhrases()
+  // `type`, `value` and `defaultValue` come last, so a host that gets any past the types still leaves the input uncontrolled and masked.
   return (
     <>
       <span className="passphrase-input">
         <input
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck="false"
+          {...field.inputProps}
           {...passed}
-          id={fieldId}
-          type={reveal.fieldType}
-          autoComplete={autoComplete}
-          // Last, so a host that gets either past the types still leaves the input uncontrolled.
+          aria-invalid={ariaInvalid}
+          data-revealed={field.isRevealed || undefined}
+          data-invalid={((ariaInvalid === true) || (ariaInvalid === 'true')) || undefined}
+          type={field.inputProps.type}
           value={undefined}
           defaultValue={undefined}
-          onKeyDown={(event) => { watchCaps(event); onKeyDown?.(event) }}
-          onKeyUp={(event) => { watchCaps(event); onKeyUp?.(event) }}
-          onBlur={(event) => { setIsCapsOn(false); onBlur?.(event) }}
         />
-        {reveal.button(fieldId)}
+        <button {...field.toggleProps}>{field.isRevealed ? phrases.hideButton : phrases.showButton}</button>
       </span>
-      <span role="status">{isCapsOn && PartsPhrases.capsLockOn}</span>
+      <span role="status">{field.isCapsLockOn && phrases.capsLockOn}</span>
     </>
   )
 }

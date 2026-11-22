@@ -91,4 +91,10 @@ describe("CreateVaultForm", () => {
     expect(createButton().disabled).to.eq(true)
     TH.expectTextUnheld(NewPassphrase, container, world.client)
   })
+
+  it("names both its fields with visible labels", async () => {
+    await renderCreateVault()
+    const fields = [TH.expectVisiblyLabelled('New passphrase'), TH.expectVisiblyLabelled('Confirm passphrase')]
+    expect(fields[0]).to.not.eq(fields[1])
+  })
 })

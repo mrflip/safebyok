@@ -1,7 +1,8 @@
-/** The giver's types and checks: the events it reads of a minder, and what a host hands it. */
+/** The giver's types and checks: the events it reads of a minder, and what a host hands it, and how it wraps a host's callback. */
 
 import type { QueryClient, QueryKey, UseQueryOptions } from '@tanstack/react-query'
-import { type BankSnapshot, type Banklabel, type DeviceOpts, type KeyDeriver, type Userid, type VaultDB, Checkers, PendingBank, isVaultDB } from 'safebyok'
+import { type AssertEqual, type BankSnapshot, type Banklabel, type BulletproofFailOpts, type CheckerInput, type DeviceOpts, type KeyDeriver, type Userid, type VaultDB, Checkers, PendingBank, isVaultDB } from 'safebyok'
+import { sanitizeForeignError } from 'safebyok/storage'
 import * as Phrases from './phrases-giver'
 
 // == [Types]: GiverBanks, GiverConfig, GiverMount, SignedOutBank, GiverEvent, BoxQueryOpts
@@ -42,7 +43,7 @@ export type GiverEvent = Readonly<{
 export type BoxQueryOpts<RecordT, SelT> = Omit<UseQueryOptions<RecordT, Error, SelT>, 'queryKey' | 'queryFn'>
 // --
 
-// == [Checks]: ScopeChecks, ConfigChecks, isOneBank
+// == [Checks]: ScopeChecks, ConfigChecks, isOneBank, HostCallbackOpts
 
 /** The check that a banklabel names the giver's bank. */
 export const ScopeChecks = Checkers('bad_scope', ({ obj, label, banklabel }) => ({
@@ -56,6 +57,8 @@ export const ConfigChecks = Checkers('bad_record', ({ obj, custom }) => ({
     banks: custom<GiverBanks>(isOneBank, Phrases.OneBankExpected).transform((banks) => Object.entries(banks) as [[Banklabel, Readonly<{ vaultDB: VaultDB }>]]),
   }),
 }))
+// The device's options in a config are left to Device.make, which checks them as it makes each device.
+true satisfies AssertEqual<Omit<GiverConfig, keyof DeviceOpts>, Readonly<CheckerInput<typeof ConfigChecks.giverConfig>>>
 
 /** True when `val` names exactly one bank by a valid banklabel, and its vaultDB. */
 function isOneBank(val: unknown): boolean {
@@ -65,4 +68,7 @@ function isOneBank(val: unknown): boolean {
   const [[banklabel, bank]] = entries as [[string, unknown]]
   return ScopeChecks.banklabel.safeParse(banklabel).success && (typeof bank === 'object') && (bank !== null) && isVaultDB((bank as { vaultDB?: unknown }).vaultDB)
 }
+
+/** How the giver wraps a callback a host hands it: what the callback throws is rethrown as an `Error`, the same object where it threw an `Error`. */
+export const HostCallbackOpts: BulletproofFailOpts = Object.freeze({ ifError: 'fail', transformer: sanitizeForeignError })
 // --
