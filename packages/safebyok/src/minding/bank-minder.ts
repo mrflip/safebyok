@@ -75,8 +75,8 @@ export class BankMinder {
     return this.worldAt(scope) ?? null
   }
 
-  /** Call `listener` after each change to a world in the cache, and return the function that stops it.
-   * The listener is called with no argument: read the world again. What it throws is reported to the platform.
+  /** Call `listener` each time a record lands in a world or a world is removed, and return the function that stops it.
+   * A landing that changes nothing calls it too. It is called with no argument: read the world again. What it throws is reported to the platform.
    */
   subscribe(listener: () => void): () => void {
     Checks.listener.parse(listener)
