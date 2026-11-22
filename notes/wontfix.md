@@ -328,3 +328,25 @@ a `<button type="reset">`.
 
 Reasoning for wontfix: a host that cancels a reset is rare, the outcome loses typed text and corrupts nothing stored,
 and the fix moves a listener to where React's internals decide its order. Ruled by the Coach, 2026-11-22.
+
+## A stage change that reveals a suspending subtree shows its fallback
+
+The bank's stage reaches React through `useSyncExternalStore` (`safebyok-react-lean`, `useBank`). React's manual: an
+update from an external store is never a transition. So when an unlock, or any other stage change, first renders a
+subtree that suspends on a record, React shows that subtree's `Suspense` fallback, and a host cannot have it wait
+behind the screen before by wrapping the change in `startTransition`.
+
+Current outcome: the fallback shows until the record arrives. Nothing is wrong on the page, and nothing is stored.
+
+Alternatives: a copy of the stage in React state, updated in a transition, gives a stage that lags the bank's, and a
+screen that shows `'locked'` after the bank has unlocked. Holding the stage change back until the subtree's records are
+fetched puts a wait in the path of every lock and unlock.
+
+Workaround: place the `Suspense` boundary low, around the part that reads the record, with a fallback the size of what
+it replaces; or read with `useBox`, which does not suspend.
+
+To reproduce: under a stage switch, render at `'unlocked'` a component that suspends on a box not yet fetched; unlock.
+
+Reasoning for wontfix: the stage is synchronous on purpose, so that no screen shows a stage the bank has left, and
+that is worth more than one smoothed fallback. The limit is React's, stated in its manual. Ruled by the Coach,
+2026-11-22.
