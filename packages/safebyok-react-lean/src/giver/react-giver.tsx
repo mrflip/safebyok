@@ -484,8 +484,8 @@ function makeBankGiver(friend: BankFriend) {
   /** A form action for `useActionState` that writes the box `boxNamed` names from the form's fields, as {@link putBoxOnce} does.
    * Make it at module scope, or under `useMemo`, so its checks run once.
    * It reads the whisper with `opts.whisperOf`, and the sidecar with `opts.sidecarOf`, then empties the form of every field before it writes.
-   * It never rejects: it resolves the box stored, or the `Error` that stopped it: a refusal, or what `whisperOf` or `sidecarOf` threw, as thrown.
-   * A thrown value that is not an `Error` comes wrapped in one, as the core's `sanitizeForeignError` makes it.
+   * It never rejects: it resolves the box stored, or the `Error` that stopped it, a refusal or what `whisperOf` or `sidecarOf` threw.
+   * An `Error` they throw arrives as thrown; anything else they throw arrives wrapped in an `Error`, a thrown string as its message.
    * @example
    *   const [put, putAction, isPutting] = useActionState(useMemo(() => Knock.putBoxAction('jokes', {
    *     whisperOf: (form) => ({ apiKey: String(form.get('apiKey')) }),
