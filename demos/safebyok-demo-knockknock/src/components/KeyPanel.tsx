@@ -1,5 +1,4 @@
 import { useMutation } from '@tanstack/react-query'
-import { useMemo } from 'react'
 import { mask } from 'safebyok-react-lean'
 import { SubmitButton, WhisperInput, WhisperMask, WhisperText } from 'safebyok-react-lean/parts'
 import { useIsKeyStored } from '../hooks/useIsKeyStored'
@@ -28,7 +27,7 @@ export function KeyPanel() {
 
 /** The form that puts a new key, or replaces the stored one. */
 function KeyEditor({ isReplacing }: Readonly<{ isReplacing: boolean }>) {
-  const putKey = useMutation(useMemo(() => Knock.putBoxMutationOptions(KeyLabelpath, {
+  const putKey = useMutation(Knock.putBoxMutationOptions(KeyLabelpath, {
     whisperOf: (form) => {
       const apiKey = formTextOf(form, 'apiKey')
       if (apiKey === '') { throw new Error('Paste your Anthropic API key first.') }
@@ -36,7 +35,7 @@ function KeyEditor({ isReplacing }: Readonly<{ isReplacing: boolean }>) {
     },
     // The sidecar is stored readable, so its mask shows no character of the key's tail.
     sidecarOf: (whisper) => ({ mask: mask(String(whisper['apiKey']), { tail: 0 }) }),
-  }), []))
+  }))
   return (
     <form className="row" action={(form) => { putKey.mutate(form) }}>
       <WhisperInput name="apiKey" aria-label="Anthropic API key" placeholder="sk-ant-…" required />

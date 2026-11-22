@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider, type UseMutationResult, onlineManager, useMutation, useQuery } from '@tanstack/react-query'
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
-import { type ReactNode, useActionState, useEffect, useMemo } from 'react'
+import { type ReactNode, useActionState, useEffect } from 'react'
 import { type BankSnapshot, type BoxRecord, type GateRecord, type Gating, type LiveOf, type Whisper, MemoryVaultDB, Thing, ThingMinder, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
@@ -1028,11 +1028,11 @@ function makeMutationKeyEditor(world: TH.ProviderWorld, opts: Partial<PutBoxActi
   const seen: { options: PutBoxMutationOptions | null, put: UseMutationResult<LiveOf<BoxRecord>, Error, FormData> | null } = { options: null, put: null }
   function KeyEditor() {
     const mask = world.Bank.useBox(TH.JokesPath, { select: (thing) => liveOf(thing)?.sidecar['mask'] }).data
-    const options = useMemo(() => world.Bank.putBoxMutationOptions(TH.JokesPath, {
+    const options = world.Bank.putBoxMutationOptions(TH.JokesPath, {
       whisperOf: (form) => ({ apiKey: form.get('apiKey') as string }),
       sidecarOf: (whisper) => ({ service: 'jokes', mask: `…${String(whisper['apiKey']).slice(-4)}` }),
       ...opts,
-    }), [])
+    })
     const put = useMutation(options)
     useEffect(() => { seen.options = options; seen.put = put })
     return (

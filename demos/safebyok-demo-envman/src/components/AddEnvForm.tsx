@@ -19,7 +19,7 @@ const AddEnvOpts: PutBoxActionOpts = {
   secretFieldnames: ['val'],
 }
 
-// Each new env is a box of its own, under a label minted at submit, so the put action is made per submit, not once.
+// Each new env is a box of its own, under a label minted at submit.
 /** Write the add form's fields as a new env, never rejecting. */
 function addEnvAction(prior: PutBoxActionResult | null, form: FormData): Promise<PutBoxActionResult> {
   return Envman.putBoxAction(newEnvLabel(), AddEnvOpts)(prior, form)

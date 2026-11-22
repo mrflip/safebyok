@@ -476,18 +476,17 @@ function makeBankGiver(friend: BankFriend) {
   // React shows the form's FormData to the components inside it, through `useFormStatus().data`, until the action settles.
   // With its secret fields deleted before the first await, it holds the whisper during no render.
   /** A form action for `useActionState` that writes the box `boxNamed` names from the form's fields, as {@link putBoxOnce} does.
-   * Make it at module scope, or under `useMemo`, so its checks run once.
    * It reads the whisper with `opts.whisperOf`, and the sidecar with `opts.sidecarOf`, then deletes the form's secret fields before it writes: every field, or only those `opts.secretFieldnames` names.
    * Name every field that carries a secret: one `whisperOf` reads that you leave out stays in the `FormData` React retains.
    * It never rejects: it resolves the box stored, or the `Error` that stopped it, a refusal or what `whisperOf`, `sidecarOf` or the vaultDB threw.
    * A refusal also carries `texts`, the text of each field left in the form (a file's field is left out), for `defaultValue`: React resets the form once the action ends, and these put back what the user typed.
    * An `Error` thrown arrives as it is; anything else thrown arrives wrapped in an `Error`, a thrown string as its message.
    * @example
-   *   const [put, putAction, isPutting] = useActionState(useMemo(() => Knock.putBoxAction('jokes', {
+   *   const [put, putAction, isPutting] = useActionState(Knock.putBoxAction('jokes', {
    *     whisperOf: (form) => ({ apiKey: String(form.get('apiKey')) }),
    *     sidecarOf: (whisper, form) => ({ title: String(form.get('title')), mask: mask(String(whisper['apiKey']), { tail: 0 }) }),
    *     secretFieldnames: ['apiKey'],
-   *   }), []), null)
+   *   }), null)
    *   <form action={putAction}>
    *     <input name="title" defaultValue={put?.texts['title']} />
    *     <input name="apiKey" type="password" />
@@ -508,7 +507,6 @@ function makeBankGiver(friend: BankFriend) {
   }
 
   /** React Query's options for writing the box `boxNamed` names from a form, for the host's own `useMutation`: its `mutate` is handed the `FormData`, as {@link putBoxAction}'s action is.
-   * Make them under `useMemo`, so their checks run once: their `mutationKey` names the user signed in when they are made.
    * The mutation reads the whisper with `opts.whisperOf` and the sidecar with `opts.sidecarOf`, deletes the form's secret fields, then writes as {@link putBoxOnce} does.
    * Every field, or only those `opts.secretFieldnames` names: name every field that carries a secret, since one `whisperOf` reads that you leave out stays in the `FormData` React Query retains.
    * It resolves the box written. It rejects with the refusal, or with what `whisperOf` or `sidecarOf` threw, as an `Error`: the mutation's `error`.

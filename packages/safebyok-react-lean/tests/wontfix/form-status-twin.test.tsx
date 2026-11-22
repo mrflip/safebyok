@@ -4,7 +4,6 @@
 /** The row "A component inside a form that hands `mutate` its `FormData` can read the secret for one render". */
 import { useMutation } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { useMemo } from 'react'
 import { useFormStatus } from 'react-dom'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it } from 'vitest'
@@ -25,11 +24,10 @@ describe("wontfix: the form status of a form that hands mutate its FormData", ()
       return null
     }
     function KeyEditor() {
-      const options = useMemo(() => world.Bank.putBoxMutationOptions(TH.JokesPath, {
+      const put = useMutation(world.Bank.putBoxMutationOptions(TH.JokesPath, {
         whisperOf: (form) => ({ apiKey: form.get('apiKey') as string }),
         sidecarOf: ()     => ({ service: 'jokes' }),
-      }), [])
-      const put = useMutation(options)
+      }))
       return (
         <form action={(form) => { put.mutate(form) }}>
           <input name="apiKey" type="password" aria-label="Key" />
