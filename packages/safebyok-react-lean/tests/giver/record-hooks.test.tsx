@@ -224,6 +224,24 @@ describe("useBoxList over the minder's own listing", () => {
     expect(lists.count).to.eq(2)
   })
 
+  it("does not list again on a remount of the hook, or a window focus", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const lists = { count: 0 }
+    const tryListThings = world.vaultDB.tryListThings.bind(world.vaultDB)
+    world.vaultDB.tryListThings = async (ask) => {
+      lists.count += 1
+      return await tryListThings(ask)
+    }
+    function Probe() { return <p>{world.Bank.useBoxList().data?.join(',') ?? 'none'}</p> }
+    function Tree({ shown }: Readonly<{ shown: boolean }>) { return TH.providerTreeOf(world, shown ? <Probe /> : null, { userid: TH.ProviderUser }) }
+    const { container, rerender } = render(<Tree shown />)
+    await waitFor(() => { expect(container.textContent).to.eq(TH.JokesPath) })
+    rerender(<Tree shown={false} />)
+    rerender(<Tree shown />)
+    await act(async () => { globalThis.dispatchEvent(new Event('focus')); await new Promise((resolve) => setTimeout(resolve, 50)) })
+    expect([container.textContent, lists.count]).to.deep.equal([TH.JokesPath, 1])
+  })
+
   it("lists again when the minder marks its listing stale", async () => {
     const { world, result, lists } = await setupListing()
     await waitFor(() => { expect(result.current.data).to.deep.equal([TH.JokesPath]) })
