@@ -76,7 +76,8 @@ export type Labelpathed = { labelpath: Labelpath }
  *   watch tells of it, and the watch tells of it before the operation returns.
  * - A refused write changes no item it writes and marks nothing stale. Its `dbhas`, through the watch, may still change an item.
  * - A write's answer and the watch's notice of the same write leave the same item, in either order: the later changes nothing.
- * - `invalidate` asks the vaultDB nothing, and marks listings stale, never items: it changes no item, and no listing.
+ * - `invalidate` marks listings stale, never items. It lists again only a listing an observer keeps active, and asks the
+ *   vaultDB nothing for the rest.
  */
 export abstract class Minder {
   // == [Props]: userid, banklabel, #bank, vaultDB, #tsq, #landers, #queryCacheOpts, #unwatch, #isReady
@@ -311,7 +312,7 @@ export abstract class Minder {
   /** Mark stale the listings under the Thing at `labelpath`, its own included, or every listing where `labelpath` is undefined.
    * Each listing marked tells one {@link ListingEvent} with `state.isInvalidated` true, and no more until a list sets it again.
    * A listing a refused list left stale tells none.
-   * Each listing marked that an observer keeps active, a hook's, is listed again; the rest wait for the next list.
+   * A listing marked that an observer keeps active, as a hook does, is listed again. The rest wait for the next list.
    */
   invalidate(labelpath: Labelpath | undefined, opts: MinderInvalidateOpts): void {
     MinderChecks.minderInvalidateOpts.parse(opts)
