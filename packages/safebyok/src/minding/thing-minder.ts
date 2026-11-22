@@ -562,7 +562,7 @@ export class ThingMinder {
   // The emitted event pragmatically mimics the incoming TSQ event.
   // A key's kind says what its query caches: an item, a soon or a listing. A removed query still has its last state, which its
   // event tells, though the cache no longer has it. An item is invalidated when it falls behind its soon, or its get is
-  // refused; a listing, by `invalidate`. A soon is never invalidated or fetched.
+  // refused; a listing, by `invalidate` or a refused list. A soon is never invalidated or fetched.
   /** The event a listener is told of `tsqEvent`, an event of the minder's cache, or undefined for an observer's or another bank's. */
   #minderEventOf(tsqEvent: TSQ.QueryCacheNotifyEvent): MinderEvent | undefined {
     if (! isTellableTSQEvent(tsqEvent)) { return undefined }
