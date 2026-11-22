@@ -72,11 +72,12 @@ describe("AdapterVaultDB, a step that throws", () => {
     expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing' })
   })
 
-  it("answers a listing that throws with no children, no parentage, no deltas and no damaged rows", async () => {
+  it("answers a listing that throws with no children, no parentage, no deltas, no damaged rows and no read_tc", async () => {
     const vaultDB = new ScriptedVaultDB(() => { throw new Error('connection reset') })
     const answer = await vaultDB.tryListThings(TH.listAskAt('box'))
     await TH.expectBad(Promise.resolve(answer), 'storage_unavailable')
     expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', dbhas: null, parentage: [], deltas: [], damaged_rows: [] })
+    expect(answer).not.to.have.property('read_tc')
   })
 
   it("answers a bank's birth that throws with its verb", async () => {

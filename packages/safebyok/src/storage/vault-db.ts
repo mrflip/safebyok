@@ -72,11 +72,11 @@ export type ListedBeside<RecordT extends ThingRecord = ThingRecord> = {
 }
 
 /** The answer to `tryListThings`: the parent's children as a {@link Kids} value, and when the datastore read them as its `read_tc`. Its act is the parent's get act.
- * Refused under `void` or `gone`, its `dbhas` is `[]`. Under any other refusal it is null.
+ * Refused under `void` or `gone`, its `dbhas` is `[]`, and it carries the `read_tc` of the read that found the parent so. Under any other refusal `dbhas` is null and there is no `read_tc`.
  */
 export type ListThingsAnswer<RecordT extends ThingRecord = ThingRecord> =
   | (GoodAnswer<Kids, EX.GotAct> & ListedBeside<RecordT> & { read_tc: ReadTc })
-  | (BadAnswer<Sparse<RecordT>[] | null> & ListedBeside<RecordT>)
+  | (BadAnswer<Sparse<RecordT>[] | null> & ListedBeside<RecordT> & { read_tc?: ReadTc })
 
 /** The answer to `tryBirthBank`: the three roots written (`born`), or found already stored (`passed`). */
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
@@ -95,10 +95,10 @@ export type Actual<ActT extends EX.GoodAct> =
   | { ok: true,  act: ActT,           world: WorldRecord | null, tracked?: Tracked, record: ThingRecord | null }
   | { ok: false, act: EX.RefusedAct,  world: WorldRecord | null, tracked?: Tracked, record: ThingRecord | null }
 
-/** A concrete adapter's report of a listing: the parent's act, its children as a {@link Kids} value, and what the answer carries beside it. */
+/** A concrete adapter's report of a listing: the parent's act, its children as a {@link Kids} value or, refused, when it read the parent, and what the answer carries beside it. */
 export type ListThingsActual = Readonly<{ world: WorldRecord | null, tracked?: Tracked } & ListedBeside & (
   | { ok: true,  act: EX.GotAct, kids: Kids }
-  | { ok: false, act: EX.RefusedAct }
+  | { ok: false, act: EX.RefusedAct, read_tc: ReadTc }
 )>
 
 /** A concrete adapter's report of a bank's birth: the three roots, written or already stored, or the first refused act with the Thing stored at that root. */

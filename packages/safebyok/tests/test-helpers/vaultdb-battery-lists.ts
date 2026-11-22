@@ -100,13 +100,14 @@ export function describeVaultDBLists({ fresh, bornBank, bornUnder, boxesBorn, ro
       expect(answer.ok && answer.val).to.deep.equal(answer.ok && kidsOf(RootGone, [], answer.read_tc))
     })
 
-    it("refuses a parent gone under ifAbsent 'fail', with no children as dbhas, reading no child", async () => {
+    it("refuses a parent gone under ifAbsent 'fail', with no children as dbhas and the read_tc of its read, reading no child", async () => {
       const vaultDB = await withRootGone()
       const answer = await vaultDB.tryListThings(listAskAt('box'))
       expect(answer).to.deep.include({ ok: false, act: 'gone', dbhas: [], parentage: [Thing.sparseOf(RootGone)], deltas: [], damaged_rows: [] })
+      expect(answer.read_tc).to.match(ReadTcPattern)
     })
 
-    it("answers or refuses a void parent by ifAbsent, with no children, reading no child", async () => {
+    it("answers or refuses a void parent by ifAbsent, with no children and a read_tc, reading no child", async () => {
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant({ ...ThingBank, labelpath: 'box/bad' }, DamagedBox)
       const nilAnswer = await vaultDB.tryListThings(listAskAt('box', 'nil'))
@@ -115,6 +116,7 @@ export function describeVaultDBLists({ fresh, bornBank, bornUnder, boxesBorn, ro
       const answer = await vaultDB.tryListThings(listAskAt('box'))
       await expectBad(Promise.resolve(answer), 'absent_vault')
       expect(answer).to.deep.include({ ok: false, act: 'void', dbhas: [], parentage: [], deltas: [], damaged_rows: [] })
+      expect(answer.read_tc).to.match(ReadTcPattern)
     })
 
     it("lists no children under a box below the root, nor under the main gate", async () => {
