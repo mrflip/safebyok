@@ -203,9 +203,9 @@ describe("AdapterVaultDB, what a watch hears of a verb's answer", () => {
 
   it("tells each Thing a good listing answers, sparse and in labelpath order, before the listing answers", async () => {
     const listed  = [Thing.sparseOf(TH.boxThingOf('anthropic')), Thing.sparseOf(TH.boxThingOf('openai'))]
-    const listing = new ScriptedVaultDB(() => ({ ok: true, act: 'gotlive', world: null, listed, parent: TH.rootBoxOf(), damaged_rows: [] }) as never)
-    const heard   = heardOver(listing)
-    await listing.tryListThings(TH.listAskAt('box'))
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotlive', world: null, listed, parent: TH.rootBoxOf(), damaged_rows: [] }) as never)
+    const heard   = heardOver(vaultDB)
+    await vaultDB.tryListThings(TH.listAskAt('box'))
     expect(heard).to.deep.equal(listed)
   })
 })
