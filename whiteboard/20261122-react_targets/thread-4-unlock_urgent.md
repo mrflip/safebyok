@@ -1,6 +1,6 @@
 # Thread 4: unlock_urgent (2026-11-22)
 
-Branch `20261122-unlock_urgent`, PR #TBD, stacked on #820 (on #818 and #817). Proved: `pnpm --filter safebyok-react-lean` lint, typecheck and the kit, parts and draft tests as each change landed; `pnpm justify` at the end (see the PR's **Tests:** line).
+Branch `20261122-unlock_urgent`, PR #821, stacked on #820 (on #818 and #817). Proved: `pnpm justify` green at the tip (safebyok-react-lean 271 tests in 17 files, safebyok 1399, safebyok-big 2946, safebyok-react 277, e2e 576, demos 99 + 24 + 26, scripts 331, the adapters all passing). The new regression tests failed before their changes: the unlock-form pair with Unlock stuck "Unlocking…" and disabled, the draft-in-form test with the draft still Dirty after the reset.
 
 So a host may use React 19 Actions freely beside the kit and `useDraft`: two changes in `packages/safebyok-react-lean`, each its own commit with its test.
 
