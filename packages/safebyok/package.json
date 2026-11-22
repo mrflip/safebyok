@@ -23,7 +23,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsdown && node ../../scripts/front-door.ts . ./core ./storage",
+    "build": "tsdown && node ../../scripts/front-door.ts . ./core ./storage ./utils",
     "prebuild": "pnpm build:deps",
     "build:watch": "tsdown --watch",
     "build:deps": "[ \"$SAFEBYOK_SKIP_BUILD_DEPS\" = 1 ] || SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok^...' build",
@@ -86,6 +86,11 @@
       "import": "./dist/testing.js",
       "require": "./dist/testing.cjs"
     },
+    "./utils": {
+      "@safebyok/source": "./src/utils.ts",
+      "import": "./dist/utils.js",
+      "require": "./dist/utils.cjs"
+    },
     "./package.json": "./package.json"
   },
   "dependencies": {
@@ -125,6 +130,10 @@
         "import": "./dist/testing.js",
         "require": "./dist/testing.cjs"
       },
+      "./utils": {
+        "import": "./dist/utils.js",
+        "require": "./dist/utils.cjs"
+      },
       "./package.json": "./package.json"
     }
   },
@@ -141,6 +150,9 @@
       ],
       "storage": [
         "./dist/storage.d.cts"
+      ],
+      "utils": [
+        "./dist/utils.d.cts"
       ],
       "testing": [
         "./dist/testing.d.cts"

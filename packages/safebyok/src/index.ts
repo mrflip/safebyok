@@ -24,4 +24,4 @@ export { type BulletproofFailOpts, type BulletproofOpts, type BulletproofTellOpt
 export { correctablekindVals } from 'safebyok-big'
 export { ForeverMillis, MaxLabelChars, MaxUserIdChars, MinuteMillis, PasskeySaltSize, PassphraseSaltSize, Patterns } from 'safebyok-big'
 export type { UserID } from 'safebyok-big'
-export { WhisperFieldAttributes, fromB64, mask, mash, toB64, type MaskOpts } from 'safebyok-big/utils'
+export { MaskSchedule, WhisperFieldAttributes, fromB64, mask, mash, toB64, type MaskOpts, type MaskRow } from 'safebyok-big/utils'
