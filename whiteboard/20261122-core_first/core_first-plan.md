@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: running (2026-11-22). In review, all on opus: thread 2 (#844, `f5d6f9b3d`, high), thread 3 (#847, `ff31e22cc`, rebased onto #844's rework, medium), thread 4 (#846, `abbb65b94`, rebased onto it, high; a new security entry for unlocking on a cached gate). Each justify green by its report. Thread 5 next, from thread 3's tip once its review is done.
+* **Status**: running (2026-11-22). Thread 2 filed (#844, `00113d236`, out of draft). In review on opus: thread 3 (#847, medium) and thread 4 (#846, high), both to catch up onto #844's reviewed tip when filed. Thread 5 next, from thread 3's tip once its review is done.
 
 The Coach's request, verbatim:
 
