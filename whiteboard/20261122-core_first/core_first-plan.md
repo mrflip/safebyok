@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: **paused by the Coach** (2026-11-22, while the workshop agent tidies its tree). Thread 1 filed (#840, out of draft, `f3fe4d495`). Thread 2 ready (#844, `07c718450`, justify green by its report), held unreviewed until the Coach resumes.
+* **Status**: resumed (2026-11-22). Thread 1 merged (#840, rebased onto main after #827 merged: one comment fix). #817, #831, #837, #841 merged. Thread 2 (#844) is being rebased onto #842 (on #830) by a fresh worker: #837 deleted react-bridge.ts, #831's attach and detach meet the rename. Its high review follows. #833, #832–#838, #843, #819, #822 are outside this sprint (the Coach).
 
 The Coach's request, verbatim:
 
