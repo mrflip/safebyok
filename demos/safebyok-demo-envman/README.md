@@ -24,16 +24,16 @@ what was typed, all but a secret, through each input's `defaultValue`.
   `UnlockDialog`, each finding its bank through the provider.
 * `src/components/EnvList.tsx`: `Envman.useBoxList()`, a row each.
 * `src/components/EnvRow.tsx`: each row's `Envman.useBox`, nothing for a deleted box, and `Envman.useDraft` for the
-  value's Save and Undo on a plain input of its `whisperField('val')`. Save is an Action on a button, through
-  `useTransition`, not a form: React empties a form's inputs after its action, and the draft would still count the
-  emptied value as typed. Save stamps `last_rotated_at` when the value changed. Beside the input, the parts'
-  `WhisperMask` writes the value's mask into the page: its last four characters while unlocked, the stored mask while
-  locked. On a lock, `Envman.useStageChange` discards the row's open draft: the library leaves it alone, and this demo
-  chooses to.
+  value's Save and Undo on a plain input of its `whisperField('val')`. The input sits in a form whose action is the
+  draft's `put`, Save its `SubmitButton` and Undo its reset button: resetting the form discards the draft, so a refused
+  Save empties the value, to be typed again. Save stamps `last_rotated_at` when the value changed. Beside the input,
+  the parts' `WhisperMask` writes the value's mask into the page: its last four characters while unlocked, the stored
+  mask while locked. On a lock, `Envman.useStageChange` discards the row's open draft: the library leaves it alone, and
+  this demo chooses to.
 * `src/components/EnvSettingsDialog.tsx`: the gear's dialog, the kit's `ModalDialog`, its form an Action setting the
   draft's sidecar.
 * `src/components/AddEnvForm.tsx`: `Envman.putBoxAction` under `useActionState`, a new box under a minted label per
-  submit, its sidecar mask from `mask` (`tail: 0`). `putBoxAction` empties the form's data before it writes, so the
+  submit, its sidecar mask from `mask` (`tail: 0`). `putBoxAction` deletes every field from the `FormData`, so the
   app reads the fields to show again first.
 * `src/lib/env-sidecar.ts`: the stored sidecar, `title`, `description`, `rotation_period_ms`, `last_rotated_at` and `mask`.
 

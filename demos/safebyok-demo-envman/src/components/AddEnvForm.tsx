@@ -20,8 +20,9 @@ const AddEnvOpts: PutBoxActionOpts = {
 /** What the add form's action resolves: why the env was refused, or null, and the fields the form shows next. */
 type AddEnvResult = Readonly<{ err: Error | null, texts: EnvTexts }>
 
-// React empties the form after its action. A refused form shows again what was typed, all but the value, which the user
-// types again. `putBoxAction` empties the form's data before it writes, so those fields are read first.
+// React resets the form's inputs on the page once its action ends: a refused form shows again what was typed, all but
+// the value, which the user types again. `putBoxAction` deletes every field from the `FormData` it is handed, so the
+// fields to show again are read from it first.
 // Each new env is a box of its own, under a label minted at submit, so the put action is made per submit, not once.
 /** Write the add form's fields as a new env, never rejecting. */
 async function addEnvAction(_prior: AddEnvResult, form: FormData): Promise<AddEnvResult> {

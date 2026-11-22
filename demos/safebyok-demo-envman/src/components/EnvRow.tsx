@@ -1,6 +1,6 @@
-import { useState, useTransition } from 'react'
+import { useActionState, useState } from 'react'
 import { isVaultError } from 'safebyok'
-import { WhisperMask } from 'safebyok-react-lean/parts'
+import { SubmitButton, WhisperMask } from 'safebyok-react-lean/parts'
 import type { EnvFields } from '../lib/env-form'
 import { DayMs, dayValueOf, envSidecarOf, isOverdueAt, valMaskOf } from '../lib/env-sidecar'
 import { Envman } from '../lib/sok'
@@ -20,34 +20,29 @@ function EnvEditor({ labelpath }: Readonly<{ labelpath: string }>) {
   const [isSetting, setIsSetting] = useState(false)
   // When the row was first shown: a row left open for days does not turn red until the page is reloaded.
   const [shownAt] = useState(Date.now)
-  const [isSaving, startSaving] = useTransition()
-  const [saveErr, setSaveErr] = useState<unknown>(null)
   // The library leaves an open draft alone on a lock: this demo empties it, so a value typed in stays nowhere once locked.
   Envman.useStageChange((stage) => {
     if (stage !== 'locked') { return }
-    setSaveErr(null)
     draft.discard()
   })
   const env = envSidecarOf(draft.sidecar)
   const isOverdue = isOverdueAt(env, shownAt)
   const title = env.title || labelpath
 
-  // An Action on a button, not a form: React empties a form's inputs after its action, and a refused `put` leaves the
-  // value counted as typed, so the next Save would write it empty.
+  // React empties the form once its action ends, and the draft discards with it: a refused value is typed again.
   // A new value is a rotation: Save stamps it, and stores the new value's mask.
-  /** Write the draft, or show why it was refused. */
-  function save(): void {
-    setSaveErr(null)
-    startSaving(async () => {
-      try {
-        await draft.put({
-          sidecarOf: (whisper, sidecar) => (draft.isWhisperDirty ? { ...sidecar, last_rotated_at: Date.now(), mask: valMaskOf(String(whisper['val'])) } : sidecar),
-        })
-      } catch (err) {
-        setSaveErr(err)
-      }
-    })
+  /** Write the draft, resolving why it was refused, or null. */
+  async function putDraftAction(): Promise<Error | null> {
+    try {
+      await draft.put({
+        sidecarOf: (whisper, sidecar) => (draft.isWhisperDirty ? { ...sidecar, last_rotated_at: Date.now(), mask: valMaskOf(String(whisper['val'])) } : sidecar),
+      })
+      return null
+    } catch (err) {
+      return err as Error
+    }
   }
+  const [putErr, putAction] = useActionState(putDraftAction, null)
 
   function applySettings(fields: EnvFields): void {
     draft.setSidecar({ ...draft.sidecar, ...fields })
@@ -63,14 +58,15 @@ function EnvEditor({ labelpath }: Readonly<{ labelpath: string }>) {
       </p>
       {(env.description !== '') && <p className="quiet">{env.description}</p>}
       <p className="quiet">Rotate every {Math.round(env.rotation_period_ms / DayMs)} days. Last rotated {dayValueOf(env.last_rotated_at)}.</p>
-      <p className="row">
+      <form action={putAction} className="row">
         <WhisperMask labelpath={labelpath} field="val" tail={4} />
         <input {...draft.whisperField('val')} aria-label={`Value of ${title}`} />
-        <button type="button" disabled={(! draft.isDirty) || isSaving} onClick={save}>Save</button>
-        <button type="button" disabled={! draft.isDirty} onClick={() => { setSaveErr(null); draft.discard() }}>Undo</button>
-      </p>
+        <SubmitButton disabled={! draft.isDirty}>Save</SubmitButton>
+        {/* Resetting the form discards the draft. */}
+        <button type="reset" disabled={! draft.isDirty}>Undo</button>
+      </form>
       {draft.isBehind && <p role="status" className="gripe">Changed elsewhere since you started: Undo to see it.</p>}
-      {(saveErr !== null) && ! isVaultError(saveErr, 'dismissed') && <p role="alert" className="gripe">{(saveErr as Error).message}</p>}
+      {(putErr !== null) && ! isVaultError(putErr, 'dismissed') && <p role="alert" className="gripe">{putErr.message}</p>}
       {(draft.lastErr !== null) && ! isVaultError(draft.lastErr, 'dismissed') && <p role="alert" className="gripe">{draft.lastErr.message}</p>}
       {isSetting && <EnvSettingsDialog title={title} env={env} onApply={applySettings} onCancel={() => { setIsSetting(false) }} />}
     </li>
