@@ -25,12 +25,12 @@ export interface IdbMinderBridgeOpts {
  * Say hello to the bridge before the minder: it copies only what the cache receives after its own `hello`.
  */
 export class IdbMinderBridge {
-  // == [Props]: #minder, #idbVaultDB, #onBadNews, #unlisten
+  // == [Props]: #minder, #idbVaultDB, #onBadNews, #isListening
 
   readonly #minder:     VaultMinder
   readonly #idbVaultDB: IdbVaultDB
   readonly #onBadNews:  (news: VaultError) => void
-  #unlisten: (() => void) | null = null
+  #isListening = false
   // --
 
   // == [Construction]: make, constructor
@@ -49,18 +49,13 @@ export class IdbMinderBridge {
   }
   // --
 
-  // == [Starting and ending]: hello, goodbye
+  // == [Starting]: hello
 
   /** Start copying the minder's cache to IndexedDB. A second call does nothing. */
   hello(): void {
-    if (this.#unlisten !== null) { return }
-    this.#unlisten = this.#minder.listen((event) => { this.#copyCached(event) }, MinderEventFormat)
-  }
-
-  /** Stop copying. A later `hello` starts again. */
-  goodbye(): void {
-    if (this.#unlisten !== null) { this.#unlisten() }
-    this.#unlisten = null
+    if (this.#isListening) { return }
+    this.#isListening = true
+    this.#minder.listen((event) => { this.#copyCached(event) }, MinderEventFormat)
   }
   // --
 
