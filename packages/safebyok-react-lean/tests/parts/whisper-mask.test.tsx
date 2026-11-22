@@ -27,6 +27,17 @@ function KeyScreen({ world, ...props }: Readonly<{ world: TH.ProviderWorld } & P
   )
 }
 
+/** The `KeyScreen`, with the box at `other` loaded beside it, so a change to that box finds its record already cached. */
+function OtherCached({ world, labelpath }: Readonly<{ world: TH.ProviderWorld, labelpath: string }>) {
+  const other = world.Bank.useBox('other').data
+  return (
+    <>
+      <p>{(other === undefined || other === null) ? 'other loading' : 'other loaded'}</p>
+      <KeyScreen world={world} labelpath={labelpath} />
+    </>
+  )
+}
+
 /** A world with the joke service's key stored, rendered under its provider, once it shows the bank locked. */
 async function renderKey(props: Partial<WhisperMaskProps> = {}) {
   const world = await TH.buildProviderWorld({ stored: 'jokes' })
@@ -85,6 +96,29 @@ describe("WhisperMask", () => {
     await unlock(world)
     expect([ 'jokes', LiveMask ]).to.include(maskTextOf(container))
     await waitFor(() => { expect(maskTextOf(container)).to.eq(LiveMask) })
+  })
+
+  it("empties the element when the bank locks and ifLocked answers with a promise, never showing the live tail meanwhile", async () => {
+    const { world, container } = await renderKey({ ifLocked: (box) => Promise.resolve(serviceOf(box)) })
+    await unlock(world)
+    await waitFor(() => { expect(maskTextOf(container)).to.eq(LiveMask) })
+    act(() => { world.Bank.lock() })
+    expect(maskTextOf(container)).to.eq('')
+    await waitFor(() => { expect(maskTextOf(container)).to.eq('jokes') })
+  })
+
+  it("empties the element when it is given another box, never showing the last box's mask beside it", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const tree = (labelpath: string) => TH.providerTreeOf(world, <OtherCached world={world} labelpath={labelpath} />, { userid: TH.ProviderUser })
+    const { container, rerender } = render(tree(TH.JokesPath))
+    await screen.findByText('locked')
+    await unlock(world)
+    await act(() => world.Bank.putBoxOnce('other', { sidecar: { service: 'other' } }, { whisper: { apiKey: TailedKey } }))
+    await screen.findByText('other loaded')
+    await waitFor(() => { expect(maskTextOf(container)).to.eq(LiveMask) })
+    rerender(tree('other'))
+    expect(maskTextOf(container)).to.eq('')
+    await waitFor(() => { expect(maskTextOf(container)).to.eq(mask(TailedKey, { tail: 4 })) })
   })
 
   it("writes the mask again when the box is written", async () => {

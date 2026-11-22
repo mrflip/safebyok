@@ -1,6 +1,6 @@
 /** `useWhisperMask`, the behaviour of a whisper's mask written into the page, without its markup: the element it is written into. */
 
-import { type RefCallback, useLayoutEffect, useState } from 'react'
+import { type RefCallback, useLayoutEffect, useRef, useState } from 'react'
 import { type BoxRecord, type LiveOf, mask } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
@@ -35,6 +35,8 @@ export type WhisperMaskResult = Readonly<{
 
 /** A field of a box's whisper, masked into an element of your own: its last `tail` characters while the bank is unlocked, the stored mask while it is locked.
  * The mask is written into the element, never into React's state, and again on a lock, an unlock or a `putBox`.
+ * Across an unlock, a `putBox`, or a lock whose `ifLocked` answers at once, the element keeps the mask it showed until
+ * the next lands; for another box, field or `tail`, or a lock whose `ifLocked` answers with a promise, it is emptied first.
  * Destructure what it answers: React's lint takes any other read of an object holding a ref for a read of the ref.
  * @example
  *   const { maskRef } = useWhisperMask('openai', 'apiKey', { tail: 4 })
@@ -46,6 +48,8 @@ export function useWhisperMask(labelpath: string, field: string, { bank: bankOpt
   const box = bank.useBox(labelpath).data
   // In state, not a ref, so an element the host mounts later, or mounts again, has the mask written into it too.
   const [maskEl, setMaskEl] = useState<HTMLElement | null>(null)
+  // What the element last showed a mask of, so a mask of another box, field or tail is never left beside the new label.
+  const shownOf = useRef<string | null>(null)
 
   // While locked, the mask comes from the record the box's query holds, so a mask `ifLocked` answers at once is written
   // before paint. Unlocked, the field is read from the box opened: until it lands, the element keeps what it showed.
@@ -56,11 +60,17 @@ export function useWhisperMask(labelpath: string, field: string, { bank: bankOpt
     return bank.withLockableWhisper(labelpath, (whisper) => mask(whisperTextOf(whisper[field]), (tail === undefined) ? {} : { tail }), { ifLocked })
   }
 
-  /** Write the mask into `el`, unless `isCurrent()` has gone false meanwhile, or empty it and report the refusal. */
+  /** Show the mask of the box as it now stands in `el`, or empty it and report why it cannot be shown. */
   const writeMask = useEffectEvent(async (el: HTMLElement, isCurrent: () => boolean) => {
+    const maskOfWhat = JSON.stringify([ labelpath, field, tail ])
+    const isSameMask = (shownOf.current === maskOfWhat)
+    shownOf.current = maskOfWhat
     try {
       const shown = maskOf()
-      const text = (typeof shown === 'string') ? shown : await shown
+      if (typeof shown === 'string') { el.textContent = shown; return }
+      // Locked, a mask that is not the stored one could be the live tail, and must not stay on show while it is awaited.
+      if (!isSameMask || (stage === 'locked')) { el.textContent = '' }
+      const text = await shown
       if (isCurrent()) { el.textContent = text }
     } catch (err) {
       if (isCurrent()) {

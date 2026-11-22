@@ -75,7 +75,7 @@ export function useWhisperText(labelpath: string, field: string, { bank: bankOpt
   }, [reveal.isRevealed])
 
   /** Show the text, written into its element inside the bank's callback. */
-  async function show() {
+  async function showText() {
     const isCurrent = isCurrentRef.current
     try {
       await reveal.showWhisper(field, (text) => { if (isCurrent() && (textElRef.current !== null)) { textElRef.current.textContent = text } })
@@ -92,7 +92,7 @@ export function useWhisperText(labelpath: string, field: string, { bank: bankOpt
       "type":         'button',
       "aria-pressed": reveal.isRevealed,
       "disabled":     isRevealing,
-      "onClick":      () => { if (reveal.isRevealed) { reveal.mask() } else { void show() } },
+      "onClick":      () => { if (reveal.isRevealed) { reveal.mask() } else { void showText() } },
     },
   }
 }

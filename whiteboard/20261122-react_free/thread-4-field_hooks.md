@@ -25,7 +25,12 @@ files, the demos 26 and 24.
 * **The blank mask (burndown item 5)**: `WhisperMask` emptied its element, then wrote the mask after an async
   `withLockableWhisper`, whose locked branch awaits `minder.get`. Now, while locked, the mask is computed from the box's
   query data (`useBox`) synchronously in a layout effect, so a sync `ifLocked` paints with the lock; unlocked, the
-  element keeps what it showed until the live mask lands. The element is never blanked before a write.
+  element keeps what it showed until the live mask lands. Rework after review: the element keeps its mask only across
+  an unlock, a `putBox` of the same box, or a lock whose `ifLocked` answers at once; it is emptied before the awaited
+  write when the labelpath, field or `tail` changed (else the last box's mask sat beside the new label) and on a lock
+  whose `ifLocked` answers with a promise (else the live tail stayed on a locked bank). A ref keeps what the element
+  last showed a mask of; a test for each case fails on the old hook. Also from review: `show()` in
+  `use-whisper-text.ts` is `showText`, and `writeMask`'s doc block says what it is for.
 * **Decisions made**:
   - The hooks live in the parts' entry, each in a file of its own, so thread 5's markup diffs in the part files stay
     apart from mine.
