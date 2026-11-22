@@ -84,7 +84,12 @@ then `demos/safebyok-demo-envman`'s Undo calls `draft.discard`, its remaining ca
 `putBoxAction` gives way to `secretFieldnames`. Review covers the whole PR from thread 1's tip. *Depends on*: thread 1.
 Independent of thread 2 (another demo). *Size*: small.
 
-*Status*: built, ready at `15100d45b` (justify green); in review. Three open matters, rows in the doc.
+*Status*: built, ready at `15100d45b` (justify green); reviewed `fixed`; filing. Three open matters, rows in the doc.
+
+*Review:* fixed, at `ac3e3ede5`: the three form actions handed to `useActionState` are arrows; two doc blocks open
+with the noun. Left: the spaces-only title (a row already); `putDraftAction` reads `isWhisperDirty` from its render's
+closure, an edit overlapping a Save in flight (a crossing; no row). Four findings dropped (a wontfix row, ruled reset
+behaviour, an action's `setState`, `EnvTexts`' underbar keys mirroring input names).
 
 ### 4. `field_hooks`: the headless field hooks and the verdict
 
