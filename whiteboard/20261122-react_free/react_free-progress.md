@@ -18,6 +18,9 @@ not write it.
 * *Orchestrator:* `notes/react_lib_principles.md` is committed only on the base checkout's branch, not on the line:
   handoffs name it as `/workspace/byok/notes/react_lib_principles.md`. `docs/guide-headless.md` is on the line (#818).
 
+* *Orchestrator:* no `base-sync` from this sprint: the base checkout's branch carries the workshop's whole line, and
+  the workshop session syncs it. A sync of this sprint's stack alone would drop the rest.
+
 ## What the threads found
 
 * Thread 2 (#822): Knock-Knock's key form is `useMutation` over `putBoxMutationOptions`; every submit in that demo is

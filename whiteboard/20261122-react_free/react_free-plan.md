@@ -9,7 +9,7 @@
 * **Levels** (defaults): review `medium`; worker `thread-worker` on `opus` at its own effort; reviewer `thread-reviewer`
   on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin.
 * **Threads at once**: 3.
-* **Status**: thread 1 done; thread 2 filed (#822); thread 3 in review (#819); threads 4 and 6 building; then 5 on 4, then 7.
+* **Status**: threads 1, 2 (#822) and 3 (#819) done and filed; threads 4 and 6 building; then 5 on 4, then 7.
 
 ## Read first
 
@@ -84,7 +84,7 @@ then `demos/safebyok-demo-envman`'s Undo calls `draft.discard`, its remaining ca
 `putBoxAction` gives way to `secretFieldnames`. Review covers the whole PR from thread 1's tip. *Depends on*: thread 1.
 Independent of thread 2 (another demo). *Size*: small.
 
-*Status*: built, ready at `15100d45b` (justify green); reviewed `fixed`; filing. Three open matters, rows in the doc.
+*Status*: built, ready at `15100d45b` (justify green); reviewed `fixed`; filed at `ac3e3ede5`, a draft. Three open matters, rows in the doc.
 
 *Review:* fixed, at `ac3e3ede5`: the three form actions handed to `useActionState` are arrows; two doc blocks open
 with the noun. Left: the spaces-only title (a row already); `putDraftAction` reads `isWhisperDirty` from its render's
