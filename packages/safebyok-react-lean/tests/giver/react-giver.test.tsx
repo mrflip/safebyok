@@ -870,7 +870,7 @@ function makeKeyEditor(world: TH.ProviderWorld, opts: Partial<PutBoxActionOpts> 
   return { KeyEditor, seen }
 }
 
-/** Throw `val`, which a host's callback may do whatever it is. */
+/** Throw `val`, an `Error` or not, as a host's callback may. */
 function throwValue(val: unknown): never { throw val as Error }
 
 /** Render the key editor over a world with the joke service's key stored, its bank unlocked. */
