@@ -177,7 +177,7 @@ export class ThingMinder {
     )
   }
 
-  /** Stop minding, and empty the cache. A later `hello` starts minding again. */
+  /** Stop minding, and remove this bank's entries from the cache. A later `hello` starts minding again. */
   goodbye(): void {
     this.#isReady = false
     if (this.#unwatch) { this.#unwatch() }
