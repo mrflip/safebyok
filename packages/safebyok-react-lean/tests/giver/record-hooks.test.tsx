@@ -1,6 +1,6 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { type ReactNode, useEffect, useLayoutEffect } from 'react'
-import { type BoxRecord, type GateRecord, type PasskeyWayinHeader, ThingMinder } from 'safebyok'
+import { type BoxRecord, type GateRecord, type PasskeyWayinHeader, VaultMinder } from 'safebyok'
 import { storageUnavailable } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
@@ -11,10 +11,10 @@ import * as TH from '../test-helpers'
 const JokesBoxPath = `box/${TH.JokesPath}`
 
 /** The key the minder caches the jokes box under, which the hooks observe. */
-const JokesKey = ThingMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: JokesBoxPath })
+const JokesKey = VaultMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: JokesBoxPath })
 
 /** The key the minder caches the listing of the root box's children under. */
-const BoxListKey = ThingMinder.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
+const BoxListKey = VaultMinder.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
 
 /** The stage of the world's bank, as a page shows it. */
 function StageShown({ world }: Readonly<{ world: TH.ProviderWorld }>) {
@@ -267,7 +267,7 @@ describe("useGate over the minder's own cache", () => {
     await waitFor(() => { expect(header).to.be.null })
     // The minder freezes, so the spy goes on its class, counting the giver's device's calls alone.
     const { minder } = world._cheat_device()
-    const get = vi.spyOn(ThingMinder.prototype, 'get')
+    const get = vi.spyOn(VaultMinder.prototype, 'get')
     onTestFinished(() => { get.mockRestore() })
     const other = LeanTH.makeDevice({}, { vaultDB: world.vaultDB })
     await act(async () => {

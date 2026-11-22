@@ -3,7 +3,7 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-li
 import { type ReactNode, useActionState, useEffect, useLayoutEffect, useMemo } from 'react'
 import { type Root, hydrateRoot } from 'react-dom/client'
 import { renderToString } from 'react-dom/server'
-import { type BankSnapshot, type BoxRecord, type Device, type GateRecord, type Gating, type LiveOf, type Whisper, MemoryVaultDB, Thing, ThingMinder, isVaultError } from 'safebyok'
+import { type BankSnapshot, type BoxRecord, type Device, type GateRecord, type Gating, type LiveOf, type Whisper, MemoryVaultDB, Thing, VaultMinder, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { liveOf, passkeyHeaderOf } from '../../src/giver/giver-defaults'
@@ -605,7 +605,7 @@ async function renderUnlocked<ResultT>(hook: (world: TH.ProviderWorld) => Result
 }
 
 /** The key the minder caches the jokes box under, for the world's user. */
-const JokesKey = ThingMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: `box/${TH.JokesPath}` })
+const JokesKey = VaultMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: `box/${TH.JokesPath}` })
 
 describe("useBox", () => {
   it("shows the stored record once the device starts, and fetches nothing while nobody is signed in", async () => {
@@ -701,7 +701,7 @@ describe("useBox", () => {
 })
 
 /** The world's user's key for the listing of the root box's children, as the minder caches it. */
-const BoxListKey = ThingMinder.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
+const BoxListKey = VaultMinder.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
 
 describe("useBoxList", () => {
   it("lists the stored boxes once the device starts, and fetches nothing while nobody is signed in", async () => {

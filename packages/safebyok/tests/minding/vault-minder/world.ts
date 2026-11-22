@@ -2,7 +2,7 @@ import { noop } from 'es-toolkit'
 import { Errors } from 'safebyok-big/internals'
 import { vi } from 'vitest'
 import type { DeliverableThing, ListingEvent, MinderEvent, ThingEvent, MinderFriend, QueryCacheOpts, TSQAnswer } from '../../../src/shapes/shapes-minder'
-import { ThingMinder } from '../../../src/minding/thing-minder'
+import { VaultMinder } from '../../../src/minding/vault-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import type { Labelpath, Revtok } from '../../../src/shapes/primitives'
 import { type GateRecord, type ThingRecord, type ThingScope, Shell } from '../../../src/shapes/shapes-thing'
@@ -83,15 +83,15 @@ export class DownVaultDB extends MemoryVaultDB {
 export const Hours24 = 24 * 60 * 60 * 1000
 
 /** A minder of `bank` over `vaultDB`. */
-export function minderOf(vaultDB: MemoryVaultDB, queryCacheOpts: Partial<QueryCacheOpts> = {}, bank: MinderFriend = fakeBankOf()): ThingMinder {
-  return ThingMinder.make({ vaultDB, queryCacheOpts }, bank)
+export function minderOf(vaultDB: MemoryVaultDB, queryCacheOpts: Partial<QueryCacheOpts> = {}, bank: MinderFriend = fakeBankOf()): VaultMinder {
+  return VaultMinder.make({ vaultDB, queryCacheOpts }, bank)
 }
 
 /** A bank's minder, what it stands on, and a way to hand its watch a notice. */
 export interface MinderWorld<VaultDBT extends MemoryVaultDB> {
   vaultDB: VaultDBT
   bank:    ReturnType<typeof fakeBankOf>
-  minder:  ThingMinder
+  minder:  VaultMinder
   receive: (notice: ThingNotice) => void
 }
 
@@ -146,7 +146,7 @@ export function noticeOf(thing: ThingNotice['val']): ThingNotice {
 }
 
 /** The revtok of the main gate's item, or undefined for nothing or the void sentinel. */
-export function revtokAt(minder: ThingMinder): Revtok | undefined {
+export function revtokAt(minder: VaultMinder): Revtok | undefined {
   const record: DeliverableThing | undefined = minder.at(TH.GateScope)
   return ((record === undefined) || Thing.isVoidSentinel(record)) ? undefined : record.revtok
 }
@@ -209,4 +209,4 @@ export function boxBirthAskOf(boxlabel = 'openai'): WriteAsk {
 }
 
 /** A minder that has not started, for a test of its keys. */
-export function minderWithoutStart(): ThingMinder { return minderWorldOf(new MemoryVaultDB(), { isStarted: false }).minder }
+export function minderWithoutStart(): VaultMinder { return minderWorldOf(new MemoryVaultDB(), { isStarted: false }).minder }

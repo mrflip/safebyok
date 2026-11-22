@@ -1,9 +1,9 @@
-/** The shapes of a ThingMinder's arguments, options and answers, and of the records its items have, with their checks. */
+/** The shapes of a VaultMinder's arguments, options and answers, and of the records its items have, with their checks. */
 
 import * as TSQ from '@tanstack/query-core'
 import type * as Z from 'zod'
 import { type Errors, Validator } from 'safebyok-big/internals'
-import type { ThingMinder } from '../minding/thing-minder'
+import type { VaultMinder } from '../minding/vault-minder'
 import type { Bank } from '../models/bank'
 import type { RecordOfKind } from '../models/base-thing'
 import * as Phrases from '../phrases'
@@ -85,7 +85,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
   return { queryCacheOpts, queryCacheOptsOrDefault, tsqStaleTime, minderFriend, minderListener, feedVersion, minderLabelpath, minderTryAtOpts, minderGetOpts, minderInvalidateOpts }
 })
 
-/** The checks of a ThingMinder's arguments and options.
+/** The checks of a VaultMinder's arguments and options.
  * Also `DefaultQueryCacheOpts` and `MaxTimerMillis`, the bounds of the cache options a host may choose.
  */
 export const MinderChecks = Object.freeze({ ...RawChecks, DefaultQueryCacheOpts, MaxTimerMillis })
@@ -281,13 +281,13 @@ export type ListingEvent = MinderEventOf<readonly Labelpath[], 'list'> & Readonl
 
 // == [A minder's making]: MinderOpts
 
-/** Options for {@link ThingMinder.make}. */
+/** Options for {@link VaultMinder.make}. */
 export interface MinderOpts {
   /** Where the bank's Things are stored. */
   vaultDB:         VaultDB
   /** The cache's timings ({@link QueryCacheOpts}). A field left out defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?: Partial<QueryCacheOpts>
-  /** The client to cache in, made by `ThingMinder.makeClient`, which minders of other banks may share. Default: a client of its own. */
+  /** The client to cache in, made by `VaultMinder.makeClient`, which minders of other banks may share. Default: a client of its own. */
   queryClient?:    TSQ.QueryClient | undefined
 }
 // --

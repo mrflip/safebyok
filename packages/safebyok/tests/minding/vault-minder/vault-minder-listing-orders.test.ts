@@ -49,7 +49,7 @@ async function listingAfter(steps: readonly ListingStep[], { isListedBefore, isL
   return minder.listingAt(TH.RootScope)
 }
 
-describe("a ThingMinder's listing is the same, in any order", () => {
+describe("a VaultMinder's listing is the same, in any order", () => {
   describe("of a list, a get, a write and a notice", () => {
     for (const steps of ListingOrders) {
       const blurb = steps.join(', ')
@@ -124,7 +124,7 @@ function shrunkListings(listings: readonly (readonly Labelpath[] | undefined)[])
   return listings.filter((labelpaths, ii) => (ii > 0) && (listings[ii - 1] ?? []).some((labelpath) => (! labelpaths?.includes(labelpath))))
 }
 
-describe("a ThingMinder tells each item and listing going forward, in any order", () => {
+describe("a VaultMinder tells each item and listing going forward, in any order", () => {
   describe("of a list, a get, a write and a notice of a later life", () => {
     for (const steps of ListingOrders) {
       const blurb = steps.join(', ')

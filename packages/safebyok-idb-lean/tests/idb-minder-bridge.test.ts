@@ -1,4 +1,4 @@
-/** Tests for IdbMinderBridge: a real ThingMinder over a MemoryVaultDB, bridged to an IdbVaultDB on fake-indexeddb. */
+/** Tests for IdbMinderBridge: a real VaultMinder over a MemoryVaultDB, bridged to an IdbVaultDB on fake-indexeddb. */
 
 // Import fake-indexeddb first: it installs IndexedDB's globals before the adapter loads.
 import 'fake-indexeddb/auto'

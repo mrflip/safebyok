@@ -1,7 +1,7 @@
-/** IdbMinderBridge: copies the whole records a ThingMinder caches into an IdbVaultDB. */
+/** IdbMinderBridge: copies the whole records a VaultMinder caches into an IdbVaultDB. */
 
 import { noop } from 'es-toolkit'
-import { type MinderEvent, type ThingRecord, type Tombstone, type VaultError, MinderEventFormat, Thing, ThingMinder } from 'safebyok'
+import { type MinderEvent, type ThingRecord, type Tombstone, type VaultError, MinderEventFormat, Thing, VaultMinder } from 'safebyok'
 import * as DB from 'safebyok/storage'
 import { IdbVaultDB } from './idb-vault-db'
 import * as Phrases from './phrases'
@@ -11,7 +11,7 @@ import * as Phrases from './phrases'
 /** Options for {@link IdbMinderBridge.make}. */
 export interface IdbMinderBridgeOpts {
   /** The minder whose cache is copied. */
-  readonly minder:     ThingMinder
+  readonly minder:     VaultMinder
   /** The IdbVaultDB the records are copied into. */
   readonly idbVaultDB: IdbVaultDB
   /** Called with the refusal of each copy that fails. Default: a no-op. */
@@ -19,7 +19,7 @@ export interface IdbMinderBridgeOpts {
 }
 // --
 
-/** Copies a ThingMinder's cache into an IdbVaultDB.
+/** Copies a VaultMinder's cache into an IdbVaultDB.
  * Each whole record or tombstone the minder caches is stored, if it is newer than the Thing stored there.
  * Nothing else is written, and nothing is ever deleted.
  * Say hello to the bridge before the minder: it copies only what the cache receives after its own `hello`.
@@ -27,7 +27,7 @@ export interface IdbMinderBridgeOpts {
 export class IdbMinderBridge {
   // == [Props]: #minder, #idbVaultDB, #onBadNews, #unlisten
 
-  readonly #minder:     ThingMinder
+  readonly #minder:     VaultMinder
   readonly #idbVaultDB: IdbVaultDB
   readonly #onBadNews:  (news: VaultError) => void
   #unlisten: (() => void) | null = null
@@ -94,7 +94,7 @@ function cachedRecordOf(event: MinderEvent): ThingRecord | Tombstone<ThingRecord
 /** The check of {@link IdbMinderBridge.make}'s arguments. */
 const Checks = DB.Checkers('bad_record', ({ obj, custom, fn }) => ({
   bridgeMakeArgs: obj({
-    minder:     custom<ThingMinder>((val) => val instanceof ThingMinder, Phrases.BridgeMinderExpected),
+    minder:     custom<VaultMinder>((val) => val instanceof VaultMinder, Phrases.BridgeMinderExpected),
     idbVaultDB: custom<IdbVaultDB>((val) => val instanceof IdbVaultDB, Phrases.BridgeVaultDBExpected),
     onBadNews:  fn<(news: VaultError) => void>().optional(),
   }).strict(),

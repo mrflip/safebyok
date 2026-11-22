@@ -27,7 +27,7 @@ async function listedWorldOf() {
   return { ...world, heard: listenerOf() }
 }
 
-describe("ThingMinder.invalidate", () => {
+describe("VaultMinder.invalidate", () => {
   it("tells a listener of each listing under the labelpath, its own included", async () => {
     const { minder, heard } = await listedWorldOf()
     minder.listen(heard, MinderEventFormat)

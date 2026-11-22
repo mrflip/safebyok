@@ -52,7 +52,7 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   whole. Send every tombstone whole, so that "sparse" means live and not whole, and the minder's `gotgone` answers a
   whole tombstone as the vaultDB's does.
 * **Redo the minder's landing for titles and sparse tombstones.** The vaultDB is to send only whole tombstones, and the
-  void sentinel counts as a tombstone, not gone (the Coach, 2026-11-18). `ThingMinder`'s landing, which sends a sparse
+  void sentinel counts as a tombstone, not gone (the Coach, 2026-11-18). `VaultMinder`'s landing, which sends a sparse
   tombstone to the item, and `isTombstone` are written for sparse tombstones and for a tombstone that excludes the void
   sentinel; rename them for what they test, and drop what a sparse tombstone needed.
 * **Remove the old life's item on a soon from a newer life, if possible.** The item keeps the old life's whole record,

@@ -5,7 +5,7 @@ import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
 import { badnewsOf, listenerOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, revtokAt, toldOf } from './world'
 
-describe("ThingMinder.isStaleAt", () => {
+describe("VaultMinder.isStaleAt", () => {
   it("is true before any get, false after, and true past staleTime", async () => {
     const { minder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
     expect(minder.isStaleAt(TH.GateScope)).to.be.true
@@ -112,7 +112,7 @@ async function renotifiedWorldOf() {
   return { minder, gate, listener }
 }
 
-describe("ThingMinder's watch", () => {
+describe("VaultMinder's watch", () => {
   it("caches each gate written", async () => {
     const vaultDB = new MemoryVaultDB()
     const { minder } = minderWorldOf(vaultDB)

@@ -7,7 +7,7 @@ import type { BirthGating } from './gating'
 import { Proving, guardKeyDeriver } from './proving'
 import { Vault } from './vault'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
-import { ThingMinder } from '../minding/thing-minder'
+import { VaultMinder } from '../minding/vault-minder'
 import { type BadNewsHandler, type BankAskDraft, type BankSnapshot, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, type RefusalSnapshot, BankishChecks, PendingBank } from '../shapes/shapes-bankish'
 import { type GetAsk, type ListAsk, getAskOf, listAskOf } from '../shapes/shapes-asks'
 import { type MinderFriend, MinderChecks } from '../shapes/shapes-minder'
@@ -48,7 +48,7 @@ export class Device implements MinderFriend {
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
   /** The minder of this device's bank's Things, which this device is the friend of. */
-  readonly #minder: ThingMinder
+  readonly #minder: VaultMinder
   /** The shell of the root box, which the minder is given while the device has no bank. */
   readonly #rootShell: ShellOf<BoxRecord>
   /** This device's bank, from when `hello` finds it stored or a birth on this device makes it. Null until then. */
@@ -88,7 +88,7 @@ export class Device implements MinderFriend {
   get autolockMinutes(): number { return this.leaseMillis / Consts.MinuteMillis }
 
   /** The minder of this device's bank's Things: it says `hello` with the device. */
-  get minder(): ThingMinder { return this.#minder }
+  get minder(): VaultMinder { return this.#minder }
 
   /** This device's bank, or null until `hello` finds it stored or a birth on this device makes it. */
   get bank(): Bank | null { return this.#bank }
@@ -127,7 +127,7 @@ export class Device implements MinderFriend {
     this.logger = Logger.parseLogger(logger)
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.#onBadNews = onBadNews
-    this.#minder = ThingMinder.make({ vaultDB, queryCacheOpts, queryClient }, this)
+    this.#minder = VaultMinder.make({ vaultDB, queryCacheOpts, queryClient }, this)
     this.#snapshot = this.#makeSnapshot()
     if (Deriver.isTestDeriver(keyDeriver)) { this.logger.warn(PhrasesX.TestDeriverNotice, { oplabel: 'Device.make' }) }
     Object.freeze(this)
@@ -341,7 +341,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
       autolockMinutes: VX.positiveMinutes.optional(),
       onBadNews:       fn<BadNewsHandler>().optional(),
       queryCacheOpts:  MinderChecks.queryCacheOptsOrDefault,
-      queryClient:     custom<QueryClient>((val) => ThingMinder.isClient(val), Phrases.MinderClientExpected).optional(),
+      queryClient:     custom<QueryClient>((val) => VaultMinder.isClient(val), Phrases.MinderClientExpected).optional(),
       // Ignored: the new core has no device database. Accepted so that `...browserOpts()` from safebyok/browser, which carries one, spreads in.
       deviceDB:        custom<unknown>().optional(),
     }), { refusalkind: 'bad_record' }),

@@ -6,7 +6,7 @@ import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
 import { Hours24, GateGetAsk, DownVaultDB, QuietVaultDB, fakeBankOf, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, sparseNoticeOf, actOf, boxScopeOf, cheatBox, boxBirthAskOf } from './world'
 
-describe("ThingMinder.at", () => {
+describe("VaultMinder.at", () => {
   it("has nothing before any get", () => {
     const { minder } = minderWorldOf(new MemoryVaultDB())
     expect(minder.at(TH.GateScope)).to.be.undefined
@@ -70,7 +70,7 @@ describe("ThingMinder.at", () => {
   })
 })
 
-describe("ThingMinder.soonAt", () => {
+describe("VaultMinder.soonAt", () => {
   it("has a list's sparse record where no item is cached", async () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
@@ -133,7 +133,7 @@ describe("ThingMinder.soonAt", () => {
   })
 })
 
-describe("ThingMinder.isBehindAt", () => {
+describe("VaultMinder.isBehindAt", () => {
   it("is true while a newer sparse record is cached, with no item or a whole older one, and false once a record no older lands", () => {
     const { minder, receive } = minderWorldOf(new MemoryVaultDB())
     const box0 = TH.boxThingOf()
@@ -155,7 +155,7 @@ describe("ThingMinder.isBehindAt", () => {
   })
 })
 
-describe("ThingMinder.listingAt", () => {
+describe("VaultMinder.listingAt", () => {
   it("lists each box received before the root box's first list", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
@@ -290,7 +290,7 @@ describe("ThingMinder.listingAt", () => {
   }
 })
 
-describe("ThingMinder.isListingBareAt", () => {
+describe("VaultMinder.isListingBareAt", () => {
   it("is true of the root box's listing while boxes join it", async () => {
     const vaultDB = new QuietVaultDB()
     await storedBoxOf(vaultDB)
@@ -352,7 +352,7 @@ describe("ThingMinder.isListingBareAt", () => {
   }
 })
 
-describe("ThingMinder.tryAt", () => {
+describe("VaultMinder.tryAt", () => {
   it("answers vacant where the cache has nothing", () => {
     const { minder } = minderWorldOf(new MemoryVaultDB())
     expect(minder.tryAt(TH.GateScope)).to.deep.include({ ok: true, act: 'vacant', val: undefined, record: undefined, isTimely: false, refreshedAt: 0, isFetching: false, lastErr: null })

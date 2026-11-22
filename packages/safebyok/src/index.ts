@@ -1,4 +1,4 @@
-// safebyok, the front door: everything `safebyok/core` and `safebyok/storage` export, the ThingMinder and Vault the layers above the
+// safebyok, the front door: everything `safebyok/core` and `safebyok/storage` export, the VaultMinder and Vault the layers above the
 // core build on, the strength checkers, the bulletproof wrappers of a host's functions, and what a host or an adapter reaches
 // for that safebyok-big defines, re-exported so that each stays one binding across both packages. The browser's deriver and checker are on `safebyok/browser`.
 // The proving classes are on no entry as values: see core.ts.
@@ -13,7 +13,7 @@ export {
   type ListingEvent, type MinderActionOf, type MinderActionTyped, type TSQQueryAction, type MinderEvent, type MinderEventkind, MinderEventFormat, type MinderEventOf, type RecordEventFields, type SoonEvent, type ThingEvent,
   DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis, MinderChecks, type MinderFriend, type MinderGetOpts, type MinderInvalidateOpts, type MinderTryAtOpts, type TsqStaleTime,
 } from './shapes/shapes-minder'
-export { type Labelpathed, ThingMinder } from './minding/thing-minder'
+export { type Labelpathed, VaultMinder } from './minding/vault-minder'
 export { Vault } from './models/vault'
 export { newerThingOf } from './minding/newer-thing'
 export { DefaultStrengthChecker, guardStrengthChecker } from './helpers/passphrase-strength'

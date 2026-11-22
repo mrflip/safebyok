@@ -1,5 +1,5 @@
 // safebyok/core: the device, bank, gate, wayin and lease, the gate's form verbs and the methods that seal the bank's boxes and
-// put its Things, and every type their signatures name; no caching, so neither the ThingMinder nor TanStack Query. Private
+// put its Things, and every type their signatures name; no caching, so neither the VaultMinder nor TanStack Query. Private
 // while it is built. The proving classes are exported as types alone: a proving's `buildLease` is public, and a proving is
 // built only in a form verb's gating, which hands it to the gate's private verbs.
 export { Bank } from './models/bank'

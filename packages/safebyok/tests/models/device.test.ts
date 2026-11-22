@@ -9,7 +9,7 @@ import { browserOpts } from '../../src/browser'
 import { Bank } from '../../src/models/bank'
 import { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from '../../src/models/device'
 import { BirthGating } from '../../src/models/gating'
-import { ThingMinder } from '../../src/minding/thing-minder'
+import { VaultMinder } from '../../src/minding/vault-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { type BadNews, type DeviceSnapshot, PendingBank } from '../../src/shapes/shapes-bankish'
 import * as TH from '../test-helpers'
@@ -64,9 +64,9 @@ describe("Device.make(record, opts)", () => {
     expect(TH.makeDevice({}, { queryCacheOpts: { staleTime: 5 } }).minder).to.be.an('object')
   })
 
-  it("refuses a queryClient ThingMinder.makeClient did not make, and gives its minder the one it is given", () => {
+  it("refuses a queryClient VaultMinder.makeClient did not make, and gives its minder the one it is given", () => {
     TH.expectSyncRefusal(() => TH.makeDevice({}, { queryClient: new QueryClient() }), 'bad_record')
-    const queryClient = ThingMinder.makeClient()
+    const queryClient = VaultMinder.makeClient()
     expect(TH.makeDevice({}, { queryClient }).minder.queryClient).to.equal(queryClient)
   })
 

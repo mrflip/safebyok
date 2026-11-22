@@ -2,7 +2,7 @@
   "name": "safebyok-idb-lean",
   "private": true,
   "version": "0.0.0",
-  "description": "IndexedDB storage for the new safebyok core: a vaultDB that keeps a bank's Things as ciphertext in this browser, and a bridge that copies a ThingMinder's cache into it. Private until it replaces safebyok-indexeddb.",
+  "description": "IndexedDB storage for the new safebyok core: a vaultDB that keeps a bank's Things as ciphertext in this browser, and a bridge that copies a VaultMinder's cache into it. Private until it replaces safebyok-indexeddb.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,

@@ -5,7 +5,7 @@ import { type BadNews, type BoxUnsealed } from '../../src/shapes/shapes-bankish'
 import { type BoxLabelpath, Lifeseq } from '../../src/shapes/primitives'
 import { type BoxRecord, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { Thing } from '../../src/models/thing'
-import { ThingMinder } from '../../src/minding/thing-minder'
+import { VaultMinder } from '../../src/minding/vault-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { GetAsk } from '../../src/shapes/shapes-asks'
 import { refusedAnswerOf } from '../../src/storage/refused-answer'
@@ -41,12 +41,12 @@ async function bumpApicalls(vault: Vault): Promise<BoxRecord> {
 }
 
 /** A vault of `bank` beside the one its device made, with a minder of its own, befriending the bank, that has not said `hello`. */
-function vaultBesideOf(bank: Bank): Vault { return Vault.make(bank, ThingMinder.make({ vaultDB: bank.vaultDB }, bank)) }
+function vaultBesideOf(bank: Bank): Vault { return Vault.make(bank, VaultMinder.make({ vaultDB: bank.vaultDB }, bank)) }
 
 describe("Vault.make(bank, minder)", () => {
   it("makes the vault of the bank's boxes, over the minder given, which waits for its hello", async () => {
     const { bank } = await TH.buildBornBank()
-    const minder = ThingMinder.make({ vaultDB: bank.vaultDB }, bank)
+    const minder = VaultMinder.make({ vaultDB: bank.vaultDB }, bank)
     const vault = Vault.make(bank, minder)
     expect(vault.bank).to.equal(bank)
     expect(vault.minder).to.equal(minder)
@@ -676,7 +676,7 @@ function refuseGets(bank: Bank) {
 }
 
 /** The revtok of `minder`'s item at `labelpath` at the moment each write the vaultDB answers comes back to its caller. */
-function itemsOnAnswer(bank: Bank, minder: ThingMinder, labelpath: string): (string | undefined)[] {
+function itemsOnAnswer(bank: Bank, minder: VaultMinder, labelpath: string): (string | undefined)[] {
   const tryWriteThing = bank.vaultDB.tryWriteThing.bind(bank.vaultDB)
   const seen: (string | undefined)[] = []
   vi.spyOn(bank.vaultDB, 'tryWriteThing').mockImplementation(async (ask) => {

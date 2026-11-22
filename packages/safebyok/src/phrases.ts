@@ -42,7 +42,7 @@ export const GatingSpent = 'This gating was attempted already, and a gating is a
 export const VaultBankExpected = 'A Vault is made with the Bank whose boxes it carries.'
 
 /** A vault made without a minder. */
-export const VaultMinderExpected = "A Vault is made with the ThingMinder of its bank's Things."
+export const VaultMinderExpected = "A Vault is made with the VaultMinder of its bank's Things."
 
 /** Something a bank is asked to host that has no sweep. */
 export const HostedVaultExpected = 'Expected a vault: an object with a sweep function.'
@@ -153,17 +153,17 @@ export const AnswerNotMade = "The vaultDB could not make an answer for a failure
 // == [Minding]: MinderFriendExpected, MinderClientExpected, BankMindedInClient, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, NotARecord, RecordsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
 
 /** A minder made without a friend: a device or a bank. */
-export const MinderFriendExpected = 'A ThingMinder is made with its friend: the device or bank whose Things it minds.'
+export const MinderFriendExpected = 'A VaultMinder is made with its friend: the device or bank whose Things it minds.'
 
 
-/** A minder made with a QueryClient that ThingMinder.makeClient did not make. */
-export const MinderClientExpected = 'A ThingMinder caches only in a QueryClient made by ThingMinder.makeClient, whose cache hands each fetched record to its minder.'
+/** A minder made with a QueryClient that VaultMinder.makeClient did not make. */
+export const MinderClientExpected = 'A VaultMinder caches only in a QueryClient made by VaultMinder.makeClient, whose cache hands each fetched record to its minder.'
 
 /** A minder's hello while another minder of its bank is minding in the same QueryClient. */
-export const BankMindedInClient = "Another ThingMinder of this bank is minding in this QueryClient: call its goodbye before this one's hello."
+export const BankMindedInClient = "Another VaultMinder of this bank is minding in this QueryClient: call its goodbye before this one's hello."
 
 /** A minder read or written through before `hello`, or after `goodbye`. */
-export const MinderNotStarted = 'This ThingMinder is not minding: call hello before reading from it or writing through it.'
+export const MinderNotStarted = 'This VaultMinder is not minding: call hello before reading from it or writing through it.'
 
 /** A get that storage answered older than the record the minder had cached when it began. */
 export const StaleRead = 'Storage answered with a revision older than one this device already had. The newer record stays cached, and a later get asks again.'
@@ -172,7 +172,7 @@ export const StaleRead = 'Storage answered with a revision older than one this d
 export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
 
 /** A minder's `listen` given a feed version other than `MinderEventFormat`. */
-export const FeedVersionOther = "A ThingMinder's listen is given the version of the feed its listener reads, MinderEventFormat, and this listener was written for another: its events are not shaped as it expects."
+export const FeedVersionOther = "A VaultMinder's listen is given the version of the feed its listener reads, MinderEventFormat, and this listener was written for another: its events are not shaped as it expects."
 
 /** A value handed to newerThingOf that is not a Thing's record. */
 export const NotARecord = "newerThingOf compares the records of one Thing, and was given a value that is not a Thing's record, tombstone or shell."
@@ -181,7 +181,7 @@ export const NotARecord = "newerThingOf compares the records of one Thing, and w
 export const RecordsOfOtherThings = "newerThingOf compares the records of one Thing, and was given the records of two different Things."
 
 /** A record the vaultDB delivered to a minder of another bank, or of another Thing than the minder asked for. */
-export const DeliveredOfOtherScope = "The vaultDB delivered a ThingMinder a record of another bank than the minder's, or of another Thing than it asked for: this is a bug in the vaultDB."
+export const DeliveredOfOtherScope = "The vaultDB delivered a VaultMinder a record of another bank than the minder's, or of another Thing than it asked for: this is a bug in the vaultDB."
 
 /** Children a list found stored damaged, and left out of its answer. */
 export const ChildrenStoredDamaged = "Some of the Things this list found are stored damaged, so it left them out: the refusal's meta.labelpaths names each one. They were left as they are in storage."

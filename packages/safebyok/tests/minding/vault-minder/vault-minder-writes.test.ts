@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ThingMinder } from '../../../src/minding/thing-minder'
+import { VaultMinder } from '../../../src/minding/vault-minder'
 import { type BoxRecord, Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import { MinderEventFormat } from '../../../src/shapes/shapes-minder'
@@ -7,7 +7,7 @@ import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
 import { QuietVaultDB, LateWriteVaultDB, minderWorldOf, bornOf, storedBoxOf, noticeOf, cheatBox, listenerOf, boxBirthAskOf } from './world'
 
-describe("ThingMinder.tryWrite", () => {
+describe("VaultMinder.tryWrite", () => {
   it("answers as the vaultDB did, once the record written is in its item", async () => {
     const vaultDB = await bornOf(new QuietVaultDB())
     const { minder } = minderWorldOf(vaultDB)
@@ -145,7 +145,7 @@ describe("ThingMinder.tryWrite", () => {
 
   it("writes a box the bank sealed, then the tombstone it sealed, through the put and del asks the bank makes", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const minder = ThingMinder.make({ vaultDB: device.vaultDB }, bank)
+    const minder = VaultMinder.make({ vaultDB: device.vaultDB }, bank)
     minder.hello()
     const shell  = Shell.of({ ...bank.scope, labelpath: TH.BoxScope.labelpath }, bank.rootBox)
     const box    = await bank.sealBox(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
@@ -204,7 +204,7 @@ describe("ThingMinder.tryWrite", () => {
   }
 })
 
-describe("ThingMinder.write", () => {
+describe("VaultMinder.write", () => {
   it("returns the record written, once it is in its item", async () => {
     const vaultDB = await bornOf(new QuietVaultDB())
     const { minder } = minderWorldOf(vaultDB)

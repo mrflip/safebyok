@@ -8,7 +8,7 @@ import { type ReactNode, createContext, useCallback, useContext, useEffect, useM
 import {
   type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, Labelpath,
   type LiveOf, type LivePublicPropsOf, MinderEventFormat, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
-  PendingBank, type Sidecar, ThingMinder, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
+  PendingBank, type Sidecar, VaultMinder, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
 } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
@@ -286,7 +286,7 @@ const Unjudged = Object.freeze({ verdict: null, isJudging: false, lastErr: null 
 
 /** A provider's mount, before its first userid: a QueryClient its devices' minders may cache in, and no device. */
 function makeProviderMount(): ProviderMount {
-  return { client: ThingMinder.makeClient(), device: null }
+  return { client: VaultMinder.makeClient(), device: null }
 }
 
 /** What a provider handed `userid` shows its children of `device`, its mount's: none while it is another user's or not yet made, stage `starting` for a userid and `signed_out` for none. */
@@ -707,7 +707,7 @@ function isBehindAt(device: Device | null, labelpath: Labelpath): boolean {
 // invalidated tells nothing when it falls behind again. A fetch already under way is left to land, and its landing tells
 // again where it landed behind.
 /** Refetch each item or listing of `minder`'s that a hook observes, once the minder marks it behind or stale. Returns the function that stops it. */
-function refetchMarked(minder: ThingMinder): () => void {
+function refetchMarked(minder: VaultMinder): () => void {
   const client = minder.queryClient
   return minder.listen((event) => {
     if (event.type !== 'updated') { return }

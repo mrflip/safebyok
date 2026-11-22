@@ -2,10 +2,10 @@ import * as TSQ from '@tanstack/query-core'
 import { describe, expect, it } from 'vitest'
 import type { ThingScope } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
-import { ThingMinder } from '../../../src/minding/thing-minder'
+import { VaultMinder } from '../../../src/minding/vault-minder'
 import { minderWithoutStart } from './world'
 
-describe("ThingMinder keys", () => {
+describe("VaultMinder keys", () => {
   const DeepScope = { ...TH.BoxScope, labelpath: 'box/openai/deep' }
 
   it("name the item after the bank, interleave '/' between the labels, then end with '!'", () => {
@@ -45,15 +45,15 @@ describe("ThingMinder keys", () => {
   it("are the same, made without a minder, for anyone caching the same record", () => {
     const minder = minderWithoutStart()
     for (const scope of [TH.GateScope, TH.RootScope, TH.BoxScope, TH.BankScope]) {
-      expect(ThingMinder.itemQueryKeyOf(scope)).to.deep.equal(minder.itemQueryKey(scope))
-      expect(ThingMinder.listQueryKeyOf(scope)).to.deep.equal(minder.listQueryKey(scope))
+      expect(VaultMinder.itemQueryKeyOf(scope)).to.deep.equal(minder.itemQueryKey(scope))
+      expect(VaultMinder.listQueryKeyOf(scope)).to.deep.equal(minder.listQueryKey(scope))
     }
-    expect(ThingMinder.bankQueryKeyOf(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme'])
+    expect(VaultMinder.bankQueryKeyOf(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme'])
   })
 
   it("made without a minder, refuse a scope that is not one", () => {
-    TH.expectSyncRefusal(() => ThingMinder.itemQueryKeyOf({ ...TH.BoxScope, labelpath: '' }), 'bad_record')
-    TH.expectSyncRefusal(() => ThingMinder.listQueryKeyOf({ ...TH.BoxScope, labelpath: '' }), 'bad_record')
-    TH.expectSyncRefusal(() => ThingMinder.bankQueryKeyOf({ userid: 'u1' } as never), 'bad_record')
+    TH.expectSyncRefusal(() => VaultMinder.itemQueryKeyOf({ ...TH.BoxScope, labelpath: '' }), 'bad_record')
+    TH.expectSyncRefusal(() => VaultMinder.listQueryKeyOf({ ...TH.BoxScope, labelpath: '' }), 'bad_record')
+    TH.expectSyncRefusal(() => VaultMinder.bankQueryKeyOf({ userid: 'u1' } as never), 'bad_record')
   })
 })

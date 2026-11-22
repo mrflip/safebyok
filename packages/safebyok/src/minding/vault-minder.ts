@@ -1,11 +1,11 @@
-// The ThingMinder is an exemplar at both of its ends. Its interface is the minder as we would design it for the layer in
+// The VaultMinder is an exemplar at both of its ends. Its interface is the minder as we would design it for the layer in
 // front of it: scopes, records, acts and refusals, in our vocabulary. Its implementation shows TanStack Query used as
 // its authors intend: each need is met by the feature TanStack built for that job (query defaults, structural sharing,
 // the error state, the cache's events), chosen because it fits, not because it was nearest to hand.
 // Where a ruling, a design note or this code seems to serve one end at the other's expense, report it rather than split
 // the difference.
 
-/** `ThingMinder`, which minds every Thing in one bank in a TanStack Query cache, its own or one it shares with minders of other banks. */
+/** `VaultMinder`, which minds every Thing in one bank in a TanStack Query cache, its own or one it shares with minders of other banks. */
 
 import * as TSQ from '@tanstack/query-core'
 import { deepFreeze, union } from 'es-toolkit'
@@ -79,7 +79,7 @@ export type Labelpathed = { labelpath: Labelpath }
  *   later changes nothing.
  * - `invalidate` asks the vaultDB nothing, and marks listings stale, never items: it changes no item, and no listing's labelpaths.
  */
-export class ThingMinder {
+export class VaultMinder {
   // == [Props]: userid, banklabel, #bank, #vaultDB, #tsq, #landers, #queryCacheOpts, #unwatch, #isReady
   readonly userid:    Userid
   readonly banklabel: Banklabel
@@ -97,9 +97,9 @@ export class ThingMinder {
   // == [Construction]: make, constructor, makeClient, isClient, #setQueryDefaults
 
   /** Make a minder of every Thing in `bank`. It does nothing until `hello`. */
-  static make(opts: MinderOpts, bank: MinderFriend): ThingMinder {
+  static make(opts: MinderOpts, bank: MinderFriend): VaultMinder {
     const checked = Checks.minderMakeArgs.parse({ opts, bank })
-    return new ThingMinder(checked.opts, checked.bank)
+    return new VaultMinder(checked.opts, checked.bank)
   }
 
   private constructor(opts: MinderOpts & { queryCacheOpts: QueryCacheOpts }, bank: MinderFriend) {
@@ -109,7 +109,7 @@ export class ThingMinder {
     this.#bank           = bank
     this.#vaultDB        = opts.vaultDB
     this.#queryCacheOpts = Object.freeze(opts.queryCacheOpts)
-    this.#tsq            = opts.queryClient ?? ThingMinder.makeClient()
+    this.#tsq            = opts.queryClient ?? VaultMinder.makeClient()
     this.#landers        = LandersOfClient.get(this.#tsq)!
     Object.freeze(this)
   }
@@ -646,7 +646,7 @@ function bankHashOf(queryKey: TSQ.QueryKey): string { return TSQ.hashKey(queryKe
 type Lander = (val: unknown, queryKey: TSQ.QueryKey) => void
 
 // A client is a TanStack QueryClient as a host's QueryClientProvider takes it, so what minders it has is kept beside it.
-/** The minders attached to each client {@link ThingMinder.makeClient} made, by {@link bankHashOf} of their bank's key head. */
+/** The minders attached to each client {@link VaultMinder.makeClient} made, by {@link bankHashOf} of their bank's key head. */
 const LandersOfClient = new WeakMap<TSQ.QueryClient, Map<string, Lander>>()
 
 /** The time a bare listing was last listed: TanStack's `dataUpdatedAt` for a query no fetch has set. */
@@ -709,13 +709,13 @@ const landedListingOf = (prior: unknown, next: unknown): unknown => {
 
 // == [Checks]: Checks, DeliveredChecks
 
-/** The checks of {@link ThingMinder.make}'s arguments. */
+/** The checks of {@link VaultMinder.make}'s arguments. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
   minderMakeArgs: obj({
     opts: obj({
       vaultDB:        ThingChecks.vaultDBShape,
       queryCacheOpts: MinderChecks.queryCacheOptsOrDefault,
-      queryClient:    custom<TSQ.QueryClient>((val) => ThingMinder.isClient(val), Phrases.MinderClientExpected).optional(),
+      queryClient:    custom<TSQ.QueryClient>((val) => VaultMinder.isClient(val), Phrases.MinderClientExpected).optional(),
     }),
     bank: MinderChecks.minderFriend,
   }),

@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { DefaultQueryCacheOpts, MaxTimerMillis } from '../../../src/shapes/shapes-minder'
-import { ThingMinder } from '../../../src/minding/thing-minder'
+import { VaultMinder } from '../../../src/minding/vault-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
 import { Hours24, fakeBankOf, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf } from './world'
 
-describe("ThingMinder.make", () => {
+describe("VaultMinder.make", () => {
   const vaultDB = new MemoryVaultDB()
   const { makeGetAsk: _makeGetAsk, ...noAsks } = fakeBankOf()
   const { makeListAsk: _makeListAsk, ...noListAsks } = fakeBankOf()
@@ -26,7 +26,7 @@ describe("ThingMinder.make", () => {
   for (const [optsOver, bank, blurb] of MakeCases) {
     it(blurb, () => {
       // @ts-expect-error -- sloppy input is the point
-      TH.expectSyncRefusal(() => ThingMinder.make({ vaultDB, ...optsOver }, bank ?? fakeBankOf()), 'bad_record')
+      TH.expectSyncRefusal(() => VaultMinder.make({ vaultDB, ...optsOver }, bank ?? fakeBankOf()), 'bad_record')
     })
   }
 
@@ -36,7 +36,7 @@ describe("ThingMinder.make", () => {
   })
 })
 
-describe("ThingMinder.hello", () => {
+describe("VaultMinder.hello", () => {
   it("counts an item timely for the staleTime the minder was made with, an hour by default", async () => {
     vi.useFakeTimers()
     try {
@@ -153,7 +153,7 @@ async function fetchedWorldOf() {
   return { minder, vaultDB, gate0 }
 }
 
-describe("ThingMinder.goodbye", () => {
+describe("VaultMinder.goodbye", () => {
   it("empties the cache", async () => {
     const { minder } = await fetchedWorldOf()
     minder.goodbye()

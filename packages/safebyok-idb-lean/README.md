@@ -1,7 +1,7 @@
 # safebyok-idb-lean
 
 A `VaultDB` for the new safebyok core that keeps a bank's Things in this browser's
-[IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API), and a bridge that copies a `ThingMinder`'s cache
+[IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API), and a bridge that copies a `VaultMinder`'s cache
 into it. The Things are what any backend would have, ciphertext and a few unencrypted fields; nothing in them unlocks a
 bank without its passphrase or passkey.
 

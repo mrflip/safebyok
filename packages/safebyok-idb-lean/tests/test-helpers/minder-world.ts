@@ -1,13 +1,13 @@
 /** The world of an IdbMinderBridge under test. */
 import { vi } from 'vitest'
-import { type MinderFriend, type VaultError, ThingMinder } from 'safebyok'
+import { type MinderFriend, type VaultError, VaultMinder } from 'safebyok'
 import { type Labelpath, MemoryVaultDB, Shell, getAskOf, listAskOf } from 'safebyok/storage'
 import { BoxScope, ThingBank, birthAskOf, birthBankAskOf, boxThingOf, expectGood, rootBoxOf, trackOf } from 'safebyok/testing'
 import type { IdbVaultDB } from '../../src/idb-vault-db'
 import { IdbMinderBridge } from '../../src/idb-minder-bridge'
 import { makeIdbVaultDB } from './idb-world'
 
-/** A fake bank for a ThingMinder. Its asks track the roots at revision 0, and `tellBadNews` is a spy. */
+/** A fake bank for a VaultMinder. Its asks track the roots at revision 0, and `tellBadNews` is a spy. */
 export function fakeBankOf() {
   return {
     scope:       { ...ThingBank },
@@ -22,7 +22,7 @@ export function fakeBankOf() {
 export interface BridgedWorld {
   vaultDB:    MemoryVaultDB
   bank:       ReturnType<typeof fakeBankOf>
-  minder:     ThingMinder
+  minder:     VaultMinder
   idbVaultDB: IdbVaultDB
   onBadNews:  ReturnType<typeof vi.fn<(news: VaultError) => void>>
   bridge:     IdbMinderBridge
@@ -38,7 +38,7 @@ export async function bridgedWorldOf({ isStarted = true, isBadNewsHeard = true }
   const boxAsk = birthAskOf(boxThingOf(), Shell.of(BoxScope, rootBoxOf()))
   await expectGood(vaultDB.tryWriteThing(boxAsk))
   const bank       = fakeBankOf()
-  const minder     = ThingMinder.make({ vaultDB }, bank)
+  const minder     = VaultMinder.make({ vaultDB }, bank)
   const idbVaultDB = makeIdbVaultDB()
   const onBadNews  = vi.fn<(news: VaultError) => void>()
   const bridge     = IdbMinderBridge.make({ minder, idbVaultDB, ...(isBadNewsHeard && { onBadNews }) })

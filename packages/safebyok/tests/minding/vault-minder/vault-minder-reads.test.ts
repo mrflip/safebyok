@@ -8,7 +8,7 @@ import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
 import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, revtokAt, listenerOf, toldOf } from './world'
 
-describe("ThingMinder.get", () => {
+describe("VaultMinder.get", () => {
   it("refuses bad_record for a scope of another bank", async () => {
     const { minder } = minderWorldOf(new MemoryVaultDB())
     await TH.expectRefusal(minder.get({ ...TH.GateScope, banklabel: 'zz' }), 'bad_record')
@@ -175,7 +175,7 @@ describe("ThingMinder.get", () => {
 
 })
 
-describe("ThingMinder.tryGet", () => {
+describe("VaultMinder.tryGet", () => {
   it("resolves the record stored as a good outcome", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 1)
@@ -200,7 +200,7 @@ describe("ThingMinder.tryGet", () => {
   })
 })
 
-describe("ThingMinder.backgroundRefresh", () => {
+describe("VaultMinder.backgroundRefresh", () => {
   it("returns at once, and caches the record the vaultDB answers", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 1)
@@ -265,7 +265,7 @@ describe("ThingMinder.backgroundRefresh", () => {
   }
 })
 
-describe("ThingMinder.list", () => {
+describe("VaultMinder.list", () => {
   it("lists the boxes under the root box, and caches each sparse and stale", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
@@ -368,7 +368,7 @@ describe("ThingMinder.list", () => {
   })
 })
 
-describe("ThingMinder.tryList", () => {
+describe("VaultMinder.tryList", () => {
   it("resolves the labelpaths listed as its good outcome", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)

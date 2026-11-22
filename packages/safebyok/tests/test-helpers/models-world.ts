@@ -17,7 +17,7 @@ import { Gate } from '../../src/models/gate'
 import { Gating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
 import type { Vault } from '../../src/models/vault'
-import type { ThingMinder } from '../../src/minding/thing-minder'
+import type { VaultMinder } from '../../src/minding/vault-minder'
 import { PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
 import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import type { BankMakeRecord, DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
@@ -158,7 +158,7 @@ export function makeStoredBank({ device, record, gateRecord }: Pick<BornBank, 'd
 /** A {@link buildBornBank} bank, beside the vault of its boxes and that vault's minder. */
 export interface BornVault extends BornBank {
   vault:  Vault
-  minder: ThingMinder
+  minder: VaultMinder
 }
 
 /** A {@link buildBornBank} bank, unlocked, and the vault of its boxes its device made at the birth. */

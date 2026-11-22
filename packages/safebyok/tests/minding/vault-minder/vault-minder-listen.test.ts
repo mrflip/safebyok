@@ -8,7 +8,7 @@ import { type BoxRecord, type GateRecord, type Sparse, type Tombstone } from '..
 import * as TH from '../../test-helpers'
 import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, cheatBox, storedGateOf, storedBoxOf, noticeOf, sparseNoticeOf, everyEventListenerOf, listenerOf, toldOf, isListingEvent } from './world'
 
-describe("ThingMinder.listen", () => {
+describe("VaultMinder.listen", () => {
   it("tells the cached record of every Thing of every kind, until stopped", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder } = minderWorldOf(vaultDB)
