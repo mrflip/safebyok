@@ -81,8 +81,8 @@ type DraftFriend = RevealFriend & Readonly<{
 export function makeUseDraft(bank: DraftFriend) {
   /** A draft of the box at `labelpath`: an editor's sidecar, its whisper's fields as inputs, and `put` and `discard` for its Save and Undo.
    * The fields' text lives only in the inputs: React never holds it, and `put` reads it from there.
-   * The inputs may sit in a form whose action calls `put`. React empties that form once the action ends, and the draft discards with it,
-   * so a refused put there loses what was typed, and the draft starts again from the box stored.
+   * The inputs may sit in a form whose action calls `put`. React empties that form once the action ends, and the draft forgets the fields
+   * typed into with it, so a refused put there loses what was typed, but not the draft's sidecar.
    * @example
    *   const draft = Knock.useDraft('jokes')
    *   <input aria-label="API key" {...draft.whisperField('apiKey')} />
@@ -104,7 +104,8 @@ export function makeUseDraft(bank: DraftFriend) {
     const baseSidecar = base?.sidecar ?? EmptySidecar
     const sidecar = sidecarSet ?? baseSidecar
     const isWhisperDirty = dirtyFieldnames.size > 0
-    const isDirty = isWhisperDirty || (! isEqual(sidecar, baseSidecar))
+    const isSidecarDirty = ! isEqual(sidecar, baseSidecar)
+    const isDirty = isWhisperDirty || isSidecarDirty
     const isBehind = (pinned !== null) && (stored !== undefined) && (Thing.cmp(pinned, stored) > 0)
 
     // Locking the bank masks the field shown, and this empties every input not typed into.
@@ -112,12 +113,12 @@ export function makeUseDraft(bank: DraftFriend) {
       if (isLocked) { emptyInputs(inputs.current, dirtyFieldnames) }
     }, [isLocked, dirtyFieldnames])
 
-    // React empties a form's uncontrolled fields once its action ends, firing no change event, so the draft discards with them.
+    // React empties a form's uncontrolled fields once its action ends, firing no change event, so the draft forgets them with it.
     // An effect listens, not the inputs' ref callbacks: React detaches a ref callback that changed before it resets the form in the same commit.
     useEffect(() => {
       const forms = formsOf(inputs.current)
-      for (const form of forms) { form.addEventListener('reset', discard) }
-      return () => { for (const form of forms) { form.removeEventListener('reset', discard) } }
+      for (const form of forms) { form.addEventListener('reset', forgetTyped) }
+      return () => { for (const form of forms) { form.removeEventListener('reset', forgetTyped) } }
     })
 
     /** Base the draft on the box stored now, unless it already has a base. */
@@ -170,6 +171,17 @@ export function makeUseDraft(bank: DraftFriend) {
         onFocus:     (event) => { void revealField(fieldname, event.currentTarget) },
         onBlur:      (event) => { maskField(fieldname, event.currentTarget) },
         onChange:    () => { markDirty(fieldname) },
+      }
+    }
+
+    /** Forget the fields typed into and mask the field shown, as a form reset empties them. A draft with no sidecar edit left is discarded. */
+    function forgetTyped(): void {
+      if (isSidecarDirty) {
+        emptyInputs(inputs.current, NoFieldnames)
+        setDirtyFieldnames(NoFieldnames)
+        reveal.mask()
+      } else {
+        discard()
       }
     }
 

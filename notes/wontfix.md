@@ -339,7 +339,7 @@ Cases in the React layer, `packages/safebyok-react-lean`, and in an app built on
 
 A `useDraft` whose inputs sit in a form discards when the form is reset (`safebyok-react-lean`, `use-draft.ts`). A host
 whose `onReset` calls `preventDefault()`, to ask "keep your changes?" say, leaves its form as it was, but the draft has
-already emptied the fields typed into and started again from the box stored.
+already emptied the fields typed into and forgotten them, though not its sidecar edits.
 
 Current outcome: the typed text is lost, and nothing is written. The draft and the page agree.
 
