@@ -177,7 +177,13 @@ browser, headless Chromium through Playwright if the repo has it, walking each a
 unlock, save, reveal, a refusal), and record what breaks. Fix what is a plain bug in a demo; carry the rest back as
 matters. The comparison with the Coach's own run is the Coach's (a *For coach* row). *Levels*: review `none` unless it
 changes code. *Orchestrator:* the machine has no browser; the worker installs Playwright and Chromium in its scratch
-directory only, and reports blocked if Chromium needs system libraries. *Depends on*: threads 2 to 5, restacked into a line. *Size*: small to medium.
+directory only, and reports blocked if Chromium needs system libraries.
+
+*Status*: blocked once (13 system libraries missing, no root); *Orchestrator:* YOLO, 15 bookworm arm64 .debs from
+deb.debian.org unpacked into scratch, checked against the Packages SHA256, loaded by `LD_LIBRARY_PATH`. Then walked
+Knock-Knock, envman and the old React demo in headless Chromium 159: no step failed, no demo bug. #838 adds the
+walk-through and the walk scripts. Resumed to fix a react-giver test flake CI met on node 26 (test-only). Three open
+matters and a *For coach* row in the doc; two calls on Cleanup. Review `none` (no product code). *Depends on*: threads 2 to 5, restacked into a line. *Size*: small to medium.
 
 ### Not taken
 
