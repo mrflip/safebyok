@@ -3,7 +3,10 @@
 export { type CreateVaultFormProps, CreateVaultForm } from './create-vault-form'
 export { type AskPasskeyOpts, type CreatePasskeyOpts, askPasskey, createPasskey, passkeysAvailable } from './passkey'
 export { type AddPasskeyFormProps, type PasskeyUnlockButtonProps, type RevokePasskeyFormProps, AddPasskeyForm, PasskeyUnlockButton, RevokePasskeyForm } from './passkey-forms'
+export { type KitPhrasesProviderProps, type RefusalPhrases, KitPhrases, KitPhrasesProvider, refusalTextOf, useKitPhrases } from './phrases-kit'
 export { ModalDialog } from './modal-dialog'
 export { type ReplacePassphraseFormProps, ReplacePassphraseForm } from './replace-passphrase-form'
-export { type NewPassphrase, type NewPassphraseFieldProps, useNewPassphrase } from './use-new-passphrase'
+export { type NewPassphrase, type NewPassphraseFieldProps, type PassphraseMatch, useNewPassphrase } from './use-new-passphrase'
+// The checker's verdict `useNewPassphrase` answers: the core's, one binding across both packages.
+export type { PassphraseVerdict } from 'safebyok'
 export { type UnlockDialogProps, type UnlockFormProps, UnlockDialog, UnlockForm } from './unlock-form'

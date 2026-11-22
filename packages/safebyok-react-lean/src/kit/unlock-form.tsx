@@ -1,13 +1,13 @@
 /** `UnlockForm`, the passphrase form that unlocks a bank, and `UnlockDialog`, the same form as the dialog shown while a call waits on it. */
 
-import { useId, useRef } from 'react'
+import { useId, useRef, useState } from 'react'
 import { useGivenBank } from '../giver/giver-context'
 import type { BankGiver } from '../giver/react-giver'
 import { PassphraseInput } from '../parts/passphrase-input'
 import { SubmitButton } from '../parts/submit-button'
 import { formActionOf } from './form-action'
 import { ModalDialog } from './modal-dialog'
-import { KitPhrases, refusalTextOf } from './phrases-kit'
+import { refusalTextOf, useKitPhrases } from './phrases-kit'
 
 // == [The form]: UnlockFormProps, UnlockForm, UsernameField
 
@@ -29,31 +29,44 @@ export interface UnlockFormProps {
 export function UnlockForm({ bank: bankProp, username, onCancel }: Readonly<UnlockFormProps>) {
   const bank = useGivenBank(bankProp)
   const unlock = bank.useUnlock()
+  const phrases = useKitPhrases()
+  const [isUnlocking, setIsUnlocking] = useState(false)
   const fieldRef = useRef<HTMLInputElement>(null)
+  const fieldId = useId()
   const alertId = useId()
   const unlockAction = formActionOf(unlock, ['passphrase'], ({ passphrase }) => ({ passphraseCleartext: passphrase }))
+  // What waits on the unlock may be a host's pending Action, and React commits no transition's update until every
+  // transition running ends. So the form submits from a handler, never a form action, and shows its pending in plain state.
   // The submit button is disabled while the unlock runs and loses focus, so a refusal hands it back to the field.
-  /** Unlock with the form's passphrase. */
-  async function action(form: FormData) {
-    if (! await unlockAction(form)) { fieldRef.current?.focus() }
+  /** Unlock with the passphrase in `formEl`, then empty the form, as a form action would. */
+  async function submit(formEl: HTMLFormElement) {
+    setIsUnlocking(true)
+    try {
+      if (! await unlockAction(new FormData(formEl))) { fieldRef.current?.focus() }
+    } finally {
+      formEl.reset()
+      setIsUnlocking(false)
+    }
   }
   const isRefused = (unlock.error !== null)
   return (
-    <form className="sok-unlock-form" action={action}>
+    <form className="sok-unlock-form" onSubmit={(event) => { event.preventDefault(); void submit(event.currentTarget) }}>
       {(username !== undefined) && <UsernameField username={username} />}
+      <label htmlFor={fieldId}>{phrases.passphraseField}</label>
       <PassphraseInput
         ref={fieldRef}
+        id={fieldId}
         name="passphrase"
         autoComplete="current-password"
-        aria-label={KitPhrases.passphraseField}
-        placeholder={KitPhrases.passphraseField}
+        placeholder={phrases.passphraseField}
         required
         aria-invalid={isRefused || undefined}
         aria-describedby={isRefused ? alertId : undefined}
+        isPending={isUnlocking}
       />
-      <div role="alert" id={alertId}>{isRefused && refusalTextOf(unlock.error)}</div>
-      <SubmitButton whilePending={KitPhrases.unlockingButton}>{KitPhrases.unlockButton}</SubmitButton>
-      {(onCancel !== undefined) && <button type="button" onClick={onCancel}>{KitPhrases.cancelButton}</button>}
+      <div role="alert" id={alertId}>{isRefused && refusalTextOf(unlock.error, phrases)}</div>
+      <SubmitButton isPending={isUnlocking} whilePending={phrases.unlockingButton}>{phrases.unlockButton}</SubmitButton>
+      {(onCancel !== undefined) && <button type="button" onClick={onCancel}>{phrases.cancelButton}</button>}
     </form>
   )
 }
@@ -77,18 +90,20 @@ export interface UnlockDialogProps {
 
 /** The unlock form as a modal dialog, open while a call such as `withWhisper` waits for the bank to be unlocked. Mount it once, anywhere under the provider.
  * Cancel or Escape dismisses the wait: each waiting call rejects `dismissed`, and the bank stays locked.
+ * The waiting call may run inside a transition or a form Action: the dialog still takes another try after a wrong passphrase.
  * @example
  *   <main><KeyEditor /><UnlockDialog /></main>
  */
 export function UnlockDialog({ bank: bankProp, username }: Readonly<UnlockDialogProps>) {
   const bank = useGivenBank(bankProp)
   const isUnlockWanted = bank.useBank((snap) => snap.isUnlockWanted)
+  const phrases = useKitPhrases()
   const titleId = useId()
   if (! isUnlockWanted) { return null }
   return (
     <ModalDialog labelledBy={titleId} onCancel={bank.dismissUnlock}>
-      <h2 id={titleId}>{KitPhrases.unlockTitle}</h2>
-      <p>{KitPhrases.unlockBlurb}</p>
+      <h2 id={titleId}>{phrases.unlockTitle}</h2>
+      <p>{phrases.unlockBlurb}</p>
       <UnlockForm bank={bank} username={username} onCancel={bank.dismissUnlock} />
     </ModalDialog>
   )

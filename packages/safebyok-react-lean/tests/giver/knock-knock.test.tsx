@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { type BankSnapshot, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
+import { popField } from '../../src/index'
 import * as TH from '../test-helpers'
 
 // Hue sits down at the knock-knock app. The first time, there is no vault yet: Hue creates one with a new passphrase, and
@@ -37,7 +38,7 @@ function makeKnockKnockApp(world: TH.ProviderWorld) {
     const birth = Knock.useBirth()
     const strength = SOK.useStrengthVerdict()
     return (
-      <form action={(form) => { birth.mutate(birth.gating({ passphraseCleartext: takeText(form, 'passphrase') })) }}>
+      <form action={(form) => { birth.mutate(birth.gating({ passphraseCleartext: popField(form, 'passphrase') })) }}>
         <input name="passphrase" type="password" autoComplete="new-password" aria-label="New passphrase" onChange={(event) => { void strength.judge(event.target.value) }} />
         <button disabled={birth.isPending || ! strength.verdict?.strong}>Create</button>
       </form>
@@ -50,7 +51,7 @@ function makeKnockKnockApp(world: TH.ProviderWorld) {
       mutationFn: (line: string) => Knock.withWhisper(TH.JokesPath, ({ apiKey }) => tellJoke(apiKey, line)),
     })
     return (
-      <form action={(form) => { ask.mutate(takeText(form, 'line')) }}>
+      <form action={(form) => { ask.mutate(popField(form, 'line')) }}>
         <input name="line" aria-label="Line" />
         <button>Tell</button>
         <output aria-label="Reply">{ask.data}</output>
@@ -63,7 +64,7 @@ function makeKnockKnockApp(world: TH.ProviderWorld) {
   function UnlockForm() {
     const unlock = Knock.useUnlock()
     return (
-      <form action={(form) => { unlock.mutate(unlock.gating({ passphraseCleartext: takeText(form, 'passphrase') })) }}>
+      <form action={(form) => { unlock.mutate(unlock.gating({ passphraseCleartext: popField(form, 'passphrase') })) }}>
         <input name="passphrase" type="password" autoComplete="current-password" aria-label="Passphrase" />
         <button disabled={unlock.isPending}>Unlock</button>
         <button type="button" onClick={() => { Knock.dismissUnlock() }}>Cancel</button>
@@ -113,15 +114,6 @@ function makeKnockKnockApp(world: TH.ProviderWorld) {
 function unlockAlertOf(err: unknown): string {
   if (! isVaultError(err) || (err.family !== 'condition')) { return 'Something went wrong. Please try again later.' }
   return (err.refusalkind === 'wrong_passphrase') ? 'That is not the passphrase.' : err.message
-}
-
-// React retains the FormData a form action is handed after the action ends: as the form's pending status, and in the
-// action's queued update. A field removed before the first await is never in either.
-/** Take the text of `form`'s field `fieldname` out of it, or '' for none. */
-function takeText(form: FormData, fieldname: string): string {
-  const val = form.get(fieldname)
-  form.delete(fieldname)
-  return (typeof val === 'string') ? val : ''
 }
 
 /** Hue's app over a fresh world storing `stored`, rendered under the giver's provider, signed in as Hue: with the jokes stored, once it shows the vault locked. */

@@ -75,6 +75,16 @@ describe("WhisperInput", () => {
     expect(field.type).to.eq('password')
   })
 
+  it("hides the whisper again while isPending, for a form that submits from a handler", () => {
+    const { rerender } = render(<WhisperInput name="apiKey" aria-label="API key" />)
+    const field = screen.getByLabelText<HTMLInputElement>('API key')
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    expect(field.type).to.eq('text')
+    rerender(<WhisperInput name="apiKey" aria-label="API key" isPending />)
+    expect(field.type).to.eq('password')
+    expect(field.hasAttribute('ispending')).to.eq(false)
+  })
+
   it("carries the attributes that keep password managers away", () => {
     render(<WhisperInput name="apiKey" aria-label="API key" />)
     const field = screen.getByLabelText('API key')
@@ -90,5 +100,16 @@ describe("WhisperInput", () => {
     expect(field.value).to.eq('')
     fireEvent.change(field, { target: { value: TH.JokesKey } })
     expect(field.value).to.eq(TH.JokesKey)
+  })
+
+  it("hands className and other attributes to the input, and marks it revealed and invalid in data- attributes", () => {
+    const { rerender } = render(<WhisperInput name="apiKey" aria-label="API key" className="field" title="Your key" />)
+    const field = screen.getByLabelText<HTMLInputElement>('API key')
+    expect([field.className, field.title]).to.deep.equal(['field', 'Your key'])
+    expect([Object.hasOwn(field.dataset, 'revealed'), Object.hasOwn(field.dataset, 'invalid')]).to.deep.equal([false, false])
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    expect(Object.hasOwn(field.dataset, 'revealed')).to.eq(true)
+    rerender(<WhisperInput name="apiKey" aria-label="API key" aria-invalid />)
+    expect(Object.hasOwn(field.dataset, 'invalid')).to.eq(true)
   })
 })

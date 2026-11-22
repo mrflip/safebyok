@@ -1,3 +1,4 @@
+import type { QueryClient } from '@tanstack/query-core'
 import { isEqual } from 'es-toolkit'
 import { Consts, Deriver, Errors, type GX, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
@@ -17,6 +18,7 @@ import { type Banklabel, type DeviceTok, Labelpath, type Userid } from '../shape
 import type { VaultDB } from '../storage/vault-db'
 import { type BankRecord, type BoxRecord, type GateRecord, type Modelkind, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
+import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
 // == [Defaults]: DefaultLeaseMillis
@@ -116,7 +118,7 @@ export class Device implements MinderFriend {
 
   private constructor(record: DeviceRecord, opts: DeviceOpts) {
     checkSecureContext()
-    const { record: { userid, banklabel, device_tok }, opts: { vaultDB, keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, onBadNews = DefaultOnBadNews, queryCacheOpts } } = Checks.deviceMakeArgs.parse({ record, opts })
+    const { record: { userid, banklabel, device_tok }, opts: { vaultDB, keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, onBadNews = DefaultOnBadNews, queryCacheOpts, queryClient } } = Checks.deviceMakeArgs.parse({ record, opts })
     Object.assign(this, { userid, banklabel, device_tok })
     this.#rootShell = Object.freeze(BoxChecks.liveOrShell.parse(Shell.of({ userid, banklabel, labelpath: Labelpath.RootBox })) as ShellOf<BoxRecord>)
     this.vaultDB = vaultDB
@@ -125,7 +127,7 @@ export class Device implements MinderFriend {
     this.logger = Logger.parseLogger(logger)
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.#onBadNews = onBadNews
-    this.#minder = ThingMinder.make({ vaultDB, queryCacheOpts }, this)
+    this.#minder = ThingMinder.make({ vaultDB, queryCacheOpts, queryClient }, this)
     this.#snapshot = this.#makeSnapshot()
     if (Deriver.isTestDeriver(keyDeriver)) { this.logger.warn(PhrasesX.TestDeriverNotice, { oplabel: 'Device.make' }) }
     Object.freeze(this)
@@ -339,6 +341,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
       autolockMinutes: VX.positiveMinutes.optional(),
       onBadNews:       fn<BadNewsHandler>().optional(),
       queryCacheOpts:  MinderChecks.queryCacheOptsOrDefault,
+      queryClient:     custom<QueryClient>((val) => ThingMinder.isClient(val), Phrases.MinderClientExpected).optional(),
       // Ignored: the new core has no device database. Accepted so that `...browserOpts()` from safebyok/browser, which carries one, spreads in.
       deviceDB:        custom<unknown>().optional(),
     }), { refusalkind: 'bad_record' }),

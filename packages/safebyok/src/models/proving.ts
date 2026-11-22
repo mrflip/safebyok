@@ -8,6 +8,7 @@ import * as Stamps from '../shapes/shapes-stamps'
 import type { Modelkind } from '../shapes/shapes-thing'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { Wayin, wayinCtxOf } from './wayin'
+import { bulletproofAsyncHandlerOf } from '../helpers/bulletproof'
 import * as Throwers from '../refusals/throwers'
 
 // == [NOVEL and the usages]: NOVEL, Novel, RewrapUsage, CheckUsage
@@ -255,14 +256,9 @@ function mintPasskeyHeader({ device_tok }: ProvingDevice, { credential_id, prf_s
 /** Wrap `hostDeriver`, checking its interface, so no error it throws can quote the passphrase. */
 export function guardKeyDeriver(hostDeriver: Deriver.KeyDeriver): GuardedKeyDeriver {
   const { key_deriver_label, salt_size } = CX.keyDeriverShape.parse(hostDeriver, { where: 'keyDeriver' })
-  const load = async (): Promise<void> => {
-    try {
-      await hostDeriver.load?.()
-    } catch (err) {
-      if (Errors.isVaultError(err)) { throw err }
-      throw Throwers.keyDeriverLoadFailed(err)
-    }
-  }
+  const load = bulletproofAsyncHandlerOf(async () => { await hostDeriver.load?.() }, {
+    ifError: 'fail', transformer: (err) => (Errors.isVaultError(err) ? err : Throwers.keyDeriverLoadFailed(err)),
+  })
   return ConstsX.brandGuarded<GuardedKeyDeriver>({ key_deriver_label, salt_size, deriveKeyBytes: (passphrase, saltBytes) => deriveKeyBytes(hostDeriver, passphrase, saltBytes), load })
 }
 
