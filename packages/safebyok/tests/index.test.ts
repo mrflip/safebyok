@@ -45,9 +45,13 @@ describe("safebyok/storage", () => {
   it("re-exports safebyok-big's throwers, checkers and storage policies, the very ones an adapter's refusals are made with", () => {
     const exportnames = [
       'Checker', 'Checkers', 'VaultError', 'fetchFailed', 'identityRevoked', 'isVaultError', 'objCheck', 'sanitizeForeignError', 'storageFailed', 'storagePolicyVals', 'storageUnavailable',
-      'unexpectedError',
+      'storageRefusalOf', 'unexpectedError',
     ] as const
     for (const exportname of exportnames) { expect(Storage, exportname).to.have.property(exportname).that.eq(BigStorage[exportname]) }
     expect(Storage.storageIssue).to.eq(BigThrowers.storageIssue)
+  })
+
+  it("re-exports safebyok-big's IndexedDB transaction and versioned database, the very ones an IndexedDB store is written with", () => {
+    for (const exportname of ['dbprefixOf', 'inOneStep', 'rowAt', 'versionedShelfOf'] as const) { expect(Storage, exportname).to.have.property(exportname).that.eq(BigStorage[exportname]) }
   })
 })
