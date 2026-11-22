@@ -1,6 +1,6 @@
-/** This package's test helpers, behind one door: star-import it as `TH`. Everything `safebyok/testing` publishes comes
- * through it, and beside it the world of an IdbVaultDB: a vaultDB on a fresh database, a twin of it as another tab would
- * have, and the cheat into what its IndexedDB stores.
+/** This package's test helpers: star-import them as `TH`.
+ * They include everything `safebyok/testing` exports, and the test worlds of an IdbVaultDB and of an IdbMinderBridge.
  */
 export * from 'safebyok/testing'
 export * from './test-helpers/idb-world'
+export * from './test-helpers/minder-world'
