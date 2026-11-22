@@ -66,7 +66,7 @@ describe("newerThingOf", () => {
 
   const NotRecords = [
     [Box0,      undefined,                   undefined,                   'passes a next of undefined through'],
-    [Box0,      { labelpath: 'box/openai' }, { labelpath: 'box/openai' }, 'passes a next with no revision through'],
+    [Box0,      { labelpath: "box/openai" }, { labelpath: "box/openai" }, 'passes a next with no revision through'],
     [42,        Box0,                        Box0,                        'passes a next through over a prior that is no record'],
   ] as const
   for (const [prior, next, expected, blurb] of NotRecords) {
