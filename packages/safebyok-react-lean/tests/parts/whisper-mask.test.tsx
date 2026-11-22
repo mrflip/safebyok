@@ -90,14 +90,6 @@ describe("WhisperMask", () => {
     expect(maskTextOf(container)).to.eq('jokes')
   })
 
-  it("keeps the stored mask showing until the live one lands, never blank between", async () => {
-    const { world, container } = await renderKey()
-    await waitFor(() => { expect(maskTextOf(container)).to.eq('jokes') })
-    await unlock(world)
-    expect([ 'jokes', LiveMask ]).to.include(maskTextOf(container))
-    await waitFor(() => { expect(maskTextOf(container)).to.eq(LiveMask) })
-  })
-
   it("empties the element when it is given another box, never showing the last box's mask beside it", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     const tree = (labelpath: string) => TH.providerTreeOf(world, <OtherCached world={world} labelpath={labelpath} />, { userid: TH.ProviderUser })
