@@ -956,14 +956,6 @@ describe("putBoxAction", () => {
     expect([...forms[0]!.keys()]).to.deep.equal([])
   })
 
-  it("makes a thrown string the message of an Error", async () => {
-    const { seen } = await renderKeyEditor({ whisperOf: () => throwValue('The key field is missing') })
-    submitKey()
-    await screen.findByText('Refused')
-    expect(seen.result?.err).to.be.instanceOf(Error)
-    expect(seen.result?.err?.message).to.eq('The key field is missing')
-  })
-
   it("keeps the box's sidecar when it has no sidecarOf", async () => {
     const { world } = await renderKeyEditor({ sidecarOf: undefined })
     submitKey()

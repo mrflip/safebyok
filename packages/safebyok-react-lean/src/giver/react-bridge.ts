@@ -1,7 +1,8 @@
 /** The bridge: keeps the host's React Query items of a Device's boxes and main gate, and its listing of the boxes, current with its bank's minder. */
 
 import type { QueryClient } from '@tanstack/react-query'
-import { type GateRecord, type ListingEvent, type MinderEvent, MinderEventFormat, ThingMinder } from 'safebyok'
+import { type GateRecord, type ListingEvent, type MinderEvent, MinderEventFormat, ThingMinder, bulletproofHandlerOf } from 'safebyok'
+import { sanitizeForeignError } from 'safebyok/storage'
 import { gateShownOf } from './giver-defaults'
 import type { GiverEvent } from './shapes-giver'
 
@@ -10,11 +11,12 @@ import type { GiverEvent } from './shapes-giver'
  * What a delivery throws goes to `tellBadNews`, as what a listener throws goes to the bank's.
  */
 export function bridgeMinder(client: QueryClient, minder: ThingMinder, tellBadNews: (badnews: readonly unknown[]) => void): () => void {
+  const deliverOrTell = bulletproofHandlerOf(deliver, { ifError: 'tell', transformer: sanitizeForeignError, onBadNews: (err) => { tellBadNews([err]) } })
   return minder.listen((event) => {
     // Delivered a microtask later, out of the minder's own notification: an invalidation here runs the host's queryFn,
     // whose get would otherwise start inside it. Without it the get still works. A pragmatic fix, to go if it causes
-    // other problems. Out of the minder's own try/catch, so it has one of its own. #not-a-crossing #pragmatic-fix
-    queueMicrotask(() => { try { deliver(client, minder, event) } catch (err) { tellBadNews([err]) } })
+    // other problems. Out of the minder's own wrapper, so it has one of its own. #not-a-crossing #pragmatic-fix
+    queueMicrotask(() => { deliverOrTell(client, minder, event) })
   }, MinderEventFormat)
 }
 
