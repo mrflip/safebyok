@@ -105,7 +105,7 @@ export class Device implements MinderFriend {
   /** The autolock duration in minutes, past which a lease no longer unlocks the bank. */
   get autolockMinutes(): number { return this.leaseMillis / Consts.MinuteMillis }
 
-  // Refusing rather than null: a bank, its gate and their gatings exist only once someone is signed in, and read it unchecked.
+  // Refusing rather than null, as `minder` does: a bank, its gate and their gatings exist only once someone is signed in, and read it unchecked.
   /** The minder of the signed-in user's bank's roots: its bank, main gate and root box, as last heard of. Refuses `absent_vault` until `signIn`. */
   get bankMinder(): BankMinder {
     if (this.#bankMinder === null) { throw Throwers.nobodySignedIn() }
@@ -114,8 +114,11 @@ export class Device implements MinderFriend {
   /** The QueryClient the signed-in user's boxes are cached in: the same one from `Device.make` on, empty until `signIn`, for hooks to observe. */
   get queryClient(): QueryClient { return this.#queryClient }
 
-  /** The minder of the signed-in user's boxes, or null until `signIn`. */
-  get minder(): VaultMinder | null { return this.#minder }
+  /** The minder of the signed-in user's boxes. Refuses `absent_vault` until `signIn`. */
+  get minder(): VaultMinder {
+    if (this.#minder === null) { throw Throwers.nobodySignedIn() }
+    return this.#minder
+  }
 
   /** The signed-in user's bank, or null until the device finds it stored or a birth on this device makes it. */
   get bank(): Bank | null { return this.#bank }
@@ -254,7 +257,7 @@ export class Device implements MinderFriend {
   /** Make `bank` this device's bank. */
   #attachBank(bank: Bank): void {
     this.#bank  = bank
-    this.#vault = Vault.make(bank, this.#minder!)
+    this.#vault = Vault.make(bank, this.minder)
     bank.subscribe(this.#align)
     this.#align()
   }

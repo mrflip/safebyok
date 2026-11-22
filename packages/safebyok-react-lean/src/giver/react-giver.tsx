@@ -217,7 +217,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
       return () => { if (mounted === device) { mounted = null } }
     }, [device])
     useEffect(() => { if (typeof userid === 'string') { signIn(userid) } }, [userid])
-    useEffect(() => ((signedIn?.minder == null) ? undefined : refetchMarked(signedIn.minder)), [signedIn])
+    useEffect(() => ((signedIn === null) ? undefined : refetchMarked(signedIn.minder)), [signedIn])
     const shown = useMemo(() => shownOf(signedIn, userid, device.queryClient), [signedIn, userid, device])
     return <ShownContext value={shown}><GiverContext value={given}>{children}</GiverContext></ShownContext>
   }
@@ -690,7 +690,7 @@ function isBroughtUp(bank: BankSnapshot): boolean {
 
 /** True while `device`'s minder has heard of a newer revision of the Thing at `labelpath` than its item. False for no device. */
 function isBehindAt(device: Device | null, labelpath: Labelpath): boolean {
-  return device?.minder?.isBehindAt({ ...device.scope, labelpath }) ?? false
+  return device?.minder.isBehindAt({ ...device.scope, labelpath }) ?? false
 }
 
 // The minder marks an item behind, or a listing stale, but refetches nothing: no get or list is waiting on it. A hook

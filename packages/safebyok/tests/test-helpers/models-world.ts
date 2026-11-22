@@ -173,7 +173,7 @@ export interface BornVault extends BornBank {
 /** A {@link buildBornBank} bank, unlocked, and the vault of its boxes its device made at the birth. */
 export async function buildBornVault(given: BornBankGiven = {}): Promise<BornVault> {
   const born = await buildBornBank(given)
-  return { ...born, vault: born.device.vault!, minder: born.device.minder! }
+  return { ...born, vault: born.device.vault!, minder: born.device.minder }
 }
 // --
 

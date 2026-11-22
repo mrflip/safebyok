@@ -40,7 +40,7 @@ describe("a page that is not a secure context", () => {
 describe("Device.make(record, opts)", () => {
   it("makes an enabled device of the record's banklabel and token, nobody signed in", () => {
     const device = TH.makeDevice({ userid: null })
-    expect(device).to.include({ banklabel: TH.WorldScope.banklabel, device_tok: TH.DeviceTok, userid: null, minder: null, bank: null })
+    expect(device).to.include({ banklabel: TH.WorldScope.banklabel, device_tok: TH.DeviceTok, userid: null, bank: null })
     expect(device.getSnapshot()).to.deep.equal({ bank: SignedOutBank })
     expect(device.isEnabled).to.be.true
     expect(device.demandEnabled()).to.equal(device)
@@ -92,7 +92,7 @@ describe("Device.make(record, opts)", () => {
     expect(VaultMinder.isClient(queryClient)).to.be.true
     expect(queryClient.getQueryCache().getAll()).to.have.lengthOf(0)
     void device.signIn(TH.WorldScope.userid)
-    expect([device.queryClient, device.minder!.queryClient]).to.deep.equal([queryClient, queryClient])
+    expect([device.queryClient, device.minder.queryClient]).to.deep.equal([queryClient, queryClient])
   })
 
   it("serializes as its user, banklabel and token alone, and is frozen", () => {
@@ -198,6 +198,8 @@ describe("a device nobody is signed in to", () => {
   it("refuses what needs a user, absent_vault", async () => {
     const device = TH.makeDevice({ userid: null })
     TH.expectSyncRefusal(() => device.scope, 'absent_vault')
+    TH.expectSyncRefusal(() => device.bankMinder, 'absent_vault')
+    TH.expectSyncRefusal(() => device.minder, 'absent_vault')
     await TH.expectRefusal(device.judgeStrength(TH.TestPassphrase), 'absent_vault')
   })
 
