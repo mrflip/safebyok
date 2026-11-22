@@ -23,6 +23,7 @@ import {
   FixedQueryCacheOpts, MinderChecks,
 } from '../shapes/shapes-minder'
 import { newerThingOf } from './newer-thing'
+import { bulletproofHandlerOf } from '../helpers/bulletproof'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
@@ -277,14 +278,11 @@ export class ThingMinder {
   listen(listener: (event: MinderEvent) => void, version: typeof MinderEventFormat): () => void {
     MinderChecks.minderListener.parse(listener)
     MinderChecks.feedVersion.parse(version)
+    const tellListener = bulletproofHandlerOf(listener, { ifError: 'tell', transformer: Throwers.unexpectedError, onBadNews: (err) => { this.#bank.tellBadNews([err]) } })
     return this.#tsq.getQueryCache().subscribe((tsqEvent) => {
       const event = this.#minderEventOf(tsqEvent)
       if (event === undefined) { return }
-      try {
-        listener(event)
-      } catch (err) {
-        this.#bank.tellBadNews([Throwers.unexpectedError(err)])
-      }
+      tellListener(event)
     })
   }
   // --

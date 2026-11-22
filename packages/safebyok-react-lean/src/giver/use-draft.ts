@@ -2,12 +2,12 @@
 
 import { isEqual } from 'es-toolkit'
 import { type ChangeEventHandler, type FocusEventHandler, type RefCallback, useEffect, useRef, useState } from 'react'
-import { type BoxRecord, Checkers, type LiveOf, type Sidecar, Thing, type Vault, VaultError, type Whisper, WhisperFieldAttributes } from 'safebyok'
+import { type BoxRecord, Checkers, type LiveOf, type Sidecar, Thing, type Vault, VaultError, type Whisper, WhisperFieldAttributes, bulletproofHandlerOf } from 'safebyok'
 import { PartsPhrases } from '../parts/phrases-parts'
 import { liveOf } from './giver-defaults'
 import * as Phrases from './phrases-giver'
 import type { BoxSelected, BoxShown } from './react-giver'
-import type { BoxQueryOpts } from './shapes-giver'
+import { type BoxQueryOpts, HostCallbackOpts } from './shapes-giver'
 import { type RevealFriend, useReveal } from './use-reveal'
 
 // == [Types]: Draft, DraftPutOpts, WhisperFieldProps, DraftFriend
@@ -50,7 +50,7 @@ export type Draft = Readonly<{
 /** How a draft's `put` writes. */
 export type DraftPutOpts = Readonly<{
   /** The sidecar to write, from the whisper about to be written and the draft's sidecar. Left out, the draft's sidecar is written.
-   * Use the whisper only inside it, and return no part of it.
+   * Use the whisper only inside it, and return no part of it. What it throws rejects `put`, anything that is no `Error` wrapped in one.
    */
   sidecarOf?: ((whisper: Whisper, sidecar: Sidecar) => Sidecar) | undefined
 }>
@@ -172,7 +172,8 @@ export function makeUseDraft(bank: DraftFriend) {
     }
 
     async function put(opts: DraftPutOpts = {}): Promise<LiveOf<BoxRecord>> {
-      const { sidecarOf } = Checks.draftPutOpts.parse(opts)
+      const { sidecarOf: hostSidecarOf } = Checks.draftPutOpts.parse(opts)
+      const sidecarOf = hostSidecarOf && bulletproofHandlerOf(hostSidecarOf, HostCallbackOpts)
       const edits = Object.fromEntries([...dirtyFieldnames].map((fieldname) => [fieldname, inputOf(inputs.current, fieldname).value]))
       const box = await bank.withWhisper(labelpath, async (whisper, unsealed) => {
         const nextWhisper = { ...whisper, ...edits }

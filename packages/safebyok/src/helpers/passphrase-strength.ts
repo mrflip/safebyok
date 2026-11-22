@@ -3,6 +3,7 @@ import { Consts, Errors, GX, Helpers, Phrases, Strength } from 'safebyok-big/int
 import { type GuardedStrengthChecker, type StrengthChecker, GateishChecks } from '../shapes/shapes-gateish'
 import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
 import * as Throwers from '../refusals/throwers'
+import { bulletproofAsyncHandlerOf } from './bulletproof'
 
 // == [The default]: DefaultStrengthChecker
 
@@ -46,14 +47,9 @@ export function guardStrengthChecker(hostChecker: StrengthChecker): GuardedStren
     const verdict = GX.passphraseVerdict.parse(answered, { advice: Phrases.StrengthCheckerMisanswered })
     return verdict.strong ? Strength.StrongVerdict : verdict
   }
-  const load = async (): Promise<void> => {
-    try {
-      await host.load?.()
-    } catch (err) {
-      if (Errors.isVaultError(err)) { throw err }
-      throw Throwers.strengthCheckerLoadFailed(err)
-    }
-  }
+  const load = bulletproofAsyncHandlerOf(async () => { await host.load?.() }, {
+    ifError: 'fail', transformer: (err) => (Errors.isVaultError(err) ? err : Throwers.strengthCheckerLoadFailed(err)),
+  })
   return Consts.brandGuarded(Helpers.decorate(check as GuardedStrengthChecker, { load }))
 }
 // --
