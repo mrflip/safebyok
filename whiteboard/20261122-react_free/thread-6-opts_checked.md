@@ -10,7 +10,7 @@ true satisfies AssertEqual<PutBoxActionOpts, Readonly<CheckerInput<typeof Checks
 `AssertEqual` and `CheckerInput` come from `safebyok` (re-exported through `safebyok/storage` by this thread). `Readonly<>`
 matches the type's `Readonly<{…}>`; an array field's check needs `.readonly()` to match a `readonly string[]`.
 
-Branch `20261122-opts_checked`, PR #TBD, stacked on #823. Proved: safebyok-react-lean lint, typecheck, test (19 files,
+Branch `20261122-opts_checked`, PR #835, stacked on #823. Proved: safebyok-react-lean lint, typecheck, test (19 files,
 291 tests); safebyok lint and typecheck.
 
 * **Built**:
