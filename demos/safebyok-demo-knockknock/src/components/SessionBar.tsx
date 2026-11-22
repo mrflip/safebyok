@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import { SubmitButton } from 'safebyok-react-lean/parts'
 import { formTextOf } from '../lib/form-text'
 import { type Session, signIn, signOut } from '../lib/session'
 
 /** Who is signed in, with Sign out; or, while nobody is, the fake sign-in form. */
 export function SessionBar({ session }: Readonly<{ session: Session | null }>) {
-  const [gripe, setGripe] = useState<string | null>(null)
+  // The demo's sign-in answers at once, where a real one would await its server.
+  const signingIn = useMutation({ mutationFn: (username: string) => { signIn(username); return Promise.resolve() } })
   if (session !== null) {
     return (
       <p className="row">
@@ -13,19 +15,11 @@ export function SessionBar({ session }: Readonly<{ session: Session | null }>) {
       </p>
     )
   }
-  /** Sign in as the username typed, or say why it will not do. */
-  const action = (form: FormData): void => {
-    try {
-      signIn(formTextOf(form, 'username'))
-    } catch (err) {
-      setGripe((err as Error).message)
-    }
-  }
   return (
-    <form className="row" action={action}>
+    <form className="row" action={(form) => { signingIn.mutate(formTextOf(form, 'username')) }}>
       <input name="username" aria-label="Username" placeholder="Username" autoComplete="username" required />
-      <button type="submit">Sign in</button>
-      {(gripe !== null) && <span role="alert" className="gripe">{gripe}</span>}
+      <SubmitButton isPending={signingIn.isPending} whilePending="Signing in…">Sign in</SubmitButton>
+      {(signingIn.error !== null) && <span role="alert" className="gripe">{signingIn.error.message}</span>}
     </form>
   )
 }

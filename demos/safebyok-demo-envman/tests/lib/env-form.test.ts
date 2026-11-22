@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { envFieldsOf } from '../../src/lib/env-form'
+import { envFieldsOf, envTextsOfEnv, envTextsOfForm } from '../../src/lib/env-form'
+import { DayMs } from '../../src/lib/env-sidecar'
 
 /** A form with the fields of the settings dialog, `over` replacing any of them. */
 function formOf(over: Record<string, string> = {}): FormData {
@@ -28,5 +29,19 @@ describe("envFieldsOf", () => {
     expect(() => envFieldsOf(formOf({ title: ' ' }), AfternoonMs)).to.throw('Give it a title.')
     expect(() => envFieldsOf(formOf({ rotation_days: '0' }), AfternoonMs)).to.throw('whole number of days')
     expect(() => envFieldsOf(formOf({ rotation_days: '1.5' }), AfternoonMs)).to.throw('whole number of days')
+  })
+})
+
+describe("envTextsOfForm", () => {
+  it("reads each field but the value, trimmed", () => {
+    const form = formOf({ title: ' KEY ', val: 'sk-proj-fake-0123456789abcdef' })
+    expect(envTextsOfForm(form)).to.deep.equal({ title: 'KEY', description: '', rotation_days: '30', last_rotated_day: '2026-11-21' })
+  })
+})
+
+describe("envTextsOfEnv", () => {
+  it("shows the period in whole days and the last-rotated day in UTC", () => {
+    const env = { title: 'KEY', description: 'Production', rotation_period_ms: 30 * DayMs, last_rotated_at: AfternoonMs, mask: '' }
+    expect(envTextsOfEnv(env)).to.deep.equal({ title: 'KEY', description: 'Production', rotation_days: '30', last_rotated_day: '2026-11-21' })
   })
 })
