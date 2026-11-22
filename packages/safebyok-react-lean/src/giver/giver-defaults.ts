@@ -31,7 +31,7 @@ export function recordQueryDefaults(labelpath: string, isBehind: () => boolean, 
 // does, which it replaces while a hook observes.
 /** Structural sharing for a hook's item of the box at `labelpath`: of two of its records or Absents at different revisions, the newer. Anything else goes to TanStack's default, `replaceEqualDeep`. */
 function newerOrSharedOf(prior: unknown, next: unknown, labelpath: string, deadAt: DeadAt): unknown {
-  const isItemVal = (val: unknown): boolean => isAbsent(val) || (isRecord(val) && (val.labelpath === labelpath))
+  function isItemVal(val: unknown): boolean { return isAbsent(val) || (isRecord(val) && (val.labelpath === labelpath)) }
   if (! (isItemVal(prior) && isItemVal(next))) { return replaceEqualDeep(prior, next) }
   const isSame = (isAbsent(prior) && isAbsent(next)) || (isRecord(prior) && isRecord(next) && (Thing.cmp(prior, next) === 0))
   if (isSame) { return replaceEqualDeep(prior, next) }
