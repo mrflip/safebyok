@@ -103,7 +103,7 @@ describe("Bank.make(record, { device, vaultDB, gate })", () => {
     expect(bank.device).to.equal(device)
     expect(bank.device_tok).to.eq(TH.DeviceTok)
     expect(bank.gate).to.equal(gate)
-    expect(bank.rootBox).to.equal(device.bankMinder.worldAt(device.scope)?.root)
+    expect(bank.rootBox).to.equal(device.bankMinder.worldAt()?.root)
     expect([bank.revtok, bank.revseq, bank.written_at]).to.deep.equal([record.revtok, 0, TH.T0])
   })
 
@@ -215,8 +215,9 @@ describe("Bank.make(record, { device, vaultDB, gate })", () => {
   it("reads its root box and its track from its world, as the world hears of newer roots", async () => {
     const { bank, device } = await TH.buildBornBank()
     const root = TH.nextOf(bank.rootBox)
-    device.bankMinder.sendToTSQ(root)
-    expect(bank.rootBox).to.equal(root)
+    await TH.expectGood(device.vaultDB.tryWriteThing(TH.replaceAskOf(bank.rootBox, root)))
+    await TH.eventually(() => bank.rootBox.revtok === root.revtok)
+    expect(bank.rootBox).to.deep.equal(root)
     expect(bank.track[Labelpath.RootBox]).to.deep.equal({ revseq: root.revseq, lifepath: root.lifepath })
   })
 
@@ -753,7 +754,7 @@ describe("bank.track, and the asks the bank builds", () => {
     const record = nextBankThingOf(bank)
     const ask = { ...bank.makePutAsk({ cited: bank.pickle(), record }), labelpath: 'bank', modelkind: 'bank' } as const
     await TH.expectGood(device.vaultDB.tryWriteThing(ask))
-    expect(device.bankMinder.worldAt(bank.scope)?.bank).to.deep.equal(record)
+    expect(device.bankMinder.worldAt()?.bank).to.deep.equal(record)
     expect(bank.track.bank).to.deep.equal({ revseq: 1, lifepath: record.lifepath })
   })
 
@@ -770,13 +771,13 @@ describe("the bank's world, beside the bank's own writes", () => {
   it("has the bank's Thing that bank.put wrote once it resolves", async () => {
     const { bank, device } = await TH.buildBornBank()
     const written = await bank.put({ cited: bank.pickle(), record: nextBankThingOf(bank) })
-    expect(device.bankMinder.worldAt(bank.scope)?.bank).to.deep.equal(written)
+    expect(device.bankMinder.worldAt()?.bank).to.deep.equal(written)
   })
 
   it("has the main gate a gate verb wrote once the verb resolves", async () => {
     const { bank, device } = await TH.buildBornBank()
     const after = await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'another horse battery staple' })
-    expect(device.bankMinder.worldAt(bank.scope)?.gate).to.deep.equal(after.pickle())
+    expect(device.bankMinder.worldAt()?.gate).to.deep.equal(after.pickle())
   })
 })
 

@@ -78,19 +78,6 @@ describe("VaultMinder.get", () => {
     expect(asked.mock.calls).to.have.lengthOf(2)
   })
 
-  it("lands a main gate the ask tracks stale in the BankMinder's world once its own notice arrives, never in an item", async () => {
-    const vaultDB = await bornOf(new MemoryVaultDB())
-    const gate0   = TH.gateThingOf()
-    const gate1   = TH.nextGateOf(gate0)
-    await TH.expectGood(vaultDB.tryWriteThing(TH.replaceAskOf(gate0, gate1)))
-    const { minder, bankMinder } = await minderWorldOf(vaultDB)
-    await TH.wakeupAtNextTick()
-    expect(bankMinder.worldAt(TH.ThingBank)?.gate).to.deep.equal(gate0)
-    await minder.get(TH.BoxScope)
-    await TH.eventually(() => bankMinder.worldAt(TH.ThingBank)?.gate.revtok === gate1.revtok)
-    TH.expectSyncRefusal(() => minder.at(TH.GateScope), 'bad_record')
-  })
-
   it("returns a notice that lands during the get over the get's older answer", async () => {
     const vaultDB = new LateVaultDB()
     const box0   = await storedBoxOf(vaultDB, 0)

@@ -150,22 +150,22 @@ export const BankRootsMissing = "A bank is stored without its main gate or its r
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: MinderFriendExpected, BankMinderExpected, BoxesOnly, WorldNotHeard, MinderClientExpected, BankMindedInClient, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, NotARecord, RecordsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
+// == [Minding]: MinderFriendExpected, BankMinderExpected, NotMinded, WorldNotHeard, MinderClientExpected, BankMindedInClient, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, NotARecord, RecordsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
 
 /** A minder made without a friend: a device or a bank. */
-export const MinderFriendExpected = 'A VaultMinder is made with its friend: the device or bank whose boxes it minds.'
+export const MinderFriendExpected = 'A minder is made with its friend: the device or bank whose Things it minds.'
 
-/** A VaultMinder made without the BankMinder its bank's roots land in. */
-export const BankMinderExpected = 'A VaultMinder is made with the BankMinder that minds the world of its bank: its bank, main gate and root box.'
+/** A VaultMinder made without the BankMinder it reads its bank's root box from. */
+export const BankMinderExpected = 'A VaultMinder is made with the BankMinder of its bank, which minds the bank, its main gate and its root box.'
 
-/** A VaultMinder asked for an item of the bank, its main gate or its root box. */
-export const BoxesOnly = "A VaultMinder minds the boxes under the root box, and the root box's listing: read the bank, its main gate and its root box from the BankMinder's world."
+/** A minder asked for an item or a listing it does not mind. */
+export const NotMinded = "A VaultMinder minds the boxes under the root box, and their listings and the root box's; a BankMinder minds the bank, its main gate and its root box."
 
 /** A Bank made of a bank whose world its device's BankMinder does not hold. */
 export const WorldNotHeard = "A Bank is made of the bank whose world its device's BankMinder holds: bring the device up, or birth the bank, first."
 
 /** A minder made with a QueryClient that VaultMinder.makeClient did not make. */
-export const MinderClientExpected = 'A VaultMinder caches only in a QueryClient made by VaultMinder.makeClient, whose cache hands each fetched record to its minder.'
+export const MinderClientExpected = 'A minder caches only in a QueryClient made by makeClient, on VaultMinder or BankMinder, whose cache hands each fetched record to its minder.'
 
 /** A minder's hello while another minder of its bank is minding in the same QueryClient. */
 export const BankMindedInClient = "Another VaultMinder of this bank is minding in this QueryClient: call its goodbye before this one's hello."

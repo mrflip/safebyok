@@ -50,13 +50,13 @@ describe("VaultMinder.at", () => {
     })
   }
 
-  it("has the item of a box, leaving the bank, main gate and root box to the BankMinder", async () => {
+  it("has the item of a box, and refuses an item of the bank, main gate or root box", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
-    const { minder, bankMinder } = await minderWorldOf(vaultDB)
+    const { minder } = await minderWorldOf(vaultDB)
     await minder.get(TH.BoxScope)
     expect(minder.at(TH.BoxScope)).to.deep.equal(box)
-    expect(bankMinder.worldAt(TH.ThingBank)).to.deep.equal({ bank: TH.bankThingOf(), gate: TH.gateThingOf(), root: TH.rootBoxOf() })
+    for (const labelpath of ['bank', 'gate', 'box']) { TH.expectSyncRefusal(() => minder.at({ ...TH.ThingBank, labelpath }), 'bad_record') }
   })
 
   it("types the record by the labelpath's kind, where it is known when compiled", async () => {

@@ -99,18 +99,16 @@ async function refusedGetWorldOf() {
   return { minder, vaultDB, box1 }
 }
 
-/** A minder and its BankMinder, after the watch has notified the main gate a second time; the minder, the BankMinder, the gate its world had before, and a listener on the minder. */
+/** A minder after the watch has notified the main gate a second time, and a listener on it from before the second. */
 async function renotifiedWorldOf() {
   const vaultDB = await bornOf(new MemoryVaultDB())
-  const { minder, bankMinder } = await minderWorldOf(vaultDB)
+  const { minder } = await minderWorldOf(vaultDB)
   const staleGet = { ...TH.getAskAt('box'), track: TH.GateStaleTrack }
   await TH.expectGood(vaultDB.tryGetThing(staleGet))
-  const gate = bankMinder.worldAt(TH.ThingBank)?.gate
-  expect(gate).to.deep.equal(TH.gateThingOf())
   const listener = listenerOf()
   minder.listen(listener, MinderEventFormat)
   await TH.expectGood(vaultDB.tryGetThing(staleGet))
-  return { minder, bankMinder, gate, listener }
+  return { minder, listener }
 }
 
 describe("VaultMinder's watch", () => {
@@ -122,20 +120,14 @@ describe("VaultMinder's watch", () => {
     expect(minder.at(TH.BoxScope)).to.deep.equal(box)
   })
 
-  it("caches the box a notice carries, and gives the BankMinder the main gate", async () => {
+  it("caches the box a notice carries, and drops the main gate one carries", async () => {
     const { minder, bankMinder, receive } = await minderWorldOf(new MemoryVaultDB())
     const [gate, box] = [TH.nextGateOf(TH.gateThingOf()), TH.boxThingOf()]
     receive(noticeOf(box))
     expect(minder.at(TH.BoxScope)).to.deep.equal(box)
-    expect(bankMinder.worldAt(TH.ThingBank)?.gate).to.deep.equal(TH.gateThingOf())
     receive(noticeOf(gate))
-    expect(bankMinder.worldAt(TH.ThingBank)?.gate).to.deep.equal(gate)
+    expect(bankMinder.worldAt()?.gate).to.deep.equal(TH.gateThingOf())
     TH.expectSyncRefusal(() => minder.at(TH.GateScope), 'bad_record')
-  })
-
-  it("still has the main gate's record in the BankMinder when the watch notifies it again", async () => {
-    const { bankMinder, gate } = await renotifiedWorldOf()
-    expect(bankMinder.worldAt(TH.ThingBank)?.gate).to.eq(gate)
   })
 
   it("tells a listener nothing when the watch notifies the main gate", async () => {

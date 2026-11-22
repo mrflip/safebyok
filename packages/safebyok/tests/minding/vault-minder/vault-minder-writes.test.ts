@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { VaultMinder } from '../../../src/minding/vault-minder'
-import { BankMinder } from '../../../src/minding/bank-minder'
 import { type BoxRecord, Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import { MinderEventFormat } from '../../../src/shapes/shapes-minder'
@@ -19,24 +18,13 @@ describe("VaultMinder.tryWrite", () => {
     expect(minder.at(TH.BoxScope)).to.deep.equal(TH.boxThingOf())
   })
 
-  it("leaves the bank, the main gate and a tracked root box the answer reports stored to the watch", async () => {
+  it("gives no other minder the bank, the main gate or a tracked root box the answer reports stored", async () => {
     const vaultDB = await bornOf(new QuietVaultDB())
     const { minder, bankMinder } = await minderWorldOf(vaultDB, { isWorldHeard: false })
     const answer = await minder.tryWrite({ ...boxBirthAskOf(), track: TH.RootStaleTrack })
     expect(answer.world).to.not.be.null
     expect(Object.values(answer.tracked ?? {})).to.deep.include(TH.rootBoxOf())
-    expect(bankMinder.worldAt(TH.ThingBank)).to.be.undefined
-  })
-
-  it("gives the BankMinder a tracked main gate the answer reports stored, from the vaultDB's watch alone", async () => {
-    const vaultDB = await bornOf(new MemoryVaultDB())
-    const gate0   = TH.gateThingOf()
-    const gate1   = TH.nextGateOf(gate0)
-    await TH.expectGood(vaultDB.tryWriteThing(TH.replaceAskOf(gate0, gate1)))
-    const { minder, bankMinder } = await minderWorldOf(vaultDB)
-    await minder.tryWrite({ ...boxBirthAskOf(), track: TH.GateStaleTrack })
-    await TH.eventually(() => bankMinder.worldAt(TH.ThingBank)?.gate.revtok === gate1.revtok)
-    expect(bankMinder.worldAt(TH.ThingBank)?.gate).to.deep.equal(gate1)
+    expect(bankMinder.worldAt()).to.be.undefined
   })
 
   it("has cached the record a stale_write reports stored before the write answers", async () => {
@@ -148,9 +136,7 @@ describe("VaultMinder.tryWrite", () => {
 
   it("writes a box the bank sealed, then the tombstone it sealed, through the put and del asks the bank makes", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const bankMinder = BankMinder.make()
-    await bankMinder.fetchWorld(device.vaultDB, bank.scope)
-    const minder = VaultMinder.make({ vaultDB: device.vaultDB, bankMinder }, bank)
+    const minder = VaultMinder.make({ vaultDB: device.vaultDB, bankMinder: device.bankMinder }, bank)
     minder.hello()
     const shell  = Shell.of({ ...bank.scope, labelpath: TH.BoxScope.labelpath }, bank.rootBox)
     const box    = await bank.sealBox(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })

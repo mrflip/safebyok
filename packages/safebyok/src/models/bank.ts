@@ -76,7 +76,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   // A bank of a life replaced since reads the world of the life that replaced it: its boxes refuse as of another root box.
   /** The world of this bank in the device's BankMinder. */
   get #world(): BankRoots {
-    const world = this.#device.bankMinder.worldAt(this.scope)
+    const world = this.#device.bankMinder.worldAt()
     if (world === undefined) { throw Throwers.worldNotHeard() }
     return world
   }
@@ -102,7 +102,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     const { record: bankRecord, opts: { device, vaultDB, gate } } = Checks.bankMakeArgs.parse({ record, opts })
     Validator.checkedConsistent(StampChecks.bankScope.parse(bankRecord), device.scope, { kind: 'record_conflict' })
     Validator.checkedConsistent(gate.bankStamp, BankChecks.stamp.parse(bankRecord), { kind: 'record_conflict' })
-    const world = device.bankMinder.worldAt(device.scope)
+    const world = device.bankMinder.worldAt()
     if (world === undefined) { throw Throwers.worldNotHeard() }
     Validator.checkedConsistent(BankChecks.stamp.parse(world.bank), BankChecks.stamp.parse(bankRecord), { kind: 'record_conflict' })
     BoxChecks.live.parse(world.root)
@@ -166,7 +166,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** Write `ask.record`, this bank's next revision, over `ask.cited`. Resolves the bank's Thing the store reports writing, and its world shows it. This Bank object is not updated. */
   async put(ask: PutAskDraft<BankRecord>): Promise<BankRecord> {
     this.demandEnabled()
-    const answer = await this.#device.bankMinder.tryWrite(this.#vaultDB, { ...this.makePutAsk(ask), labelpath: 'bank', modelkind: 'bank' })
+    const answer = await this.#device.bankMinder.tryWrite({ ...this.makePutAsk(ask), labelpath: 'bank', modelkind: 'bank' })
     if (! answer.ok) { throw answer.err }
     // The ask's modelkind is the bank's, which the vaultDB checks what it answers against.
     return answer.val as BankRecord

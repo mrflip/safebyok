@@ -1,215 +1,113 @@
-/** `BankMinder`, which minds the world of each bank this device hears of in a TanStack Query cache of its own. */
+/** `BankMinder`, which minds one bank's roots, the bank, its main gate and its root box, in a TanStack Query cache, its own or one it shares with minders of other banks. */
 
-import * as TSQ from '@tanstack/query-core'
-import { deepFreeze } from 'es-toolkit'
-import { ReportError, Validator } from 'safebyok-big/internals'
+import { Validator } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
-import { type BankRecord, type BoxRecord, type GateRecord, ThingChecks } from '../shapes/shapes-thing'
-import { type BankScope, type BankStamp, StampChecks } from '../shapes/shapes-stamps'
-import { type BankRoots, type BirthBankAsk, type WorldRecord, type WriteAsk, getAskOf } from '../shapes/shapes-asks'
-import { type DeliverableThing, FixedQueryCacheOpts } from '../shapes/shapes-minder'
-import type { BirthBankAnswer, VaultDB, WriteThingAnswer } from '../storage/vault-db'
+import { type BankRecord, type BoxRecord, type GateRecord, type ThingScope, type VoidSentinel, Shell } from '../shapes/shapes-thing'
+import type { BankRoots, BirthBankAsk } from '../shapes/shapes-asks'
+import { type MinderEvent, type MinderFriend, type MinderOpts, MinderChecks, MinderEventFormat } from '../shapes/shapes-minder'
+import type { BirthBankAnswer } from '../storage/vault-db'
 import { Thing } from '../models/thing'
-import { bankKeyHeadOf } from './minder-keys'
-import { newerThingOf } from './newer-thing'
+import { type CheckedMinderOpts, Minder, MinderOptsChecks } from './minder'
 import * as Throwers from '../refusals/throwers'
 
-/** This device's cache of the world of each bank it hears of, for any number of users: the bank, its main gate and its root box.
- * A bank's world is landed from the vaultDB's answers and notices, never fetched by its key, and found by the bank's scope.
- * It needs no user to exist, and nothing in it ends with a VaultMinder's `goodbye`.
- *
- * ## Invariants
- * - A bank has one world cached at most: the world of the life last landed whole. A world of another life replaces it
- *   whole, and a late answer from an earlier life lands as such a world.
- * - A world is first cached whole, its three roots read in one step: the answer to {@link fetchWorld} or a birth, or a
- *   notice of the root box with its bank's world.
- * - Within a life, each root never goes back: a record lands only where it is newer than the one cached. A record of a
- *   life with no world cached lands nowhere, and neither does a sparse record.
- * - It caches only what the vaultDB answered or notified, and asks the vaultDB nothing but in {@link fetchWorld} and the
- *   writes made through it.
+/** This device's cache of one bank's roots: the bank, its main gate and its root box, each an item ({@link Minder}).
+ * Its world, read from those three items, is the one place the bank's roots are read from.
  */
-export class BankMinder {
-  // == [Props]: #tsq
+export class BankMinder extends Minder {
+  // == [Construction]: make, constructor
 
-  readonly #tsq: TSQ.QueryClient
-  // --
+  /** Make a minder of `bank`'s roots. It does nothing until `hello`. */
+  static make(opts: MinderOpts, bank: MinderFriend): BankMinder {
+    const checked = Checks.bankMinderMakeArgs.parse({ opts, bank })
+    return new BankMinder(checked.opts, checked.bank)
+  }
 
-  // == [Construction]: make, constructor, #makeTSQ
-
-  /** Make a minder of banks' worlds, its cache empty. */
-  static make(): BankMinder { return new BankMinder() }
-
-  private constructor() {
-    this.#tsq = this.#makeTSQ()
+  private constructor(opts: CheckedMinderOpts, bank: MinderFriend) {
+    super(opts, bank)
     Object.freeze(this)
   }
-
-  // A world is never fetched by its key, so it never goes stale; under skipToken TanStack never fetches it.
-  /** The QueryClient whose cache has the worlds, its query defaults set. */
-  #makeTSQ(): TSQ.QueryClient {
-    const tsq = new TSQ.QueryClient()
-    tsq.setQueryDefaults([KeyHead], { ...FixedQueryCacheOpts, staleTime: Infinity, queryFn: TSQ.skipToken, structuralSharing: newerRootsOf })
-    return tsq
-  }
   // --
 
-  // == [Reading]: worldAt, fetchWorld, subscribe
+  // == [What it minds]: mindsItemAt, mindsListingAt, rootBox
 
-  /** The world of `scoped`'s bank as last heard of, or undefined for none. Never asks the vaultDB. */
-  worldAt(scoped: BankScope): BankRoots | undefined {
-    const [entry] = this.#tsq.getQueriesData<BankRoots>({ queryKey: worldKeyHeadOf(Checks.bankScope.parse(scoped)) })
-    return entry?.[1]
+  /** True for the bank, its main gate and its root box. */
+  protected mindsItemAt(labelpath: Labelpath): boolean { return RootLabelpaths.has(labelpath) }
+
+  /** False: the root box's listing is its VaultMinder's. */
+  protected mindsListingAt(): boolean { return false }
+
+  /** The bank's root box, the parent of every box, as last heard of: its shell while none is. */
+  get rootBox(): BoxRecord | VoidSentinel { return (this.at(this.#scopeAt(Labelpath.RootBox)) ?? Shell.of(this.#scopeAt(Labelpath.RootBox))) as BoxRecord | VoidSentinel }
+  // --
+
+  // == [The world]: worldAt, fetchWorld, subscribe
+
+  // Each call makes a new object of the items' own records, which stay the same until one lands.
+  /** The bank's roots as last heard of, or undefined while any of the three is not cached, or is a shell. Never asks the vaultDB. */
+  worldAt(): BankRoots | undefined {
+    const bank = this.at(this.#scopeAt('bank'))
+    const gate = this.at(this.#scopeAt(Labelpath.MainGate))
+    const root = this.at(this.#scopeAt(Labelpath.RootBox))
+    if ([bank, gate, root].some((record) => (record === undefined) || Thing.isVoidSentinel(record))) { return undefined }
+    return Object.freeze({ bank: bank as BankRecord, gate: gate as GateRecord, root: root as BoxRecord })
   }
 
-  /** Fetch the world of `scoped`'s bank from `vaultDB`, and cache it: the bank's three roots, or null where none is stored.
+  /** Get the root box from the vaultDB, whose answer's world brings the bank and main gate, and answer the bank's roots, or null where none is stored.
    * Refuses where a root is stored without the others, or damaged beside them.
    */
-  async fetchWorld(vaultDB: VaultDB, scoped: BankScope): Promise<BankRoots | null> {
-    const { vaultDB: checkedVaultDB, scope } = Checks.fetchWorldArgs.parse({ vaultDB, scope: scoped })
-    // A get of the root box answers it, and the bank and main gate as its world, all three read in one step.
-    const answer = await checkedVaultDB.tryGetThing(getAskOf({ ...scope, labelpath: Labelpath.RootBox, ifAbsent: 'nil' }))
-    if (! answer.ok) { throw answer.err }
-    if ((answer.world === null) && (answer.act === 'gotvoid')) { return null }
-    if ((answer.world === null) || (answer.act === 'gotvoid')) { throw Throwers.bankRootsMissing() }
-    this.#landWorld(answer.world, answer.val as BoxRecord)
-    return this.worldAt(scope) ?? null
+  async fetchWorld(): Promise<BankRoots | null> {
+    const root  = await this.get(this.#scopeAt(Labelpath.RootBox), { staleTime: 0 })
+    const world = this.worldAt()
+    if (world !== undefined) { return world }
+    const isNoneStored = Thing.isVoidSentinel(root) && (this.at(this.#scopeAt('bank')) === undefined) && (this.at(this.#scopeAt(Labelpath.MainGate)) === undefined)
+    if (isNoneStored) { return null }
+    throw Throwers.bankRootsMissing()
   }
 
-  /** Call `listener` each time a record lands in a world or a world is removed, and return the function that stops it.
-   * A landing that changes nothing calls it too. It is called with no argument: read the world again. What it throws is reported to the platform.
+  /** Call `listener` each time a record lands in one of the bank's roots, and return the function that stops it.
+   * A landing that changes nothing calls it too. It is called with no argument: read {@link worldAt} again. What it throws goes to the bank's `tellBadNews`.
    */
   subscribe(listener: () => void): () => void {
     Checks.listener.parse(listener)
-    return this.#tsq.getQueryCache().subscribe((tsqEvent) => {
-      if (! isWorldChange(tsqEvent)) { return }
-      try {
-        listener()
-      } catch (err) {
-        ReportError.reportToPlatform(err)
-      }
-    })
+    return this.listen((event) => { if (isRootLanding(event)) { listener() } }, MinderEventFormat)
   }
   // --
 
-  // == [Writing]: tryWrite, tryBirthBank
+  // == [Writing]: tryBirthBank
 
-  /** Write `ask` through `vaultDB`, and return its answer, a refusal included.
-   * The world the answer reports is cached before it answers, so a write of the bank or its main gate shows there at once.
+  /** Birth the bank through the vaultDB, and return its answer, a refusal included.
+   * The three roots it answers, written or found stored, are cached before it answers, while minding.
    */
-  async tryWrite(vaultDB: VaultDB, ask: WriteAsk): Promise<WriteThingAnswer> {
-    const answer = await Checks.vaultDB.parse(vaultDB).tryWriteThing(ask)
-    if (answer.world !== null) { this.#landWorld(answer.world) }
-    if (answer.ok) { this.sendToTSQ(answer.val) }
-    return answer
-  }
-
-  /** Birth a bank through `vaultDB`, and return its answer, a refusal included.
-   * The three roots it answers, written or found stored, are cached before it answers as the bank's world.
-   */
-  async tryBirthBank(vaultDB: VaultDB, ask: BirthBankAsk): Promise<BirthBankAnswer> {
-    const answer = await Checks.vaultDB.parse(vaultDB).tryBirthBank(ask)
-    if (answer.ok) { this.#landWorld({ ...answer.val.bank, maingate: answer.val.gate }, answer.val.root) }
-    return answer
-  }
-  // --
-
-  // == [Landing]: sendToTSQ, #landWorld, #landRoot
-
-  /** Cache `record` in the world of its bank, where it is the bank, its main gate or its root box, whole, and newer than the one cached.
-   * A record of a life with no world cached lands nowhere: a new life's world lands whole.
-   */
-  sendToTSQ(record: DeliverableThing): void {
-    Checks.record.parse(record)
-    if (Thing.isSparse(record) || Thing.isVoidSentinel(record)) { return }
-    if (record.labelpath === 'bank') {
-      const worldKey = worldQueryKeyOf(record as BankRecord)
-      const prior    = this.#tsq.getQueryData<BankRoots>(worldKey)
-      if (prior !== undefined) { this.#tsq.setQueryData<BankRoots>(worldKey, { ...prior, bank: deepFreeze(record as BankRecord) }) }
-      return
+  async tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer> {
+    const answer = await this.vaultDB.tryBirthBank(ask)
+    if (answer.ok) {
+      for (const record of [answer.val.bank, answer.val.gate, answer.val.root]) { this.sendToTSQ(record) }
     }
-    if (record.labelpath === Labelpath.MainGate) { this.#landRoot(record, { gate: record as GateRecord }) }
-    if (record.labelpath === Labelpath.RootBox)  { this.#landRoot(record, { root: record as BoxRecord }) }
-  }
-
-  // A world of another life replaces every world of its bank: nothing compares the two lives. A world of the life cached
-  // lands root by root, each through newerRootsOf, so none goes back.
-  /** Cache `world`, and `root` where in hand, as the world of its bank's life. A world of a life not cached lands only with its root box. */
-  #landWorld(world: WorldRecord, root?: BoxRecord): void {
-    const { maingate, ...bank } = world
-    const worldKey = worldQueryKeyOf(bank)
-    const prior    = this.#tsq.getQueryData<BankRoots>(worldKey)
-    const landedRoot = root ?? prior?.root
-    if (landedRoot === undefined) { return }
-    if (prior === undefined) { this.#tsq.removeQueries({ queryKey: worldKeyHeadOf(bank) }) }
-    this.#tsq.setQueryData<BankRoots>(worldKey, deepFreeze({ bank, gate: maingate, root: landedRoot }))
-  }
-
-  // A main gate's or root box's record names no life of its bank, so it lands in the world found by the bank's scope.
-  /** Cache `roots`, the main gate or the root box `record` is, in the world of `record`'s bank, where one is cached. */
-  #landRoot(record: DeliverableThing, roots: Partial<BankRoots>): void {
-    const [entry] = this.#tsq.getQueriesData<BankRoots>({ queryKey: worldKeyHeadOf(record) })
-    if (entry?.[1] === undefined) { return }
-    this.#tsq.setQueryData<BankRoots>(entry[0], { ...entry[1], ...deepFreeze(roots) })
+    return answer
   }
   // --
 
-  // == [Keys]: worldQueryKeyOf
-
-  // A key is the bank's three segments, 'world', then the bank's lifeseq and lifetok: one key for each life of the bank,
-  // which its birth and its delete each change. Its head without the life finds the world of the bank, whatever its life.
-  /** The query key a BankMinder caches the world of `bank`'s life under. */
-  static worldQueryKeyOf(bank: BankStamp): TSQ.QueryKey {
-    return worldQueryKeyOf(Checks.bankStamp.parse(bank))
-  }
-  // --
+  /** The scope of the Thing at `labelpath` in this bank. */
+  #scopeAt(labelpath: Labelpath): ThingScope { return { ...this.scope, labelpath } }
 }
 
-// == [Helpers]: KeyHead, Worldkind, worldKeyHeadOf, worldQueryKeyOf, newerRootsOf, isWorldChange
+// == [Helpers]: RootLabelpaths, isRootLanding
 
-/** The segment every query key a minder makes starts with. */
-const KeyHead = 'sok'
+/** The labelpaths of a bank's roots: the bank, its main gate and its root box. */
+const RootLabelpaths: ReadonlySet<Labelpath> = new Set(['bank', Labelpath.MainGate, Labelpath.RootBox])
 
-/** The entrykind segment of a world's query key. */
-const Worldkind = 'world'
-
-/** The part of a world's query key that every life of `scope`'s bank has in common. */
-function worldKeyHeadOf(scope: BankScope): TSQ.QueryKey { return [...bankKeyHeadOf(scope), Worldkind] }
-
-/** The query key the world of `bank`'s life is cached under. */
-function worldQueryKeyOf(bank: Pick<BankStamp, 'userid' | 'banklabel' | 'lifeseq' | 'lifetok'>): TSQ.QueryKey {
-  return [...worldKeyHeadOf(bank), bank.lifeseq, bank.lifetok]
-}
-
-/** TanStack's structural sharing for a world: the newer of each root in `prior` and `next`, frozen; `prior` itself where `next` brings none newer. */
-const newerRootsOf = (prior: unknown, next: unknown): unknown => {
-  const nextRoots = next as BankRoots
-  if (prior === undefined) { return nextRoots }
-  const priorRoots = prior as BankRoots
-  const landed = {
-    bank: newerThingOf(priorRoots.bank, nextRoots.bank) as BankRecord,
-    gate: newerThingOf(priorRoots.gate, nextRoots.gate) as GateRecord,
-    root: newerThingOf(priorRoots.root, nextRoots.root) as BoxRecord,
-  }
-  const isPrior = (landed.bank === priorRoots.bank) && (landed.gate === priorRoots.gate) && (landed.root === priorRoots.root)
-  return isPrior ? priorRoots : Object.freeze(landed)
-}
-
-/** True for a cache event that changes what a world holds: a record landing, or a world removed. */
-function isWorldChange(tsqEvent: TSQ.QueryCacheNotifyEvent): boolean {
-  return (tsqEvent.type === 'removed') || ((tsqEvent.type === 'updated') && (tsqEvent.action.type === 'success'))
+/** True for an event of a record landing in an item, or of an item removed. */
+function isRootLanding(event: MinderEvent): boolean {
+  if (event.eventkind !== 'item') { return false }
+  return (event.type === 'removed') || ((event.type === 'updated') && (event.action?.type === 'success'))
 }
 // --
 
 // == [Checks]: Checks
 
 /** The checks of a BankMinder's arguments. */
-const Checks = Validator.Checkers('bad_record', ({ obj, fn, custom }) => ({
-  bankScope:      StampChecks.bankScope,
-  bankStamp:      StampChecks.bankStamp,
-  vaultDB:        ThingChecks.vaultDBShape,
-  fetchWorldArgs: obj({ vaultDB: ThingChecks.vaultDBShape, scope: StampChecks.bankScope }),
-  listener:       fn<() => void>(),
-  // A record passes through as it is, so that the record cached is the one given.
-  record:         custom<DeliverableThing>((val) => ThingChecks.scopedCited.safeParse(val).success),
+const Checks = Validator.Checkers('bad_record', ({ obj, fn }) => ({
+  bankMinderMakeArgs: obj({ opts: MinderOptsChecks.minderOpts, bank: MinderChecks.minderFriend }),
+  listener:           fn<() => void>(),
 }))
 // --

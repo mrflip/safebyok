@@ -112,10 +112,10 @@ export function bankRootsMissing(): Errors.VaultError { return new Errors.VaultE
 export function answerNotMade(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerNotMade) }
 // --
 
-// == [Minding Throwers]: boxesOnly, worldNotHeard, minderNotStarted, bankMindedInClient, staleRead, childrenStoredDamaged, recordsOfOtherThings
+// == [Minding Throwers]: notMinded, worldNotHeard, minderNotStarted, bankMindedInClient, staleRead, childrenStoredDamaged, recordsOfOtherThings
 
-/** The refusal of a VaultMinder's item of anything but a box under the root box. */
-export function boxesOnly(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.BoxesOnly) }
+/** The refusal of a minder's item or listing of a Thing it does not mind. */
+export function notMinded(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.NotMinded) }
 
 /** The refusal of a Bank whose world its device's BankMinder does not hold, of the bank's life. */
 export function worldNotHeard(): Errors.VaultError { return new Errors.VaultError('record_conflict', Phrases.WorldNotHeard) }

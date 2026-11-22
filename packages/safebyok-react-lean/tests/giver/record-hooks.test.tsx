@@ -246,7 +246,7 @@ describe("useBoxList over the minder's own listing", () => {
 
   it("shows a list refused as its error", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
-    world.vaultDB.tryListThings = () => Promise.resolve({ ok: false, err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') } as never)
+    world.vaultDB.tryListThings = () => Promise.resolve({ ok: false, world: null, err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') } as never)
     function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
     const { result } = renderHook(() => world.Bank.useBoxList(), { wrapper: Wrapper })
     await waitFor(() => { expect(result.current.isError).to.eq(true) })

@@ -82,14 +82,15 @@ export class DownVaultDB extends MemoryVaultDB {
 /** A day, in milliseconds: far past the five minutes after which TanStack Query collects a query by default. */
 export const Hours24 = 24 * 60 * 60 * 1000
 
-/** A BankMinder that has the world of `TH.ThingBank`, its roots at revision 0, unless `isWorldHeard` is false. Its birth is in a vaultDB of its own. */
+/** A BankMinder of `TH.ThingBank`, minding, with its roots at revision 0 unless `isWorldHeard` is false. Its birth is in a vaultDB of its own. */
 export async function bankMinderOf({ isWorldHeard = true } = {}): Promise<BankMinder> {
-  const bankMinder = BankMinder.make()
-  if (isWorldHeard) { await TH.expectGood(bankMinder.tryBirthBank(new MemoryVaultDB(), TH.birthBankAskOf())) }
+  const bankMinder = BankMinder.make({ vaultDB: new MemoryVaultDB() }, fakeBankOf())
+  bankMinder.hello()
+  if (isWorldHeard) { await TH.expectGood(bankMinder.tryBirthBank(TH.birthBankAskOf())) }
   return bankMinder
 }
 
-/** A minder of `bank` over `vaultDB`, landing the bank's roots in `bankMinder`, one that has the bank's world by default. */
+/** A minder of `bank` over `vaultDB`, reading the root box from `bankMinder`, one that has the bank's roots by default. */
 export async function minderOf(vaultDB: MemoryVaultDB, queryCacheOpts: Partial<QueryCacheOpts> = {}, bank: MinderFriend = fakeBankOf(), bankMinder?: BankMinder): Promise<VaultMinder> {
   return VaultMinder.make({ vaultDB, bankMinder: bankMinder ?? await bankMinderOf(), queryCacheOpts }, bank)
 }

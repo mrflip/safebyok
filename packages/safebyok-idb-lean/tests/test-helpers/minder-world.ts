@@ -32,12 +32,13 @@ export interface BridgedWorld {
  * - `isBadNewsHeard` -- the bridge is made with the `onBadNews` spy (default: true)
  */
 export async function bridgedWorldOf({ isStarted = true, isBadNewsHeard = true } = {}): Promise<BridgedWorld> {
-  const vaultDB = new MemoryVaultDB()
-  const bankMinder = BankMinder.make()
-  await expectGood(bankMinder.tryBirthBank(vaultDB, birthBankAskOf()))
+  const vaultDB    = new MemoryVaultDB()
+  const bank       = fakeBankOf()
+  const bankMinder = BankMinder.make({ vaultDB }, bank)
+  bankMinder.hello()
+  await expectGood(bankMinder.tryBirthBank(birthBankAskOf()))
   const boxAsk = birthAskOf(boxThingOf(), Shell.of(BoxScope, rootBoxOf()))
   await expectGood(vaultDB.tryWriteThing(boxAsk))
-  const bank       = fakeBankOf()
   const minder     = VaultMinder.make({ vaultDB, bankMinder }, bank)
   const idbVaultDB = makeIdbVaultDB()
   const onBadNews  = vi.fn<(news: VaultError) => void>()

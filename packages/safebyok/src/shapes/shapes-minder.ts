@@ -1,10 +1,9 @@
-/** The shapes of a VaultMinder's arguments, options and answers, and of the records its items have, with their checks; and the options both minders pin. */
+/** The shapes of a minder's arguments, options and answers, and of the records its items have, with their checks; and the options every minder pins. */
 
 import * as TSQ from '@tanstack/query-core'
 import type * as Z from 'zod'
 import { type Errors, Validator } from 'safebyok-big/internals'
 import type { BankMinder } from '../minding/bank-minder'
-import type { VaultMinder } from '../minding/vault-minder'
 import type { Bank } from '../models/bank'
 import type { RecordOfKind } from '../models/base-thing'
 import * as Phrases from '../phrases'
@@ -83,7 +82,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
   return { queryCacheOpts, queryCacheOptsOrDefault, tsqStaleTime, minderFriend, minderListener, feedVersion, minderLabelpath, minderTryAtOpts, minderGetOpts, minderInvalidateOpts }
 })
 
-/** The checks of a VaultMinder's arguments and options.
+/** The checks of a minder's arguments and options.
  * Also `DefaultQueryCacheOpts` and `MaxTimerMillis`, the bounds of the cache options a host may choose.
  */
 export const MinderChecks = Object.freeze({ ...RawChecks, DefaultQueryCacheOpts, MaxTimerMillis })
@@ -275,17 +274,21 @@ export type ListingEvent = MinderEventOf<readonly Labelpath[], 'list'> & Readonl
 }>
 // --
 
-// == [A minder's making]: MinderOpts
+// == [A minder's making]: MinderOpts, VaultMinderOpts
 
-/** Options for {@link VaultMinder.make}. */
+/** Options for `BankMinder.make`, and the options every minder is made with. */
 export interface MinderOpts {
   /** Where the bank's Things are stored. */
   vaultDB:         VaultDB
-  /** The minder of the bank's world: what the watch tells of the bank, its main gate and its root box lands there. */
-  bankMinder:      BankMinder
   /** The cache's timings ({@link QueryCacheOpts}). A field left out defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?: Partial<QueryCacheOpts>
-  /** The client to cache in, made by `VaultMinder.makeClient`, which minders of other banks may share. Default: a client of its own. */
+  /** The client to cache in, made by `makeClient`, which minders of other banks may share. Default: a client of its own. */
   queryClient?:    TSQ.QueryClient | undefined
+}
+
+/** Options for `VaultMinder.make`. */
+export interface VaultMinderOpts extends MinderOpts {
+  /** The minder of the bank's roots, which the root box is read from. */
+  bankMinder:      BankMinder
 }
 // --

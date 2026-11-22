@@ -46,7 +46,7 @@ export class Device implements MinderFriend {
 
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
-  /** The minder of the world of this device's bank: the bank, its main gate and its root box. */
+  /** The minder of this device's bank's roots: the bank, its main gate and its root box. */
   readonly #bankMinder: BankMinder
   /** The minder of this device's bank's boxes, which this device is the friend of. */
   readonly #minder: VaultMinder
@@ -86,7 +86,7 @@ export class Device implements MinderFriend {
   /** The autolock duration in minutes, past which a lease no longer unlocks the bank. */
   get autolockMinutes(): number { return this.leaseMillis / Consts.MinuteMillis }
 
-  /** The minder of the world of this device's bank: its bank, main gate and root box, as last heard of. */
+  /** The minder of this device's bank's roots: its bank, main gate and root box, as last heard of. It says `hello` with the device. */
   get bankMinder(): BankMinder { return this.#bankMinder }
 
   /** The minder of this device's bank's boxes: it says `hello` with the device. */
@@ -125,7 +125,8 @@ export class Device implements MinderFriend {
     this.logger = Logger.parseLogger(logger)
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.#onBadNews = onBadNews
-    this.#bankMinder = BankMinder.make()
+    // The BankMinder caches in a client of its own: the main gate's wrapped bankKeys stay out of the client a host observes.
+    this.#bankMinder = BankMinder.make({ vaultDB }, this)
     this.#minder = VaultMinder.make({ vaultDB, bankMinder: this.#bankMinder, queryCacheOpts, queryClient }, this)
     this.#snapshot = this.#makeSnapshot()
     if (Deriver.isTestDeriver(keyDeriver)) { this.logger.warn(PhrasesX.TestDeriverNotice, { oplabel: 'Device.make' }) }
@@ -143,7 +144,7 @@ export class Device implements MinderFriend {
 
   // == [Starting]: hello, birthGating, #bringUp, #attachBank
 
-  /** Start the minder, fetch the bank's world, and bring up the bank from it: resolves once the snapshot shows `'locked'`, `'unborn'` or `'failed'` (with `lastErr`). Never rejects.
+  /** Start the minders, fetch the bank's world, and bring up the bank from it: resolves once the snapshot shows `'locked'`, `'unborn'` or `'failed'` (with `lastErr`). Never rejects.
    * Each later call resolves as the first.
    */
   hello(): Promise<void> {
@@ -167,9 +168,10 @@ export class Device implements MinderFriend {
   /** Bring up this device's bank. */
   async #bringUp(): Promise<void> {
     try {
+      this.#bankMinder.hello()
       this.#minder.hello()
       const { vaultDB } = this
-      const world = await this.#bankMinder.fetchWorld(vaultDB, this.scope)
+      const world = await this.#bankMinder.fetchWorld()
       if ((world === null) || (! Bank.isLive(world.bank))) {
         this.#banklessSnapshot = Object.freeze({ ...PendingBank, stage: 'unborn' })
         this.#align()

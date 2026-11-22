@@ -718,7 +718,7 @@ const GateShownOfCkey = new WeakMap<GateRecord | Device, GateShown>()
 
 /** `device`'s main gate, from its bank's world, as the giver shows it: its shell where no world is heard of. The same object until the world's gate changes. */
 function gateShownOfWorld(device: Device): GateShown {
-  const gate = device.bankMinder.worldAt(device.scope)?.gate
+  const gate = device.bankMinder.worldAt()?.gate
   const ckey = gate ?? device
   const cached = GateShownOfCkey.get(ckey)
   if (cached !== undefined) { return cached }
