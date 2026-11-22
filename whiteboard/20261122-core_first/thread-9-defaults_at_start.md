@@ -36,8 +36,10 @@ options, which existed because each minder set its bank's query defaults at `hel
     case no one meets), and a sparse-array prefix such as `['sok', , , 'soon']` (TanStack's `partialMatchKey` skips the
     holes: works, but clever). Hosts are not the threat model; say if the skipToken should come back.
 * **Discoveries**:
-  - **A listing's staleTime of 0 reaches observers.** `useBoxList` (safebyok-react-lean) passes no staleTime, so it
-    took the minder's (an hour by default); now it lists again at each mount and each window focus. Two minder tests
+  - **A listing's staleTime of 0 reaches observers.** `useBoxList` (safebyok-react-lean) passed no staleTime, so it
+    took the minder's (an hour by default); after this thread's defaults it would have listed at each mount and focus.
+    Review rework: it now passes `staleTime: Infinity`, so a listing goes stale only on evidence (a child's first landing,
+    `invalidate`), as items do; `list()` keeps 0. A test in `record-hooks.test.tsx` covers remount and focus. Two minder tests
     that mount a `QueryObserver` on a listing now wait for its mount's list before acting.
   - **React's null-user placeholder keys** (`['sok', null, banklabel, ...]`, in `giver-defaults.ts`) also start with
     `'sok'`, so they now take these defaults: `gcTime: Infinity` among them. They carry `skipToken` while the bank is
@@ -45,5 +47,4 @@ options, which existed because each minder set its bank's query defaults at `hel
   - `FixedQueryCacheOpts`' doc ("every minder sets") now says the client sets them; `Device`'s `#queryCacheOpts` doc and
     the comment in `react-giver.tsx`'s `boxQueryBaseOf` that said the minder's queryFn is "set in the client at its
     `hello`" are brought up to date.
-* **For the Coach**: whether the window-focus re-list of `useBoxList` is wanted (it follows from the listing's default
-  of 0); and whether the soon and dead entries should keep skipToken at the cost above.
+* **For the Coach**: whether the soon and dead entries should keep skipToken at the cost above.
