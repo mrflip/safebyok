@@ -69,7 +69,7 @@ export function useWhisperMask(labelpath: string, field: string, { bank: bankOpt
       const shown = maskOf()
       if (typeof shown === 'string') { el.textContent = shown; return }
       // Locked, a mask that is not the stored one could be the live tail, and must not stay on show while it is awaited.
-      if (!isSameMask || (stage === 'locked')) { el.textContent = '' }
+      if ((! isSameMask) || (stage === 'locked')) { el.textContent = '' }
       const text = await shown
       if (isCurrent()) { el.textContent = text }
     } catch (err) {
