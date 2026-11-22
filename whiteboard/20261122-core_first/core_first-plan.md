@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: running (2026-11-22). Thread 1 merged (#840). Thread 2 (#844) rebased onto main at `5cce9f369`, justify green by its report, in high review on opus. Threads 3 (`list_answer`) and 4 (`device_early`) building, cut from thread 2's branch. #845 ready for the Coach; every other open PR stays in draft, outside this sprint.
+* **Status**: running (2026-11-22). Thread 2 (#844) in rework: the Coach ruled the BankMinder a subclass of one minder class beside VaultMinder, made early and holding all users' rows, with no world entry (`worldAt` reads the three items synchronously); the paused review's `useGate` fix (`3f44feddc`) is on the branch. Thread 4 (#846, draft, base main) paused, blocked on thread 2's rework; it leans only on `make`, `worldAt`, `fetchWorld`. Thread 3 building.
 
 The Coach's request, verbatim:
 
@@ -128,7 +128,7 @@ once #828 has merged and 1 has caught up; if #828 has not merged when 1 is ready
 any user is signed in, and has one VaultMinder per signed-in user attach to a client the device made; build the
 BankMinder so that it needs no userid to exist and holds many users' worlds. Thread 6 persists both clients. *Size*: L.
 
-*Status*: ready, [#844](https://github.com/mrflip/safebyok/pull/844) at `5cce9f369`, rebased onto main over #831, #837, #830 and #842 by a second worker (one compaction, mid-rebase). In high review. World keyed `['sok', userid, banklabel, 'world', lifeseq, lifetok]`; `VaultMinder`, boxes only, forwards bank, gate and root on any client (no gap for thread 4). bridgeWorld moved into the giver: `useGate` caches only `GateShown` from `bankMinder.worldAt`, refetched on `subscribe`. Deviations: `storage_issue` for a damaged root; `#minderEventOf` skips non-item entrykinds; `IdbMinderBridge.goodbye` removed (the Coach).
+*Status*: rework. *The Coach (2026-11-22):* "I didn't imagine there was any code in BankMinder different than ThingMinder at all" … "a bank-side minder made any time is fine, I'd conceived it was made before then and held all users' rows … if it breaks vaultdb then do it with the userid, or just cheat and keep it fed by magic or the idb" … "easier to have them be subclasses even if it's just different names". The paused high review (one fix kept: `useGate` reads the world through `useSyncExternalStore`, `3f44feddc`) left: the `select` pin to remove, the entrykind filter now dead, the world doc's false clause; all in the rework. A fresh high review follows it.
 
 ### 3. `list_answer`: a list's answer under the feed principle, and the listing over it
 
