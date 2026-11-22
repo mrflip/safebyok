@@ -143,8 +143,8 @@ lifecycle: new machinery in a primitive's critical path, for crossings the host 
 ### A minder's answer that crosses a `goodbye` and a fresh `hello`
 
 * current outcome, as built, and promised nowhere: a `get`, `list` or `write` the VaultMinder began before `goodbye`,
-  answered after `goodbye` and a fresh `hello`, may land in the new cache; one whose fetch had settled may join its Thing
-  to the new root box's listing. What a get or a list still waiting at `goodbye` refuses, even with no `hello`, is
+  answered after `goodbye` and a fresh `hello`, may land in the new cache; one whose fetch had settled may mark the new
+  root box's listing stale. What a get or a list still waiting at `goodbye` refuses, even with no `hello`, is
   unspecified: as built, TanStack cancels it, and it rejects with TanStack's `CancelledError` (a `tryList` answers it as
   `unexpected_error`), its listing not set. The Things such a list answers are still notified to each watch open when the
   vaultDB answers, so a fresh `hello`'s watch caches them. A good write caches the record written, as though begun
@@ -211,6 +211,21 @@ and the cache marks itself behind before any later call reads it. Ruled by the o
 Steps to reproduce: sign in with the listing fetch pending; write a box through the device in the microtask between the fetch's `listingAt` and TanStack storing its answer.
 
 Reasoning for wontfix: it is a crossing of a write and a fetch of milliseconds (CLAUDE.md, *Hours separate updates*); the listing holds only labelpaths the vaultDB did store, and the fix puts a guard on a common path. Written by the react_life thread 8 reviewer, 2026-11-21, awaiting a ruling.
+
+### A box new to a listing that lands while a list read before it is under way
+
+* current outcome: the box's first landing marks its parent's listing stale, which joins the list under way
+  (`cancelRefetch: false`); that list lands without the box and leaves the listing current. The box shows at the next list.
+* alternatives:
+  - cancel and restart the list: a list's own children land while it is under way, and would restart it.
+  - settle the listing against the cached children as it lands: surgery on a common path, for a crossing.
+* workaround: none needed. The next list lists it.
+
+Steps to reproduce: start `list('box')` on a vaultDB that answers late; write a new box through the minder after the
+datastore has read; let the list answer.
+
+Reasoning for wontfix: a crossing of a write and a list of milliseconds (CLAUDE.md, *Hours separate updates*); the
+listing holds only what the vaultDB answered. Written by core_first thread 3, 2026-11-22.
 
 ### A lock that lands while a draft's field is on its way shows the field on a locked bank
 
