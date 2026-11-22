@@ -5,6 +5,7 @@ import { aWhile, eventually, expectSyncRefusal } from 'safebyok-big/testing'
 import type { ThingWatchScope } from '../../src/shapes/shapes-asks'
 import type { ThingNotice, VaultDB } from '../../src/storage/vault-db'
 import { Shell } from '../../src/shapes/shapes-thing'
+import { Thing } from '../../src/models/thing'
 import {
   BankStaleTrack, GateStaleTrack, Life0, RootStaleTrack, ThingBank, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf, trackOf,
 } from './vaultdb-world'
@@ -131,6 +132,19 @@ export function describeVaultDBWatch({ fresh, bornBank, withGate }: VaultDBBatte
         expect(notices.map(({ val }) => val)).to.deep.equal([bankThingOf(), gateThingOf(), rootBoxOf(), gateThingOf()])
         await aWhile()
         expect(notices).to.have.lengthOf(4)
+        expect(badNews).to.deep.equal([])
+      })
+
+      it("hears a good listing's changed bank, then each Thing listed, sparse and in labelpath order, before the listing answers", async () => {
+        const vaultDB = await bornBank()
+        const boxes   = [boxThingOf('openai'), boxThingOf('anthropic')]
+        for (const box of boxes) { await vaultDB.tryWriteThing(birthAskOf(box, Shell.childCited(Life0))) }
+        await aWhile()
+        const { notices, badNews } = heardOf(vaultDB)
+        await vaultDB.tryListThings({ ...listAskAt('box'), track: BankStaleTrack })
+        expect(notices.map(({ val }) => val)).to.deep.equal([bankThingOf(), Thing.sparseOf(boxes[1]!), Thing.sparseOf(boxes[0]!)])
+        await aWhile()
+        expect(notices).to.have.lengthOf(3)
         expect(badNews).to.deep.equal([])
       })
 

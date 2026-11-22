@@ -126,7 +126,7 @@ export async function storedGateOf(vaultDB: MemoryVaultDB, revseq: number): Prom
 }
 
 /** A vaultDB with a born bank and the box under its root box, and that box. */
-export async function storedBoxOf(vaultDB: MemoryVaultDB): Promise<ThingNotice['val']> {
+export async function storedBoxOf(vaultDB: MemoryVaultDB): Promise<ThingRecord> {
   await bornOf(vaultDB)
   const box   = TH.boxThingOf()
   const shell = Shell.of(TH.BoxScope, TH.rootBoxOf())
@@ -136,7 +136,7 @@ export async function storedBoxOf(vaultDB: MemoryVaultDB): Promise<ThingNotice['
 
 /** A watch notice of `record` sparse, as the vaultDB sends one for a large record. */
 export function sparseNoticeOf(record: ThingRecord): ThingNotice {
-  return noticeOf(Thing.sparseOf(record) as ThingRecord)
+  return noticeOf(Thing.sparseOf(record))
 }
 
 /** A watch notice of `thing`, as the vaultDB sends one. */
