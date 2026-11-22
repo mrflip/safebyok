@@ -6,7 +6,7 @@ import * as TH from '../test-helpers'
 /** The stage a fresh device over `vaultDB` finds the world's bank at. */
 async function stageFoundOver(vaultDB: LocalStorageVaultDB): Promise<string> {
   const device = TH.makeDevice({}, { vaultDB })
-  await device.hello()
+  await device.signIn(TH.WorldScope.userid)
   return device.getSnapshot().bank.stage
 }
 
@@ -17,7 +17,7 @@ describe("LocalStorageVaultDB", () => {
     const { vault } = await TH.buildBornVault({ device: TH.makeDevice({}, { vaultDB: new LocalStorageVaultDB() }) })
     await vault.putBoxOnce('box/openai', { sidecar: { mask: 'sk-…' } }, { whisper: TH.Whisper })
     const device = TH.makeDevice({}, { vaultDB: new LocalStorageVaultDB() })
-    await device.hello()
+    await device.signIn(TH.WorldScope.userid)
     await device.bank!.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await device.vault!.withWhisper('box/openai', (box) => box.whisper)).to.deep.equal(TH.Whisper)
   })
