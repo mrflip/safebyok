@@ -1,8 +1,8 @@
 # Thread 7: browser_pass (2026-11-22)
 
 Branch `20261122-browser_pass`, PR [#838](https://github.com/mrflip/safebyok/pull/838), stacked on [#836](https://github.com/mrflip/safebyok/pull/836). Proved: both new demos and the old one walked in headless
-Chromium 159 (Playwright 1.65.1), against each demo's `vite` dev server at 14cc583e6. Nothing broke that is a demo's
-bug to fix, so the thread changes no code.
+Chromium 159 (Playwright 1.65.1), against each demo's `vite` dev server at 14cc583e6; `pnpm justify` green (7,423
+tests). Nothing broke that is a demo's bug to fix, so the thread changes no code.
 
 * **Built**: this walk-through, and the scripts that make it, in [thread-7-browser_pass/](thread-7-browser_pass/).
   `setup.sh <workdir>` installs Playwright, Chromium and the libraries it lacks into the workdir; `run.sh <workdir> kk.mjs`
@@ -80,6 +80,11 @@ gone a second later. safebyok-big is frozen, so I left it.
 * **The demos' own fields have no visible label**: Username, "Who's there?", the API key box, Envman's Title, Description,
   Value and each row's value box rely on `aria-label` and a placeholder. The kit's forms all have visible labels.
 * **"Any username will do"** sits beside a sign-in that refuses `Bob!`. The refusal says why, but the line overpromises.
+* **A flake in `packages/safebyok-react-lean/tests/giver/react-giver.test.tsx`**, "resolves a refusal as its error, and
+  never rejects", red on CI's node-compat (26) at 751a544a4 while `pnpm justify` was green locally (7,423 tests). The
+  KeyEditor harness sets `seen.result` in a `useEffect`, after the render that shows the `Refused` output `findByText`
+  waits on, so the test can read `seen.result` as null. Not this thread's code; the fix (wait on `seen.result` itself)
+  belongs to the thread that owns the test.
 
 ## Deviations
 
