@@ -187,7 +187,7 @@ export class Device implements MinderFriend {
   // == [Starting]: hello, #restore, signIn, birthGating, #bringUp, #attachWorld, #attachBank
 
   /** Start the device, resolving once its caches are restored from the host's persisters, and saved to them from then on. Never rejects, and each later call resolves as the first.
-   * A persister that fails to restore is told to `onBadNews`, and its cache starts empty.
+   * Each restore that fails is told to `onBadNews`, and its cache starts empty.
    * Refuses `insecure_context` outside a secure context, where WebCrypto is missing.
    */
   hello(): Promise<void> {
