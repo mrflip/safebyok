@@ -6,6 +6,18 @@ tests, typecheck and lint clean; `pnpm justify` at the tip of the branch above (
 At the Coach's direction, the thread's second change, making the errors a host is handed `Error`s, is a thin PR of its
 own on `20261122-error_wraps`, stacked on this one. Its PR body has the change and its count of call sites.
 
+## The error wraps (`20261122-error_wraps`, PR #825, stacked on #824)
+
+* **Built**: `sanitizeForeignError` at the five existing catches that put their `unknown` into something typed `Error`:
+  - `useDraft`'s `revealField`, so `Draft.lastErr` is now `Error | null`.
+  - `useStrengthVerdict`'s `judge`, so `StrengthVerdictResult.lastErr` is now `Error | null`.
+  - `putBoxAction`, whose `err as Error` goes.
+  - `WhisperMask`'s `writeMask` and `WhisperTextOf`'s `show`, so their `onError` takes an `Error`.
+  - The envman demo's `(draft.lastErr as Error)` cast goes too, by the coordinator's ruling.
+* **Deviations, by the Coach's ruling ("trust typescript ... otherwise, do not wrap")**: no new `try`/`catch`.
+  `draft.put`'s rejection is left raw, with its doc as it was. `withLockableWhisper`'s `ifLocked` is left unguarded.
+  There is one non-Error test in all (`WhisperMask`), not one per site.
+
 * **Built**: `useDraft` (`packages/safebyok-react-lean/src/giver/use-draft.ts`) reacts to a form reset with
   `forgetTyped` rather than `discard`.
   - **With a sidecar edit pending** (`isSidecarDirty`: the draft's sidecar differs from its base's), it empties the
