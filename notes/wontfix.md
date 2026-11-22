@@ -250,23 +250,24 @@ Reasoning for wontfix: it needs a write from another device inside the moment be
 is written is what the user typed, over the newest revision. Catching it would mean a base pinned on every focus, or the
 whisper held outside its callback. Written by the react_life thread 9 worker, 2026-11-21, awaiting a ruling.
 
-### A lock that lands while `withLockableWhisper` takes its unlocked branch refuses `bank_locked`
+### A lock that lands while the giver's `withUnlockedWhisper` gets the box refuses `bank_locked`
 
-* current outcome: in `safebyok-react-lean`, `Knock.withLockableWhisper` reads the stage once. At unlocked it unseals
-  the box through the vault's `withUnlockedWhisper`, which never waits for an unlock. A `lock()` that lands after that
-  read, while the box is being got, rejects the call `bank_locked` rather than answer through `ifLocked`. A lock that
-  lands after the unseal lets the callback answer. An unlock that lands after a locked read answers through `ifLocked`.
+* current outcome: in `safebyok-react-lean`, `Knock.withUnlockedWhisper` passes through to the vault's
+  `withUnlockedWhisper`, which never waits for an unlock. A `lock()` that lands while the box is being got rejects the
+  call `bank_locked`; one that lands after the unseal lets the callback answer. The parts' `WhisperMask` calls it only
+  where its render shows the bank unlocked, and reads the stored mask itself where it shows it locked.
 * alternatives:
-  - catch the refusal and fall back to `ifLocked`: a branch in the unseal's path for a crossing.
+  - catch the refusal and answer from the stored record: a branch in the unseal's path for a crossing.
   - hold a lock across the read and the unseal: a lock where none was needed.
 * workaround: none needed: a caller that asks again on a stage change, as the parts' `WhisperMask` does, answers under
-  the new stage.
+  the new stage, and drops the refused answer.
 
-Steps to reproduce: call `withLockableWhisper` on an unlocked bank, and call `lock()` while the vaultDB's get is held.
+Steps to reproduce: call `withUnlockedWhisper` on an unlocked bank, and call `lock()` while the vaultDB's get is held.
 
 Reasoning for wontfix: a lock comes a few times a day, and a get is in flight for milliseconds (CLAUDE.md, *Hours
 separate updates*, `#no-slop-crossings`). Nothing is written, and the refusal shows no whisper. Written by the react_life
-thread 12 worker, rewritten by the thread 15 worker, 2026-11-21, awaiting a ruling.
+thread 12 worker, rewritten by the thread 15 worker, 2026-11-21, and by the react_free thread 8 worker, 2026-11-22, when
+`withLockableWhisper` became `withUnlockedWhisper`; awaiting a ruling.
 
 ### A bank's sweep stops its device's minder, which the device owns
 

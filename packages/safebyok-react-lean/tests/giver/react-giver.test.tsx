@@ -71,7 +71,7 @@ describe("reactGiver", () => {
     const { SOK } = await TH.buildProviderWorld()
     expect(Object.keys(SOK)).to.deep.equal(['Provider', 'useStrengthVerdict', 'useQueryOptions', 'bank'])
     expect(Object.keys(SOK.bank('acme'))).to.deep.equal([
-      'useBank', 'useStageChange', 'useGate', 'useBox', 'useBoxList', 'boxQuery', 'keys', 'withWhisper', 'withLockableWhisper', 'putBoxOnce', 'delBoxOnce', 'putBoxAction', 'putBoxMutationOptions', 'useDraft', 'lock', 'dismissUnlock',
+      'useBank', 'useStageChange', 'useGate', 'useBox', 'useBoxList', 'boxQuery', 'keys', 'withWhisper', 'withUnlockedWhisper', 'putBoxOnce', 'delBoxOnce', 'putBoxAction', 'putBoxMutationOptions', 'useDraft', 'lock', 'dismissUnlock',
       'useBirth', 'useUnlock', 'useReplacePassphrase', 'useAddPasskey', 'useRevokePasskey',
       'birthGating', 'unlockGating', 'replacePassphraseGating', 'addPasskeyGating', 'revokePasskeyGating',
       'birthMutationOptions', 'unlockMutationOptions', 'replacePassphraseMutationOptions', 'addPasskeyMutationOptions', 'revokePasskeyMutationOptions',
@@ -444,67 +444,53 @@ describe("withWhisper", () => {
   })
 })
 
-describe("withLockableWhisper", () => {
-  /** The callback and `ifLocked`, each answering which it was and what it was handed. */
-  const unlockedFn = vi.fn((whisper: Whisper, box: { sidecar: unknown }) => ['unlocked', String(whisper['apiKey']), box.sidecar])
-  const ifLocked = vi.fn((box: BoxRecord) => ['locked', box.sidecar])
+describe("withUnlockedWhisper", () => {
+  /** The callback, answering what it was handed. */
+  const unlockedFn = vi.fn((whisper: Whisper, box: { sidecar: unknown }) => [String(whisper['apiKey']), box.sidecar])
 
   it("calls back with the whisper on an unlocked bank", async () => {
     const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
     act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
     await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
-    expect(await world.Bank.withLockableWhisper(TH.JokesPath, unlockedFn, { ifLocked })).to.deep.equal(['unlocked', TH.JokesKey, { service: 'jokes' }])
+    expect(await world.Bank.withUnlockedWhisper(TH.JokesPath, unlockedFn)).to.deep.equal([TH.JokesKey, { service: 'jokes' }])
   })
 
-  it("calls ifLocked with the sealed record on a locked bank, wanting no unlock", async () => {
+  it("refuses bank_locked on a locked bank, wanting no unlock and calling nothing", async () => {
     const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
-    const answer = await world.Bank.withLockableWhisper(TH.JokesPath, unlockedFn, { ifLocked })
-    expect(answer).to.deep.equal(['locked', { service: 'jokes' }])
+    const fn = vi.fn()
+    await TH.expectRefusal(world.Bank.withUnlockedWhisper(TH.JokesPath, fn), 'bank_locked')
     expect(result.current.bank.isUnlockWanted).to.eq(false)
-    expect(ifLocked.mock.calls.at(-1)![0]).to.not.have.property('whisper')
+    expect(fn.mock.calls).to.have.lengthOf(0)
   })
 
-  it("refuses on a locked bank for a box never stored", async () => {
-    const { world } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
-    await TH.expectRefusal(world.Bank.withLockableWhisper('other', unlockedFn, { ifLocked }), 'absent_box')
-  })
-
-  it("refuses while the bank is starting, calling neither function", async () => {
+  it("refuses while the bank is starting, calling nothing", async () => {
     const { world, result } = await renderStarting(() => null)
     expect(result.current.stage).to.eq('starting')
-    const [fn, ifLockedHere] = [vi.fn(), vi.fn()]
-    const err = await TH.expectRefusal(world.Bank.withLockableWhisper(TH.JokesPath, fn, { ifLocked: ifLockedHere }), 'absent_vault')
+    const fn = vi.fn()
+    const err = await TH.expectRefusal(world.Bank.withUnlockedWhisper(TH.JokesPath, fn), 'absent_vault')
     expect(err.message).to.eq(Phrases.BankNotStarted)
-    expect([fn, ifLockedHere].map((each) => each.mock.calls.length)).to.deep.equal([0, 0])
+    expect(fn.mock.calls).to.have.lengthOf(0)
   })
 
   it("refuses for a user with no bank stored", async () => {
     const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage))
     await waitFor(() => { expect(result.current).to.eq('unborn') })
-    await TH.expectRefusal(world.Bank.withLockableWhisper(TH.JokesPath, unlockedFn, { ifLocked }), 'absent_vault')
+    await TH.expectRefusal(world.Bank.withUnlockedWhisper(TH.JokesPath, unlockedFn), 'absent_vault')
   })
 
-  it("refuses a callback or an ifLocked that is not a function", async () => {
+  it("refuses a callback that is not a function", async () => {
     const world = await TH.buildProviderWorld()
-    await TH.expectRefusal(world.Bank.withLockableWhisper(TH.JokesPath, 'not a function' as never, { ifLocked }), 'bad_record')
-    for (const opts of [undefined, {}, { ifLocked: 'not a function' }]) {
-      await TH.expectRefusal(world.Bank.withLockableWhisper(TH.JokesPath, unlockedFn, opts as never), 'bad_record')
-    }
+    await TH.expectRefusal(world.Bank.withUnlockedWhisper(TH.JokesPath, 'not a function' as never), 'bad_record')
   })
 
-  // withLockableWhisper @example
-  it("resolves a live mask to write into the page while unlocked, and the stored one while locked", async () => {
+  // withUnlockedWhisper @example
+  it("resolves a live mask to write into the page", async () => {
     const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
-    const maskElement = document.createElement('code')
-    const showMask = async () => {
-      const shown = await world.Bank.withLockableWhisper(TH.JokesPath, ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: (box) => box.sidecar['service'] as string })
-      maskElement.textContent = shown
-    }
-    await showMask()
-    expect(maskElement.textContent).to.eq('jokes')
     act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
     await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
-    await showMask()
+    const maskElement = document.createElement('code')
+    const shown = await world.Bank.withUnlockedWhisper(TH.JokesPath, ({ apiKey }) => mask(String(apiKey), { tail: 4 }))
+    maskElement.textContent = shown
     expect(maskElement.textContent).to.eq(mask(TH.JokesKey, { tail: 4 }))
   })
 })

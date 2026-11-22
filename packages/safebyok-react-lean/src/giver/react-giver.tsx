@@ -21,7 +21,7 @@ import { bridgeMinder } from './react-bridge'
 import { type BoxQueryOpts, ConfigChecks, type GiverConfig, type GiverMount, HostCallbackOpts, ScopeChecks, SignedOutBank } from './shapes-giver'
 import { makeUseDraft } from './use-draft'
 
-// == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, HeaderedGate, GateShown, GateSelected, BoxQueryOptions, BoxQueries, WithLockableWhisperOpts, PutBoxActionOpts, PutBoxActionResult, PutBoxMutationOptions, FormMutationOptions, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
+// == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, HeaderedGate, GateShown, GateSelected, BoxQueryOptions, BoxQueries, PutBoxActionOpts, PutBoxActionResult, PutBoxMutationOptions, FormMutationOptions, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
 
 /** The props of a giver's `Provider`. */
 export type ProviderProps = Readonly<{
@@ -59,12 +59,6 @@ export type BoxQueryOptions = UseQueryOptions<BoxShown, Error, BoxSelected> & Re
 export type BoxQueries = Readonly<{
   /** The `queryOptions` of the box at `labelpath`. */
   box: (labelpath: string) => BoxQueryOptions
-}>
-
-/** What a {@link BankGiver.withLockableWhisper} calls in place of its callback on a locked bank. */
-export type WithLockableWhisperOpts<ResultT> = Readonly<{
-  /** Called with the box's stored record, its whisper sealed, while the bank is locked: answer from its sidecar. */
-  ifLocked: (box: LiveOf<BoxRecord>) => ResultT | Promise<ResultT>
 }>
 
 /** How a {@link BankGiver.putBoxAction} reads the form it is handed. */
@@ -438,26 +432,18 @@ function makeBankGiver(friend: BankFriend) {
     return await demandVault().withWhisper(boxLabelpath, (box) => fn(box.whisper, box))
   }
 
-  /** Call `fn` with the box's whisper on an unlocked bank, and `opts.ifLocked` with its sealed record on a locked one, resolving what either resolves.
-   * Unlike {@link withWhisper}, it never waits for the unlock form: a lock that lands before the box is unsealed refuses `bank_locked`.
-   * Call it once the stage shows `locked` or `unlocked`, and again after a lock, an unlock or a `putBox`.
+  /** Call `fn` with the box's whisper on an unlocked bank, and resolve what `fn` resolves.
+   * Unlike {@link withWhisper}, it never waits for the unlock form: on a locked bank it refuses `bank_locked`.
+   * Call it once the stage shows `unlocked`, and again after an unlock or a `putBox`.
    * Use the whisper only inside `fn`. A result that shows any of the whisper belongs in the page, not in React's state or a query.
    * @example
-   *   const shown = await Knock.withLockableWhisper('jokes', ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: (box) => String(box.sidecar['mask']) })
+   *   const shown = await Knock.withUnlockedWhisper('jokes', ({ apiKey }) => mask(String(apiKey), { tail: 4 }))
    *   maskElement.textContent = shown
    */
-  async function withLockableWhisper<ResultT>(
-    labelpath: string, fn: (whisper: Whisper, box: BoxUnsealed) => ResultT | Promise<ResultT>, opts: WithLockableWhisperOpts<ResultT>,
-  ): Promise<ResultT> {
+  async function withUnlockedWhisper<ResultT>(labelpath: string, fn: (whisper: Whisper, box: BoxUnsealed) => ResultT | Promise<ResultT>): Promise<ResultT> {
     const boxLabelpath = boxLabelpathOf(labelpath)
     Checks.fn.parse(fn)
-    const { ifLocked } = Checks.withLockableWhisperOpts.parse(opts) as WithLockableWhisperOpts<ResultT>
-    const vault = demandVault()
-    if (vault.bank.isUnlocked) { return await vault.withUnlockedWhisper(boxLabelpath, (box) => fn(box.whisper, box)) }
-    const box = liveOf<BoxRecord>(await vault.minder.get({ ...vault.bank.scope, labelpath: boxLabelpath }))
-    // A sparse record has no sidecar to read, so it refuses as a deleted box does.
-    if ((box === null) || (box === undefined)) { throw new VaultError('absent_box', Phrases.BoxAbsent) }
-    return await ifLocked(box)
+    return await demandVault().withUnlockedWhisper(boxLabelpath, (box) => fn(box.whisper, box))
   }
 
   // Each write tries once. By the time it resolves, the minder has cached what was written, and the bridge has copied it
@@ -651,7 +637,7 @@ function makeBankGiver(friend: BankFriend) {
   const useDraft = makeUseDraft({ useBank, useBox, withWhisper, demandVault })
 
   const bankGiver = Object.freeze({
-    useBank, useStageChange, useGate, useBox, useBoxList, boxQuery, keys, withWhisper, withLockableWhisper, putBoxOnce, delBoxOnce, putBoxAction, putBoxMutationOptions, useDraft, lock, dismissUnlock,
+    useBank, useStageChange, useGate, useBox, useBoxList, boxQuery, keys, withWhisper, withUnlockedWhisper, putBoxOnce, delBoxOnce, putBoxAction, putBoxMutationOptions, useDraft, lock, dismissUnlock,
     useBirth, useUnlock, useReplacePassphrase, useAddPasskey, useRevokePasskey,
     birthGating, unlockGating, replacePassphraseGating, addPasskeyGating, revokePasskeyGating,
     birthMutationOptions, unlockMutationOptions, replacePassphraseMutationOptions, addPasskeyMutationOptions, revokePasskeyMutationOptions,
@@ -761,11 +747,9 @@ const Checks = Checkers('bad_record', ({ obj, arr, str, fn, custom }) => {
     boxLabelpath,
     boxScoped:               obj({ labelpath: boxLabelpath }).loose(),
     fn:                      fn(),
-    withLockableWhisperOpts: obj({ ifLocked: fn<WithLockableWhisperOpts<unknown>['ifLocked']>() }),
     putBoxActionOpts:        obj({ whisperOf: fn<PutBoxActionOpts['whisperOf']>(), sidecarOf: fn<NonNullable<PutBoxActionOpts['sidecarOf']>>().optional(), secretFieldnames: arr(str.min(1)).readonly().optional() }),
     form:                    custom<FormData>((val) => val instanceof FormData, 'Expected the FormData a form action is handed'),
   }
 })
 true satisfies AssertEqual<PutBoxActionOpts, Readonly<CheckerInput<typeof Checks.putBoxActionOpts>>>
-true satisfies AssertEqual<WithLockableWhisperOpts<unknown>, Readonly<CheckerInput<typeof Checks.withLockableWhisperOpts>>>
 // --

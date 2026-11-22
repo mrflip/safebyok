@@ -1,6 +1,6 @@
 // The messages of the refusals the giver makes itself.
 
-// == [The giver]: OneBankExpected, NoProvider, NobodySignedIn, BankAbsent, BankNotStarted, BankFailed, BoxAbsent, TypedFieldGone
+// == [The giver]: OneBankExpected, NoProvider, NobodySignedIn, BankAbsent, BankNotStarted, BankFailed, TypedFieldGone
 
 /** A giver's config whose `banks` does not name exactly one bank and its vaultDB. */
 export const OneBankExpected = 'Expected `banks` to name one bank and its vaultDB: `{ banks: { mybank: { vaultDB } } }`.'
@@ -19,9 +19,6 @@ export const BankNotStarted = 'The bank is not brought up: wait for the stage to
 
 /** A call that needs the bank, made after it failed to come up. */
 export const BankFailed = "The bank failed to come up, as its snapshot's `lastErr` says: nothing reaches it until the page is loaded again."
-
-/** A box asked for while the bank is locked, with none stored, or deleted. */
-export const BoxAbsent = 'No box is stored at that labelpath: put one first.'
 
 /** A draft's `put`, made after the input of a field typed into has left the page, so its text is gone. */
 export const TypedFieldGone = 'A field typed into has left the page, and its text with it: nothing was written.'

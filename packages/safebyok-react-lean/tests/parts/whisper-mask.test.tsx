@@ -98,15 +98,6 @@ describe("WhisperMask", () => {
     await waitFor(() => { expect(maskTextOf(container)).to.eq(LiveMask) })
   })
 
-  it("empties the element when the bank locks and ifLocked answers with a promise, never showing the live tail meanwhile", async () => {
-    const { world, container } = await renderKey({ ifLocked: (box) => Promise.resolve(serviceOf(box)) })
-    await unlock(world)
-    await waitFor(() => { expect(maskTextOf(container)).to.eq(LiveMask) })
-    act(() => { world.Bank.lock() })
-    expect(maskTextOf(container)).to.eq('')
-    await waitFor(() => { expect(maskTextOf(container)).to.eq('jokes') })
-  })
-
   it("empties the element when it is given another box, never showing the last box's mask beside it", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     const tree = (labelpath: string) => TH.providerTreeOf(world, <OtherCached world={world} labelpath={labelpath} />, { userid: TH.ProviderUser })
