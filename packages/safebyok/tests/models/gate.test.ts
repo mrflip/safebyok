@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Errors } from 'safebyok-big/internals'
 import { BaseBox } from '../../src/models/base-box'
 import { Gate } from '../../src/models/gate'
+import { Lease } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
 import type { GateOpts } from '../../src/shapes/shapes-gateish'
@@ -262,6 +263,34 @@ describe("gate.seal(sealer, donor, publicProps, secretProps) and gate.unseal(sea
     await TH.expectRefusal(bank.gate.unseal(BaseBox, box), 'bank_locked')
     bank.gate.sweep()
     expect(await TH.expectRefusal(bank.gate.unseal(BaseBox, box), 'disabled')).to.equal(bank.gate.endCause)
+  })
+})
+
+describe("the lease a proof grants a gate", () => {
+  it("renews the lease the gate holds: it keeps that lease's born_at, and is proved now", async () => {
+    const { bank } = await TH.buildBornBank()
+    vi.setSystemTime(TH.T0 + 5)
+    const make = vi.spyOn(Lease, 'make')
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    expect(make.mock.calls[0]![0]).to.include({ born_at: TH.T0, proved_at: TH.T0 + 5 })
+    expect(bank.gate.leaseEndsAt).to.equal(TH.T0 + 5 + bank.device.leaseMillis)
+  })
+
+  it("is born when it is proved, where the gate holds no lease", async () => {
+    const { bank } = await TH.buildBornBank()
+    bank.gate.lock()
+    vi.setSystemTime(TH.T0 + 5)
+    const make = vi.spyOn(Lease, 'make')
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    expect(make.mock.calls[0]![0]).to.include({ born_at: TH.T0 + 5, proved_at: TH.T0 + 5 })
+  })
+
+  it("renews the lease the gate holds across a gate verb, citing the revision it writes", async () => {
+    const { bank } = await TH.buildBornBank()
+    vi.setSystemTime(TH.T0 + 5)
+    const make = vi.spyOn(Lease, 'make')
+    await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'a different passphrase, just as long' })
+    expect(make.mock.calls[0]![0]).to.include({ born_at: TH.T0, proved_at: TH.T0 + 5, gate_revtok: bank.gate.revtok })
   })
 })
 

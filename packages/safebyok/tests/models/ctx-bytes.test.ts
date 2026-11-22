@@ -26,7 +26,7 @@ const GateStampText = `{"banklabel":"acme","born_at":${String(TH.T0)},"labelpath
 
 const BankStampFields = ['userid', 'banklabel', 'lifeseq', 'born_at', 'lifetok'] as const
 const GateStampFields = ['userid', 'banklabel', 'labelpath', 'lifeseq', 'born_at'] as const
-const LeaseStampFields = ['fmt', ...BankStampFields, 'gate_labelpath', 'gate_lifeseq', 'gate_revtok', 'proved_at', 'wayinkind'] as const
+const LeaseStampFields = ['fmt', 'userid', 'banklabel', 'bank_lifeseq', 'bank_born_at', 'bank_lifetok', 'gate_labelpath', 'gate_lifeseq', 'gate_revtok', 'born_at', 'proved_at', 'wayinkind'] as const
 const BoxStampFields = ['userid', 'banklabel', 'labelpath', 'label', 'fmt', 'revtok', 'revseq', 'am', 'lifeseq', 'lifepath', 'born_at', 'written_at'] as const
 const SealTagFields = ['codectag', 'schematag'] as const
 
@@ -83,7 +83,7 @@ describe("each ctx, byte for byte", () => {
   it("binds a passphrase wayin's wrap to the bank's stamp, the gate's, the purpose and its whole header", async () => {
     const { bank } = await TH.buildBornBank()
     const wayin = bank.gate.wayins.main
-    const ctx = textBytes(`[${BankStampText},${GateStampText},"bank_key_passphrase_wrapped",{"device_tok":"${wayin.device_tok}","key_deriver_label":"${wayin.key_deriver_label}","registered_at":${String(wayin.registered_at)},"salt_b64":"${wayin.salt_b64}","wayinkind":"passphrase","wayinlabel":"main"}]`)
+    const ctx = textBytes(`[${BankStampText},${GateStampText},"bank_key_passphrase_wrapped",{"born_at":${String(wayin.born_at)},"device_tok":"${wayin.device_tok}","key_deriver_label":"${wayin.key_deriver_label}","label":"main","salt_b64":"${wayin.salt_b64}","wayinkind":"passphrase"}]`)
     const wayinKey = await Crypto.importWrappingKeyBytes(await TH.testDeriver.deriveKeyBytes(TH.TestPassphrase, Crypto.fromB64(wayin.salt_b64)))
     expect(await Crypto.unwrapKeyUnder(wayinKey, wayin.bank_key_wayin_wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
   })
@@ -93,14 +93,14 @@ describe("each ctx, byte for byte", () => {
     const prfBytes = new Uint8Array(answer.prfBytes)
     const { bank } = await TH.buildBornBank({ passkeyCleartext: answer })
     const wayin = bank.gate.wayins.passkey0!
-    const ctx = textBytes(`[${BankStampText},${GateStampText},"bank_key_passkey_wrapped",{"credential_id":"${wayin.credential_id}","device_tok":"${wayin.device_tok}","prf_salt_b64":"${wayin.prf_salt_b64}","registered_at":${String(wayin.registered_at)},"wayinkind":"passkey","wayinlabel":"passkey0"}]`)
+    const ctx = textBytes(`[${BankStampText},${GateStampText},"bank_key_passkey_wrapped",{"born_at":${String(wayin.born_at)},"credential_id":"${wayin.credential_id}","device_tok":"${wayin.device_tok}","label":"passkey0","prf_salt_b64":"${wayin.prf_salt_b64}","wayinkind":"passkey"}]`)
     const passkeyKey = await Crypto.deriveWrappingKey(prfBytes, ctx)
     expect(await Crypto.unwrapKeyUnder(passkeyKey, wayin.bank_key_wayin_wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
   })
 
   it("binds a lease's wrap of the bankKey to the bank's stamp and its own", async () => {
     const record = await leaseRecordOf()
-    const leaseText = `{"banklabel":"acme","born_at":${String(TH.T0)},"fmt":"${LeaseFormat}","gate_labelpath":"gate","gate_lifeseq":"0000000000","gate_revtok":"${TH.WorldGate.revtok}","lifeseq":"0000000000","lifetok":"${TH.FirstLifetok}","proved_at":${String(TH.T0)},"userid":"u1","wayinkind":"passphrase"}`
+    const leaseText = `{"bank_born_at":${String(TH.T0)},"bank_lifeseq":"0000000000","bank_lifetok":"${TH.FirstLifetok}","banklabel":"acme","born_at":${String(TH.T0)},"fmt":"${LeaseFormat}","gate_labelpath":"gate","gate_lifeseq":"0000000000","gate_revtok":"${TH.WorldGate.revtok}","proved_at":${String(TH.T0)},"userid":"u1","wayinkind":"passphrase"}`
     const ctx = textBytes(`[${BankStampText},${leaseText},"bank_key_lease_wrapped"]`)
     expect(await Crypto.unwrapKeyUnder(record.lease_key, record.bank_key_lease_wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
   })

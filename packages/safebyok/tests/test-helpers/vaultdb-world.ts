@@ -1,11 +1,11 @@
 /** The Things and asks a vaultDB's tests share: a bank's three roots and a box under its root, and the asks that get, list and write them. */
 
-import { BW } from 'safebyok-big/testing'
 import { type Labelpath, type Lifepath, Lifeseq } from '../../src/shapes/primitives'
 import {
   type BankRecord, type BoxRecord, type GateRecord, type ThingCited, type ThingRecord,
   Shell, ThingFormat,
 } from '../../src/shapes/shapes-thing'
+import { WayinChecks } from '../../src/shapes/shapes-wayin'
 import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { FirstLifetok, FirstRevtok, T0, revtokOf } from './models-world'
 
@@ -20,12 +20,23 @@ export const RootScope = Object.freeze({ ...ThingBank, labelpath: 'box' })
 /** The scope of a box one label under the root box. */
 export const BoxScope  = Object.freeze({ ...ThingBank, labelpath: 'box/openai' })
 
-/** The main gate's wayins: its passphrase wayin alone, its ciphertext fake. */
-export const MainOnly = Object.freeze({ main: BW.mainWayin, passkey0: null })
-/** The main gate's wayins with a passkey wayin beside its passphrase wayin. */
-export const WithPasskey = Object.freeze({ main: BW.mainWayin, passkey0: BW.passkey0Wayin })
-
 const FakeCiphered = Object.freeze({ cipher_iv_b64: 'aXY', ciphertext_b64: 'Y3Q' })
+
+/** The main gate's passphrase wayin, its ciphertext fake. */
+export const MainWayin = WayinChecks.passphraseWayinRecord.parse({
+  wayinkind: 'passphrase', label: 'main', key_deriver_label: 'test', salt_b64: 'c2FsdHNhbHRzYWx0c2FsdA', device_tok: '00000000-0000-4000-8000-0000000000d1', born_at: T0, bank_key_wayin_wrapped: FakeCiphered,
+})
+/** The main gate's passkey wayin, its ciphertext fake. */
+export const Passkey0Wayin = WayinChecks.passkeyWayinRecord.parse({
+  wayinkind: 'passkey', label: 'passkey0', credential_id: 'cred1', prf_salt_b64: 'A'.repeat(43), device_tok: '00000000-0000-4000-8000-0000000000d1', born_at: T0, bank_key_wayin_wrapped: FakeCiphered,
+})
+/** Another passphrase wayin, as `replacePassphrase` puts. */
+export const OtherMainWayin = WayinChecks.passphraseWayinRecord.parse({ ...MainWayin, salt_b64: 'b3RoZXJzYWx0b3RoZXJzYQ' })
+
+/** The main gate's wayins: its passphrase wayin alone, its ciphertext fake. */
+export const MainOnly = Object.freeze({ main: MainWayin, passkey0: null })
+/** The main gate's wayins with a passkey wayin beside its passphrase wayin. */
+export const WithPasskey = Object.freeze({ main: MainWayin, passkey0: Passkey0Wayin })
 /** A sealed whisper with fake ciphertext: the store checks only its shape. */
 export const FakeSealed = Object.freeze({ key_wrapped: FakeCiphered, ciphered: FakeCiphered, codectag: 'json_v1', schematag: 'test_v1' })
 

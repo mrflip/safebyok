@@ -4,11 +4,12 @@ import { isEmptyObject } from 'es-toolkit'
 import type { AllUnionFields } from 'type-fest'
 import type * as Z from 'zod'
 import { exactOptional, uuid } from 'zod'
-import { BX, CX, EX, SX, Validator } from 'safebyok-big/internals'
+import { CX, EX, SX, Validator } from 'safebyok-big/internals'
 import type { ShellOf, TombstoneOf } from './shapes-sealers'
 import * as Phrases from '../phrases'
 import { type VaultDB, isVaultDB } from '../storage/vault-db'
 import { type Lifepath, type Revtok, Labelpath, Lifeseq, VoidLifeseq } from './primitives'
+import { WayinChecks } from './shapes-wayin'
 
 // == [Kinds]: thingkindVals, Thingkind, Modelkind, ThingFormat
 
@@ -117,8 +118,7 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
 export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ obj, lit, union }) => {
   const { labelpath, anyLifeseq, voidLifeseq, voidLifepath, sparse, thingCited, sealed } = GenericChecks
   const emptyBag     = obj({}).strict()
-  // A record has no optional part: a gate with no passkey has `passkey0: null`.
-  const wayins       = obj({ main: BX.wayins.shape.main, passkey0: BX.wayins.shape.passkey0.unwrap().nullable() }).strict()
+  const { wayins }   = WayinChecks
   // What a write under a storage policy reads of the gate stored, beside its storedCited.
   const storedWayins = obj({ wayins })
 

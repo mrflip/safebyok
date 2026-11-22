@@ -44,10 +44,11 @@ export const LeaseFormat = ThingFormat
 
 /** The checks of a lease's stamp and record. */
 const LeaseChecks = Validator.Checkers('bad_record', ({ obj, lit, custom, epochMillis, bank_key_lease_wrapped }) => {
+  const { userid, banklabel, lifeseq, born_at, lifetok } = PlainChecks.bankStamp.shape
   const leaseStamp  = obj({
-    fmt: lit(LeaseFormat), ...PlainChecks.bankStamp.shape,
+    fmt: lit(LeaseFormat), userid, banklabel, bank_lifeseq: lifeseq, bank_born_at: born_at, bank_lifetok: lifetok,
     gate_labelpath: PlainChecks.gateStamp.shape.labelpath, gate_lifeseq: PlainChecks.gateStamp.shape.lifeseq, gate_revtok: ThingChecks.sparse.shape.revtok,
-    proved_at: epochMillis, wayinkind: GX.wayinkind,
+    born_at: epochMillis, proved_at: epochMillis, wayinkind: GX.wayinkind,
   })
   const leaseRecord = leaseStamp.extend({
     lease_key:              custom<CryptoKey>(GX.isLeaseKey, Phrases.LeaseKeyExpected),
@@ -58,7 +59,8 @@ const LeaseChecks = Validator.Checkers('bad_record', ({ obj, lit, custom, epochM
 
 /** The checks of a bank's scope and stamp, a gate's stamp, a {@link StampedGate}, a box's stamp, and a lease's stamp and record.
  * Anything carrying a stamp's fields passes, such as a Bank, a Gate or its Thing, and its other fields are dropped.
- * The lease's stamp cites the gate the lease was granted under, and is bound into the wrap of its bankKey.
+ * The lease's stamp has its bank's stamp under `bank_` names, cites the gate the lease was granted under, and is bound into the wrap of its bankKey.
+ * Its `born_at` is that of the lease it renews, or its `proved_at` where it renews none.
  * The record adds the leaseKey and the bankKey wrapped under it.
  * Also `LeaseFormat`, the `fmt` a lease carries.
  */

@@ -15,6 +15,7 @@ import type { BankScope, BankStamp, GateStamp } from './shapes-stamps'
 import { BankChecks, GateChecks } from './shapes-thingkinds'
 import { type GateRecord, ThingChecks } from './shapes-thing'
 import type { PutAskDraft } from './shapes-asks'
+import type { WayinHeader } from './shapes-wayin'
 import type { VaultDB } from '../storage/vault-db'
 
 // == [The form verbs' cleartexts]: CleartextChecks, BirthCleartexts, UnlockCleartexts, PassphraseReplaceCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, ProvedCleartexts, GatingCleartexts
@@ -121,7 +122,7 @@ export type ProvingDevice = Z.infer<typeof GateishChecks.provingDevice>
 export type GuardedKeyDeriver = ProvingDevice['keyDeriver']
 
 /** The parts of a proving: the stamps its wayin is bound to, the wayin's header, and the stored wayin it proves, if any. */
-export interface ProvingParts<HeaderT extends GX.WayinHeader> {
+export interface ProvingParts<HeaderT extends WayinHeader> {
   bankStamp: BankStamp
   gateStamp: GateStamp
   header:    HeaderT

@@ -1,13 +1,13 @@
 /** The battery's cases of tryGetThing and tryWriteThing, over the bank, the main gate and the boxes. */
 import { describe, expect, it } from 'vitest'
-import { BW, expectBad, expectGood } from 'safebyok-big/testing'
+import { expectBad, expectGood } from 'safebyok-big/testing'
 import * as Phrases from '../../src/phrases'
 import { Shell } from '../../src/shapes/shapes-thing'
 import { Thing } from '../../src/models/thing'
 import { delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import {
-  BankScope, GateScope, Life0, RootScope, ThingBank, WithPasskey, bankThingOf, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAskFor, gateThingOf,
-  getAskAt, getGateAskOf, nextGateOf, nextOf, replaceAskOf, rootBoxOf,
+  BankScope, GateScope, Life0, MainWayin, OtherMainWayin, Passkey0Wayin, RootScope, ThingBank, WithPasskey, bankThingOf, birthAskOf, boxRebornOf, boxThingOf, boxTombOf,
+  delAskFor, gateThingOf, getAskAt, getGateAskOf, nextGateOf, nextOf, replaceAskOf, rootBoxOf,
 } from './vaultdb-world'
 import { FirstRevtok, OtherLifetok, OtherRevtok, T0, revtokOf } from './models-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
@@ -81,7 +81,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       const vaultDB = await fresh()
       const answer = await vaultDB.tryWriteThing(birthAskOf())
       expect(answer.ask).to.deep.include({ op: 'put', modelkind: 'gate', ...GateScope })
-      expect(JSON.stringify(answer.ask)).to.not.include(BW.mainWayin.salt_b64)
+      expect(JSON.stringify(answer.ask)).to.not.include(MainWayin.salt_b64)
     })
   })
 
@@ -139,13 +139,13 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       const answer = await vaultDB.tryWriteThing(birthAskOf(gateThingOf({ revtok: OtherRevtok })))
       const err = await expectBad(Promise.resolve(answer), 'stale_write')
       expect(err.meta).to.deep.include({ oplabel: 'writeThing', act: 'stale' })
-      expect(JSON.stringify(err.meta)).to.not.include(BW.mainWayin.salt_b64)
+      expect(JSON.stringify(err.meta)).to.not.include(MainWayin.salt_b64)
     })
   })
 
   describe("tryWriteThing(ask), under a storage policy", () => {
     const stored = gateThingOf()
-    const otherMain = { main: BW.otherMainWayin, passkey0: null }
+    const otherMain = { main: OtherMainWayin, passkey0: null }
 
     it("replaces the passphrase wayin the gating proved against", async () => {
       const vaultDB = await withGate(stored)
@@ -163,7 +163,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
 
     it("refuses a passphrase replacement that changes the passkey wayin too", async () => {
       const vaultDB = await withGate(stored)
-      const ask = replaceAskOf(stored, nextGateOf(stored, { wayins: { ...WithPasskey, main: BW.otherMainWayin } }), { policies: ['replace_passphrase'] })
+      const ask = replaceAskOf(stored, nextGateOf(stored, { wayins: { ...WithPasskey, main: OtherMainWayin } }), { policies: ['replace_passphrase'] })
       await expectBad(vaultDB.tryWriteThing(ask), 'gate_issue')
     })
 
@@ -178,7 +178,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     it("refuses to add a passkey wayin to a gate that has one", async () => {
       const vaultDB = await withGate(gateThingOf({ wayins: WithPasskey }))
       const withOne = gateThingOf({ wayins: WithPasskey })
-      const ask = replaceAskOf(withOne, nextGateOf(withOne, { wayins: { ...WithPasskey, passkey0: { ...BW.passkey0Wayin, credential_id: 'other-credential' } } }), { policies: ['add_passkey'] })
+      const ask = replaceAskOf(withOne, nextGateOf(withOne, { wayins: { ...WithPasskey, passkey0: { ...Passkey0Wayin, credential_id: 'other-credential' } } }), { policies: ['add_passkey'] })
       await expectBad(vaultDB.tryWriteThing(ask), 'gate_issue')
     })
 
@@ -263,7 +263,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       const vaultDB = await fresh()
       const stored = gateThingOf()
       await rowsOf(vaultDB).plant(GateScope, { ...stored, auth: { stray: true } })
-      const next = nextGateOf(stored, { wayins: { main: BW.otherMainWayin, passkey0: null } })
+      const next = nextGateOf(stored, { wayins: { main: OtherMainWayin, passkey0: null } })
       const ask  = replaceAskOf(stored, next, { policies: ['replace_passphrase'] })
       expect(await vaultDB.tryWriteThing(ask)).to.deep.include({ ok: true, act: 'replaced', val: next })
       expect(await gotAt(vaultDB, 'gate')).to.deep.equal(next)

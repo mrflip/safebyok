@@ -7,7 +7,7 @@ import type { Banklabel, EpochMillis, Labelpath, Lifeseq, Lifetok, Revtok, Useri
 import type { Modelkind, Sparse, ThingRecord } from '../shapes/shapes-thing'
 import { type LeaseGate, type LeaseOpts, type SecretFieldname, GateishChecks } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
-import { type LeaseRecord, type LeaseSparse, type LeaseStamp, StampChecks } from '../shapes/shapes-stamps'
+import { type BankStamp, type LeaseRecord, type LeaseSparse, type LeaseStamp, StampChecks } from '../shapes/shapes-stamps'
 import { BankChecks } from '../shapes/shapes-thingkinds'
 import * as Throwers from '../refusals/throwers'
 
@@ -24,20 +24,26 @@ const CleartextFieldnames: ReadonlySet<string> = new Set(['whisper'])
  * Once evicted, or once its gate is swept or its device ends, it refuses every seal and unseal, even one in flight.
  */
 export class Lease implements LeaseStamp {
-  // == [Props]: fmt, userid, banklabel, lifeseq, born_at, lifetok, gate_labelpath, gate_lifeseq, gate_revtok, proved_at, wayinkind, #gate, #record, stamp, toJSON
+  // == [Props]: fmt, userid, banklabel, bank_lifeseq, bank_born_at, bank_lifetok, gate_labelpath, gate_lifeseq, gate_revtok, born_at, proved_at, wayinkind, #gate, #record, stamp, toJSON
 
   declare readonly fmt:            LeaseStamp['fmt']
   declare readonly userid:         Userid
   declare readonly banklabel:      Banklabel
-  declare readonly lifeseq:        Lifeseq
-  declare readonly born_at:        EpochMillis
-  declare readonly lifetok:        Lifetok
+  /** The lifeseq of its bank's life. */
+  declare readonly bank_lifeseq:   Lifeseq
+  /** When its bank's life was born. */
+  declare readonly bank_born_at:   EpochMillis
+  /** The lifetok of its bank's life. */
+  declare readonly bank_lifetok:   Lifetok
   /** The labelpath of the gate the lease was granted under. */
   declare readonly gate_labelpath: Labelpath
   /** The lifeseq of that gate's life. */
   declare readonly gate_lifeseq:   Lifeseq
   /** The revision of that gate the lease was granted under. */
   declare readonly gate_revtok:    Revtok
+  /** When the lease it renews was born, or its `proved_at` where it renews none. */
+  declare readonly born_at:        EpochMillis
+  /** When the proof that granted it was made. */
   declare readonly proved_at:      EpochMillis
   declare readonly wayinkind:      EX.Wayinkind
 
@@ -60,7 +66,7 @@ export class Lease implements LeaseStamp {
 
   private constructor(record: Z.input<typeof StampChecks.leaseRecord>, opts: LeaseOpts) {
     const { record: recordChecked, opts: { gate } } = Checks.leaseMakeArgs.parse({ record, opts })
-    Validator.checkedConsistent(BankChecks.stamp.parse(recordChecked), gate.bankStamp, { kind: 'damaged_lease' })
+    Validator.checkedConsistent(bankStampOf(recordChecked), gate.bankStamp, { kind: 'damaged_lease' })
     this.#record = recordChecked
     Helpers.tattoo(this, StampChecks.leaseStamp.parse(recordChecked), { configurable: false })
     this.#gate = opts.gate
@@ -210,7 +216,12 @@ export class Lease implements LeaseStamp {
   get modelkind(): 'lease' { return 'lease' satisfies Modelkind }
 }
 
-// == [Helpers]: withoutSecrets, sealerMembersOf
+// == [Helpers]: bankStampOf, withoutSecrets, sealerMembersOf
+
+/** The stamp of the bank `stamp` is granted under, from its `bank_` fields. */
+function bankStampOf({ userid, banklabel, bank_lifeseq, bank_born_at, bank_lifetok }: LeaseStamp): BankStamp {
+  return { userid, banklabel, lifeseq: bank_lifeseq, born_at: bank_born_at, lifetok: bank_lifetok }
+}
 
 /** A copy of `bag` without its secret fields: `whisper`, and every field whose name ends in `_sealed`.
  * It checks nothing else of `bag`.

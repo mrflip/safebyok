@@ -460,14 +460,14 @@ describe("loggableAskOf(ask)", () => {
     const loggable = loggableAskOf(TH.birthAskOf())
     expect(loggable).to.deep.include({ op: 'put', modelkind: 'gate', ...TH.GateScope, ifAbsent: 'add', ifPresent: 'fail' })
     expect(loggable.record).to.deep.equal({ revtok: TH.revtokOf('0'), revseq: 0, am: 'a', lifepath: Life0 })
-    expect(JSON.stringify(loggable)).to.not.include(TH.BW.mainWayin.salt_b64)
+    expect(JSON.stringify(loggable)).to.not.include(TH.MainWayin.salt_b64)
   })
 
   it("carries over what a bank's birth cites of each root, and drops their bodies", () => {
     const loggable = loggableAskOf(TH.birthBankAskOf())
     expect(loggable).to.deep.include({ op: 'birth', ...TH.ThingBank })
     expect(loggable.root).to.deep.equal({ revtok: TH.revtokOf('0'), revseq: 0, am: 'a', lifepath: Life0 })
-    expect(JSON.stringify(loggable)).to.not.include(TH.BW.mainWayin.salt_b64)
+    expect(JSON.stringify(loggable)).to.not.include(TH.MainWayin.salt_b64)
     expect(JSON.stringify(loggable)).to.not.include(TH.FakeSealed.codectag)
   })
 

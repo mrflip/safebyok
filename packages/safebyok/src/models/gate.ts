@@ -230,9 +230,11 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
 
   // == [The gatings' private verbs]: unlockByProving, putGate, adopt
 
-  /** Unlock this gate under a lease `proved` builds, citing the revision this gate models. */
+  /** Unlock this gate under a lease `proved` builds, citing the revision this gate models.
+   * A lease this gate holds is renewed: the new one keeps its `born_at`.
+   */
   async #unlockByProving(proved: Proving): Promise<this> {
-    const lease = await proved.buildLease(this, this)
+    const lease = await proved.buildLease(this, this, this.#lease)
     this.#attachLease(lease)
     return this
   }

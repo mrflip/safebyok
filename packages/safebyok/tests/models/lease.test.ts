@@ -11,9 +11,12 @@ import * as TH from '../test-helpers'
 
 TH.useFakeClock()
 
-const StampFieldnames = ['fmt', 'userid', 'banklabel', 'lifeseq', 'born_at', 'lifetok', 'gate_labelpath', 'gate_lifeseq', 'gate_revtok', 'proved_at', 'wayinkind'] as const satisfies readonly (keyof LeaseRecord)[]
+const StampFieldnames = ['fmt', 'userid', 'banklabel', 'bank_lifeseq', 'bank_born_at', 'bank_lifetok', 'gate_labelpath', 'gate_lifeseq', 'gate_revtok', 'born_at', 'proved_at', 'wayinkind'] as const satisfies readonly (keyof LeaseRecord)[]
 
-const Stamped = { ...TH.WorldBankStamp, fmt: LeaseFormat, gate_labelpath: 'gate', gate_lifeseq: TH.WorldGate.lifeseq, gate_revtok: TH.WorldGate.revtok, proved_at: TH.T0, wayinkind: 'passphrase' }
+const Stamped = {
+  fmt: LeaseFormat, userid: 'u1', banklabel: 'acme', bank_lifeseq: TH.WorldBankStamp.lifeseq, bank_born_at: TH.WorldBankStamp.born_at, bank_lifetok: TH.WorldBankStamp.lifetok,
+  gate_labelpath: 'gate', gate_lifeseq: TH.WorldGate.lifeseq, gate_revtok: TH.WorldGate.revtok, born_at: TH.T0, proved_at: TH.T0, wayinkind: 'passphrase',
+}
 
 const Cleartexts = Object.freeze({ whisper: TH.Whisper })
 
@@ -107,6 +110,7 @@ describe("Lease.make(record, { gate })", () => {
   const OtherBankCases = [
     [{ lifeseq: Lifeseq.ofLifenum(2) },   'another life of the bank, by its lifeseq'],
     [{ born_at: TH.T0 + 1 },         'another life of the bank, by its born_at'],
+    [{ lifetok: TH.revtokOf('life2') }, 'another birth of the bank, by its lifetok'],
     [{ userid: 'u2' },               "another user's bank"],
     [{ banklabel: 'work' },          'another bank of the same user'],
   ] as const
@@ -403,6 +407,7 @@ describe("lease.isEnabled and lease.demandEnabled(), over its gate", () => {
 describe("a tampered lease record", () => {
   const TamperCases = [
     [(record: LeaseRecord) => ({ ...record, proved_at: record.proved_at + 1 }),                            'its proved_at moved'],
+    [(record: LeaseRecord) => ({ ...record, born_at: record.born_at - 1 }),                                'its born_at moved'],
     [(record: LeaseRecord) => ({ ...record, wayinkind: 'passkey' }),                                       'its wayinkind changed'],
     [(record: LeaseRecord) => ({ ...record, gate_revtok: TH.revtokOf('gate2') }),                         'its gate_revtok changed'],
     [(record: LeaseRecord) => ({ ...record, gate_lifeseq: Lifeseq.ofLifenum(1) }),                                 'its gate_lifeseq changed'],
