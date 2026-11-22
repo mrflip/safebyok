@@ -151,7 +151,7 @@ describe("bank.sweep() and device.sweep(), over the vaults made on the bank", ()
 describe("the box flows, through a vault and its bank's MemoryVaultDB", () => {
   it("lists no boxes under the bank's root box, before any is put", async () => {
     const { minder } = await TH.buildBornVault()
-    expect(await minder.list('box')).to.deep.equal([])
+    expect(await minder.list('box')).to.deep.include({ items: {}, gones: {} })
   })
 
   it("gets the shell of a box not stored, under the root box's life, for its first revision to cite", async () => {
@@ -169,7 +169,7 @@ describe("the box flows, through a vault and its bank's MemoryVaultDB", () => {
     const unsealed = await unsealedAt(vault)
     expect(unsealed).to.include({ revseq: 1, am: 'a' })
     expect(unsealed.whisper).to.deep.equal({ ...TH.Whisper, apicalls: 2 })
-    expect(await minder.list('box')).to.deep.equal([Openai])
+    expect(await minder.list('box')).to.deep.include({ items: { openai: { lifeseq: Lifeseq.ofLifenum(0) } }, gones: {} })
   })
 
   it("deletes a box by its sealed tombstone, which unseals, is listed, and which a put brings back to life", async () => {
@@ -179,7 +179,7 @@ describe("the box flows, through a vault and its bank's MemoryVaultDB", () => {
     const unsealed = await unsealedAt(vault)
     expect(unsealed).to.include({ am: 'x', lifeseq: Lifeseq.ofLifenum(1) })
     expect(unsealed.whisper).to.deep.equal({})
-    expect(await minder.list('box')).to.deep.equal([Openai])
+    expect(await minder.list('box')).to.deep.include({ items: {}, gones: { openai: { lifeseq: Lifeseq.ofLifenum(1) } } })
 
     const reborn = await bumpApicalls(vault)
     expect(reborn).to.include({ am: 'a', lifeseq: Lifeseq.ofLifenum(2) })
@@ -229,13 +229,12 @@ describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
 })
 
 describe("vault.putBoxOnce(cited, patch, secrets)", () => {
-  it("resolves a birth with the stored box already in its item and in its parent's listing", async () => {
+  it("resolves a birth with the stored box already in its item", async () => {
     // putBoxOnce @example
     const { bank, vault, minder } = await TH.buildBornVault()
     const box = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     expect(box).to.include({ labelpath: Openai, revseq: 0, am: 'a' })
     expect(minder.at(scopeAt(bank, Openai))).to.deep.equal(box)
-    expect(minder.listingAt(scopeAt(bank, 'box'))).to.deep.equal([Openai])
     expect(await bank.unsealBox(box)).to.deep.include({ whisper: TH.Whisper, sidecar: TH.Sidecar })
   })
 
@@ -346,13 +345,12 @@ describe("vault.tryDelBoxOnce(labelpath)", () => {
 })
 
 describe("vault.delBoxOnce(labelpath)", () => {
-  it("writes the tombstone over the newest revision: its item has the tombstone, and it stays listed", async () => {
+  it("writes the tombstone over the newest revision: its item has the tombstone", async () => {
     const { bank, vault, minder } = await TH.buildBornVault()
     const box = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const tombstone = await vault.delBoxOnce(Openai)
     expect(tombstone).to.include({ labelpath: Openai, am: 'x', revseq: box.revseq + 1 })
     expect(minder.at(scopeAt(bank, Openai))).to.deep.equal(tombstone)
-    expect(minder.listingAt(scopeAt(bank, 'box'))).to.deep.equal([Openai])
   })
 
   it("refuses a box never stored, or already deleted", async () => {

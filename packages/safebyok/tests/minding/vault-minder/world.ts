@@ -10,7 +10,7 @@ import { type BoxRecord, type ThingRecord, type ThingScope, Shell } from '../../
 import { Thing } from '../../../src/models/thing'
 import { type GetAsk, type WriteAsk, getAskOf, listAskOf } from '../../../src/shapes/shapes-asks'
 import type { BankScope } from '../../../src/shapes/shapes-stamps'
-import type { GetThingAnswer, ThingNotice, WriteThingAnswer } from '../../../src/storage/vault-db'
+import type { GetThingAnswer, Kids, ThingNotice, WriteThingAnswer } from '../../../src/storage/vault-db'
 import * as TH from '../../test-helpers'
 
 /** The get ask a minder sends the vaultDB for the box at `TH.BoxScope`: the bank's, tracking the roots at revision 0. */
@@ -161,6 +161,17 @@ export function boxScopeOf(boxlabel: string): ThingScope { return { ...TH.ThingB
 
 /** Put `box` in `vaultDB`'s datastore as another device would, telling no watch. */
 export function cheatBox(vaultDB: MemoryVaultDB, box: DeliverableThing): void { vaultDB._cheat_things(TH.ThingBank).set(box.labelpath, box) }
+
+/** The labelpaths `kids` names, live and gone, in labelpath order, or undefined for no listing. */
+export function labelpathsOf(kids: Kids | undefined): Labelpath[] | undefined {
+  if (kids === undefined) { return undefined }
+  return [...Object.keys(kids.items), ...Object.keys(kids.gones)].map((label) => `${kids.parentpath}/${label}`).toSorted((one, other) => one.localeCompare(other, 'en'))
+}
+
+/** True when `minder`'s listing at `scope` is cached and marked stale. */
+export function isListingStaleAt(minder: VaultMinder, scope: ThingScope): boolean {
+  return minder.queryClient.getQueryState(minder.listQueryKey(scope))?.isInvalidated === true
+}
 
 /** A listener that records each event it is told. */
 export function everyEventListenerOf() { return vi.fn<(event: MinderEvent) => void>() }

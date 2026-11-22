@@ -6,7 +6,7 @@ import { Shell } from '../../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../../src/shapes/shapes-thingkinds'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, storedBoxOf, noticeOf, revtokAt, listenerOf, toldOf } from './world'
+import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, storedBoxOf, noticeOf, revtokAt, listenerOf, toldOf, labelpathsOf } from './world'
 
 describe("VaultMinder.get", () => {
   it("refuses bad_record for a scope of another bank", async () => {
@@ -265,7 +265,7 @@ describe("VaultMinder.list", () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { minder } = await minderWorldOf(vaultDB)
-    expect(await minder.list('box')).to.deep.equal([TH.BoxScope.labelpath])
+    expect(labelpathsOf(await minder.list('box'))).to.deep.equal([TH.BoxScope.labelpath])
     expect([minder.at(TH.BoxScope), minder.soonAt(TH.BoxScope)]).to.deep.equal([undefined, Thing.sparseOf(box)])
     expect(minder.isStaleAt(TH.BoxScope)).to.be.true
     expect(await minder.get(TH.BoxScope)).to.deep.equal(box)
@@ -333,15 +333,15 @@ describe("VaultMinder.list", () => {
     await minder.list('box')
     expect(badnewsOf(bank)).to.deep.equal([])
     vaultDB._cheat_things(TH.ThingBank).set('box/bad', { ...TH.boxThingOf('bad'), whisper_sealed: {} })
-    expect(await minder.list('box')).to.deep.equal([TH.BoxScope.labelpath])
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal([TH.BoxScope.labelpath])
+    expect(labelpathsOf(await minder.list('box'))).to.deep.equal([TH.BoxScope.labelpath])
+    expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal([TH.BoxScope.labelpath])
     expect(badnewsOf(bank)).to.deep.equal(['damaged_row'])
     expect(bank.tellBadNews.mock.calls[0]?.[0][0]).to.have.nested.property('meta.labelpaths').that.deep.equals(['box/bad'])
   })
 
   it("lists nothing under a root box with no boxes under it", async () => {
     const { minder } = await minderWorldOf(await bornOf(new MemoryVaultDB()))
-    expect(await minder.list('box')).to.deep.equal([])
+    expect(labelpathsOf(await minder.list('box'))).to.deep.equal([])
   })
 
   it("sends the bank's list ask, which tracks the roots, and refuses where the bank is not stored", async () => {
@@ -353,7 +353,7 @@ describe("VaultMinder.list", () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder, bank } = await minderWorldOf(vaultDB)
     const listed = vi.spyOn(vaultDB, 'tryListThings')
-    expect(await minder.list('box/openai')).to.deep.equal([])
+    expect(labelpathsOf(await minder.list('box/openai'))).to.deep.equal([])
     expect(listed.mock.calls).to.deep.equal([[bank.makeListAsk({ labelpath: 'box/openai', ifAbsent: 'nil' })]])
   })
 
@@ -364,12 +364,13 @@ describe("VaultMinder.list", () => {
 })
 
 describe("VaultMinder.tryList", () => {
-  it("resolves the labelpaths listed as its good outcome", async () => {
+  it("resolves the Kids value listed as its good outcome", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { minder } = await minderWorldOf(vaultDB)
-    expect(await minder.tryList('box')).to.deep.equal({ ok: true, val: [TH.BoxScope.labelpath] })
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal([TH.BoxScope.labelpath])
+    const outcome = await minder.tryList('box')
+    expect(outcome).to.deep.equal({ ok: true, val: minder.listingAt(TH.RootScope) })
+    expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal([TH.BoxScope.labelpath])
   })
 
   it("answers the vaultDB's refusal", async () => {

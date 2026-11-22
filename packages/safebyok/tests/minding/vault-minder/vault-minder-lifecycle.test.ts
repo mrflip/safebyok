@@ -6,7 +6,7 @@ import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { Hours24, fakeBankOf, minderOf, minderWorldOf, storedBoxOf, boxScopeOf, cheatBox } from './world'
+import { Hours24, fakeBankOf, minderOf, minderWorldOf, storedBoxOf, boxScopeOf, cheatBox, labelpathsOf } from './world'
 
 describe("VaultMinder.make", () => {
   const vaultDB = new MemoryVaultDB()
@@ -136,7 +136,7 @@ describe("VaultMinder.hello", () => {
       await vi.advanceTimersByTimeAsync(Hours24)
       expect(minder.at(boxScopeOf('anthropic'))).to.deep.equal(anthropic)
       expect(minder.soonAt(TH.BoxScope)).to.deep.equal(Thing.sparseOf(box))
-      expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/anthropic', 'box/openai'])
+      expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/anthropic', 'box/openai'])
       minder.goodbye()
       expect([minder.at(boxScopeOf('anthropic')), minder.soonAt(TH.BoxScope)]).to.deep.equal([undefined, undefined])
     } finally {

@@ -10,7 +10,6 @@ import * as Phrases from '../phrases'
 
 /** This device's cache of one bank's boxes under its root box, and their listings, the root box's included ({@link Minder}).
  * The bank, its main gate and the root box itself are its BankMinder's, which it reads the root box from.
- * `hello` caches the root box's listing, empty and bare: bare until a list sets it.
  */
 export class VaultMinder extends Minder {
   // == [Props]: #bankMinder

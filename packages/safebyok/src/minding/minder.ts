@@ -8,14 +8,14 @@
 /** `Minder`, the code a VaultMinder and a BankMinder share: they mind the Things of one bank in a TanStack Query cache, its own or one shared with minders of other banks. */
 
 import * as TSQ from '@tanstack/query-core'
-import { deepFreeze, union } from 'es-toolkit'
-import { Outcome, Validator } from 'safebyok-big/internals'
+import { deepFreeze } from 'es-toolkit'
+import { CX, Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
 import { type BoxRecord, type Sparse, type ThingRecord, type ThingScope, type Tombstone, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetAsk, type ThingWatchScope, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
-import type { ThingNotice, VaultDB, WriteThingAnswer } from '../storage/vault-db'
+import type { Kids, ThingNotice, VaultDB, WriteThingAnswer } from '../storage/vault-db'
 import { refusedAnswerOf } from '../storage/refused-answer'
 import {
   type DeliverableThing, type GotAnswer, type MinderEvent, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts,
@@ -37,10 +37,9 @@ export type Labelpathed = { labelpath: Labelpath }
  * It may also have a soon: a sparse record newer than the item, removed once the item catches up. Each Thing whose
  * children it minds has a listing of them, once listed.
  * Records arrive from gets, lists, good writes, the world each answer carries, and the watch, in any order, late or more
- * than once. A whole record, tombstone or shell lands in the item and a sparse record in the soon, and each adds the
- * Thing to its parent's listing, where one is cached. A list sets the parent's listing. A record of a Thing it does not
- * mind lands nowhere. It caches only from `hello` until `goodbye`, and `goodbye` empties its cache. Where it minds the
- * root box's listing, `hello` caches it empty and bare: bare until a list sets it.
+ * than once. A whole record, tombstone or shell lands in the item and a sparse record in the soon. A listing is the
+ * {@link Kids} value a list answered, replaced whole by the next. A record of a Thing it does not mind lands nowhere. It
+ * caches only from `hello` until `goodbye`, and `goodbye` empties its cache.
  *
  * ## Invariants
  * - For a caller or listener using it as documented, what it shows depends only on which records the minder has heard
@@ -57,30 +56,22 @@ export type Labelpathed = { labelpath: Labelpath }
  * - A sparse record lands in the soon before its item is invalidated, so from the soon's `success` on, every read and
  *   get finds the item behind ({@link SoonEvent}). A refused get leaves the item invalidated too, until a record lands in it.
  * - A listener is told of each item, soon and listing in the order the cache changes, and what it is told never goes
- *   back either: each record told of an item, or of a soon, is no older than the last, and each listing lists every
- *   labelpath the last one did. Only a removal breaks the run, and what is told after it starts over. A soon is removed
+ *   back either: each record told of an item, or of a soon, is no older than the last, and each listing was read no
+ *   earlier than the last. Only a removal breaks the run, and what is told after it starts over. A soon is removed
  *   whenever the item catches up with it; the cache removes an item or a listing only at `goodbye`.
  *   {@link ThingEvent}, {@link SoonEvent} and {@link ListingEvent} give the order of the events.
  * - A get answered with a revision older than the newest cached when it began refuses `stale_read`, and changes nothing.
- * - A listing never drops a labelpath: a list adds what it answers, and each record that lands adds its own. So once a
- *   listing is cached, what it lists depends only on which records arrived, never on their order.
- * - The root box's listing, where minded, is cached from `hello` until `goodbye`. So each box that lands
- *   joins it, before its first list or after: what it lists depends only on which records arrived since `hello`, never
- *   on whether they came before the answer of its first list.
- * - A listing is bare from `hello` until a list sets it, even a list that answers nothing. A record joining it, or an
- *   `invalidate`, leaves it bare. Only the root box's listing is ever bare.
- * - A listing is the same array until a labelpath joins it.
- * - A listing lists only Things the vaultDB has stored, tombstones included, never a shell. It lists by labelpath alone,
- *   so when the parent's life changes it keeps the earlier life's children beside the new life's.
- * - A record that lands while its parent has no listing cached joins none: the parent's next list lists it.
- * - An operation caches its own good answer (the record got or written, or the labelpaths listed, never a write's ask)
- *   and the bank and main gate of the world its answer carries, refused or not. Any other record an answer carries (a
- *   refusal's `dbhas`, each Thing a list answers, or a tracked bank, main gate or root box) is cached only as the watch
- *   tells of it, and the watch tells of it before the operation returns.
+ * - A listing is what the vaultDB last answered a list of its parent with, never joined to: a list landing replaces it
+ *   whole, unless the listing cached was read later, by `read_tc`. A list refused leaves it as it was.
+ * - A child's first stored record to land, in its item or its soon while the other has none, marks its parent's listing
+ *   stale, and a listing a host observes is listed again. A shell marks nothing.
+ * - An operation caches its own good answer (the record got or written, or the {@link Kids} value listed, never a write's
+ *   ask) and the bank and main gate of the world its answer carries, refused or not. Any other record an answer carries (a
+ *   refusal's `dbhas`, a list's parentage and deltas, or a tracked bank, main gate or root box) is cached only as the
+ *   watch tells of it, and the watch tells of it before the operation returns.
  * - A refused write changes no item it writes and marks nothing stale. Its `dbhas`, through the watch, may still change an item.
- * - A write's answer and the watch's notice of the same write leave the same item and listing, in either order: the
- *   later changes nothing.
- * - `invalidate` asks the vaultDB nothing, and marks listings stale, never items: it changes no item, and no listing's labelpaths.
+ * - A write's answer and the watch's notice of the same write leave the same item, in either order: the later changes nothing.
+ * - `invalidate` asks the vaultDB nothing, and marks listings stale, never items: it changes no item, and no listing.
  */
 export abstract class Minder {
   // == [Props]: userid, banklabel, #bank, vaultDB, #tsq, #landers, #queryCacheOpts, #unwatch, #isReady
@@ -149,7 +140,7 @@ export abstract class Minder {
     this.#tsq.setQueryDefaults([...bankHead, Listkind], {
       ...fixed,
       queryFn:           ({ queryKey }) => this.#fetchListing(this.#scopeOfQueryKey(queryKey)),
-      structuralSharing: landedListingOf,
+      structuralSharing: landedKidsOf,
     })
   }
   // --
@@ -157,7 +148,6 @@ export abstract class Minder {
   // == [Starting and ending]: hello, goodbye
 
   /** Start minding: until `goodbye`, answer gets, and cache each change the vaultDB notifies. A second call does nothing.
-   * Where it minds the root box's listing, it caches it empty and bare: each box received joins it, and it is bare until a list sets it.
    * Refuses while another minder of this bank is minding in the same client.
    */
   hello(): void {
@@ -167,10 +157,9 @@ export abstract class Minder {
     this.#isReady = true
     this.#landers.set(bankHash, (val, queryKey) => { this.#landedByFetch(val, queryKey) })
     this.#setQueryDefaults()
-    if (this.mindsListingAt(Labelpath.RootBox)) { this.#seedListing(this.#rootBoxScope) }
     this.#unwatch = this.vaultDB.watch(
       this.scope,
-      // Synchronous on purpose: the vaultDB notifies of a refusal's dbhas, each changed tracked Thing and each Thing a list answers before its verb returns. An await here would cache them after the operation resumes.
+      // Synchronous on purpose: the vaultDB notifies of a refusal's dbhas, each changed tracked Thing and a list's parentage and deltas before its verb returns. An await here would cache them after the operation resumes.
       (notice: ThingNotice) => { this.sendToTSQ(notice.val) },
       (news)                => { this.#bank.tellBadNews([news]) },
     )
@@ -186,7 +175,7 @@ export abstract class Minder {
   }
   // --
 
-  // == [Reading]: at, soonAt, isBehindAt, listingAt, isListingBareAt, tryAt, get, tryGet, backgroundRefresh, list, tryList, isStaleAt, listen
+  // == [Reading]: at, soonAt, isBehindAt, listingAt, tryAt, get, tryGet, backgroundRefresh, list, tryList, isStaleAt, listen
 
   /** The record `scoped`'s item has, however old, or undefined for no item. Never asks the vaultDB. */
   at<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): ThingAt<LabelpathT> | Tombstone<ThingAt<LabelpathT>> | undefined {
@@ -203,18 +192,9 @@ export abstract class Minder {
     return this.#isBehindAt(this.#demandItemScope(scoped))
   }
 
-  /** The cached listing of `scoped`'s children, however old, or undefined for none. Never asks the vaultDB.
-   * A bare listing lists only the children received since `hello` ({@link isListingBareAt}).
-   */
-  listingAt(scoped: ThingScope): readonly Labelpath[] | undefined {
-    return this.#tsq.getQueryData<readonly Labelpath[]>(this.listQueryKey(this.#demandListingScope(scoped)))
-  }
-
-  /** True when `scoped`'s listing is cached but bare: no list has set it since `hello`, so the vaultDB may have more. */
-  isListingBareAt(scoped: ThingScope): boolean {
-    // A listing a first list is still fetching, or left refused, is a query with no labelpaths: it is not cached.
-    const listing = this.#tsq.getQueryState(this.listQueryKey(this.#demandListingScope(scoped)))
-    return (listing?.data !== undefined) && (listing.dataUpdatedAt === BareListedAt)
+  /** The cached listing of `scoped`'s children, however old, or undefined for none: the {@link Kids} value a list last answered. Never asks the vaultDB. */
+  listingAt(scoped: ThingScope): Kids | undefined {
+    return this.#tsq.getQueryData<Kids>(this.listQueryKey(this.#demandListingScope(scoped)))
   }
 
   /** The cache's answer for `scoped`, without waiting on the vaultDB.
@@ -256,22 +236,21 @@ export abstract class Minder {
     void this.tryGet(scoped, opts)
   }
 
-  /** List the labelpaths of the Things directly under `labelpath`, tombstones included, in labelpath order, from the vaultDB.
+  /** List the Things directly under `labelpath` from the vaultDB, as the {@link Kids} value it answers: the live ones and the tombstones, by label.
    * A list called while another of the same labelpath is under way answers what that one does.
-   * They are added to the listing at `labelpath` ({@link listingAt}). A live Thing listed is cached as its soon where it
-   * is newer than the item, so the next get fetches the item whole. A tombstone lands in the item, so a get of it answers
-   * from the cache. A Thing stored damaged is left out, and reported to the bank's `tellBadNews`.
+   * The listing at `labelpath` ({@link listingAt}) takes the answer, unless it has one read later. The parent and each child
+   * listed land first: a live child as its soon where it is newer than the item, so the next get fetches the item whole; a
+   * tombstone in the item, so a get of it answers from the cache. A Thing stored damaged is left out, and reported to the bank's `tellBadNews`.
    */
-  async list(labelpath: Labelpath): Promise<Labelpath[]> {
+  async list(labelpath: Labelpath): Promise<Kids> {
     this.#demandListingScope({ ...this.scope, labelpath: MinderChecks.minderLabelpath.parse(labelpath) })
     this.#demandReady()
-    // Under staleTime 0 TanStack fetches whatever the listing holds, and shares a fetch under way. Each caller gets its own
-    // array: callers sharing a list share the one its fetch returned.
-    return [...await this.#tsq.query<readonly Labelpath[]>({ queryKey: this.listQueryKey({ labelpath }), staleTime: 0 })]
+    // Under staleTime 0 TanStack fetches whatever the listing holds, and shares a fetch under way.
+    return await this.#tsq.query<Kids>({ queryKey: this.listQueryKey({ labelpath }), staleTime: 0 })
   }
 
   /** {@link list}, resolving an `Outcome` instead of throwing: a refusal, misuse included, is its bad outcome. */
-  async tryList(labelpath: Labelpath): Promise<Outcome.Outcome<Labelpath[]>> {
+  async tryList(labelpath: Labelpath): Promise<Outcome.Outcome<Kids>> {
     return await Outcome.outcomeOf(() => this.list(labelpath))
   }
 
@@ -306,9 +285,9 @@ export abstract class Minder {
   // == [Invalidating]: invalidate
 
   /** Mark stale the listings under the Thing at `labelpath`, its own included, or every listing where `labelpath` is undefined.
-   * Each listing marked tells one {@link ListingEvent} with `state.isInvalidated` true, and no more until a list or a joining record sets it again.
+   * Each listing marked tells one {@link ListingEvent} with `state.isInvalidated` true, and no more until a list sets it again.
    * A listing a refused list left stale tells none.
-   * It asks the vaultDB nothing, and leaves what each listing lists unchanged.
+   * It asks the vaultDB nothing, and leaves each listing unchanged.
    */
   invalidate(labelpath: Labelpath | undefined, opts: MinderInvalidateOpts): void {
     MinderChecks.minderInvalidateOpts.parse(opts)
@@ -345,7 +324,7 @@ export abstract class Minder {
   }
   // --
 
-  // == [TSQ Direct Cache Calls]: #doGet, #fetchRecord, #fetchListing, #itemAt, #soonAt, #soonestAt, #isBehindAt, #tsqFind, sendToTSQ, #landWorld, #landedByFetch, #settleLanded, #markBehinds, #seedListing, #addToParentListing
+  // == [TSQ Direct Cache Calls]: #doGet, #fetchRecord, #fetchListing, #itemAt, #soonAt, #soonestAt, #isBehindAt, #tsqFind, sendToTSQ, #landWorld, #landedByFetch, #settleLanded, #isFirstStored, #markBehinds
 
   // TanStack resolves with what the queryFn returned, not what structural sharing left in the cache: a notice that landed during the
   // get may have left the item a later record.
@@ -371,16 +350,16 @@ export abstract class Minder {
     return deepFreeze(record)
   }
 
-  // Only the labelpaths land here: the vaultDB notifies each Thing listed before it answers, so each lands through the
-  // watch, and joins the listing where one is cached, before the listing itself does.
-  /** Fetch the labelpaths listed under `scoped`, telling the bank's `tellBadNews` of any Thing stored damaged. */
-  async #fetchListing(scoped: ThingScope): Promise<readonly Labelpath[]> {
+  // Only the Kids value lands here: the vaultDB notifies the parent and each Thing listed before it answers, so each lands
+  // through the watch before the listing itself does.
+  /** Fetch the {@link Kids} value of `scoped`'s children, deeply frozen, telling the bank's `tellBadNews` of any Thing stored damaged. */
+  async #fetchListing(scoped: ThingScope): Promise<Kids> {
     const ask    = this.#bank.makeListAsk({ labelpath: scoped.labelpath, ifAbsent: 'nil' })
     const answer = await this.vaultDB.tryListThings(ask)
     this.#landWorld(answer.world)
     if (! answer.ok) { throw answer.err }
     if (answer.damaged_rows.length > 0) { this.#bank.tellBadNews([Throwers.childrenStoredDamaged(ask, answer.damaged_rows)]) }
-    return Object.freeze(answer.val.map((record) => record.labelpath))
+    return deepFreeze(answer.val)
   }
 
   /** The record `scoped`'s item has, or undefined for no item. */
@@ -413,19 +392,25 @@ export abstract class Minder {
   // Every record but a get's lands here: TanStack lands a get's record in the item itself, then calls #landedByFetch.
   // A whole record at the item's revision lands, and makes the item fresh as of now, as TanStack counts a confirmation from
   // the server. An older one lands nowhere: it would make the newer record read fresh as of its arrival.
-  /** Cache `record` in its item or soon, and in its parent's listing, while minding, where this minder minds its Thing.
-   * A whole record older than the item, or a sparse one no newer than the soonest cached, joins only the listing.
+  /** Cache `record` in its item or soon while minding, where this minder minds its Thing.
+   * A whole record older than the item, or a sparse one no newer than the soonest cached, lands nowhere.
    */
   protected sendToTSQ(record: DeliverableThing): void {
     if (! this.#isReady) { return }
     deepFreeze(this.#checkedDelivered(record, this.scope))
     if (! this.mindsItemAt(record.labelpath)) { return }
+    let isFirst = false
     if (! Thing.isSparse(record)) {
-      if (! isOlder(this.#itemAt(record), record)) { this.#tsq.setQueryData(this.itemQueryKey(record), record) }
+      const prior = this.#itemAt(record)
+      if (! isOlder(prior, record)) {
+        this.#tsq.setQueryData(this.itemQueryKey(record), record)
+        isFirst = this.#isFirstStored(record, this.itemQueryKey(record), prior)
+      }
     } else if (isNewer(this.#soonestAt(record), record)) {
       this.#tsq.setQueryData(this.soonQueryKey(record), record)
+      isFirst = this.#isFirstStored(record, this.soonQueryKey(record), undefined)
     }
-    this.#settleLanded(record)
+    this.#settleLanded(record, isFirst)
   }
 
   // The world is read with the answer, in one step: its bank and main gate are as new as the answer.
@@ -440,16 +425,32 @@ export abstract class Minder {
   // A listing's fetch needs nothing more: the Things it lists landed through the watch before it. A soon is never fetched.
   /** Settle what a fetch that just landed `val` under `queryKey` brings about, where it is an item of this bank. */
   #landedByFetch(val: unknown, queryKey: TSQ.QueryKey): void {
-    if (TSQ.partialMatchKey(queryKey, [...bankKeyHeadOf(this.scope), Itemkind])) { this.#settleLanded(val as DeliverableThing) }
+    if (! TSQ.partialMatchKey(queryKey, [...bankKeyHeadOf(this.scope), Itemkind])) { return }
+    const record = val as DeliverableThing
+    this.#settleLanded(record, this.#isFirstStored(record, queryKey, undefined))
   }
 
   // The record has landed before #markBehinds invalidates the item or removes the soon, so a listener told of a soon's
   // success already finds the item behind, and a get there fetches it; and the item's invalidate follows the soon's
-  // success at once, before the listing's join.
-  /** Bring `record`'s soon, item and parent's listing up to date with its having landed, or been dropped. */
-  #settleLanded(record: DeliverableThing): void {
+  // success at once, before the listing's. cancelRefetch false: a list's own children land while it is under way, and
+  // the list joined takes them in; any other refetch would cancel it and start it again.
+  /** Bring `record`'s soon and item up to date with its having landed, or been dropped, and mark its parent's listing stale where `isFirst`. */
+  #settleLanded(record: DeliverableThing, isFirst: boolean): void {
     this.#markBehinds(record)
-    this.#addToParentListing(record)
+    if (! isFirst) { return }
+    void this.#tsq.invalidateQueries({ queryKey: this.listQueryKey({ labelpath: Labelpath.parentOf(record.labelpath) }), exact: true }, { cancelRefetch: false })
+  }
+
+  // TanStack counts each landing in an entry's dataUpdateCount, 1 at its first. A shell holds an item where nothing is
+  // stored, so the first stored record over it counts as first too: a box put on this device gets its shell first.
+  /** True when `record`, just landed under `landedKey` over `prior`, is the first stored record of its Thing: its entry's first landing,
+   * or its first over a shell, while its other entry, the item or the soon, has no stored record.
+   */
+  #isFirstStored(record: DeliverableThing, landedKey: TSQ.QueryKey, prior: DeliverableThing | undefined): boolean {
+    if (Thing.isVoidSentinel(record)) { return false }
+    const isFirstHere = (this.#tsq.getQueryState(landedKey)?.dataUpdateCount === 1) || ((prior !== undefined) && Thing.isVoidSentinel(prior))
+    const other = Thing.isSparse(record) ? this.#itemAt(record) : this.#soonAt(record)
+    return isFirstHere && ((other === undefined) || Thing.isVoidSentinel(other))
   }
 
   // TanStack tells nothing when it invalidates a query already invalidated, so an item tells its falling behind once until
@@ -466,24 +467,6 @@ export abstract class Minder {
       return
     }
     void this.#tsq.invalidateQueries({ queryKey: this.itemQueryKey(scoped), exact: true, refetchType: 'none' })
-  }
-
-  // Its time is TanStack's for a query never fetched, so the listing reads as bare until a list sets it.
-  /** Cache `scoped`'s listing empty and bare. */
-  #seedListing(scoped: ThingScope): void {
-    this.#tsq.setQueryData<readonly Labelpath[]>(this.listQueryKey(scoped), [], { updatedAt: BareListedAt })
-  }
-
-  // Each record that lands joins its parent's listing here, whatever its source. A shell is stored nowhere, so it is no
-  // one's child; and a root's parent, '', is never listed. A join is not a list, so the listing's time stays the time a list
-  // last set it, as TanStack dates data derived from another query at that query's time: a bare listing stays bare.
-  /** Add `record`'s labelpath to its parent's listing, where one is cached that lacks it. */
-  #addToParentListing(record: DeliverableThing): void {
-    if (Thing.isVoidSentinel(record)) { return }
-    const parentKey = this.listQueryKey({ labelpath: Labelpath.parentOf(record.labelpath) })
-    const listing   = this.#tsq.getQueryState<readonly Labelpath[]>(parentKey)
-    if ((listing?.data === undefined) || listing.data.includes(record.labelpath)) { return }
-    this.#tsq.setQueryData<readonly Labelpath[]>(parentKey, listingOf(listing.data, [record.labelpath]), { updatedAt: listing.dataUpdatedAt })
   }
   // --
 
@@ -555,16 +538,13 @@ export abstract class Minder {
   abstract get rootBox(): BoxRecord | VoidSentinel
   // --
 
-  // == [Checks]: scope, queryClient, #rootBoxScope, #demandOwnScope, #demandItemScope, #demandListingScope, #checkedDelivered, #demandReady, #scopeOfQueryKey
+  // == [Checks]: scope, queryClient, #demandOwnScope, #demandItemScope, #demandListingScope, #checkedDelivered, #demandReady, #scopeOfQueryKey
 
   /** The scope of this minder's bank. */
   get scope(): ThingWatchScope { return { userid: this.userid, banklabel: this.banklabel } }
 
   /** The QueryClient this minder caches in: hand it to TanStack's `QueryClientProvider` to observe what it caches. */
   get queryClient(): TSQ.QueryClient { return this.#tsq }
-
-  /** The scope of the bank's root box. */
-  get #rootBoxScope(): ThingScope { return { ...this.scope, labelpath: Labelpath.RootBox } }
 
   /** The scope of `labelpathed`, demanding that it is in this minder's bank. */
   #demandOwnScope(labelpathed: Labelpathed): ThingScope {
@@ -652,7 +632,7 @@ export abstract class Minder {
   // --
 }
 
-// == [Helpers]: Itemkind, Soonkind, Listkind, EntrykindIdx, Marks, labelsOf, bankHashOf, Lander, LandersOfClient, BareListedAt, TellableTSQEvent, isTellableTSQEvent, isNewer, isOlder, gotAnswerOf, isTimelyQuery, listingOf, landedListingOf
+// == [Helpers]: Itemkind, Soonkind, Listkind, EntrykindIdx, Marks, labelsOf, bankHashOf, Lander, LandersOfClient, TellableTSQEvent, isTellableTSQEvent, isNewer, isOlder, gotAnswerOf, isTimelyQuery, isKids, landedKidsOf
 
 /** The entrykind segment of an item's query key. */
 const Itemkind = 'item'
@@ -679,9 +659,6 @@ type Lander = (val: unknown, queryKey: TSQ.QueryKey) => void
 // A client is a TanStack QueryClient as a host's QueryClientProvider takes it, so what minders it has is kept beside it.
 /** The minders attached to each client {@link Minder.makeClient} made, by {@link bankHashOf} of their bank's key head. */
 const LandersOfClient = new WeakMap<TSQ.QueryClient, Map<string, Lander>>()
-
-/** The time a bare listing was last listed: TanStack's `dataUpdatedAt` for a query no fetch has set. */
-const BareListedAt = 0
 
 /** A cache event a listener hears of, as {@link isTellableTSQEvent} narrows it: a query added, updated or removed. */
 type TellableTSQEvent = Readonly<
@@ -724,17 +701,17 @@ function isTimelyQuery(itemQuery: TSQ.Query<ThingRecord | Tombstone<ThingRecord>
   return (! itemQuery.isStaleByTime(staleTime))
 }
 
-/** A listing of every labelpath in `prior` and in `labelpaths`, once each, in labelpath order. */
-function listingOf(prior: readonly Labelpath[], labelpaths: readonly Labelpath[]): Labelpath[] {
-  // Labelpaths sort by code unit, as the vaultDB lists them; the union has no two alike. The rule's `one - other` is for numbers.
-  return union(prior, labelpaths).toSorted((one: Labelpath, other: Labelpath) => ((one < other) ? -1 : 1)) // eslint-disable-line unicorn/prefer-simple-sort-comparator
+/** True for a {@link Kids} value. */
+function isKids(val: unknown): val is Kids {
+  return CX.isPlainBag(val) && (val['modelkind'] === 'kids')
 }
 
-// A list lands what it lists over what the listing had, so a Thing that joined while the list was under way stays listed.
-/** TanStack's structural sharing for a listing: every labelpath `prior` and `next` list, frozen; `prior` itself where `next` adds none. */
-const landedListingOf = (prior: unknown, next: unknown): unknown => {
-  const landed = listingOf((prior ?? []) as readonly Labelpath[], next as readonly Labelpath[])
-  return Object.freeze(TSQ.replaceEqualDeep(prior, landed))
+// TanStack shares structure through this both between a listing's values and between what a host's `select` returns from
+// them, so anything but two Kids values gets TanStack's own default. A read_tc compares as text in the order of the reads.
+/** TanStack's structural sharing for a listing: `prior` where it was read later than `next`, else `next`, frozen, with the parts equal to `prior`'s kept. */
+function landedKidsOf(prior: unknown, next: unknown): unknown {
+  if (isKids(prior) && isKids(next) && (prior.read_tc > next.read_tc)) { return prior }
+  return deepFreeze(TSQ.replaceEqualDeep(prior, next))
 }
 // --
 

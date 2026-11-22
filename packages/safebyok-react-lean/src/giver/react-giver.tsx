@@ -6,7 +6,7 @@ import { type DataTag, type QueryKey, type UseMutationOptions, type UseMutationR
 import { pick } from 'es-toolkit'
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, Labelpath,
+  type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, type Kids, Labelpath,
   type LiveOf, type LivePublicPropsOf, MinderEventFormat, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
   PendingBank, Shell, type Sidecar, VaultMinder, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
 } from 'safebyok'
@@ -412,12 +412,11 @@ function makeBankGiver(friend: BankFriend) {
     return { data: (shown === undefined) ? undefined : select(shown) }
   }
 
-  // The minder's listing fetches by a list, and is cached from `hello`, bare: TanStack reads it stale, as data no fetch has
-  // set, so the hook's first render once the bank is up lists the root box.
+  // The minder's listing fetches by a list, so the hook's first render once the bank is up lists the root box.
   /** The labelpaths of the bank's boxes, through React Query, for a list that renders each one by {@link useBox}.
-   * `data` is the labelpaths in labelpath order, and undefined until the user's device starts. It is the same array until a box joins.
-   * Until the bank is brought up and its first list lands, it lists only the boxes this device has heard of: `isFetching` shows that list.
-   * A deleted box stays listed, and its `useBox` answers null. A box this device writes or hears of joins at once. A list refused shows as its `error`.
+   * `data` is the labelpaths in labelpath order, and undefined until the first list lands. It is the same array until the labelpaths change.
+   * A deleted box stays listed, and its `useBox` answers null. A box this device writes or hears of for the first time lists again,
+   * and joins when that list lands. A list refused shows as its `error`.
    * @example
    *   const { data: labelpaths } = Knock.useBoxList()
    *   labelpaths?.map((labelpath) => <JokeRow key={labelpath} labelpath={labelpath} />)
@@ -425,7 +424,7 @@ function makeBankGiver(friend: BankFriend) {
   function useBoxList(): UseQueryResult<readonly string[]> {
     const { device, client } = useShown()
     const isUp = useBank(isBroughtUp)
-    return useQuery<readonly Labelpath[], Error, readonly string[]>({
+    return useQuery<Kids, Error, readonly string[]>({
       queryKey: boxListQueryKeyOf({ userid: useridOf(device), banklabel }),
       ...((! isUp || (device === null)) && { queryFn: skipToken }),
       select:   hostLabelpathsOf,
@@ -756,10 +755,10 @@ function boxLabelpathOfNamed(boxNamed: BoxNamed): BoxLabelpath {
   return (typeof boxNamed === 'string') ? boxLabelpathOf(boxNamed) : Checks.boxScoped.parse(boxNamed).labelpath
 }
 
-// Labelpaths are flat: a box's label is the host's labelpath.
-/** The host's labelpaths of the boxes the core lists at `boxLabelpaths`. */
-function hostLabelpathsOf(boxLabelpaths: readonly Labelpath[]): readonly string[] {
-  return boxLabelpaths.map((boxLabelpath) => Labelpath.labelOf(boxLabelpath))
+// Labelpaths are flat: a box's label is the host's labelpath. Labels sort by code unit, as the vaultDB lists them.
+/** The host's labelpaths of the boxes a list answered as `kids`, live and deleted, in labelpath order. */
+function hostLabelpathsOf(kids: Kids): readonly string[] {
+  return [...Object.keys(kids.items), ...Object.keys(kids.gones)].toSorted((one, other) => ((one < other) ? -1 : 1)) // eslint-disable-line unicorn/prefer-simple-sort-comparator
 }
 
 /** The patch and the secrets of a box write, read from a form with the host's `opts` and then stripped of its secret fields, whether or not they could be read.

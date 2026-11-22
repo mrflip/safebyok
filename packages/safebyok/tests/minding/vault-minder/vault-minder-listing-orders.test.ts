@@ -1,10 +1,10 @@
-import { describe, expect, it, vi } from 'vitest'
-import type { Labelpath } from '../../../src/shapes/primitives'
+import { describe, expect, it } from 'vitest'
 import type { ThingRecord, Tombstone } from '../../../src/shapes/shapes-thing'
+import type { Kids } from '../../../src/storage/vault-db'
 import { MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { QuietVaultDB, minderWorldOf, storedBoxOf, noticeOf, boxScopeOf, cheatBox, boxBirthAskOf, listenerOf, isListingEvent } from './world'
+import { QuietVaultDB, minderWorldOf, storedBoxOf, noticeOf, boxScopeOf, cheatBox, boxBirthAskOf, listenerOf, isListingEvent, isListingStaleAt, labelpathsOf } from './world'
 
 // == [Listings in any order]: ListingStep, OrdersWithoutWrite, ListingOrders, listingAfter
 
@@ -22,21 +22,14 @@ const OrdersWithoutWrite: readonly (readonly ListingStep[])[] = [
 ]
 const ListingOrders = OrdersWithoutWrite.flatMap((steps) => [0, 1, 2, 3].map((ii) => steps.toSpliced(ii, 0, 'write')))
 
-/** The root box's listing after `steps`, in order, over a datastore with the boxes openai, anthropic and mistral.
- * The get is of anthropic, the notice of mistral, and the write births cohere. Under `isListStale`, the list step answers
- * what the datastore had before the steps, openai alone: only the get, the write and the notice bring the other three.
- * Listed before, the root box's listing has openai alone before the steps. Its watch tells nothing: the notice step
- * hands the minder its one notice.
+/** The root box's listing after `steps`, in order, and a list more where they left it stale, over a datastore with the boxes
+ * openai, anthropic and mistral. The get is of anthropic, the notice of mistral, and the write births cohere. Its watch
+ * tells nothing: the notice step hands the minder its one notice.
  */
-async function listingAfter(steps: readonly ListingStep[], { isListedBefore, isListStale }: Readonly<{ isListedBefore: boolean, isListStale: boolean }>) {
+async function listingAfter(steps: readonly ListingStep[]) {
   const vaultDB = new QuietVaultDB()
   await storedBoxOf(vaultDB)
-  const { minder, bank, receive } = await minderWorldOf(vaultDB)
-  if (isListedBefore) { await minder.list('box') }
-  if (isListStale) {
-    const answered = await vaultDB.tryListThings(bank.makeListAsk({ labelpath: 'box', ifAbsent: 'nil' }))
-    vi.spyOn(vaultDB, 'tryListThings').mockResolvedValueOnce(answered)
-  }
+  const { minder, receive } = await minderWorldOf(vaultDB)
   const mistral = TH.boxThingOf('mistral')
   for (const box of [TH.boxThingOf('anthropic'), mistral]) { cheatBox(vaultDB, box) }
   const stepRunners: Readonly<Record<ListingStep, () => Promise<void> | void>> = {
@@ -46,40 +39,23 @@ async function listingAfter(steps: readonly ListingStep[], { isListedBefore, isL
     notice: () => { receive(noticeOf(mistral)) },
   }
   for (const step of steps) { await stepRunners[step]() }
-  return minder.listingAt(TH.RootScope)
+  if (isListingStaleAt(minder, TH.RootScope)) { await minder.list('box') }
+  return labelpathsOf(minder.listingAt(TH.RootScope))
 }
 
-describe("a VaultMinder's listing is the same, in any order", () => {
+describe("a VaultMinder's listing is current or marked stale, in any order", () => {
   describe("of a list, a get, a write and a notice", () => {
     for (const steps of ListingOrders) {
       const blurb = steps.join(', ')
       it(blurb, async () => {
-        expect(await listingAfter(steps, { isListedBefore: false, isListStale: false })).to.deep.equal(['box/anthropic', 'box/cohere', 'box/mistral', 'box/openai'])
-      })
-    }
-  })
-
-  describe("of a list answered before the get's, the write's and the notice's boxes were born, a get, a write and a notice, once listed", () => {
-    for (const steps of ListingOrders) {
-      const blurb = steps.join(', ')
-      it(blurb, async () => {
-        expect(await listingAfter(steps, { isListedBefore: true, isListStale: true })).to.deep.equal(['box/anthropic', 'box/cohere', 'box/mistral', 'box/openai'])
-      })
-    }
-  })
-
-  describe("of a stale first list, a get, a write and a notice", () => {
-    for (const steps of ListingOrders) {
-      const blurb = steps.join(', ')
-      it(blurb, async () => {
-        expect(await listingAfter(steps, { isListedBefore: false, isListStale: true })).to.deep.equal(['box/anthropic', 'box/cohere', 'box/mistral', 'box/openai'])
+        expect(await listingAfter(steps)).to.deep.equal(['box/anthropic', 'box/cohere', 'box/mistral', 'box/openai'])
       })
     }
   })
 })
 // --
 
-// == [Events in any order]: Openai, Reborn, eventsAfter, backwardRecords, shrunkListings
+// == [Events in any order]: Openai, Reborn, eventsAfter, backwardRecords, backwardListings
 
 /** The box openai, as the datastore has it at the start. */
 const Openai = TH.boxThingOf()
@@ -119,9 +95,12 @@ function backwardRecords(records: readonly (ThingRecord | Tombstone<ThingRecord>
   })
 }
 
-/** Each listing in `listings`, told in that order, that lacks a labelpath of the one told before it. */
-function shrunkListings(listings: readonly (readonly Labelpath[] | undefined)[]) {
-  return listings.filter((labelpaths, ii) => (ii > 0) && (listings[ii - 1] ?? []).some((labelpath) => (! labelpaths?.includes(labelpath))))
+/** Each listing in `listings`, told in that order, read earlier than the one told before it. */
+function backwardListings(listings: readonly (Kids | undefined)[]) {
+  return listings.filter((kids, ii) => {
+    const prior = listings[ii - 1]
+    return (ii > 0) && (prior !== undefined) && ((kids === undefined) || (kids.read_tc < prior.read_tc))
+  })
 }
 
 describe("a VaultMinder tells each item and listing going forward, in any order", () => {
@@ -133,7 +112,7 @@ describe("a VaultMinder tells each item and listing going forward, in any order"
         const records  = events.flatMap((event) => ((event.eventkind === 'item') && (event.labelpath === TH.BoxScope.labelpath)) ? [event.state.data] : [])
         const listings = events.flatMap((event) => (isListingEvent(event) && (event.labelpath === 'box')) ? [event.state.data] : [])
         expect(backwardRecords(records)).to.deep.equal([])
-        expect(shrunkListings(listings)).to.deep.equal([])
+        expect(backwardListings(listings)).to.deep.equal([])
         expect(records.at(-1)).to.deep.equal(Reborn)
         expect(refusalkinds.filter((kind) => kind !== 'stale_read')).to.deep.equal([])
       })

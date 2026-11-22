@@ -740,7 +740,7 @@ describe("useBoxList", () => {
     await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
     expect(world.Bank.keys.boxList()).to.deep.equal(['sok', 'u1', 'acme', 'list', 'box', '#', 'kids'])
     const client = world.Bank.queryClient()
-    expect(client.getQueryData(BoxListKey)).to.deep.equal([`box/${TH.JokesPath}`])
+    expect(client.getQueryData(BoxListKey)).to.have.nested.property(`items.${TH.JokesPath}`)
     await client.invalidateQueries({ queryKey: world.Bank.keys.under() })
     expect(client.getQueryState(BoxListKey)?.isInvalidated).to.eq(false)
   })

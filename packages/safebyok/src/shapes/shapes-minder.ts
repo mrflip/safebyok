@@ -7,7 +7,7 @@ import type { BankMinder } from '../minding/bank-minder'
 import type { Bank } from '../models/bank'
 import type { RecordOfKind } from '../models/base-thing'
 import * as Phrases from '../phrases'
-import type { BadAnswer, GoodAnswer, VaultDB } from '../storage/vault-db'
+import type { BadAnswer, GoodAnswer, Kids, VaultDB } from '../storage/vault-db'
 import type { Banklabel, BoxLabelpath, EpochMillis, Labelpath, Lifepath, Lifeseq, Revtok, Userid } from './primitives'
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, type VoidSentinel, ThingChecks, ThingFormat } from './shapes-thing'
 import { type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, AskChecks } from './shapes-asks'
@@ -260,15 +260,15 @@ export type SoonEvent<KindT extends Thingkind = Thingkind> = KindT extends Thing
   ? MinderEventOf<Sparse<RecordOfKind<KindT>>, 'soon'> & RecordEventFields<KindT>
   : never
 
-/** A listing's query changed, its `eventkind` `'list'`. `state.data` is the labelpaths it lists, in labelpath order.
- * The array stays the same object until a labelpath joins. A listing marked stale has `state.isInvalidated` true, and still lists what it did.
- * It tells `success` each time a list sets it (even to the labelpaths it had), a labelpath joins it, or `hello` caches the
- * root box's, and `invalidate` when `invalidate` marks it stale.
+/** A listing's query changed, its `eventkind` `'list'`. `state.data` is the {@link Kids} value the vaultDB last answered a list with.
+ * A list landing replaces it whole, except where the listing has one read later (by `read_tc`); its `items` and `gones` stay the same objects while unchanged.
+ * It tells `success` each time a list lands, and `invalidate` when the listing is marked stale: by `invalidate`, or when a
+ * child lands for the first time, which also lists again while a host observes the listing. A stale listing still has what it had.
  * A list tells `fetch` as it starts, and `error` if refused, which leaves the listing as it was, `state.isInvalidated` true.
  * The first list of a listing not cached tells it `added`, `state.data` undefined until the list lands.
- * Each Thing a list answers lands before the list does: one new to the listing joins it, with its own `success`.
+ * The parent and each child a list answers land before the list does.
  */
-export type ListingEvent = MinderEventOf<readonly Labelpath[], 'list'> & Readonly<{
+export type ListingEvent = MinderEventOf<Kids, 'list'> & Readonly<{
   /** The modelkind of the Thing at `labelpath` and of every Thing listed, which is the same: a labelpath starts with its parent's. */
   modelkind: Thingkind
 }>
