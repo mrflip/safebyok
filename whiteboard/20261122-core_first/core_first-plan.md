@@ -5,7 +5,8 @@
 * **Levels** (defaults): review `medium`; worker `thread-worker` on `opus` at its own effort (`thread-worker-400k`
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
-* **Status**: planned; thread 1 starting.
+* **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
+* **Status**: thread 1 building.
 
 The Coach's request, verbatim:
 
