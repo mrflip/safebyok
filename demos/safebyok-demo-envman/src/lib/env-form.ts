@@ -36,13 +36,14 @@ export function envFieldsOf(form: FormData, rotatedAt: number): EnvFields {
   return { title, description: formTextOf(form, 'description'), rotation_period_ms: rotationDays * DayMs, last_rotated_at }
 }
 
-/** The text typed into each of `form`'s fields but the value, trimmed. */
+// Every field of envman's forms is text, never a file.
+/** The text typed into each of `form`'s fields but the value, as typed. */
 export function envTextsOfForm(form: FormData): EnvTexts {
   return {
-    title:            formTextOf(form, 'title'),
-    description:      formTextOf(form, 'description'),
-    rotation_days:    formTextOf(form, 'rotation_days'),
-    last_rotated_day: formTextOf(form, 'last_rotated_day'),
+    title:            (form.get('title') as string | null) ?? '',
+    description:      (form.get('description') as string | null) ?? '',
+    rotation_days:    (form.get('rotation_days') as string | null) ?? '',
+    last_rotated_day: (form.get('last_rotated_day') as string | null) ?? '',
   }
 }
 

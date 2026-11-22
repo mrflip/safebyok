@@ -16,10 +16,11 @@ export function EnvSettingsDialog({ title, env, onApply, onCancel }: Readonly<{
   const titleId = useId()
   // React empties the form after its action: a refused form shows again what was typed, for the user to mend.
   /** Hand the fields typed to `onApply`, or say why they will not do. */
-  const applyAction = (_prior: ApplyResult, form: FormData): ApplyResult => {
+  const applyAction = (prior: ApplyResult, form: FormData): ApplyResult => {
     try {
       onApply(envFieldsOf(form, env.last_rotated_at))
-      return { err: null, texts: envTextsOfForm(form) }
+      // The row's onApply closes the dialog: nothing reads the texts after a Done that is not refused.
+      return { err: null, texts: prior.texts }
     } catch (err) {
       return { err: err as Error, texts: envTextsOfForm(form) }
     }

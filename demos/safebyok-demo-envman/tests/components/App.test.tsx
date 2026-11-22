@@ -275,7 +275,7 @@ describe("Envman", () => {
     fireEvent.change(within(dialog).getByLabelText('Rotation period in days'), { target: { value: '7' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
     await within(dialog).findByText('Give it a title.')
-    expect(valuesIn(dialog, ['Title', 'Description', 'Rotation period in days'])).to.deep.equal(['', 'Rotated by hand', '7'])
+    expect(valuesIn(dialog, ['Title', 'Description', 'Rotation period in days'])).to.deep.equal([' ', 'Rotated by hand', '7'])
 
     fireEvent.change(within(dialog).getByLabelText('Title'), { target: { value: 'OPENAI_KEY_PROD' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }))

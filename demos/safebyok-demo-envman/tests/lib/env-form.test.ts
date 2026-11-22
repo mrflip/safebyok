@@ -33,9 +33,9 @@ describe("envFieldsOf", () => {
 })
 
 describe("envTextsOfForm", () => {
-  it("reads each field but the value, trimmed", () => {
+  it("reads each field but the value, as typed", () => {
     const form = formOf({ title: ' KEY ', val: 'sk-proj-fake-0123456789abcdef' })
-    expect(envTextsOfForm(form)).to.deep.equal({ title: 'KEY', description: '', rotation_days: '30', last_rotated_day: '2026-11-21' })
+    expect(envTextsOfForm(form)).to.deep.equal({ title: ' KEY ', description: '', rotation_days: '30', last_rotated_day: '2026-11-21' })
   })
 })
 
