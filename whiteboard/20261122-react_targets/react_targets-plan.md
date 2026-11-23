@@ -447,3 +447,51 @@ Findings, none repaired, each open with the Coach:
 
 Also noted: a selecting `useBank` renders once more, when the device appears; the tests' search of the host's client for a wrapped bankKey is now nearly vacuous, since nothing of ours goes there.
 
+
+## 2026-11-23: both lines land, the minder made simple, the threat model, the dojo
+
+Where things stand, replacing what earlier sections say of open PRs. The workshop's own PR (#817) has merged, so *How
+the Coach wants it run* above no longer describes a line: a round is now a PR of its own from main, or stacked on the
+one it needs.
+
+### What merged
+
+* The workshop's line, #818 … #837 and #817, then core_first's, #844 … #857 and #839. Main is `683175bef`.
+* **`one_client` ([#857](https://github.com/mrflip/safebyok/pull/857)).** The Coach asked which of three shapes the minder should have: a split between what manages the QueryClient and what queries it, one minder shared by all users, or "minder and TSQ have the same lifetime". He did not mind the first or third: "we don't need the common use case to be awesome, we need all use cases to be simple and work and to prove there are no races". Built as the third, with the lifetime the device's: one minder, one client, made together by the device before anyone signs in; persisters per user and bank, restored at `signIn`. It reverses #831's shared client. The reason: a device serves its first user for its life, so no client ever had a second minder, and restoring every user's roots before anyone is identified loaded wrapped bankKeys nobody asked for.
+* **Thread 12's F4 is closed in substance:** the roots are in a client no host reaches. F2 is closed by `useBoxList`'s doc, not checked by a run.
+
+### The threat model (the Coach, 2026-11-23)
+
+Written as `docs/threat-model.md` ([#859](https://github.com/mrflip/safebyok/pull/859), a draft). What the Coach ruled or said, in his words:
+
+* Time is a dimension of it, and "some of them do defend against a script in the page": `withWhisper`, the strength check, compare-and-swap and stamps. A script in the page is bounded by time, not out of the model.
+* A stolen device belongs beside the walk-up.
+* Two lease clocks: "only after we have things working. And it's a customer option: a password manager or doppler is one thing, a price-capped 96-character PAT is another." "Assume the common use case has lock times of days or nevers." "This is void if they have control over the clock."
+* A freshness bound on the gate: "also real, also a TODO, also clock".
+* The session-replay marker on the parts: "TODO that!". "Masking a field at the tab-sleep notification or a timer is quite reasonable." All four are in `TODO.md`.
+* Forms: "We offer uncontrolled fields with bells and whistles: eyeball unmasking, timer and page lock, mask display schedule, placeholder text. sidecar fields are controlled; customer defines how the sidecar and whisper fields map to box elements."
+* Reloading the page to switch users or sign out: "I don't think a customer will stand for this."
+
+Proposed by the session, not ruled:
+
+* **The table of what a form keeps after each outcome** (kept through a refusal or a failure; cleared when stored or cancelled).
+* **Sign-out comes into bounds, alone, as the next core thread:** one device serves users in turn, its client the same object throughout, since a hook binds its client once.
+* **The roots reach a host as records with the key material left out, not as the client:** `useGate` does this for the gate already; the bank and the root box want a hook.
+* **An async step on `putBoxAction` and `putBoxMutationOptions`** that gets the whisper once the form is emptied, for "test the key before saving".
+* **The react_free PRs (#819, #822, #832, #834, #835, #836, #838, #843) are closed once a new sprint has mined them,** not reworked: the surface work rewrites the same hooks.
+
+Found by experiment (jsdom only): React's reset of a form Action goes through the form's cancelable `reset` event, so a form that cancels it when the action ended in a refusal keeps its uncontrolled fields, a secret's among them, and still clears when stored.
+
+Small matters: `landedKidsOf` keeps `>` on `read_tc` (the session's lean, lightly held; a comment is owed, since `>` already returns `prior` for the same read). `UsernameField` should return `null` for no username and its five callers drop their condition: a directive for the next thread through the kit.
+
+### The dojo
+
+`demos/safebyok-demo-dojo` ([#858](https://github.com/mrflip/safebyok/pull/858), reviewed and ready; [#860](https://github.com/mrflip/safebyok/pull/860) stacked on it, under review): each outcome of a vault-creation form and a box-put form on demand, and an Inspect tab over the stores. What each form keeps today, and what the library made awkward, are in `whiteboard/20261123-dojo/dojo-findings.md`. The finding that matters: the library empties only the `FormData`, and React's reset empties every uncontrolled field after every outcome of a form Action.
+
+Ruled by the Coach: the second tab adds a box ("yes, box"); the outcomes come about for real ("perfect"); the Thing's fields are `label, am, lifepath, lifeseq, revtok, revseq, written_at, born_at, fmt` after its scope, "the thing's body follows fmt the last common field", and the Inspect table leaves out everything before `label`; the table keeps each row's ckey; a shell lists its fields as a record does ("good call").
+
+Open from the dojo, each with the Coach: after `gate_made_elsewhere` the stage stays `unborn` though the message says to unlock; the form verbs hand back no texts, so a hand-built vault form loses its username on a refusal; `stale_write` and `bank_locked` reach a user as a bare kind and a developer's instruction; `safebyok-idb-lean` exports no database or store names; nobody has run the dojo in a real browser.
+
+### What is next
+
+"Before we can do the gating we need to demonstrate the target": the dojo is that demonstration. Then the gating talk (what a gate is, the gate verbs as calls that take the form), dynamic instances, and error routing, none yet discussed.
