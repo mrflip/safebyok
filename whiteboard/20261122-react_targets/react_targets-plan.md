@@ -591,3 +591,24 @@ The dojo line is now #858 ← #860 ← #861 ← #862 ← #863 `dojo_practice` �
 * Scenarios claim E9, "It saves in the background: nothing goes away in the form", is "cannot today" because `useDraft`'s `put` ends with `discard()`. Whether "in the background" means the user keeps typing while it saves decides what `useDraft` owes (findings 18 to 27).
 * Two threads recommended, neither started: the minder (mark the listing on any change of life; drop the dead record at a rebirth; a later life's soon ends the earlier life; a full record lands on a bare soon of its life), with #866's table as its acceptance test; and `useDraft` (typing kept across a save, a pending state, a reveal without moving focus).
 * A flaky test on main fails CI now and then: `passkey-forms.test.tsx`, "drops a wrong-passphrase message when the next attempt ends at a dismissed prompt". A two-line fix sits uncommitted in the worktree `byok-test_races`, not this session's.
+
+### The form verbs ruled, the two whisper modes, and the forms sketch (the Coach, 2026-11-23)
+
+**Ruled on #865** (the five matters above): "verbs: 1,2,4; is 5 difficult? if not do it; 3 I don't mind the names as they are; add 'wasFoo or hasFoo are acceptable where it's more natural or the distinction is important'".
+
+* 1: `keepTextIfRefused(event, onEmptied?)`. 2: the older ways with no caller in `src` go now; `gate.unlock({…})` and its siblings, `popField` and the makers' `isInCleartextNames` bridge go in a later pass (`TODO.md`). 4: create-vault and replace-passphrase are the kit forms that keep their text through a refusal.
+* 5, read by the session as: a passphrase submitted before hydration should not leave the page, if that is cheap by React's own idiom; else build nothing and report the cost.
+* 3: the names `wasRefused` and "dna" stay, and STYLE.md's *Naming* gains his line.
+
+**On the table of what a form keeps:** "passphrase column yes." For whispers he named two modes:
+
+* **Editing a box:** "I made a change, please apply them while I continue to work; predictably veil and unveil fields without being intrusive".
+* **Committing a box:** "take this away, store it, my next steps are elsewhere and/or I won't want to read this (and if I do it will be in a new edit session)".
+
+This settles Scenarios claim E9: "in the background" means the user keeps working while it saves, so `useDraft` owes an editing mode whose `put` discards nothing.
+
+**`formClearing`.** The Coach: "keepTextIfRefused -- may we call it formClearing({ onRefused, onSuccess, onComplete }) or whatever the vernacular field names would be? if the arguments would be tags, accept something like `ifRefused: 'nil' | 'same'`; if it's callbacks use the traditional conventions; if it's going to be both, do `ifRefused: 'nil' | 'same' | 'call'` and a separate callback arg, with a refine() discouraging call without a callback or non-call with one." The session's proposal, in the sketch and not yet agreed: `formClearing({ ifSuccess = 'clear', ifRefused = 'keep', onCleared }?)`, an `onReset` handler. Tags for the policy, in the words `'clear'` and `'keep'`; one callback, `onCleared`, which runs whenever the form does empty (the user's own Cancel included), so it never overlaps a tag and needs no `'call'` value or refine. It is a thread of its own after #865.
+
+**The forms sketch:** `whiteboard/20261123-react_poured/dream_interface.md`, asked for by the Coach as a new version of `whiteboard/20261121-react_life/dream_interface.md`: four kinds of form (a passphrase, committing a box, editing a box, a form that uses a secret), three ways to submit (a form Action, `onSubmit`, no form), and the four modalities of `docs/react-overview.md`. It proposes one hook shape for every form, `usePutBox` among them. Not ruled.
+
+**PRs:** #866 is ready (reviewed twice; one row's `wanted`, a get of the item already cached under a newer soon, awaits a ruling). The react_free PRs carry the label `sidelined`.
