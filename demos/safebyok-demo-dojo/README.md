@@ -22,9 +22,13 @@ pnpm --filter safebyok-demo-dojo fixture     # writes src/fixture/fixture.json a
 * **New Box**: the same form adding a box at the labelpath `login` (`putBoxAction` under `useActionState`): the username
   in its sidecar, the password in its whisper. Sign in as Hero or Thierry and unlock.
 * **Inspect**: the vault database's rows (there), the persisted caches' rows (here, where the old core had a DeviceDB),
-  the device's QueryClient, and the host's mutations. Each is a table, grouped by modelkind: a group's first row names it,
+  the device's bank TSQ (its bank, main gate and root box) and vault TSQ (its boxes and their listings), through the
+  library's back door, `SOK.maskedView()`, which cuts each ciphertext to its last 2 characters and its length, and its
+  lease, by its loggable and when it ends (Lock and Unlock change it), and the host's mutations. Each is a table, grouped by modelkind: a group's first row names it,
   with its count, and the fields of its rows, in the order the rows have them. A Thing's scope (`userid`, `banklabel`,
-  `labelpath`), `scope` and `modelkind` are left out: a row's first cell, its ckey, says them. Ciphertext is cut short, and nothing is decrypted.
+  `labelpath`), `scope` and `modelkind` are left out: a row's first cell, its ckey, says them. Ciphertext is cut short, and nothing is decrypted. A
+  `revtok`, `lifetok` or `read_tc` column shows its first ten characters and its last two, by `maskUuid` from
+  `safebyok/utils`.
 
 Under each form, the **readout** shows, after each press, whether each field still has text and the message the form
 shows. It reads `value.length > 0` and nothing else of a field.

@@ -7,7 +7,7 @@ import { type BankSnapshot, type BoxRecord, type Device, type GateRecord, type G
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { liveOf, passkeyHeaderOf } from '../../src/giver/giver-defaults'
-import { mask } from '../../src/index'
+import { EmptyMaskedView, mask } from '../../src/index'
 import { type PutBoxActionOpts, type PutBoxActionResult, type PutBoxMutationOptions, reactGiver } from '../../src/giver/react-giver'
 import * as Phrases from '../../src/giver/phrases-giver'
 import * as TH from '../test-helpers'
@@ -69,9 +69,9 @@ describe("reactGiver", () => {
   }
 
   // reactGiver @example
-  it("gives the provider, the strength hook, and the bank's hooks and calls", async () => {
+  it("gives the provider, the strength hook, the devtool's masked view, and the bank's hooks and calls", async () => {
     const { SOK } = await TH.buildProviderWorld()
-    expect(Object.keys(SOK)).to.deep.equal(['Provider', 'useStrengthVerdict', 'useQueryOptions', 'bank'])
+    expect(Object.keys(SOK)).to.deep.equal(['Provider', 'useStrengthVerdict', 'useQueryOptions', 'maskedView', 'bank'])
     expect(Object.keys(SOK.bank('acme'))).to.deep.equal([
       'useBank', 'useStageChange', 'useGate', 'useBox', 'useBoxList', 'boxQuery', 'queryClient', 'keys', 'withWhisper', 'withLockableWhisper', 'putBoxOnce', 'delBoxOnce', 'putBoxAction', 'putBoxMutationOptions', 'useDraft', 'lock', 'dismissUnlock',
       'useBirth', 'useUnlock', 'useReplacePassphrase', 'useAddPasskey', 'useRevokePasskey',
@@ -183,7 +183,7 @@ describe("the provider", () => {
     await waitFor(() => { expect([one.container.textContent, other.container.textContent]).to.deep.equal(['locked jokes', 'locked jokes']) })
     const [oneDevice, otherDevice] = world._cheat_devices() as [Device, Device]
     expect(world._cheat_devices()).to.have.lengthOf(2)
-    expect([oneDevice.device_tok === otherDevice.device_tok, oneDevice.queryClient === otherDevice.queryClient]).to.deep.equal([false, false])
+    expect([oneDevice.device_tok === otherDevice.device_tok, oneDevice.vaultTsqClient === otherDevice.vaultTsqClient]).to.deep.equal([false, false])
     await act(() => oneDevice.bank!.gate.unlock({ passphraseCleartext: Passphrase }))
     expect([one.container.textContent, other.container.textContent]).to.deep.equal(['unlocked jokes', 'locked jokes'])
   })
@@ -192,12 +192,25 @@ describe("the provider", () => {
     const { world, result, unmount } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' })
     await waitFor(() => { expect(result.current).to.eq('locked') })
     const device = world._cheat_device()
-    expect(world.Bank.queryClient()).to.eq(device.queryClient)
+    expect(world.Bank.queryClient()).to.eq(device.vaultTsqClient)
     unmount()
     await TH.expectRefusal(world.Bank.withWhisper(TH.JokesPath, (whisper) => whisper), 'absent_vault')
     TH.expectSyncRefusal(() => world.Bank.unlockGating({ passphraseCleartext: Passphrase }), 'absent_vault')
-    expect(world.Bank.queryClient()).to.not.eq(device.queryClient)
+    expect(world.Bank.queryClient()).to.not.eq(device.vaultTsqClient)
     expect(device.getSnapshot().bank.stage).to.eq('locked')
+  })
+
+  it("hands maskedView its device's masked view while it is mounted, and EmptyMaskedView before or after", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    expect(world.SOK.maskedView()).to.equal(EmptyMaskedView)
+    const { result, unmount } = renderHook(() => world.Bank.useBank((bank) => bank.stage), { wrapper: ({ children }: Readonly<{ children: ReactNode }>) => TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) })
+    await waitFor(() => { expect(result.current).to.eq('locked') })
+    const shown = world.SOK.maskedView()
+    expect(shown).to.deep.equal(world._cheat_device().maskedView())
+    expect(shown.bankTSQ.map(({ val }) => (val as { labelpath: string }).labelpath)).to.have.members(['bank', 'box', 'gate'])
+    expect(shown.lease).to.deep.equal({ active: false })
+    unmount()
+    expect(world.SOK.maskedView()).to.equal(EmptyMaskedView)
   })
 
   it("leaves the calls that are not hooks with the provider mounted last, while two are mounted", async () => {
@@ -207,9 +220,9 @@ describe("the provider", () => {
     const other = render(TH.providerTreeOf(world, <StageProbe />, { userid: TH.ProviderUser }))
     await waitFor(() => { expect([one.container.textContent, other.container.textContent]).to.deep.equal(['locked', 'locked']) })
     const [, otherDevice] = world._cheat_devices()
-    expect(world.Bank.queryClient()).to.eq(otherDevice!.queryClient)
+    expect(world.Bank.queryClient()).to.eq(otherDevice!.vaultTsqClient)
     one.unmount()
-    expect(world.Bank.queryClient()).to.eq(otherDevice!.queryClient)
+    expect(world.Bank.queryClient()).to.eq(otherDevice!.vaultTsqClient)
     other.unmount()
     TH.expectSyncRefusal(() => world.Bank.unlockGating({ passphraseCleartext: Passphrase }), 'absent_vault')
   })

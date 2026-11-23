@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { Crypto, GX } from 'safebyok-big/internals'
+import { maskUuid } from '../../src/helpers/mask-uuid'
 import { BaseBox } from '../../src/models/base-box'
 import { Lease, withoutSecrets } from '../../src/models/lease'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
@@ -467,9 +468,9 @@ describe("a lease's Thing-like getters", () => {
     expect(ThingChecks.thingScope.safeParse(lease.scope).success).to.be.false
   })
 
-  it("stay out of its keys, its stamp and its toJSON", async () => {
+  it("stay out of its keys and its stamp", async () => {
     const { lease } = await leaseWorld()
-    for (const shown of [Object.keys(lease), Object.keys(lease.stamp), Object.keys(lease.toJSON()), Object.keys(TH.jsonOf(lease))]) {
+    for (const shown of [Object.keys(lease), Object.keys(lease.stamp)]) {
       expect(shown).to.have.members(StampFieldnames)
     }
   })
@@ -481,12 +482,39 @@ describe("what a lease shows", () => {
     expect(Object.keys(lease)).to.have.members(StampFieldnames)
   })
 
-  it("JSON.stringify, toJSON and stamp give its stamp alone", async () => {
-    const { lease, record } = await leaseWorld()
-    expect(TH.jsonOf(lease)).to.deep.equal(Stamped)
-    expect(lease.toJSON()).to.deep.equal(Stamped)
+  it("stamp gives its stamp alone", async () => {
+    const { lease } = await leaseWorld()
     expect(lease.stamp).to.deep.equal(Stamped)
+  })
+
+  it("JSON.stringify and toJSON give its loggable", async () => {
+    const { lease, record } = await leaseWorld()
+    expect(TH.jsonOf(lease)).to.deep.equal(lease.loggable)
+    expect(lease.toJSON()).to.deep.equal(lease.loggable)
     expect(JSON.stringify(lease)).to.not.include(record.bank_key_lease_wrapped.ciphertext_b64)
+  })
+
+  it("spreads to its stamp's fields alone, each a string or a number: nothing secret and nothing opaque", async () => {
+    const { lease } = await leaseWorld()
+    // The spread is this test's subject: what a log line or a host's `{ ...thing }` sees of a lease.
+    const spread = { ...lease } // eslint-disable-line @typescript-eslint/no-misused-spread
+    expect(Object.keys(spread)).to.have.members(StampFieldnames)
+    expect(Object.values(spread).every((val) => ['string', 'number'].includes(typeof val))).to.be.true
+  })
+
+  it("gives a log its loggable, a frozen object of strings, numbers and a boolean, with nothing secret and nothing opaque", async () => {
+    const { lease, record } = await leaseWorld()
+    expect(lease.loggable).to.deep.equal({
+      fmt: LeaseFormat, userid: 'u1', banklabel: 'acme', labelpath: 'lease/gate', wayinkind: 'passphrase', born_at: TH.T0, proved_at: TH.T0,
+      gate_labelpath: 'gate', gate_lifeseq: TH.WorldGate.lifeseq, gate_revtok: maskUuid(TH.WorldGate.revtok),
+      bank_lifeseq: TH.WorldBankStamp.lifeseq, bank_born_at: TH.WorldBankStamp.born_at, bank_lifetok: maskUuid(TH.WorldBankStamp.lifetok), isEvicted: false,
+    })
+    expect(JSON.stringify(lease.loggable)).to.not.include(TH.WorldGate.revtok).and.to.not.include(TH.WorldBankStamp.lifetok)
+    expect(Object.isFrozen(lease.loggable)).to.be.true
+    expect(Object.values(lease.loggable).every((val) => ['string', 'number', 'boolean'].includes(typeof val))).to.be.true
+    expect(JSON.stringify(lease.loggable)).to.not.include(record.bank_key_lease_wrapped.ciphertext_b64)
+    lease.evict()
+    expect(lease.loggable.isEvicted).to.be.true
   })
 
   it("is frozen: its stamp cannot be changed", async () => {

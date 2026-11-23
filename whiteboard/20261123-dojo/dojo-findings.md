@@ -52,6 +52,9 @@ Each with what it cost the dojo. None is smoothed over with machinery.
    cannot be written through it in order. Raw writes instead (part of 1).
 3. **The roots minder's QueryClient is out of reach of a React host**: the giver exposes no device, so Inspect's TSQ
    panel shows the boxes' client only; Bank and Gate read 0 there. 0 lines; a gap in the panel.
+   Thread 3 added a back door for a devtool: `device.maskedView()` in the core, handed on as `SOK.maskedView()`, answers
+   the bank TSQ and the vault TSQ with each ciphertext masked to its last 2 characters and its length, and the lease by
+   its loggable; the TSQ panel now reads it, so Bank and Gate show. The bank TSQ itself stays out of a React host's reach.
 4. **`useNewPassphrase` has no `judge`**, so once the checker changes, the Login meter cannot be judged again: it says
    Strong enough while the birth refuses `weak_passphrase`. 0 lines; recorded.
 5. **A host's strength check at submit cannot await.** `whisperOf` is synchronous and the secrets must leave the

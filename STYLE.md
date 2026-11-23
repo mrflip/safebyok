@@ -480,15 +480,19 @@ a server) are designed in `notes/more_style.md` *Interfaces a host implements*.
   the Vault object, `lock()` and all. Nothing that crosses needs a method.
 * **Build a stored record from a parsed part**, `{ format, ...CX.vaultScope.parse(thing), ... }`,
   never from a spread of the object that has it, which would put its other fields into the record too.
-* **Spreading a thing is harmless.** Its own enumerable fields are what a log line, a spread or
-  `JSON.stringify` sees, so they have nothing sensitive and nothing that clutters a log (large
+* **Spreading a model is harmless.** Its own enumerable fields are what a log line, a spread or
+  `JSON.stringify` sees, so `{ ...thing }` shows only what belongs in a log: nothing secret and
+  nothing opaque (a ciphertext, a wrapped key, a salt), nor anything that clutters a log (large
   values, or objects with behaviour). Where reasonable, they are a strict subset of its record.
+* **What a log wants of a model is its `loggable`**, a frozen object of plain values. A stamp is
+  what a ctx binds: the two may share fields, but they are different things, and neither stands
+  in for the other.
 * **What a log should not see is private, elsewhere, or non-enumerable**: a `#field`, a separate
   object reached by a method or accessor, or a getter on the prototype.
 
 ## Stateful objects and snapshots
 
-* **A stateful object's own fields are its stamp**: enumerable, assigned in the constructor, and
+* **A stateful object's own fields are its loggable fields**: enumerable, assigned in the constructor, and
   `Object.freeze(this)` as the constructor's last line. Private `#fields` stay writable under a
   freeze, so every changing value lives in one. A frozen instance cannot be spied on; a test spies
   on a collaborator instead.
@@ -582,7 +586,7 @@ A member that will not describe in a line is a smell: report it.
   opens with the noun it is, the thing it returns, or (most commonly) an imperative verb and its object:
   - `The cached record for a scope` (never "What the cache holds for a scope")
   - `The bank's three roots` (never "What a birth writes")
-  - `Remove every one of this minder's entries from the cache.`
+  - `Remove every one of this minder's stored records from the cache.`
 
   When that noun needs a clause to describe it, open with the verb instead: `Classify a vault request's outcome, based on the stored row`. Read the
   member's name against that sentence (*Naming*). It carries one qualifier at most; anything more is a sentence of its own.

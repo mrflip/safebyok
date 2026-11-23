@@ -169,7 +169,7 @@ export function labelpathsOf(kids: Kids | undefined): Labelpath[] | undefined {
 
 /** True when `minder`'s listing at `scope` is cached and marked stale. */
 export function isListingStaleAt(minder: VaultMinder, scope: ThingScope): boolean {
-  return minder.queryClient.getQueryState(minder.listQueryKey(scope))?.isInvalidated === true
+  return minder.tsqClient.getQueryState(minder.listQueryKey(scope))?.isInvalidated === true
 }
 
 /** A listener that records each event it is told. */

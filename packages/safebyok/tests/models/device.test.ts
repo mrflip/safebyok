@@ -6,9 +6,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import 'fake-indexeddb/auto'
 import { Consts, Errors, Phrases } from 'safebyok-big/internals'
 import { browserOpts } from '../../src/browser'
+import { maskUuid } from '../../src/helpers/mask-uuid'
 import { Bank } from '../../src/models/bank'
 import { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from '../../src/models/device'
 import { BirthGating } from '../../src/models/gating'
+import { EmptyMaskedView } from '../../src/shapes/shapes-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { type DevicePersisters, MemoryPersister } from '../../src/storage/persister'
 import { refusedAnswerOf } from '../../src/storage/refused-answer'
@@ -87,10 +89,10 @@ describe("Device.make(record, opts)", () => {
 
   it("makes its QueryClient with it, empty, its VaultMinder's, the same before and after signIn", () => {
     const device = TH.makeDevice({ userid: null })
-    const { queryClient } = device
-    expect(queryClient.getQueryCache().getAll()).to.have.lengthOf(0)
+    const { vaultTsqClient } = device
+    expect(vaultTsqClient.getQueryCache().getAll()).to.have.lengthOf(0)
     void device.signIn(TH.WorldScope.userid)
-    expect([device.queryClient, device.minder.queryClient]).to.deep.equal([queryClient, queryClient])
+    expect([device.vaultTsqClient, device.minder.tsqClient]).to.deep.equal([vaultTsqClient, vaultTsqClient])
   })
 
   it("serializes as its user, banklabel and token alone, and is frozen", () => {
@@ -104,7 +106,16 @@ describe("Device.make(record, opts)", () => {
   it("wraps each of the host's functions, leaving none of the host's own on a property", () => {
     const device = TH.makeDevice()
     for (const guarded of [device.keyDeriver, device.strengthChecker]) { expect(Consts.isGuarded(guarded)).to.be.true }
-    expect(Object.values(device)).to.not.include.members([TH.testDeriver, TH.anyStrengthChecker])
+    expect([device.keyDeriver, device.strengthChecker]).to.not.include(TH.testDeriver).and.to.not.include(TH.anyStrengthChecker)
+  })
+
+  it("spreads to its banklabel, token and leaseMillis alone: nothing secret and nothing opaque", () => {
+    const device = TH.makeDevice()
+    // The spread is this test's subject: what a log line or a host's `{ ...device }` sees of a device.
+    const spread = { ...device } // eslint-disable-line @typescript-eslint/no-misused-spread
+    expect(Object.keys(spread)).to.have.members(['banklabel', 'device_tok', 'leaseMillis'])
+    expect(Object.values(spread).every((val) => ['string', 'number'].includes(typeof val))).to.be.true
+    expect([device.vaultDB, device.keyDeriver, device.strengthChecker, device.logger]).to.not.include(undefined)
   })
 
   it("rounds a fraction of a minute to the nearest millisecond, and turns Infinity into ForeverMillis", () => {
@@ -256,8 +267,8 @@ describe("a device's persisters", () => {
     await device.signIn(otherScope.userid)
     await nextTick()
     expect(device.minder.at({ ...otherScope, labelpath: 'box/openai' })).to.be.undefined
-    for (const { queryClient } of [device.bankMinder, device.minder]) {
-      expect(queryClient.getQueryCache().getAll().map((tsqQuery) => tsqQuery.queryKey[1])).to.not.include(TH.WorldScope.userid)
+    for (const { tsqClient } of [device.bankMinder, device.minder]) {
+      expect(tsqClient.getQueryCache().getAll().map((tsqQuery) => tsqQuery.queryKey[1])).to.not.include(TH.WorldScope.userid)
     }
     for (const persisterOf of [persisters.roots, persisters.boxes]) {
       const savedUserids = (await persisterOf(TH.WorldScope).restoreClient())!.clientState.queries.map((saved) => saved.queryKey[1])
@@ -605,6 +616,62 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
   it("refuses a listener that is not a function", async () => {
     const { device } = await TH.buildBornBank()
     TH.expectSyncRefusal(() => device.subscribe(null as never), 'bad_record')
+  })
+})
+
+describe("device.maskedView()", () => {
+  it("answers EmptyMaskedView before signIn", () => {
+    expect(TH.makeDevice({ userid: null }).maskedView()).to.equal(EmptyMaskedView)
+    expect(EmptyMaskedView).to.deep.equal({ bankTSQ: [], vaultTSQ: [], lease: { active: false } })
+  })
+
+  it("answers the lease of an unlocked bank by its loggable and when it ends, and none granted once it locks", async () => {
+    const { device, bank } = await TH.buildBornVault()
+    const { lease } = device.maskedView()
+    expect(lease).to.have.all.keys(
+      'active', 'ends_at', 'fmt', 'userid', 'banklabel', 'labelpath', 'wayinkind', 'born_at', 'proved_at', 'gate_labelpath', 'gate_lifeseq', 'gate_revtok', 'bank_lifeseq', 'bank_born_at', 'bank_lifetok', 'isEvicted',
+    )
+    const { proved_at } = lease as { proved_at: number }
+    expect(lease).to.include({ active: true, ends_at: proved_at + device.leaseMillis, born_at: proved_at, labelpath: 'lease/gate', gate_revtok: maskUuid(bank.gate.revtok), bank_lifetok: maskUuid(bank.lifetok), wayinkind: 'passphrase', isEvicted: false })
+    bank.lock()
+    expect(device.maskedView().lease).to.deep.equal({ active: false })
+  })
+
+  it("answers the bank, its main gate and its root box in the bank TSQ, and the boxes put in the vault TSQ, each with its state", async () => {
+    const { device, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const { bankTSQ, vaultTSQ } = device.maskedView()
+    expect(bankTSQ.map(({ val }) => (val as { labelpath: string }).labelpath)).to.have.members(['bank', 'box', 'gate'])
+    expect(vaultTSQ.map(({ val }) => (val as { labelpath?: string } | null)?.labelpath)).to.include('box/openai')
+    for (const row of [...bankTSQ, ...vaultTSQ]) {
+      expect(row).to.include({ status: 'success', fetchStatus: 'idle', isInvalidated: false, lastRefusalkind: null })
+      expect(row.queryKey.slice(0, 3)).to.deep.equal(['sok', TH.WorldScope.userid, TH.WorldScope.banklabel])
+    }
+  })
+
+  it("cuts each wrapped bankKey and each sealed whisper's ciphertext to its last 2 characters and its length", async () => {
+    const { device, vault, gateRecord } = await TH.buildBornVault()
+    await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const { whisper_sealed } = device.minder.at({ ...TH.WorldScope, labelpath: 'box/openai' })!
+    const named = [gateRecord.wayins.main.bank_key_wayin_wrapped, whisper_sealed.key_wrapped, whisper_sealed.ciphered].map(({ ciphertext_b64 }) => ciphertext_b64)
+    // Every ciphertext either minder keeps, the root box's among them, not only those named above.
+    const keptJsons = [device.bankMinder.tsqClient, device.vaultTsqClient].flatMap((tsq) => tsq.getQueryCache().getAll().map(({ state }) => JSON.stringify(state.data ?? null)))
+    const ciphertexts = new Set(keptJsons.flatMap((json) => [...json.matchAll(/"ciphertext_b64":"([^"]+)"/g)].map(([, ciphertext]) => ciphertext!)))
+    expect([...ciphertexts]).to.include.members(named)
+    expect(ciphertexts.size).to.be.at.least(5)
+    const shown = JSON.stringify(device.maskedView())
+    for (const ciphertext of ciphertexts) {
+      expect(shown).to.not.include(ciphertext)
+      expect(shown).to.include(`"…${ciphertext.slice(-2)}(${String(ciphertext.length)})"`)
+    }
+    expect(shown).to.not.include(`"${named[0]!.slice(0, 8)}`)
+    expect(shown).to.include(gateRecord.wayins.main.bank_key_wayin_wrapped.cipher_iv_b64)
+  })
+
+  it("leaves out what a host keeps beside its rows in the vault TSQ", async () => {
+    const { device } = await TH.buildBornVault()
+    device.vaultTsqClient.setQueryData(['host', 'notes'], { note: 'mine' })
+    expect(JSON.stringify(device.maskedView())).to.not.include('mine')
   })
 })
 

@@ -8,3 +8,5 @@ export type { Draft, DraftPutOpts, WhisperFieldProps } from './giver/use-draft'
 export { type MaskOpts, mask } from 'safebyok'
 // The bank snapshot a hook shows while nobody is signed in: the core's, so a host compares one binding.
 export { SignedOutBank } from 'safebyok'
+// What a devtool is shown of the device's bank TSQ, vault TSQ and lease, by the giver's `maskedView`: the core's types, and the empty masked view.
+export { type LeaseLoggable, type MaskedRow, type MaskedView, type MaskedViewLease, EmptyMaskedView } from 'safebyok'

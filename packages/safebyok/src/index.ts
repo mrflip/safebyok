@@ -19,6 +19,7 @@ export { BankMinder } from './minding/bank-minder'
 export { Vault } from './models/vault'
 export { type DeadAt, newerThingOf } from './minding/newer-thing'
 export { DefaultStrengthChecker, guardStrengthChecker } from './helpers/passphrase-strength'
+export { maskUuid } from './helpers/mask-uuid'
 export { type BulletproofFailOpts, type BulletproofOpts, type BulletproofTellOpts, bulletproofAsyncHandlerOf, bulletproofHandlerOf } from './helpers/bulletproof'
 
 // From safebyok-big, beside what core.ts and storage.ts re-export: the kinds, sizes and patterns a host checks its own input

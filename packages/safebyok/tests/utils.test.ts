@@ -3,12 +3,13 @@ import * as BigUtils from 'safebyok-big/utils'
 import * as utils from '../src/utils'
 
 describe("the utils entry point", () => {
-  it("exports exactly mash, mask and its schedule, the base64url codec and the secret field's attributes", () => {
-    expect(Object.keys(utils)).to.have.members(['mash', 'mask', 'MaskSchedule', 'fromB64', 'toB64', 'WhisperFieldAttributes'])
+  it("exports exactly mash, mask and its schedule, the base64url codec, the secret field's attributes and maskUuid", () => {
+    expect(Object.keys(utils)).to.have.members(['mash', 'mask', 'MaskSchedule', 'fromB64', 'toB64', 'WhisperFieldAttributes', 'maskUuid'])
   })
 
-  it("exports the very values safebyok-big/utils defines", () => {
-    for (const [exportname, val] of Object.entries(utils)) { expect(BigUtils, exportname).to.have.property(exportname).that.eq(val) }
+  it("exports the very values safebyok-big/utils defines, all but maskUuid, which is the core's own", () => {
+    const bigs = Object.entries(utils).filter(([exportname]) => exportname !== 'maskUuid')
+    for (const [exportname, val] of bigs) { expect(BigUtils, exportname).to.have.property(exportname).that.eq(val) }
   })
 
   it("exports a mash that answers the SHA-256 of the text as unpadded base64url", async () => {
@@ -23,6 +24,10 @@ describe("the utils entry point", () => {
 
   it("exports a mask that masks", () => {
     expect(utils.mask('sk-ant-abcd1234')).to.eq('******************34')
+  })
+
+  it("exports a maskUuid that cuts a UUID to its first ten characters and its last two", () => {
+    expect(utils.maskUuid('0195a3f2-1c4b-7e21-9a3d-5b8c2d4e6f7c')).to.eq('0195a3f2-1…7c')
   })
 
   it("exports the schedule mask follows and the attributes of a secret's field", () => {

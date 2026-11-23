@@ -184,7 +184,7 @@ export async function buildProviderWorld({ stored = 'none', isInConfig = false, 
     SOK, Bank: SOK.bank('acme'), vaultDB, deriver, checker, client, counts, _cheat_otherVault: otherVault,
     pauseGets:      () => pauseAt('ask'),
     pauseAnswers:   () => pauseAt('answer'),
-    clients:        () => [client, ...devices.map((device) => device.queryClient)],
+    clients:        () => [client, ...devices.map((device) => device.vaultTsqClient)],
     _cheat_device:  () => devices[0]!,
     _cheat_devices: () => [...devices],
     _cheat_putJokesKey: async (passphraseCleartext) => {

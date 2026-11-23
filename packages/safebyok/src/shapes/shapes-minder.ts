@@ -10,6 +10,7 @@ import type { BadAnswer, GoodAnswer, Kids, VaultDB } from '../storage/vault-db'
 import type { Banklabel, BoxLabelpath, EpochMillis, Labelpath, Lifepath, Lifeseq, Revtok, Userid } from './primitives'
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, ThingChecks, ThingFormat } from './shapes-thing'
 import { type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope } from './shapes-asks'
+import type { LeaseLoggable } from './shapes-stamps'
 import type { BankAskDraft } from './shapes-bankish'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis
@@ -283,6 +284,42 @@ export type ListingEvent = MinderEventOf<Kids, 'list'> & Readonly<{
   /** The modelkind of the Thing at `labelpath` and of every Thing listed, which is the same: a labelpath starts with its parent's. */
   modelkind: Thingkind
 }>
+// --
+
+// == [What a devtool is shown]: MaskedRow, MaskedViewLease, MaskedView, EmptyMaskedView
+
+/** One row of a masked view: what a bank TSQ or vault TSQ keeps under one key, with each ciphertext masked. For experimenting: its fields may change without notice. */
+export type MaskedRow = Readonly<{
+  queryKey:        readonly unknown[]
+  status:          TSQ.QueryStatus
+  fetchStatus:     TSQ.FetchStatus
+  /** When a record or listing last landed under this key, or 0 for none. */
+  dataUpdatedAt:   EpochMillis
+  isInvalidated:   boolean
+  /** The refusalkind of the last fetch under this key, or null where it did not refuse. */
+  lastRefusalkind: Errors.Refusalkind | null
+  /** A copy of the record, null or listing kept under this key, or undefined for none, with every `ciphertext_b64` masked: its last 2 characters and its length, as `…yz(64)`.
+   * It is no longer a record: nothing unseals or unwraps it.
+   */
+  val:             unknown
+}>
+
+/** The lease a device's bank holds, as a devtool is shown it: its loggable and when it ends, or only `active: false` while none is granted. For experimenting: its fields may change without notice. */
+export type MaskedViewLease = Readonly<{ active: false }> | (LeaseLoggable & Readonly<{
+  active:  true
+  /** When it stops unlocking the bank. */
+  ends_at: EpochMillis
+}>)
+
+/** A device's bank TSQ and vault TSQ, and the lease its bank holds, masked for a devtool. For experimenting: its fields may change without notice. */
+export type MaskedView = Readonly<{
+  bankTSQ:  readonly MaskedRow[]
+  vaultTSQ: readonly MaskedRow[]
+  lease:    MaskedViewLease
+}>
+
+/** The masked view of a device nobody is signed in on: nothing in either TSQ, and no lease. */
+export const EmptyMaskedView: MaskedView = Object.freeze({ bankTSQ: Object.freeze([]), vaultTSQ: Object.freeze([]), lease: Object.freeze({ active: false }) })
 // --
 
 // == [A minder's making]: MinderOpts

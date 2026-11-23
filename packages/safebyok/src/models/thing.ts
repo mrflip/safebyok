@@ -5,6 +5,7 @@ import type { ThingRecord } from '../shapes/shapes-thing'
 // TypeScript cannot type a static `make` here that returns the subclass while its constructor is private, so each
 // subclass declares its own: `make(record, opts[, friend])`, which parses what it is given.
 /** A model of one life of a stored Thing: its Thing fields are read-only props, and its record is private.
+ * Its spread, `{ ...thing }`, shows its Thing fields alone, which belong in a log: nothing secret and nothing opaque. A subclass keeps what it adds private, or behind a getter.
  * A subclass parses its record before calling `super`. One that never adopts a newer record freezes itself last.
  * A listener can {@link subscribe} to the changes a subclass tells of.
  */

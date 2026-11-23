@@ -98,7 +98,7 @@ describe("VaultMinder's item behind a newer sparse record", () => {
       cheatBox(vaultDB, box1)
       receive(sparseNoticeOf(box1))
       await TH.eventually(() => minder.at(TH.BoxScope)?.revseq === 1)
-      await TH.eventually(() => ! minder.queryClient.isFetching())
+      await TH.eventually(() => ! minder.tsqClient.isFetching())
       expect([minder.isBehindAt(TH.BoxScope), asked.mock.calls.length]).to.deep.equal([false, 1])
     })
   })
@@ -113,7 +113,7 @@ describe("VaultMinder's item behind a newer sparse record", () => {
       cheatBox(vaultDB, box2)
       receive(sparseNoticeOf(box2))
       await TH.eventually(() => minder.at(TH.BoxScope)?.revseq === 2)
-      await TH.eventually(() => ! minder.queryClient.isFetching())
+      await TH.eventually(() => ! minder.tsqClient.isFetching())
       expect([minder.isBehindAt(TH.BoxScope), asked.mock.calls.length]).to.deep.equal([false, 1])
     })
   })
@@ -125,7 +125,7 @@ describe("VaultMinder's item behind a newer sparse record", () => {
     receive(sparseNoticeOf(TH.nextOf(box)))
     await TH.expectRefusal(minder.get(TH.BoxScope), 'stale_read')
     await observeItem(minder, async () => {
-      await TH.eventually(() => ! minder.queryClient.isFetching())
+      await TH.eventually(() => ! minder.tsqClient.isFetching())
       const box2 = TH.nextOf(TH.nextOf(box))
       cheatBox(vaultDB, box2)
       receive(sparseNoticeOf(box2))
@@ -139,7 +139,7 @@ describe("VaultMinder's item behind a newer sparse record", () => {
     const box1  = TH.nextOf(box)
     cheatBox(vaultDB, box1)
     receive(sparseNoticeOf(box1))
-    await TH.eventually(() => ! minder.queryClient.isFetching())
+    await TH.eventually(() => ! minder.tsqClient.isFetching())
     expect([minder.isBehindAt(TH.BoxScope), asked.mock.calls.length]).to.deep.equal([true, 0])
     expect(await minder.get(TH.BoxScope)).to.deep.equal(box1)
     expect(asked.mock.calls).to.have.lengthOf(1)
@@ -157,7 +157,7 @@ async function gotWorldOf(revseq = 0) {
 
 /** Run `body` while an observer, as a hook is, keeps the item at `TH.BoxScope` active. */
 async function observeItem(minder: VaultMinder, body: () => Promise<void>): Promise<void> {
-  const observer    = new TSQ.QueryObserver(minder.queryClient, { queryKey: minder.itemQueryKey(TH.BoxScope) })
+  const observer    = new TSQ.QueryObserver(minder.tsqClient, { queryKey: minder.itemQueryKey(TH.BoxScope) })
   const unsubscribe = observer.subscribe(() => undefined)
   try {
     await body()

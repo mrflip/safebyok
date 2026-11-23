@@ -609,7 +609,7 @@ describe("proving.buildLease(gate, cited)", () => {
     const proving = await PasskeyProving.buildStored(gate, answerOf())
     const lease = await proving.buildLease(leaseGate, gate)
     const { userid, banklabel, lifeseq, born_at, lifetok } = TH.WorldBankStamp
-    expect(lease.toJSON()).to.deep.include({ userid, banklabel, bank_lifeseq: lifeseq, bank_born_at: born_at, bank_lifetok: lifetok, gate_labelpath: 'gate', gate_lifeseq: gate.lifeseq, gate_revtok: gate.revtok, proved_at: TH.T0, wayinkind: 'passkey' })
+    expect(lease.stamp).to.deep.include({ userid, banklabel, bank_lifeseq: lifeseq, bank_born_at: born_at, bank_lifetok: lifetok, gate_labelpath: 'gate', gate_lifeseq: gate.lifeseq, gate_revtok: gate.revtok, proved_at: TH.T0, wayinkind: 'passkey' })
     expect(lease.isEvicted).to.be.false
     expect(leaseGate.lock).not.toHaveBeenCalled()
   })

@@ -165,6 +165,14 @@ describe("what a gate shows", () => {
     expect(JSON.stringify(gate)).to.not.include('ciphertext_b64')
   })
 
+  it("spreads to its Thing fields alone, each a string or a number: nothing secret and nothing opaque", async () => {
+    const gate = Gate.make(await gateRecordOf(true), worldOpts())
+    // The spread is this test's subject: what a log line or a host's `{ ...thing }` sees of a gate, its wayins aside.
+    const spread = { ...gate } // eslint-disable-line @typescript-eslint/no-misused-spread
+    expect(Object.keys(spread)).to.have.members(ThingFields)
+    expect(Object.values(spread).every((val) => ['string', 'number'].includes(typeof val))).to.be.true
+  })
+
   it("fixes the fields of its life for good, and only its revision fields may be set again", async () => {
     const gate = Gate.make(await gateRecordOf(), worldOpts())
     function configurableOf(fieldname: string): boolean | undefined { return Object.getOwnPropertyDescriptor(gate, fieldname)!.configurable }
@@ -271,6 +279,13 @@ describe("the lease a proof grants a gate", () => {
     await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(make.mock.calls[0]![0]).to.include({ born_at: TH.T0, proved_at: TH.T0 + 5 })
     expect(bank.gate.leaseEndsAt).to.equal(TH.T0 + 5 + bank.device.leaseMillis)
+  })
+
+  it("shows its loggable through the gate's leaseLoggable, and null once the gate locks", async () => {
+    const { bank } = await TH.buildBornBank()
+    expect(bank.gate.leaseLoggable).to.include({ born_at: TH.T0, proved_at: TH.T0, labelpath: 'lease/gate', gate_labelpath: 'gate', wayinkind: 'passphrase', isEvicted: false })
+    bank.gate.lock()
+    expect(bank.gate.leaseLoggable).to.be.null
   })
 
   it("is born when it is proved, where the gate holds no lease", async () => {

@@ -15,7 +15,7 @@ export type {
   SealedOf, SealedPartsOf, Sealer, ShellOf, TombstoneOf, TombstonePublicProps, UnsealedOf,
 } from './shapes/shapes-sealers'
 export {
-  type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseRecord, type LeaseSparse, type LeaseStamp, type StampedGate,
+  type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseLoggable, type LeaseRecord, type LeaseSparse, type LeaseStamp, type StampedGate,
   StampChecks,
 } from './shapes/shapes-stamps'
 export { Wayin } from './models/wayin'
@@ -46,8 +46,9 @@ export {
   type VoidSentinel, type Wayins, Shell, ThingChecks, thingkindVals,
 } from './shapes/shapes-thing'
 export { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from './shapes/shapes-thingkinds'
-// A bank is made with the defaults its minders set on their cached items and lists; the minder itself is on the front door.
-export type { QueryCacheOpts } from './shapes/shapes-minder'
+// A bank is made with the defaults its minders set on their cached items and lists, and a device shows a devtool a masked view of
+// its bank TSQ, vault TSQ and lease; the minder itself is on the front door.
+export { type MaskedRow, type MaskedView, type MaskedViewLease, type QueryCacheOpts, EmptyMaskedView } from './shapes/shapes-minder'
 
 // From safebyok-big, re-exported so that each stays one binding across both packages: its refusals and logger, what a
 // device is handed, what a form verb, a wayin and a box carry, and the acts a vaultDB's answer reports.

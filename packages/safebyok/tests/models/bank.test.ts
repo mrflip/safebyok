@@ -135,6 +135,14 @@ describe("Bank.make(record, { device, vaultDB, gate })", () => {
     expect(bank.modelkind).to.eq('bank')
   })
 
+  it("spreads to its Thing fields alone, each a string or a number: nothing secret and nothing opaque", async () => {
+    const { bank } = await TH.buildBornBank()
+    // The spread is this test's subject: what a log line or a host's `{ ...thing }` sees of a bank.
+    const spread = { ...bank } // eslint-disable-line @typescript-eslint/no-misused-spread
+    expect(Object.keys(spread)).to.have.members(BankProps)
+    expect(Object.values(spread).every((val) => ['string', 'number'].includes(typeof val))).to.be.true
+  })
+
   it("has the lifetok of its record", async () => {
     const { bank, record } = await TH.buildBornBank()
     expect(bank.lifetok).to.eq(record.lifetok)
