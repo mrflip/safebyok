@@ -145,3 +145,10 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   lock times of days or never: a password manager is one thing, a price-capped token typed once and put in a header is
   another. Today nothing locks a bank when its lease ends: the snapshot only reports `leaseEndsAt` (the Coach,
   2026-11-23).
+* **Pad a whisper's text before it is sealed, so the ciphertext's length says little.** A sealed whisper is as long as
+  its text, and an API key's length often says whose it is; the backend sees that length today. The whisper is sealed as
+  JSON, which reads the same with spaces after it, so pad the text to a length chosen by Padmé (Nikitin et al., "Reducing
+  Metadata Leakage from Encrypted Files and Communication with PURBs", PETS 2019), which leaks O(log log n) bits of the
+  length for at most about 12% more bytes. A record sealed before the change still unseals. "A customer can pad too"
+  (the Coach, 2026-11-23).
+
