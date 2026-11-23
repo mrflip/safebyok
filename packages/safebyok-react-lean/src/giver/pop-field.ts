@@ -9,7 +9,11 @@ import { Checkers } from 'safebyok'
 /** Read the text of `form`'s field `fieldname` and delete the field from `form`. Returns '' when the field is missing or is a file.
  * Call it before the action's first `await`, so that no render sees the secret in the `FormData`.
  * @example
- *   <form action={(form) => { unlock.mutate(unlock.gating({ passphraseCleartext: popField(form, 'passphrase') })) }}>
+ *   async function addPasskeyAction(form: FormData) {
+ *     const passphrase = popField(form, 'passphrase')
+ *     const nextPasskeyAnswer = await createPasskey(passkeyOpts)
+ *     if (nextPasskeyAnswer !== null) { await addPasskey.attempt({ passphrase, nextPasskeyAnswer }) }
+ *   }
  */
 export function popField(form: FormData, fieldname: string): string {
   Checks.popFieldArgs.parse({ form, fieldname }, { where: "In popField's arguments" })

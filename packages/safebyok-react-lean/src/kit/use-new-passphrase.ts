@@ -1,6 +1,6 @@
 /** `useNewPassphrase`, the state of a new passphrase and its confirmation, for a kit form or a host's own: the strength meter and whether the two fields match. */
 
-import { type ChangeEvent, type RefObject, useId, useRef, useState } from 'react'
+import { type ChangeEvent, type RefObject, type SyntheticEvent, useId, useRef, useState } from 'react'
 import type { ReactGiver } from '../giver/react-giver'
 import { KitPhrases } from './phrases-kit'
 
@@ -22,8 +22,8 @@ export type NewPassphrase = Readonly<{
   matchText:    string
   /** True once the new passphrase is judged strong and the confirmation matches it: the form's submit is enabled only then. */
   isReady:      boolean
-  /** Forget the verdicts on what the fields held, for the form's `onReset`. */
-  forget:       () => void
+  /** Forget the verdicts on what the fields held, for the form's `onReset`: a reset whose `event` was cancelled, which keeps the text, keeps them too. */
+  forget:       (event?: SyntheticEvent) => void
 }>
 
 /** The props {@link useNewPassphrase} gives one of its fields. */
@@ -41,7 +41,7 @@ export type NewPassphraseFieldProps = Readonly<{
 // == [The hook]: useNewPassphrase
 
 /** The verdicts on a new passphrase and its confirmation as the user types them, for a form of your own: how strong it is, and whether the two match.
- * Spread `field` and `confirmField` onto two `PassphraseInput`s, show `verdictText` and `matchText` under them, enable the submit on `isReady`, and call `forget` from the form's `onReset`.
+ * Spread `field` and `confirmField` onto two `PassphraseInput`s, show `verdictText` and `matchText` under them, enable the submit on `isReady`, and call `forget` from the form's `onReset`, or hand it to a hook's `keepTextIfRefused` as its `onEmptied` where the form has one.
  * `giver`'s strength checker judges the passphrase. React keeps the verdicts, never the text.
  */
 export function useNewPassphrase(giver: Pick<ReactGiver, 'useStrengthVerdict'>): NewPassphrase {
@@ -65,8 +65,9 @@ export function useNewPassphrase(giver: Pick<ReactGiver, 'useStrengthVerdict'>):
     void strength.judge(typed)
   }
   // React empties the fields after each submit without an onChange, so the verdicts are reset by hand.
-  /** Forget the verdicts on what the fields held. */
-  function forget() {
+  /** Forget the verdicts on what the fields held, unless `event` was cancelled. */
+  function forget(event?: SyntheticEvent) {
+    if (event?.defaultPrevented === true) { return }
     setIsChosenTyped(false)
     setConfirmation('untyped')
   }

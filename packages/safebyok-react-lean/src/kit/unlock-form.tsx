@@ -5,8 +5,8 @@ import { useGivenBank } from '../giver/giver-context'
 import type { BankGiver } from '../giver/react-giver'
 import { PassphraseInput } from '../parts/passphrase-input'
 import { SubmitButton } from '../parts/submit-button'
-import { formActionOf } from './form-action'
 import { ModalDialog } from './modal-dialog'
+import { useIsHydrated } from './use-is-hydrated'
 import { KitPhrases, refusalTextOf } from './phrases-kit'
 
 // == [The form]: UnlockFormProps, UnlockForm, UsernameField
@@ -30,9 +30,10 @@ export function UnlockForm({ bank: bankProp, username, onCancel }: Readonly<Unlo
   const bank = useGivenBank(bankProp)
   const unlock = bank.useUnlock()
   const [isUnlocking, setIsUnlocking] = useState(false)
+  // This form submits from a handler, so before hydration the browser would submit it its own way, the passphrase in the request.
+  const isHydrated = useIsHydrated()
   const fieldRef = useRef<HTMLInputElement>(null)
   const alertId = useId()
-  const unlockAction = formActionOf(unlock, ['passphrase'], ({ passphrase }) => ({ passphraseCleartext: passphrase }))
   // What waits on the unlock may be a host's pending Action, and React commits no transition's update until every
   // transition running ends. So the form submits from a handler, never a form action, and shows its pending in plain state.
   // The submit button is disabled while the unlock runs and loses focus, so a refusal hands it back to the field.
@@ -40,7 +41,8 @@ export function UnlockForm({ bank: bankProp, username, onCancel }: Readonly<Unlo
   async function submit(formEl: HTMLFormElement) {
     setIsUnlocking(true)
     try {
-      if (! await unlockAction(new FormData(formEl))) { fieldRef.current?.focus() }
+      await unlock.attempt(new FormData(formEl))
+      if (unlock.wasRefused()) { fieldRef.current?.focus() }
     } finally {
       formEl.reset()
       setIsUnlocking(false)
@@ -48,8 +50,9 @@ export function UnlockForm({ bank: bankProp, username, onCancel }: Readonly<Unlo
   }
   const isRefused = (unlock.error !== null)
   return (
-    <form className="sok-unlock-form" onSubmit={(event) => { event.preventDefault(); void submit(event.currentTarget) }}>
-      {(username !== undefined) && <UsernameField username={username} />}
+    // Unlock is disabled until React attaches. A submit that gets past that posts its fields rather than putting them in the URL.
+    <form className="sok-unlock-form" method="post" onSubmit={(event) => { event.preventDefault(); void submit(event.currentTarget) }}>
+      <UsernameField username={username} />
       <PassphraseInput
         ref={fieldRef}
         name="passphrase"
@@ -62,14 +65,15 @@ export function UnlockForm({ bank: bankProp, username, onCancel }: Readonly<Unlo
         isPending={isUnlocking}
       />
       <div role="alert" id={alertId}>{isRefused && refusalTextOf(unlock.error)}</div>
-      <SubmitButton isPending={isUnlocking} whilePending={KitPhrases.unlockingButton}>{KitPhrases.unlockButton}</SubmitButton>
+      <SubmitButton disabled={! isHydrated} isPending={isUnlocking} whilePending={KitPhrases.unlockingButton}>{KitPhrases.unlockButton}</SubmitButton>
       {(onCancel !== undefined) && <button type="button" onClick={onCancel}>{KitPhrases.cancelButton}</button>}
     </form>
   )
 }
 
-/** A hidden username field, so a password manager files the passphrase under the account. */
-export function UsernameField({ username }: Readonly<{ username: string }>) {
+/** A hidden username field, so a password manager files the passphrase under the account: nothing where there is no username. */
+export function UsernameField({ username }: Readonly<{ username?: string | undefined }>) {
+  if (username === undefined) { return null }
   // The inline style, as a host's stylesheet may override the hidden attribute.
   return <input type="text" name="username" autoComplete="username" value={username} readOnly hidden style={{ display: 'none' }} />
 }

@@ -3,11 +3,11 @@
 import { useId, useRef, useState } from 'react'
 import { type PasskeyAnswer, type VaultError, type WayinHeader, isVaultError } from 'safebyok'
 import { passkeyHeaderOf } from '../giver/giver-defaults'
+import { popField } from '../giver/pop-field'
 import { useGivenBank } from '../giver/giver-context'
 import type { BankGiver } from '../giver/react-giver'
 import { PassphraseInput } from '../parts/passphrase-input'
 import { SubmitButton } from '../parts/submit-button'
-import { formActionOf } from './form-action'
 import { type AskPasskeyOpts, type CreatePasskeyOpts, askPasskey, createPasskey, passkeysAvailable } from './passkey'
 import { KitPhrases, refusalTextOf } from './phrases-kit'
 import { UsernameField } from './unlock-form'
@@ -36,21 +36,22 @@ export function AddPasskeyForm({ bank: bankProp, passkeyOpts, username }: Readon
   const [ceremonyErr, setCeremonyErr] = useState<VaultError | null>(null)
   const fieldRef = useRef<HTMLInputElement>(null)
   const alertId = useId()
-  const addAction = formActionOf(add, ['passphrase'], async ({ passphrase }) => {
-    const nextPasskeyCleartext = await heardCeremony(() => createPasskey(passkeyOpts), setCeremonyErr)
-    return (nextPasskeyCleartext === null) ? null : { passphraseCleartext: passphrase, nextPasskeyCleartext }
-  })
+  // A form cannot carry the passkey's answer, so the passphrase is taken from it before the ceremony is awaited.
   /** Add a passkey under the form's passphrase, handing focus back to its field on a refusal. */
   async function action(form: FormData) {
     setCeremonyErr(null)
     add.reset()
-    if (! await addAction(form)) { fieldRef.current?.focus() }
+    const passphrase = popField(form, 'passphrase')
+    const nextPasskeyAnswer = await heardCeremony(() => createPasskey(passkeyOpts), setCeremonyErr)
+    if (nextPasskeyAnswer === null) { return }
+    await add.attempt({ passphrase, nextPasskeyAnswer })
+    if (add.wasRefused()) { fieldRef.current?.focus() }
   }
   const refusal = ceremonyErr ?? add.error
   return (
     <form className="sok-add-passkey-form" action={action}>
       <p>{KitPhrases.addPasskeyBlurb}</p>
-      {(username !== undefined) && <UsernameField username={username} />}
+      <UsernameField username={username} />
       <PassphraseInput
         ref={fieldRef}
         name="passphrase"
@@ -89,16 +90,16 @@ export function RevokePasskeyForm({ bank: bankProp, username }: Readonly<RevokeP
   const revoke = bank.useRevokePasskey()
   const fieldRef = useRef<HTMLInputElement>(null)
   const alertId = useId()
-  const revokeAction = formActionOf(revoke, ['passphrase'], ({ passphrase }) => ({ passphraseCleartext: passphrase }))
   /** Revoke the passkey, proved by the form's passphrase, handing focus back to its field on a refusal. */
   async function action(form: FormData) {
-    if (! await revokeAction(form)) { fieldRef.current?.focus() }
+    await revoke.attempt(form)
+    if (revoke.wasRefused()) { fieldRef.current?.focus() }
   }
   const isRefused = (revoke.error !== null)
   return (
     <form className="sok-revoke-passkey-form" action={action}>
       <p>{KitPhrases.revokePasskeyBlurb}</p>
-      {(username !== undefined) && <UsernameField username={username} />}
+      <UsernameField username={username} />
       <PassphraseInput
         ref={fieldRef}
         name="passphrase"
@@ -140,18 +141,15 @@ export function PasskeyUnlockButton({ bank: bankProp, passkeyHeader: passkeyHead
   const [isUnlocking, setIsUnlocking] = useState(false)
   const [ceremonyErr, setCeremonyErr] = useState<VaultError | null>(null)
   const alertId = useId()
-  const unlockAction = formActionOf(unlock, [], async () => {
-    const passkeyCleartext = await heardCeremony(() => askPasskey(passkeyHeader, askOpts), setCeremonyErr)
-    return (passkeyCleartext === null) ? null : { passkeyCleartext }
-  })
   // Submitted from a handler, never a form action, as the unlock form is: what waits on the unlock may be a host's pending Action.
   /** Ask the passkey, and unlock the bank with its answer. */
-  async function submit(formEl: HTMLFormElement) {
+  async function submit() {
     setCeremonyErr(null)
     unlock.reset()
     setIsUnlocking(true)
     try {
-      await unlockAction(new FormData(formEl))
+      const passkeyAnswer = await heardCeremony(() => askPasskey(passkeyHeader, askOpts), setCeremonyErr)
+      if (passkeyAnswer !== null) { await unlock.attempt({ passkeyAnswer }) }
     } finally {
       setIsUnlocking(false)
     }
@@ -159,7 +157,7 @@ export function PasskeyUnlockButton({ bank: bankProp, passkeyHeader: passkeyHead
   if (! passkeysAvailable() || (passkeyHeader?.wayinkind !== 'passkey')) { return null }
   const refusal = ceremonyErr ?? unlock.error
   return (
-    <form className="sok-passkey-unlock" onSubmit={(event) => { event.preventDefault(); void submit(event.currentTarget) }}>
+    <form className="sok-passkey-unlock" onSubmit={(event) => { event.preventDefault(); void submit() }}>
       <SubmitButton isPending={isUnlocking} whilePending={KitPhrases.askingPasskeyButton} aria-describedby={(refusal === null) ? undefined : alertId}>
         {KitPhrases.passkeyUnlockButton}
       </SubmitButton>

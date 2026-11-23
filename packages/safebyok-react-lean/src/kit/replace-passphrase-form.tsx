@@ -5,7 +5,6 @@ import { useGivenBank, useGivenGiver } from '../giver/giver-context'
 import type { BankGiver, ReactGiver } from '../giver/react-giver'
 import { PassphraseInput } from '../parts/passphrase-input'
 import { SubmitButton } from '../parts/submit-button'
-import { formActionOf } from './form-action'
 import { KitPhrases, refusalTextOf } from './phrases-kit'
 import { UsernameField } from './unlock-form'
 import { useNewPassphrase } from './use-new-passphrase'
@@ -24,6 +23,7 @@ export interface ReplacePassphraseFormProps {
 
 /** The form that replaces the passphrase: the current one, then a new one with the strength checker's verdict beside it, and the new one again to confirm it.
  * Its submit stays disabled until the new passphrase is strong and the two match. The passkey stays, and the bank is left unlocked.
+ * A refused attempt leaves what was typed, for the user to correct; a stored one empties the form.
  * No passphrase reaches React's state or the mutation's variables.
  * @example
  *   case 'unlocked': return <ReplacePassphraseForm username={user.email} />
@@ -35,21 +35,19 @@ export function ReplacePassphraseForm({ giver: giverProp, bank: bankProp, userna
   const newPassphrase = useNewPassphrase(giver)
   const currentRef = useRef<HTMLInputElement>(null)
   const alertId = useId()
-  const replaceAction = formActionOf(replace, ['passphrase', 'nextPassphrase', 'confirmation'], ({ passphrase, nextPassphrase }) => (
-    { passphraseCleartext: passphrase, nextPassphraseCleartext: nextPassphrase }
-  ))
 
   // The refusal is most often the current passphrase, so focus goes back to its field.
   /** Replace the passphrase with the form's, handing focus back to the current passphrase's field on a refusal. */
   async function action(form: FormData) {
-    if (! await replaceAction(form)) { currentRef.current?.focus() }
+    await replace.attempt(form)
+    if (replace.wasRefused()) { currentRef.current?.focus() }
   }
 
   const isRefused = (replace.error !== null)
   return (
-    <form className="sok-replace-passphrase-form" action={action} onReset={newPassphrase.forget}>
+    <form className="sok-replace-passphrase-form" action={action} onReset={(event) => { replace.keepTextIfRefused(event, newPassphrase.forget) }}>
       <p>{KitPhrases.replaceBlurb}</p>
-      {(username !== undefined) && <UsernameField username={username} />}
+      <UsernameField username={username} />
       <PassphraseInput
         ref={currentRef}
         name="passphrase"

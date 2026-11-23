@@ -38,7 +38,7 @@ function makeKnockKnockApp(world: TH.ProviderWorld) {
     const birth = Knock.useBirth()
     const strength = SOK.useStrengthVerdict()
     return (
-      <form action={(form) => { birth.mutate(birth.gating({ passphraseCleartext: popField(form, 'passphrase') })) }}>
+      <form action={birth.attempt}>
         <input name="passphrase" type="password" autoComplete="new-password" aria-label="New passphrase" onChange={(event) => { void strength.judge(event.target.value) }} />
         <button disabled={birth.isPending || ! strength.verdict?.strong}>Create</button>
       </form>
@@ -64,7 +64,7 @@ function makeKnockKnockApp(world: TH.ProviderWorld) {
   function UnlockForm() {
     const unlock = Knock.useUnlock()
     return (
-      <form action={(form) => { unlock.mutate(unlock.gating({ passphraseCleartext: popField(form, 'passphrase') })) }}>
+      <form action={unlock.attempt}>
         <input name="passphrase" type="password" autoComplete="current-password" aria-label="Passphrase" />
         <button disabled={unlock.isPending}>Unlock</button>
         <button type="button" onClick={() => { Knock.dismissUnlock() }}>Cancel</button>

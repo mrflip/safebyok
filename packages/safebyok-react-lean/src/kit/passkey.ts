@@ -16,10 +16,10 @@ export function passkeysAvailable(): boolean {
 }
 
 /** Create a new passkey and return its first answer. Returns null when the user dismisses the prompt.
- * Hand the answer to a gating straight away: the gating copies its bytes and zeroes the answer's own.
+ * Hand the answer to a form verb's `attempt` straight away: its gating copies the bytes and zeroes the answer's own.
  * @example
- *   const nextPasskeyCleartext = await createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
- *   if (nextPasskeyCleartext !== null) { addPasskey.mutate(addPasskey.gating({ passphraseCleartext, nextPasskeyCleartext })) }
+ *   const nextPasskeyAnswer = await createPasskey({ rp: { name: 'Acme' }, user: { name: email, displayName: fullName } })
+ *   if (nextPasskeyAnswer !== null) { await addPasskey.attempt({ passphrase, nextPasskeyAnswer }) }
  */
 export async function createPasskey(given: CreatePasskeyOpts): Promise<PasskeyAnswer | null> {
   const opts = PasskeyChecks.createPasskeyOpts.parse(given, { where: "In createPasskey's options" })
@@ -61,10 +61,10 @@ export async function createPasskey(given: CreatePasskeyOpts): Promise<PasskeyAn
 }
 
 /** Ask the passkey named in `passkeyHeader` for its answer. Returns null when the user dismisses the prompt.
- * Refuses `absent_wayin` for a bank with no passkey, `passkeyHeader` null. Hand the answer to a gating straight away.
+ * Refuses `absent_wayin` for a bank with no passkey, `passkeyHeader` null. Hand the answer to a form verb's `attempt` straight away.
  * @example
- *   const passkeyCleartext = await askPasskey(passkeyHeader, { rpId: 'example.com' })
- *   if (passkeyCleartext !== null) { unlock.mutate(unlock.gating({ passkeyCleartext })) }
+ *   const passkeyAnswer = await askPasskey(passkeyHeader, { rpId: 'example.com' })
+ *   if (passkeyAnswer !== null) { await unlock.attempt({ passkeyAnswer }) }
  */
 export async function askPasskey(passkeyHeader: WayinHeader | null, given: AskPasskeyOpts = {}): Promise<PasskeyAnswer | null> {
   const { passkeyHeader: header, opts } = PasskeyChecks.askPasskeyArgs.parse({ passkeyHeader, opts: given }, { where: "In askPasskey's arguments" })
