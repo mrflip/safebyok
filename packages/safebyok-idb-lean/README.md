@@ -22,12 +22,22 @@ Hand it to the core wherever a `VaultDB` is asked for.
   `IdbVaultDB`s made with the same `dbName`, in one tab or two, share the Things.
 * An option it cannot use is refused with `bad_record`.
 
-To keep a device's caches between page loads, hand it an `IdbPersister` for each:
+To keep a device's caches between page loads, hand it an `IdbPersister` for its roots, and a function giving one for
+each bank's boxes:
 
 ```ts
-const persisters = { roots: new IdbPersister({ recordlabel: 'roots', dbName: 'acme' }), boxes: new IdbPersister({ recordlabel: 'boxes', dbName: 'acme' }) }
-const device = Device.make(record, { vaultDB, persisters })
+function reportRefusal(news: VaultError) { console.warn(news.message) }
+
+const persisters = {
+  roots: new IdbPersister({ recordlabel: 'roots', dbName: 'acme', onBadNews: reportRefusal }),
+  boxes: ({ userid, banklabel }) => new IdbPersister({ recordlabel: `boxes:${userid}:${banklabel}`, dbName: 'acme', onBadNews: reportRefusal }),
+}
+const device = Device.make(record, { vaultDB, persisters, onBadNews: ({ news }) => { reportRefusal(news) } })
 ```
+
+The device restores the roots at `hello`, and the signed-in bank's boxes at `signIn`. Every bank's record stays stored.
+The device's `onBadNews` hears of a restore that fails, and each persister's of a save that fails: report both in one
+place, as here.
 
 * **`recordlabel`** names the record each snapshot is kept in, as an object by structured clone, in the database
   `safebyok-<dbName>:persist-v001-001-001`: one record per persister, so give each its own.

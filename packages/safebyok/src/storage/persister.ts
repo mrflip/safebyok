@@ -1,16 +1,31 @@
 /** The persisters a device keeps its caches in between page loads: TanStack Query's own interface, and one in memory. */
 
 import type { PersistedClient, Persister } from '@tanstack/query-persist-client-core'
+import type { BankScope } from '../shapes/shapes-stamps'
 
 export type { PersistedClient, Persister } from '@tanstack/query-persist-client-core'
 
-// == [The plug]: DevicePersisters, isPersister, PersisterMembernames
+// == [The plug]: DevicePersisters, PersisterOfBank, isPersister, PersisterMembernames
 
-/** Where a device keeps its two caches between page loads, a TanStack Query `Persister` for each: `roots`, every user and bank's bank, main gate and root box, and `boxes`, the boxes and their listings.
- * Each keeps one snapshot of everything in its cache, which the device restores at `hello`. It is handed the whole
- * snapshot at every change to the cache: over slow storage, throttle the writes, as TanStack's stock persisters do.
+/** Where a device keeps its two caches between page loads, through TanStack Query `Persister`s.
+ * `roots` keeps every user and bank's bank, main gate and root box, and the device restores it at `hello`. `boxes` gives
+ * the persister of one bank's boxes and their listings, and the device restores the signed-in bank's at `signIn`: give
+ * each bank a record of its own, say `boxes:<userid>:<banklabel>`. Every bank's record stays stored until the host
+ * removes it.
+ * A persister is handed its whole snapshot at every change to the cache: over slow storage, throttle the writes, as
+ * TanStack's stock persisters do. The device tells its `onBadNews` of a restore that fails, and nothing of a save: have
+ * each persister report a failed save where `onBadNews` reports.
+ * @example
+ * const persisters = {
+ *   roots: new IdbPersister({ recordlabel: 'roots', onBadNews: reportRefusal }),
+ *   boxes: ({ userid, banklabel }) => new IdbPersister({ recordlabel: `boxes:${userid}:${banklabel}`, onBadNews: reportRefusal }),
+ * }
+ * const device = Device.make(record, { vaultDB, persisters, onBadNews: ({ news }) => { reportRefusal(news) } })
  */
-export type DevicePersisters = Readonly<{ roots: Persister, boxes: Persister }>
+export type DevicePersisters = Readonly<{ roots: Persister, boxes: PersisterOfBank }>
+
+/** The `Persister` of the boxes of the bank at `scope`, as {@link DevicePersisters} takes it. Called once, at `signIn`. */
+export type PersisterOfBank = (scope: BankScope) => Persister
 
 /** True for an object with a function for each of a `Persister`'s three members. */
 export function isPersister(val: unknown): val is Persister {

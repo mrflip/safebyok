@@ -26,7 +26,7 @@ export {
   type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside, type ReadTc,
   type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,
 } from './storage/vault-db'
-export { type DevicePersisters, type PersistedClient, type Persister, MemoryPersister, isPersister } from './storage/persister'
+export { type DevicePersisters, type PersistedClient, type Persister, type PersisterOfBank, MemoryPersister, isPersister } from './storage/persister'
 export {
   type BadNews, type BadNewsHandler, type BankAskDraft, type BankOpts, type BankSnapshot, type BankStage, type BoxUnsealed, type DeviceJSON, type DeviceOpts, type DeviceRecord,
   type DeviceSnapshot, type HostedVault, type RefusalSnapshot,

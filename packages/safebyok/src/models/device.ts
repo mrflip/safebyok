@@ -17,7 +17,7 @@ import type { BirthCleartexts, GuardedKeyDeriver, GuardedStrengthChecker, Streng
 import type { BankScope } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
-import { type DevicePersisters, type Persister, isPersister } from '../storage/persister'
+import { type DevicePersisters, type Persister, type PersisterOfBank, isPersister } from '../storage/persister'
 import { type Modelkind, ThingChecks } from '../shapes/shapes-thing'
 import * as Throwers from '../refusals/throwers'
 import * as Phrases from '../phrases'
@@ -29,9 +29,10 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
 /** This browser, before and after anyone signs in: the host's functions, guarded, the minders, and the signed-in user's bank and vault.
  * Make it with `Device.make(record, opts)`, which does no I/O, touches no browser global and subscribes to nothing; call
- * `hello()` to start it, which restores its caches from the host's persisters, and `signIn(userid)` once the host knows
- * who is signed in. Its snapshot's stage is `'signed_out'` until then, `'starting'` while it restores its caches and brings
- * up the user's bank, then `'locked'` for a bank stored, or `'unborn'` for none, which a {@link birthGating} on this device fills.
+ * `hello()` to start it, which restores its roots' cache from the host's persisters, and `signIn(userid)` once the host
+ * knows who is signed in, which restores that user's boxes. Its snapshot's stage is `'signed_out'` until then,
+ * `'starting'` while it restores its caches and brings up the user's bank, then `'locked'` for a bank stored, or
+ * `'unborn'` for none, which a {@link birthGating} on this device fills.
  * It serves the first user it is told of for its life: another user signing in is a sign-out, which the host answers by
  * reloading the page.
  */
@@ -54,7 +55,7 @@ export class Device implements MinderFriend {
   readonly #onBadNews: BadNewsHandler
   /** The cache options of the signed-in user's VaultMinder, which {@link queryClient} takes for its boxes. */
   readonly #queryCacheOpts: QueryCacheOpts
-  /** The host's persisters, which the two QueryClients are restored from and saved to, or undefined for none. */
+  /** The host's persisters, which the roots' QueryClient and the signed-in bank's boxes are restored from and saved to, or undefined for none. */
   readonly #persisters: DevicePersisters | undefined
   /** The QueryClient each user's BankMinder caches the bank's roots in, made with the device, empty. */
   readonly #bankClient: QueryClient
@@ -151,7 +152,8 @@ export class Device implements MinderFriend {
 
   /** Make a device of the banklabel and token in `record`, guarding the host's functions in `opts`, with nobody signed in.
    * It makes the two QueryClients its users' minders cache in, empty: one for the bank's roots, and {@link queryClient} for its boxes.
-   * They are restored from `opts.persisters` at {@link hello}, and nothing is fetched from the vaultDB until {@link signIn}.
+   * The roots are restored from `opts.persisters` at {@link hello}, and the signed-in bank's boxes at {@link signIn}, and
+   * nothing is fetched from the vaultDB until `signIn`.
    */
   static make(record: DeviceRecord, opts: DeviceOpts): Device { return new Device(record, opts) }
 
@@ -184,10 +186,10 @@ export class Device implements MinderFriend {
   async judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> { return await Proving.judgeStrength(this, this.scope, passphraseCleartext) }
   // --
 
-  // == [Starting]: hello, #restore, signIn, birthGating, #bringUp, #attachWorld, #attachBank
+  // == [Starting]: hello, #restore, #restoreBoxes, signIn, birthGating, #bringUp, #attachWorld, #attachBank
 
-  /** Start the device, resolving once its caches are restored from the host's persisters, and saved to them from then on. Never rejects, and each later call resolves as the first.
-   * Each restore that fails is told to `onBadNews`, and its cache starts empty.
+  /** Start the device, resolving once its roots' cache is restored from the host's persisters, and saved to them from then on. Never rejects, and each later call resolves as the first.
+   * A restore that fails is told to `onBadNews`, and the cache starts empty.
    * Refuses `insecure_context` outside a secure context, where WebCrypto is missing.
    */
   hello(): Promise<void> {
@@ -197,18 +199,31 @@ export class Device implements MinderFriend {
   }
 
   // Before anything speaks to the vaultDB: a minder says hello only once this has resolved, so what it caches lands over what was restored.
-  /** Restore each QueryClient from its persister, and save it there from then on, telling `onBadNews` of each that fails to restore. */
+  /** Restore the roots' QueryClient from its persister, and save it there from then on, telling `onBadNews` if it fails to restore. */
   async #restore(): Promise<void> {
     if (this.#persisters === undefined) { return }
-    const { roots, boxes } = this.#persisters
-    const restores = await Promise.allSettled([BankMinder.persist(this.#bankClient, roots), VaultMinder.persist(this.#queryClient, boxes)])
-    const failures = restores.flatMap((restore) => ((restore.status === 'rejected') ? [Outcome.storageRefusalOf(restore.reason)] : []))
-    if (failures.length > 0) { this.tellBadNews(failures) }
+    try {
+      await BankMinder.persist(this.#bankClient, this.#persisters.roots)
+    } catch (err) {
+      this.tellBadNews([Outcome.storageRefusalOf(err)])
+    }
+  }
+
+  // Before the VaultMinder says hello, so what it caches lands over what was restored.
+  /** Restore the boxes of the bank at `scope` from the persister the host gives for it, and save them there from then on, telling `onBadNews` if it fails to restore. */
+  async #restoreBoxes(scope: BankScope): Promise<void> {
+    if (this.#persisters === undefined) { return }
+    try {
+      const persister = Checks.persister.parse(this.#persisters.boxes(scope))
+      await VaultMinder.persist(this.#queryClient, persister, scope)
+    } catch (err) {
+      this.tellBadNews([Outcome.storageRefusalOf(err)])
+    }
   }
 
   /** Tell the device who is signed in, and bring up that user's bank: resolves once the snapshot shows `'locked'`, `'unborn'` or `'failed'` (with `lastErr`). Never rejects.
-   * It starts the device first, as {@link hello} does. Where the device has cached the bank's world, the bank comes up `'locked'`
-   * from it at once, and unlocks on its cached gate, before the vaultDB answers.
+   * It starts the device first, as {@link hello} does, then restores the bank's boxes. Where the device has cached the
+   * bank's world, the bank comes up `'locked'` from it at once, and unlocks on its cached gate, before the vaultDB answers.
    * Each later call resolves as the first, whatever userid it is handed: the device serves its first user for its life.
    */
   signIn(userid: Userid): Promise<void> {
@@ -244,6 +259,7 @@ export class Device implements MinderFriend {
   async #bringUp(bankMinder: BankMinder, minder: VaultMinder): Promise<void> {
     try {
       await this.hello()
+      await this.#restoreBoxes(this.scope)
       bankMinder.hello()
       minder.hello()
       const cached = bankMinder.worldAt()
@@ -417,6 +433,7 @@ function refusalSnapshotOf(err: unknown): RefusalSnapshot {
 /** The checks of {@link Device.make}'s arguments, {@link Device.signIn}'s and {@link tellBadNewsTo}'s. */
 const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
   userid:        BankishChecks.userid,
+  persister:     custom<Persister>(isPersister, Phrases.PersisterExpected),
   deviceMakeArgs: obj({
     record: BankishChecks.deviceRecord,
     opts:   Validator.objCheck(() => ({
@@ -427,7 +444,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
       autolockMinutes: VX.positiveMinutes.optional(),
       onBadNews:       fn<BadNewsHandler>().optional(),
       queryCacheOpts:  MinderChecks.queryCacheOptsOrDefault,
-      persisters:      obj({ roots: custom<Persister>(isPersister, Phrases.PersisterExpected), boxes: custom<Persister>(isPersister, Phrases.PersisterExpected) }).optional(),
+      persisters:      obj({ roots: custom<Persister>(isPersister, Phrases.PersisterExpected), boxes: fn<PersisterOfBank>() }).optional(),
       // Ignored: the new core has no device database. Accepted so that `...browserOpts()` from safebyok/browser, which carries one, spreads in.
       deviceDB:        custom<unknown>().optional(),
     }), { refusalkind: 'bad_record' }),
