@@ -342,8 +342,8 @@ function makeBankGiver(friend: BankFriend) {
     return queryOptions({ ...boxQueryBaseOf(device, labelpath, isUp), select: liveOf<BoxRecord> })
   }
 
-  // Left with no queryFn, a query of the minder's item fetches by the minder's own, set in the client at its `hello`,
-  // which lands the record as a get's.
+  // Left with no queryFn, a query of the minder's item fetches by the client's own, which asks the minder of the item's
+  // bank and lands the record as a get's.
   /** {@link boxQueryOf}, less its `select`. */
   function boxQueryBaseOf(device: Device | null, labelpath: string, isUp: boolean): Pick<UseQueryOptions<BoxShown>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
     const boxLabelpath = boxLabelpathOf(labelpath)
@@ -413,8 +413,9 @@ function makeBankGiver(friend: BankFriend) {
   // The minder's listing fetches by a list, so the hook's first render once the bank is up lists the root box.
   /** The labelpaths of the bank's boxes, through React Query, for a list that renders each one by {@link useBox}.
    * `data` is the labelpaths in labelpath order, and undefined until the first list lands. It is the same array until the labelpaths change.
-   * A deleted box stays listed, and its `useBox` answers null. A box this device writes or hears of for the first time lists again,
-   * and joins when that list lands. A list refused shows as its `error`.
+   * A deleted box stays listed, and its `useBox` answers null. It lists again only on evidence, never on a remount, window focus or reconnect:
+   * a box this device writes or hears of for the first time, or `invalidateQueries` on {@link keys}`.boxList()`. The box joins when that list lands.
+   * A list refused shows as its `error`.
    * @example
    *   const { data: labelpaths } = Knock.useBoxList()
    *   labelpaths?.map((labelpath) => <JokeRow key={labelpath} labelpath={labelpath} />)
@@ -426,6 +427,7 @@ function makeBankGiver(friend: BankFriend) {
       queryKey: boxListQueryKeyOf({ userid: useridOf(device), banklabel }),
       ...((! isUp || (device === null)) && { queryFn: skipToken }),
       select:   hostLabelpathsOf,
+      staleTime: Infinity,
     }, client)
   }
 

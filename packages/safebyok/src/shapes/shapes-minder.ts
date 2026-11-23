@@ -26,7 +26,7 @@ export const DefaultQueryCacheOpts: Readonly<QueryCacheOpts> = Object.freeze({ s
 // Each is an option a client's defaults could set, and that would change what lands in the cache, what a fetch answers
 // the minder, or when a fetch runs. Options only an observer reads (refetchInterval, the refetchOn* and enabled) are left
 // to whoever observes: the minder has no observer, and an observer's fetch still lands through the minder's queryFn.
-/** The TanStack Query options every minder sets, and no host can change: a get asks the vaultDB even offline, is never retried, and its item stays cached until `goodbye`. */
+/** The TanStack Query options of every minder's entries, set by `makeClient`, which no host can change: a get asks the vaultDB even offline, is never retried, and its item stays cached until `goodbye`. */
 export const FixedQueryCacheOpts = Object.freeze({
   // Under TanStack's own networkMode, 'online', a get made while the browser reports itself offline waits, and so does its caller.
   networkMode:     'always',

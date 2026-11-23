@@ -61,6 +61,21 @@ describe("Minder.persist(queryClient, persister)", () => {
     expect(restored.at(boxScopeOf('anthropic'))).to.be.undefined
   })
 
+  it("builds each entry it restores with the query defaults the client was made with, before any minder's hello", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedBoxOf(vaultDB)
+    const { persister, minder } = await savedGetOf(vaultDB)
+    await minder.list('box')
+    await nextTick()
+    const queryClient = VaultMinder.makeClient()
+    await VaultMinder.persist(queryClient, persister)
+    for (const queryKey of [VaultMinder.itemQueryKeyOf(TH.BoxScope), VaultMinder.listQueryKeyOf(TH.RootScope)]) {
+      const { options } = queryClient.getQueryCache().find({ queryKey, exact: true })!
+      const defaults = queryClient.getQueryDefaults(queryKey)
+      expect([options.queryFn, options.structuralSharing, options.gcTime]).to.deep.equal([defaults.queryFn, defaults.structuralSharing, Infinity])
+    }
+  })
+
   it("keeps what it restored past TanStack's collection, however old the snapshot", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)

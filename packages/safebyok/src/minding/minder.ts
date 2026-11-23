@@ -23,7 +23,7 @@ import {
   type MinderInvalidateOpts, type QueryCacheOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingEvent, type SoonEvent, type DeadEvent, type TsqStaleTime, type ListingEvent, type MinderEventkind, type MinderEventFormat, type TSQQueryAction,
   FixedQueryCacheOpts, MinderChecks,
 } from '../shapes/shapes-minder'
-import { bankKeyHeadOf } from './minder-keys'
+import { MinderKeyRoot, bankKeyHeadOf } from './minder-keys'
 import { newerThingOf } from './newer-thing'
 import { bulletproofHandlerOf } from '../helpers/bulletproof'
 import * as Phrases from '../phrases'
@@ -81,22 +81,22 @@ export type Labelpathed = { labelpath: Labelpath }
  *   vaultDB nothing for the rest.
  */
 export abstract class Minder {
-  // == [Props]: userid, banklabel, #bank, vaultDB, #tsq, #landers, #queryCacheOpts, #unwatch, #isReady
+  // == [Props]: userid, banklabel, #bank, vaultDB, #tsq, #minders, #queryCacheOpts, #unwatch, #isReady
   readonly userid:    Userid
   readonly banklabel: Banklabel
   readonly #bank:           MinderFriend
   /** Where the bank's Things are stored. */
   protected readonly vaultDB: VaultDB
   readonly #tsq:            TSQ.QueryClient
-  /** The minders attached to `#tsq`, this one among them while minding. */
-  readonly #landers:        Map<string, Lander>
+  /** The minders minding in `#tsq`, this one among them while minding. */
+  readonly #minders:        Map<string, Minder>
   readonly #queryCacheOpts: Readonly<QueryCacheOpts>
   #unwatch: (() => void) | null = null
   /** True while minding: from `hello` until `goodbye`. */
   #isReady = false
   // --
 
-  // == [Construction]: constructor, makeClient, isClient, persist, #setQueryDefaults
+  // == [Construction]: constructor, makeClient, isClient, persist
 
   // A subclass freezes the minder once its own fields are set.
   /** A minder of `bank`'s Things over `opts`, checked by the subclass's `make`. */
@@ -108,30 +108,60 @@ export abstract class Minder {
     this.vaultDB         = opts.vaultDB
     this.#queryCacheOpts = Object.freeze(opts.queryCacheOpts)
     this.#tsq            = opts.queryClient ?? Minder.makeClient()
-    this.#landers        = LandersOfClient.get(this.#tsq)!
+    this.#minders        = MindersOfClient.get(this.#tsq)!
   }
 
   // TanStack calls the cache's onSuccess right after a fetch's record lands, and never for setQueryData: sendToTSQ does
-  // the same for every other record.
+  // the same for every other record. The client's own defaults are left to whoever owns it: TanStack matches query
+  // defaults by key prefix, and every minder key starts with MinderKeyRoot, so every entry of every bank takes these from
+  // the start, a restored one included. Where an option differs by bank, it asks the minder minding the key's bank; by
+  // kind of entry, it reads the key's kind, or the value's for structural sharing, which TanStack hands no key.
   /** Make a QueryClient that minders of several banks can share, each minding its own bank's entries.
-   * Hand it to `make` as `queryClient`. Its cache settles a fetched record only while a minder of the record's bank is minding.
+   * Hand it to `make` as `queryClient`. Its cache fetches, and settles a fetched record, only while a minder of the key's bank is minding.
    */
   static makeClient(): TSQ.QueryClient {
-    const landers     = new Map<string, Lander>()
-    const queryClient = new TSQ.QueryClient({
-      queryCache: new TSQ.QueryCache({ onSuccess: (val, tsqQuery) => { landers.get(bankHashOf(tsqQuery.queryKey))?.(val, tsqQuery.queryKey) } }),
+    /** Anything with a query key: a query, or what TanStack hands a queryFn. */
+    type Keyed = Readonly<{ queryKey: TSQ.QueryKey }>
+    const minders = new Map<string, Minder>()
+    function minderOf(queryKey: TSQ.QueryKey): Minder | undefined { return minders.get(bankHashOf(queryKey)) }
+    function settleFetch(val: unknown, { queryKey }: Keyed): void {
+      const minder = minderOf(queryKey)
+      if (minder !== undefined) { minder.#landedByFetch(val, queryKey) }
+    }
+    async function fetchAt({ queryKey }: Keyed): Promise<ThingRecord | Absent | Kids> {
+      const minder = minderOf(queryKey)
+      if (minder === undefined) { throw Throwers.minderNotStarted() }
+      return await minder.#fetchAt(queryKey)
+    }
+    // A list fetches whatever its listing holds.
+    function staleTimeOf({ queryKey }: Keyed): TsqStaleTime {
+      const minder = minderOf(queryKey)
+      if ((minder === undefined) || (queryKey[EntrykindIdx] === Listkind)) { return 0 }
+      return minder.#queryCacheOpts.staleTime
+    }
+    function deadAt(scope: ThingScope): Tombstone<ThingRecord> | undefined {
+      const minder = minderOf(bankKeyHeadOf(scope))
+      return (minder === undefined) ? undefined : minder.#deadAt(scope)
+    }
+    const queryClient = new TSQ.QueryClient({ queryCache: new TSQ.QueryCache({ onSuccess: settleFetch }) })
+    queryClient.setQueryDefaults([MinderKeyRoot], {
+      ...FixedQueryCacheOpts,
+      queryFn:           fetchAt,
+      staleTime:         staleTimeOf,
+      structuralSharing: (prior: unknown, next: unknown) => (isKids(next) ? landedKidsOf(prior, next) : newerThingOf(prior, next, deadAt)),
     })
-    LandersOfClient.set(queryClient, landers)
+    MindersOfClient.set(queryClient, minders)
     return queryClient
   }
 
   /** True for a QueryClient {@link makeClient} made: the only kind `make` accepts. */
   static isClient(val: unknown): val is TSQ.QueryClient {
-    return LandersOfClient.has(val as TSQ.QueryClient)
+    return MindersOfClient.has(val as TSQ.QueryClient)
   }
 
   // TanStack's own restore and save, with our defaults where its own would drop what we keep: a refused get's item, and a
-  // snapshot more than a day old. A restore builds each entry with its saved state, so no structural sharing or onSuccess runs.
+  // snapshot more than a day old. A restore builds each entry with its saved state and the client's query defaults, so no
+  // structural sharing or onSuccess runs.
   /** Restore `queryClient`, a client {@link makeClient} made, from the snapshot `persister` keeps, then save the whole client to it at each change.
    * Call it before any minder attached to the client says `hello`: what a minder caches then lands over what was restored.
    * Every entry with a record or a listing is saved, an item whose last get was refused among them, and restored however
@@ -145,29 +175,6 @@ export abstract class Minder {
       persistQueryClientSubscribe({ queryClient, persister, buster: PersistBuster, dehydrateOptions: SaveOpts })
     }
   }
-
-  // The client's own defaults are left to whoever owns it. TanStack matches query defaults by key prefix, and the kind of
-  // entry follows the bank's segments in every key, so one prefix each gives the items, the soons, the dead entries and
-  // the listings of this bank their own, the fixed options over any the client sets. Under skipToken, TanStack never
-  // fetches a soon or a dead entry. They are set at hello, not at make: a minder of the same bank made while another
-  // minds must not take its queries over.
-  /** Set the query defaults of this bank's items, soons, dead entries and listings in the client. */
-  #setQueryDefaults(): void {
-    const fixed    = { ...FixedQueryCacheOpts, staleTime: this.#queryCacheOpts.staleTime }
-    const bankHead = bankKeyHeadOf(this.scope)
-    this.#tsq.setQueryDefaults([...bankHead, Itemkind], {
-      ...fixed,
-      queryFn:           ({ queryKey }) => this.#fetchRecord(this.#askAt(this.#scopeOfQueryKey(queryKey))),
-      structuralSharing: (prior: unknown, next: unknown) => newerThingOf(prior, next, (scoped) => this.#deadAt(scoped)),
-    })
-    this.#tsq.setQueryDefaults([...bankHead, Soonkind], { ...fixed, queryFn: TSQ.skipToken, structuralSharing: newerThingOf })
-    this.#tsq.setQueryDefaults([...bankHead, Deadkind], { ...fixed, queryFn: TSQ.skipToken, structuralSharing: newerThingOf })
-    this.#tsq.setQueryDefaults([...bankHead, Listkind], {
-      ...fixed,
-      queryFn:           ({ queryKey }) => this.#fetchListing(this.#scopeOfQueryKey(queryKey)),
-      structuralSharing: landedKidsOf,
-    })
-  }
   // --
 
   // == [Starting and ending]: hello, goodbye
@@ -176,8 +183,7 @@ export abstract class Minder {
   hello(): void {
     if (this.#isReady) { return }
     this.#isReady = true
-    this.#landers.set(bankHashOf(bankKeyHeadOf(this.scope)), (val, queryKey) => { this.#landedByFetch(val, queryKey) })
-    this.#setQueryDefaults()
+    this.#minders.set(bankHashOf(bankKeyHeadOf(this.scope)), this)
     this.#unwatch = this.vaultDB.watch(
       this.scope,
       // Synchronous on purpose: the vaultDB notifies of a refusal's dbhas, each changed tracked Thing and a list's parentage and deltas before its verb returns. An await here would cache them after the operation resumes.
@@ -191,7 +197,7 @@ export abstract class Minder {
     this.#isReady = false
     if (this.#unwatch) { this.#unwatch() }
     this.#unwatch = null
-    this.#landers.delete(bankHashOf(bankKeyHeadOf(this.scope)))
+    this.#minders.delete(bankHashOf(bankKeyHeadOf(this.scope)))
     this.#tsq.removeQueries({ queryKey: bankKeyHeadOf(this.scope) })
   }
   // --
@@ -271,8 +277,8 @@ export abstract class Minder {
   async list(labelpath: Labelpath): Promise<Kids> {
     MinderChecks.minderLabelpath.parse(labelpath)
     this.#demandReady()
-    // Under staleTime 0 TanStack fetches whatever the listing holds, and shares a fetch under way.
-    return await this.#tsq.query<Kids>({ queryKey: this.listQueryKey({ labelpath }), staleTime: 0 })
+    // Under a listing's staleTime, 0, TanStack fetches whatever the listing holds, and shares a fetch under way.
+    return await this.#tsq.query<Kids>({ queryKey: this.listQueryKey({ labelpath }) })
   }
 
   /** {@link list}, resolving an `Outcome` instead of throwing: a refusal, misuse included, is its bad outcome. */
@@ -350,7 +356,7 @@ export abstract class Minder {
   }
   // --
 
-  // == [TSQ Direct Cache Calls]: #doGet, #fetchRecord, #fetchListing, #itemAt, #soonAt, #deadAt, #itemRecordAt, #soonestAt, #isBehindAt, #tsqFind, sendToTSQ, #landWorld, #landedByFetch, #settleLanded, #hasStoredBesideItem, #markBehinds
+  // == [TSQ Direct Cache Calls]: #doGet, #fetchAt, #fetchRecord, #fetchListing, #itemAt, #soonAt, #deadAt, #itemRecordAt, #soonestAt, #isBehindAt, #tsqFind, sendToTSQ, #landWorld, #landedByFetch, #settleLanded, #hasStoredBesideItem, #markBehinds
 
   // TanStack resolves with what the queryFn returned, not what structural sharing left in the cache: a notice that landed during the
   // get may have left the item a later record.
@@ -358,6 +364,13 @@ export abstract class Minder {
   async #doGet(scoped: ThingScope, opts: MinderGetOpts): Promise<ThingRecord | Absent> {
     const fetched = await this.#tsq.query(this.#tsqQueryOptions(scoped, opts))
     return this.#itemAt(scoped) ?? fetched
+  }
+
+  // The minder never fetches a soon or a dead entry: each takes its record only from sendToTSQ.
+  /** Fetch what `queryKey`, the key of one of this bank's items or listings, caches. */
+  async #fetchAt(queryKey: TSQ.QueryKey): Promise<ThingRecord | Absent | Kids> {
+    const scope = this.#scopeOfQueryKey(queryKey)
+    return (queryKey[EntrykindIdx] === Listkind) ? await this.#fetchListing(scope) : await this.#fetchRecord(this.#askAt(scope))
   }
 
   // A tombstone answered is the answer's dbhas, which the watch lands before the answer resumes this fetch.
@@ -465,9 +478,9 @@ export abstract class Minder {
 
   // A listing's fetch needs nothing more: the Things it lists landed through the watch before it. A soon or a dead entry is
   // never fetched. A get's live record over Absent is no first landing: only the item's own count of landings tells one.
-  /** Settle what a fetch that just landed `val` under `queryKey` brings about, where it is an item of this bank. */
+  /** Settle the item a fetch just landed `val` in, where `queryKey`, a key of this bank, is an item's. */
   #landedByFetch(val: unknown, queryKey: TSQ.QueryKey): void {
-    if (! TSQ.partialMatchKey(queryKey, [...bankKeyHeadOf(this.scope), Itemkind])) { return }
+    if (queryKey[EntrykindIdx] !== Itemkind) { return }
     const scope   = this.#scopeOfQueryKey(queryKey)
     const isFirst = (! isAbsent(val)) && (this.#tsq.getQueryState(queryKey)?.dataUpdateCount === 1) && (! this.#hasStoredBesideItem(scope))
     this.#settleLanded(scope, isFirst)
@@ -654,7 +667,7 @@ export abstract class Minder {
   // --
 }
 
-// == [Helpers]: Itemkind, Soonkind, Deadkind, Listkind, EntrykindIdx, Marks, labelsOf, bankHashOf, Lander, LandersOfClient, TellableTSQEvent, isTellableTSQEvent, absentCitedOf, isNewer, isOlder, gotAnswerOf, isTimelyQuery, isKids, landedKidsOf, PersistBuster, RestoreOpts, SaveOpts, restoredSharingOf
+// == [Helpers]: Itemkind, Soonkind, Deadkind, Listkind, EntrykindIdx, Marks, labelsOf, bankHashOf, MindersOfClient, TellableTSQEvent, isTellableTSQEvent, absentCitedOf, isNewer, isOlder, gotAnswerOf, isTimelyQuery, isKids, landedKidsOf, PersistBuster, RestoreOpts, SaveOpts
 
 /** The entrykind segment of an item's query key. */
 const Itemkind = 'item'
@@ -677,12 +690,9 @@ function labelsOf(labelpath: Labelpath): string[] {
 /** The hash of `queryKey`'s first three segments, which are its bank's where it is a minder's key. */
 function bankHashOf(queryKey: TSQ.QueryKey): string { return TSQ.hashKey(queryKey.slice(0, EntrykindIdx)) }
 
-/** What a client's cache hands a record a fetch just landed under `queryKey`, for the minder of its bank to settle. */
-type Lander = (val: unknown, queryKey: TSQ.QueryKey) => void
-
 // A client is a TanStack QueryClient as a host's QueryClientProvider takes it, so what minders it has is kept beside it.
-/** The minders attached to each client {@link Minder.makeClient} made, by {@link bankHashOf} of their bank's key head. */
-const LandersOfClient = new WeakMap<TSQ.QueryClient, Map<string, Lander>>()
+/** The minders minding in each client {@link Minder.makeClient} made, by {@link bankHashOf} of their bank's key head. */
+const MindersOfClient = new WeakMap<TSQ.QueryClient, Map<string, Minder>>()
 
 /** A cache event a listener hears of, as {@link isTellableTSQEvent} narrows it: a query added, updated or removed. */
 type TellableTSQEvent = Readonly<
@@ -746,21 +756,13 @@ function landedKidsOf(prior: unknown, next: unknown): unknown {
 /** The buster a snapshot is saved under: a snapshot saved under another is discarded at restore. */
 const PersistBuster: string = ThingFormat
 
-// A restored entry keeps the options it was built with until a fetch replaces them with its kind's, and its minder has
-// set none yet: so they are the fixed ones, and its structural sharing stands for either kind's.
-/** How {@link Minder.persist} restores a snapshot: each entry kept until `goodbye`, its record or listing deeply frozen. */
-const RestoreOpts: TSQ.HydrateOptions = Object.freeze({
-  defaultOptions: { queries: { ...FixedQueryCacheOpts, structuralSharing: restoredSharingOf }, deserializeData: deepFreeze },
-})
+/** How {@link Minder.persist} restores a snapshot: each record or listing deeply frozen. */
+const RestoreOpts: TSQ.HydrateOptions = Object.freeze({ defaultOptions: { deserializeData: deepFreeze } })
 
 // A mutation's variables may hold the cleartexts it was handed: a whisper put, a passphrase for a gating.
 /** What {@link Minder.persist} saves: every entry with a record or a listing, whatever its last fetch did, and no mutation. */
 const SaveOpts: TSQ.DehydrateOptions = Object.freeze({ shouldDehydrateQuery: (tsqQuery: TSQ.Query) => (tsqQuery.state.data !== undefined), shouldDehydrateMutation: () => false })
 
-/** TanStack's structural sharing for an entry restored: a listing's for a listing, and a record's for a record. */
-function restoredSharingOf(prior: unknown, next: unknown): unknown {
-  return isKids(next) ? landedKidsOf(prior, next) : newerThingOf(prior, next)
-}
 // --
 
 // == [Checks]: MinderOptsChecks, DeliveredChecks

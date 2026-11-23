@@ -52,7 +52,7 @@ export class Device implements MinderFriend {
 
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
-  /** The defaults the signed-in user's VaultMinder sets in {@link queryClient}. */
+  /** The cache options of the signed-in user's VaultMinder, which {@link queryClient} takes for its boxes. */
   readonly #queryCacheOpts: QueryCacheOpts
   /** The host's persisters, which the two QueryClients are restored from and saved to, or undefined for none. */
   readonly #persisters: DevicePersisters | undefined

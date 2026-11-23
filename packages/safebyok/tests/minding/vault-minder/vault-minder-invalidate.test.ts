@@ -49,6 +49,8 @@ describe("VaultMinder.invalidate", () => {
     const observer    = new TSQ.QueryObserver(minder.queryClient, { queryKey: minder.listQueryKey(TH.RootScope) })
     const unsubscribe = observer.subscribe(() => undefined)
     try {
+      // A listing is stale at once, so the observer lists as it mounts.
+      await TH.eventually(() => ! observer.getCurrentResult().isFetching)
       cheatBox(vaultDB, TH.boxThingOf('anthropic'))
       minder.invalidate(undefined, { list: 'all' })
       await TH.eventually(() => labelpathsOf(minder.listingAt(TH.RootScope))?.length === 2)
