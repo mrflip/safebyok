@@ -56,6 +56,14 @@ pnpm --filter safebyok-demo-dojo fixture     # writes src/fixture/fixture.json a
   `labelpath`), `scope` and `modelkind` are left out: a row's first cell, its ckey, says them. Ciphertext is cut short, and nothing is decrypted. A
   `revtok`, `lifetok` or `read_tc` column shows its first ten characters and its last two, by `maskUuid` from
   `safebyok/utils`.
+* **Scenarios**: two whole forms as a user would meet them (`src/components/scenarios/`), each with a checklist of the
+  Coach's claims about it and what the dojo found today (`claims.ts`). **Envman** edits Hero's stored box `github` on
+  `useDraft`: the username (sidecar) in a plain input, the password (whisper) masked, an eye that shows it, a double
+  click or the quill that edits it, and Save, or a save whenever either field loses focus. **API key** writes a new box,
+  `scenario_apikey`, from a form Action through `putBoxAction` with a `WhisperInput`, and shows the box stored beneath
+  it by `WhisperMask`. Each form has the Forms tab's mirror. Two buttons arm the vaultDB to hold the next write six
+  seconds or refuse it, and the app mounts the kit's `UnlockDialog`, which opens while a reveal or a draft's save waits
+  for the passphrase. Sign in as Hero and unlock.
 
 Under each form, the **readout** shows, after each press, whether each field still has text and the message the form
 shows. It reads `value.length > 0` and nothing else of a field.

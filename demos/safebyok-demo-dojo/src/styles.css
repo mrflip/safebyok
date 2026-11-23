@@ -63,3 +63,6 @@ form.formrow button { padding: 0.2rem 0.3rem; }
 .example pre { font-size: 0.75rem; overflow-x: auto; background: var(--paper); padding: 0.4rem; margin: 0.4rem 0 0; }
 .field { display: grid; grid-template-columns: 5rem 1fr; gap: 0.15rem 0.5rem; align-items: center; }
 .field .gripe { grid-column: 2; font-size: 0.85rem; min-height: 1.2em; }
+.savelog { display: flex; flex-direction: column; font-size: 0.8rem; }
+.envman .mirror, .apikey .mirror { min-width: 18rem; }
+.checklist td { vertical-align: top; font-size: 0.85rem; }

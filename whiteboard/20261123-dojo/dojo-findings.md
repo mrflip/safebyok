@@ -300,7 +300,106 @@ Each with what it cost the dojo. None is smoothed over with machinery.
     `try`/`finally`, under `void`). The passkey unlock has the same shape, but renders only once the bank's header names
     a passkey. A test that unlocked through the Practice card before the stage showed `locked` met it. The form is
     documented for stage `locked`. 0 lines; recorded.
+18. **`useDraft` reveals a field only on its focus**: there is no call to show a field without focusing it, and none to
+    show it read-only. The envman eye and quill are the host's buttons that move the focus, each cancelling its
+    `mousedown` so the press does not blur, and mask, the field first, with a ref composed onto the draft's: about 25 lines
+    in `src/components/scenarios/EnvmanForm.tsx`. A click on the field, or a Tab into it, shows it too; and after a lock
+    with the field focused the eye does nothing, since focusing a focused field fires nothing.
+19. **A revealed draft field is editable**: double-click-to-edit takes a boolean of the host's and a `readOnly` joined to
+    the draft's. 4 lines.
+20. **`useDraft` has no pending state, outcome or order for `put`**: the host counts saves under way and logs how each
+    ended, about 15 lines, and `SaveLog.tsx` shows them. Two puts at once cite the same base, so whichever lands second
+    refuses `stale_write`. Where the first lands first, an edit made between the two is lost from the box and the form;
+    only where the first is held past the second is every edit stored.
+21. **`put` starts the draft again from the box stored when it lands**: it empties every input and drops the sidecar
+    edit, including whatever was typed after it began. Keeping that typing would take a host's own diff of the draft
+    against what the put sent. Not built.
+22. **`put` empties the field that has the focus**: after Enter in a field being edited, the field stays focused,
+    editable, masked and empty; the eye does nothing until it loses focus, since focusing a focused field fires nothing;
+    and what is typed next replaces the whole whisper. 0 lines.
+23. **A draft field typed into keeps its text in the input's `value` while masked, and across a lock**: `put` reads it
+    from there. 0 lines; the envman mirror shows it.
+24. **`WhisperInput`'s button reads Show and Hide**, from `PartsPhrases`, and no prop makes it an eye. 0 lines.
+25. **A draft's mask is the placeholder of an empty input**, eight dots, saying nothing of the stored whisper;
+    `WhisperMask` is an element of its own. 0 lines.
+26. **`useDraft` binds no sidecar field to an input**: `whisperField` gives a whisper's field its props, but the sidecar
+    comes whole, so the envman username is a controlled input bound by hand, a reader of one string field and a setter
+    spreading the whole sidecar. About 7 lines.
+27. **`useDraft` has no save on blur**: the host wraps the whisper field's `onBlur` around its own, with the draft's
+    `isDirty`, and adds one to the username. About 6 lines; a move from one field into the other saves too (E10).
 
 React itself, not the library, cost two lines more: an outcome set after an `await` must be wrapped in
 `startTransition` to commit with React's reset of the form, and a query-cache subscriber must go through
 `notifyManager.batchCalls`, since `useBox` adds a query while it renders.
+
+## The Scenarios forms, claim by claim
+
+Thread 6 built the two forms the Coach describes as a user would meet them, on the Scenarios tab
+(`src/components/scenarios/`), and asked of each of his sentences whether it holds "with no weirdness". **Envman** edits
+Hero's stored box `github` on `useDraft`: the username (sidecar) in a plain input, the password (whisper) in the
+draft's field, an eye and a quill beside it, and Save, or a save when either field loses focus. **API key** writes a new
+box from the Forms tab's recommended row (a form Action through `putBoxAction` that cancels React's reset on a refusal)
+with a `WhisperInput`, and shows the box stored beneath it by `WhisperMask`. The app mounts the kit's `UnlockDialog`.
+Each row is asserted by `tests/components/scenarios/ScenariosTab.test.tsx`, one test a claim, under jsdom; **nobody has
+run either form in a real browser**: the machine has none.
+
+| Claim | Today | What was found |
+| --- | --- | --- |
+| E1. I see the whisper field masked. | works | An empty password input, its placeholder eight dots: it says nothing of the password's length. |
+| E2. I click an eye and I see it. | works, odd | The password shows in the field, read-only; a second press masks it. Any focus shows it too (a click on the field, a Tab into it): the eye is a host button that focuses the field (list item 18). After a lock, or a save that lands, with the field focused, the eye does nothing until the field loses focus. From the keyboard the eye only shows it: a Tab to the eye masks the field, so pressing the eye shows it again. |
+| E3. I double click the field and I am editing its cleartext like a text edit. | works | The host keeps the field read-only until a double click (item 19). |
+| E4. The quill edit button to its right does the same. | works | One press reveals and makes it editable. |
+| E5. On blur it masks again. | works, odd | Dots again, but not the same dots: a field not typed into is emptied, back to the placeholder's eight; one typed into shows a dot a character, since it keeps its text in the input's `value` until a save lands, and across a lock (items 23, 25). |
+| E6. I can click Save while the field is masked. | works | Save writes the password typed and the username. Disabled until something is typed, as `useDraft`'s example has it. |
+| E7. I can click Save while the field is not masked. | works, odd | A mouse press on Save saves what was typed; the field masks as the press takes the focus, as on any blur. Enter in the field saves without masking it first, and once the save lands leaves the field focused, editable, masked and empty: the eye does nothing until it loses focus, and what is typed next replaces the whole password (item 22). |
+| E8. Save puts both the whisper and the sidecar. | works | One press, both fields; a field left alone keeps what was stored. |
+| E9. It saves in the background: nothing goes away in the form. | cannot today | During the save the form stays usable; once it lands, the username shows what was saved (no render shows the old one) and the password shows masked. But whatever is typed while a save runs, in either field, goes away when it lands, and a password revealed meanwhile is masked and emptied under the focus (item 21). Going on working while it saves is what "in the background" asks for, and that is where things go away. |
+| E10. I can save on blur of the sidecar field. | works, odd | Leaving the username with an edit saves. Leaving it for the password reveals the password while the save runs; the save landing masks and empties it, the focus still there, losing anything typed into it meanwhile, and a click does not show it again until it loses focus. |
+| E11. I can save on blur of the whisper field. | works, odd | Leaving the password with an edit saves; leaving it unchanged saves nothing. A save begun while one runs cites the same revision, so whichever lands second refuses `stale_write`: where the first lands first, an edit made between the two is lost from the box and the form; where the first is held past the second, every edit is stored and the log still ends in the error (item 20). |
+| A1. I enter the values. | works | Title (sidecar) and key (whisper), plain uncontrolled inputs: in no React state and no `value` attribute. |
+| A2. The whisper field is password-style. | works | `WhisperInput`, with the attributes that keep password managers away. |
+| A3. An eye reveals it. | works, odd | Its button shows the key as text and hides it, but reads Show and Hide, not an eye (item 24). It does nothing while a save runs. |
+| A4. Once I hit Save it is only displayed as masked. | works | While the save runs the key is masked, though still in the input's `value`. Once stored, React empties the form and the key shows only by `WhisperMask`: its last four characters while unlocked, the sidecar's stored mask while locked. A refusal keeps it in the field, masked. |
+
+One claim, E9, cannot hold today without a host's own diff of the draft (item 21); nothing under `packages/` changed, and
+nothing was built past a host's plain use of the hooks and parts. Where the reading of a sentence was a choice: the eye shows the text in the field itself; "click Save whether
+the field is masked or not" is a press on Save while the field shows its text, which a mouse press masks as it takes the
+focus, and Enter saves unmasked (a Save that cancels its `mousedown`, as the eye does, would save as Enter does); save on
+blur hides the Save button, a choice of the dojo's, not the Coach's words, since with both a mouse press on Save after an
+edit would start two saves, the blur's and the press's, and end one in `stale_write` (reasoned, not run);
+"sidebar" is the sidecar; the envman box is the fixture's `github` (username and password), not a new one, so the
+fixture is not remade.
+
+### What the dojo tried, and what the user sees
+
+By scratch tests under jsdom, not kept, unless a claim's test above covers it.
+
+* **Reveal, then edit**: the eye shows it read-only; a double click or the quill makes it editable. As the claims say.
+* **Edit, then Save without a blur**: by Enter here; the field is left focused and empty, and the eye then does nothing
+  until it loses focus (E7).
+* **Blur without changing anything**: masked and emptied; with save on blur, no save.
+* **Change only the sidecar, or only the secret**: each saves alone; the other keeps what was stored.
+* **Save twice quickly**, the first held: the second lands first (`ok`), the first then refuses `stale_write`. The log's
+  newest line is the error; both edits are stored. With the second held instead (by the thread's reviewer, wrapping the
+  vaultDB's write), the first lands and the second refuses `stale_write`: a username typed between the two presses is
+  in neither the box nor the form.
+* **Save on blur while a save is under way**: the same as twice quickly.
+* **Save on blur, from the username into the password**, the save held (by the thread's reviewer): the password shows
+  while the save runs; once it lands it is masked and emptied under the focus, and a password typed there meanwhile is
+  in neither the box nor the field (E10).
+* **Type while a save is held**: the typing is gone when the save lands, the username back to what was saved and the
+  password emptied.
+* **Save while locked**, envman: the `UnlockDialog` opens; once unlocked the save lands and nothing is lost. Cancel logs
+  "The unlock was dismissed, …", and everything typed stays, the password masked in its `value`.
+* **Save while locked**, API key: `bank_locked`, with its message for a developer (list item 8) and no unlock prompt
+  (item 9); everything typed stays, since the form cancels React's reset on a refusal.
+* **A refused write**: envman logs the vaultDB's message and keeps every field, the password masked in its `value`; API
+  key the same, as the Forms tab's row 1.
+* **Lock while revealed**, the field focused: masked and emptied at once, the focus left on it; the eye then does
+  nothing until the field loses focus. Clicked away and back, the eye opens the unlock dialog, and once unlocked the
+  field shows, given the focus back.
+* **Lock while being edited**: masked, the typed password still in its `value`; a Save then waits for the unlock dialog
+  and writes it.
+* **Reveal, switch tabs, come back**: under jsdom the field stays revealed in the hidden tab and on return, since jsdom
+  moves no focus on a click and hides nothing from focus. In a browser the press on a tab button takes the focus, which
+  should blur and mask the field before the tab hides. Not seen in one.
