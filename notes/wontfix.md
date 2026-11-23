@@ -191,7 +191,7 @@ removing it would add a branch to every landing for a state a get already ends. 
 * alternatives:
   - refuse the get `stale_read` when a newer soon is cached as its answer lands: a check outside `structuralSharing`,
     against a record the get did not begin with, in a primitive's critical path.
-* workaround: none needed. The next get fetches the newest whole record.
+* workaround: none needed. An item an observer keeps active is fetched again at once; any other, by its next get.
 
 Steps to reproduce: start a get of a box; while the vaultDB answers it, list its parent after another device wrote the
 box anew; let the get answer.
