@@ -152,4 +152,7 @@ in the same masked input they typed it into. So the target is what a careful ord
 * **Forms that keep their text through a refusal.** Today the kit's forms, other than its two
   unlock forms, are form Actions, and are emptied after every outcome.
 * **Clearing a secret left in a field when the bank locks.**
-* **Re-keying.** Nothing replaces a bankKey.
+* **Re-keying.** Nothing replaces a bankKey. Every other key encrypts once: a whisper is sealed under a fresh key at
+  every write, and a wayin's or a lease's key wraps the bankKey once. The bankKey wraps one fresh key for every seal
+  in the bank's life, each under a random 96-bit IV, and the accepted limit for random IVs under one key is 2^32 uses
+  (NIST SP 800-38D). A vault of secrets is many orders of magnitude below that.
