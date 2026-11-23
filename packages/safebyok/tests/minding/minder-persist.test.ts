@@ -121,6 +121,17 @@ describe("minder.persist(persister)", () => {
     }
   })
 
+  it("saves no query a host runs in the minder's client", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedBoxOf(vaultDB)
+    const { persister, minder } = await savedGetOf(vaultDB)
+    minder.queryClient.setQueryData(['whisper', TH.BoxScope.labelpath], TH.Whisper)
+    await nextTick()
+    const savedKeys = persister.restoreClient()!.clientState.queries.map(({ queryKey }) => queryKey)
+    expect(savedKeys).to.deep.include(minder.itemQueryKey(TH.BoxScope))
+    expect(savedKeys.map((queryKey) => queryKey[0])).to.not.include('whisper')
+  })
+
   it("discards a snapshot saved under another ThingFormat, restoring nothing", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)

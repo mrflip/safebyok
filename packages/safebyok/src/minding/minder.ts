@@ -725,9 +725,13 @@ const PersistBuster: string = ThingFormat
 /** How {@link Minder.persist} restores a snapshot: each record or listing deeply frozen. */
 const RestoreOpts: TSQ.HydrateOptions = Object.freeze({ defaultOptions: { deserializeData: deepFreeze } })
 
-// A mutation's variables may hold the cleartexts it was handed: a whisper put, a passphrase for a gating.
-/** What {@link Minder.persist} saves: every query with a record or a listing, whatever its last fetch did, and no mutation. */
-const SaveOpts: TSQ.DehydrateOptions = Object.freeze({ shouldDehydrateQuery: (tsqQuery: TSQ.Query) => (tsqQuery.state.data !== undefined), shouldDehydrateMutation: () => false })
+// A mutation's variables may hold the cleartexts it was handed: a whisper put, a passphrase for a gating. A host observes
+// the minder's client, and may run queries of its own in it, which may hold the same.
+/** What {@link Minder.persist} saves: every minder query with a record or a listing, whatever its last fetch did, no query of the host's, and no mutation. */
+const SaveOpts: TSQ.DehydrateOptions = Object.freeze({
+  shouldDehydrateQuery:    (tsqQuery: TSQ.Query) => ((tsqQuery.queryKey[0] === MinderKeyRoot) && (tsqQuery.state.data !== undefined)),
+  shouldDehydrateMutation: () => false,
+})
 
 // --
 
