@@ -476,8 +476,8 @@ Proposed by the session, not ruled:
 
 * **The table of what a form keeps after each outcome** (kept through a refusal or a failure; cleared when stored or cancelled).
 * **Sign-out comes into bounds, alone, as the next core thread:** one device serves users in turn, its client the same object throughout, since a hook binds its client once.
-* **The roots reach a host as records with the key material left out, not as the client:** `useGate` does this for the gate already; the bank and the root box want a hook.
-* **An async step on `putBoxAction` and `putBoxMutationOptions`** that gets the whisper once the form is emptied, for "test the key before saving".
+* **The roots reach a host as records with the key material left out, not as the client:** `useGate` does this for the gate already. For the dojo's Inspect tab the Coach ruled: "mask the keys as they come out of the back door, but do include a taste of them for the dev to understand how the library works. This is for experimentation, not to be installed in a real app." A worker is building it, stacked on #860.
+* ~~An async step on `putBoxAction` and `putBoxMutationOptions`, for "test the key before saving".~~ Withdrawn the same day. The Coach: testing a key "should be a button under control of the user", and a button's handler is not a submit, so the key stays in its field and no form is emptied. For strength, "the in-form check would just disable submit, our check runs async just fine": the verb judges inside the library, after it has taken the passphrase, where awaiting costs nothing. The dojo needed its ten lines only because its Weak button forces a submit past a disabled one.
 * **The react_free PRs (#819, #822, #832, #834, #835, #836, #838, #843) are closed once a new sprint has mined them,** not reworked: the surface work rewrites the same hooks.
 
 Found by experiment (jsdom only): React's reset of a form Action goes through the form's cancelable `reset` event, so a form that cancels it when the action ended in a refusal keeps its uncontrolled fields, a secret's among them, and still clears when stored.
@@ -495,3 +495,5 @@ Open from the dojo, each with the Coach: after `gate_made_elsewhere` the stage s
 ### What is next
 
 "Before we can do the gating we need to demonstrate the target": the dojo is that demonstration. Then the gating talk (what a gate is, the gate verbs as calls that take the form), dynamic instances, and error routing, none yet discussed.
+
+Two words the Coach set straight (2026-11-23): "mask display schedule" meant the map from a text's length to how many stars show and how many characters from each end, which the code calls `MaskSchedule`; with fields that mask again on a timer, that map "needs a new word". "Placeholder text" meant only an input's light gray placeholder.
