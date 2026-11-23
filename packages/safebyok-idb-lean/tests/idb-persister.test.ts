@@ -99,7 +99,7 @@ describe("a device restored through IdbPersisters", () => {
     function persistersOf(): DevicePersisters {
       return {
         roots: new IdbPersister({ recordlabel: 'roots', dbName, throttleMs: 0, onBadNews: noop }),
-        boxes: new IdbPersister({ recordlabel: 'boxes', dbName, throttleMs: 0, onBadNews: noop }),
+        boxes: ({ userid, banklabel }) => new IdbPersister({ recordlabel: `boxes:${userid}:${banklabel}`, dbName, throttleMs: 0, onBadNews: noop }),
       }
     }
     const first     = TH.makeDevice({}, { persisters: persistersOf() })
@@ -110,5 +110,7 @@ describe("a device restored through IdbPersisters", () => {
     const device = TH.makeDevice({}, { vaultDB: vault.bank.vaultDB, persisters: persistersOf() })
     await device.signIn(TH.WorldScope.userid)
     expect(Object.keys(device.minder.listingAt({ ...TH.WorldScope, labelpath: 'box' })?.items ?? {})).to.deep.equal(['openai'])
+    const stored = await new IdbPersister({ recordlabel: `boxes:${TH.WorldScope.userid}:${TH.WorldScope.banklabel}`, dbName }).restoreClient()
+    expect(stored?.clientState.queries).to.not.be.empty
   })
 })

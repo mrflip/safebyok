@@ -41,7 +41,7 @@ async function restoredMinderOf(persister: MemoryPersister): Promise<VaultMinder
   return minderIn(queryClient, new DownVaultDB())
 }
 
-describe("Minder.persist(queryClient, persister)", () => {
+describe("Minder.persist(queryClient, persister, scope)", () => {
   it("saves each box and listing a minder caches, and restores them into another client, frozen, before its minder's hello", async () => {
     const vaultDB   = new MemoryVaultDB()
     const box       = await storedBoxOf(vaultDB)
@@ -59,6 +59,24 @@ describe("Minder.persist(queryClient, persister)", () => {
     expect(Object.isFrozen(restored.at(TH.BoxScope))).to.be.true
     expect(Object.keys(restored.listingAt(TH.RootScope)?.items ?? {}).toSorted((left, right) => left.localeCompare(right))).to.deep.equal(['anthropic', 'openai'])
     expect(restored.at(boxScopeOf('anthropic'))).to.be.undefined
+  })
+
+  it("saves only the queries of the bank at scope, where one is given, from a client other banks' minders share", async () => {
+    const vaultDB     = new MemoryVaultDB()
+    await storedBoxOf(vaultDB)
+    const persister   = new MemoryPersister()
+    const queryClient = VaultMinder.makeClient()
+    await VaultMinder.persist(queryClient, persister, TH.ThingBank)
+    const minder      = minderIn(queryClient, vaultDB)
+    const otherBank   = { ...TH.ThingBank, userid: 'u_other' }
+    // Another bank's item, as its own minder would cache it: no bank is stored for it to fetch from.
+    queryClient.setQueryData(VaultMinder.itemQueryKeyOf({ ...otherBank, labelpath: TH.BoxScope.labelpath }), null)
+    await minder.get(TH.BoxScope)
+    await nextTick()
+    const savedKeys = persister.restoreClient()!.clientState.queries.map(({ queryKey }) => queryKey)
+    expect(savedKeys).to.deep.include(minder.itemQueryKey(TH.BoxScope))
+    expect(savedKeys.map((queryKey) => queryKey[1])).to.not.include(otherBank.userid)
+    expect(queryClient.getQueryCache().getAll().map(({ queryKey }) => queryKey[1])).to.include(otherBank.userid)
   })
 
   it("builds each query it restores with the query defaults the client was made with, before any minder's hello", async () => {

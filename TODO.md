@@ -126,3 +126,7 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   persisted snapshot (dehydrated whole, as one string), IndexedDB's limits on one record and the origin's quota,
   and the cost of writing it whole each time. Find when a vault grows big enough to hit one, and what a host sees
   then (thread 8, core_first, 2026-11-22).
+* **A size limit for a persisted snapshot.** A save past the origin's quota is refused `vault_full` and told to the
+  persister's `onBadNews`, and the last snapshot stands; with boxes persisted per bank, the limit bounds one user's boxes.
+  TanStack's `PersistRetryer`, with `removeOldestQuery`, is the way to shrink a snapshot until it fits (the Coach,
+  2026-11-22, box_persist).

@@ -164,17 +164,17 @@ export abstract class Minder {
   // TanStack's own restore and save, with our defaults where its own would drop what we keep: a refused get's item, and a
   // snapshot more than a day old. A restore builds each query with its saved state and the client's query defaults, so no
   // structural sharing or onSuccess runs.
-  /** Restore `queryClient`, a client {@link makeClient} made, from the snapshot `persister` keeps, then save the whole client to it at each change.
+  /** Restore `queryClient`, a client {@link makeClient} made, from the snapshot `persister` keeps, then save the client to it at each change: the whole client, or with `scope`, only that bank's queries.
    * Call it before any minder attached to the client says `hello`: what a minder caches then lands over what was restored.
    * Every query with a record or a listing is saved, an item whose last get was refused among them, and restored however
    * old, unless it was saved under another {@link ThingFormat}. No mutation is saved, paused or not.
    * Rejects where the restore fails, discarding the snapshot; saving goes on.
    */
-  static async persist(queryClient: TSQ.QueryClient, persister: Persister): Promise<void> {
+  static async persist(queryClient: TSQ.QueryClient, persister: Persister, scope?: BankScope): Promise<void> {
     try {
       await persistQueryClientRestore({ queryClient, persister, buster: PersistBuster, maxAge: Infinity, hydrateOptions: RestoreOpts })
     } finally {
-      persistQueryClientSubscribe({ queryClient, persister, buster: PersistBuster, dehydrateOptions: SaveOpts })
+      persistQueryClientSubscribe({ queryClient, persister, buster: PersistBuster, dehydrateOptions: saveOptsOf(scope) })
     }
   }
   // --
@@ -676,7 +676,7 @@ export abstract class Minder {
   // --
 }
 
-// == [Helpers]: Itemkind, Soonkind, Deadkind, Listkind, EntrykindIdx, Marks, labelsOf, bankHashOf, MindersOfClient, TellableTSQEvent, isTellableTSQEvent, nullCitedOf, isNewer, isOlder, gotAnswerOf, isTimelyQuery, isKids, landedKidsOf, PersistBuster, RestoreOpts, SaveOpts
+// == [Helpers]: Itemkind, Soonkind, Deadkind, Listkind, EntrykindIdx, Marks, labelsOf, bankHashOf, MindersOfClient, TellableTSQEvent, isTellableTSQEvent, nullCitedOf, isNewer, isOlder, gotAnswerOf, isTimelyQuery, isKids, landedKidsOf, PersistBuster, RestoreOpts, saveOptsOf
 
 /** The entrykind segment of an item's query key. */
 const Itemkind = 'item'
@@ -769,8 +769,14 @@ const PersistBuster: string = ThingFormat
 const RestoreOpts: TSQ.HydrateOptions = Object.freeze({ defaultOptions: { deserializeData: deepFreeze } })
 
 // A mutation's variables may hold the cleartexts it was handed: a whisper put, a passphrase for a gating.
-/** What {@link Minder.persist} saves: every query with a record or a listing, whatever its last fetch did, and no mutation. */
-const SaveOpts: TSQ.DehydrateOptions = Object.freeze({ shouldDehydrateQuery: (tsqQuery: TSQ.Query) => (tsqQuery.state.data !== undefined), shouldDehydrateMutation: () => false })
+/** What {@link Minder.persist} saves: every query with a record or a listing, of the bank at `scope` where one is given, whatever its last fetch did, and no mutation. */
+function saveOptsOf(scope: BankScope | undefined): TSQ.DehydrateOptions {
+  const bankHash = (scope === undefined) ? undefined : bankHashOf(bankKeyHeadOf(scope))
+  function isSaved(tsqQuery: TSQ.Query): boolean {
+    return (tsqQuery.state.data !== undefined) && ((bankHash === undefined) || (bankHashOf(tsqQuery.queryKey) === bankHash))
+  }
+  return { shouldDehydrateQuery: isSaved, shouldDehydrateMutation: () => false }
+}
 
 // --
 
