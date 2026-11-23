@@ -131,8 +131,9 @@ in the same masked input they typed it into. So the target is what a careful ord
   in the library's methods for those seconds anyway, and a script that could read the field then
   could read it before the submit.
 * **What follows for a form with a secret in it.** A secret cannot be a controlled field (rule
-  1), and an uncontrolled one does not survive a form Action. To keep a secret's text through a
-  refusal, the form submits from a handler.
+  1), and an uncontrolled one is emptied by a form Action's reset. To keep a secret's text through
+  a refusal, the form either cancels that reset (its `reset` event is cancelable) when the action
+  ended in a refusal, or submits from a handler.
 * **Masking again is cheap and reasonable.** A revealed field goes back to masked when the tab is
   hidden, or after a while.
 * **Where clearing is earned.** When a bank locks, a whisper left in an input is still readable
