@@ -12,7 +12,7 @@ import { type Persister, persistQueryClientRestore, persistQueryClientSubscribe 
 import { deepFreeze } from 'es-toolkit'
 import { CX, Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
-import { type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Tombstone, Absent, Shell, ThingChecks, ThingFormat, isAbsent } from '../shapes/shapes-thing'
+import { type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Tombstone, Shell, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetAsk, type ThingWatchScope, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
@@ -34,21 +34,21 @@ export type Labelpathed = { labelpath: Labelpath }
 
 /** This device's cache of the Things of one bank it minds, kept from everything the vaultDB tells of them.
  * A subclass says which Things it minds: a VaultMinder the boxes under the root box, a BankMinder the bank, its main gate and its root box.
- * Each Thing minded has an item, with what a host shows: its live whole record, or {@link Absent} where none is stored live.
+ * Each Thing minded has an item, with what a host shows: its live whole record, or null where none is stored live.
  * It may also have a soon, a sparse record newer than the item, removed once the item catches up; and a dead entry, its
  * tombstone that last landed. Each Thing whose children it minds has a listing of them, once listed.
  * Records arrive from gets, lists, good writes, the world each answer carries, and the watch, in any order, late or more
  * than once. A live whole record lands in the item, a sparse record in the soon, and a tombstone in the dead entry and
- * then, as Absent, in the item. A listing is the {@link Kids} value a list answered, replaced whole by the next. Of a Thing
+ * then, as null, in the item. A listing is the {@link Kids} value a list answered, replaced whole by the next. Of a Thing
  * it does not mind, only what a get or list of it answers is cached, and no later record brings that up to date: get and
  * list only the Things it minds. It caches only from `hello` until `goodbye`, and `goodbye` empties its cache.
  *
  * ## Invariants
  * - For a caller or listener using it as documented, what it shows depends only on which records the minder has heard
  *   of, never on the order they arrived in.
- * - An item, a soon and a dead entry never go back. An item that is Absent counts as its dead entry's tombstone, or
+ * - An item, a soon and a dead entry never go back. An item that is null counts as its dead entry's tombstone, or
  *   where it has none, as nothing stored, older than every record. The item has the newest whole record or tombstone
- *   heard of, a tombstone as Absent, and the soon the newest sparse record while that is newer than the item. A newer
+ *   heard of, a tombstone as null, and the soon the newest sparse record while that is newer than the item. A newer
  *   life replaces an older one whole.
  * - A record that would take the item or soon back is dropped, nothing is told, and the item keeps its time: a sparse
  *   record no newer than the item or the soon, or a whole record or tombstone older than the item from any source but a get. One at the item's
@@ -65,11 +65,13 @@ export type Labelpathed = { labelpath: Labelpath }
  *   soon is removed whenever the item catches up with it; the cache removes any other entry only at `goodbye`.
  *   {@link ThingEvent}, {@link SoonEvent}, {@link DeadEvent} and {@link ListingEvent} give the order of the events.
  * - A get answered with a revision older than the newest cached when it began refuses `stale_read`, and changes nothing.
- *   An answer of Absent counts as its tombstone, or as nothing stored.
+ *   An answer of null counts as its tombstone, or as nothing stored.
+ * - A good get resolves what the item holds once it resolves: its record, or null. A `tryAt` that answers `gotlive`,
+ *   `gotgone` or `gotvoid` has the same as its `val`, and where that is null, the dead entry's tombstone, or null, as its `dbhas`.
  * - A listing is what the vaultDB last answered a list of its parent with, never joined to: a list landing replaces it
  *   whole, unless the listing cached was read later, by `read_tc`. A list refused leaves it as it was.
  * - A child's first stored record to land, in its item, its soon or its dead entry while the others have none, marks its
- *   parent's listing stale, and a listing a host observes is listed again. Absent is no stored record, and marks nothing;
+ *   parent's listing stale, and a listing a host observes is listed again. A null item is no stored record, and marks nothing;
  *   nor does a get's record that replaces it.
  * - An operation caches its own good answer (the record got or written, or the {@link Kids} value listed, never a write's
  *   ask) and the bank and main gate of the world its answer carries, refused or not. Any other record an answer carries (a
@@ -128,7 +130,7 @@ export abstract class Minder {
       const minder = minderOf(queryKey)
       if (minder !== undefined) { minder.#landedByFetch(val, queryKey) }
     }
-    async function fetchAt({ queryKey }: Keyed): Promise<ThingRecord | Absent | Kids> {
+    async function fetchAt({ queryKey }: Keyed): Promise<ThingRecord | null | Kids> {
       const minder = minderOf(queryKey)
       if (minder === undefined) { throw Throwers.minderNotStarted() }
       return await minder.#fetchAt(queryKey)
@@ -204,9 +206,9 @@ export abstract class Minder {
 
   // == [Reading]: at, soonAt, deadAt, isBehindAt, listingAt, tryAt, get, tryGet, backgroundRefresh, list, tryList, isStaleAt, listen
 
-  /** What `scoped`'s item has, however old: its live record, {@link Absent}, or undefined for no item. Never asks the vaultDB. */
-  at<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): ThingAt<LabelpathT> | Absent | undefined {
-    return this.#itemAt(this.#demandOwnScope(scoped)) as ThingAt<LabelpathT> | Absent | undefined
+  /** What `scoped`'s item has, however old: its live record, null, or undefined for no item. Never asks the vaultDB. */
+  at<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): ThingAt<LabelpathT> | null | undefined {
+    return this.#itemAt(this.#demandOwnScope(scoped)) as ThingAt<LabelpathT> | null | undefined
   }
 
   /** The sparse record `scoped`'s soon has, newer than its item, or undefined for no soon. Never asks the vaultDB. */
@@ -246,18 +248,18 @@ export abstract class Minder {
     }
   }
 
-  /** Get `scoped`'s live whole record, or {@link Absent} where none is stored live: the cached one if timely, else from the vaultDB. A get already under way is shared.
+  /** Get `scoped`'s live whole record, or null where none is stored live: the cached one if timely, else from the vaultDB. A get already under way is shared.
    * Where the Thing is deleted, {@link deadAt} has its tombstone by the time the get resolves.
    * Refuses `stale_read` when the vaultDB answers with a revision older than one cached when the get began. A later get asks again.
    */
-  async get<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<ThingAt<LabelpathT> | Absent> {
+  async get<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<ThingAt<LabelpathT> | null> {
     MinderChecks.minderGetOpts.parse(opts)
     this.#demandReady()
-    return await this.#doGet(this.#demandOwnScope(scoped), opts) as ThingAt<LabelpathT> | Absent
+    return await this.#doGet(this.#demandOwnScope(scoped), opts) as ThingAt<LabelpathT> | null
   }
 
   /** {@link get}, resolving an `Outcome` instead of throwing: a refusal, misuse included, is its bad outcome. */
-  async tryGet<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<Outcome.Outcome<ThingAt<LabelpathT> | Absent>> {
+  async tryGet<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<Outcome.Outcome<ThingAt<LabelpathT> | null>> {
     return await Outcome.outcomeOf(() => this.get(scoped, opts))
   }
 
@@ -272,7 +274,7 @@ export abstract class Minder {
    * A list called while another of the same labelpath is under way answers what that one does.
    * The listing at `labelpath` ({@link listingAt}) takes the answer, unless it has one read later. The parent and each child
    * listed land first: a live child as its soon where it is newer than the item, so the next get fetches the item whole; a
-   * tombstone in its dead entry, and Absent in its item, so a get of it answers from the cache. A Thing stored damaged is left out, and reported to the bank's `tellBadNews`.
+   * tombstone in its dead entry, and null in its item, so a get of it answers from the cache. A Thing stored damaged is left out, and reported to the bank's `tellBadNews`.
    */
   async list(labelpath: Labelpath): Promise<Kids> {
     MinderChecks.minderLabelpath.parse(labelpath)
@@ -332,7 +334,7 @@ export abstract class Minder {
   // == [Writing]: tryWrite, write
 
   /** Write `ask` through the vaultDB, and return its answer, a refusal included.
-   * The record written, a tombstone as Absent in its item, and the bank and main gate of the answer's world, are cached before it answers, where this minder minds them. A refusal's `dbhas` is cached only as the watch tells of it.
+   * The record written, a tombstone as null in its item, and the bank and main gate of the answer's world, are cached before it answers, where this minder minds them. A refusal's `dbhas` is cached only as the watch tells of it.
    * Before `hello`, after `goodbye`, or for a Thing this minder does not mind, it answers the refusal without asking the vaultDB.
    * Rejects, whether or not the write was made, when the answer carries a record of another bank.
    */
@@ -360,31 +362,32 @@ export abstract class Minder {
 
   // TanStack resolves with what the queryFn returned, not what structural sharing left in the cache: a notice that landed during the
   // get may have left the item a later record.
-  /** `scoped`'s live record or Absent: the item's if timely within `opts.staleTime`, else from the vaultDB. */
-  async #doGet(scoped: ThingScope, opts: MinderGetOpts): Promise<ThingRecord | Absent> {
+  /** `scoped`'s live record or null: the item's if timely within `opts.staleTime`, else from the vaultDB. */
+  async #doGet(scoped: ThingScope, opts: MinderGetOpts): Promise<ThingRecord | null> {
     const fetched = await this.#tsq.query(this.#tsqQueryOptions(scoped, opts))
-    return this.#itemAt(scoped) ?? fetched
+    const item = this.#itemAt(scoped)
+    return (item === undefined) ? fetched : item
   }
 
   // The minder never fetches a soon or a dead entry: each takes its record only from sendToTSQ.
   /** Fetch what `queryKey`, the key of one of this bank's items or listings, caches. */
-  async #fetchAt(queryKey: TSQ.QueryKey): Promise<ThingRecord | Absent | Kids> {
+  async #fetchAt(queryKey: TSQ.QueryKey): Promise<ThingRecord | null | Kids> {
     const scope = this.#scopeOfQueryKey(queryKey)
     return (queryKey[EntrykindIdx] === Listkind) ? await this.#fetchListing(scope) : await this.#fetchRecord(this.#askAt(scope))
   }
 
   // A tombstone answered is the answer's dbhas, which the watch lands before the answer resumes this fetch.
-  /** Fetch `ask`'s live record, deeply frozen, or Absent where the vaultDB has none live.
-   * Refuses `stale_read` for an answer older than the soonest record cached when the fetch began: Absent counts as its tombstone, or as nothing stored.
+  /** Fetch `ask`'s live record, deeply frozen, or null where the vaultDB has none live.
+   * Refuses `stale_read` for an answer older than the soonest record cached when the fetch began: null counts as its tombstone, or as nothing stored.
    */
-  async #fetchRecord(ask: GetAsk): Promise<ThingRecord | Absent> {
+  async #fetchRecord(ask: GetAsk): Promise<ThingRecord | null> {
     // Read before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
     const prior  = this.#soonestAt(ask)
     const answer = await this.vaultDB.tryGetThing(ask)
     this.#landWorld(answer.world)
     // Thrown unchanged. The `dbhas` is delivered through the watch, never from here.
     if (! answer.ok) { throw answer.err }
-    const answered = (answer.act === 'gotlive') ? this.#checkedDelivered(answer.val, ask) : absentCitedOf(answer)
+    const answered = (answer.act === 'gotlive') ? this.#checkedDelivered(answer.val, ask) : nullCitedOf(answer)
     // TanStack leaves the item and its time as they were, marks it invalidated, and caches the refusal beside it as its error.
     if ((prior !== undefined) && (Thing.cmp(prior, answered) < 0)) { throw Throwers.staleRead(ask) }
     return deepFreeze(answer.val)
@@ -402,9 +405,9 @@ export abstract class Minder {
     return deepFreeze(answer.val)
   }
 
-  /** What `scoped`'s item has: its live record, Absent, or undefined for no item. */
-  #itemAt(scoped: Labelpathed): ThingRecord | Absent | undefined {
-    return this.#tsq.getQueryData<ThingRecord | Absent>(this.itemQueryKey(scoped))
+  /** What `scoped`'s item has: its live record, null, or undefined for no item. */
+  #itemAt(scoped: Labelpathed): ThingRecord | null | undefined {
+    return this.#tsq.getQueryData<ThingRecord | null>(this.itemQueryKey(scoped))
   }
 
   /** The sparse record `scoped`'s soon has, or undefined for no soon. */
@@ -417,10 +420,10 @@ export abstract class Minder {
     return this.#tsq.getQueryData<Tombstone<ThingRecord>>(this.deadQueryKey(scoped))
   }
 
-  /** The record `scoped`'s item counts as: its live record, or where it is Absent its tombstone, or undefined for neither. */
+  /** The record `scoped`'s item counts as: its live record, or where it is null its tombstone, or undefined for neither. */
   #itemRecordAt(scoped: Labelpathed): DeliverableThing | undefined {
     const item = this.#itemAt(scoped)
-    return isAbsent(item) ? this.#deadAt(scoped) : item
+    return (item === null) ? this.#deadAt(scoped) : item
   }
 
   /** The soonest record cached for `scoped`: its soon where the item is behind it, else the record its item counts as, or undefined for neither. */
@@ -436,14 +439,14 @@ export abstract class Minder {
   }
 
   /** The cache's query of `scoped`'s item, or undefined for none. */
-  #tsqFind(scoped: Labelpathed): TSQ.Query<ThingRecord | Absent> | undefined {
-    return this.#tsq.getQueryCache().find<ThingRecord | Absent>({ queryKey: this.itemQueryKey(scoped), exact: true })
+  #tsqFind(scoped: Labelpathed): TSQ.Query<ThingRecord | null> | undefined {
+    return this.#tsq.getQueryCache().find<ThingRecord | null>({ queryKey: this.itemQueryKey(scoped), exact: true })
   }
 
   // Every record but a get's lands here: TanStack lands a get's record in the item itself, then calls #landedByFetch.
   // A whole record at the item's revision lands, and makes the item fresh as of now, as TanStack counts a confirmation from
   // the server. An older one lands nowhere: it would make the newer record read fresh as of its arrival. A tombstone
-  // lands in its dead entry before Absent lands in the item, so a listener on the item's success finds it there.
+  // lands in its dead entry before a null lands in the item, so a listener on the item's success finds it there.
   /** Cache `record` in its item, soon or dead entry while minding, where this minder minds its Thing.
    * A whole record or tombstone older than the record the item counts as, or a sparse one no newer than the soonest cached, lands nowhere.
    */
@@ -451,13 +454,14 @@ export abstract class Minder {
     if (! this.#isReady) { return }
     deepFreeze(this.#checkedDelivered(record, this.scope))
     if (! this.mindsItemAt(record.labelpath)) { return }
-    const isNoneStored = (! this.#hasStoredBesideItem(record)) && ((this.#itemAt(record) === undefined) || isAbsent(this.#itemAt(record)))
+    const item = this.#itemAt(record)
+    const isNoneStored = (! this.#hasStoredBesideItem(record)) && ((item === undefined) || (item === null))
     let isLanded = false
     if (! Thing.isSparse(record)) {
       if (! isOlder(this.#itemRecordAt(record), record)) {
         const isTombstone = Thing.isTombstone(record)
         if (isTombstone) { this.#tsq.setQueryData(this.deadQueryKey(record), record) }
-        this.#tsq.setQueryData(this.itemQueryKey(record), isTombstone ? Absent : record)
+        this.#tsq.setQueryData(this.itemQueryKey(record), isTombstone ? null : record)
         isLanded = true
       }
     } else if (isNewer(this.#soonestAt(record), record)) {
@@ -477,12 +481,12 @@ export abstract class Minder {
   }
 
   // A listing's fetch needs nothing more: the Things it lists landed through the watch before it. A soon or a dead entry is
-  // never fetched. A get's live record over Absent is no first landing: only the item's own count of landings tells one.
+  // never fetched. A get's live record over a null item is no first landing: only the item's own count of landings tells one.
   /** Settle the item a fetch just landed `val` in, where `queryKey`, a key of this bank, is an item's. */
   #landedByFetch(val: unknown, queryKey: TSQ.QueryKey): void {
     if (queryKey[EntrykindIdx] !== Itemkind) { return }
     const scope   = this.#scopeOfQueryKey(queryKey)
-    const isFirst = (! isAbsent(val)) && (this.#tsq.getQueryState(queryKey)?.dataUpdateCount === 1) && (! this.#hasStoredBesideItem(scope))
+    const isFirst = (val !== null) && (this.#tsq.getQueryState(queryKey)?.dataUpdateCount === 1) && (! this.#hasStoredBesideItem(scope))
     this.#settleLanded(scope, isFirst)
   }
 
@@ -556,7 +560,7 @@ export abstract class Minder {
   listQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...bankKeyHeadOf(this.scope), Listkind, ...labelsOf(labelpathed.labelpath), '#', 'kids'] }
 
   /** TanStack's query options for a get of `labelpathed`'s item, under {@link #staleTimeOf}'s staleTime. */
-  #tsqQueryOptions(labelpathed: Labelpathed, opts: MinderGetOpts): TSQ.QueryExecuteOptions<ThingRecord | Absent> {
+  #tsqQueryOptions(labelpathed: Labelpathed, opts: MinderGetOpts): TSQ.QueryExecuteOptions<ThingRecord | null> {
     return { queryKey: this.itemQueryKey(labelpathed), staleTime: this.#staleTimeOf(labelpathed, opts) }
   }
 
@@ -658,8 +662,8 @@ export abstract class Minder {
     }
     // A listing lists Things of its parent's kind, as a labelpath starts with its parent's.
     if (told.eventkind === Listkind) { return Object.freeze(told) as ListingEvent }
-    // The record at a labelpath is of the kind its labelpath starts with. Absent has none of a record's fields.
-    const record = isAbsent(told.state.data) ? undefined : told.state.data as DeliverableThing | undefined
+    // The record at a labelpath is of the kind its labelpath starts with. null has none of a record's fields.
+    const record = (told.state.data === null) ? undefined : told.state.data as DeliverableThing | undefined
     return Object.freeze({
       ...told, revtok: record?.revtok, revseq: record?.revseq, am: record?.am, lifeseq: record?.lifeseq, lifepath: record?.lifepath,
     }) as ThingEvent | SoonEvent | DeadEvent
@@ -667,7 +671,7 @@ export abstract class Minder {
   // --
 }
 
-// == [Helpers]: Itemkind, Soonkind, Deadkind, Listkind, EntrykindIdx, Marks, labelsOf, bankHashOf, MindersOfClient, TellableTSQEvent, isTellableTSQEvent, absentCitedOf, isNewer, isOlder, gotAnswerOf, isTimelyQuery, isKids, landedKidsOf, PersistBuster, RestoreOpts, SaveOpts
+// == [Helpers]: Itemkind, Soonkind, Deadkind, Listkind, EntrykindIdx, Marks, labelsOf, bankHashOf, MindersOfClient, TellableTSQEvent, isTellableTSQEvent, nullCitedOf, isNewer, isOlder, gotAnswerOf, isTimelyQuery, isKids, landedKidsOf, PersistBuster, RestoreOpts, SaveOpts
 
 /** The entrykind segment of an item's query key. */
 const Itemkind = 'item'
@@ -706,9 +710,9 @@ function isTellableTSQEvent(event: TSQ.QueryCacheNotifyEvent): event is Tellable
   return (event.type === 'added') || (event.type === 'updated') || (event.type === 'removed')
 }
 
-/** What a good get's answer of Absent compares as, by life and revision: its tombstone, or for nothing stored the shell's citation, older than every record. */
-function absentCitedOf(answer: Extract<GetThingAnswer, { val: Absent }>): Pick<ThingCited, 'lifepath' | 'revseq'> {
-  return (answer.act === 'gotgone') ? answer.dbhas : Shell.Cited
+/** What a good get's answer of null compares as, by life and revision: its tombstone, or for nothing stored the shell's citation, older than every record. */
+function nullCitedOf(answer: Extract<GetThingAnswer, { val: null }>): Pick<ThingCited, 'lifepath' | 'revseq'> {
+  return answer.dbhas ?? Shell.Cited
 }
 
 /** True when `record` is newer than `prior`, or `prior` is undefined. */
@@ -722,20 +726,20 @@ function isOlder(prior: DeliverableThing | undefined, record: DeliverableThing):
 }
 
 /** The {@link GotAnswer} for `itemQuery`, the query of `ask`'s item, with its record and whether it is timely within `staleTime`, and `dead`, the Thing's tombstone cached. */
-function gotAnswerOf(ask: GetAsk, itemQuery: TSQ.Query<ThingRecord | Absent> | undefined, dead: Tombstone<ThingRecord> | undefined, isBehind: boolean, staleTime: TsqStaleTime): GotAnswer & Pick<TSQGotAnswer, 'record' | 'isTimely'> {
+function gotAnswerOf(ask: GetAsk, itemQuery: TSQ.Query<ThingRecord | null> | undefined, dead: Tombstone<ThingRecord> | undefined, isBehind: boolean, staleTime: TsqStaleTime): GotAnswer & Pick<TSQGotAnswer, 'record' | 'isTimely'> {
   const record   = itemQuery?.state.data
   const isTimely = isTimelyQuery(itemQuery, isBehind, staleTime)
   const base     = { ok: true, record, ask, world: null, isTimely } as const
   // A newer revision heard of, with no item, is something cached all the same.
   if ((record === undefined) && (! isBehind))  { return { ...base, act: 'vacant',   val: undefined } }
   if ((record === undefined) || (! isTimely))  { return { ...base, act: 'untimely', val: undefined } }
-  if (! isAbsent(record))                      { return { ...base, act: 'gotlive',  val: record } }
-  if (dead === undefined)                      { return { ...base, act: 'gotvoid',  val: record } }
-  return                                                { ...base, act: 'gotgone',  val: record, dbhas: dead }
+  if (record !== null)                         { return { ...base, act: 'gotlive',  val: record } }
+  if (dead === undefined)                      { return { ...base, act: 'gotvoid',  val: null, dbhas: null } }
+  return                                                { ...base, act: 'gotgone',  val: null, dbhas: dead }
 }
 
 /** True when `itemQuery` has a record, is not behind, and is fresh under `staleTime` as TanStack Query counts it. */
-function isTimelyQuery(itemQuery: TSQ.Query<ThingRecord | Absent> | undefined, isBehind: boolean, staleTime: TsqStaleTime): boolean {
+function isTimelyQuery(itemQuery: TSQ.Query<ThingRecord | null> | undefined, isBehind: boolean, staleTime: TsqStaleTime): boolean {
   if ((itemQuery === undefined) || isBehind) { return false }
   return (! itemQuery.isStaleByTime(staleTime))
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { newerThingOf } from '../../src/minding/newer-thing'
-import { type ThingRecord, type Tombstone, Absent, Shell } from '../../src/shapes/shapes-thing'
+import { type ThingRecord, type Tombstone, Shell } from '../../src/shapes/shapes-thing'
 import { Thing } from '../../src/models/thing'
 import * as TH from '../test-helpers'
 
@@ -38,24 +38,24 @@ describe("newerThingOf", () => {
   })
 
   const deadAtTomb = (): Tombstone<ThingRecord> => Tomb as Tombstone<ThingRecord>
-  const AbsentCases = [
-    [Box1,    Absent,                Absent, deadAtTomb, 'answers Absent over the revision its tombstone deletes'],
-    [Absent,  Box1,                  Absent, deadAtTomb, 'keeps Absent over the revision its tombstone deletes'],
-    [Absent,  Reborn,                Reborn, deadAtTomb, 'answers a later life over Absent for a tombstone'],
-    [Absent,  Box0,                  Box0,   undefined,  'answers a first life over Absent where no tombstone is found'],
-    [Box0,    Absent,                Box0,   undefined,  'keeps a life over Absent where no tombstone is found'],
+  const NullCases = [
+    [Box1, null,   null,   deadAtTomb, 'answers null over the revision its tombstone deletes'],
+    [null, Box1,   null,   deadAtTomb, 'keeps null over the revision its tombstone deletes'],
+    [null, Reborn, Reborn, deadAtTomb, 'answers a later life over null for a tombstone'],
+    [null, Box0,   Box0,   undefined,  'answers a first life over null where no tombstone is found'],
+    [Box0, null,   Box0,   undefined,  'keeps a life over null where no tombstone is found'],
   ] as const
-  for (const [prior, next, expected, deadAt, blurb] of AbsentCases) {
+  for (const [prior, next, expected, deadAt, blurb] of NullCases) {
     it(blurb, () => { expect(newerThingOf(prior, next, deadAt)).to.eq(expected) })
   }
 
-  it("keeps prior of two Absents, telling Absent by its shape", () => {
-    expect(newerThingOf(Absent, structuredClone(Absent), deadAtTomb)).to.eq(Absent)
+  it("keeps prior of two nulls", () => {
+    expect(newerThingOf(null, null, deadAtTomb)).to.be.null
   })
 
-  it("looks the tombstone up at the scope of the record beside Absent", () => {
+  it("looks the tombstone up at the scope of the record beside null", () => {
     const scopes: unknown[] = []
-    newerThingOf(Box1, Absent, (scoped) => { scopes.push(scoped); return Tomb as Tombstone<ThingRecord> })
+    newerThingOf(Box1, null, (scoped) => { scopes.push(scoped); return Tomb as Tombstone<ThingRecord> })
     expect(scopes).to.deep.equal([Box1])
   })
 

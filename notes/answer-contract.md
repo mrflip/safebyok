@@ -104,6 +104,7 @@ The soft cap is such a case: a put that would be `born` may refuse `vault_full` 
 Returning:
 
 - An ok result returns the actual stored value in `val`. For a write, that is the stored record, the row the datastore reports writing; it must agree with the record sent, which the tables call **reqval**.
+- A get's `gotgone` and `gotvoid` have a `val` of null and carry `dbhas`: the tombstone, or null.
 - Many refusals return the actual stored value in a separate `dbhas` field, which the caller can use to try again. `void` returns dbnil.
 - A row that fails its checks gets no act: it is thrown, as `damaged_row` for the row asked for and `damaged_vault` for a box op's vault. The refusal names the fields that failed, and quotes nothing of the row.
 - Every response, ok or refused, carries its `parent` back: the whole vault row, or the shell row where the vault is void.

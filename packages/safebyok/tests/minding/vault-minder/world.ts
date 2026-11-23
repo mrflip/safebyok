@@ -6,7 +6,7 @@ import { VaultMinder } from '../../../src/minding/vault-minder'
 import { BankMinder } from '../../../src/minding/bank-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import type { Labelpath, Revtok } from '../../../src/shapes/primitives'
-import { type BoxRecord, type ThingRecord, type ThingScope, Shell, isAbsent } from '../../../src/shapes/shapes-thing'
+import { type BoxRecord, type ThingRecord, type ThingScope, Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import { type GetAsk, type WriteAsk, getAskOf, listAskOf } from '../../../src/shapes/shapes-asks'
 import type { BankScope } from '../../../src/shapes/shapes-stamps'
@@ -147,7 +147,7 @@ export function noticeOf(thing: ThingNotice['val']): ThingNotice {
   return { ok: true, act: Thing.isLive(thing) ? 'gotlive' : 'gotgone', val: thing }
 }
 
-/** The revtok of the item of the box at `TH.BoxScope`, or undefined for nothing or Absent. */
+/** The revtok of the item of the box at `TH.BoxScope`, or undefined for nothing or null. */
 export function revtokAt(minder: VaultMinder): Revtok | undefined {
   return TH.itemRevtokOf(minder.at(TH.BoxScope))
 }
@@ -189,8 +189,8 @@ export function isListingEvent(event: MinderEvent): event is ListingEvent {
   return event.eventkind === 'list'
 }
 
-/** What an item's event tells: `'behind'` for its falling behind, `'removed'` for its removal, else whether it has a live record or Absent, or undefined for neither. */
-export type ToldSort = 'live' | 'absent' | 'behind' | 'removed' | undefined
+/** What an item's event tells: `'behind'` for its falling behind, `'removed'` for its removal, else whether it has a live record or null, or undefined for neither. */
+export type ToldSort = 'live' | 'null' | 'behind' | 'removed' | undefined
 
 /** A summary of each event `listener` recorded, in order:
  * - an item's       -- `[labelpath, ToldSort]` ({@link ToldSort})
@@ -212,7 +212,7 @@ function toldSortOf(event: ThingEvent): ToldSort {
   if (event.action?.type === 'invalidate') { return 'behind' }
   const record = event.state.data
   if (record === undefined)                { return undefined }
-  return isAbsent(record) ? 'absent' : 'live'
+  return (record === null) ? 'null' : 'live'
 }
 
 /** The ask that births the box `boxlabel` under the root box, over its shell. */
