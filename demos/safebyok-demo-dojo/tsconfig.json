@@ -1,0 +1,10 @@
+{
+  // Vite's own layout: the app (browser) and its config (Node) are separate projects, each with
+  // only its own runtime's types, and the fixture script a third. `tsc -b` checks all three.
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" },
+    { "path": "./tsconfig.scripts.json" }
+  ]
+}

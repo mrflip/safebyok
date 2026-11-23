@@ -1,0 +1,17 @@
+{
+  // The fixture script, run by Node over fake-indexeddb: Node's types, and the DOM's, which the IndexedDB code it imports names.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.scripts.tsbuildinfo",
+    "lib": [
+      "ES2023",
+      "DOM"
+    ],
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "scripts"
+  ]
+}

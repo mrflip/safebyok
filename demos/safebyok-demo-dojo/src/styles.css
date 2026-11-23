@@ -1,0 +1,47 @@
+/* Just enough style to tell the parts of the page apart. */
+
+:root {
+  --ink:    #1a2330;
+  --quiet:  #6b7686;
+  --paper:  #f7f8fa;
+  --card:   #ffffff;
+  --line:   #d8dee8;
+  --accent: #2458b3;
+  --danger: #b3242f;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+h1 { font-size: 1.5rem; margin: 0; }
+h2 { font-size: 1.15rem; margin: 0 0 0.5rem; }
+h3 { font-size: 1rem; margin: 0.75rem 0 0.25rem; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+.row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.quiet { color: var(--quiet); }
+.gripe { color: var(--danger); }
+.joke { display: block; white-space: pre-wrap; margin-top: 0.75rem; padding: 0.75rem; border-left: 3px solid var(--accent); }
+
+form { margin: 0.25rem 0; }
+form:not(.row) > * { display: block; margin: 0.35rem 0; }
+input { font: inherit; padding: 0.3rem 0.5rem; border: 1px solid var(--line); border-radius: 4px; }
+button { font: inherit; padding: 0.3rem 0.8rem; border: 1px solid var(--accent); border-radius: 4px; background: var(--card); color: var(--accent); cursor: pointer; }
+button:disabled { opacity: 0.5; cursor: default; }
+dialog { border: 1px solid var(--line); border-radius: 8px; padding: 1.25rem; max-width: 26rem; }
+dialog::backdrop { background: rgb(0 0 0 / 30%); }
+
+h4 { font-size: 0.9rem; margin: 0.6rem 0 0.2rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+header { display: block; }
+nav button[aria-pressed="true"] { background: var(--accent); color: var(--card); }
+.users { list-style: none; padding: 0; margin: 0.5rem 0; }
+.users li { margin: 0.25rem 0; }
+.rows { list-style: none; padding: 0; margin: 0; font-size: 0.85rem; }
+.rows li { margin: 0.15rem 0; overflow-wrap: anywhere; }
+.readout { border-collapse: collapse; margin-top: 0.75rem; }
+.readout caption { text-align: left; font-weight: 600; }
+.readout th, .readout td { border: 1px solid var(--line); padding: 0.2rem 0.6rem; text-align: left; }
