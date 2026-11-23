@@ -55,8 +55,8 @@ export type Labelpathed = { labelpath: Labelpath }
  *   revision lands, and makes the item fresh as of then. The soon is removed once the item is no older than it.
  * - An item is behind while a soon newer than it is cached, or a soon with no item. Behind is that comparison, not
  *   whether a soon is cached: a `tryAt` or `isBehindAt` made while a record lands, once it has caught the item up but
- *   before the soon is removed, already finds the item not behind. An item behind is never timely, and the next get
- *   fetches the newest whole record.
+ *   before the soon is removed, already finds the item not behind. An item behind is never timely. One an observer keeps
+ *   active, as a hook does, is fetched again as it falls behind; any other waits for its next get.
  * - A sparse record lands in the soon before its item is invalidated, so from the soon's `success` on, every read and
  *   get finds the item behind ({@link SoonEvent}). A refused get leaves the item invalidated too, until a record lands in it.
  * - A listener is told of each item, soon, dead record and listing in the order the cache changes, and what it is told
@@ -273,8 +273,9 @@ export abstract class Minder {
   /** List the Things directly under `labelpath` from the vaultDB, as the {@link Kids} value it answers: the live ones and the tombstones, by label.
    * A list called while another of the same labelpath is under way answers what that one does.
    * The listing at `labelpath` ({@link listingAt}) takes the answer, unless it has one read later. The parent and each child
-   * listed land first: a live child as its soon where it is newer than the item, so the next get fetches the item whole; a
-   * tombstone in its dead record, and null in its item, so a get of it answers from the cache. A Thing stored damaged is left out, and reported to the bank's `tellBadNews`.
+   * listed land first: a live child as its soon where it is newer than the item, so the item is fetched whole again, at
+   * once where an observer keeps it active, else by its next get; a tombstone in its dead record, and null in its item, so
+   * a get of it answers from the cache. A Thing stored damaged is left out, and reported to the bank's `tellBadNews`.
    */
   async list(labelpath: Labelpath): Promise<Kids> {
     MinderChecks.minderLabelpath.parse(labelpath)
@@ -507,8 +508,11 @@ export abstract class Minder {
   }
 
   // TanStack tells nothing when it invalidates a query already invalidated, so an item tells its falling behind once until
-  // a record lands in it, and not at all after a refused get. refetchType 'none': the next get of the item fetches it.
-  /** Remove `scoped`'s soon if its item has caught up with it, else invalidate the item.
+  // a record lands in it, and not at all after a refused get; but it fetches an active item again each time, so one a
+  // refused get left invalidated is fetched again when it falls further behind. An item no observer keeps active waits for
+  // the next get. cancelRefetch false: a fetch already under way is left to land, and its landing marks it again where it
+  // landed behind.
+  /** Remove `scoped`'s soon if its item has caught up with it, else invalidate the item, fetching it again where an observer keeps it active.
    * Does nothing unless both are cached.
    */
   #markBehinds(scoped: Labelpathed): void {
@@ -518,7 +522,7 @@ export abstract class Minder {
       this.#tsq.removeQueries({ queryKey: this.soonQueryKey(scoped), exact: true })
       return
     }
-    void this.#tsq.invalidateQueries({ queryKey: this.itemQueryKey(scoped), exact: true, refetchType: 'none' })
+    void this.#tsq.invalidateQueries({ queryKey: this.itemQueryKey(scoped), exact: true }, { cancelRefetch: false })
   }
   // --
 
