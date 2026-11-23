@@ -612,3 +612,13 @@ This settles Scenarios claim E9: "in the background" means the user keeps workin
 **The forms sketch:** `whiteboard/20261123-react_poured/dream_interface.md`, asked for by the Coach as a new version of `whiteboard/20261121-react_life/dream_interface.md`: four kinds of form (a passphrase, committing a box, editing a box, a form that uses a secret), three ways to submit (a form Action, `onSubmit`, no form), and the four modalities of `docs/react-overview.md`. It proposes one hook shape for every form, `usePutBox` among them. Not ruled.
 
 **PRs:** #866 is ready (reviewed twice; one row's `wanted`, a get of the item already cached under a newer soon, awaits a ruling). The react_free PRs carry the label `sidelined`.
+
+### #865 reworked, reviewed and ready (2026-11-23)
+
+Tip `d4b99a315`, CI green. Built as ruled: `keepTextIfRefused(event, onEmptied?)`; the core's `try<Verb>` wrappers, the giver's `<verb>Gating` and form-verb `<verb>MutationOptions`, and each hook's `.gating` removed; `CreateVaultForm` and `ReplacePassphraseForm` keep their text through a refusal; STYLE.md's *Naming* has the `wasFoo` / `hasFoo` line.
+
+* **Before hydration** (ruling 5). The kit's four Action forms were already safe: React holds an early submit and replays it once hydrated. `UnlockForm`, which submits from a handler, posted its passphrase to the page's URL. The worker first disabled every `SubmitButton` until hydrated; after review the session narrowed the guard to `UnlockForm`'s own button (`useIsHydrated`, private to the kit), so `SubmitButton` keeps its promise for a host's forms. The reviewer's argument for narrowing: a host's server render that is never hydrated would have left its `SubmitButton` disabled for good, and a host's Action form would have lost React's replay. Not ruled by the Coach; one commit puts the wider guard back.
+* **Left open, none blocking:** `mutate` and `mutateAsync` remain on each form hook, taking a gating the giver no longer makes (to go with `formClearing`); whether the core checks `confirmation` (the session and the worker: no, a form's concern); Enter in a field before hydration rests on the HTML spec, since jsdom has no implicit submission.
+* **The flaky add-passkey test** (`passkey-forms.test.tsx`, "drops a wrong-passphrase message when the next attempt ends at a dismissed prompt") is fixed on #865 by the same two lines that sit uncommitted in the worktree `byok-test_races`.
+
+The ready line is now #861 ← #862 ← #863 ← #864 ← #865, every base `main`; merging #865 with a merge commit lands all five. #866 is ready on its own, from main.
