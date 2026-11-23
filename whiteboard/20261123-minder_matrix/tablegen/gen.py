@@ -126,7 +126,7 @@ for comment, rs in groups:
         else:
           chosen = diffs
         if chosen: extra.append("todayBy: { " + ", ".join((f'"{r}"' if len(r) == 1 else r) + f": {fmtCache(v)}" for r, v in sorted(chosen.items())) + " },")
-    if blurb: extra.append(f'blurb: "{blurb}",')
+    if blurb: extra.append(f"blurb: '{blurb}',")
     lines.append(("row", fields + extra))
 
 widths = [0, 0, 0]
