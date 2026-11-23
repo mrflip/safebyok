@@ -1,4 +1,4 @@
-/** Tests for IdbVaultDB: the battery every vaultDB must pass, then what is its own (options, databases, other tabs, overwriteThing, IndexedDB's failures). */
+/** Tests for IdbVaultDB: the battery every vaultDB must pass, then what is its own (options, databases, other tabs, IndexedDB's failures). */
 
 // Import fake-indexeddb first: it installs IndexedDB's globals before the adapter loads, with real transactions and structured clone but no browser.
 import 'fake-indexeddb/auto'
@@ -85,83 +85,6 @@ describe("IdbVaultDB's watch", () => {
     await TH.expectGood(idbVaultDB.tryWriteThing(TH.birthAskOf()))
     await TH.eventually(() => notices.length > 0)
     expect(notices).to.deep.equal([{ ok: true, act: 'gotlive', val: TH.gateThingOf() }])
-    unwatch()
-  })
-})
-
-describe("IdbVaultDB.overwriteThing(record)", () => {
-  it("stores a record at a scope where nothing is stored", async () => {
-    const idbVaultDB = TH.makeIdbVaultDB()
-    const gate = TH.gateThingOf()
-    await idbVaultDB.overwriteThing(gate)
-    expect(await TH._cheat_idbThingsOf(idbVaultDB).rawAt(TH.GateScope)).to.deep.equal(gate)
-  })
-
-  it("stores a newer record over an older one", async () => {
-    const idbVaultDB = TH.makeIdbVaultDB()
-    const gate = TH.gateThingOf()
-    const next = TH.nextGateOf(gate)
-    await idbVaultDB.overwriteThing(gate)
-    await idbVaultDB.overwriteThing(next)
-    expect(await TH._cheat_idbThingsOf(idbVaultDB).rawAt(TH.GateScope)).to.deep.equal(next)
-  })
-
-  it("ignores an older record, leaving the stored one", async () => {
-    const idbVaultDB = TH.makeIdbVaultDB()
-    const gate = TH.gateThingOf()
-    const next = TH.nextGateOf(gate)
-    await idbVaultDB.overwriteThing(next)
-    await idbVaultDB.overwriteThing(gate)
-    expect(await TH._cheat_idbThingsOf(idbVaultDB).rawAt(TH.GateScope)).to.deep.equal(next)
-  })
-
-  it("ignores a record at the stored revision, leaving the stored one", async () => {
-    const idbVaultDB = TH.makeIdbVaultDB()
-    const gate = TH.gateThingOf()
-    await idbVaultDB.overwriteThing(gate)
-    await idbVaultDB.overwriteThing({ ...gate, written_at: gate.written_at + 5 })
-    expect(await TH._cheat_idbThingsOf(idbVaultDB).rawAt(TH.GateScope)).to.deep.equal(gate)
-  })
-
-  it("stores the tombstone of a later life over the live record", async () => {
-    const idbVaultDB = TH.makeIdbVaultDB()
-    const box = TH.boxThingOf()
-    const tomb = TH.boxTombOf(box)
-    await idbVaultDB.overwriteThing(box)
-    await idbVaultDB.overwriteThing(tomb)
-    expect(await TH._cheat_idbThingsOf(idbVaultDB).rawAt(TH.BoxScope)).to.deep.equal(tomb)
-  })
-
-  it("stores a record over a stored row that fails its kind's checks, even at the stored revision", async () => {
-    const idbVaultDB = TH.makeIdbVaultDB()
-    const gate = TH.gateThingOf()
-    await TH._cheat_idbThingsOf(idbVaultDB).plant(TH.GateScope, { ...gate, note: 'damaged' })
-    await idbVaultDB.overwriteThing(gate)
-    expect(await TH._cheat_idbThingsOf(idbVaultDB).rawAt(TH.GateScope)).to.deep.equal(gate)
-  })
-
-  const BadRecordCases = [
-    [{ ...TH.gateThingOf(), note: 'hi' },  'refuses a record with a field its kind does not know'],
-    [Shell.of(TH.GateScope),               'refuses the shell'],
-    [{ labelpath: 'nowhere/aa' },          'refuses a record at no Thing\'s labelpath'],
-    ["not a record",                       'refuses something that is not a record'],
-  ] as const
-
-  for (const [record, blurb] of BadRecordCases) {
-    it(blurb, async () => {
-      const idbVaultDB = TH.makeIdbVaultDB()
-      await TH.expectRefusal(idbVaultDB.overwriteThing(record as never), 'bad_record')
-      expect(await TH._cheat_idbThingsOf(idbVaultDB).rawAt(TH.GateScope)).to.be.null
-    })
-  }
-
-  it("tells no watch", async () => {
-    const idbVaultDB = TH.makeIdbVaultDB()
-    const notices: unknown[] = []
-    const unwatch = idbVaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, noop)
-    await idbVaultDB.overwriteThing(TH.gateThingOf())
-    await TH.aWhile()
-    expect(notices).to.deep.equal([])
     unwatch()
   })
 })

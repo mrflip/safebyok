@@ -331,25 +331,21 @@ Reasoning for wontfix: a gate change comes a few times a day, and a lease is bui
 separate updates*, `#no-slop-crossings`). Nothing stored changes, and no secret moves. Written by the gate_super thread 1
 worker, 2026-11-21, awaiting a ruling.
 
-### A bank born again under the same scope is ignored by the IndexedDB copy where the old life's Things compare newer
+### A snapshot write already under way when `removeClient` runs can land after its delete
 
-* current outcome: `IdbVaultDB.overwriteThing` stores a record only where it is newer than the Thing stored at its
-  `[userid, banklabel, labelpath]`, by `Thing.cmp`: lifepath, then revseq. A bank deleted and born again under the same
-  userid and banklabel starts its Things at lifepaths that may compare older than the old life's, so the new life's
-  records are ignored in IndexedDB until they pass the old ones. The copy there keeps the old life's Things.
+* current outcome: `IdbPersister.removeClient` cancels the write its throttle holds and deletes the record. A write the
+  throttle had already let through, still in flight to IndexedDB, can commit after the delete, so the next
+  `restoreClient` returns that snapshot.
 * alternatives:
-  - put the bank's lifetok in the key, or read it before each overwrite: a change to the stored scopepath, or a read in
-    every copy, for a life that ends a few times in a user's history.
-  - wipe the copy when a bank is born: a deletion, which the bridge does not do.
-* workaround: none needed today. Nothing reads IndexedDB's copy back yet; when something does, it reads it as a cache
-  that the vaultDB corrects.
+  - keep the promise of the write in flight and await it before the delete: a state in the persister for a write that
+    lasts milliseconds.
+* workaround: none needed; a device that restores the snapshot refetches what it shows (the bankDB is the ground truth).
 
-Steps to reproduce: bridge a minder to an `IdbVaultDB`, so that it holds a box at a later lifepath than a new life's box
-will carry; then land the new life's box through the minder. The stored box stays.
+Steps to reproduce: call `persistClient`, then `removeClient` in the same turn, and read the record once both settle.
 
-Reasoning for wontfix: the lifetok is under-used and the copy is a cache of what the vaultDB holds, never the ground
-truth. A bank ends and is born again a few times at most (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`).
-Nothing in the vaultDB changes, and no secret moves. Unspecified and unguarded, by the Coach's ruling, 2026-11-22.
+Reasoning for wontfix: `removeClient` runs when a bank is deleted or a user signs out, a few times a day, against a
+write in flight for milliseconds (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). The snapshot is a cache of
+what the bankDB holds. Unspecified and unguarded; reviewer, 2026-11-22, awaiting a ruling.
 
 ## React
 
