@@ -273,14 +273,6 @@ describe("a device's persisters", () => {
     expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'storage_unavailable' })
   })
 
-  it("tell onBadNews where boxes gives no Persister, and the bank comes up all the same", async () => {
-    const onBadNews = vi.fn()
-    const device    = TH.makeDevice({ userid: null }, { persisters: { roots: new MemoryPersister(), boxes: () => ({}) as never }, onBadNews })
-    await device.signIn(TH.WorldScope.userid)
-    expect(device.getSnapshot().bank).to.include({ stage: 'unborn' })
-    expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'bad_record' })
-  })
-
   it("tell onBadNews where the roots fail to restore, and the device starts with that cache empty, never rejecting", async () => {
     vi.spyOn(console, 'error').mockImplementation(noop)
     vi.spyOn(console, 'warn').mockImplementation(noop)

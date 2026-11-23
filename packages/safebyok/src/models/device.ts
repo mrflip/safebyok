@@ -210,12 +210,11 @@ export class Device implements MinderFriend {
   }
 
   // Before the VaultMinder says hello, so what it caches lands over what was restored.
-  /** Restore the boxes of the bank at `scope` from the persister the host gives for it, and save them there from then on, telling `onBadNews` if it fails to restore. */
+  /** Restore and keep saving the boxes of the bank at `scope`, telling `onBadNews` if the restore fails. */
   async #restoreBoxes(scope: BankScope): Promise<void> {
     if (this.#persisters === undefined) { return }
     try {
-      const persister = Checks.persister.parse(this.#persisters.boxes(scope))
-      await VaultMinder.persist(this.#queryClient, persister, scope)
+      await VaultMinder.persist(this.#queryClient, this.#persisters.boxes(scope), scope)
     } catch (err) {
       this.tellBadNews([Outcome.storageRefusalOf(err)])
     }
@@ -433,7 +432,6 @@ function refusalSnapshotOf(err: unknown): RefusalSnapshot {
 /** The checks of {@link Device.make}'s arguments, {@link Device.signIn}'s and {@link tellBadNewsTo}'s. */
 const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
   userid:        BankishChecks.userid,
-  persister:     custom<Persister>(isPersister, Phrases.PersisterExpected),
   deviceMakeArgs: obj({
     record: BankishChecks.deviceRecord,
     opts:   Validator.objCheck(() => ({
