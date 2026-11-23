@@ -19,7 +19,7 @@ afterwards, and how long it stays reachable.
 | **Passphrase**, as typed | Secret. Never stored, never sent. |
 | **Whisper**, unsealed | Secret. Cleartext only inside a callback, for the length of one call. |
 | **bankKey** | Secret. Kept wrapped under a key this browser cannot export; unwrapped for one seal or unseal at a time. |
-| **Wrapped bankKey**, in the gate's record | Not secret from the backend or the page, but it is what an offline guess is checked against. We keep it out of logs and out of a host's hands. |
+| **Wrapped bankKey**, in the gate's record | Not secret from the backend, the page or the host, whose vaultDB stores it. But it is what an offline guess is checked against, so we never disclose it ourselves: not in a log, an error, or anything we display. |
 | **Sealed whisper** | Ciphertext. The backend stores it. |
 | **Sidecar** | Not secret: it is readable while the bank is locked. We do not disclose its contents ourselves. |
 
