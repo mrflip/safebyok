@@ -532,3 +532,17 @@ The Coach's framing for a host: "First, choose your tradeoff: would you like the
 
 Also ruled: "masking a field shouldn't validate it: that would be surprising behavior trying to log a field", so `maskUuid` checks nothing, and `safebyok/utils` again loads none of the vault. A "things to do right" tab is being built (validation by zod with the message by its input, no double submit, why a debounce is wrong, inviting and disinviting a password manager, and more), stacked on #862.
 
+
+### Two more tabs, the masked view's nod, and the form verbs start (the Coach, 2026-11-23)
+
+The dojo line is now #858 ← #860 ← #861 ← #862 ← #863 `dojo_practice` ← #864 `dojo_scenarios` ← thread 7 `gating_attempt`, every base `main`.
+
+**Ruled:**
+
+* The masked view shows **2** characters, not 3: "you mentioned last 3 chars was safe, do 2 anyway". By the same counting, up to 21 masked wraps of one bankKey check no guess, where it was 14 (`notes/security.md` has the amendment). This is taken as the nod that held #861 in draft.
+* `Entrykind` is `Qkeykind`, and STYLE's example says "stored records", not "entries" (done on #861).
+* "LeaseStamp should be the stamp, lease sparse doesn't sound useful as a type"; Wayin and Proving break the spread rule, to fix; whether a box's record keeps the spread rule waits on the form verbs; `Knock.vaultTsqClient()` "in a later pass" (all four in `TODO.md`).
+* The Inspect tab's TSQ panel re-reading each second while shown: "that's OK".
+* The form verbs: "we've got a good proposal, yes start: `gate.gatingFooAttempt(params: FormData | gatingDNA)`". Thread 7 builds the five entrypoints in the core, one call on each React hook that takes a form or a dna, a one-line helper to keep a form's text through a refusal, and moves the kit and the dojo's Login tab onto them.
+
+**Held for a ruling, with the worker's counts to come:** whether the core's older three ways for each verb (`unlockGating`, `unlock`, `tryUnlock`) and the giver's (`Knock.unlockGating`, `Knock.unlockMutationOptions`, `popField`) go once the entrypoints are in.
