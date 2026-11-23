@@ -255,6 +255,7 @@ export type ThingEvent<KindT extends Thingkind = Thingkind> = KindT extends Thin
  * A listener on a `success` finds the item behind: `soonAt` answers the soon, `isBehindAt` true, `tryAt` untimely, and a
  * get fetches unless given a staleTime of its own. The item's `invalidate` follows at once, so its own
  * `state.isInvalidated` may still read false.
+ * The minder fetches the item again by itself where an observer keeps it active, so a listener need not.
  */
 export type SoonEvent<KindT extends Thingkind = Thingkind> = KindT extends Thingkind
   ? MinderEventOf<Sparse<RecordOfKind<KindT>>, 'soon'> & RecordEventFields<KindT>
