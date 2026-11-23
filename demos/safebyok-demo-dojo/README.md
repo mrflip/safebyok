@@ -22,8 +22,9 @@ pnpm --filter safebyok-demo-dojo fixture     # writes src/fixture/fixture.json a
 * **New Box**: the same form adding a box at the labelpath `login` (`putBoxAction` under `useActionState`): the username
   in its sidecar, the password in its whisper. Sign in as Hero or Thierry and unlock.
 * **Inspect**: the vault database's rows (there), the persisted caches' rows (here, where the old core had a DeviceDB),
-  the device's QueryClient, and the host's mutations. Each is grouped by modelkind with a count, ciphertext cut short,
-  nothing decrypted.
+  the device's QueryClient, and the host's mutations. Each is a table, grouped by modelkind: a group's first row names it,
+  with its count, and the fields of its rows, in the order the rows have them. A Thing's scope (`userid`, `banklabel`,
+  `labelpath`), `scope` and `modelkind` are left out: a row's first cell, its ckey, says them. Ciphertext is cut short, and nothing is decrypted.
 
 Under each form, the **readout** shows, after each press, whether each field still has text and the message the form
 shows. It reads `value.length > 0` and nothing else of a field.
@@ -36,7 +37,7 @@ submits the one form. Each arrangement lasts until that outcome lands.
 | Button | Arranges |
 | --- | --- |
 | Sign In, Save | nothing |
-| Weak | the strength checker judges every passphrase weak (`src/lib/switchable-checker.ts`); New Box also judges the password again, so its own check sees the verdict |
+| Weak | the strength checker, which otherwise judges four characters or more strong, judges every passphrase weak (`src/lib/switchable-checker.ts`); New Box also judges the password again, so its own check sees the verdict |
 | Exists | the fixture's planted rows written into the vault database behind the device's back: Nolo's bank, or a box at `login` in Hero's and Thierry's. They are written as the fixture made them, over whatever is stored: after a Save, Reset first, or the put meets an older box and refuses `record_conflict` |
 | Failed | the vaultDB refuses its next write (`src/lib/refusing-vault-db.ts`) |
 | Dismiss | Login: the form is reset, as a Cancel button would, and nothing reaches the library. New Box: the bank is locked before the submit |
@@ -58,3 +59,5 @@ The fixture is made by `scripts/make-fixture.ts`, through the library, under Nod
   in milliseconds. These settings are for the dojo alone, whose passphrases are printed on the page: they protect
   nothing, and a host keeps the library's own (`Argon2idWebV1`).
 * **Signing in is fake**: the userid is kept in localStorage.
+* **The strength checker is the dojo's own**: four characters or more is strong (`src/lib/switchable-checker.ts`). It
+  judges nothing a host should, and a host passes a real one, such as `zxcvbnStrengthChecker`.

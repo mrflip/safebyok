@@ -81,7 +81,7 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
   const bankScope    = obj({ userid: user_id, banklabel: label })
   const thingScope   = bankScope.extend({ labelpath })
   // A revtok is minted by crypto.randomUUID; the void revtok is the nil UUID.
-  const revisioned   = { revtok: uuid(Phrases.RevtokShape), revseq: uint, am, lifeseq, lifepath, born_at: epochMillis, written_at: epochMillis }
+  const revisioned   = { am, lifepath, lifeseq, revtok: uuid(Phrases.RevtokShape), revseq: uint, written_at: epochMillis, born_at: epochMillis }
   // Just what the act tables compare. A write may cite the shell, so its revseq and life may be the shell's -1.
   const thingCited   = obj({
     revtok:   revisioned.revtok,
@@ -92,7 +92,9 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
   // A Thing's scope and citation: what every record and tombstone has, sparse or whole. Its revseq is the shell's -1
   // only beside the void revtok and lifeseq, and they only beside it.
   const scopedCited  = obj({ ...thingScope.shape, ...thingCited.shape }).refine(isShellCitable, Phrases.CitedHalfShell)
-  const sparse       = obj({ ...thingScope.shape, label, fmt: lit(ThingFormat), ...revisioned })
+  // A checked record shows its fields in this order, for a reader's eye alone: nothing stored, compared or bound into a
+  // ctx takes its order from an object's keys (STYLE.md, *Order comes from an explicit list*).
+  const sparse       = obj({ ...thingScope.shape, label, ...revisioned, fmt: lit(ThingFormat) })
   // What a write reads of the Thing stored before it carries its record forward: the rest of the row goes unread.
   const storedCited  = obj({ ...thingScope.shape, revtok: revisioned.revtok, revseq: uint, am, lifepath, born_at: epochMillis })
   // AdapterVaultDB checks only the shape of a sealed part: what is inside is the sealer's.
@@ -300,7 +302,7 @@ const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, label }) => {
       ...fixed,
     }),
     // What a shell proposed must meet, of a record's rules.
-    shell: obj({ ...ThingChecks.thingScope.shape, label, fmt: lit(ThingFormat), lifepath: shellLifepath, ...fixed })
+    shell: obj({ ...ThingChecks.sparse.shape, lifepath: shellLifepath, ...fixed })
       .refine(isLabelLast,    Phrases.LabelNotLast)
       .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
       .refine(isLifepathDeep, Phrases.LifepathDepth),

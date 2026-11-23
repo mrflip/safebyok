@@ -5,8 +5,8 @@ import { defineConfig } from 'vitest/config'
 // fake-indexeddb (tests/setup.ts).
 export default defineConfig({
   plugins: [react()],
-  // zxcvbn's dictionaries, which the strength meter loads, make one chunk of about a megabyte.
-  build:   { chunkSizeWarningLimit: 1500, target: 'es2022' },
+  // The dojo builds to one chunk of about 600 kB, over Vite's 500 kB warning: it is a local page, never deployed.
+  build:   { chunkSizeWarningLimit: 1000, target: 'es2022' },
   test: {
     include:     ['tests/**/*.test.{ts,tsx}'],
     environment: 'jsdom',

@@ -6,7 +6,7 @@ import * as TH from '../test-helpers'
 // drives the real app, its giver and the core, over the IndexedDB stores (fake-indexeddb) loaded with the fixture. A test
 // records what the library does now: a change here is news for the readout table, not a regression by definition.
 
-/** A password that zxcvbn finds strong, an obvious fake. */
+/** A password the dojo's checker finds strong, an obvious fake. */
 const Password = 'correct horse battery staple violet'
 
 /** A fresh page with Hero signed in and unlocked, and the New Box form filled in: the form's section. */

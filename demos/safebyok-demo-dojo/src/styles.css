@@ -35,13 +35,15 @@ button:disabled { opacity: 0.5; cursor: default; }
 dialog { border: 1px solid var(--line); border-radius: 8px; padding: 1.25rem; max-width: 26rem; }
 dialog::backdrop { background: rgb(0 0 0 / 30%); }
 
-h4 { font-size: 0.9rem; margin: 0.6rem 0 0.2rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 header { display: block; }
 nav button[aria-pressed="true"] { background: var(--accent); color: var(--card); }
 .users { list-style: none; padding: 0; margin: 0.5rem 0; }
 .users li { margin: 0.25rem 0; }
-.rows { list-style: none; padding: 0; margin: 0; font-size: 0.85rem; }
-.rows li { margin: 0.15rem 0; overflow-wrap: anywhere; }
+.scroller { overflow-x: auto; }
+.inspect { border-collapse: collapse; font-size: 0.8rem; }
+.inspect th, .inspect td { border: 1px solid var(--line); padding: 0.15rem 0.4rem; text-align: left; vertical-align: top; }
+.inspect th { background: var(--paper); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+.inspect td { max-width: 24rem; overflow-wrap: anywhere; }
 .readout { border-collapse: collapse; margin-top: 0.75rem; }
 .readout caption { text-align: left; font-weight: 600; }
 .readout th, .readout td { border: 1px solid var(--line); padding: 0.2rem 0.6rem; text-align: left; }
