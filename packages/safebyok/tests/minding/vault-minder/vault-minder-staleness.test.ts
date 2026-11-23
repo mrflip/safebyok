@@ -115,6 +115,21 @@ describe("VaultMinder's item behind a newer sparse record", () => {
     })
   })
 
+  it("is fetched again where an observer keeps it active after its first get was refused", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const box     = await storedBoxOf(vaultDB)
+    const { minder, receive } = await minderWorldOf(vaultDB)
+    receive(sparseNoticeOf(TH.nextOf(box)))
+    await TH.expectRefusal(minder.get(TH.BoxScope), 'stale_read')
+    await observeItem(minder, async () => {
+      await TH.eventually(() => ! minder.queryClient.isFetching())
+      const box2 = TH.nextOf(TH.nextOf(box))
+      cheatBox(vaultDB, box2)
+      receive(sparseNoticeOf(box2))
+      await TH.eventually(() => minder.at(TH.BoxScope)?.revseq === 2)
+    })
+  })
+
   it("is not fetched where no observer keeps it active, until a get", async () => {
     const { minder, vaultDB, receive, box } = await gotWorldOf()
     const asked = vi.spyOn(vaultDB, 'tryGetThing')

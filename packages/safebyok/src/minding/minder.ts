@@ -511,14 +511,15 @@ export abstract class Minder {
   // a record lands in it, and not at all after a refused get; but it fetches an active item again each time, so one a
   // refused get left invalidated is fetched again when it falls further behind. An item no observer keeps active waits for
   // the next get. cancelRefetch false: a fetch already under way is left to land, and its landing marks it again where it
-  // landed behind.
+  // landed behind. An item query with no record, one whose first get was refused, is invalidated too, so an observer of
+  // it is fetched again.
   /** Remove `scoped`'s soon if its item has caught up with it, else invalidate the item, fetching it again where an observer keeps it active.
-   * Does nothing unless both are cached.
+   * Does nothing unless the soon is cached.
    */
   #markBehinds(scoped: Labelpathed): void {
     const soon = this.#soonAt(scoped)
-    if ((soon === undefined) || (this.#itemAt(scoped) === undefined)) { return }
-    if (! isNewer(this.#itemRecordAt(scoped), soon)) {
+    if (soon === undefined) { return }
+    if ((this.#itemAt(scoped) !== undefined) && (! isNewer(this.#itemRecordAt(scoped), soon))) {
       this.#tsq.removeQueries({ queryKey: this.soonQueryKey(scoped), exact: true })
       return
     }
