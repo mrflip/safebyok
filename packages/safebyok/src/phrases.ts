@@ -1,9 +1,12 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, SealerExpected, NovelOrProvingExpected, WayinExpected, GateExpected, TombstoneSecretsGiven, BoxOfOtherRoot, BankSwept, BankNotBroughtUp, NobodySignedIn, GateSwept, UnlockDismissed, VaultBankExpected, VaultMinderExpected, HostedVaultExpected, BoxSoonestBare
+// == [Models]: VaultDBExpected, PersisterExpected, SealerExpected, NovelOrProvingExpected, WayinExpected, GateExpected, TombstoneSecretsGiven, BoxOfOtherRoot, BankSwept, BankNotBroughtUp, NobodySignedIn, GateSwept, UnlockDismissed, VaultBankExpected, VaultMinderExpected, HostedVaultExpected, BoxSoonestBare
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
+
+/** A device's persister that lacks one of a TanStack Query Persister's members. */
+export const PersisterExpected = 'Expected a TanStack Query Persister: an object with the functions persistClient, restoreClient and removeClient.'
 
 /** Something other than NOVEL or a Proving, given as a wayin's source. */
 export const NovelOrProvingExpected = 'Expected NOVEL or a proving'

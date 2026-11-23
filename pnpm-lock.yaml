@@ -653,6 +653,9 @@ importers:
       '@tanstack/query-core':
         specifier: ^5.107.1
         version: 5.107.1
+      '@tanstack/query-persist-client-core':
+        specifier: ^5.107.1
+        version: 5.107.1
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
@@ -2345,6 +2348,9 @@ packages:
 
   '@tanstack/query-core@5.107.1':
     resolution: {integrity: sha512-PSyAik11oQBEVOiVy5hjZWHmoUqOXqK1WYy4v55mcxozEfKaQgpUMsgnXhWjuESzSht8JfzqMS1m6M/9CpNgvg==}
+
+  '@tanstack/query-persist-client-core@5.107.1':
+    resolution: {integrity: sha512-/qDxEcKh44xViKKFlf8MUoeITritIn58XcT3YkCOQ0Ovj4Wa2EgZtqvHSlw+tnQQGhtq9+gLVZSeUtSfkIL9Kg==}
 
   '@tanstack/react-query@5.107.1':
     resolution: {integrity: sha512-udCOOLp3ZAheUrIHLCe+ZZge6nr2ZUrGMSWcCuXsjY1Bf2JeeE09oxst97PILiCY6N8xo/7bIo3Hvz13zh06FA==}
@@ -5649,6 +5655,10 @@ snapshots:
       picomatch: 4.0.7
 
   '@tanstack/query-core@5.107.1': {}
+
+  '@tanstack/query-persist-client-core@5.107.1':
+    dependencies:
+      '@tanstack/query-core': 5.107.1
 
   '@tanstack/react-query@5.107.1(@types/react@19.3.0)(react@19.3.1)':
     dependencies:

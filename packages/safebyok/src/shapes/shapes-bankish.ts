@@ -6,6 +6,7 @@ import type { Bank } from '../models/bank'
 import type { DefaultOnBadNews, Device } from '../models/device'
 import type { Gate } from '../models/gate'
 import type { VaultDB } from '../storage/vault-db'
+import type { DevicePersisters } from '../storage/persister'
 import type { StrengthChecker } from './shapes-gateish'
 import type { DefaultQueryCacheOpts, QueryCacheOpts } from './shapes-minder'
 import type { BoxCleartexts, UnsealedOf } from './shapes-sealers'
@@ -89,6 +90,8 @@ export interface DeviceOpts {
   onBadNews?:       BadNewsHandler | undefined
   /** The defaults each user's minder sets on its items and lists in the device's QueryClient. A missing field defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?:  Partial<QueryCacheOpts> | undefined
+  /** Where the device keeps its caches between page loads, restored at `hello`. Without them, each page load starts with its caches empty. */
+  persisters?:      DevicePersisters | undefined
   /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
   deviceDB?:        unknown
 }
