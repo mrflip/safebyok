@@ -23,8 +23,8 @@ pnpm --filter safebyok-demo-dojo fixture     # writes src/fixture/fixture.json a
   in its sidecar, the password in its whisper. Sign in as Hero or Thierry and unlock.
 * **Inspect**: the vault database's rows (there), the persisted caches' rows (here, where the old core had a DeviceDB),
   the device's QueryClient, and the host's mutations. Each is a table, grouped by modelkind: a group's first row names it,
-  with its count, and the fields of its rows, in the order the rows have them. `scope`, `userid`, `banklabel` and
-  `modelkind` are left out. Ciphertext is cut short, and nothing is decrypted.
+  with its count, and the fields of its rows, in the order the rows have them. A Thing's scope (`userid`, `banklabel`,
+  `labelpath`), `scope` and `modelkind` are left out: a row's first cell, its ckey, says them. Ciphertext is cut short, and nothing is decrypted.
 
 Under each form, the **readout** shows, after each press, whether each field still has text and the message the form
 shows. It reads `value.length > 0` and nothing else of a field.

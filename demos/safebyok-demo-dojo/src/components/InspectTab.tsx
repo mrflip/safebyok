@@ -14,8 +14,8 @@ const Modelkinds = ['bank', 'gate', 'box'] as const
 /** The one group of the mutations' panel. */
 const MutationGroups = ['mutation'] as const
 
-/** Fields the tables leave out, to stay narrow: a row's ckey or its group says them already. */
-const OmittedFieldnames: ReadonlySet<string> = new Set(['scope', 'userid', 'banklabel', 'modelkind'])
+/** Fields the tables leave out: a Thing's scope, which comes before its `label`, and what a row's ckey or its group says already. */
+const OmittedFieldnames: ReadonlySet<string> = new Set(['scope', 'userid', 'banklabel', 'labelpath', 'modelkind'])
 
 /** How often the panel reads the two stores again while it shows. */
 const RereadMillis = 1000
