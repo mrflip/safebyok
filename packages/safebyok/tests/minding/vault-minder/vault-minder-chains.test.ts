@@ -366,11 +366,10 @@ function historyClashesOf(precises: readonly Precis[]): string[] {
 // --
 
 describe("the chain table", () => {
-  // A start the minder reaches today and the principles would not (dead+soon) is earned by its today.
-  it("seeds each start by a row from nothing that ends there, as wanted or today", () => {
+  // Where a start's seed ends is its row from nothing's to say, and each row's run checks it there.
+  it("seeds each start by a row from nothing whose chain is its records", () => {
     const starts = [...InitialNames.keys()].filter((initial) => initial !== Empty)
-    const strays = starts.filter((initial) => [withoutListing(seedRowOf(initial)?.wanted ?? Empty), seededOf(initial)].every((end) => ! isEqual(end, initial)))
-    expect(strays.map((initial) => InitialNames.get(initial))).to.deep.equal([])
+    expect(starts.filter((initial) => ! seedRowOf(initial)).map((initial) => InitialNames.get(initial))).to.deep.equal([])
     expect(ChainCases.filter((row) => ! InitialNames.has(row.initial)).map((row) => titleOf(row))).to.deep.equal([])
   })
 
