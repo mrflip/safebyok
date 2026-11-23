@@ -512,3 +512,23 @@ The inspection back door, further (the Coach, 2026-11-23): "8 chars is good" for
 
 **The back door** ([#861](https://github.com/mrflip/safebyok/pull/861), a draft): its review found that two prefixes of the passphrase wayin's wrapped bankKey, taken across a passphrase replace, XOR to keystream alone, a check for an offline guess as good as the whole wrap. The Coach: "Aren't we supposed to include a never-reused salt next to every wrap or encryption? It's supposed to be safe to expose these." They are, in that nothing leaks without a guess and each guess costs a key-deriver run; the finding is that a masked view was meant to show less than the whole wrap. Ruled: show the end, "three chars is enough, just to be able to say 'yes this is the same record here as there'", as `…xyz(64)`; call it a "masked view", not a taste; the lease shows a `loggable`, not its stamp; the rule that `{ ...thing }` "only reveals things you'd want in a log (not secret, not opaque)" goes into STYLE.md and "into the invariants of Thing's doc block"; the BankMinder's QueryClient is "the bank TSQ", since "query, client and cache will never be unambiguous". A sealed whisper's length is the backend's to see today: padding by Padmé is in `TODO.md`.
 
+### The Forms tab, and what the library offers for forms (the Coach, 2026-11-23)
+
+The dojo's Forms tab ([#862](https://github.com/mrflip/safebyok/pull/862), a draft on #861) builds one form with a secret ten ways, and its reviews settled the facts the form verbs rest on (all in `whiteboard/20261123-dojo/dojo-findings.md`):
+
+* React keeps a form Action's `FormData` as the form's pending status, the same object the action is handed. An action that deletes the secret from it before it returns keeps the secret out of React's hands; one that does not leaves it there for the whole save. So a verb handed a `FormData` takes the secret out before it first awaits, which reverses the session's earlier lean that it need never delete.
+* A mutation handed the form shows the secret to TanStack's mutation-cache subscribers once, before any `mutationFn` runs. A mutation handed nothing, which reads the form itself, shows nothing.
+* A controlled input's text is written into its `value` attribute, for a password field too. A form library's store keeps a registered field's text as typed.
+* Cancelling the form's `reset` event on a refusal keeps an uncontrolled secret through a refused form Action, in one line.
+* A second submit queued behind a pending save under `useActionState` sits in React's status, secret included, until the first ends: disable the button while pending.
+
+The Coach's framing for a host: "First, choose your tradeoff: would you like the value cleared on save, but kept for edit or retry on error? Or would you like it cleared immediately -- but require the user re-enter on a problem?" "Have the docs recommend only ones where it's a good idea."
+
+**Ruled** ("I endorse your recommendations on which to recommend and the library offerings to drop and keep"):
+
+* Recommend: a form Action whose form cancels its reset on a refusal; a plain `onSubmit` form; a TanStack mutation handed nothing; a form library given every field but the secret; and, for a shared screen, a form that empties the field at once.
+* The library offers: secret inputs that cannot be controlled; one verb per action that takes a form or a bag; for form Actions, an action that empties its form at once, with a one-line helper to cancel the reset on a refusal.
+* The library drops `putBoxMutationOptions` as documented, which is the mutation handed the form; its docs show the mutation handed nothing. No cloak is offered: it would cure only that one row, which handing the mutation nothing already does.
+
+Also ruled: "masking a field shouldn't validate it: that would be surprising behavior trying to log a field", so `maskUuid` checks nothing, and `safebyok/utils` again loads none of the vault. A "things to do right" tab is being built (validation by zod with the message by its input, no double submit, why a debounce is wrong, inviting and disinviting a password manager, and more), stacked on #862.
+
