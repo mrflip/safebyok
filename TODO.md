@@ -130,3 +130,15 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   persister's `onBadNews`, and the last snapshot stands; with boxes persisted per bank, the limit bounds one user's boxes.
   TanStack's `PersistRetryer`, with `removeOldestQuery`, is the way to shrink a snapshot until it fits (the Coach,
   2026-11-22, box_persist).
+* **A marker on the parts for session-replay tools.** A revealed secret is plain text in the DOM, and a replay tool
+  records it. Give `WhisperText`, `WhisperInput` and `PassphraseInput` a stable attribute a host can tell its replay
+  tool to mask (docs/threat-model.md, *Not built yet*; the Coach, 2026-11-23).
+* **Mask a revealed field again** when the tab is hidden, or on a timer: "Masking a field at the tab-sleep notification
+  or a timer is quite reasonable" (the Coach, 2026-11-23).
+* **A freshness bound on the gate.** A lease stands until this device hears of a newer gate revision, however long
+  that takes. Let a host set a period within which the gate must be confirmed from the vaultDB for the lease to stand.
+  Void against whoever controls the clock (the Coach, 2026-11-23).
+* **A second lease clock, for idleness, as a host's option.** "Only after we have things working." The common case has
+  lock times of days or never: a password manager is one thing, a price-capped token typed once and put in a header is
+  another. Today nothing locks a bank when its lease ends: the snapshot only reports `leaseEndsAt` (the Coach,
+  2026-11-23).
