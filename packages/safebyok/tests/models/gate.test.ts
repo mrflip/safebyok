@@ -63,7 +63,6 @@ describe("Gate.makeRecord(dna)", () => {
   })
 
   const DnaCases = [
-    [(wayins: DnaWayins) => ({ ...TH.WorldGateStamp, wayins: { ...wayins, main: wayins.main.pickle() } }), 'a wayin record in place of a Wayin'],
     [(wayins: DnaWayins) => ({ ...TH.WorldGateStamp, wayins: { main: wayins.main } }),                    'no passkey0, where a gate with no passkey has null'],
     [(wayins: DnaWayins) => ({ ...TH.WorldGateStamp, labelpath: 'box/gate', wayins }),                    'the labelpath of a box'],
     [(wayins: DnaWayins) => ({ ...TH.WorldGateStamp, lifeseq: undefined, wayins }),                       'no lifeseq'],
@@ -132,12 +131,10 @@ describe("Gate.make(record, { device, vaultDB, bankStamp })", () => {
     expect(Gate.make(record, worldOpts()).lifeseq).to.eq(later)
   })
 
-  it("refuses opts with no bankStamp, no device, a device that is not a Device, or no opts at all", async () => {
+  it("refuses opts with no bankStamp, or no opts at all", async () => {
     const record = await gateRecordOf()
     const opts = worldOpts()
     TH.expectSyncRefusal(() => Gate.make(record, { ...opts, bankStamp: undefined } as never), 'bad_record')
-    TH.expectSyncRefusal(() => Gate.make(record, { ...opts, device: undefined } as never), 'bad_record')
-    TH.expectSyncRefusal(() => Gate.make(record, { ...opts, device: TH.provingDeviceOf() } as never), 'bad_record')
     TH.expectSyncRefusal(() => Gate.make(record, undefined as never))
   })
 

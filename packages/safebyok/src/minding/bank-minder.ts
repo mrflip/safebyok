@@ -2,7 +2,7 @@
 
 import { Validator } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
-import { type BankRecord, type BoxRecord, type GateRecord, type ThingScope, type VoidSentinel, Shell, isAbsent } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type GateRecord, type ThingScope, isAbsent } from '../shapes/shapes-thing'
 import type { BankRoots, BirthBankAsk } from '../shapes/shapes-asks'
 import { type MinderEvent, type MinderFriend, type MinderOpts, type QueryCacheOpts, MinderChecks, MinderEventFormat } from '../shapes/shapes-minder'
 import type { BirthBankAnswer } from '../storage/vault-db'
@@ -27,19 +27,10 @@ export class BankMinder extends Minder {
   }
   // --
 
-  // == [What it minds]: mindsItemAt, mindsListingAt, rootBox
+  // == [What it minds]: mindsItemAt
 
   /** True for the bank, its main gate and its root box. */
   protected mindsItemAt(labelpath: Labelpath): boolean { return RootLabelpaths.has(labelpath) }
-
-  /** False: the root box's listing is its VaultMinder's. */
-  protected mindsListingAt(): boolean { return false }
-
-  /** The bank's root box, the parent of every box, as last heard of live: its shell while none is. */
-  get rootBox(): BoxRecord | VoidSentinel {
-    const root = this.at(this.#scopeAt(Labelpath.RootBox))
-    return ((root === undefined) || isAbsent(root)) ? Shell.of(this.#scopeAt(Labelpath.RootBox)) : root as BoxRecord
-  }
   // --
 
   // == [The world]: worldAt, fetchWorld, subscribe

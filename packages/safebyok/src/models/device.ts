@@ -218,7 +218,7 @@ export class Device implements MinderFriend {
     this.#userid = signedIn
     const { vaultDB } = this
     this.#bankMinder = BankMinder.make({ vaultDB, queryClient: this.#bankClient }, this)
-    this.#minder = VaultMinder.make({ vaultDB, bankMinder: this.#bankMinder, queryCacheOpts: this.#queryCacheOpts, queryClient: this.#queryClient }, this)
+    this.#minder = VaultMinder.make({ vaultDB, queryCacheOpts: this.#queryCacheOpts, queryClient: this.#queryClient }, this)
     this.#banklessSnapshot = PendingBank
     this.#align()
     this.#broughtUp = this.#bringUp(this.#bankMinder, this.#minder)
@@ -434,7 +434,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
   }),
   tellBadNewsToArgs: obj({
     onBadNews: fn<BadNewsHandler>(),
-    device:    custom<Device>((val) => val instanceof Device, PhrasesX.DeviceExpected),
+    device:    custom<Device>(),
     badnews:   arr(custom<Errors.VaultError>(Errors.isVaultError, PhrasesX.VaultErrorExpected)),
   }),
 }))

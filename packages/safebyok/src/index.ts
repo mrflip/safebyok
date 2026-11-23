@@ -9,7 +9,7 @@ export * from './core'
 export * from './storage'
 /* eslint-enable import-x/export */
 export {
-  type DeliverableThing, type GotAnswer, type MinderOpts, type VaultMinderOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt,
+  type DeliverableThing, type GotAnswer, type MinderOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt,
   type ListingEvent, type MinderActionOf, type MinderActionTyped, type TSQQueryAction, type MinderEvent, type MinderEventkind, MinderEventFormat, type MinderEventOf, type RecordEventFields, type SoonEvent, type DeadEvent, type ThingEvent,
   DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis, MinderChecks, type MinderFriend, type MinderGetOpts, type MinderInvalidateOpts, type MinderTryAtOpts, type TsqStaleTime,
 } from './shapes/shapes-minder'

@@ -276,7 +276,7 @@ export function classifyListThings(ask: ListAsk, { parent: rawParent, children, 
   const parentage = (stored === null) ? [] : [Thing.sparseOf(stored)]
   const world     = worldOf(ask, worldFetched)
   const beside    = trackedFieldOf(ask, worldFetched.tracked)
-  if (isRefusedAct(act))  { return { ok: false, act, world, parentage, deltas: [], damaged_rows: [], ...beside } }
+  if (isRefusedAct(act))  { return { ok: false, act, world, read_tc, parentage, deltas: [], damaged_rows: [], ...beside } }
   // A tombstone or none has no children.
   if (stored?.am !== 'a') { return { ok: true, act, world, kids: kidsOf(ask, stored, [], read_tc), parentage, deltas: [], damaged_rows: [], ...beside } }
   const { userid, banklabel } = ask

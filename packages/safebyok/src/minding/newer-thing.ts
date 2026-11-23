@@ -1,6 +1,5 @@
 /** `newerThingOf`: the merge every record a minder caches lands through. */
 import * as TSQ from '@tanstack/query-core'
-import * as Throwers from '../refusals/throwers'
 import { type Absent, type ThingCited, type ThingRecord, type ThingScope, type Tombstone, Shell, ThingChecks, isAbsent } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
 
@@ -14,14 +13,13 @@ export type DeadAt = (scope: ThingScope) => Tombstone<ThingRecord> | undefined
 /** The newer of two values of one Thing's item, soon or tombstone, by life and then revision, with `prior` on a tie and `next` where `prior` is undefined.
  * It serves as structural sharing for a TanStack query of one Thing's records. {@link Absent} stands for the tombstone `deadAt`
  * finds at the other value's scope, or, where it finds none, for nothing stored, older than every record. Of two Absents, `prior`.
- * Anything that is neither a record nor Absent gets TanStack's own default. Refuses two records of different Things.
+ * Anything that is neither a record nor Absent gets TanStack's own default.
  */
 export function newerThingOf(prior: unknown, next: unknown, deadAt?: DeadAt): unknown {
   if (prior === undefined) { return next }
   if (! (isEntryVal(prior) && isEntryVal(next))) { return TSQ.replaceEqualDeep(prior, next) }
   if (isAbsent(prior)) { return isAbsent(next) ? prior : newerOfCited(prior, next, citedOf(prior, next, deadAt), next) }
   if (isAbsent(next))  { return newerOfCited(prior, next, prior, citedOf(next, prior, deadAt)) }
-  if (! Thing.haveSameScope(prior, next)) { throw Throwers.recordsOfOtherThings() }
   return newerOfCited(prior, next, prior, next)
 }
 // --

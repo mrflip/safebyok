@@ -9,6 +9,7 @@ import { VaultMinder } from '../../src/minding/vault-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { GetAsk } from '../../src/shapes/shapes-asks'
 import { refusedAnswerOf } from '../../src/storage/refused-answer'
+import * as Phrases from '../../src/phrases'
 import * as Throwers from '../../src/refusals/throwers'
 import type { MinderEvent } from '../../src/shapes/shapes-minder'
 import * as TH from '../test-helpers'
@@ -43,31 +44,17 @@ async function bumpApicalls(vault: Vault): Promise<BoxRecord> {
 }
 
 /** A vault of `bank` beside the one its device made, with a minder of its own, befriending the bank, that has not said `hello`. */
-function vaultBesideOf(bank: Bank): Vault { return Vault.make(bank, VaultMinder.make({ vaultDB: bank.vaultDB, bankMinder: bank.device.bankMinder }, bank)) }
+function vaultBesideOf(bank: Bank): Vault { return Vault.make(bank, VaultMinder.make({ vaultDB: bank.vaultDB }, bank)) }
 
 describe("Vault.make(bank, minder)", () => {
   it("makes the vault of the bank's boxes, over the minder given, which waits for its hello", async () => {
     const { bank } = await TH.buildBornBank()
-    const minder = VaultMinder.make({ vaultDB: bank.vaultDB, bankMinder: bank.device.bankMinder }, bank)
+    const minder = VaultMinder.make({ vaultDB: bank.vaultDB }, bank)
     const vault = Vault.make(bank, minder)
     expect(vault.bank).to.equal(bank)
     expect(vault.minder).to.equal(minder)
     expect(vault.minder.tryAt(scopeAt(bank, Openai))).to.include({ ok: false })
     expect(Object.isFrozen(vault)).to.be.true
-  })
-
-  it("refuses anything but a bank and a minder", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    TH.expectSyncRefusal(() => Vault.make({} as never, device.minder), 'bad_record')
-    TH.expectSyncRefusal(() => Vault.make(null as never, device.minder), 'bad_record')
-    TH.expectSyncRefusal(() => Vault.make(bank, {} as never), 'bad_record')
-    TH.expectSyncRefusal(() => Vault.make(bank, bank as never), 'bad_record')
-  })
-
-  it("refuses a minder of another bank", async () => {
-    const { bank } = await TH.buildBornBank()
-    const other = TH.makeDevice({ banklabel: 'other' })
-    TH.expectSyncRefusal(() => Vault.make(bank, other.minder), 'record_conflict')
   })
 
   it("refuses a swept bank", async () => {
@@ -310,6 +297,16 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
   it("refuses a labelpath that is not a box's", async () => {
     const { vault } = await TH.buildBornVault()
     await TH.expectRefusal(vault.putBoxOnce('gate' as never, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bad_record')
+  })
+
+  it("refuses the root box's labelpath, fetching and writing nothing", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    const fetched = vi.spyOn(bank.vaultDB, 'tryGetThing')
+    const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    const err = await TH.expectRefusal(vault.putBoxOnce('box', { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bad_record')
+    expect(err.message).to.include(Phrases.VaultBoxIsRoot)
+    expect(fetched).not.toHaveBeenCalled()
+    expect(written).not.toHaveBeenCalled()
   })
 
   it("refuses while the bank is locked, or once its bank is swept, and writes nothing", async () => {
@@ -567,6 +564,16 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     await TH.expectRefusal(vault.withWhisper(Openai, undefined as never), 'bad_record')
     await TH.expectRefusal(vault.withWhisper(Openai, 'apiKey' as never), 'bad_record')
     await TH.expectRefusal(vault.withWhisper('gate' as never, () => undefined), 'bad_record')
+    expect(bank.getSnapshot().isUnlockWanted).to.be.false
+  })
+
+  it("refuses the root box's labelpath, wanting no unlock and fetching nothing", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    const fetched = vi.spyOn(bank.vaultDB, 'tryGetThing')
+    bank.lock()
+    const err = await TH.expectRefusal(vault.withWhisper('box', () => undefined), 'bad_record')
+    expect(err.message).to.include(Phrases.VaultBoxIsRoot)
+    expect(fetched).not.toHaveBeenCalled()
     expect(bank.getSnapshot().isUnlockWanted).to.be.false
   })
 })

@@ -164,7 +164,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
 
   /** The device of the provider mounted, while someone is signed in on it, or null. */
   function signedInDevice(): Device | null {
-    return (mounted?.userid == null) ? null : mounted
+    return (typeof mounted?.userid === 'string') ? mounted : null
   }
 
   /** The signed-in user's device. Refuses `absent_vault` while nobody is signed in, or no provider is mounted. */
@@ -693,15 +693,15 @@ function isBehindAt(device: Device | null, labelpath: Labelpath): boolean {
   return device?.minder.isBehindAt({ ...device.scope, labelpath }) ?? false
 }
 
-// The minder marks an item behind, or a listing stale, but refetches nothing: no get or list is waiting on it. A hook
-// showing it is, so each active one is fetched again. A soon's success refetches its item too: an item a refused get left
-// invalidated tells nothing when it falls behind again. A fetch already under way is left to land, and its landing tells
-// again where it landed behind.
-/** Refetch each item or listing of `minder`'s that a hook observes, once the minder marks it behind or stale. Returns the function that stops it. */
+// The minder marks an item behind but refetches nothing: no get is waiting on it. A hook showing it is, so each active
+// one is fetched again. A soon's success refetches its item too: an item a refused get left invalidated tells nothing
+// when it falls behind again. A fetch already under way is left to land, and its landing tells again where it landed
+// behind. A listing the minder marks stale it lists again itself, where a hook observes it.
+/** Refetch each item of `minder`'s that a hook observes, once the minder marks it behind. Returns the function that stops it. */
 function refetchMarked(minder: VaultMinder): () => void {
   const client = minder.queryClient
   return minder.listen((event) => {
-    if (event.type !== 'updated') { return }
+    if ((event.type !== 'updated') || (event.eventkind === 'list')) { return }
     const isSoon = (event.eventkind === 'soon')
     if (event.action?.type !== (isSoon ? 'success' : 'invalidate')) { return }
     void client.refetchQueries({ queryKey: isSoon ? minder.itemQueryKey(event) : event.queryKey, exact: true, type: 'active' }, { cancelRefetch: false })

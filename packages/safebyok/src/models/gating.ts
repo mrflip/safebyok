@@ -1,10 +1,10 @@
 /** A form verb's gating: the form's cleartexts, hidden from anything that serializes, prints or spreads an object, and the change they prove, attempted once. */
 
 import { omitBy } from 'es-toolkit'
-import { type EX, type GX, Errors, Outcome, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
+import { type EX, type GX, Errors, Outcome, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { BaseBox } from './base-box'
-import { Device } from './device'
+import type { Device } from './device'
 import { Gate } from './gate'
 import type { Wayin } from './wayin'
 import { NOVEL, PasskeyProving, PassphraseProving, type Proving } from './proving'
@@ -127,7 +127,7 @@ export class RevokePasskeyGating extends Gating<Gate> {
  * Refuses `gate_made_elsewhere` where a live bank is already stored.
  */
 async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatingFriend): Promise<Bank> {
-  Checks.device.parse(device).demandEnabled()
+  device.demandEnabled()
   const { passphraseCleartext, passkeyCleartext } = CleartextChecks.birth.parse(cleartexts)
   // A birth's stamps are minted here, one pair per gating.
   const { bankStamp, gateStamp } = Bank.mintStamps(device.scope)
@@ -302,14 +302,4 @@ function zeroBytes(bytes: unknown): void {
   // A bare ArrayBuffer, as WebAuthn hands the PRF output, judged by its tag for the same reason.
   if (Object.prototype.toString.call(bytes) === '[object ArrayBuffer]') { new Uint8Array(bytes as ArrayBuffer).fill(0) }
 }
-// --
-
-// == [Checks]: Checks
-
-// Defined here, not with the shapes: it names a model class. Only a birth needs it: every other gating takes a gate,
-// whose device is already checked.
-/** The check of {@link birthBank}'s device. */
-const Checks = Validator.Checkers('bad_record', ({ custom }) => ({
-  device: custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
-}))
 // --

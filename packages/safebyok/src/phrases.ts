@@ -1,21 +1,12 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, PersisterExpected, SealerExpected, NovelOrProvingExpected, WayinExpected, GateExpected, TombstoneSecretsGiven, BoxOfOtherRoot, BankSwept, BankNotBroughtUp, NobodySignedIn, GateSwept, UnlockDismissed, VaultBankExpected, VaultMinderExpected, HostedVaultExpected, BoxSoonestBare
+// == [Models]: VaultDBExpected, PersisterExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, BankNotBroughtUp, NobodySignedIn, GateSwept, UnlockDismissed, HostedVaultExpected, BoxSoonestBare
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
 
 /** A device's persister that lacks one of a TanStack Query Persister's members. */
 export const PersisterExpected = 'Expected a TanStack Query Persister: an object with the functions persistClient, restoreClient and removeClient.'
-
-/** Something other than NOVEL or a Proving, given as a wayin's source. */
-export const NovelOrProvingExpected = 'Expected NOVEL or a proving'
-
-/** Something other than a Wayin, where one is expected. */
-export const WayinExpected = 'Expected a Wayin'
-
-/** Something other than a Gate, where one is expected. */
-export const GateExpected = 'Expected a Gate'
 
 /** A sealer that lacks one of its methods, its tags or its purposes. */
 export const SealerExpected = 'Expected a sealer: its tags, its purposes, and a function for each of its methods.'
@@ -25,6 +16,9 @@ export const TombstoneSecretsGiven = "A tombstone seals no secrets: give `{ am: 
 
 /** A box whose lifepath is not under the bank's root box. */
 export const BoxOfOtherRoot = "A box's lifepath starts with the lifeseq of its bank's root box: this one is of another life of the root."
+
+/** A vault's box entry point given the root box's labelpath. */
+export const VaultBoxIsRoot = "A vault's boxes are under its bank's root box: give a labelpath such as 'box/openai', never 'box' itself."
 
 /** A call on a bank after its sweep. */
 export const BankSwept = 'This bank was swept, so it answers nothing more: make it again with Bank.make.'
@@ -43,12 +37,6 @@ export const UnlockDismissed = 'The unlock was dismissed, so the bank stayed loc
 
 /** A gating attempted a second time. */
 export const GatingSpent = 'This gating was attempted already, and a gating is attempted once: make another for the next try.'
-
-/** A vault made without a bank. */
-export const VaultBankExpected = 'A Vault is made with the Bank whose boxes it carries.'
-
-/** A vault made without a minder. */
-export const VaultMinderExpected = "A Vault is made with the VaultMinder of its bank's Things."
 
 /** Something a bank is asked to host that has no sweep. */
 export const HostedVaultExpected = 'Expected a vault: an object with a sweep function.'
@@ -156,25 +144,19 @@ export const BankRootsMissing = "A bank is stored without its main gate or its r
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: MinderFriendExpected, BankMinderExpected, NotMinded, WorldNotHeard, MinderClientExpected, BankMindedInClient, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, RecordsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
+// == [Minding]: MinderFriendExpected, NotMinded, WorldNotHeard, MinderClientExpected, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, DeliveredOfOtherScope, ChildrenStoredDamaged
 
 /** A minder made without a friend: a device or a bank. */
 export const MinderFriendExpected = 'A minder is made with its friend: the device or bank whose Things it minds.'
 
-/** A VaultMinder made without the BankMinder it reads its bank's root box from. */
-export const BankMinderExpected = 'A VaultMinder is made with the BankMinder of its bank, which minds the bank, its main gate and its root box.'
-
-/** A minder asked for an item or a listing it does not mind. */
-export const NotMinded = "A VaultMinder minds the boxes under the root box, and their listings and the root box's; a BankMinder minds the bank, its main gate and its root box."
+/** A write through a minder of a Thing it does not mind. */
+export const NotMinded = "A minder writes only the Things it minds: a VaultMinder the boxes under the root box, a BankMinder the bank, its main gate and its root box."
 
 /** A Bank made of a bank whose world its device's BankMinder does not hold. */
 export const WorldNotHeard = "A Bank is made of the bank whose world its device's BankMinder holds: bring the device up, or birth the bank, first."
 
 /** A minder made with a QueryClient that VaultMinder.makeClient did not make. */
 export const MinderClientExpected = 'A minder caches only in a QueryClient made by makeClient, on VaultMinder or BankMinder, whose cache hands each fetched record to its minder.'
-
-/** A minder's hello while another minder of its bank is minding in the same QueryClient. */
-export const BankMindedInClient = "Another minder of this bank is minding in this QueryClient: call its goodbye before this one's hello."
 
 /** A minder read or written through before `hello`, or after `goodbye`. */
 export const MinderNotStarted = 'This minder is not minding: call hello before reading from it or writing through it.'
@@ -187,9 +169,6 @@ export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of mil
 
 /** A minder's `listen` given a feed version other than `MinderEventFormat`. */
 export const FeedVersionOther = "A minder's listen is given the version of the feed its listener reads, MinderEventFormat, and this listener was written for another: its events are not shaped as it expects."
-
-/** Two records of different Things handed to newerThingOf. */
-export const RecordsOfOtherThings = "newerThingOf compares the records of one Thing, and was given the records of two different Things."
 
 /** A record the vaultDB delivered to a minder of another bank, or of another Thing than the minder asked for. */
 export const DeliveredOfOtherScope = "The vaultDB delivered a minder a record of another bank than the minder's, or of another Thing than it asked for: this is a bug in the vaultDB."

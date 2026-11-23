@@ -137,7 +137,7 @@ describe("VaultMinder.tryWrite", () => {
 
   it("writes a box the bank sealed, then the tombstone it sealed, through the put and del asks the bank makes", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const minder = VaultMinder.make({ vaultDB: device.vaultDB, bankMinder: device.bankMinder }, bank)
+    const minder = VaultMinder.make({ vaultDB: device.vaultDB }, bank)
     minder.hello()
     const shell  = Shell.of({ ...bank.scope, labelpath: TH.BoxScope.labelpath }, bank.rootBox)
     const box    = await bank.sealBox(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })

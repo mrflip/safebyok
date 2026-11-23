@@ -8,7 +8,7 @@ import type { BankScope } from '../shapes/shapes-stamps'
 /** The part of a query key that every key of `scope`'s bank has in common, in either minder's cache. */
 export function bankKeyHeadOf({ userid, banklabel }: BankScope): string[] { return ['sok', userid, banklabel] }
 
-/** The userid of each bank with an entry in `queryClient`, a minder's client, once each. */
+/** The userid of each bank with an entry holding a record or Absent in `queryClient`, a minder's client, once each. */
 export function useridsCachedIn(queryClient: QueryClient): Userid[] {
-  return uniq(queryClient.getQueryCache().getAll().map((tsqQuery) => tsqQuery.queryKey[1] as Userid))
+  return uniq(queryClient.getQueryCache().getAll().filter((tsqQuery) => tsqQuery.state.data !== undefined).map((tsqQuery) => tsqQuery.queryKey[1] as Userid))
 }

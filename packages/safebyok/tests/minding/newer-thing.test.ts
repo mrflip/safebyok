@@ -37,11 +37,6 @@ describe("newerThingOf", () => {
     expect(newerThingOf(undefined, Box0)).to.eq(Box0)
   })
 
-  it("refuses two records of different Things", () => {
-    TH.expectSyncRefusal(() => newerThingOf(Box0, TH.boxThingOf('anthropic')), 'bad_record')
-    TH.expectSyncRefusal(() => newerThingOf(Box0, { ...Box1, banklabel: 'zz' }), 'bad_record')
-  })
-
   const deadAtTomb = (): Tombstone<ThingRecord> => Tomb as Tombstone<ThingRecord>
   const AbsentCases = [
     [Box1,    Absent,                Absent, deadAtTomb, 'answers Absent over the revision its tombstone deletes'],

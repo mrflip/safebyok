@@ -127,7 +127,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const beside      = { world: actual.world, ...trackedFieldOf(actual), parentage: actual.parentage, deltas: actual.deltas, damaged_rows: actual.damaged_rows }
       const answer: ListThingsAnswer = actual.ok
         ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, read_tc: actual.kids.read_tc, val: actual.kids }
-        : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: [], err: Throwers.actRefused('vault', actual.act, { oplabel: 'listThings', ask: loggableAsk }) }
+        : { ok: false, ask: loggableAsk, act: actual.act, ...beside, read_tc: actual.read_tc, dbhas: [], err: Throwers.actRefused('vault', actual.act, { oplabel: 'listThings', ask: loggableAsk }) }
       this.notifyTrackedRecords(listAsk, answer)
       this.notifyListed(answer)
       return answer

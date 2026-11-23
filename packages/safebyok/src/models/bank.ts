@@ -369,9 +369,9 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
   bankMakeArgs: obj({
     record: BankChecks.record,
     opts:   obj({
-      device:  custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
+      device:  custom<Device>(),
       vaultDB: ThingChecks.vaultDBShape,
-      gate:    custom<Gate>((val) => val instanceof Gate, Phrases.GateExpected),
+      gate:    custom<Gate>(),
     }),
   }),
 }))

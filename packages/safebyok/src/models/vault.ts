@@ -8,7 +8,7 @@ import * as Throwers from '../refusals/throwers'
 import type { BoxUnsealed } from '../shapes/shapes-bankish'
 import type { BoxWriteAsk } from '../shapes/shapes-asks'
 import type { BoxCleartexts, BoxPublicProps, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
-import type { BoxLabelpath } from '../shapes/primitives'
+import { type BoxLabelpath, Labelpath } from '../shapes/primitives'
 import { type MinderGetOpts, type ScopeAt, MinderChecks } from '../shapes/shapes-minder'
 import { type BoxRecord, Shell, isAbsent } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
@@ -38,9 +38,7 @@ export class Vault {
    * Its gets refuse until the minder's `hello`. The bank's sweep sweeps the vault too, and so the minder. Refuses a swept bank.
    */
   static make(bank: Bank, minder: VaultMinder): Vault {
-    const checked = Checks.vaultMakeArgs.parse({ bank, minder })
-    Validator.checkedConsistent(checked.minder.scope, checked.bank.scope, { kind: 'record_conflict' })
-    const vault = new Vault(checked.bank, checked.minder)
+    const vault = new Vault(bank, minder)
     bank.hostVault(vault)
     return vault
   }
@@ -183,9 +181,9 @@ export class Vault {
     return BaseBox.isTombstone(record) ? this.#bank.makeDelAsk<BoxRecord>({ cited, record }) : this.#bank.makePutAsk<BoxRecord>({ cited, record })
   }
 
-  /** The scope of the box at `labelpath`, in this vault's bank. */
+  /** The scope of the box at `labelpath`, in this vault's bank. Refuses the root box's labelpath. */
   #scopeAt(labelpath: BoxLabelpath): ScopeAt<BoxLabelpath> {
-    return { ...this.#bank.scope, labelpath: BoxChecks.labelpath.parse(labelpath) as BoxLabelpath }
+    return { ...this.#bank.scope, labelpath: Checks.boxLabelpath.parse(labelpath) as BoxLabelpath }
   }
 
   // The shell of a box is of the root box's life.
@@ -209,13 +207,10 @@ function isOfNewerLife(item: Pick<BoxRecord, 'lifepath' | 'revseq'>, soon: Pick<
 
 // == [Checks]: Checks
 
-// Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Vault.make}'s arguments, and of the `fn` {@link Vault.withWhisper} and {@link Vault.withUnlockedWhisper} call. */
-const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn }) => ({
-  vaultMakeArgs: obj({
-    bank:   custom<Bank>((val) => val instanceof Bank, Phrases.VaultBankExpected),
-    minder: custom<VaultMinder>((val) => val instanceof VaultMinder, Phrases.VaultMinderExpected),
-  }),
-  fn: fn<(box: BoxUnsealed) => unknown>(),
+/** The checks of a box's labelpath, never the root box's, and of the `fn` {@link Vault.withWhisper} and {@link Vault.withUnlockedWhisper} call. */
+const Checks = Validator.Checkers('bad_record', ({ fn }) => ({
+  // The root box is the bank's, minded by its BankMinder: a vault's minder minds only the boxes under it.
+  boxLabelpath: BoxChecks.labelpath.refine((given) => given !== Labelpath.RootBox, Phrases.VaultBoxIsRoot),
+  fn:           fn<(box: BoxUnsealed) => unknown>(),
 }))
 // --

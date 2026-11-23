@@ -40,9 +40,6 @@ describe("VaultMinder.at", () => {
     [{ ...TH.BoxScope, userid: 'u2' },            "refuses bad_record for another user's scope"],
     [{ ...TH.BoxScope, banklabel: 'zz' },         "refuses bad_record for another bank's scope"],
     [{ ...TH.BoxScope, labelpath: 'Box/openai' }, "refuses bad_record for a labelpath that is no Thing's"],
-    [TH.GateScope,                                'refuses bad_record for the main gate, which is no box'],
-    [{ ...TH.ThingBank, labelpath: 'bank' },      'refuses bad_record for the bank, which is no box'],
-    [TH.RootScope,                                'refuses bad_record for the root box, which has no item here'],
   ] as const
   for (const [scoped, blurb] of ForeignScopes) {
     it(blurb, async () => {
@@ -51,13 +48,13 @@ describe("VaultMinder.at", () => {
     })
   }
 
-  it("has the item of a box, and refuses an item of the bank, main gate or root box", async () => {
+  it("has the item of a box, and none of the bank, main gate or root box its answer carried", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { minder } = await minderWorldOf(vaultDB)
     await minder.get(TH.BoxScope)
     expect(minder.at(TH.BoxScope)).to.deep.equal(box)
-    for (const labelpath of ['bank', 'gate', 'box']) { TH.expectSyncRefusal(() => minder.at({ ...TH.ThingBank, labelpath }), 'bad_record') }
+    for (const labelpath of ['bank', 'gate', 'box']) { expect(minder.at({ ...TH.ThingBank, labelpath })).to.be.undefined }
   })
 
   it("types the record by the labelpath's kind, where it is known when compiled", async () => {
@@ -239,7 +236,7 @@ describe("VaultMinder.listingAt", () => {
     try {
       const vaultDB = new MemoryVaultDB()
       await storedBoxOf(vaultDB)
-      const minder  = await minderOf(vaultDB)
+      const minder  = minderOf(vaultDB)
       minder.hello()
       await minder.list('box')
       await vi.advanceTimersByTimeAsync(Hours24)
@@ -452,9 +449,9 @@ describe("VaultMinder.tryAt", () => {
     expect(answer).to.have.nested.property('lastErr.refusalkind', 'storage_unavailable')
   })
 
-  it("answers unexpected_error, not a storage refusal, for anything else its own code throws", async () => {
+  it("answers unexpected_error, not a storage refusal, for anything else its own code throws", () => {
     const bank = { ...fakeBankOf(), makeGetAsk: () => { throw new Error('ask broke') } }
-    const minder = await minderOf(new MemoryVaultDB(), {}, bank)
+    const minder = minderOf(new MemoryVaultDB(), {}, bank)
     minder.hello()
     const answer = minder.tryAt(TH.BoxScope)
     expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing' })

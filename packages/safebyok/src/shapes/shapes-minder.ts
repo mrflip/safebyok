@@ -3,7 +3,6 @@
 import * as TSQ from '@tanstack/query-core'
 import type * as Z from 'zod'
 import { type Errors, Validator } from 'safebyok-big/internals'
-import type { BankMinder } from '../minding/bank-minder'
 import type { Bank } from '../models/bank'
 import type { RecordOfKind } from '../models/base-thing'
 import * as Phrases from '../phrases'
@@ -261,7 +260,7 @@ export type SoonEvent<KindT extends Thingkind = Thingkind> = KindT extends Thing
   ? MinderEventOf<Sparse<RecordOfKind<KindT>>, 'soon'> & RecordEventFields<KindT>
   : never
 
-/** A dead entry's query changed, its `eventkind` `'dead'`: the Thing's newest tombstone heard of arrived (`success`), just before
+/** A dead entry's query changed, its `eventkind` `'dead'`: a tombstone of the Thing landed (`success`), just before
  * Absent lands in its item, or it was removed at `goodbye`. `state.data` is the tombstone, and its {@link RecordEventFields} are that tombstone's.
  * A Thing born again keeps its dead entry, of the older life.
  */
@@ -283,9 +282,9 @@ export type ListingEvent = MinderEventOf<Kids, 'list'> & Readonly<{
 }>
 // --
 
-// == [A minder's making]: MinderOpts, VaultMinderOpts
+// == [A minder's making]: MinderOpts
 
-/** Options for `BankMinder.make`, and the options every minder is made with. */
+/** The options every minder is made with: `VaultMinder.make`'s and `BankMinder.make`'s. */
 export interface MinderOpts {
   /** Where the bank's Things are stored. */
   vaultDB:         VaultDB
@@ -293,11 +292,5 @@ export interface MinderOpts {
   queryCacheOpts?: Partial<QueryCacheOpts>
   /** The client to cache in, made by `makeClient`, which minders of other banks may share. Default: a client of its own. */
   queryClient?:    TSQ.QueryClient | undefined
-}
-
-/** Options for `VaultMinder.make`. */
-export interface VaultMinderOpts extends MinderOpts {
-  /** The minder of the bank's roots, which the root box is read from. */
-  bankMinder:      BankMinder
 }
 // --

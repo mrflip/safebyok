@@ -107,11 +107,11 @@ describe("a BankMinder's watch", () => {
     const { bankMinder } = bankMinderOver(vaultDB)
     expect(bankMinder.at(TH.GateScope)).to.be.undefined
     const staleBank = { ...fakeBankOf(), makeGetAsk: (ask: { labelpath: string }) => getAskOf({ ...ask, ...TH.ThingBank, track: TH.GateStaleTrack }) }
-    const minder    = await minderOf(vaultDB, {}, staleBank, bankMinder)
+    const minder    = minderOf(vaultDB, {}, staleBank)
     minder.hello()
     await minder.get(TH.BoxScope)
     await TH.eventually(() => TH.itemRevtokOf(bankMinder.at(TH.GateScope)) === Gate1.revtok)
-    TH.expectSyncRefusal(() => minder.at(TH.GateScope), 'bad_record')
+    expect(minder.at(TH.GateScope)).to.be.undefined
   })
 })
 
@@ -178,13 +178,5 @@ describe("bankMinder.subscribe(listener)", () => {
 
   it("refuses a listener that is not a function", () => {
     TH.expectSyncRefusal(() => bankMinderOver().bankMinder.subscribe('listen' as never), 'bad_record')
-  })
-})
-
-describe("a BankMinder's reads of what it does not mind", () => {
-  it("refuses a box's item, and any listing", async () => {
-    const { bankMinder } = await fetchedWorldOf()
-    TH.expectSyncRefusal(() => bankMinder.at(TH.BoxScope), 'bad_record')
-    await TH.expectRefusal(bankMinder.list('box'), 'bad_record')
   })
 })

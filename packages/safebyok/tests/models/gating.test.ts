@@ -228,12 +228,6 @@ describe("a gating's vacating of the passkey answers it is handed", () => {
     expect(TH.isZeroed(prfBytes)).to.be.true
   })
 
-  it("zeroes the answer when the gating's device is not a Device", async () => {
-    const passkeyCleartext = TH.passkeyAnswerOf()
-    await TH.expectRefusal(Bank.birthGating(TH.provingDeviceOf() as never, { passphraseCleartext: TH.TestPassphrase, passkeyCleartext }, attachNothing).attempt(), 'bad_record')
-    expect(TH.isZeroed(passkeyCleartext.prfBytes)).to.be.true
-  })
-
   // Refused at the entry point, before any gating exists, so the answer is the host's to zero.
   it("leaves the answer live where `Bank.birth` is handed a device that is not a Device", async () => {
     const passkeyCleartext = TH.passkeyAnswerOf()

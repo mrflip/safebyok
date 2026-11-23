@@ -10,7 +10,6 @@ import { Hours24, fakeBankOf, minderOf, minderWorldOf, storedBoxOf, boxScopeOf, 
 
 describe("VaultMinder.make", () => {
   const vaultDB = new MemoryVaultDB()
-  const bankMinder = BankMinder.make({ vaultDB }, fakeBankOf())
   const { makeGetAsk: _makeGetAsk, ...noAsks } = fakeBankOf()
   const { makeListAsk: _makeListAsk, ...noListAsks } = fakeBankOf()
   const MakeCases = [
@@ -24,13 +23,11 @@ describe("VaultMinder.make", () => {
     [{ queryCacheOpts: { staleTime: MaxTimerMillis + 1 } }, null,                'refuses a staleTime past MaxTimerMillis'],
     [{ queryCacheOpts: { gcTime: 10 } },                    null,                'refuses a gcTime, which no host sets'],
     [{ queryCacheOpts: { staleTime: 'static' } },           null,                "refuses a staleTime of 'static' for the minder's own"],
-    [{ bankMinder: undefined },                             null,                'refuses a minder made without its BankMinder'],
-    [{ bankMinder: {} },                                    null,                'refuses a bankMinder that is not a BankMinder'],
   ] as const
   for (const [optsOver, bank, blurb] of MakeCases) {
     it(blurb, () => {
       // @ts-expect-error -- sloppy input is the point
-      TH.expectSyncRefusal(() => VaultMinder.make({ vaultDB, bankMinder, ...optsOver }, bank ?? fakeBankOf()), 'bad_record')
+      TH.expectSyncRefusal(() => VaultMinder.make({ vaultDB, ...optsOver }, bank ?? fakeBankOf()), 'bad_record')
     })
   }
 
@@ -48,7 +45,7 @@ describe("VaultMinder.hello", () => {
       await storedBoxOf(vaultDB)
       expect(DefaultQueryCacheOpts.staleTime).to.eq(60 * 60 * 1000)
       for (const [queryCacheOpts, staleTime] of [[{}, 60 * 60 * 1000], [{ staleTime: 5 }, 5]] as const) {
-        const minder = await minderOf(vaultDB, queryCacheOpts)
+        const minder = minderOf(vaultDB, queryCacheOpts)
         minder.hello()
         await minder.get(TH.BoxScope)
         await vi.advanceTimersByTimeAsync(staleTime - 1)
@@ -67,7 +64,7 @@ describe("VaultMinder.hello", () => {
     try {
       const vaultDB = new MemoryVaultDB()
       await storedBoxOf(vaultDB)
-      const minder  = await minderOf(vaultDB, { staleTime: Infinity })
+      const minder  = minderOf(vaultDB, { staleTime: Infinity })
       minder.hello()
       await minder.list('box')
       expect(minder.isStaleAt(TH.BoxScope)).to.be.true
@@ -114,7 +111,7 @@ describe("VaultMinder.hello", () => {
     const vaultDB    = new MemoryVaultDB()
     const bankMinder = BankMinder.make({ vaultDB }, fakeBankOf())
     bankMinder.hello()
-    const minder     = await minderOf(vaultDB, {}, fakeBankOf(), bankMinder)
+    const minder     = minderOf(vaultDB, {}, fakeBankOf())
     minder.hello()
     await TH.expectRefusal(minder.get(TH.BoxScope), 'storage_issue')
     await TH.expectGood(bankMinder.tryBirthBank(TH.birthBankAskOf()))
@@ -128,7 +125,7 @@ describe("VaultMinder.hello", () => {
       const box     = await storedBoxOf(vaultDB)
       const anthropic = TH.boxThingOf('anthropic')
       cheatBox(vaultDB, anthropic)
-      const minder  = await minderOf(vaultDB)
+      const minder  = minderOf(vaultDB)
       minder.hello()
       await minder.get(boxScopeOf('anthropic'))
       await minder.list('box')
@@ -190,7 +187,7 @@ describe("VaultMinder.goodbye", () => {
       const vaultDB = new MemoryVaultDB()
       await storedBoxOf(vaultDB)
       const box     = TH.boxThingOf()
-      const minder  = await minderOf(vaultDB, { staleTime: 5 })
+      const minder  = minderOf(vaultDB, { staleTime: 5 })
       minder.hello()
       minder.goodbye()
       minder.hello()
