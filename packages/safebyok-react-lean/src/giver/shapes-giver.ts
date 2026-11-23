@@ -1,20 +1,17 @@
 /** The giver's types and checks: what a host hands it, and how it wraps a host's callback. */
 
 import type { UseQueryOptions } from '@tanstack/react-query'
-import { type BankSnapshot, type Banklabel, type BulletproofFailOpts, type DeviceOpts, type VaultDB, Checkers, PendingBank, isVaultDB } from 'safebyok'
+import { type Banklabel, type BulletproofFailOpts, type DeviceOpts, type VaultDB, Checkers, isVaultDB } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import * as Phrases from './phrases-giver'
 
-// == [Types]: GiverBanks, GiverConfig, SignedOutBank, BoxQueryOpts
+// == [Types]: GiverBanks, GiverConfig, BoxQueryOpts
 
 /** The one bank a giver serves, keyed by its banklabel: `{ knock: { vaultDB } }`. */
 export type GiverBanks<BanklabelT extends string = string> = Readonly<Record<BanklabelT, Readonly<{ vaultDB: VaultDB }>>>
 
 /** A giver's config: its one bank and where that is stored, and the options of each device it makes. */
-export type GiverConfig<BanklabelT extends string = string> = Readonly<{ banks: GiverBanks<BanklabelT> }> & Readonly<Omit<DeviceOpts, 'vaultDB' | 'deviceDB' | 'queryClient'>>
-
-/** The bank snapshot a giver's hooks show while nobody is signed in. */
-export const SignedOutBank: BankSnapshot = Object.freeze({ ...PendingBank, stage: 'signed_out' })
+export type GiverConfig<BanklabelT extends string = string> = Readonly<{ banks: GiverBanks<BanklabelT> }> & Readonly<Omit<DeviceOpts, 'vaultDB' | 'deviceDB'>>
 
 // The rest would configure the minder's own query while a hook observes it: its key, fetch, staleness, cache time, retries,
 // structural sharing, initial data or persister.

@@ -94,7 +94,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   /** Make the bank of `record`, with `opts.gate` as its main gate, on `opts.device`, with its boxes in `opts.vaultDB`. Nothing is fetched or stored.
    * The device's BankMinder must hold the world of `record`'s life, its root box live: fetch the world, or birth the bank, first.
-   * It is locked or unlocked as its gate is. The device is not told of it: a device makes its own bank in its `hello`, and is handed the bank its birth makes.
+   * It is locked or unlocked as its gate is. The device is not told of it: a device makes its own bank in its `signIn`, and is handed the bank its birth makes.
    */
   static make(record: BankRecord, opts: BankOpts): Bank { return new Bank(record, opts) }
 
@@ -185,7 +185,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** Birth the bank of `device`'s scope with the user's new passphrase and optional passkey, and resolve it unlocked. The device's bank is then this one.
    * A weak passphrase refuses `weak_passphrase`: show {@link Device.judgeStrength}'s verdict as the user types.
    * Where a live bank is already stored, it refuses `gate_made_elsewhere`, and the passphrase is not set.
-   * Call it once the device's `hello` shows the stage `'unborn'`.
+   * Call it once the device's `signIn` shows the stage `'unborn'`.
    */
   static async birth(device: Device, cleartexts: BirthCleartexts): Promise<Bank> { return await Checks.device.parse(device).birthGating(cleartexts).attempt() }
 

@@ -1,5 +1,5 @@
 /** The giver: a host's React layer over one bank, made once at module scope, before anyone signs in.
- * Its provider says who is signed in, and hands its hooks that user's device. Its hooks observe the provider's own QueryClient, which the device's minder caches records in.
+ * Its provider makes a device at its mount, tells it who is signed in, and hands its hooks that device. Its hooks observe the device's QueryClient, which the signed-in user's minder caches records in.
  */
 
 import { type DataTag, type QueryKey, type UseMutationOptions, type UseMutationResult, type UseQueryOptions, type UseQueryResult, QueryClient, mutationOptions, queryOptions, skipToken, useMutation, useQuery } from '@tanstack/react-query'
@@ -8,7 +8,7 @@ import { type ReactNode, createContext, useCallback, useContext, useEffect, useM
 import {
   type Absent, type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, type Kids, Labelpath,
   type LiveOf, type LivePublicPropsOf, MinderEventFormat, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
-  PendingBank, Shell, type Sidecar, VaultMinder, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
+  PendingBank, Shell, type Sidecar, SignedOutBank, VaultMinder, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
 } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
@@ -18,18 +18,18 @@ import {
 import { type Given, GiverContext } from './giver-context'
 import * as Phrases from './phrases-giver'
 import { popField } from './pop-field'
-import { type BoxQueryOpts, ConfigChecks, type GiverConfig, HostCallbackOpts, ScopeChecks, SignedOutBank } from './shapes-giver'
+import { type BoxQueryOpts, ConfigChecks, type GiverConfig, HostCallbackOpts, ScopeChecks } from './shapes-giver'
 import { makeUseDraft } from './use-draft'
 
 // == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, HeaderedGate, GateShown, GateSelected, GateOpts, GateResult, BoxQueryOptions, BoxQueries, WithLockableWhisperOpts, PutBoxActionOpts, PutBoxActionResult, PutBoxMutationOptions, FormMutationOptions, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
 
 /** The props of a giver's `Provider`. */
 export type ProviderProps = Readonly<{
-  /** The signed-in user's id. The first one this mount of the provider is handed starts that user's device; null or undefined changes nothing. */
+  /** The signed-in user's id. The first one this mount of the provider is handed signs that user in on its device; null or undefined changes nothing. */
   userid:      string | null | undefined
-  /** The vaultDB to use in place of the config's: a test's `MemoryVaultDB`, say. Only the one present when the first userid arrives is used. */
+  /** The vaultDB to use in place of the config's: a test's `MemoryVaultDB`, say. Only the one present at the provider's mount is used. */
   vaultDB?:    VaultDB | undefined
-  /** The key deriver to use in place of the config's. Only the one present when the first userid arrives is used. */
+  /** The key deriver to use in place of the config's. Only the one present at the provider's mount is used. */
   keyDeriver?: KeyDeriver | undefined
   children?:   ReactNode
 }>
@@ -127,10 +127,6 @@ export type BankGiver = ReturnType<ReactGiver['bank']>
 /** What a provider shows the hooks under it: its user's device, or none and the bank snapshot shown meanwhile; and the QueryClient they observe. */
 type Shown = Readonly<{ client: QueryClient } & ({ device: Device, bank: null } | { device: null, bank: BankSnapshot })>
 
-// A ref, in effect: the provider's effect sets `device` once, and the calls outside its hooks read it.
-/** What one mount of a provider owns: the QueryClient its hooks observe, made with the mount, and the device its first userid starts. */
-type ProviderMount = { readonly client: QueryClient, device: Device | null }
-
 /** What a bank's hooks and calls read of their giver. */
 type BankFriend = Readonly<{
   banklabel:    string
@@ -145,10 +141,10 @@ type BankFriend = Readonly<{
 }>
 // --
 
-// == [The giver]: reactGiver, Unjudged, makeProviderMount, shownOf
+// == [The giver]: reactGiver, Unjudged, shownOf
 
 /** Make the giver of one bank: hold `config`, until someone signs in. Make it once, at module scope.
- * `config` is the bank, as `banks: { mybank: { vaultDB } }`, and the options of each Device it makes.
+ * `config` is the bank, as `banks: { mybank: { vaultDB } }`, and the options of the Device each provider makes.
  * A box's labelpath is the host's, without the `box/` the core stores it under.
  * @example
  *   export const SOK   = reactGiver({ banks: { knock: { vaultDB } }, keyDeriver })
@@ -157,17 +153,23 @@ type BankFriend = Readonly<{
 export function reactGiver<BanklabelT extends string>(config: GiverConfig<BanklabelT>) {
   const [[banklabel, { vaultDB: configVaultDB }]] = ConfigChecks.giverConfig.parse(config).banks
   const { banks: _banks, ...configDeviceOpts } = config
-  /** The provider mounted, whose device the calls outside its hooks act on, or null while none is. */
-  let mounted: ProviderMount | null = null
+  // A ref, in effect: the provider's effect sets it, and the calls outside its hooks read it.
+  /** The device of the provider mounted, which the calls outside its hooks act on, or null while none is. */
+  let mounted: Device | null = null
   /** The QueryClient a hook observes outside every provider, where each query skips its fetch. */
   const outsideClient = new QueryClient()
   // One context for each giver, so a hook of one giver never reads the device of another giver's provider.
   /** The device the nearest provider of this giver shows its children, or signed out outside every one. */
   const ShownContext = createContext<Shown>({ device: null, bank: SignedOutBank, client: outsideClient })
 
+  /** The device of the provider mounted, while someone is signed in on it, or null. */
+  function signedInDevice(): Device | null {
+    return (mounted?.userid == null) ? null : mounted
+  }
+
   /** The signed-in user's device. Refuses `absent_vault` while nobody is signed in, or no provider is mounted. */
   function demandDevice(): Device {
-    const device = mounted?.device ?? null
+    const device = signedInDevice()
     if (device === null) { throw new VaultError('absent_vault', Phrases.NobodySignedIn) }
     return device
   }
@@ -187,7 +189,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
   }
 
   /** Says who is signed in: mount it once, at the root, inside the host's `QueryClientProvider`, which runs the form verbs' mutations.
-   * The first userid it is handed starts that user's device, for the life of this mount. A null or undefined userid changes nothing.
+   * It makes a device at its mount, and signs in on it the first userid it is handed, for the life of this mount. A null or undefined userid changes nothing.
    * Under it, a hook never shows a device whose userid is not the prop's: it shows `starting` instead. Until its effects run,
    * as in a server render, a hook shows `starting` for a userid and `signed_out` for none.
    * The calls that are not hooks act on the device of the provider mounted, and refuse once it unmounts. Unmounting ends nothing.
@@ -195,27 +197,28 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
    * The parts and the kit beneath it use its giver and bank, unless handed their own as props.
    */
   function Provider({ userid, vaultDB, keyDeriver, children }: ProviderProps) {
-    // StrictMode makes a second mount and discards it, and a server render discards its own: making one does no I/O.
-    const [mount] = useState(makeProviderMount)
-    const [device, setDevice] = useState<Device | null>(null)
-    // Made in the effect, not in render: Device.make checks the secure context, and a server has no device to make.
-    // The mount keeps its first device, so StrictMode's second run of the effect starts nothing more. `hello` fetches the
-    // bank, its main gate and root box as its world, and answers its first call to every later one.
-    const startDevice = useEffectEvent((signedIn: string) => {
-      // Cheat (react_life): a fresh device_tok for each device. Nothing keeps one across a reload yet.
-      mount.device ??= Device.make({ userid: signedIn, banklabel, device_tok: globalThis.crypto.randomUUID() }, {
-        ...configDeviceOpts, vaultDB: vaultDB ?? configVaultDB, ...(keyDeriver && { keyDeriver }), queryClient: mount.client,
-      })
-      setDevice(mount.device)
-      void mount.device.hello()
+    // StrictMode makes a second device and discards it, and a server render discards its own: making one does no I/O,
+    // and subscribes to nothing. The hooks observe its QueryClient from their first render, before anyone signs in.
+    // Cheat (react_life): a fresh device_tok for each device. Nothing keeps one across a reload yet.
+    const [device] = useState(() => Device.make({ banklabel, device_tok: globalThis.crypto.randomUUID() }, {
+      ...configDeviceOpts, vaultDB: vaultDB ?? configVaultDB, ...(keyDeriver && { keyDeriver }),
+    }))
+    /** The device, once a userid is signed in on it. */
+    const [signedIn, setSignedIn] = useState<Device | null>(null)
+    // The device serves its first user for its life: each later `signIn`, StrictMode's second run of the effect among them,
+    // answers as the first and starts nothing more.
+    const signIn = useEffectEvent((user: string) => {
+      void device.signIn(user)
+      setSignedIn(device)
     })
     useEffect(() => {
-      mounted = mount
-      return () => { if (mounted === mount) { mounted = null } }
-    }, [mount])
-    useEffect(() => { if (typeof userid === 'string') { startDevice(userid) } }, [userid])
-    useEffect(() => ((device === null) ? undefined : refetchMarked(device.minder)), [device])
-    const shown = useMemo(() => shownOf(device, userid, mount.client), [device, userid, mount])
+      mounted = device
+      void device.hello()
+      return () => { if (mounted === device) { mounted = null } }
+    }, [device])
+    useEffect(() => { if (typeof userid === 'string') { signIn(userid) } }, [userid])
+    useEffect(() => ((signedIn === null) ? undefined : refetchMarked(signedIn.minder)), [signedIn])
+    const shown = useMemo(() => shownOf(signedIn, userid, device.queryClient), [signedIn, userid, device])
     return <ShownContext value={shown}><GiverContext value={given}>{children}</GiverContext></ShownContext>
   }
 
@@ -250,7 +253,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
   }
 
   const { bankGiver, boxQueryOf } = makeBankGiver({
-    banklabel, signedIn: () => mounted?.device ?? null, clientNow: () => mounted?.client ?? outsideClient, demandDevice, demandBank, demandVault, useShown,
+    banklabel, signedIn: signedInDevice, clientNow: () => mounted?.queryClient ?? outsideClient, demandDevice, demandBank, demandVault, useShown,
   })
 
   /** The query factories of the signed-in user's bank, by banklabel, for the host's own `useQuery` and its kin, with the QueryClient they run in.
@@ -287,12 +290,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
 /** The fields of a {@link StrengthVerdictResult} before anything is judged. */
 const Unjudged = Object.freeze({ verdict: null, isJudging: false, lastErr: null })
 
-/** A provider's mount, before its first userid: a QueryClient its devices' minders may cache in, and no device. */
-function makeProviderMount(): ProviderMount {
-  return { client: VaultMinder.makeClient(), device: null }
-}
-
-/** What a provider handed `userid` shows its children of `device`, its mount's: none while it is another user's or not yet made, stage `starting` for a userid and `signed_out` for none. */
+/** What a provider handed `userid` shows its children of `device`, its device once signed in: none while it is another user's or nobody is signed in on it, stage `starting` for a userid and `signed_out` for none. */
 function shownOf(device: Device | null, userid: string | null | undefined, client: QueryClient): Shown {
   if ((device !== null) && ((typeof userid !== 'string') || (device.userid === userid))) { return { device, bank: null, client } }
   return { device: null, bank: (typeof userid === 'string') ? PendingBank : SignedOutBank, client }

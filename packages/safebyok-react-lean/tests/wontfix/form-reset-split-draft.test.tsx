@@ -32,7 +32,7 @@ describe("wontfix: a draft with one input in a form and one outside it", () => {
     render(TH.providerTreeOf(world, <SplitEditor />, { userid: TH.ProviderUser }))
     const device = await waitFor(() => world._cheat_device())
     await act(async () => {
-      await device.hello()
+      await device.signIn(TH.ProviderUser)
       await device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase })
     })
     const keyInput = await screen.findByLabelText<HTMLInputElement>('Key')

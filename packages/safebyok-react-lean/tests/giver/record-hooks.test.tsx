@@ -105,7 +105,7 @@ describe("useBox, mounted before anyone is signed in", () => {
     const { rerender } = render(treeOf(world, <BoxProbe />, null))
     rerender(treeOf(world, <BoxProbe />))
     await waitFor(() => { expect(seen.current?.data).to.not.be.undefined })
-    const client = world._cheat_device().minder.queryClient
+    const client = world._cheat_device().queryClient
     const { options } = client.getQueryCache().find({ queryKey: JokesKey, exact: true })!
     const defaults = client.getQueryDefaults(JokesKey)
     expect(defaults.queryFn).to.be.a('function')
@@ -271,7 +271,7 @@ describe("useGate over the BankMinder's world", () => {
     onTestFinished(() => { get.mockRestore() })
     const other = LeanTH.makeDevice({}, { vaultDB: world.vaultDB })
     await act(async () => {
-      await other.hello()
+      await other.signIn(TH.ProviderUser)
       await other.bank!.gate.addPasskey({ passphraseCleartext: LeanTH.TestPassphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })
     })
     await waitFor(() => { expect(header?.wayinkind).to.eq('passkey') })

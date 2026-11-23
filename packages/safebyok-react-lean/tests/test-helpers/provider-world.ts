@@ -107,7 +107,7 @@ export interface ProviderWorld {
   pauseGets(): () => void
   /** Pause every get {@link vaultDB} is asked from now on after it reads, until the function returned is called: it answers what it read. */
   pauseAnswers(): () => void
-  /** The device the giver made first, once a provider has a userid: for a test to read its minder. */
+  /** The device the giver made first, at a provider's mount: for a test to read its minder once a userid is signed in on it. */
   _cheat_device(): Device
   /** Every device the giver has made, in the order made. */
   _cheat_devices(): readonly Device[]
@@ -184,12 +184,12 @@ export async function buildProviderWorld({ stored = 'none', isInConfig = false, 
     SOK, Bank: SOK.bank('acme'), vaultDB, deriver, checker, client, counts, _cheat_otherVault: otherVault,
     pauseGets:      () => pauseAt('ask'),
     pauseAnswers:   () => pauseAt('answer'),
-    clients:        () => [client, ...devices.map((device) => device.minder.queryClient)],
+    clients:        () => [client, ...devices.map((device) => device.queryClient)],
     _cheat_device:  () => devices[0]!,
     _cheat_devices: () => [...devices],
     _cheat_putJokesKey: async (passphraseCleartext) => {
-      const device = makeDeviceUnspied({ ...LeanTH.WorldScope, device_tok: globalThis.crypto.randomUUID() }, { keyDeriver: LeanTH.testDeriver, logger: LeanTH.quietLogger, vaultDB })
-      await device.hello()
+      const device = makeDeviceUnspied({ banklabel: LeanTH.WorldScope.banklabel, device_tok: globalThis.crypto.randomUUID() }, { keyDeriver: LeanTH.testDeriver, logger: LeanTH.quietLogger, vaultDB })
+      await device.signIn(ProviderUser)
       await device.bank!.gate.unlock({ passphraseCleartext })
       await device.vault!.putBoxOnce(`box/${JokesPath}`, { sidecar: { service: 'jokes' } }, { whisper: LeanTH.Whisper })
     },

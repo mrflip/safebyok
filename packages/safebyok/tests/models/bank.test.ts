@@ -49,7 +49,7 @@ describe("Bank.mintStamps(scope)", () => {
   })
 
   it("accepts the scope of anything that has one, such as a device", () => {
-    const { bankStamp } = Bank.mintStamps(TH.makeDevice())
+    const { bankStamp } = Bank.mintStamps(TH.makeDevice().scope)
     expect(bankStamp).to.include(TH.ThingBank)
     expect(bankStamp).to.not.have.property('device_tok')
   })

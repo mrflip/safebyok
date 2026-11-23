@@ -124,7 +124,8 @@ describe("the provider", () => {
   it("starts one device once under StrictMode, which makes its state twice and runs its effects twice", async () => {
     const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' }, { isStrict: true })
     await waitFor(() => { expect(result.current).to.eq('locked') })
-    expect([world._cheat_devices().length, world.counts.watches]).to.deep.equal([1, 2])
+    const signedIn = world._cheat_devices().filter((device) => device.userid !== null)
+    expect([world._cheat_devices().length, signedIn.length, world.counts.watches]).to.deep.equal([2, 1, 2])
   })
 
   it("shows starting, in the same render, under a userid other than its device's", async () => {
@@ -150,12 +151,12 @@ describe("the provider", () => {
     await waitFor(() => { expect(container.textContent).to.eq('jokes') })
   })
 
-  it("makes no device in a server render, showing starting for a userid and signed_out for none", async () => {
+  it("signs nobody in and watches nothing in a server render, showing starting for a userid and signed_out for none", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     function StageProbe() { return <p>{world.Bank.useBank((bank) => bank.stage)}</p> }
     const htmlOf = (userid: string | null) => renderToString(TH.providerTreeOf(world, <StageProbe />, { userid }))
     expect([htmlOf(TH.ProviderUser), htmlOf(null)]).to.deep.equal(['<p>starting</p>', '<p>signed_out</p>'])
-    expect([world._cheat_devices().length, world.counts.watches]).to.deep.equal([0, 0])
+    expect([world._cheat_devices().map((device) => device.userid), world.counts.watches]).to.deep.equal([[null, null], 0])
   })
 
   it("hydrates a server render with no mismatch, then starts the device", async () => {
@@ -170,7 +171,8 @@ describe("the provider", () => {
     act(() => { root = hydrateRoot(container, tree, { onRecoverableError: (err) => { mismatches.push(err) } }) })
     onTestFinished(() => { act(() => { root?.unmount() }); container.remove() })
     await waitFor(() => { expect(container.textContent).to.eq('locked') })
-    expect([mismatches, world._cheat_devices().length]).to.deep.equal([[], 1])
+    // One device for the server render, and one for the hydration, which alone signs in.
+    expect([mismatches, world._cheat_devices().map((device) => device.userid)]).to.deep.equal([[], [null, TH.ProviderUser]])
   })
 
   it("gives each mount a device of its own, sharing nothing with another mount of the same giver", async () => {
@@ -181,7 +183,7 @@ describe("the provider", () => {
     await waitFor(() => { expect([one.container.textContent, other.container.textContent]).to.deep.equal(['locked jokes', 'locked jokes']) })
     const [oneDevice, otherDevice] = world._cheat_devices() as [Device, Device]
     expect(world._cheat_devices()).to.have.lengthOf(2)
-    expect([oneDevice.device_tok === otherDevice.device_tok, oneDevice.minder.queryClient === otherDevice.minder.queryClient]).to.deep.equal([false, false])
+    expect([oneDevice.device_tok === otherDevice.device_tok, oneDevice.queryClient === otherDevice.queryClient]).to.deep.equal([false, false])
     await act(() => oneDevice.bank!.gate.unlock({ passphraseCleartext: Passphrase }))
     expect([one.container.textContent, other.container.textContent]).to.deep.equal(['unlocked jokes', 'locked jokes'])
   })
@@ -190,11 +192,11 @@ describe("the provider", () => {
     const { world, result, unmount } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' })
     await waitFor(() => { expect(result.current).to.eq('locked') })
     const device = world._cheat_device()
-    expect(world.Bank.queryClient()).to.eq(device.minder.queryClient)
+    expect(world.Bank.queryClient()).to.eq(device.queryClient)
     unmount()
     await TH.expectRefusal(world.Bank.withWhisper(TH.JokesPath, (whisper) => whisper), 'absent_vault')
     TH.expectSyncRefusal(() => world.Bank.unlockGating({ passphraseCleartext: Passphrase }), 'absent_vault')
-    expect(world.Bank.queryClient()).to.not.eq(device.minder.queryClient)
+    expect(world.Bank.queryClient()).to.not.eq(device.queryClient)
     expect(device.getSnapshot().bank.stage).to.eq('locked')
   })
 
@@ -205,9 +207,9 @@ describe("the provider", () => {
     const other = render(TH.providerTreeOf(world, <StageProbe />, { userid: TH.ProviderUser }))
     await waitFor(() => { expect([one.container.textContent, other.container.textContent]).to.deep.equal(['locked', 'locked']) })
     const [, otherDevice] = world._cheat_devices()
-    expect(world.Bank.queryClient()).to.eq(otherDevice!.minder.queryClient)
+    expect(world.Bank.queryClient()).to.eq(otherDevice!.queryClient)
     one.unmount()
-    expect(world.Bank.queryClient()).to.eq(otherDevice!.minder.queryClient)
+    expect(world.Bank.queryClient()).to.eq(otherDevice!.queryClient)
     other.unmount()
     TH.expectSyncRefusal(() => world.Bank.unlockGating({ passphraseCleartext: Passphrase }), 'absent_vault')
   })
@@ -596,7 +598,7 @@ async function renderUnlocked<ResultT>(hook: (world: TH.ProviderWorld) => Result
   const rendered = await renderUnder(hook, { stored: 'jokes' })
   const device = await waitFor(() => rendered.world._cheat_device())
   await act(async () => {
-    await device.hello()
+    await device.signIn(TH.ProviderUser)
     await device.bank!.gate.unlock({ passphraseCleartext: Passphrase })
   })
   return rendered
@@ -973,7 +975,7 @@ async function renderKeyEditor(opts: Partial<PutBoxActionOpts> = {}) {
   const rendered = render(TH.providerTreeOf(world, <editor.KeyEditor />, { userid: TH.ProviderUser }))
   const device = await waitFor(() => world._cheat_device())
   await act(async () => {
-    await device.hello()
+    await device.signIn(TH.ProviderUser)
     await device.bank!.gate.unlock({ passphraseCleartext: Passphrase })
   })
   return { world, ...editor, ...rendered }
@@ -1152,7 +1154,7 @@ async function renderMutationKeyEditor(opts: Partial<PutBoxActionOpts> = {}) {
   const rendered = render(TH.providerTreeOf(world, <editor.KeyEditor />, { userid: TH.ProviderUser }))
   const device = await waitFor(() => world._cheat_device())
   await act(async () => {
-    await device.hello()
+    await device.signIn(TH.ProviderUser)
     await device.bank!.gate.unlock({ passphraseCleartext: Passphrase })
   })
   return { world, ...editor, ...rendered }
