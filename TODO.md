@@ -133,8 +133,11 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
 * **A marker on the parts for session-replay tools.** A revealed secret is plain text in the DOM, and a replay tool
   records it. Give `WhisperText`, `WhisperInput` and `PassphraseInput` a stable attribute a host can tell its replay
   tool to mask (docs/threat-model.md, *Not built yet*; the Coach, 2026-11-23).
-* **Mask a revealed field again** when the tab is hidden, or on a timer: "Masking a field at the tab-sleep notification
-  or a timer is quite reasonable" (the Coach, 2026-11-23).
+* **`MaskingPolicy`: one name for where and when text is masked.** "To define the space-time extent of masked text"
+  (the Coach, 2026-11-23). Its space half is today's `MaskSchedule`, the map from a text's length to how many stars show
+  and how many characters from each end; rename it when `mask` is ported out of `safebyok-big`. Its time half is not
+  built: a revealed field masks again when the tab is hidden, or on a timer ("Masking a field at the tab-sleep
+  notification or a timer is quite reasonable").
 * **A freshness bound on the gate.** A lease stands until this device hears of a newer gate revision, however long
   that takes. Let a host set a period within which the gate must be confirmed from the vaultDB for the lease to stand.
   Void against whoever controls the clock (the Coach, 2026-11-23).
