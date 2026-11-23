@@ -9,7 +9,7 @@ import * as Phrases from '../phrases'
 import type { BadAnswer, GoodAnswer, Kids, VaultDB } from '../storage/vault-db'
 import type { Banklabel, BoxLabelpath, EpochMillis, Labelpath, Lifepath, Lifeseq, Revtok, Userid } from './primitives'
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, ThingChecks, ThingFormat } from './shapes-thing'
-import { type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, AskChecks } from './shapes-asks'
+import { type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope } from './shapes-asks'
 import type { BankAskDraft } from './shapes-bankish'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis
@@ -26,7 +26,7 @@ export const DefaultQueryCacheOpts: Readonly<QueryCacheOpts> = Object.freeze({ s
 // Each is an option a client's defaults could set, and that would change what lands in the cache, what a fetch answers
 // the minder, or when a fetch runs. Options only an observer reads (refetchInterval, the refetchOn* and enabled) are left
 // to whoever observes: the minder has no observer, and an observer's fetch still lands through the minder's queryFn.
-/** The TanStack Query options of every minder's queries, set by `makeClient`, which no host can change: a get asks the vaultDB even offline, is never retried, and its item stays cached until `goodbye`. */
+/** The TanStack Query options of every minder's queries, which no host can change: a get asks the vaultDB even offline, is never retried, and its item stays cached until `goodbye`. */
 export const FixedQueryCacheOpts = Object.freeze({
   // Under TanStack's own networkMode, 'online', a get made while the browser reports itself offline waits, and so does its caller.
   networkMode:     'always',
@@ -68,8 +68,9 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
   }).strict()
   // A field left out, or the whole, defaults from DefaultQueryCacheOpts.
   const queryCacheOptsOrDefault = orDefault(queryCacheOpts, DefaultQueryCacheOpts)
-  // A live object passes whole where these checks pass: parsing it would hand back a copy, its getters read once.
-  const friendFields     = obj({ scope: AskChecks.thingWatchScope, makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
+  // A live object passes whole where these checks pass: parsing it would hand back a copy, its getters read once. Its
+  // scope is not read: a device's refuses until `signIn`, and a minder reads it at each use.
+  const friendFields     = obj({ makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.MinderFriendExpected)
   const minderListener   = fn<(event: MinderEvent) => void>()
   const feedVersion      = lit(MinderEventFormat, Phrases.FeedVersionOther)
@@ -107,6 +108,7 @@ export type MinderInvalidateOpts = Z.input<typeof MinderChecks.minderInvalidateO
  * A Device is one, and so is a {@link Bank}.
  */
 export interface MinderFriend {
+  /** The bank's scope, which the minder reads at each use, never at its making: it may refuse until the bank is known. */
   readonly scope:   ThingWatchScope
   /** The get ask for the Thing at `ask.labelpath` in the bank. */
   makeGetAsk(ask: BankAskDraft): GetAsk
@@ -291,7 +293,5 @@ export interface MinderOpts {
   vaultDB:         VaultDB
   /** The cache's timings ({@link QueryCacheOpts}). A field left out defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?: Partial<QueryCacheOpts>
-  /** The client to cache in, made by `makeClient`, which minders of other banks may share. Default: a client of its own. */
-  queryClient?:    TSQ.QueryClient | undefined
 }
 // --

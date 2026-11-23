@@ -1,12 +1,11 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, PersisterExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, BankNotBroughtUp, NobodySignedIn, GateSwept, UnlockDismissed, HostedVaultExpected, BoxSoonestBare
+// == [Models]: VaultDBExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, BankNotBroughtUp, NobodySignedIn, GateSwept, UnlockDismissed, HostedVaultExpected, BoxSoonestBare
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
 
 /** A device's persister that lacks one of a TanStack Query Persister's members. */
-export const PersisterExpected = 'Expected a TanStack Query Persister: an object with the functions persistClient, restoreClient and removeClient.'
 
 /** A sealer that lacks one of its methods, its tags or its purposes. */
 export const SealerExpected = 'Expected a sealer: its tags, its purposes, and a function for each of its methods.'
@@ -144,7 +143,7 @@ export const BankRootsMissing = "A bank is stored without its main gate or its r
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: MinderFriendExpected, NotMinded, WorldNotHeard, MinderClientExpected, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, DeliveredOfOtherScope, ChildrenStoredDamaged
+// == [Minding]: MinderFriendExpected, NotMinded, WorldNotHeard, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, DeliveredOfOtherScope, ChildrenStoredDamaged
 
 /** A minder made without a friend: a device or a bank. */
 export const MinderFriendExpected = 'A minder is made with its friend: the device or bank whose Things it minds.'
@@ -154,9 +153,6 @@ export const NotMinded = "A minder writes only the Things it minds: a VaultMinde
 
 /** A Bank made of a bank whose world its device's BankMinder does not hold. */
 export const WorldNotHeard = "A Bank is made of the bank whose world its device's BankMinder holds: bring the device up, or birth the bank, first."
-
-/** A minder made with a QueryClient that VaultMinder.makeClient did not make. */
-export const MinderClientExpected = 'A minder caches only in a QueryClient made by makeClient, on VaultMinder or BankMinder, whose cache hands each fetched record to its minder.'
 
 /** A minder read or written through before `hello`, or after `goodbye`. */
 export const MinderNotStarted = 'This minder is not minding: call hello before reading from it or writing through it.'

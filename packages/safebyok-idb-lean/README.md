@@ -22,20 +22,20 @@ Hand it to the core wherever a `VaultDB` is asked for.
   `IdbVaultDB`s made with the same `dbName`, in one tab or two, share the Things.
 * An option it cannot use is refused with `bad_record`.
 
-To keep a device's caches between page loads, hand it an `IdbPersister` for its roots, and a function giving one for
-each bank's boxes:
+To keep a device's caches between page loads, hand it two functions, each giving an `IdbPersister` for a bank: one for
+its roots, one for its boxes:
 
 ```ts
 function reportRefusal(news: VaultError) { console.warn(news.message) }
 
 const persisters = {
-  roots: new IdbPersister({ recordlabel: 'roots', dbName: 'acme', onBadNews: reportRefusal }),
+  roots: ({ userid, banklabel }) => new IdbPersister({ recordlabel: `roots:${userid}:${banklabel}`, dbName: 'acme', onBadNews: reportRefusal }),
   boxes: ({ userid, banklabel }) => new IdbPersister({ recordlabel: `boxes:${userid}:${banklabel}`, dbName: 'acme', onBadNews: reportRefusal }),
 }
 const device = Device.make(record, { vaultDB, persisters, onBadNews: ({ news }) => { reportRefusal(news) } })
 ```
 
-The device restores the roots at `hello`, and the signed-in bank's boxes at `signIn`. Every bank's record stays stored.
+The device restores the signed-in bank's roots and boxes at `signIn`. Every bank's records stay stored.
 The device's `onBadNews` hears of a restore that fails, and each persister's of a save that fails: report both in one
 place, as here.
 

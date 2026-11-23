@@ -10,7 +10,7 @@ import { persistShelfOf } from './persist-shelf'
 // == [Options]: IdbPersisterOpts, idbPersisterOpts
 
 /** Options for {@link IdbPersister}:
- * - `recordlabel` -- names the record the snapshot is kept in; give each of a device's persisters its own, say `roots`, and `boxes:<userid>:<banklabel>` for each bank's boxes
+ * - `recordlabel` -- names the record the snapshot is kept in; give each of a device's persisters its own, say `roots:<userid>:<banklabel>` and `boxes:<userid>:<banklabel>` for each bank's two
  * - `dbName`     -- scopes the database name: `safebyok-<dbName>:…`, or `safebyok:…` if left out
  * - `throttleMs` -- the least time between two writes to IndexedDB (default: 1000)
  * - `onBadNews`  -- called with the refusal of each write that fails (default: a no-op)

@@ -1,4 +1,4 @@
-/** `VaultMinder`, which minds the boxes of one bank in a TanStack Query cache, its own or one it shares with minders of other banks. */
+/** `VaultMinder`, which minds the boxes of one bank in a TanStack Query cache of its own. */
 
 import { Validator } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
@@ -11,7 +11,7 @@ import { Minder, MinderOptsChecks } from './minder'
 export class VaultMinder extends Minder {
   // == [Construction]: make, constructor
 
-  /** Make a minder of the boxes in `bank`. It does nothing until `hello`. */
+  /** Make a minder of the boxes in `bank`, with a QueryClient of its own. It does nothing until `hello`. */
   static make(opts: MinderOpts, bank: MinderFriend): VaultMinder {
     const checked = Checks.vaultMinderMakeArgs.parse({ opts, bank })
     return new VaultMinder(checked.opts, checked.bank)
