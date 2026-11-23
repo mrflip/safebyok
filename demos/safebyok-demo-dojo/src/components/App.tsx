@@ -2,13 +2,14 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { SOK, hostQueryClient } from '../lib/dojo'
 import { sessionUserid } from '../lib/session'
+import { FormsTab } from './forms/FormsTab'
 import { Header } from './Header'
 import { InspectTab } from './InspectTab'
 import { LoginTab } from './LoginTab'
 import { NewBoxTab } from './NewBoxTab'
 
 /** The tabs, in order, with their titles. */
-const TabTitles = { login: 'Login', box: 'New Box', inspect: 'Inspect' } as const
+const TabTitles = { login: 'Login', box: 'New Box', forms: 'Forms', inspect: 'Inspect' } as const
 
 /** One of the tabs. */
 type Tabkind = keyof typeof TabTitles
@@ -43,6 +44,7 @@ export function App() {
           </nav>
           <div hidden={tab !== 'login'}><LoginTab userid={userid} /></div>
           <div hidden={tab !== 'box'}><NewBoxTab userid={userid} /></div>
+          <div hidden={tab !== 'forms'}><FormsTab userid={userid} /></div>
           <div hidden={tab !== 'inspect'}><InspectTab isShown={tab === 'inspect'} /></div>
         </main>
       </SOK.Provider>

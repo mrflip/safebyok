@@ -8,5 +8,10 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- Not React: it reads each Forms row's secret input from the DOM, and writes what it finds beside the row. -->
+    <script type="module">
+      import { startMirror } from '/src/lib/mirror.ts'
+      startMirror()
+    </script>
   </body>
 </html>

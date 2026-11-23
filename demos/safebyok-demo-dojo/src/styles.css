@@ -47,3 +47,10 @@ nav button[aria-pressed="true"] { background: var(--accent); color: var(--card);
 .readout { border-collapse: collapse; margin-top: 0.75rem; }
 .readout caption { text-align: left; font-weight: 600; }
 .readout th, .readout td { border: 1px solid var(--line); padding: 0.2rem 0.6rem; text-align: left; }
+.formrow-frame { margin: 0.75rem 0; padding-top: 0.5rem; border-top: 1px solid var(--line); }
+.formrow-head { margin: 0 0 0.25rem; font-size: 0.85rem; }
+form.formrow { display: grid; grid-template-columns: 8rem 8rem 3.5rem 3.5rem 3.5rem 14rem 14rem 1fr; gap: 0.4rem; align-items: center; height: 3.5rem; font-size: 0.8rem; }
+form.formrow > * { margin: 0; min-width: 0; }
+form.formrow button { padding: 0.2rem 0.3rem; }
+.mirror, .variables, .result { overflow-wrap: anywhere; max-height: 3.5rem; overflow: hidden; }
+.mirror, .variables { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; }
