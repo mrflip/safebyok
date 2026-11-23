@@ -6,7 +6,7 @@ describe("dump", () => {
       for (const routes of routeSetsOf(row.chain)) {
         const run = await runChain(row, routes)
         const hasListStep = row.chain.some(([liveness], ii) => (liveness === 'soon') && (routes[ii] === 'g'))
-        out.push({ key: `${InitialNames.get(row.initial)} ${JSON.stringify(row.chain)}`, routes, cache: withoutListing(run.cache), stale: run.cache.isListingStale === true, hasListStep, derived: lifeOf(run.cache) !== run.listedLife })
+        out.push({ key: `${InitialNames.get(row.initial)} ${JSON.stringify(row.chain)}`, routes, cache: withoutListing(run.cache), stale: run.cache.isListingStale === true, hasListStep, derived: lifeOf(run.cache) !== run.listedLife, refused: run.isRefused })
       }
     }
     const { writeFileSync } = await import('node:fs')
