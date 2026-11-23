@@ -1,7 +1,7 @@
 # Thread 1: dojo (2026-11-23)
 
-Branch `20261123-dojo`, PR #858, cut from `20261123-one_client` (#857, merged into main since). Proved: the demo's lint,
-typecheck, 12 tests and build; `pnpm justify` at ready.
+Branch `20261123-dojo`, PR #858, cut from `20261123-one_client` (#857), caught up onto main at 683175bef. Proved: `pnpm justify`
+green after the catch-up (the dojo's 12 tests among them).
 
 The findings, the readout table and the awkward list, are in [dojo-findings.md](dojo-findings.md): the Coach's read.
 
