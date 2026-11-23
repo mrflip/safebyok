@@ -622,3 +622,13 @@ Tip `d4b99a315`, CI green. Built as ruled: `keepTextIfRefused(event, onEmptied?)
 * **The flaky add-passkey test** (`passkey-forms.test.tsx`, "drops a wrong-passphrase message when the next attempt ends at a dismissed prompt") is fixed on #865 by the same two lines that sit uncommitted in the worktree `byok-test_races`.
 
 The ready line is now #861 ← #862 ← #863 ← #864 ← #865, every base `main`; merging #865 with a merge commit lands all five. #866 is ready on its own, from main.
+
+### The forms sketch approved (the Coach, 2026-11-23)
+
+The Coach on `whiteboard/20261123-react_poured/dream_interface.md`: "looks great", and a thumbs up. The session reads that as agreeing what the sketch proposes: `formClearing({ ifSuccess = 'clear', ifRefused = 'keep', onCleared }?)` with no `'call'` value, `usePutBox`, and `useDraft` as the editing mode. None is built; each is a thread to be issued.
+
+* **"Write always as a real developer would. I would not write these on one line, especially with the awaits."** The sketch's handlers are now named functions over several lines. The guides in `docs/` have the same one-line habit (`onSubmit={(event) => { event.preventDefault(); unlock.mutate(…) }}`) and still say `mutate` where #865 has `attempt`: owed when the guides are next rewritten.
+* **Callbacks inline.** The Coach asked whether any callback needs `useCallback` or to live up in scope. None does: React replaces a handler on a DOM element at no cost, and a hook is to read its options afresh on each render, as `useMutation` does; the sketch now says so, which binds `usePutBox`. Today `attempt` is a new function on every render, which matters only in an effect's dependencies or as a prop of a memoized child; the `formClearing` thread should make it stable, as TanStack's `mutate` is.
+* **The hydration guard:** "don't know what this is, as long as it is well tested I'm ok". It stays on `UnlockForm` alone. Tested (`tests/kit/unlock-form.test.tsx`): a server render has Unlock disabled, a click on it submits nothing, and once hydrated the button is enabled with no mismatch and React cancels the submit. Not tested: Enter in the field before hydration, which jsdom cannot run.
+* **#866's one row** (a get of the item already cached under a newer soon): "don't worry about the get/soon stuff that's being fixed". Dropped from this workshop's open matters.
+* **`docs/threat-model.md`** has the two whisper modes in its table of what a form keeps, and its *Not built yet* line on forms says what stands once #865 lands: the kit's two passkey forms and `putBoxAction` still empty after every outcome. #859 should merge after #865.

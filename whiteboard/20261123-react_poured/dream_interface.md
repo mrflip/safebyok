@@ -21,6 +21,9 @@ unlock.formClearing()                 // an onReset handler: what the form keeps
 A secret travels in the form, never in anything React or TanStack retains. `attempt` takes it out of
 the `FormData` before it first awaits.
 
+Every callback on this page can be written inline. None needs `useCallback`: a hook reads its options
+afresh on each render, as `useMutation` does.
+
 ## Three ways to submit
 
 ### Form Actions
@@ -41,7 +44,14 @@ Check the form's own fields before the Action starts, in `onSubmit`. Cancelling 
 nothing they typed.
 
 ```tsx
-<form action={save.attempt} onSubmit={(event) => { if (! showProblems(Fields.safeParse(textsOf(event.currentTarget)))) { event.preventDefault() } }}>
+function checkFields(event: FormEvent<HTMLFormElement>) {
+  const fields = Fields.safeParse(textsOf(event.currentTarget))
+  if (! fields.success) {
+    showProblems(fields.error)
+    event.preventDefault()
+  }
+}
+<form action={save.attempt} onSubmit={checkFields}>
 ```
 
 ### Keeping what was typed: `formClearing`
@@ -51,9 +61,14 @@ them when the attempt was refused, so a typo does not cost a long passphrase or 
 shows only once.
 
 ```tsx
-<form action={birth.attempt} onReset={birth.formClearing()}>                                // stored: emptied. Refused or failed: kept.
-<form action={save.attempt}  onReset={save.formClearing({ ifSuccess: 'keep' })}>           // a settings form: nothing goes away
-<form action={birth.attempt} onReset={birth.formClearing({ onCleared: newPassphrase.forget })}>   // run the host's own tidying whenever the form does empty
+// Stored: emptied. Refused or failed: kept.
+<form action={birth.attempt} onReset={birth.formClearing()}>
+
+// A settings form: nothing goes away.
+<form action={save.attempt} onReset={save.formClearing({ ifSuccess: 'keep' })}>
+
+// The host's own tidying, run whenever the form does empty.
+<form action={birth.attempt} onReset={birth.formClearing({ onCleared: newPassphrase.forget })}>
 
 formClearing({ ifSuccess = 'clear', ifRefused = 'keep', onCleared }?)
 //   The user's own Reset or Cancel always empties the form, and calls onCleared.
@@ -67,19 +82,27 @@ the one that must not: it opens beneath other work in progress, and has to show 
 
 ```tsx
 const unlock = useUnlock()
-<form method="post" onSubmit={(event) => { event.preventDefault(); void unlock.attempt(new FormData(event.currentTarget)) }}>
+function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  event.preventDefault()
+  void unlock.attempt(new FormData(event.currentTarget))
+}
+<form method="post" onSubmit={handleSubmit}>
   <PassphraseInput name="passphrase" autoFocus />
   <button disabled={unlock.isPending}>{unlock.isPending ? 'Unlocking…' : 'Unlock'}</button>
 </form>
 //   React never resets this form: the text stays through a refusal with no help.
+```
 
-// A handler's form that should empty once stored asks for its own reset, and formClearing decides as before.
-<form onReset={save.formClearing()} onSubmit={async (event) => {
+A handler's form that should empty once stored asks for its own reset, and `formClearing` decides as before.
+
+```tsx
+async function handleSubmit(event: FormEvent<HTMLFormElement>) {
   event.preventDefault()
-  const form = event.currentTarget
+  const form = event.currentTarget          // the event forgets it once the handler awaits
   await save.attempt(new FormData(form))
   form.reset()
-}}>
+}
+<form onSubmit={handleSubmit} onReset={save.formClearing()}>
 ```
 
 ### No form at all
@@ -87,7 +110,11 @@ const unlock = useUnlock()
 A passkey, a command palette, a test: hand `attempt` an object.
 
 ```tsx
-<button type="button" onClick={async () => { await unlock.attempt({ passkeyAnswer: await askPasskey(passkeyHeader) }) }}>Unlock with a passkey</button>
+async function unlockWithPasskey() {
+  const passkeyAnswer = await askPasskey(passkeyHeader)
+  await unlock.attempt({ passkeyAnswer })
+}
+<button type="button" onClick={unlockWithPasskey}>Unlock with a passkey</button>
 ```
 
 ## Four kinds of form
@@ -133,7 +160,9 @@ const save = usePutBox('openai', {
 <WhisperMask labelpath="openai" field="apiKey" />         {/* …1234 once stored */}
 
 // Testing the key before saving is a button, not a submit: the key stays in its field, and no variable has it.
-const test = useMutation({ mutationFn: () => checkKey(keyInput.current!.value) })
+const test = useMutation({
+  mutationFn: () => checkKey(keyInput.current!.value),
+})
 <button type="button" onClick={() => { test.mutate() }}>Test</button>
 ```
 
@@ -143,9 +172,12 @@ const test = useMutation({ mutationFn: () => checkKey(keyInput.current!.value) }
 save lands, typing during a save is kept, and a secret is veiled until the user asks to see it.
 
 ```tsx
-const draft = useDraft(labelpath)   // { sidecarField, whisperField, eye, isDirty, isSaving, isBehind, error, put, discard, rebase }
+const draft = useDraft(labelpath)
+//   { sidecarField, whisperField, eye, isDirty, isSaving, isBehind, error, put, discard, rebase }
+
 <input {...draft.sidecarField('username')} />
-<input {...draft.whisperField('password')} />             {/* veiled; shown while focused or while its eye is on; veiled again on blur */}
+{/* Veiled; shown while focused or while its eye is on; veiled again on blur. */}
+<input {...draft.whisperField('password')} />
 <button type="button" {...draft.eye('password')}><Eye /></button>
 <button disabled={! draft.isDirty || draft.isSaving} onClick={draft.put}>Save</button>
 <button disabled={! draft.isDirty} onClick={draft.discard}>Undo</button>
@@ -162,9 +194,16 @@ The form's own fields are not secret; its work needs one. The key is read inside
 nowhere else. On a locked vault the call waits for the user to unlock, and the form keeps what was typed.
 
 ```tsx
-const ask = useMutation({ mutationFn: (prompt: string) => vault.withWhisper('openai', ({ apiKey }) => callOpenAI(apiKey, prompt)) })
-<form onSubmit={(event) => { event.preventDefault(); ask.mutate(prompt) }}>
-  <textarea value={prompt} onChange={(event) => { setPrompt(event.target.value) }} />   {/* not a secret: ordinary state */}
+const [prompt, setPrompt] = useState('')                  // not a secret: ordinary state
+const ask = useMutation({
+  mutationFn: (prompt: string) => vault.withWhisper('openai', ({ apiKey }) => callOpenAI(apiKey, prompt)),
+})
+function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  event.preventDefault()
+  ask.mutate(prompt)
+}
+<form onSubmit={handleSubmit}>
+  <textarea value={prompt} onChange={(event) => { setPrompt(event.target.value) }} />
   <button disabled={ask.isPending}>Ask</button>
 </form>
 <UnlockDialog />                                          {/* once, at the root: opens while a call waits */}
@@ -194,10 +233,21 @@ Records suspend on their first fetch, forms are Actions, and no pending flag is 
 
 ```tsx
 const box = useSuspenseBox('openai')
-<form action={save.attempt} onReset={save.formClearing()}>…<SubmitButton whilePending="Saving…">Save</SubmitButton></form>
+<form action={save.attempt} onReset={save.formClearing()}>
+  …
+  <SubmitButton whilePending="Saving…">Save</SubmitButton>
+</form>
 
-const [shownTitle, showTitle] = useOptimistic(box.sidecar.title)   // a sidecar is not secret, so React may hold it
-<form action={async (form) => { showTitle(String(form.get('title'))); await vault.putBoxOnce(labelpath, { sidecar: { ...box.sidecar, title: String(form.get('title')) } }, {}) }}>
+// A sidecar is not secret, so React may hold it.
+const [shownTitle, showTitle] = useOptimistic(box.sidecar.title)
+async function rename(form: FormData) {
+  const title = String(form.get('title'))
+  showTitle(title)
+  await vault.putBoxOnce(labelpath, { sidecar: { ...box.sidecar, title } }, {})
+}
+<form action={rename}>
+  <input name="title" defaultValue={shownTitle} />
+</form>
 ```
 
 ### Next.js App Router
@@ -207,12 +257,27 @@ sees a passphrase or a key.
 
 ```tsx
 // app/settings/page.tsx: a Server Component
-export default function SettingsPage() { return <><h1>Settings</h1><ApiKeyForm /><UnlockDialog /></> }
+export default function SettingsPage() {
+  return (
+    <>
+      <h1>Settings</h1>
+      <ApiKeyForm />
+      <UnlockDialog />
+    </>
+  )
+}
 
 // components/api-key-form.tsx
 'use client'
-export function ApiKeyForm() { const save = usePutBox('openai', { whisperOf, sidecarOf }); … }
-//   <form action={save.attempt}> is a client Action. Never put 'use server' on a function that is handed a secret.
+export function ApiKeyForm() {
+  const save = usePutBox('openai', { whisperOf, sidecarOf })
+  return (
+    <form action={save.attempt} onReset={save.formClearing()}>
+      …
+    </form>
+  )
+}
+//   save.attempt is a client Action. Never put 'use server' on a function that is handed a secret.
 ```
 
 ### Headless, and shadcn
@@ -222,9 +287,15 @@ React; the form hooks are unchanged.
 
 ```tsx
 const field = usePassphraseField({ autoComplete: 'current-password' })
-<form method="post" onSubmit={(event) => { event.preventDefault(); void unlock.attempt(new FormData(event.currentTarget)) }}>
+function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  event.preventDefault()
+  void unlock.attempt(new FormData(event.currentTarget))
+}
+<form method="post" onSubmit={handleSubmit}>
   <Input name="passphrase" {...field.inputProps} />        {/* type, id, the handlers: never a value */}
-  <Button type="button" variant="ghost" {...field.toggleProps}>{field.isRevealed ? <EyeOff /> : <Eye />}</Button>
+  <Button type="button" variant="ghost" {...field.toggleProps}>
+    {field.isRevealed ? <EyeOff /> : <Eye />}
+  </Button>
   <Button type="submit" disabled={unlock.isPending}>Unlock</Button>
 </form>
 ```
@@ -236,7 +307,16 @@ its input.
 
 ```tsx
 const { register, handleSubmit, reset } = useForm<{ title: string }>()
-<form ref={formRef} onReset={save.formClearing({ onCleared: () => { reset() } })} onSubmit={handleSubmit(async () => { await save.attempt(new FormData(formRef.current!)); formRef.current!.reset() })}>
+const formRef = useRef<HTMLFormElement>(null)
+
+const onValid = handleSubmit(async () => {
+  const form = formRef.current!
+  await save.attempt(new FormData(form))
+  form.reset()
+})
+const onReset = save.formClearing({ onCleared: () => { reset() } })
+
+<form ref={formRef} onSubmit={onValid} onReset={onReset}>
   <input {...register('title', { required: true })} />
   <WhisperInput name="apiKey" />                          {/* not registered */}
 </form>

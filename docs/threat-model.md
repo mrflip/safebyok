@@ -116,17 +116,26 @@ Two different things empty a form, and only one is the library's.
 None of the threats above is served by emptying a field the user is still working in: the text is
 in the same masked input they typed it into. So the target is what a careful ordinary form does.
 
-| Outcome | Passphrase and its confirmation | Whisper field | Other fields |
-|---|---|---|---|
-| Stored | Cleared | Cleared | The app's choice |
-| Refused, and the user can mend it: wrong, weak, already exists, stale | Kept | Kept | Kept |
-| Failed: storage, network | Kept | Kept | Kept |
-| The user cancels the form | Cleared | Cleared | Cleared |
-| The user dismisses an unlock prompt the form opened | No such field | Kept | Kept |
+A form with a whisper in it is one of two kinds, and they differ in what stays once a save lands.
+
+* **Committing a box:** "take this away and store it; my next steps are elsewhere." Adding an API
+  key. Once stored, the secret leaves the form, and shows only masked.
+* **Editing a box:** "apply my change while I keep working." A settings table, an env editor.
+  Nothing leaves the form when a save lands, and a secret is veiled until the user asks to see it.
+
+| Outcome | Passphrase and its confirmation | Whisper, committing | Whisper, editing | Other fields |
+|---|---|---|---|---|
+| Stored | Cleared | Cleared | Kept, veiled | The app's choice |
+| Refused, and the user can mend it: wrong, weak, already exists, stale | Kept | Kept | Kept | Kept |
+| Failed: storage, network | Kept | Kept | Kept | Kept |
+| The user cancels the form | Cleared | Cleared | Back to what is stored | Cleared |
+| The user dismisses an unlock prompt the form opened | No such field | Kept | Kept | Kept |
 
 * **What clearing costs.** A provider shows an API key once: a form that empties the key on a
   refused save makes the user mint a new one. A long passphrase cleared for one typo is typed
   again in full.
+* **What editing costs.** The secret rests in its field for as long as the user works there:
+  the third clock under *Time*. It is veiled, and a lock clears it.
 * **While the submit runs.** Leaving the text in its field adds almost nothing. The cleartext is
   in the library's methods for those seconds anyway, and a script that could read the field then
   could read it before the submit.
@@ -149,8 +158,10 @@ in the same masked input they typed it into. So the target is what a careful ord
 * **A second lease clock, for idleness,** as a host's option beside the lease's length.
 * **A freshness bound on the gate:** a lease that needs its gate confirmed from the vaultDB within
   a period the host sets.
-* **Forms that keep their text through a refusal.** Today the kit's forms, other than its two
-  unlock forms, are form Actions, and are emptied after every outcome.
+* **Every form keeping its text through a refusal, and the two whisper modes.** Today the kit's
+  forms that create a vault, unlock it and replace a passphrase keep theirs. Its two passkey forms
+  are emptied after every outcome, and so is a box committed through `putBoxAction`. A draft is
+  discarded when its `put` lands, where editing should keep it.
 * **Clearing a secret left in a field when the bank locks.**
 * **Re-keying.** Nothing replaces a bankKey. Every other key encrypts once: a whisper is sealed under a fresh key at
   every write, and a wayin's or a lease's key wraps the bankKey once. The bankKey wraps one fresh key for every seal
