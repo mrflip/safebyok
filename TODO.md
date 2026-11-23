@@ -164,4 +164,7 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   verbs, which settle what a host is handed (the Coach, 2026-11-23).
 * **`Knock.queryClient()` becomes `Knock.vaultTsqClient()`,** in a later pass: it is the vault TSQ, as
   `device.vaultTsqClient` already says (the Coach, 2026-11-23).
+* **Remove the core's older gate verbs** (`gate.unlock({…})` and its siblings) once their tests, about 75 call
+  sites, are moved onto the form verbs (`gate.gatingUnlockAttempt` and its siblings). `popField` and the makers'
+  `isInCleartextNames` bridge go with them (the Coach, 2026-11-23).
 
