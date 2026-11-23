@@ -108,10 +108,13 @@ describe("VaultMinder's item behind a newer sparse record", () => {
     await observeItem(minder, async () => {
       vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, TH.boxThingOf())
       await TH.expectRefusal(minder.get(TH.BoxScope, { staleTime: 0 }), 'stale_read')
-      const box2 = TH.nextOf(box)
+      const asked = vi.spyOn(vaultDB, 'tryGetThing')
+      const box2  = TH.nextOf(box)
       cheatBox(vaultDB, box2)
       receive(sparseNoticeOf(box2))
       await TH.eventually(() => minder.at(TH.BoxScope)?.revseq === 2)
+      await TH.eventually(() => ! minder.queryClient.isFetching())
+      expect([minder.isBehindAt(TH.BoxScope), asked.mock.calls.length]).to.deep.equal([false, 1])
     })
   })
 
