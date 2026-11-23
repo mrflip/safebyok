@@ -1,7 +1,7 @@
 # Thread 14: one_client (2026-11-23)
 
 Branch `20261123-one_client`, PR [#857](https://github.com/mrflip/safebyok/pull/857), stacked on [#856](https://github.com/mrflip/safebyok/pull/856). Proved: `safebyok`
-1445 tests, `safebyok-idb-lean` 112, `safebyok-react-lean` 307 (no source change), lint and typecheck of all three.
+1445 tests, `safebyok-idb-lean` 112, `safebyok-react-lean` 307 (no source change), lint and typecheck of all three; `pnpm justify` green after the catch-up.
 
 A removal: one minder, one QueryClient, made together. No new machinery was needed.
 
