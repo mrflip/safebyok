@@ -1,7 +1,7 @@
 import { fireEvent, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { Fixture } from '../../src/lib/fixture'
-import { vaultRowsNow } from '../../src/lib/stores'
+import { cacheRowsNow, vaultRowsNow } from '../../src/lib/stores'
 import * as TH from '../test-helpers'
 
 describe('Reset', () => {
@@ -21,6 +21,7 @@ describe('Reset', () => {
     await TH.reloadPage()
 
     expect(await vaultRowsNow()).to.deep.equal(Fixture.vault)
+    expect(await cacheRowsNow()).to.have.deep.members(Fixture.cache)
     expect(screen.getByText('Nobody is signed in.')).to.exist
     const inspect = TH.showTab('Inspect', 'Inspect')
     await within(inspect).findByText('-- Bank (2) --')
