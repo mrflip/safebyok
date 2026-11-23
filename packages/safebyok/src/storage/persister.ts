@@ -7,24 +7,24 @@ export type { PersistedClient, Persister } from '@tanstack/query-persist-client-
 
 // == [The plug]: DevicePersisters, PersisterOfBank, isPersister, PersisterMembernames
 
-/** Where a device keeps its two caches between page loads, through TanStack Query `Persister`s.
- * `roots` keeps every user and bank's bank, main gate and root box, and the device restores it at `hello`. `boxes` gives
- * the persister of one bank's boxes and their listings, and the device restores the signed-in bank's at `signIn`: give
- * each bank a record of its own, say `boxes:<userid>:<banklabel>`. Every bank's record stays stored until the host
- * removes it.
+/** Where a device keeps its two caches between page loads, through TanStack Query `Persister`s, one of each per bank.
+ * `roots` gives the persister of one bank's bank, main gate and root box, and `boxes` the persister of its boxes and
+ * their listings. The device restores the signed-in bank's two at `signIn`, before it asks the vaultDB anything: give
+ * each its own record, say `roots:<userid>:<banklabel>` and `boxes:<userid>:<banklabel>`. Every bank's records stay
+ * stored until the host removes them.
  * A persister is handed its whole snapshot at every change to the cache: over slow storage, throttle the writes, as
  * TanStack's stock persisters do. The device tells its `onBadNews` of a restore that fails, and nothing of a save: have
  * each persister report a failed save where `onBadNews` reports.
  * @example
  * const persisters = {
- *   roots: new IdbPersister({ recordlabel: 'roots', onBadNews: reportRefusal }),
+ *   roots: ({ userid, banklabel }) => new IdbPersister({ recordlabel: `roots:${userid}:${banklabel}`, onBadNews: reportRefusal }),
  *   boxes: ({ userid, banklabel }) => new IdbPersister({ recordlabel: `boxes:${userid}:${banklabel}`, onBadNews: reportRefusal }),
  * }
  * const device = Device.make(record, { vaultDB, persisters, onBadNews: ({ news }) => { reportRefusal(news) } })
  */
-export type DevicePersisters = Readonly<{ roots: Persister, boxes: PersisterOfBank }>
+export type DevicePersisters = Readonly<{ roots: PersisterOfBank, boxes: PersisterOfBank }>
 
-/** The `Persister` of the boxes of the bank at `scope`, as {@link DevicePersisters} takes it. Called once, at `signIn`. */
+/** The `Persister` of one of the caches of the bank at `scope`, as {@link DevicePersisters} takes it. Called once, at `signIn`. */
 export type PersisterOfBank = (scope: BankScope) => Persister
 
 /** True for an object with a function for each of a `Persister`'s three members. */

@@ -98,7 +98,7 @@ describe("a device restored through IdbPersisters", () => {
     const dbName = freshDbName()
     function persistersOf(): DevicePersisters {
       return {
-        roots: new IdbPersister({ recordlabel: 'roots', dbName, throttleMs: 0, onBadNews: noop }),
+        roots: ({ userid, banklabel }) => new IdbPersister({ recordlabel: `roots:${userid}:${banklabel}`, dbName, throttleMs: 0, onBadNews: noop }),
         boxes: ({ userid, banklabel }) => new IdbPersister({ recordlabel: `boxes:${userid}:${banklabel}`, dbName, throttleMs: 0, onBadNews: noop }),
       }
     }

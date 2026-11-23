@@ -1,4 +1,4 @@
-/** `BankMinder`, which minds one bank's roots, the bank, its main gate and its root box, in a TanStack Query cache, its own or one it shares with minders of other banks. */
+/** `BankMinder`, which minds one bank's roots, the bank, its main gate and its root box, in a TanStack Query cache of its own. */
 
 import { Validator } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
@@ -15,7 +15,7 @@ import * as Throwers from '../refusals/throwers'
 export class BankMinder extends Minder {
   // == [Construction]: make, constructor
 
-  /** Make a minder of `bank`'s roots. It does nothing until `hello`. */
+  /** Make a minder of `bank`'s roots, with a QueryClient of its own. It does nothing until `hello`. */
   static make(opts: MinderOpts, bank: MinderFriend): BankMinder {
     const checked = Checks.bankMinderMakeArgs.parse({ opts, bank })
     return new BankMinder(checked.opts, checked.bank)

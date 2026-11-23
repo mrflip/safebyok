@@ -90,7 +90,7 @@ export interface DeviceOpts {
   onBadNews?:       BadNewsHandler | undefined
   /** The defaults each user's minder sets on its items and lists in the device's QueryClient. A missing field defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?:  Partial<QueryCacheOpts> | undefined
-  /** Where the device keeps its caches between page loads, restored at `hello`. Without them, each page load starts with its caches empty. */
+  /** Where the device keeps the signed-in bank's caches between page loads, restored at `signIn` before the vaultDB is asked anything. Without them, each page load starts with its caches empty. */
   persisters?:      DevicePersisters | undefined
   /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
   deviceDB?:        unknown
