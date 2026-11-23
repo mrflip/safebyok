@@ -155,4 +155,13 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   lease's own enumerable fields are still its stamp: whole tokens, and no `isEvicted`, so `{ ...lease }` differs from
   `lease.loggable`. Make them agree, keep the stamp as a getter for what a ctx binds, and retire `LeaseSparse`, which
   nothing answers since `toJSON` answers the loggable (the Coach, 2026-11-23, dojo_backdoor's second review).
+  "`LeaseStamp` should be the stamp, lease sparse doesn't sound useful as a type" (the Coach, 2026-11-23).
+* **Wayin and Proving break the spread rule.** `{ ...wayin }` shows its whole record, the wrapped bankKey included, and
+  `{ ...proving }` its header's salts and credential id. STYLE.md's rule is that a spread shows only what belongs in a
+  log. Device, Bank, Gate, Vault and Gating keep it; fix these two (the Coach, 2026-11-23).
+* **Whether a box's record keeps the spread rule.** No box model is ever made: a box is handed out as a `BoxRecord`,
+  whose spread shows `whisper_sealed`, so Thing's promise about its spread is empty for a box. Decide it with the form
+  verbs, which settle what a host is handed (the Coach, 2026-11-23).
+* **`Knock.queryClient()` becomes `Knock.vaultTsqClient()`,** in a later pass: it is the vault TSQ, as
+  `device.vaultTsqClient` already says (the Coach, 2026-11-23).
 
