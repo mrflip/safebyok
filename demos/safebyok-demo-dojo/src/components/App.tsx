@@ -7,9 +7,10 @@ import { Header } from './Header'
 import { InspectTab } from './InspectTab'
 import { LoginTab } from './LoginTab'
 import { NewBoxTab } from './NewBoxTab'
+import { PracticeTab } from './practice/PracticeTab'
 
 /** The tabs, in order, with their titles. */
-const TabTitles = { login: 'Login', box: 'New Box', forms: 'Forms', inspect: 'Inspect' } as const
+const TabTitles = { login: 'Login', box: 'New Box', forms: 'Forms', practice: 'Practice', inspect: 'Inspect' } as const
 
 /** One of the tabs. */
 type Tabkind = keyof typeof TabTitles
@@ -45,6 +46,7 @@ export function App() {
           <div hidden={tab !== 'login'}><LoginTab userid={userid} /></div>
           <div hidden={tab !== 'box'}><NewBoxTab userid={userid} /></div>
           <div hidden={tab !== 'forms'}><FormsTab userid={userid} /></div>
+          <div hidden={tab !== 'practice'}><PracticeTab userid={userid} /></div>
           <div hidden={tab !== 'inspect'}><InspectTab isShown={tab === 'inspect'} /></div>
         </main>
       </SOK.Provider>

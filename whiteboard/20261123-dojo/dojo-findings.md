@@ -152,6 +152,98 @@ Read with it:
 * **The Inspect tab cannot show row 8's variables**: it prints a `FormData` as `[object FormData]`. The Variables cell
   and the test read the host's mutation cache instead.
 
+## What each Practice card shows
+
+The Practice tab (thread 5) has a card for each thing a careful form with a secret does: a working example to copy, a
+line or two on why, and the thing not to do beside it where there is one. Each card's claims are asserted by
+`tests/components/practice/<Card>.test.tsx` under jsdom (over fake-indexeddb, for a card that saves); "read" marks what was
+only read, in react-dom's source or elsewhere, and not run. Nobody has looked at the tab in a real browser.
+
+Where a test says the secret is in no React state, `TH.fiberHolds` walked every fiber of the page's tree, current and
+alternate: each hook's state, queue and skipped updates (`baseQueue`), each component's props, each form's status,
+`FormData` values included. It reads plain data only: a closure (what a debounce holds), a `Map` or `Set`, and a
+`#private` field are out of its reach, and so TanStack Query's caches are. It finds the key in the double-submit card's
+queued form status (item 2), and `tests/test-helpers/fiber-holds.test.tsx` pins its reach into `baseQueue`, so it is
+not blind.
+
+1. **Hold the submit until zod passes, and show each message by its field** (`ValidateCard`). The check runs in
+   `onSubmit`, reading `new FormData(form)`, and calls `preventDefault()` when zod refuses: react-dom 19.3.1 starts a
+   form Action only when the submit event was not default-prevented (`extractEvents$1`, read), so no action runs, no
+   reset comes, and nothing goes into the form's status, unless the handler itself started a transition, when React puts
+   the form's `FormData` in its status all the same (read) (run: no save, both fields kept, the first bad field
+   focused). Only the messages are in state; once one shows, the form checks itself again on each change, so a mended
+   field's message clears (run). Each message is the `aria-describedby` of its field, which is `aria-invalid` while it
+   has one (run). A zod 4 issue carries no copy of the input: the messages are the schema's own, the card's text never
+   holds the key, and the fiber walk finds it nowhere (run). The **Don't** runs the same check inside the form Action:
+   React resets the form once the action returns, so the messages sit beside emptied fields (run). **Where the check has
+   to run**, then: in `onSubmit`, before React starts the action. Inside the action it comes too late to keep what was
+   typed, unless the form also cancels its reset as Forms row 1 does.
+2. **Disable the submit while the save is pending** (`DoubleSubmitCard`, real saves held by the dojo's vaultDB). The
+   library's `SubmitButton` is disabled from the first press until the save ends; a press on it then starts nothing, and
+   React's form status holds only the name, the library having deleted the key before its first await (run). The
+   **Don't**, a plain enabled button pressed twice: `useActionState` queues the second submit, React's form status shows
+   `keyname, apiKey`, and the fiber walk finds the key; both saves land, and once they have, the walk finds it nowhere
+   (run). Between those, by one run of the reviewer's, not asserted: the key leaves the queued `FormData` when the first
+   save ends and the second action, starting, deletes it; React commits neither save's result until both have ended, so
+   the status line keeps reading `keyname, apiKey` until then, and no "Saves ended: 1" is ever shown. This is the
+   second-submit item of *React's form status, by experiment*, above, shown.
+3. **Don't debounce a secret's check or its submit** (`DebounceCard`, es-toolkit 1.53.2's `debounce`, with the dojo's
+   made-up service and save; fake timers). Run: a debounced check typed into and then cleared (`form.reset()`, which
+   fires no change) fires after its wait with the 24-character key, the field then holding nothing; one whose form was
+   removed fires too ("the form was gone"); nothing fires before the wait ends. es-toolkit releases what it holds once
+   it fires or is cancelled (read, its source), so it holds the key exactly until it fires, and no longer. A debounced
+   submit merges the presses within its wait into one save, which is a guard of a sort; but a press after the wait while
+   the save is still pending starts a second save, the two running together (run). **The brief's "it only delays the
+   second one" is not quite true**: within its wait it merges the presses into one call, with the last press's arguments
+   (read, its source); after it, it lets the next press through. The right tools beside it: the submit disabled while
+   pending (run: two presses, one save), a test on a button press (item 9), and for a check as the user types, the
+   latest answer only, as `useStrengthVerdict` does (read, its `judgeseq`). Not shown: firing after the bank locks,
+   which is the same timer and was not run. lodash is not a dependency here (only `lodash.merge`).
+4. **Invite a password manager to the passphrase, and disinvite it from a key** (`PasswordManagerCard`). The kit's
+   `UnlockForm`, handed `username`, renders a real form, a hidden `username` field with `autocomplete="username"`, and
+   `name="passphrase"` with `type="password"` and `autocomplete="current-password"` (run); it unlocks the bank (run).
+   `useNewPassphrase` gives each new field `autocomplete="new-password"` (read; item 5 renders it). The key's
+   `WhisperInput` carries every attribute of `WhisperFieldAttributes` (run). What a manager does with any of it, Chrome's
+   built-in one above all, was not run: the export's doc says Chrome's still offers a saved password for a
+   `type="password"` field marked `off`, and the card says so.
+5. **A new passphrase's strength as it is typed, and its confirmation** (`NewPassphraseCard`; the brief's items 5 and 6
+   as one card, since `useNewPassphrase` does both over `useStrengthVerdict`). Run: three characters get the dojo
+   checker's reason, four "Strong enough", six spaces the library's own blank verdict; a confirmation that differs is
+   `aria-invalid` with "The passphrases do not match", and one that matches makes the form ready; neither text is found by
+   the fiber walk.
+6. **Turn the typing helpers off on a field that can be revealed** (`RevealCard`). Run: a hand-made Show button leaves
+   the field `type="text"` with no `spellcheck`, `autocorrect` or `autocapitalize`; the library's `WhisperInput` and
+   `PassphraseInput`, shown, keep `spellcheck="false"`, `autocorrect="off"` and `autocapitalize="none"`. **What the
+   library's parts set**: `WhisperInput` spreads `WhisperFieldAttributes` after the host's props, and its type leaves
+   them out, so a host cannot undo them; `PassphraseInput` sets the three before the host's props, so a host can. Both
+   hide the field again while a form Action's submit is pending; in a form that submits from `onSubmit`, only
+   `PassphraseInput` does, handed `isPending`, and `WhisperInput`, having no such prop, stays shown (read; the reviewer
+   ran the latter once). What a browser's spell-checker or a phone's keyboard does with a text field's contents was
+   read, not run: public reports (2022) found enhanced spell-check services in Chrome and Edge sending field text to
+   their servers.
+7. **Let a key be pasted, and trim it where the whisper is made** (`PasteCard`). Run: a key set as pasted, with two
+   spaces before it and a space and a newline after, is stored trimmed (read back with `withWhisper`), and the page
+   shows its `mask`; the input drops the newline itself, as HTML has a single-line input do, so the trim is for the
+   spaces; a paste into the **Don't**'s field is cancelled. **A passphrase's surrounding spaces**: the library takes a
+   passphrase as typed and trims nothing (read: `passphraseCleartext` is a plain string); Hero's passphrase with a space
+   after it unlocks nothing (run, in `PasswordManagerCard`'s test), and one of only spaces is judged weak (run, item 5).
+8. **After a refusal, focus the field and say what to do** (`RefusalCard`). Run: a refused save keeps the key, focuses its
+   field, and shows the kit's text in a `role="alert"` that the field is described by, the field `aria-invalid`; a save
+   meeting `stale_write` shows the form's own words instead of the kit's `stale_write` (awkward item 8); a save after a
+   refusal lands and empties the form.
+9. **Test a key with a button the user presses** (`TestKeyCard`, the dojo's made-up service). Run: the handler reads the
+   field when pressed, the button is disabled while the check runs, the answer shows, the key stays in its field, and the
+   fiber walk finds it nowhere.
+10. **Give an onSubmit form `method="post"`** (`PostMethodCard`). Read in react-dom 19.3.1's server renderer and run
+    with `renderToString` under jsdom: a form that submits from `onSubmit` is rendered as a bare `<form>`, whose
+    `method` a browser reads as `get`, so a submit before React attaches would send every field, the key too, in the URL
+    (HTML's form submission, read, not run in a browser). With `method="post"` the tag keeps it, and the fields would go
+    in the body, still to the server. A form Action is rendered with `action="javascript:throw …"`, no `method`, and a
+    script that catches an early submit and keeps its `FormData`, secret included, in `document.$$reactFormReplay` until
+    React attaches and replays it; React warns of a `method` given beside a function `action`, and the server renderer
+    drops it (run); the client keeps the attribute and submits through the action all the same (the reviewer's run, not
+    asserted). So the card is for `onSubmit` forms only. Which of the library's forms it touches: awkward item 16.
+
 ## What the library made awkward, verbose or impossible
 
 Each with what it cost the dojo. None is smoothed over with machinery.
@@ -194,6 +286,20 @@ Each with what it cost the dojo. None is smoothed over with machinery.
     unlocked with the fixture's passphrase, writes a box during the hold, after the save has cited. About 30 lines in
     `src/lib/elsewhere.ts`; the dojo's scaffolding, not a host's. A save after a stale one then lands, the watch having
     told this page of the newer box.
+
+15. **The kit's `UsernameField` is not exported**: a host's own passphrase form writes the hidden username field again
+    (one line). The Practice tab shows the kit's `UnlockForm` instead. 0 lines; recorded.
+16. **The kit's `UnlockForm` and passkey unlock submit from `onSubmit` with no `method`**: rendered on a server and
+    submitted before React attaches, the browser would send `UnlockForm`'s passphrase and username in the URL (Practice
+    item 10). The passkey unlock has no field, so an early submit only reloads the page with an empty query. The kit's
+    form Actions (`CreateVaultForm`, `ReplacePassphraseForm`, the passkey add and revoke) are safe from it. The two are
+    shown at stage `locked`, which a server rarely knows, so the risk is narrow. 0 lines; recorded, not built: nothing
+    under `packages/` changes in this thread.
+17. **The kit's `UnlockForm` submitted before the bank is brought up rejects unhandled**: `formActionOf` rejects a
+    gating made at the wrong stage, as its doc says, and `UnlockForm` awaits it with no `catch` (its `submit` has
+    `try`/`finally`, under `void`). The passkey unlock has the same shape, but renders only once the bank's header names
+    a passkey. A test that unlocked through the Practice card before the stage showed `locked` met it. The form is
+    documented for stage `locked`. 0 lines; recorded.
 
 React itself, not the library, cost two lines more: an outcome set after an `await` must be wrapped in
 `startTransition` to commit with React's reset of the form, and a query-cache subscriber must go through
