@@ -6,7 +6,9 @@ assert, under jsdom over fake-indexeddb; nobody has yet looked at it in a real b
 
 ## What each form kept and cleared, today
 
-"Cleared" is React's own reset of an uncontrolled form once its action ends: it comes after every outcome, refused or not.
+"Cleared" is React's own reset of an uncontrolled form whose `action` is a function: React queues it as the action
+starts, so it comes after every outcome, refused or not. A form that submits from `onSubmit` with `preventDefault` gets
+none. The one exception is Login's Dismiss, where the dojo's own Cancel calls `form.reset()`.
 The library deletes the secret fields from the `FormData` only; it never touches the inputs.
 
 **Login** (Nolo, bank `unborn`): a hand-built form on `useBirth`, `useNewPassphrase`, `PassphraseInput` and `popField`.
