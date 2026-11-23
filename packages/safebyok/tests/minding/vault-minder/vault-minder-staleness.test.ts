@@ -1,9 +1,11 @@
 import { Errors } from 'safebyok-big/internals'
+import * as TSQ from '@tanstack/query-core'
 import { describe, expect, it, vi } from 'vitest'
+import type { VaultMinder } from '../../../src/minding/vault-minder'
 import { MaxTimerMillis, MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
-import { badnewsOf, listenerOf, minderWorldOf, bornOf, storedBoxOf, noticeOf, revtokAt, toldOf } from './world'
+import { badnewsOf, cheatBox, listenerOf, minderWorldOf, bornOf, storedBoxOf, noticeOf, sparseNoticeOf, revtokAt, toldOf } from './world'
 
 describe("VaultMinder.isStaleAt", () => {
   it("is true before any get, false after, and true past staleTime", async () => {
@@ -86,6 +88,83 @@ describe("VaultMinder.isStaleAt", () => {
     })
   }
 })
+
+describe("VaultMinder's item behind a newer sparse record", () => {
+  it("is fetched again, once, where an observer keeps it active", async () => {
+    const { minder, vaultDB, receive, box } = await gotWorldOf()
+    await observeItem(minder, async () => {
+      const asked = vi.spyOn(vaultDB, 'tryGetThing')
+      const box1  = TH.nextOf(box)
+      cheatBox(vaultDB, box1)
+      receive(sparseNoticeOf(box1))
+      await TH.eventually(() => minder.at(TH.BoxScope)?.revseq === 1)
+      await TH.eventually(() => ! minder.queryClient.isFetching())
+      expect([minder.isBehindAt(TH.BoxScope), asked.mock.calls.length]).to.deep.equal([false, 1])
+    })
+  })
+
+  it("is fetched again where an observer keeps it active after a refused get left it invalidated", async () => {
+    const { minder, vaultDB, receive, box } = await gotWorldOf(1)
+    await observeItem(minder, async () => {
+      vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, TH.boxThingOf())
+      await TH.expectRefusal(minder.get(TH.BoxScope, { staleTime: 0 }), 'stale_read')
+      const asked = vi.spyOn(vaultDB, 'tryGetThing')
+      const box2  = TH.nextOf(box)
+      cheatBox(vaultDB, box2)
+      receive(sparseNoticeOf(box2))
+      await TH.eventually(() => minder.at(TH.BoxScope)?.revseq === 2)
+      await TH.eventually(() => ! minder.queryClient.isFetching())
+      expect([minder.isBehindAt(TH.BoxScope), asked.mock.calls.length]).to.deep.equal([false, 1])
+    })
+  })
+
+  it("is fetched again where an observer keeps it active after its first get was refused", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const box     = await storedBoxOf(vaultDB)
+    const { minder, receive } = await minderWorldOf(vaultDB)
+    receive(sparseNoticeOf(TH.nextOf(box)))
+    await TH.expectRefusal(minder.get(TH.BoxScope), 'stale_read')
+    await observeItem(minder, async () => {
+      await TH.eventually(() => ! minder.queryClient.isFetching())
+      const box2 = TH.nextOf(TH.nextOf(box))
+      cheatBox(vaultDB, box2)
+      receive(sparseNoticeOf(box2))
+      await TH.eventually(() => minder.at(TH.BoxScope)?.revseq === 2)
+    })
+  })
+
+  it("is not fetched where no observer keeps it active, until a get", async () => {
+    const { minder, vaultDB, receive, box } = await gotWorldOf()
+    const asked = vi.spyOn(vaultDB, 'tryGetThing')
+    const box1  = TH.nextOf(box)
+    cheatBox(vaultDB, box1)
+    receive(sparseNoticeOf(box1))
+    await TH.eventually(() => ! minder.queryClient.isFetching())
+    expect([minder.isBehindAt(TH.BoxScope), asked.mock.calls.length]).to.deep.equal([true, 0])
+    expect(await minder.get(TH.BoxScope)).to.deep.equal(box1)
+    expect(asked.mock.calls).to.have.lengthOf(1)
+  })
+})
+
+/** A minder that has got the box at `TH.BoxScope`, over a vaultDB storing it at revision `revseq`, and that box. */
+async function gotWorldOf(revseq = 0) {
+  const vaultDB = new MemoryVaultDB()
+  const box     = await storedBoxOf(vaultDB, revseq)
+  const world   = await minderWorldOf(vaultDB)
+  await world.minder.get(TH.BoxScope)
+  return { ...world, box }
+}
+
+/** Run `body` while an observer, as a hook is, keeps the item at `TH.BoxScope` active. */
+async function observeItem(minder: VaultMinder, body: () => Promise<void>): Promise<void> {
+  const observer    = new TSQ.QueryObserver(minder.queryClient, { queryKey: minder.itemQueryKey(TH.BoxScope) })
+  const unsubscribe = observer.subscribe(() => undefined)
+  try {
+    await body()
+  } finally {
+    unsubscribe()
+  }
+}
 
 /** A minder whose get of the box at `TH.BoxScope` was refused stale_read after it fetched `box1`; the minder, its vaultDB, which still has the older box, and `box1`. */
 async function refusedGetWorldOf() {

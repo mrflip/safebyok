@@ -7,8 +7,8 @@ import { pick } from 'es-toolkit'
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, type Kids, Labelpath,
-  type LiveOf, type LivePublicPropsOf, MinderEventFormat, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
-  PendingBank, Shell, type Sidecar, SignedOutBank, VaultMinder, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
+  type LiveOf, type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
+  PendingBank, Shell, type Sidecar, SignedOutBank, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
 } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
@@ -217,7 +217,6 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
       return () => { if (mounted === device) { mounted = null } }
     }, [device])
     useEffect(() => { if (typeof userid === 'string') { signIn(userid) } }, [userid])
-    useEffect(() => ((signedIn === null) ? undefined : refetchMarked(signedIn.minder)), [signedIn])
     const shown = useMemo(() => shownOf(signedIn, userid, device.queryClient), [signedIn, userid, device])
     return <ShownContext value={shown}><GiverContext value={given}>{children}</GiverContext></ShownContext>
   }
@@ -679,7 +678,7 @@ function makeBankGiver(friend: BankFriend) {
 }
 // --
 
-// == [Helpers]: useridOf, isBroughtUp, isBehindAt, refetchMarked, GateShownOfCkey, gateShownOfWorld, BoxShapingOptnames, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
+// == [Helpers]: useridOf, isBroughtUp, isBehindAt, GateShownOfCkey, gateShownOfWorld, BoxShapingOptnames, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
 
 /** `device`'s userid, or null for no device. */
 function useridOf(device: Device | null): Userid | null {
@@ -694,21 +693,6 @@ function isBroughtUp(bank: BankSnapshot): boolean {
 /** True while `device`'s minder has heard of a newer revision of the Thing at `labelpath` than its item. False for no device. */
 function isBehindAt(device: Device | null, labelpath: Labelpath): boolean {
   return device?.minder.isBehindAt({ ...device.scope, labelpath }) ?? false
-}
-
-// The minder marks an item behind but refetches nothing: no get is waiting on it. A hook showing it is, so each active
-// one is fetched again. A soon's success refetches its item too: an item a refused get left invalidated tells nothing
-// when it falls behind again. A fetch already under way is left to land, and its landing tells again where it landed
-// behind. A listing the minder marks stale it lists again itself, where a hook observes it.
-/** Refetch each item of `minder`'s that a hook observes, once the minder marks it behind. Returns the function that stops it. */
-function refetchMarked(minder: VaultMinder): () => void {
-  const client = minder.queryClient
-  return minder.listen((event) => {
-    if ((event.type !== 'updated') || (event.eventkind === 'list')) { return }
-    const isSoon = (event.eventkind === 'soon')
-    if (event.action?.type !== (isSoon ? 'success' : 'invalidate')) { return }
-    void client.refetchQueries({ queryKey: isSoon ? minder.itemQueryKey(event) : event.queryKey, exact: true, type: 'active' }, { cancelRefetch: false })
-  }, MinderEventFormat)
 }
 
 // useSyncExternalStore wants the same snapshot until the store changes, and the world's gate record is the same object
