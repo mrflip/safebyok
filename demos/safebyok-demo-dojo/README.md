@@ -22,8 +22,9 @@ pnpm --filter safebyok-demo-dojo fixture     # writes src/fixture/fixture.json a
 * **New Box**: the same form adding a box at the labelpath `login` (`putBoxAction` under `useActionState`): the username
   in its sidecar, the password in its whisper. Sign in as Hero or Thierry and unlock.
 * **Inspect**: the vault database's rows (there), the persisted caches' rows (here, where the old core had a DeviceDB),
-  the device's QueryClient, and the host's mutations. Each is grouped by modelkind with a count, ciphertext cut short,
-  nothing decrypted.
+  the device's QueryClient, and the host's mutations. Each is a table, grouped by modelkind: a group's first row names it,
+  with its count, and the fields of its rows, in the order the rows have them. `scope`, `userid`, `banklabel` and
+  `modelkind` are left out. Ciphertext is cut short, and nothing is decrypted.
 
 Under each form, the **readout** shows, after each press, whether each field still has text and the message the form
 shows. It reads `value.length > 0` and nothing else of a field.

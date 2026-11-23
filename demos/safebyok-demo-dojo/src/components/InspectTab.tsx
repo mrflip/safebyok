@@ -8,13 +8,19 @@ import { cacheRowsNow, vaultRowsNow } from '../lib/stores'
 /** One row as the panel shows it: what it is filed under, and its stored fields. */
 type Shown = Readonly<{ ckey: string, modelkind: string, val: unknown }>
 
-/** The groups every panel shows, in order, even when empty. */
+/** The groups every store's panel shows, in order, even when empty. */
 const Modelkinds = ['bank', 'gate', 'box'] as const
+
+/** The one group of the mutations' panel. */
+const MutationGroups = ['mutation'] as const
+
+/** Fields the tables leave out, to stay narrow: a row's ckey or its group says them already. */
+const OmittedFieldnames: ReadonlySet<string> = new Set(['scope', 'userid', 'banklabel', 'modelkind'])
 
 /** How often the panel reads the two stores again while it shows. */
 const RereadMillis = 1000
 
-/** The rows of the two stores, read through the dojo's own connections, and of the app's QueryClients, read live: grouped by modelkind, decrypting nothing. */
+/** The rows of the two stores, read through the dojo's own connections, and of the app's QueryClients, read live: a table for each, grouped by modelkind, decrypting nothing. */
 export function InspectTab({ isShown }: Readonly<{ isShown: boolean }>) {
   const [stored, setStored] = useState<Readonly<{ vault: Shown[], cache: Shown[] }> | null>(null)
   const { client } = SOK.useQueryOptions().dojo
@@ -36,36 +42,71 @@ export function InspectTab({ isShown }: Readonly<{ isShown: boolean }>) {
   return (
     <section aria-labelledby="inspect-title" className="card">
       <h2 id="inspect-title">Inspect</h2>
-      <Panel title="VaultDB: what the backend stores (IndexedDB, read directly)" rows={stored?.vault} />
-      <Panel title="Device cache: the snapshots kept here between page loads, in place of a DeviceDB: the new core has none" rows={stored?.cache} />
-      <Panel title={"TSQ: the device's QueryClient, which the hooks observe"} rows={tsqRows} />
-      <h3>{"Mutations: the host's QueryClient"} ({mutationRows.length})</h3>
-      <ul className="rows">{mutationRows.map((row) => <li key={row.ckey}><code>{row.ckey}</code> <code>{shownText(row.val)}</code></li>)}</ul>
+      <Panel title="VaultDB: what the backend stores (IndexedDB, read directly)" groups={Modelkinds} rows={stored?.vault} />
+      <Panel title="Device cache: the snapshots kept here between page loads, in place of a DeviceDB: the new core has none" groups={Modelkinds} rows={stored?.cache} />
+      <Panel title={"TSQ: the device's QueryClient, which the hooks observe"} groups={Modelkinds} rows={tsqRows} />
+      <Panel title={"Mutations: the host's QueryClient"} groups={MutationGroups} rows={mutationRows} />
     </section>
   )
 }
 
-/** One store's rows, grouped by modelkind, with a count in each heading. */
-function Panel({ title, rows }: Readonly<{ title: string, rows: readonly Shown[] | undefined }>) {
+/** One panel's rows as a table, a section for each of `groups` and one for the rest, each with its count. */
+function Panel({ title, groups, rows }: Readonly<{ title: string, groups: readonly string[], rows: readonly Shown[] | undefined }>) {
   if (rows === undefined) { return <><h3>{title}</h3><p className="quiet">Reading…</p></> }
-  const others = rows.filter((row) => ! (Modelkinds as readonly string[]).includes(row.modelkind))
+  const others = rows.filter((row) => ! groups.includes(row.modelkind))
   return (
     <>
       <h3>{title}</h3>
-      {Modelkinds.map((modelkind) => <Group key={modelkind} title={titleOf(modelkind)} rows={rows.filter((row) => row.modelkind === modelkind)} />)}
-      {(others.length > 0) && <Group title="Other" rows={others} />}
+      <div className="scroller">
+        <table className="inspect">
+          {groups.map((modelkind) => <Group key={modelkind} title={titleOf(modelkind)} rows={rows.filter((row) => row.modelkind === modelkind)} />)}
+          {(others.length > 0) && <Group title="Other" rows={others} />}
+        </table>
+      </div>
     </>
   )
 }
 
-/** One modelkind's rows, under a heading with their count. */
+/** One group's rows, under a row of header cells: the group's title and count, then the name of each field its rows have. */
 function Group({ title, rows }: Readonly<{ title: string, rows: readonly Shown[] }>) {
+  const fieldnames = fieldnamesOf(rows)
   return (
-    <>
-      <h4>-- {title} ({rows.length}) --</h4>
-      <ul className="rows">{rows.map((row) => <li key={row.ckey}><code>{row.ckey}</code> <code>{shownText(row.val)}</code></li>)}</ul>
-    </>
+    <tbody>
+      <tr>
+        <th scope="col">-- {title} ({rows.length}) --</th>
+        {fieldnames.map((fieldname) => <th key={fieldname} scope="col">{fieldname}</th>)}
+      </tr>
+      {rows.map((row) => <Row key={row.ckey} row={row} fieldnames={fieldnames} />)}
+    </tbody>
   )
+}
+
+/** One row: its ckey, then a cell for each of `fieldnames`, or one cell across them all when its value has no fields. */
+function Row({ row, fieldnames }: Readonly<{ row: Shown, fieldnames: readonly string[] }>) {
+  const { ckey, val } = row
+  return (
+    <tr>
+      <td><code>{ckey}</code></td>
+      {isFielded(val)
+        ? fieldnames.map((fieldname) => <td key={fieldname}><code>{Object.hasOwn(val, fieldname) ? shownText(val[fieldname]) : ''}</code></td>)
+        : <td colSpan={Math.max(fieldnames.length, 1)}><code>{shownText(val)}</code></td>}
+    </tr>
+  )
+}
+
+/** The fields of `rows`' values, each once, in the order the values have them: all but {@link OmittedFieldnames}. */
+function fieldnamesOf(rows: readonly Shown[]): string[] {
+  const fieldnames = new Set<string>()
+  for (const { val } of rows) {
+    if (! isFielded(val)) { continue }
+    for (const fieldname of Object.keys(val)) { if (! OmittedFieldnames.has(fieldname)) { fieldnames.add(fieldname) } }
+  }
+  return [...fieldnames]
+}
+
+/** True when `val` is an object with fields to show, not null or an array. */
+function isFielded(val: unknown): val is Readonly<Record<string, unknown>> {
+  return (typeof val === 'object') && (val !== null) && (! Array.isArray(val))
 }
 
 // A query is added to the cache while a hook renders: batchCalls tells the panel after that render, as React Query's own hooks are told.
