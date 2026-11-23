@@ -1,6 +1,7 @@
 // Writes src/fixture/fixture.json: the dojo's three users, and the rows Reset loads into the browser's two stores, made
 // through the library under Node over fake-indexeddb. Run it with `pnpm --filter safebyok-demo-dojo fixture` after a change
-// to the library makes the stored rows stale; tests/lib/fixture.test.ts fails until then.
+// to the library makes the stored rows stale. tests/lib/fixture.test.ts fails when the banks no longer unlock; it does not
+// check the cached snapshots or the planted rows.
 //
 // Hero:    a bank stored there, with a box, and its two caches kept here.
 // Thierry: a bank stored there, with a box, and nothing here.
