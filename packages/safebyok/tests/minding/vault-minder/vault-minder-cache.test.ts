@@ -196,7 +196,7 @@ describe("VaultMinder.listingAt", () => {
     const { minder } = await minderWorldOf(vaultDB)
     const earlier = await minder.list('box')
     const later   = await minder.list('box')
-    minder.queryClient.setQueryData(minder.listQueryKey(TH.RootScope), earlier)
+    minder.tsqClient.setQueryData(minder.listQueryKey(TH.RootScope), earlier)
     expect(minder.listingAt(TH.RootScope)?.read_tc).to.eq(later.read_tc)
   })
 
@@ -315,12 +315,12 @@ describe("VaultMinder, a child's first landing", () => {
     const { minder, receive } = await minderWorldOf(vaultDB)
     receive(noticeOf(TH.boxThingOf('anthropic')))
     expect(minder.listingAt(TH.RootScope)).to.be.undefined
-    expect(minder.queryClient.getQueryState(minder.listQueryKey(TH.RootScope))).to.be.undefined
+    expect(minder.tsqClient.getQueryState(minder.listQueryKey(TH.RootScope))).to.be.undefined
   })
 
   it("lists again while a host observes the listing", async () => {
     const { minder, vaultDB, receive } = await listedWorld()
-    const observer = new TSQ.QueryObserver(minder.queryClient, { queryKey: minder.listQueryKey(TH.RootScope) })
+    const observer = new TSQ.QueryObserver(minder.tsqClient, { queryKey: minder.listQueryKey(TH.RootScope) })
     const unsubscribe = observer.subscribe(() => undefined)
     try {
       // A listing is stale at once, so the observer lists as it mounts.

@@ -19,8 +19,9 @@ export async function arrange(arrangement: Arrangement, userid: string | null): 
   }
 }
 
-/** Switch the checker back to its own verdict, and forget a refusal not yet made: once a form's outcome lands. */
+/** Switch the checker back to its own verdict, and forget a refusal or a hold not yet made: once a form's outcome lands. */
 export function disarm(): void {
   forceWeak(false)
   vaultDB.stopRefusing()
+  vaultDB.stopHolding()
 }

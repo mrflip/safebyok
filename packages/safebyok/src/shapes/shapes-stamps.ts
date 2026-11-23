@@ -37,7 +37,7 @@ export type StampedGate = Z.infer<typeof StampChecks.stampedGate>
 export type BoxStamp    = Z.infer<typeof StampChecks.boxStamp>
 // --
 
-// == [The lease's forms]: LeaseFormat, LeaseChecks, StampChecks, LeaseStamp, LeaseSparse, LeaseRecord
+// == [The lease's forms]: LeaseFormat, LeaseChecks, StampChecks, LeaseStamp, LeaseSparse, LeaseRecord, LeaseLoggable
 
 /** The `fmt` a lease carries, the same as every Thing's. It is bound into the wrap of the lease's bankKey. */
 export const LeaseFormat = ThingFormat
@@ -72,4 +72,18 @@ export type LeaseStamp  = Z.infer<typeof StampChecks.leaseStamp>
 export type LeaseSparse = LeaseStamp
 /** A lease's record: its stamp, its leaseKey handle, and the bankKey wrapped under it. */
 export type LeaseRecord = Z.infer<typeof StampChecks.leaseRecord>
+// Picked field by field, so that a field added to the stamp joins the loggable only when chosen.
+/** What a log wants of a lease: its scope, the bank and gate it was granted under, when, by which wayin, and whether it is evicted.
+ * It has nothing secret and nothing opaque, and is no stamp: a ctx binds the {@link LeaseStamp}.
+ */
+export type LeaseLoggable = Readonly<Pick<LeaseStamp, 'fmt' | 'userid' | 'banklabel' | 'wayinkind' | 'born_at' | 'proved_at' | 'gate_labelpath' | 'gate_lifeseq' | 'bank_lifeseq' | 'bank_born_at'> & {
+  /** The lease's labelpath, such as `lease/gate`. */
+  labelpath: `lease/${string}`
+  /** The revtok of the gate's revision it was granted under, cut short by `maskUuid`. */
+  gate_revtok: string
+  /** The lifetok of its bank's life, cut short by `maskUuid`. */
+  bank_lifetok: string
+  /** True once the lease's keys are dropped. */
+  isEvicted: boolean
+}>
 // --

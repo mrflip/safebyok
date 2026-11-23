@@ -7,8 +7,8 @@ import { pick } from 'es-toolkit'
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, type Kids, Labelpath,
-  type LiveOf, type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
-  PendingBank, Shell, type Sidecar, SignedOutBank, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
+  type LiveOf, type LivePublicPropsOf, type MaskedView, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
+  EmptyMaskedView, PendingBank, Shell, type Sidecar, SignedOutBank, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
 } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
@@ -118,7 +118,7 @@ export type StrengthVerdictResult = Readonly<{
   judge:     (passphrase: string) => Promise<void>
 }>
 
-/** What {@link reactGiver} returns: the provider, the strength hook, and `bank` for the bank's own hooks. */
+/** What {@link reactGiver} returns: the provider, the strength hook, `maskedView` for a devtool, and `bank` for the bank's own hooks. */
 export type ReactGiver<BanklabelT extends string = string> = ReturnType<typeof reactGiver<BanklabelT>>
 
 /** The hooks and calls of a giver's bank, from `SOK.bank(banklabel)`. */
@@ -217,7 +217,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
       return () => { if (mounted === device) { mounted = null } }
     }, [device])
     useEffect(() => { if (typeof userid === 'string') { signIn(userid) } }, [userid])
-    const shown = useMemo(() => shownOf(signedIn, userid, device.queryClient), [signedIn, userid, device])
+    const shown = useMemo(() => shownOf(signedIn, userid, device.vaultTsqClient), [signedIn, userid, device])
     return <ShownContext value={shown}><GiverContext value={given}>{children}</GiverContext></ShownContext>
   }
 
@@ -252,7 +252,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
   }
 
   const { bankGiver, boxQueryOf } = makeBankGiver({
-    banklabel, signedIn: signedInDevice, clientNow: () => mounted?.queryClient ?? outsideClient, demandDevice, demandBank, demandVault, useShown,
+    banklabel, signedIn: signedInDevice, clientNow: () => mounted?.vaultTsqClient ?? outsideClient, demandDevice, demandBank, demandVault, useShown,
   })
 
   /** The query factories of the signed-in user's bank, by banklabel, for the host's own `useQuery` and its kin, with the QueryClient they run in.
@@ -271,10 +271,18 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     }, [shownDevice, isUp, client])
   }
 
+  // The device stays out of a host's reach: what leaves is the core's copy, each ciphertext masked, and the lease's loggable.
+  /** The mounted provider's bank TSQ, vault TSQ and lease, masked for a devtool, as `device.maskedView()` does.
+   * For experimenting, never for an app's own logic: what it answers may change without notice. While no provider is mounted, or nobody is signed in, it answers `EmptyMaskedView`.
+   * It is no hook: call it again to see what changed.
+   */
+  function maskedView(): MaskedView { return mounted?.maskedView() ?? EmptyMaskedView }
+
   const giver = Object.freeze({
     Provider,
     useStrengthVerdict,
     useQueryOptions,
+    maskedView,
     /** The hooks and calls of the giver's bank, refusing any other banklabel. Name the result in PascalCase (`const Knock = SOK.bank('knock')`), so the rules-of-hooks lint checks `Knock.useBank()`. */
     bank: (banklabelAsked: BanklabelT) => {
       ScopeChecks.bankScoped.parseConsistent({ banklabel: banklabelAsked }, { banklabel })

@@ -9,7 +9,7 @@
 
 import * as TSQ from '@tanstack/query-core'
 import { type Persister, persistQueryClientRestore, persistQueryClientSubscribe } from '@tanstack/query-persist-client-core'
-import { deepFreeze } from 'es-toolkit'
+import { cloneDeepWith, deepFreeze } from 'es-toolkit'
 import { CX, Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
 import { type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Tombstone, Shell, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
@@ -20,7 +20,7 @@ import type { GetThingAnswer, Kids, ThingNotice, VaultDB, WriteThingAnswer } fro
 import { refusedAnswerOf } from '../storage/refused-answer'
 import {
   type DeliverableThing, type GotAnswer, type MinderEvent, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts,
-  type MinderInvalidateOpts, type QueryCacheOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingEvent, type SoonEvent, type DeadEvent, type TsqStaleTime, type ListingEvent, type MinderEventkind, type MinderEventFormat, type TSQQueryAction,
+  type MinderInvalidateOpts, type QueryCacheOpts, type MaskedRow, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingEvent, type SoonEvent, type DeadEvent, type TsqStaleTime, type ListingEvent, type MinderEventkind, type MinderEventFormat, type TSQQueryAction,
   FixedQueryCacheOpts, MinderChecks,
 } from '../shapes/shapes-minder'
 import { MinderKeyRoot, bankKeyHeadOf } from './minder-keys'
@@ -111,7 +111,7 @@ export abstract class Minder {
       ...FixedQueryCacheOpts,
       queryFn:           async ({ queryKey }) => await this.#fetchAt(queryKey),
       // A list fetches whatever its listing holds.
-      staleTime:         ({ queryKey }) => ((queryKey[EntrykindIdx] === Listkind) ? 0 : this.#queryCacheOpts.staleTime),
+      staleTime:         ({ queryKey }) => ((queryKey[QkeykindIdx] === Listkind) ? 0 : this.#queryCacheOpts.staleTime),
       structuralSharing: (prior: unknown, next: unknown) => (isKids(next) ? landedKidsOf(prior, next) : newerThingOf(prior, next, (scope) => this.#deadAt(scope))),
     })
   }
@@ -329,7 +329,7 @@ export abstract class Minder {
   async #fetchAt(queryKey: TSQ.QueryKey): Promise<ThingRecord | null | Kids> {
     this.#demandReady()
     const scope = this.#scopeOfQueryKey(queryKey)
-    return (queryKey[EntrykindIdx] === Listkind) ? await this.#fetchListing(scope) : await this.#fetchRecord(this.#askAt(scope))
+    return (queryKey[QkeykindIdx] === Listkind) ? await this.#fetchListing(scope) : await this.#fetchRecord(this.#askAt(scope))
   }
 
   // A tombstone answered is the answer's dbhas, which the watch lands before the answer resumes this fetch.
@@ -440,7 +440,7 @@ export abstract class Minder {
   // never fetched. A get's live record over a null item is no first landing: only the item's own count of landings tells one.
   /** Settle the item a fetch just landed `val` in, where `queryKey`, a key of this bank, is an item's. */
   #landedByFetch(val: unknown, queryKey: TSQ.QueryKey): void {
-    if (queryKey[EntrykindIdx] !== Itemkind) { return }
+    if (queryKey[QkeykindIdx] !== Itemkind) { return }
     const scope   = this.#scopeOfQueryKey(queryKey)
     const isFirst = (val !== null) && (this.#tsq.getQueryState(queryKey)?.dataUpdateCount === 1) && (! this.#hasStoredBesideItem(scope))
     this.#settleLanded(scope, isFirst)
@@ -537,13 +537,35 @@ export abstract class Minder {
   }
   // --
 
+  // == [A devtool's view]: maskedRows
+
+  /** The rows this minder keeps of its bank, masked for a devtool.
+   * Each has its key, its state, and a copy of its record or listing with each ciphertext masked. What a host keeps beside them in the same TSQ is left out.
+   * For experimenting, never for an app's own logic: what it answers may change without notice.
+   */
+  maskedRows(): MaskedRow[] {
+    return this.#tsq.getQueryCache().findAll({ queryKey: bankKeyHeadOf(this.scope) }).map((tsqQuery) => {
+      const { status, fetchStatus, dataUpdatedAt, isInvalidated, error: err, data: val } = tsqQuery.state
+      return {
+        queryKey:        [...tsqQuery.queryKey],
+        status,
+        fetchStatus,
+        dataUpdatedAt,
+        isInvalidated,
+        lastRefusalkind: (err === null) ? null : Outcome.storageRefusalOf(err).refusalkind,
+        val:             maskedOf(val),
+      }
+    })
+  }
+  // --
+
   // == [What a subclass minds]: mindsItemAt
 
   /** True for the labelpath of a Thing whose item and soon this minder caches. */
   protected abstract mindsItemAt(labelpath: Labelpath): boolean
   // --
 
-  // == [Checks]: userid, banklabel, scope, queryClient, #demandOwnScope, #demandItemScope, #checkedDelivered, #demandReady, #scopeOfQueryKey
+  // == [Checks]: userid, banklabel, scope, tsqClient, #demandOwnScope, #demandItemScope, #checkedDelivered, #demandReady, #scopeOfQueryKey
 
   /** The user whose bank this minder minds: its friend's. Refuses where its friend's scope does, as a device's until `signIn`. */
   get userid(): Userid { return this.scope.userid }
@@ -557,8 +579,8 @@ export abstract class Minder {
     return { userid, banklabel }
   }
 
-  /** The QueryClient this minder caches in, its own: hand it to TanStack's `QueryClientProvider` to observe what it caches. */
-  get queryClient(): TSQ.QueryClient { return this.#tsq }
+  /** The QueryClient of this minder's TSQ, its own: hand it to TanStack's `QueryClientProvider` to observe what it caches. */
+  get tsqClient(): TSQ.QueryClient { return this.#tsq }
 
   /** The scope of `labelpathed`, demanding that it is in this minder's bank. */
   #demandOwnScope(labelpathed: Labelpathed): ThingScope {
@@ -587,8 +609,8 @@ export abstract class Minder {
 
   /** The scope whose item, soon or listing is cached under `queryKey`, one of this minder's query keys. */
   #scopeOfQueryKey(queryKey: TSQ.QueryKey): ThingScope {
-    const afterEntrykind = queryKey.slice(EntrykindIdx + 1)
-    const labels         = afterEntrykind.slice(0, afterEntrykind.findIndex((segment) => Marks.has(segment)))
+    const afterQkeykind = queryKey.slice(QkeykindIdx + 1)
+    const labels         = afterQkeykind.slice(0, afterQkeykind.findIndex((segment) => Marks.has(segment)))
     return { ...this.scope, labelpath: labels.filter((segment) => segment !== '/').join('/') }
   }
   // --
@@ -619,7 +641,7 @@ export abstract class Minder {
     const { queryKey, queryHash, state } = tsqEvent.query
     const { labelpath } = this.#scopeOfQueryKey(queryKey)
     const told = {
-      eventkind: queryKey[EntrykindIdx] as MinderEventkind,
+      eventkind: queryKey[QkeykindIdx] as MinderEventkind,
       type:      tsqEvent.type,
       action:    (tsqEvent.type === 'updated') ? Object.freeze({ ...tsqEvent.action }) : undefined,
       queryKey:  Object.freeze([...queryKey]),
@@ -640,18 +662,18 @@ export abstract class Minder {
   // --
 }
 
-// == [Helpers]: Itemkind, Soonkind, Deadkind, Listkind, EntrykindIdx, Marks, labelsOf, TellableTSQEvent, isTellableTSQEvent, nullCitedOf, isNewer, isOlder, gotAnswerOf, isTimelyQuery, isKids, landedKidsOf, PersistBuster, RestoreOpts, SaveOpts
+// == [Helpers]: Itemkind, Soonkind, Deadkind, Listkind, QkeykindIdx, Marks, labelsOf, TellableTSQEvent, isTellableTSQEvent, nullCitedOf, isNewer, isOlder, gotAnswerOf, isTimelyQuery, isKids, landedKidsOf, MaskedChars, CiphertextFieldname, maskedCiphertextOf, maskedOf, PersistBuster, RestoreOpts, SaveOpts
 
-/** The entrykind segment of an item's query key. */
+/** The qkeykind segment of an item's query key. */
 const Itemkind = 'item'
-/** The entrykind segment of a soon's query key. */
+/** The qkeykind segment of a soon's query key. */
 const Soonkind = 'soon'
-/** The entrykind segment of a dead record's query key. */
+/** The qkeykind segment of a dead record's query key. */
 const Deadkind = 'dead'
-/** The entrykind segment of a listing's query key. */
+/** The qkeykind segment of a listing's query key. */
 const Listkind = 'list'
-/** Where a query key's entrykind segment is: after the bank's three. */
-const EntrykindIdx = 3
+/** Where a query key's qkeykind segment is: after the bank's three. */
+const QkeykindIdx = 3
 /** The marks a query key's labels end at. */
 const Marks: ReadonlySet<unknown> = new Set(['!', '~', '+', '#'])
 
@@ -717,6 +739,28 @@ function isKids(val: unknown): val is Kids {
 function landedKidsOf(prior: unknown, next: unknown): unknown {
   if (isKids(prior) && isKids(next) && (prior.read_tc > next.read_tc)) { return prior }
   return deepFreeze(TSQ.replaceEqualDeep(prior, next))
+}
+
+// A masked ciphertext shows its end, which lies in its GCM tag. The tag depends on the whole ciphertext, and so on
+// the key it wraps: while the bankKey is unknown, two characters of a wayin's tag check no guess at the passphrase,
+// nor do those of up to 21 wraps of the one bankKey taken together: 12 bits each, against a key of 256. From the 22nd
+// such wrap a guess at all their passphrases at once can be checked, and whoever holds the bankKey already can check a
+// guess against one.
+// The start would not do: a passphrase replace rewraps the same bankKey, and two masks of its start, one from either
+// side, XOR to keystream alone, which checks a guess at both passphrases. See notes/security.md.
+/** How many characters of a ciphertext's end its mask shows. */
+const MaskedChars = 2
+
+/** The field of a {@link CX.Ciphered} that has its ciphertext: a wrapped key, or a ciphered cleartext. */
+const CiphertextFieldname = 'ciphertext_b64'
+
+// A ciphertext is base64url without padding: its last characters are its own.
+/** `ciphertext` masked, as `…yz(64)`: its last {@link MaskedChars} characters, and its length. */
+function maskedCiphertextOf(ciphertext: string): string { return `…${ciphertext.slice(-MaskedChars)}(${String(ciphertext.length)})` }
+
+/** A copy of `val`, a record, null or listing, with the text at every {@link CiphertextFieldname} masked by {@link maskedCiphertextOf}. */
+function maskedOf(val: unknown): unknown {
+  return cloneDeepWith(val, (inner: unknown, fieldname) => (((fieldname === CiphertextFieldname) && (typeof inner === 'string')) ? maskedCiphertextOf(inner) : undefined))
 }
 
 /** The buster a snapshot is saved under: a snapshot saved under another is discarded at restore. */

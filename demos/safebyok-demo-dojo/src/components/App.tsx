@@ -1,14 +1,18 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
+import { UnlockDialog } from 'safebyok-react-lean/kit'
 import { SOK, hostQueryClient } from '../lib/dojo'
 import { sessionUserid } from '../lib/session'
+import { FormsTab } from './forms/FormsTab'
 import { Header } from './Header'
 import { InspectTab } from './InspectTab'
 import { LoginTab } from './LoginTab'
 import { NewBoxTab } from './NewBoxTab'
+import { PracticeTab } from './practice/PracticeTab'
+import { ScenariosTab } from './scenarios/ScenariosTab'
 
 /** The tabs, in order, with their titles. */
-const TabTitles = { login: 'Login', box: 'New Box', inspect: 'Inspect' } as const
+const TabTitles = { login: 'Login', box: 'New Box', forms: 'Forms', practice: 'Practice', scenarios: 'Scenarios', inspect: 'Inspect' } as const
 
 /** One of the tabs. */
 type Tabkind = keyof typeof TabTitles
@@ -43,7 +47,12 @@ export function App() {
           </nav>
           <div hidden={tab !== 'login'}><LoginTab userid={userid} /></div>
           <div hidden={tab !== 'box'}><NewBoxTab userid={userid} /></div>
+          <div hidden={tab !== 'forms'}><FormsTab userid={userid} /></div>
+          <div hidden={tab !== 'practice'}><PracticeTab userid={userid} /></div>
           <div hidden={tab !== 'inspect'}><InspectTab isShown={tab === 'inspect'} /></div>
+          <div hidden={tab !== 'scenarios'}><ScenariosTab /></div>
+          {/* Open while a reveal or a save waits for the passphrase: a call that does not wait, such as putBoxOnce, never opens it. */}
+          <UnlockDialog />
         </main>
       </SOK.Provider>
     </QueryClientProvider>

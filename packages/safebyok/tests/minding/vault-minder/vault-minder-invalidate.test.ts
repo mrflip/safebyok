@@ -46,7 +46,7 @@ describe("VaultMinder.invalidate", () => {
 
   it("lists again a listing an observer keeps active", async () => {
     const { minder, vaultDB } = await listedWorldOf()
-    const observer    = new TSQ.QueryObserver(minder.queryClient, { queryKey: minder.listQueryKey(TH.RootScope) })
+    const observer    = new TSQ.QueryObserver(minder.tsqClient, { queryKey: minder.listQueryKey(TH.RootScope) })
     const unsubscribe = observer.subscribe(() => undefined)
     try {
       // A listing is stale at once, so the observer lists as it mounts.

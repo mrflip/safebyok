@@ -3,11 +3,12 @@ import type * as Z from 'zod'
 import type { EX } from 'safebyok-big/internals'
 import { Crypto, Helpers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
+import { maskUuid } from '../helpers/mask-uuid'
 import { type Banklabel, type EpochMillis, type Lifeseq, type Lifetok, type Revtok, type Userid, Labelpath } from '../shapes/primitives'
 import type { Modelkind, Sparse, ThingRecord, ThingScope } from '../shapes/shapes-thing'
 import { type LeaseGate, type LeaseOpts, type SecretFieldname, GateishChecks } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
-import { type BankStamp, type LeaseRecord, type LeaseSparse, type LeaseStamp, StampChecks } from '../shapes/shapes-stamps'
+import { type BankStamp, type LeaseLoggable, type LeaseRecord, type LeaseStamp, StampChecks } from '../shapes/shapes-stamps'
 import { BankChecks } from '../shapes/shapes-thingkinds'
 import * as Throwers from '../refusals/throwers'
 
@@ -24,7 +25,7 @@ const CleartextFieldnames: ReadonlySet<string> = new Set(['whisper'])
  * Once evicted, or once its gate is swept or its device ends, it refuses every seal and unseal, even one in flight.
  */
 export class Lease implements LeaseStamp {
-  // == [Props]: fmt, userid, banklabel, bank_lifeseq, bank_born_at, bank_lifetok, gate_labelpath, gate_lifeseq, gate_revtok, born_at, proved_at, wayinkind, label, labelpath, scope, am, written_at, #gate, #record, stamp, toJSON
+  // == [Props]: fmt, userid, banklabel, bank_lifeseq, bank_born_at, bank_lifetok, gate_labelpath, gate_lifeseq, gate_revtok, born_at, proved_at, wayinkind, label, labelpath, scope, am, written_at, #gate, #record, stamp, toJSON, loggable
 
   declare readonly fmt:            LeaseStamp['fmt']
   declare readonly userid:         Userid
@@ -75,8 +76,16 @@ export class Lease implements LeaseStamp {
   /** This lease's stamp: its record without the key material. Every ctx under the lease binds it after the bank's stamp. */
   get stamp(): LeaseStamp { return StampChecks.leaseStamp.parse(this) }
 
-  /** This lease's {@link LeaseSparse}, which has no key material. */
-  toJSON(): LeaseSparse { return this.stamp }
+  /** This lease's {@link loggable}, for `JSON.stringify`. */
+  toJSON(): LeaseLoggable { return this.loggable }
+
+  /** What a log wants of this lease, with nothing secret and nothing opaque. Its two tokens are cut short by `maskUuid`. */
+  get loggable(): LeaseLoggable {
+    const { fmt, userid, banklabel, labelpath, wayinkind, born_at, proved_at, gate_labelpath, gate_lifeseq, bank_lifeseq, bank_born_at, isEvicted } = this
+    return Object.freeze({
+      fmt, userid, banklabel, labelpath, wayinkind, born_at, proved_at, gate_labelpath, gate_lifeseq, gate_revtok: maskUuid(this.gate_revtok), bank_lifeseq, bank_born_at, bank_lifetok: maskUuid(this.bank_lifetok), isEvicted,
+    })
+  }
   // --
 
   // == [Construction]: make, constructor

@@ -59,6 +59,16 @@ export function fill(section: HTMLElement, texts: Readonly<Record<string, string
   for (const [label, text] of Object.entries(texts)) { fireEvent.change(within(section).getByLabelText(label), { target: { value: text } }) }
 }
 
+/** Wait for `readText` to answer `text`. */
+export async function expectTextSoon(readText: () => string, text: string): Promise<void> {
+  await waitFor(() => { expect(readText()).to.eq(text) })
+}
+
+/** The text of the element that `field` is described by. */
+export function describingTextOf(field: HTMLElement): string {
+  return document.querySelector(`#${CSS.escape(field.getAttribute('aria-describedby') ?? '')}`)?.textContent ?? ''
+}
+
 /** Press the button `title` of `section`, and wait for the readout of that press. */
 export async function press(section: HTMLElement, title: string): Promise<Readonly<Record<string, string>>> {
   fireEvent.click(within(section).getByRole('button', { name: title }))
@@ -71,3 +81,5 @@ export async function press(section: HTMLElement, title: string): Promise<Readon
 function readingOf(readout: HTMLElement): Readonly<Record<string, string>> {
   return Object.fromEntries([...readout.querySelectorAll('tr')].map((row) => [row.querySelector('th')?.textContent ?? '', row.querySelector('td')?.textContent ?? '']))
 }
+
+export * from './test-helpers/fiber-holds'

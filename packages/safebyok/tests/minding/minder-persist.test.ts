@@ -62,10 +62,10 @@ describe("minder.persist(persister)", () => {
     const { persister, minder } = await savedGetOf(vaultDB)
     await minder.list('box')
     await nextTick()
-    const { queryClient } = await persistedMinderOf(persister, new DownVaultDB(), { isStarted: false })
+    const { tsqClient } = await persistedMinderOf(persister, new DownVaultDB(), { isStarted: false })
     for (const queryKey of [VaultMinder.itemQueryKeyOf(TH.BoxScope), VaultMinder.listQueryKeyOf(TH.RootScope)]) {
-      const { options } = queryClient.getQueryCache().find({ queryKey, exact: true })!
-      const defaults = queryClient.getQueryDefaults(queryKey)
+      const { options } = tsqClient.getQueryCache().find({ queryKey, exact: true })!
+      const defaults = tsqClient.getQueryDefaults(queryKey)
       expect([options.queryFn, options.structuralSharing, options.gcTime]).to.deep.equal([defaults.queryFn, defaults.structuralSharing, Infinity])
     }
   })
@@ -108,10 +108,10 @@ describe("minder.persist(persister)", () => {
 
   it("saves no mutation, even one paused with the cleartexts it was handed", async () => {
     const persister       = new MemoryPersister()
-    const { queryClient } = await persistedMinderOf(persister, new MemoryVaultDB())
+    const { tsqClient }   = await persistedMinderOf(persister, new MemoryVaultDB())
     onlineManager.setOnline(false)
     try {
-      const mutation = queryClient.getMutationCache().build(queryClient, { mutationKey: ['put'], mutationFn: () => new Promise(noop), networkMode: 'online' })
+      const mutation = tsqClient.getMutationCache().build(tsqClient, { mutationKey: ['put'], mutationFn: () => new Promise(noop), networkMode: 'online' })
       void mutation.execute({ whisper: TH.Whisper }).catch(noop)
       await nextTick()
       expect(mutation.state.isPaused).to.be.true
@@ -125,7 +125,7 @@ describe("minder.persist(persister)", () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { persister, minder } = await savedGetOf(vaultDB)
-    minder.queryClient.setQueryData(['whisper', TH.BoxScope.labelpath], TH.Whisper)
+    minder.tsqClient.setQueryData(['whisper', TH.BoxScope.labelpath], TH.Whisper)
     await nextTick()
     const savedKeys = persister.restoreClient()!.clientState.queries.map(({ queryKey }) => queryKey)
     expect(savedKeys).to.deep.include(minder.itemQueryKey(TH.BoxScope))

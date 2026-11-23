@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/query-core'
 import { isEqual } from 'es-toolkit'
-import { Consts, Deriver, Errors, type GX, Logger, Outcome, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
+import { Consts, Deriver, Errors, type GX, Helpers, Logger, Outcome, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { Gate } from './gate'
 import type { BirthGating } from './gating'
@@ -11,7 +11,7 @@ import { BankMinder } from '../minding/bank-minder'
 import { VaultMinder } from '../minding/vault-minder'
 import { type BadNewsHandler, type BankAskDraft, type BankSnapshot, type DeviceJSON, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, type RefusalSnapshot, BankishChecks, PendingBank, SignedOutBank } from '../shapes/shapes-bankish'
 import { type BankRoots, type GetAsk, type ListAsk, getAskOf, listAskOf } from '../shapes/shapes-asks'
-import { type MinderFriend, MinderChecks } from '../shapes/shapes-minder'
+import { type MaskedView, type MaskedViewLease, type MinderFriend, EmptyMaskedView, MinderChecks } from '../shapes/shapes-minder'
 import type { BirthCleartexts, GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
 import type { BankScope } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
@@ -41,11 +41,12 @@ export class Device implements MinderFriend {
   readonly banklabel:          Banklabel
   /** This device's token, recorded in each wayin it builds. */
   readonly device_tok:         DeviceTok
+  // Hidden, so that a spread or a log line of the device passes by the host's objects and their guards.
   /** Where this device's banks are stored. */
-  readonly vaultDB:            VaultDB
-  readonly keyDeriver:         GuardedKeyDeriver
-  readonly strengthChecker:    GuardedStrengthChecker
-  readonly logger:             Logger.VaultLogger
+  declare readonly vaultDB:            VaultDB
+  declare readonly keyDeriver:         GuardedKeyDeriver
+  declare readonly strengthChecker:    GuardedStrengthChecker
+  declare readonly logger:             Logger.VaultLogger
   /** The autolock duration in milliseconds: how long a lease lasts on this device. */
   readonly leaseMillis:        number
 
@@ -87,7 +88,7 @@ export class Device implements MinderFriend {
   }
   // --
 
-  // == [Getters]: userid, scope, autolockMinutes, bankMinder, queryClient, minder, bank, vault, getSnapshot, subscribe
+  // == [Getters]: userid, scope, autolockMinutes, bankMinder, vaultTsqClient, minder, bank, vault, getSnapshot, subscribe
 
   /** The user signed in on this device, or null until `signIn`. */
   get userid(): Userid | null { return this.#userid }
@@ -107,8 +108,8 @@ export class Device implements MinderFriend {
     if (this.#userid === null) { throw Throwers.nobodySignedIn() }
     return this.#bankMinder
   }
-  /** The QueryClient the signed-in user's boxes are cached in, its VaultMinder's: the same one from `Device.make` on, empty until `signIn`, for hooks to observe. */
-  get queryClient(): QueryClient { return this.#minder.queryClient }
+  /** The QueryClient of the vault TSQ, where the signed-in user's boxes are cached: the same one from `Device.make` on, empty until `signIn`, for hooks to observe. */
+  get vaultTsqClient(): QueryClient { return this.#minder.tsqClient }
 
   /** The minder of the signed-in user's boxes. Refuses `absent_vault` until `signIn`. */
   get minder(): VaultMinder {
@@ -138,7 +139,7 @@ export class Device implements MinderFriend {
 
   /** Make a device of the banklabel and token in `record`, guarding the host's functions in `opts`, with nobody signed in.
    * It makes its two minders, each with its QueryClient, empty: one for the bank's roots, and one for its boxes, whose
-   * client is {@link queryClient}. The signed-in bank's caches are restored from `opts.persisters` at {@link signIn}, and
+   * client is {@link vaultTsqClient}. The signed-in bank's caches are restored from `opts.persisters` at {@link signIn}, and
    * nothing is fetched from the vaultDB until then.
    */
   static make(record: DeviceRecord, opts: DeviceOpts): Device { return new Device(record, opts) }
@@ -147,10 +148,7 @@ export class Device implements MinderFriend {
     const { record: { banklabel, device_tok }, opts: { vaultDB, keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, onBadNews = DefaultOnBadNews, queryCacheOpts, persisters } } = Checks.deviceMakeArgs.parse({ record, opts })
     this.banklabel = banklabel
     this.device_tok = device_tok
-    this.vaultDB = vaultDB
-    this.keyDeriver = guardKeyDeriver(keyDeriver)
-    this.strengthChecker = guardStrengthChecker(strengthChecker)
-    this.logger = Logger.parseLogger(logger)
+    Helpers.decorate<Device>(this, { vaultDB, keyDeriver: guardKeyDeriver(keyDeriver), strengthChecker: guardStrengthChecker(strengthChecker), logger: Logger.parseLogger(logger) })
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.#onBadNews = onBadNews
     this.#persisters = persisters
@@ -321,6 +319,21 @@ export class Device implements MinderFriend {
   }
   // --
 
+  // == [A devtool's view]: maskedView
+
+  // The bank TSQ is no devtool's to read whole: the gate's record has each wayin's wrapped bankKey, which an offline
+  // guess at a passphrase is checked against. What leaves here is a copy, with every ciphertext masked, and of
+  // the lease only its loggable: the gate hands out no lease.
+  /** The bank TSQ, the vault TSQ and the lease, masked for a devtool.
+   * Each row has its key, its state, and a copy of its record or listing with each ciphertext masked. The lease shows its loggable and when it ends, never its key material.
+   * For experimenting, never for an app's own logic: what it answers may change without notice. Before `signIn`, it answers {@link EmptyMaskedView}.
+   */
+  maskedView(): MaskedView {
+    if (this.#userid === null) { return EmptyMaskedView }
+    return { bankTSQ: this.#bankMinder.maskedRows(), vaultTSQ: this.#minder.maskedRows(), lease: maskedViewLeaseOf(this.#bank?.gate) }
+  }
+  // --
+
   // == [Telling the host]: tellBadNews
 
   /** Tell the host's `onBadNews` of failures no caller is waiting on. Never throws.
@@ -378,7 +391,7 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 }
 // --
 
-// == [Helpers]: millisOf, checkSecureContext, refusalSnapshotOf
+// == [Helpers]: millisOf, checkSecureContext, refusalSnapshotOf, maskedViewLeaseOf
 
 // A host's Infinity minutes, for never, becomes ForeverMillis: past the entrypoint, nothing is infinite.
 /** `minutes` in milliseconds, capped at `ForeverMillis`, or `fallback` for none. */
@@ -393,6 +406,13 @@ function checkSecureContext(): void {
 function refusalSnapshotOf(err: unknown): RefusalSnapshot {
   const { refusalkind, family, message } = Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)
   return Object.freeze({ refusalkind, family, message })
+}
+
+/** The lease `gate` holds, as a devtool is shown it: its loggable and when it ends, or `active: false` for no gate, or one locked. */
+function maskedViewLeaseOf(gate: Gate | undefined): MaskedViewLease {
+  const loggable = gate?.leaseLoggable ?? null
+  const endsAt = gate?.leaseEndsAt ?? null
+  return ((loggable === null) || (endsAt === null)) ? EmptyMaskedView.lease : { active: true, ...loggable, ends_at: endsAt }
 }
 // --
 

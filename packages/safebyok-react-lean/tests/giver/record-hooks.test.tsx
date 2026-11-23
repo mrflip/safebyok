@@ -105,7 +105,7 @@ describe("useBox, mounted before anyone is signed in", () => {
     const { rerender } = render(treeOf(world, <BoxProbe />, null))
     rerender(treeOf(world, <BoxProbe />))
     await waitFor(() => { expect(seen.current?.data).to.not.be.undefined })
-    const client = world._cheat_device().queryClient
+    const client = world._cheat_device().vaultTsqClient
     const { options } = client.getQueryCache().find({ queryKey: JokesKey, exact: true })!
     const defaults = client.getQueryDefaults(JokesKey)
     expect(defaults.queryFn).to.be.a('function')
@@ -161,7 +161,7 @@ describe("useBox over the minder's own cache", () => {
     await act(async () => { await LeanTH.expectBad(minder.tryGet({ ...minder.scope, labelpath: JokesBoxPath }, { staleTime: 0 }), 'stale_read') })
     await waitFor(() => { expect(seen.current?.isError).to.eq(true) })
     expect([seen.current?.data, seen.current?.isStale]).to.deep.equal([second, true])
-    expect(minder.queryClient.getQueryState(JokesKey)).to.deep.include({ isInvalidated: true, data: second })
+    expect(minder.tsqClient.getQueryState(JokesKey)).to.deep.include({ isInvalidated: true, data: second })
     expect(world.counts.gets).to.eq(gets + 1)
   })
 })
@@ -247,7 +247,7 @@ describe("useBoxList over the minder's own listing", () => {
     await waitFor(() => { expect(result.current.data).to.deep.equal([TH.JokesPath]) })
     const { minder } = world._cheat_device()
     act(() => { minder.invalidate('box', { list: 'all' }) })
-    await waitFor(() => { expect(minder.queryClient.getQueryState(BoxListKey)?.isInvalidated).to.eq(false) })
+    await waitFor(() => { expect(minder.tsqClient.getQueryState(BoxListKey)?.isInvalidated).to.eq(false) })
     expect([lists.count, result.current.data]).to.deep.equal([2, [TH.JokesPath]])
   })
 

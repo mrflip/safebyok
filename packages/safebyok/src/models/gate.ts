@@ -10,7 +10,7 @@ import type {
   BirthCleartexts, GateDna, GateGatingFriend, GateOpts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, PassphraseReplaceCleartexts, UnlockCleartexts,
 } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
-import { type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
+import { type BankStamp, type GateStamp, type LeaseLoggable, StampChecks } from '../shapes/shapes-stamps'
 import { type GateRecord, type Modelkind, type Sparse, type ThingRecord, type ThingScope, type Wayins, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type PutAskDraft, putAskOf } from '../shapes/shapes-asks'
@@ -45,7 +45,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
   #endCause: Errors.VaultError | null = null
   // --
 
-  // == [Getters]: device, vaultDB, wayins, main, passkey0, scope, stamp, bankStamp, leaseEndsAt
+  // == [Getters]: device, vaultDB, wayins, main, passkey0, scope, stamp, bankStamp, leaseEndsAt, leaseLoggable
 
   /** The device this gate's bank is on. */
   get device(): Device { return this.#device }
@@ -73,6 +73,9 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
 
   /** When the attached lease stops unlocking the bank, or null while locked. */
   get leaseEndsAt(): EpochMillis | null { return (this.#lease === null) ? null : this.#lease.proved_at + this.#device.leaseMillis }
+
+  /** What a log wants of the attached lease, or null while locked. */
+  get leaseLoggable(): LeaseLoggable | null { return this.#lease?.loggable ?? null }
   // --
 
   // == [Construction]: make, constructor, makeRecord, makeNextRecord
