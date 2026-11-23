@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Regenerate the chain table: run twice, the first pass to dump what the minder does today, the second to write today/todayBy.
+# today/todayBy are what the minder did on this run: once the minder changes, regenerate wanted only, as gen.py's head says.
 set -e
 S=$(cd "$(dirname "$0")" && pwd)
 export TABLEGEN_DUMP=$S/dump.json
