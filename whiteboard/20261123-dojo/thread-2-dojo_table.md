@@ -1,7 +1,7 @@
 # Thread 2: dojo_table (2026-11-23)
 
-Branch `20261123-dojo_table`, PR (number below), stacked on #858 (`20261123-dojo`, cut at 071d626ca). Proved: see the
-last line.
+Branch `20261123-dojo_table`, PR #860, stacked on #858 (`20261123-dojo`, cut at 071d626ca). Proved: the core's tests
+(1446) and the dojo's (14), lint and typecheck of both, while building; `pnpm justify` after the catch-up.
 
 The Coach's three requests after seeing the dojo: the dojo's own strength meter, the Inspect tab as tables, and the
 Thing's natural field order.
