@@ -1,6 +1,6 @@
 # Thread 13: item_refetch (2026-11-23)
 
-Branch `20261123-item_refetch`, PR #TBD, stacked on #854. Proved: safebyok `tests/minding` 333 passed, safebyok-react-lean 307 passed, lint and typecheck of both clean; `pnpm justify` at ready.
+Branch `20261123-item_refetch`, PR #855, stacked on #854. Proved: safebyok `tests/minding` 333 passed, safebyok-react-lean 307 passed, lint and typecheck of both clean; `pnpm justify` at ready.
 
 * **Built**: the minder is the one owner of refetch for items, as thread 8 made it for listings. `Minder.#markBehinds`
   (packages/safebyok/src/minding/minder.ts) invalidates an item that falls behind its soon with TanStack's default
