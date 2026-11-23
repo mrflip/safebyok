@@ -1,4 +1,4 @@
-import { fireEvent, within } from '@testing-library/react'
+import { fireEvent, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import * as TH from '../../test-helpers'
 import * as World from './world'
@@ -22,7 +22,7 @@ describe("the refusal card, today", () => {
     const alert = within(shown).getByRole('alert')
     await TH.expectTextSoon(() => alert.textContent, 'The dojo told its vaultDB to refuse this write.')
     const field = within(shown).getByLabelText<HTMLInputElement>('API key')
-    expect(document.activeElement).to.eq(field)
+    await waitFor(() => { expect(document.activeElement).to.eq(field) })
     expect([field.value, field.getAttribute('aria-describedby'), field.getAttribute('aria-invalid')]).to.deep.equal([World.ApiKey, alert.id, 'true'])
   })
 
