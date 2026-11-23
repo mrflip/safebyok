@@ -319,6 +319,12 @@ describe("the chain table", () => {
     const misses = ChainCases.filter((row) => (lifeOf(row.initial) !== lifeOf(row.wanted)) !== (row.wanted.isListingStale === true))
     expect(misses.map((row) => titleOf(row))).to.deep.equal([])
   })
+
+  // A todayBy route no chain takes would be skipped without a word, and its row would assert wanted there.
+  it("names in todayBy only routes its chain can take", () => {
+    const strays = ChainCases.flatMap((row) => Object.keys(row.todayBy ?? {}).filter((routes) => ! routeSetsOf(row.chain).includes(routes)).map((routes) => `${titleOf(row)}: ${routes}`))
+    expect(strays).to.deep.equal([])
+  })
 })
 
 describe("a VaultMinder's cache after a chain of records", () => {
