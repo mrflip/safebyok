@@ -8,12 +8,12 @@ import { type ReactNode, createContext, useCallback, useContext, useEffect, useM
 import {
   type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, Labelpath,
   type LiveOf, type LivePublicPropsOf, MinderEventFormat, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
-  PendingBank, type Sidecar, ThingMinder, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
+  PendingBank, Shell, type Sidecar, VaultMinder, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
 } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
 import {
-  FormMutationDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, formMutationKeyOf, gateQueryKeyOf, gateShownOf, liveGateOf, liveOf, recordQueryDefaults,
+  FormMutationDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, formMutationKeyOf, gateShownOf, liveGateOf, liveOf, recordQueryDefaults,
 } from './giver-defaults'
 import { type Given, GiverContext } from './giver-context'
 import * as Phrases from './phrases-giver'
@@ -21,7 +21,7 @@ import { popField } from './pop-field'
 import { type BoxQueryOpts, ConfigChecks, type GiverConfig, HostCallbackOpts, ScopeChecks, SignedOutBank } from './shapes-giver'
 import { makeUseDraft } from './use-draft'
 
-// == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, HeaderedGate, GateShown, GateSelected, GateQueryOpts, BoxQueryOptions, BoxQueries, WithLockableWhisperOpts, PutBoxActionOpts, PutBoxActionResult, PutBoxMutationOptions, FormMutationOptions, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
+// == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, HeaderedGate, GateShown, GateSelected, GateOpts, GateResult, BoxQueryOptions, BoxQueries, WithLockableWhisperOpts, PutBoxActionOpts, PutBoxActionResult, PutBoxMutationOptions, FormMutationOptions, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
 
 /** The props of a giver's `Provider`. */
 export type ProviderProps = Readonly<{
@@ -46,14 +46,17 @@ export type BoxSelected = LiveOf<BoxRecord> | null | undefined
 /** The main gate's record as the giver shows it: each wayin by its header, without the bankKey it wraps. */
 export type HeaderedGate = Omit<GateRecord, 'wayins'> & Readonly<{ wayins: Readonly<{ main: PassphraseWayinHeader, passkey0: PasskeyWayinHeader | null }> }>
 
-/** The main gate as the giver fetches it: its record by its wayins' headers, or its shell where none is stored. */
+/** The main gate as the giver shows it: its record by its wayins' headers, or its shell where none is stored. */
 export type GateShown = HeaderedGate | Tombstone<HeaderedGate>
 
-/** What the gate's query answers by default: the live gate, null where no bank is stored, or undefined. */
+/** What `useGate` answers by default: the live gate, null where no bank is stored, or undefined. */
 export type GateSelected = HeaderedGate | null | undefined
 
-/** React Query's options for `useGate`'s query that shape what that one hook shows. The giver sets every other. */
-export type GateQueryOpts<SelT> = Pick<BoxQueryOpts<GateShown, SelT>, 'select' | 'notifyOnChangeProps'>
+/** `useGate`'s options: `select` makes what the hook answers from the gate shown. */
+export type GateOpts<SelT> = Readonly<{ select?: ((gate: GateShown) => SelT) | undefined }>
+
+/** What `useGate` answers: `data`, what its `select` makes of the gate, or undefined until the bank is brought up. */
+export type GateResult<SelT> = Readonly<{ data: SelT | undefined }>
 
 /** The `queryOptions` of a box, for `useQuery`, `useQueries`, `queryClient.query` and the rest, run in the giver's QueryClient. */
 export type BoxQueryOptions = UseQueryOptions<BoxShown, Error, BoxSelected> & Readonly<{ queryKey: DataTag<QueryKey, BoxShown, Error> }>
@@ -197,7 +200,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     const [device, setDevice] = useState<Device | null>(null)
     // Made in the effect, not in render: Device.make checks the secure context, and a server has no device to make.
     // The mount keeps its first device, so StrictMode's second run of the effect starts nothing more. `hello` fetches the
-    // bank, its main gate and root box through the minder, and answers its first call to every later one.
+    // bank, its main gate and root box as its world, and answers its first call to every later one.
     const startDevice = useEffectEvent((signedIn: string) => {
       // Cheat (react_life): a fresh device_tok for each device. Nothing keeps one across a reload yet.
       mount.device ??= Device.make({ userid: signedIn, banklabel, device_tok: globalThis.crypto.randomUUID() }, {
@@ -286,7 +289,7 @@ const Unjudged = Object.freeze({ verdict: null, isJudging: false, lastErr: null 
 
 /** A provider's mount, before its first userid: a QueryClient its devices' minders may cache in, and no device. */
 function makeProviderMount(): ProviderMount {
-  return { client: ThingMinder.makeClient(), device: null }
+  return { client: VaultMinder.makeClient(), device: null }
 }
 
 /** What a provider handed `userid` shows its children of `device`, its mount's: none while it is another user's or not yet made, stage `starting` for a userid and `signed_out` for none. */
@@ -300,8 +303,6 @@ function shownOf(device: Device | null, userid: string | null | undefined, clien
 
 /** The hooks and calls of the bank `friend` serves. */
 function makeBankGiver(friend: BankFriend) {
-  /** The main gate as the minder caches it: its whole record, or its shell where none is stored. */
-  type GateStored = GateRecord | Tombstone<GateRecord>
   const { banklabel, signedIn, clientNow, demandDevice, demandBank, demandVault, useShown } = friend
 
   /** The bank's snapshot. Synchronous: it never waits and never suspends.
@@ -391,29 +392,24 @@ function makeBankGiver(friend: BankFriend) {
     return useQuery<BoxShown, Error, SelT>({ ...boxQueryBaseOf(device, labelpath, isUp), select: liveOf as (thing: BoxShown) => SelT, ...shaping }, client)
   }
 
-  // The client caches the whole gate, so each `select` starts from the gate without the bankKeys its wayins wrap.
-  /** The bank's main gate, through React Query: its wayins' headers, never the bankKey they wrap.
-   * `data` is the gate, null when no bank is stored, and undefined while pending or until the bank is brought up.
+  // The gate is read from the world in the device's BankMinder at each render, and React keeps only the gate shown: the
+  // whole gate, with the bankKeys its wayins wrap, stays in the BankMinder.
+  /** The bank's main gate: its wayins' headers, never the bankKey they wrap. Synchronous: it never waits and never suspends.
+   * `data` is the gate, null when no bank is stored, and undefined until the bank is brought up.
    * Its `wayins.passkey0` is the header of the bank's passkey, or null while it has none: a passkey added or revoked on any device shows here.
-   * `opts` are React Query's options that shape what this one hook shows, as {@link useBox} takes them.
+   * Given `select`, `data` is what `select` makes of the gate.
    * @example
    *   const passkeyHeader = Knock.useGate({ select: passkeyHeaderOf }).data
    *   {(passkeyHeader === null) && <AddPasskeyForm username={user.email} />}
    */
-  function useGate<SelT = GateSelected>(opts: GateQueryOpts<SelT> = {}): UseQueryResult<SelT> {
-    const { device, client } = useShown()
+  function useGate<SelT = GateSelected>(opts: GateOpts<SelT> = {}): GateResult<SelT> {
+    const { device } = useShown()
     const isUp = useBank(isBroughtUp)
-    const { select = liveGateOf as (gate: GateShown) => SelT, ...shaping } = pick(opts, GateShapingOptnames)
-    return useQuery<GateStored, Error, SelT>({ ...gateQueryBaseOf(device, isUp), select: (gate) => select(gateShownOf(gate)), ...shaping }, client)
-  }
-
-  /** The key, fetch and defaults of the query of `device`'s main gate, skipping the fetch unless `isUp`, the bank brought up. */
-  function gateQueryBaseOf(device: Device | null, isUp: boolean): Pick<UseQueryOptions<GateStored>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
-    return {
-      ...recordQueryDefaults(() => isBehindAt(device, Labelpath.MainGate)),
-      queryKey: gateQueryKeyOf({ userid: useridOf(device), banklabel }),
-      ...((! isUp || (device === null)) && { queryFn: skipToken }),
-    }
+    const { select = liveGateOf as (gate: GateShown) => SelT } = opts
+    const subscribe = useCallback((onChange: () => void) => ((device === null) ? unsubscribeFromNothing : device.bankMinder.subscribe(onChange)), [device])
+    const shownNow = () => ((isUp && (device !== null)) ? gateShownOfWorld(device) : undefined)
+    const shown = useSyncExternalStore(subscribe, shownNow, shownNow)
+    return { data: (shown === undefined) ? undefined : select(shown) }
   }
 
   // The minder's listing fetches by a list, and is cached from `hello`, bare: TanStack reads it stale, as data no fetch has
@@ -436,7 +432,7 @@ function makeBankGiver(friend: BankFriend) {
     }, client)
   }
 
-  /** The keys of the signed-in user's boxes and gate in {@link queryClient}'s client, reading whoever is signed in when called. */
+  /** The keys of the signed-in user's boxes in {@link queryClient}'s client, reading whoever is signed in when called. */
   const keys = Object.freeze({
     /** The key of the box at `labelpath`'s query. */
     box:   (labelpath: string): QueryKey => boxQueryKeyOf({ userid: useridOf(signedIn()), banklabel, labelpath: boxLabelpathOf(labelpath) }),
@@ -447,8 +443,6 @@ function makeBankGiver(friend: BankFriend) {
     under: (labelpath?: string): QueryKey => boxesQueryKeyUnder({ userid: useridOf(signedIn()), banklabel, labelpath: (labelpath === undefined) ? RootBoxLabelpath : boxLabelpathOf(labelpath) }),
     /** The key of {@link useBoxList}'s query, which no key from `under` starts. */
     boxList: (): QueryKey => boxListQueryKeyOf({ userid: useridOf(signedIn()), banklabel }),
-    /** The key of {@link useGate}'s query, which no key from `under` starts. */
-    gate:    (): QueryKey => gateQueryKeyOf({ userid: useridOf(signedIn()), banklabel }),
   })
 
   /** Call `fn` with the box's whisper, and resolve what `fn` resolves. On a locked bank, it first waits for the unlock form.
@@ -685,7 +679,7 @@ function makeBankGiver(friend: BankFriend) {
 }
 // --
 
-// == [Helpers]: useridOf, isBroughtUp, isBehindAt, refetchMarked, BoxShapingOptnames, GateShapingOptnames, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
+// == [Helpers]: useridOf, isBroughtUp, isBehindAt, refetchMarked, GateShownOfCkey, gateShownOfWorld, BoxShapingOptnames, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
 
 /** `device`'s userid, or null for no device. */
 function useridOf(device: Device | null): Userid | null {
@@ -707,7 +701,7 @@ function isBehindAt(device: Device | null, labelpath: Labelpath): boolean {
 // invalidated tells nothing when it falls behind again. A fetch already under way is left to land, and its landing tells
 // again where it landed behind.
 /** Refetch each item or listing of `minder`'s that a hook observes, once the minder marks it behind or stale. Returns the function that stops it. */
-function refetchMarked(minder: ThingMinder): () => void {
+function refetchMarked(minder: VaultMinder): () => void {
   const client = minder.queryClient
   return minder.listen((event) => {
     if (event.type !== 'updated') { return }
@@ -717,11 +711,24 @@ function refetchMarked(minder: ThingMinder): () => void {
   }, MinderEventFormat)
 }
 
+// useSyncExternalStore wants the same snapshot until the store changes, and the world's gate record is the same object
+// until a newer one lands. Weakly held: the BankMinder alone keeps the gate record alive.
+/** The gate shown for each world's gate record, or for each device whose BankMinder has no world of its bank. */
+const GateShownOfCkey = new WeakMap<GateRecord | Device, GateShown>()
+
+/** `device`'s main gate, from its bank's world, as the giver shows it: its shell where no world is heard of. The same object until the world's gate changes. */
+function gateShownOfWorld(device: Device): GateShown {
+  const gate = device.bankMinder.worldAt()?.gate
+  const ckey = gate ?? device
+  const cached = GateShownOfCkey.get(ckey)
+  if (cached !== undefined) { return cached }
+  const shown = gateShownOf(gate ?? Shell.of({ ...device.scope, labelpath: Labelpath.MainGate }))
+  GateShownOfCkey.set(ckey, shown)
+  return shown
+}
+
 /** The options of React Query's that a record hook takes from its caller: those that shape what that one hook shows. */
 const BoxShapingOptnames = ['select', 'placeholderData', 'notifyOnChangeProps'] as const
-
-/** The options of React Query's that `useGate` takes from its caller. */
-const GateShapingOptnames = ['select', 'notifyOnChangeProps'] as const
 
 /** The subscribe of a store that never changes, for `useSyncExternalStore` while there is no device. */
 function subscribeToNothing(): () => void { return unsubscribeFromNothing }

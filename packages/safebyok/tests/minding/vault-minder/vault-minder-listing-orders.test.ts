@@ -31,7 +31,7 @@ const ListingOrders = OrdersWithoutWrite.flatMap((steps) => [0, 1, 2, 3].map((ii
 async function listingAfter(steps: readonly ListingStep[], { isListedBefore, isListStale }: Readonly<{ isListedBefore: boolean, isListStale: boolean }>) {
   const vaultDB = new QuietVaultDB()
   await storedBoxOf(vaultDB)
-  const { minder, bank, receive } = minderWorldOf(vaultDB)
+  const { minder, bank, receive } = await minderWorldOf(vaultDB)
   if (isListedBefore) { await minder.list('box') }
   if (isListStale) {
     const answered = await vaultDB.tryListThings(bank.makeListAsk({ labelpath: 'box', ifAbsent: 'nil' }))
@@ -49,7 +49,7 @@ async function listingAfter(steps: readonly ListingStep[], { isListedBefore, isL
   return minder.listingAt(TH.RootScope)
 }
 
-describe("a ThingMinder's listing is the same, in any order", () => {
+describe("a VaultMinder's listing is the same, in any order", () => {
   describe("of a list, a get, a write and a notice", () => {
     for (const steps of ListingOrders) {
       const blurb = steps.join(', ')
@@ -94,7 +94,7 @@ const Reborn = TH.boxRebornOf(TH.boxTombOf(TH.nextOf(Openai)))
 async function eventsAfter(steps: readonly ListingStep[]) {
   const vaultDB = new QuietVaultDB()
   await storedBoxOf(vaultDB)
-  const { minder, receive } = minderWorldOf(vaultDB)
+  const { minder, receive } = await minderWorldOf(vaultDB)
   const heard      = listenerOf()
   minder.listen(heard, MinderEventFormat)
   const replaceAsk = TH.replaceAskOf(Openai, TH.nextOf(Openai))
@@ -124,7 +124,7 @@ function shrunkListings(listings: readonly (readonly Labelpath[] | undefined)[])
   return listings.filter((labelpaths, ii) => (ii > 0) && (listings[ii - 1] ?? []).some((labelpath) => (! labelpaths?.includes(labelpath))))
 }
 
-describe("a ThingMinder tells each item and listing going forward, in any order", () => {
+describe("a VaultMinder tells each item and listing going forward, in any order", () => {
   describe("of a list, a get, a write and a notice of a later life", () => {
     for (const steps of ListingOrders) {
       const blurb = steps.join(', ')

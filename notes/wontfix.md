@@ -33,7 +33,7 @@ Coach, 2026-11-15, box_ops thread 1.
 
 ### A get's late, older answer keeps the newer record, but marks it fresh
 
-* current outcome: when a get's answer lands after a newer record from another source, the ThingMinder keeps the newer
+* current outcome: when a get's answer lands after a newer record from another source, the VaultMinder keeps the newer
   record, and TanStack Query marks the item fresh as of the get's answer. The record reads as timely for longer, by
   however long that answer was in flight. A whole record older than the item from any other source (a notice, or a
   write's answer) is dropped, and leaves the item as fresh as it was.
@@ -51,7 +51,7 @@ Reasoning for wontfix: the gain is at most one answer's time in flight, against 
 would put a comparison outside `structuralSharing`. Ruled by the Coach, 2026-11-15, vault_minder; narrowed to a get by
 the Coach, 2026-11-20, soon_item rework.
 
-### The ThingMinder detects no conflict among the records it holds
+### The VaultMinder detects no conflict among the records it holds
 
 * current outcome: `newerThingOf` returns the later record by lifepath and then revseq. Two records of one revision
   with different revtoks keep whichever landed first. A get that storage answers older than the record cached when
@@ -142,7 +142,7 @@ lifecycle: new machinery in a primitive's critical path, for crossings the host 
 
 ### A minder's answer that crosses a `goodbye` and a fresh `hello`
 
-* current outcome, as built, and promised nowhere: a `get`, `list` or `write` the ThingMinder began before `goodbye`,
+* current outcome, as built, and promised nowhere: a `get`, `list` or `write` the VaultMinder began before `goodbye`,
   answered after `goodbye` and a fresh `hello`, may land in the new cache; one whose fetch had settled may join its Thing
   to the new root box's listing. What a get or a list still waiting at `goodbye` refuses, even with no `hello`, is
   unspecified: as built, TanStack cancels it, and it rejects with TanStack's `CancelledError` (a `tryList` answers it as

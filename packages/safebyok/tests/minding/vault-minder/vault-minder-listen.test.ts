@@ -6,24 +6,31 @@ import { Thing } from '../../../src/models/thing'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { type BoxRecord, type GateRecord, type Sparse, type Tombstone } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
-import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, cheatBox, storedGateOf, storedBoxOf, noticeOf, sparseNoticeOf, everyEventListenerOf, listenerOf, toldOf, isListingEvent } from './world'
+import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, cheatBox, storedBoxOf, noticeOf, sparseNoticeOf, boxScopeOf, everyEventListenerOf, listenerOf, toldOf, isListingEvent } from './world'
 
-describe("ThingMinder.listen", () => {
-  it("tells the cached record of every Thing of every kind, until stopped", async () => {
+/** The last item's event `heard` was told, or undefined for none. */
+function lastItemEventOf(heard: ReturnType<typeof listenerOf>): MinderEvent | undefined {
+  return heard.mock.calls.findLast(([event]) => event.eventkind === 'item')?.[0]
+}
+
+describe("VaultMinder.listen", () => {
+  it("tells the cached record of every box, until stopped", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
-    const { minder } = minderWorldOf(vaultDB)
+    cheatBox(vaultDB, TH.boxThingOf('anthropic'))
+    const { minder } = await minderWorldOf(vaultDB)
     const heard    = listenerOf()
     const unlisten = minder.listen(heard, MinderEventFormat)
     await minder.get(TH.BoxScope)
     expect(heard.mock.calls).to.have.lengthOf(1)
     expect(heard.mock.calls[0]?.[0]).to.deep.nested.include({ eventkind: 'item', type: 'updated', 'action.type': 'success', ...TH.BoxScope, modelkind: 'box', queryKey: minder.itemQueryKey(TH.BoxScope) })
     expect(heard.mock.calls[0]?.[0]).to.have.nested.property('state.data', minder.at(TH.BoxScope))
-    const gate = await minder.get(TH.GateScope)
-    expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ ...TH.GateScope, modelkind: 'gate', queryKey: minder.itemQueryKey(TH.GateScope) })
-    expect(heard.mock.calls.at(-1)?.[0]).to.have.nested.property('state.data', gate)
+    const anthropic = await minder.get(boxScopeOf('anthropic'))
+    const lastItem  = lastItemEventOf(heard)
+    expect(lastItem).to.deep.include({ ...boxScopeOf('anthropic'), modelkind: 'box', queryKey: minder.itemQueryKey(boxScopeOf('anthropic')) })
+    expect(lastItem).to.have.nested.property('state.data', anthropic)
     unlisten()
     heard.mockClear()
-    await minder.get(TH.GateScope, { staleTime: 0 })
+    await minder.get(boxScopeOf('anthropic'), { staleTime: 0 })
     expect(heard.mock.calls).to.have.lengthOf(0)
   })
 
@@ -37,7 +44,7 @@ describe("ThingMinder.listen", () => {
   it("tells an item's event, a soon's and a listing's apart by its eventkind", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
-    const { minder } = minderWorldOf(vaultDB)
+    const { minder } = await minderWorldOf(vaultDB)
     const heard = everyEventListenerOf()
     minder.listen(heard, MinderEventFormat)
     await minder.list('box')
@@ -58,11 +65,11 @@ describe("ThingMinder.listen", () => {
 
   it("tells a frozen copy of TanStack's current state, never the query itself", async () => {
     const vaultDB = new MemoryVaultDB()
-    await storedGateOf(vaultDB, 0)
-    const { minder } = minderWorldOf(vaultDB)
+    await storedBoxOf(vaultDB, 0)
+    const { minder } = await minderWorldOf(vaultDB)
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
-    await minder.get(TH.GateScope)
+    await minder.get(TH.BoxScope)
     const event = heard.mock.calls[0]![0]
     expect(event).to.not.have.property('query')
     expect(event.state).to.include({ status: 'success', error: null, isInvalidated: false })
@@ -73,7 +80,7 @@ describe("ThingMinder.listen", () => {
   it("tells TanStack's action whole, in a frozen copy", async () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
-    const { minder, receive } = minderWorldOf(vaultDB)
+    const { minder, receive } = await minderWorldOf(vaultDB)
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
     receive(noticeOf(box0))
@@ -85,10 +92,10 @@ describe("ThingMinder.listen", () => {
 
   it("tells the refusal a get's error carries in its action", async () => {
     const vaultDB = await bornOf(new DownVaultDB())
-    const { minder } = minderWorldOf(vaultDB)
+    const { minder } = await minderWorldOf(vaultDB)
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
-    await TH.expectRefusal(minder.get(TH.GateScope), 'storage_unavailable')
+    await TH.expectRefusal(minder.get(TH.BoxScope), 'storage_unavailable')
     const { action, state } = heard.mock.calls[0]![0]
     expect(action).to.have.property('type', 'error')
     expect(action).to.have.nested.property('error.refusalkind', 'storage_unavailable')
@@ -98,7 +105,7 @@ describe("ThingMinder.listen", () => {
   it("tells the query's hash beside its key", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
-    const { minder } = minderWorldOf(vaultDB)
+    const { minder } = await minderWorldOf(vaultDB)
     const heard = everyEventListenerOf()
     minder.listen(heard, MinderEventFormat)
     await minder.list('box')
@@ -109,19 +116,19 @@ describe("ThingMinder.listen", () => {
 
   it("tells the record's revision and life", async () => {
     const vaultDB = new MemoryVaultDB()
-    const gate    = await storedGateOf(vaultDB, 1)
-    const { minder } = minderWorldOf(vaultDB)
+    const box     = await storedBoxOf(vaultDB, 1)
+    const { minder } = await minderWorldOf(vaultDB)
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
-    await minder.get(TH.GateScope)
-    const { revtok, revseq, am, lifeseq, lifepath } = gate
+    await minder.get(TH.BoxScope)
+    const { revtok, revseq, am, lifeseq, lifepath } = box
     expect(heard.mock.calls[0]?.[0]).to.deep.include({ revtok, revseq, am, lifeseq, lifepath })
     expect(heard.mock.calls[0]?.[0]).to.not.have.property('agerank')
   })
 
   it("tells the shell's revision and life where nothing is stored", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
-    const { minder } = minderWorldOf(vaultDB)
+    const { minder } = await minderWorldOf(vaultDB)
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
     const { revtok, lifeseq, lifepath } = await minder.get(TH.BoxScope)
@@ -131,7 +138,7 @@ describe("ThingMinder.listen", () => {
   it("tells a newer sparse record in the soon, then the item invalidated, once, then each later sparse record in the soon", async () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
-    const { minder, receive } = minderWorldOf(vaultDB)
+    const { minder, receive } = await minderWorldOf(vaultDB)
     await minder.get(TH.BoxScope)
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
@@ -149,7 +156,7 @@ describe("ThingMinder.listen", () => {
   it("tells the record a get catches the item up with, and then the soon's removal", async () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
-    const { minder } = minderWorldOf(vaultDB)
+    const { minder } = await minderWorldOf(vaultDB)
     await minder.get(TH.BoxScope)
     const box1    = TH.nextOf(box0)
     cheatBox(vaultDB, box1)
@@ -166,21 +173,22 @@ describe("ThingMinder.listen", () => {
 
   it("tells the record itself, the same object after a record that changes nothing", async () => {
     const vaultDB = new MemoryVaultDB()
-    const gate    = await storedGateOf(vaultDB, 0)
-    const { minder, receive } = minderWorldOf(vaultDB)
+    const box     = await storedBoxOf(vaultDB, 0)
+    const { minder, receive } = await minderWorldOf(vaultDB)
     const heard   = listenerOf()
     minder.listen(heard, MinderEventFormat)
-    await minder.get(TH.GateScope)
-    receive(noticeOf(gate))
-    const cached = minder.at(TH.GateScope)
-    expect(heard.mock.calls).to.have.lengthOf(2)
-    expect(heard.mock.calls[0]?.[0]).to.have.nested.property('state.data', cached)
-    expect(heard.mock.calls[1]?.[0]).to.have.nested.property('state.data', cached)
+    await minder.get(TH.BoxScope)
+    receive(noticeOf(box))
+    const cached = minder.at(TH.BoxScope)
+    const items  = heard.mock.calls.map(([event]) => event).filter((event) => event.eventkind === 'item')
+    expect(items).to.have.lengthOf(2)
+    expect(items[0]).to.have.nested.property('state.data', cached)
+    expect(items[1]).to.have.nested.property('state.data', cached)
   })
 
   it("tells the shell, and then a tombstone", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
-    const { minder, receive } = minderWorldOf(vaultDB)
+    const { minder, receive } = await minderWorldOf(vaultDB)
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
     await minder.get(TH.BoxScope)
@@ -193,27 +201,27 @@ describe("ThingMinder.listen", () => {
 
   it("tells nothing while a get waits, then the record it lands", async () => {
     const vaultDB = new LateVaultDB()
-    const gate    = await storedGateOf(vaultDB, 0)
-    const { minder } = minderWorldOf(vaultDB)
+    const box     = await storedBoxOf(vaultDB, 0)
+    const { minder } = await minderWorldOf(vaultDB)
     const heard   = listenerOf()
     minder.listen(heard, MinderEventFormat)
-    const getting = minder.get(TH.GateScope)
+    const getting = minder.get(TH.BoxScope)
     await TH.eventually(() => vaultDB.isHolding)
     expect(heard.mock.calls).to.have.lengthOf(0)
     vaultDB.release()
     await getting
-    expect(heard.mock.calls.at(-1)?.[0].state.data).to.deep.equal(gate)
+    expect(lastItemEventOf(heard)?.state.data).to.deep.equal(box)
   })
 
   it("tells the record as cached after a refused get", async () => {
     const vaultDB = new MemoryVaultDB()
-    await storedGateOf(vaultDB, 1)
-    const { minder } = minderWorldOf(vaultDB)
-    const cached = await minder.get(TH.GateScope)
+    await storedBoxOf(vaultDB, 1)
+    const { minder } = await minderWorldOf(vaultDB)
+    const cached = await minder.get(TH.BoxScope)
     const heard  = listenerOf()
     minder.listen(heard, MinderEventFormat)
-    vaultDB._cheat_things(TH.ThingBank).set(TH.GateScope.labelpath, TH.gateThingOf())
-    await TH.expectRefusal(minder.get(TH.GateScope, { staleTime: 0 }), 'stale_read')
+    vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, TH.boxThingOf())
+    await TH.expectRefusal(minder.get(TH.BoxScope, { staleTime: 0 }), 'stale_read')
     expect(heard.mock.calls).to.have.lengthOf(1)
     expect(heard.mock.calls[0]?.[0]).to.have.nested.property('state.data', cached)
     expect(heard.mock.calls[0]?.[0]).to.deep.nested.include({ type: 'updated', 'action.type': 'error', revtok: cached.revtok })
@@ -225,7 +233,7 @@ describe("ThingMinder.listen", () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
     const box1    = TH.nextOf(box0)
-    const { minder, receive } = minderWorldOf(vaultDB)
+    const { minder, receive } = await minderWorldOf(vaultDB)
     receive(noticeOf(box1))
     vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, box0)
     const heard = listenerOf()
@@ -242,7 +250,7 @@ describe("ThingMinder.listen", () => {
       const vaultDB = new MemoryVaultDB()
       const box0    = await storedBoxOf(vaultDB)
       const box1    = TH.nextOf(box0)
-      const { minder, receive } = minderWorldOf(vaultDB)
+      const { minder, receive } = await minderWorldOf(vaultDB)
       await minder.get(TH.BoxScope)
       cheatBox(vaultDB, box1)
       await minder.list('box')
@@ -260,7 +268,7 @@ describe("ThingMinder.listen", () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
     const box1    = TH.nextOf(box0)
-    const { minder, receive } = minderWorldOf(vaultDB)
+    const { minder, receive } = await minderWorldOf(vaultDB)
     await minder.get(TH.BoxScope)
     const seen: unknown[][] = []
     minder.listen((event) => {
@@ -274,7 +282,7 @@ describe("ThingMinder.listen", () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
     const box1    = TH.nextOf(box0)
-    const { minder, receive } = minderWorldOf(vaultDB)
+    const { minder, receive } = await minderWorldOf(vaultDB)
     const item    = await minder.get(TH.BoxScope)
     cheatBox(vaultDB, box1)
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
@@ -291,7 +299,7 @@ describe("ThingMinder.listen", () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
     const box1    = TH.nextOf(box0)
-    const { minder, receive } = minderWorldOf(vaultDB)
+    const { minder, receive } = await minderWorldOf(vaultDB)
     await minder.get(TH.BoxScope)
     const seen: boolean[][] = []
     minder.listen((event) => {
@@ -307,7 +315,7 @@ describe("ThingMinder.listen", () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
     const box1    = TH.nextOf(box0)
-    const { minder, receive } = minderWorldOf(vaultDB)
+    const { minder, receive } = await minderWorldOf(vaultDB)
     await minder.get(TH.BoxScope)
     cheatBox(vaultDB, box1)
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
@@ -322,34 +330,36 @@ describe("ThingMinder.listen", () => {
 
   it("tells no record for a first get that is refused", async () => {
     const vaultDB = await bornOf(new DownVaultDB())
-    const { minder } = minderWorldOf(vaultDB)
+    const { minder } = await minderWorldOf(vaultDB)
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
-    await TH.expectRefusal(minder.get(TH.GateScope), 'storage_unavailable')
-    expect(toldOf(heard)).to.deep.equal([['gate', undefined]])
+    await TH.expectRefusal(minder.get(TH.BoxScope), 'storage_unavailable')
+    expect(toldOf(heard)).to.deep.equal([['box/openai', undefined]])
     expect(heard.mock.calls[0]?.[0]).to.deep.include({ revtok: undefined, revseq: undefined, am: undefined, lifeseq: undefined, lifepath: undefined })
   })
 
   it("tells the last record or listing of each item, soon and listing goodbye removes", async () => {
     const vaultDB = new MemoryVaultDB()
-    await storedGateOf(vaultDB, 0)
-    const { minder, receive } = minderWorldOf(vaultDB)
-    await minder.get(TH.GateScope)
-    receive(sparseNoticeOf(TH.boxThingOf()))
-    const cached = [minder.at(TH.RootScope), minder.at(TH.GateScope), minder.soonAt(TH.BoxScope), minder.listingAt(TH.RootScope)]
+    await storedBoxOf(vaultDB, 0)
+    const { minder, receive } = await minderWorldOf(vaultDB)
+    await minder.get(TH.BoxScope)
+    await minder.list('box')
+    const newer = TH.nextOf(TH.boxThingOf())
+    receive(sparseNoticeOf(newer))
+    const cached = [minder.at(TH.BoxScope), minder.soonAt(TH.BoxScope), minder.listingAt(TH.RootScope)]
     expect(cached.every((val) => val !== undefined)).to.eq(true)
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
     minder.goodbye()
-    expect(toldOf(heard)).to.have.deep.members([['box', 'removed'], ['gate', 'removed'], ['soon', 'box/openai', 'removed'], ['listing']])
-    expect(heard.mock.calls.map(([event]) => [event.type, event.action])).to.deep.equal(Array.from({ length: 4 }, () => ['removed', undefined]))
+    expect(toldOf(heard)).to.have.deep.members([['box/openai', 'removed'], ['soon', 'box/openai', 'removed'], ['listing']])
+    expect(heard.mock.calls.map(([event]) => [event.type, event.action])).to.deep.equal(Array.from({ length: 3 }, () => ['removed', undefined]))
     expect(heard.mock.calls.map(([event]) => event.state.data)).to.have.members(cached)
   })
 
   it("tells a listing as cached, with its parent and the kind of its Things", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
-    const { minder } = minderWorldOf(vaultDB)
+    const { minder } = await minderWorldOf(vaultDB)
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
     await minder.list('box')
@@ -362,7 +372,7 @@ describe("ThingMinder.listen", () => {
   })
 
   it("tells a refused list as an error, the listing left as it was and marked stale", async () => {
-    const { minder } = minderWorldOf(new MemoryVaultDB())
+    const { minder } = await minderWorldOf(new MemoryVaultDB())
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
     await TH.expectRefusal(minder.list('box'), 'storage_issue')
@@ -371,8 +381,8 @@ describe("ThingMinder.listen", () => {
     expect(minder.isListingBareAt(TH.RootScope)).to.be.true
   })
 
-  it("tells the root box's listing, empty, when hello caches it", () => {
-    const { minder } = minderWorldOf(new MemoryVaultDB(), { isStarted: false })
+  it("tells the root box's listing, empty, when hello caches it", async () => {
+    const { minder } = await minderWorldOf(new MemoryVaultDB(), { isStarted: false })
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
     minder.hello()
@@ -384,7 +394,7 @@ describe("ThingMinder.listen", () => {
   it("tells a listing once a labelpath joins it, and not for a record already listed", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
-    const { minder, receive } = minderWorldOf(vaultDB)
+    const { minder, receive } = await minderWorldOf(vaultDB)
     await minder.list('box')
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
@@ -397,7 +407,7 @@ describe("ThingMinder.listen", () => {
   it("tells the labelpaths a listing goodbye removes had", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
-    const { minder } = minderWorldOf(vaultDB)
+    const { minder } = await minderWorldOf(vaultDB)
     await minder.list('box')
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
@@ -408,16 +418,16 @@ describe("ThingMinder.listen", () => {
     expect(removed[0]?.state).to.deep.include({ data: ['box/openai'], status: 'success' })
   })
 
-  /** A minder whose first listener throws on each success and whose second is `later`, once it has fetched the main gate; the bank and the gate it stored. */
+  /** A minder whose first listener throws on each success and whose second is `later`, once it has fetched the box at `TH.BoxScope`; the bank and the box it stored. */
   async function throwingListenerWorldOf() {
     const vaultDB = new MemoryVaultDB()
-    const gate    = await storedGateOf(vaultDB, 0)
-    const { minder, bank } = minderWorldOf(vaultDB)
+    const box     = await storedBoxOf(vaultDB, 0)
+    const { minder, bank } = await minderWorldOf(vaultDB)
     const later   = listenerOf()
-    minder.listen((event) => { if (event.action?.type === 'success') { throw new Error('listener broke') } }, MinderEventFormat)
+    minder.listen((event) => { if ((event.eventkind === 'item') && (event.action?.type === 'success')) { throw new Error('listener broke') } }, MinderEventFormat)
     minder.listen(later, MinderEventFormat)
-    await minder.get(TH.GateScope)
-    return { bank, gate, later }
+    await minder.get(TH.BoxScope)
+    return { bank, box, later }
   }
 
   it("tells the bank's onBadNews what a listener throws", async () => {
@@ -427,12 +437,12 @@ describe("ThingMinder.listen", () => {
   })
 
   it("tells the listeners after one that throws", async () => {
-    const { gate, later } = await throwingListenerWorldOf()
-    expect(later.mock.calls.map(([event]) => event.state.data)).to.deep.include(gate)
+    const { box, later } = await throwingListenerWorldOf()
+    expect(later.mock.calls.map(([event]) => event.state.data)).to.deep.include(box)
   })
 
-  it("refuses a listener that is not a function", () => {
-    const { minder } = minderWorldOf(new MemoryVaultDB())
+  it("refuses a listener that is not a function", async () => {
+    const { minder } = await minderWorldOf(new MemoryVaultDB())
     // @ts-expect-error -- sloppy input is the point
     TH.expectSyncRefusal(() => minder.listen(undefined, MinderEventFormat), 'bad_record')
   })
@@ -443,8 +453,8 @@ describe("ThingMinder.listen", () => {
     [MinderEventFormat.toUpperCase(), 'refuses its own feed version spelled another way'],
   ] as const
   for (const [version, blurb] of BadVersions) {
-    it(blurb, () => {
-      const { minder } = minderWorldOf(new MemoryVaultDB())
+    it(blurb, async () => {
+      const { minder } = await minderWorldOf(new MemoryVaultDB())
       TH.expectSyncRefusal(() => minder.listen(listenerOf(), version as never), 'bad_record')
     })
   }

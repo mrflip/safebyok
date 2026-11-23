@@ -86,3 +86,11 @@ what differs from big, in a sentence or two.
   `packages/safebyok/src/models/gate.ts`), and so is the one `Lease`, kept private in the gate's `#lease`: G9's "the
   Bank keeps its one `Lease` private" reads "the Gate keeps it". A lease is granted to a `LeaseGate` and binds the
   bank's stamp as before. No public method accepts a proving, and G1 and G9 hold in substance.
+
+* 2026-11-22 (core_first thread 2, bank_minder), G3: **The main gate's record is cached in a BankMinder that outlives
+  the bank.** Each device's `BankMinder` (`packages/safebyok/src/minding/bank-minder.ts`) caches its bank's main gate
+  as an item, its `bank_key_wayin_wrapped` among it, in a client of its own that the host is not handed. Only the
+  BankMinder's own `goodbye` empties it, and nothing calls that yet: a VaultMinder's `goodbye`, a bank's sweep and a
+  device's vacate leave it. G3 holds in substance: the wayins are the ciphertext the bankDB stores, and no naked bankKey
+  or handle to one is cached. What drifts is how long that ciphertext stays in memory once the bank is swept, which the
+  ends (vacate, delete, goodbye) are to settle.

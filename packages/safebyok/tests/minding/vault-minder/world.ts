@@ -2,24 +2,24 @@ import { noop } from 'es-toolkit'
 import { Errors } from 'safebyok-big/internals'
 import { vi } from 'vitest'
 import type { DeliverableThing, ListingEvent, MinderEvent, ThingEvent, MinderFriend, QueryCacheOpts, TSQAnswer } from '../../../src/shapes/shapes-minder'
-import { ThingMinder } from '../../../src/minding/thing-minder'
+import { VaultMinder } from '../../../src/minding/vault-minder'
+import { BankMinder } from '../../../src/minding/bank-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import type { Labelpath, Revtok } from '../../../src/shapes/primitives'
-import { type GateRecord, type ThingRecord, type ThingScope, Shell } from '../../../src/shapes/shapes-thing'
+import { type BoxRecord, type ThingRecord, type ThingScope, Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import { type GetAsk, type WriteAsk, getAskOf, listAskOf } from '../../../src/shapes/shapes-asks'
 import type { BankScope } from '../../../src/shapes/shapes-stamps'
 import type { GetThingAnswer, ThingNotice, WriteThingAnswer } from '../../../src/storage/vault-db'
 import * as TH from '../../test-helpers'
 
-/** The get ask a minder sends the vaultDB for the main gate: the bank's, tracking the roots at revision 0. */
-export const GateGetAsk: GetAsk = getAskOf({ ...TH.GateScope, ifAbsent: 'nil', track: TH.trackOf() })
+/** The get ask a minder sends the vaultDB for the box at `TH.BoxScope`: the bank's, tracking the roots at revision 0. */
+export const BoxGetAsk: GetAsk = getAskOf({ ...TH.BoxScope, ifAbsent: 'nil', track: TH.trackOf() })
 
 /** A bank as a minder reads it, {@link TH.ThingBank} unless `scope` names another: its scope, its get and list asks tracking the roots at revision 0, and a spy for its bad news. */
 export function fakeBankOf(scope: BankScope = TH.ThingBank) {
   return {
     scope:       { ...scope },
-    rootBox:     { ...TH.rootBoxOf(scope), am: 'a' },
     makeGetAsk:  (args: { labelpath: Labelpath, ifAbsent?: 'nil' | 'fail' }) => getAskOf({ ...args, ...scope, track: TH.trackOf() }),
     makeListAsk: (args: { labelpath: Labelpath, ifAbsent?: 'nil' | 'fail' }) => listAskOf({ ...args, ...scope, track: TH.trackOf() }),
     tellBadNews: vi.fn<(badnews: readonly unknown[]) => void>(),
@@ -82,30 +82,39 @@ export class DownVaultDB extends MemoryVaultDB {
 /** A day, in milliseconds: far past the five minutes after which TanStack Query collects a query by default. */
 export const Hours24 = 24 * 60 * 60 * 1000
 
-/** A minder of `bank` over `vaultDB`. */
-export function minderOf(vaultDB: MemoryVaultDB, queryCacheOpts: Partial<QueryCacheOpts> = {}, bank: MinderFriend = fakeBankOf()): ThingMinder {
-  return ThingMinder.make({ vaultDB, queryCacheOpts }, bank)
+/** A BankMinder of `TH.ThingBank`, minding, with its roots at revision 0 unless `isWorldHeard` is false. Its birth is in a vaultDB of its own. */
+export async function bankMinderOf({ isWorldHeard = true } = {}): Promise<BankMinder> {
+  const bankMinder = BankMinder.make({ vaultDB: new MemoryVaultDB() }, fakeBankOf())
+  bankMinder.hello()
+  if (isWorldHeard) { await TH.expectGood(bankMinder.tryBirthBank(TH.birthBankAskOf())) }
+  return bankMinder
+}
+
+/** A minder of `bank` over `vaultDB`, reading the root box from `bankMinder`, one that has the bank's roots by default. */
+export async function minderOf(vaultDB: MemoryVaultDB, queryCacheOpts: Partial<QueryCacheOpts> = {}, bank: MinderFriend = fakeBankOf(), bankMinder?: BankMinder): Promise<VaultMinder> {
+  return VaultMinder.make({ vaultDB, bankMinder: bankMinder ?? await bankMinderOf(), queryCacheOpts }, bank)
 }
 
 /** A bank's minder, what it stands on, and a way to hand its watch a notice. */
 export interface MinderWorld<VaultDBT extends MemoryVaultDB> {
-  vaultDB: VaultDBT
-  bank:    ReturnType<typeof fakeBankOf>
-  minder:  ThingMinder
-  receive: (notice: ThingNotice) => void
+  vaultDB:    VaultDBT
+  bank:       ReturnType<typeof fakeBankOf>
+  bankMinder: BankMinder
+  minder:     VaultMinder
+  receive:    (notice: ThingNotice) => void
 }
 
-/** The minder of a bank over `vaultDB`, made, and started unless `isStarted` is false, after which it has received the root box's notice unless `isRootHeard` is false. */
-export function minderWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT, { isStarted = true, isRootHeard = true } = {}): MinderWorld<VaultDBT> {
-  const bank     = fakeBankOf()
-  const watching = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
-  const minder   = minderOf(vaultDB, {}, bank)
+/** The minder of a bank over `vaultDB`, made, and started unless `isStarted` is false. Its BankMinder has the bank's world, roots at revision 0, unless `isWorldHeard` is false. */
+export async function minderWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT, { isStarted = true, isWorldHeard = true } = {}): Promise<MinderWorld<VaultDBT>> {
+  const bank       = fakeBankOf()
+  const bankMinder = await bankMinderOf({ isWorldHeard })
+  const watching   = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
+  const minder     = await minderOf(vaultDB, {}, bank, bankMinder)
   if (isStarted) { minder.hello() }
   function receive(notice: ThingNotice): void {
     for (const watched of watching.mock.calls) { watched[1](notice) }
   }
-  if (isStarted && isRootHeard) { receive(noticeOf(TH.rootBoxOf())) }
-  return { vaultDB, bank, minder, receive }
+  return { vaultDB, bank, bankMinder, minder, receive }
 }
 
 /** `vaultDB` with a born bank, its roots at revision 0, which the asks above track. */
@@ -114,24 +123,17 @@ export async function bornOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT):
   return vaultDB
 }
 
-/** A vaultDB with a born bank, its main gate at revision `revseq`, and that gate. */
-export async function storedGateOf(vaultDB: MemoryVaultDB, revseq: number): Promise<GateRecord> {
-  let gate = TH.gateThingOf()
+/** A vaultDB with a born bank and the box at `TH.BoxScope` under its root box, at revision `revseq`, and that box. */
+export async function storedBoxOf(vaultDB: MemoryVaultDB, revseq = 0): Promise<BoxRecord> {
   await bornOf(vaultDB)
-  for (let ii = 0; ii < revseq; ii++) {
-    const next = TH.nextGateOf(gate)
-    await TH.expectGood(vaultDB.tryWriteThing(TH.replaceAskOf(gate, next)))
-    gate = next
-  }
-  return gate
-}
-
-/** A vaultDB with a born bank and the box under its root box, and that box. */
-export async function storedBoxOf(vaultDB: MemoryVaultDB): Promise<ThingRecord> {
-  await bornOf(vaultDB)
-  const box   = TH.boxThingOf()
+  let box = TH.boxThingOf()
   const shell = Shell.of(TH.BoxScope, TH.rootBoxOf())
   await TH.expectGood(vaultDB.tryWriteThing(TH.birthAskOf(box, shell)))
+  for (let ii = 0; ii < revseq; ii++) {
+    const next = TH.nextOf(box)
+    await TH.expectGood(vaultDB.tryWriteThing(TH.replaceAskOf(box, next)))
+    box = next
+  }
   return box
 }
 
@@ -145,9 +147,9 @@ export function noticeOf(thing: ThingNotice['val']): ThingNotice {
   return { ok: true, act: Thing.isLive(thing) ? 'gotlive' : 'gotgone', val: thing }
 }
 
-/** The revtok of the main gate's item, or undefined for nothing or the void sentinel. */
-export function revtokAt(minder: ThingMinder): Revtok | undefined {
-  const record: DeliverableThing | undefined = minder.at(TH.GateScope)
+/** The revtok of the item of the box at `TH.BoxScope`, or undefined for nothing or the void sentinel. */
+export function revtokAt(minder: VaultMinder): Revtok | undefined {
+  const record: DeliverableThing | undefined = minder.at(TH.BoxScope)
   return ((record === undefined) || Thing.isVoidSentinel(record)) ? undefined : record.revtok
 }
 
@@ -209,4 +211,7 @@ export function boxBirthAskOf(boxlabel = 'openai'): WriteAsk {
 }
 
 /** A minder that has not started, for a test of its keys. */
-export function minderWithoutStart(): ThingMinder { return minderWorldOf(new MemoryVaultDB(), { isStarted: false }).minder }
+export async function minderWithoutStart(): Promise<VaultMinder> {
+  const { minder } = await minderWorldOf(new MemoryVaultDB(), { isStarted: false })
+  return minder
+}

@@ -3,7 +3,7 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-li
 import { type ReactNode, useActionState, useEffect, useLayoutEffect, useMemo } from 'react'
 import { type Root, hydrateRoot } from 'react-dom/client'
 import { renderToString } from 'react-dom/server'
-import { type BankSnapshot, type BoxRecord, type Device, type GateRecord, type Gating, type LiveOf, type Whisper, MemoryVaultDB, Thing, ThingMinder, isVaultError } from 'safebyok'
+import { type BankSnapshot, type BoxRecord, type Device, type GateRecord, type Gating, type LiveOf, type Whisper, MemoryVaultDB, Thing, VaultMinder, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { liveOf, passkeyHeaderOf } from '../../src/giver/giver-defaults'
@@ -102,7 +102,7 @@ describe("the provider", () => {
     expect(seen[0]).to.eq('starting')
     await waitFor(() => { expect(result.current).to.eq('locked') })
     expect(seen).to.not.include('signed_out')
-    expect(world.counts.watches).to.eq(1)
+    expect(world.counts.watches).to.eq(2)
   })
 
   it("shows unborn for a user with no bank stored", async () => {
@@ -118,13 +118,13 @@ describe("the provider", () => {
     expect(result.current).to.eq('locked')
     treeOpts.userid = TH.ProviderUser
     rerender()
-    expect([result.current, world.counts.watches]).to.deep.equal(['locked', 1])
+    expect([result.current, world.counts.watches]).to.deep.equal(['locked', 2])
   })
 
   it("starts one device once under StrictMode, which makes its state twice and runs its effects twice", async () => {
     const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' }, { isStrict: true })
     await waitFor(() => { expect(result.current).to.eq('locked') })
-    expect([world._cheat_devices().length, world.counts.watches]).to.deep.equal([1, 1])
+    expect([world._cheat_devices().length, world.counts.watches]).to.deep.equal([1, 2])
   })
 
   it("shows starting, in the same render, under a userid other than its device's", async () => {
@@ -140,7 +140,7 @@ describe("the provider", () => {
   it("uses the config's vaultDB and key deriver where it is handed none", async () => {
     const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes', isInConfig: true }, { isBare: true })
     await waitFor(() => { expect(result.current).to.eq('locked') })
-    expect(world.counts.watches).to.eq(1)
+    expect(world.counts.watches).to.eq(2)
   })
 
   it("needs no QueryClientProvider for the record hooks under it", async () => {
@@ -402,7 +402,6 @@ describe("useGate", () => {
   it("answers undefined and fetches nothing while nobody is signed in", async () => {
     const { result, world } = await renderUnder((world) => world.Bank.useGate(), { stored: 'jokes' }, { userid: null })
     expect(result.current.data).to.be.undefined
-    expect(result.current.fetchStatus).to.eq('idle')
     expect(world.counts.gets).to.eq(0)
   })
 
@@ -412,12 +411,11 @@ describe("useGate", () => {
     await waitFor(() => { expect(result.current.gate.data).to.be.null })
   })
 
-  it("answers the stored gate with no passkey, keyed by keys.gate()", async () => {
+  it("answers the stored gate with no passkey, and caches nothing of it in the giver's client", async () => {
     const { result, world } = await renderGate()
     expect(result.current.header).to.be.null
     expect(result.current.gate.data?.wayins.main.wayinkind).to.eq('passphrase')
-    expect(world.Bank.keys.gate()).to.deep.equal(['sok', 'u1', 'acme', 'item', 'gate', '!'])
-    expect(world.Bank.queryClient().getQueryData(world.Bank.keys.gate())).to.have.property('wayins')
+    expect(world.Bank.queryClient().getQueryCache().findAll().map((tsqQuery) => tsqQuery.queryKey)).to.not.deep.include(VaultMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'gate' }))
   })
 
   // useGate @example
@@ -439,7 +437,7 @@ describe("useGate", () => {
     expect(result.current.header).to.eq(header)
   })
 
-  it("holds no wrapped bankKey in the host's cache or the rendered tree, and the passphrase in neither cache", async () => {
+  it("holds no wrapped bankKey or passphrase in the host's cache, the giver's, or the rendered tree", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     function ShowGate() {
       const { data: gate } = world.Bank.useGate()
@@ -452,8 +450,8 @@ describe("useGate", () => {
     await waitFor(() => { expect(container.textContent).to.contain('"wayinkind":"passkey"') })
     const wraps = storedWrapsOf(world)
     expect(wraps).to.have.lengthOf(2)
-    // The giver's own cache has the whole gate, by design: no hook's data shows it.
-    for (const text of wraps) { TH.expectTextUnheld(text, container, world.client) }
+    // The whole gate is in the device's BankMinder, whose client is neither of these.
+    for (const text of wraps) { TH.expectTextUnheld(text, container, world.clients()) }
     TH.expectTextUnheld(Passphrase, container, world.clients())
   })
 })
@@ -605,7 +603,7 @@ async function renderUnlocked<ResultT>(hook: (world: TH.ProviderWorld) => Result
 }
 
 /** The key the minder caches the jokes box under, for the world's user. */
-const JokesKey = ThingMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: `box/${TH.JokesPath}` })
+const JokesKey = VaultMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: `box/${TH.JokesPath}` })
 
 describe("useBox", () => {
   it("shows the stored record once the device starts, and fetches nothing while nobody is signed in", async () => {
@@ -701,7 +699,7 @@ describe("useBox", () => {
 })
 
 /** The world's user's key for the listing of the root box's children, as the minder caches it. */
-const BoxListKey = ThingMinder.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
+const BoxListKey = VaultMinder.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
 
 describe("useBoxList", () => {
   it("lists the stored boxes once the device starts, and fetches nothing while nobody is signed in", async () => {

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { type ReactNode, useActionState, useEffect } from 'react'
-import { type BoxRecord, ThingMinder, isVaultError } from 'safebyok'
+import { type BoxRecord, VaultMinder, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it } from 'vitest'
 import type { Draft, DraftPutOpts } from '../../src/giver/use-draft'
@@ -10,7 +10,7 @@ import * as TH from '../test-helpers'
 const TypedKey = 'sk-test-typed-4242'
 
 /** The key the minder caches the jokes box under, for the world's user. */
-const JokesItemKey = ThingMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: `box/${TH.JokesPath}` })
+const JokesItemKey = VaultMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: `box/${TH.JokesPath}` })
 
 /** What the draft editor last answered and its last put settled to, for a test to read. */
 interface DraftSeen {

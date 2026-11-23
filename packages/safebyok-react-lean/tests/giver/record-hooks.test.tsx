@@ -1,6 +1,6 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { type ReactNode, useEffect, useLayoutEffect } from 'react'
-import { type BoxRecord, type GateRecord, type PasskeyWayinHeader, ThingMinder } from 'safebyok'
+import { type BoxRecord, type GateRecord, type PasskeyWayinHeader, VaultMinder } from 'safebyok'
 import { storageUnavailable } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
@@ -11,10 +11,10 @@ import * as TH from '../test-helpers'
 const JokesBoxPath = `box/${TH.JokesPath}`
 
 /** The key the minder caches the jokes box under, which the hooks observe. */
-const JokesKey = ThingMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: JokesBoxPath })
+const JokesKey = VaultMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: JokesBoxPath })
 
 /** The key the minder caches the listing of the root box's children under. */
-const BoxListKey = ThingMinder.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
+const BoxListKey = VaultMinder.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
 
 /** The stage of the world's bank, as a page shows it. */
 function StageShown({ world }: Readonly<{ world: TH.ProviderWorld }>) {
@@ -246,7 +246,7 @@ describe("useBoxList over the minder's own listing", () => {
 
   it("shows a list refused as its error", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
-    world.vaultDB.tryListThings = () => Promise.resolve({ ok: false, err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') } as never)
+    world.vaultDB.tryListThings = () => Promise.resolve({ ok: false, world: null, err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') } as never)
     function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
     const { result } = renderHook(() => world.Bank.useBoxList(), { wrapper: Wrapper })
     await waitFor(() => { expect(result.current.isError).to.eq(true) })
@@ -254,7 +254,7 @@ describe("useBoxList over the minder's own listing", () => {
   })
 })
 
-describe("useGate over the minder's own cache", () => {
+describe("useGate over the BankMinder's world", () => {
   it("shows a passkey another device adds, without fetching again, and without the bankKey it wraps", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     let header: PasskeyWayinHeader | null | undefined
@@ -267,7 +267,7 @@ describe("useGate over the minder's own cache", () => {
     await waitFor(() => { expect(header).to.be.null })
     // The minder freezes, so the spy goes on its class, counting the giver's device's calls alone.
     const { minder } = world._cheat_device()
-    const get = vi.spyOn(ThingMinder.prototype, 'get')
+    const get = vi.spyOn(VaultMinder.prototype, 'get')
     onTestFinished(() => { get.mockRestore() })
     const other = LeanTH.makeDevice({}, { vaultDB: world.vaultDB })
     await act(async () => {
@@ -276,7 +276,7 @@ describe("useGate over the minder's own cache", () => {
     })
     await waitFor(() => { expect(header?.wayinkind).to.eq('passkey') })
     expect(get.mock.contexts.filter((context) => context === minder)).to.have.lengthOf(0)
-    // The minder's own item has the whole gate, by design; the host's cache and the page have none of it.
+    // The BankMinder's world has the whole gate, by design; the giver's client and the page have none of it.
     const stored = world.vaultDB._cheat_things(LeanTH.WorldScope).get('gate') as GateRecord
     TH.expectTextUnheld(stored.wayins.passkey0!.bank_key_wayin_wrapped.ciphertext_b64, container, world.client)
   })

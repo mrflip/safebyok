@@ -9,15 +9,12 @@ import type { Gate } from '../models/gate'
 import type { VaultDB } from '../storage/vault-db'
 import type { StrengthChecker } from './shapes-gateish'
 import type { DefaultQueryCacheOpts, QueryCacheOpts } from './shapes-minder'
-import type { BoxCleartexts, LiveOf, UnsealedOf } from './shapes-sealers'
-import type { BankRecord, BoxRecord } from './shapes-thing'
+import type { BoxCleartexts, UnsealedOf } from './shapes-sealers'
+import type { BoxRecord } from './shapes-thing'
 import type { GetAsk, ListAsk } from './shapes-asks'
 import type { EpochMillis, Labelpath } from './primitives'
 
-// == [The bank's forms]: BankMakeRecord, BoxUnsealed
-
-/** The record {@link Bank.make} takes: the bank's Thing, with its root box as stored at `rootBox`. */
-export type BankMakeRecord = BankRecord & Readonly<{ rootBox: LiveOf<BoxRecord> }>
+// == [The bank's forms]: BoxUnsealed
 
 /** A box unsealed: its record with its whisper in place of the sealed one. A tombstone's whisper is empty. */
 export type BoxUnsealed = UnsealedOf<BoxRecord, BoxCleartexts>
@@ -86,7 +83,7 @@ export interface DeviceOpts {
   onBadNews?:       BadNewsHandler | undefined
   /** The defaults the device's minder sets on its items and lists in TanStack Query's cache. A missing field defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?:  Partial<QueryCacheOpts> | undefined
-  /** The client the device's minder caches in, made by `ThingMinder.makeClient`, which the minders of other devices may share. Default: a client of its own. */
+  /** The client the device's minder caches in, made by `VaultMinder.makeClient`, which the minders of other devices may share. Default: a client of its own. */
   queryClient?:     QueryClient | undefined
   /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
   deviceDB?:        unknown

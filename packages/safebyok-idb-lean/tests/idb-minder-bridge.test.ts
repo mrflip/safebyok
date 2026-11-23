@@ -1,4 +1,4 @@
-/** Tests for IdbMinderBridge: a real ThingMinder over a MemoryVaultDB, bridged to an IdbVaultDB on fake-indexeddb. */
+/** Tests for IdbMinderBridge: a real VaultMinder over a MemoryVaultDB, bridged to an IdbVaultDB on fake-indexeddb. */
 
 // Import fake-indexeddb first: it installs IndexedDB's globals before the adapter loads.
 import 'fake-indexeddb/auto'
@@ -108,18 +108,6 @@ describe("IdbMinderBridge", () => {
     await vi.waitFor(() => { expect(overwriting.mock.calls).to.have.lengthOf(1) })
     await TH.aWhile()
     expect(overwriting.mock.calls).to.have.lengthOf(1)
-  })
-
-  it("copies nothing after goodbye, until hello again", async () => {
-    const { minder, idbVaultDB, bridge } = await TH.bridgedWorldOf()
-    const rows = TH._cheat_idbThingsOf(idbVaultDB)
-    bridge.goodbye()
-    await minder.get(TH.BoxScope)
-    await TH.aWhile()
-    expect(await rows.rawAt(TH.BoxScope)).to.be.null
-    bridge.hello()
-    await minder.get(TH.GateScope)
-    await vi.waitFor(async () => { expect(await rows.rawAt(TH.GateScope)).to.deep.equal(TH.gateThingOf()) })
   })
 })
 

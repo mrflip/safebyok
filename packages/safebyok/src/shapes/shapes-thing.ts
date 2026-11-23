@@ -275,7 +275,7 @@ export type Sparse<RecordT extends Sparse<ThingRecord>> = Pick<RecordT, ThingFie
 // A shell is made only from the void: each of its fixed fields defaults to the shell's, and refuses any other value.
 
 /** A shell, whole: every Thing field of a tombstone and no body, its revseq -1.
- * A ThingMinder caches it for a scope with nothing stored.
+ * A VaultMinder caches it for a scope with nothing stored.
  */
 export type VoidSentinel = ShellOf<ThingRecord>
 

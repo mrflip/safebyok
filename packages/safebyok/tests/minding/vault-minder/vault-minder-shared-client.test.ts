@@ -1,8 +1,9 @@
-/** Minders of several banks caching in one client ThingMinder.makeClient made. */
+/** Minders of several banks caching in one client makeClient made: VaultMinders in one, their BankMinders in another. */
 
 import { QueryClient } from '@tanstack/query-core'
 import { describe, expect, it } from 'vitest'
-import { ThingMinder } from '../../../src/minding/thing-minder'
+import { BankMinder } from '../../../src/minding/bank-minder'
+import { VaultMinder } from '../../../src/minding/vault-minder'
 import { MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import type { BankScope } from '../../../src/shapes/shapes-stamps'
 import { type ThingScope, Shell } from '../../../src/shapes/shapes-thing'
@@ -37,37 +38,52 @@ async function storedBanksOf(vaultDB: MemoryVaultDB, banks: readonly BankScope[]
   return vaultDB
 }
 
-/** A started minder of `bank` over `vaultDB`, caching in `queryClient`, with a listener heard from after its hello. */
-function sharingMinderOf(vaultDB: MemoryVaultDB, queryClient: QueryClient, bank: BankScope) {
-  const minder = ThingMinder.make({ vaultDB, queryClient }, fakeBankOf(bank))
+/** A started BankMinder of each of `banks` over `vaultDB`, all caching in one client, each having fetched its bank's roots. */
+async function sharedBankMindersOf(vaultDB: MemoryVaultDB, banks: readonly BankScope[]): Promise<BankMinder[]> {
+  const queryClient = BankMinder.makeClient()
+  return await Promise.all(banks.map(async (bank) => {
+    const bankMinder = BankMinder.make({ vaultDB, queryClient }, fakeBankOf(bank))
+    bankMinder.hello()
+    await bankMinder.fetchWorld()
+    return bankMinder
+  }))
+}
+
+/** A started minder of `bank` over `vaultDB`, caching in `queryClient` and reading the root box from `bankMinder`, with a listener heard from after its hello. */
+function sharingMinderOf(vaultDB: MemoryVaultDB, bankMinder: BankMinder, queryClient: QueryClient, bank: BankScope) {
+  const minder = VaultMinder.make({ vaultDB, bankMinder, queryClient }, fakeBankOf(bank))
   minder.hello()
   const heard = listenerOf()
   minder.listen(heard, MinderEventFormat)
-  return { bank, minder, heard }
+  return { bank, minder, heard, bankMinder }
 }
 
-/** Two started minders over one vaultDB with both banks stored, {@link TH.ThingBank}'s and `otherBank`'s, caching in one client. */
+/** Two started minders over one vaultDB with both banks stored, {@link TH.ThingBank}'s and `otherBank`'s, caching in one client, and their BankMinders in another. */
 async function sharedWorldOf(otherBank: BankScope) {
   const vaultDB     = await storedBanksOf(new MemoryVaultDB(), [TH.ThingBank, otherBank])
-  const queryClient = ThingMinder.makeClient()
-  const mine        = sharingMinderOf(vaultDB, queryClient, TH.ThingBank)
-  const theirs      = sharingMinderOf(vaultDB, queryClient, otherBank)
+  const [myBankMinder, theirBankMinder] = await sharedBankMindersOf(vaultDB, [TH.ThingBank, otherBank])
+  const queryClient = VaultMinder.makeClient()
+  const mine        = sharingMinderOf(vaultDB, myBankMinder!, queryClient, TH.ThingBank)
+  const theirs      = sharingMinderOf(vaultDB, theirBankMinder!, queryClient, otherBank)
   return { vaultDB, queryClient, mine, theirs }
 }
 
-describe("ThingMinder.makeClient", () => {
-  it("makes a client each minder made with it caches in, and a client of its own for a minder made without one", () => {
-    const queryClient = ThingMinder.makeClient()
+describe("VaultMinder.makeClient", () => {
+  it("makes a client each minder made with it caches in, and a client of its own for a minder made without one", async () => {
+    const queryClient = VaultMinder.makeClient()
     const vaultDB     = new MemoryVaultDB()
-    expect(ThingMinder.make({ vaultDB, queryClient }, fakeBankOf()).queryClient).to.equal(queryClient)
-    const [own1, own2] = [minderOf(vaultDB).queryClient, minderOf(vaultDB).queryClient]
+    const bankMinder  = BankMinder.make({ vaultDB }, fakeBankOf())
+    expect(VaultMinder.make({ vaultDB, bankMinder, queryClient }, fakeBankOf()).queryClient).to.equal(queryClient)
+    const [minder1, minder2] = [await minderOf(vaultDB), await minderOf(vaultDB)]
+    const [own1, own2]       = [minder1.queryClient, minder2.queryClient]
     expect(own1).to.not.equal(own2)
-    expect([ThingMinder.isClient(own1), ThingMinder.isClient(queryClient)]).to.deep.equal([true, true])
+    expect([VaultMinder.isClient(own1), VaultMinder.isClient(queryClient)]).to.deep.equal([true, true])
   })
 
   it("is the only maker of a client make accepts", () => {
-    expect(ThingMinder.isClient(new QueryClient())).to.be.false
-    TH.expectSyncRefusal(() => ThingMinder.make({ vaultDB: new MemoryVaultDB(), queryClient: new QueryClient() }, fakeBankOf()), 'bad_record')
+    expect(VaultMinder.isClient(new QueryClient())).to.be.false
+    const vaultDB = new MemoryVaultDB()
+    TH.expectSyncRefusal(() => VaultMinder.make({ vaultDB, bankMinder: BankMinder.make({ vaultDB }, fakeBankOf()), queryClient: new QueryClient() }, fakeBankOf()), 'bad_record')
   })
 })
 
@@ -113,14 +129,26 @@ for (const [otherBank, blurb] of [[OtherUserBank, 'two users'], [OtherLabelBank,
       expect(toldOf(theirs.heard)).to.deep.equal([])
     })
 
+    it("have BankMinders sharing a client of their own, each landing only its own bank's main gate, and tell nothing of it", async () => {
+      const { vaultDB, mine, theirs } = await sharedWorldOf(otherBank)
+      const [gate0, gate1] = [TH.gateThingOf(), TH.nextGateOf(TH.gateThingOf())]
+      expect(mine.bankMinder.queryClient).to.equal(theirs.bankMinder.queryClient)
+      await TH.expectGood(vaultDB.tryWriteThing(TH.replaceAskOf(gate0, gate1)))
+      await TH.eventually(() => mine.bankMinder.worldAt()?.gate.revtok === gate1.revtok)
+      expect(mine.bankMinder.worldAt()?.gate).to.deep.equal(gate1)
+      expect(theirs.bankMinder.worldAt()?.gate).to.deep.equal(TH.gateThingOf(otherBank))
+      expect([toldOf(mine.heard), toldOf(theirs.heard)]).to.deep.equal([[], []])
+    })
+
     it("each keep their entries and attachment when the other says goodbye", async () => {
       const { mine, theirs } = await sharedWorldOf(otherBank)
-      await mine.minder.get(TH.GateScope)
-      await theirs.minder.get(scopeIn(otherBank, 'gate'))
-      mine.minder.goodbye()
-      expect(theirs.minder.at(scopeIn(otherBank, 'gate'))).to.deep.equal(TH.gateThingOf(otherBank))
+      await mine.minder.get(TH.BoxScope)
       await theirs.minder.get(scopeIn(otherBank, 'box/openai'))
-      expect(theirs.minder.listingAt(scopeIn(otherBank, 'box'))).to.deep.equal(['box/openai'])
+      mine.minder.goodbye()
+      expect(theirs.minder.at(scopeIn(otherBank, 'box/openai'))).to.deep.equal(boxIn(otherBank))
+      await theirs.minder.write(boxBirthAskIn(otherBank, 'groq'))
+      await TH.wakeupAtNextTick()
+      expect(theirs.minder.listingAt(scopeIn(otherBank, 'box'))).to.deep.equal(['box/groq', 'box/openai'])
       expect(toldOf(theirs.heard).filter(([, told]) => told === 'removed')).to.deep.equal([])
     })
   })
@@ -129,14 +157,15 @@ for (const [otherBank, blurb] of [[OtherUserBank, 'two users'], [OtherLabelBank,
 describe("a minder on a shared client, after goodbye", () => {
   it("minds again at a second hello, as does another minder of its bank", async () => {
     const vaultDB     = await storedBanksOf(new MemoryVaultDB(), [TH.ThingBank])
-    const queryClient = ThingMinder.makeClient()
-    const { minder }  = sharingMinderOf(vaultDB, queryClient, TH.ThingBank)
+    const [bankMinder] = await sharedBankMindersOf(vaultDB, [TH.ThingBank])
+    const queryClient = VaultMinder.makeClient()
+    const { minder }  = sharingMinderOf(vaultDB, bankMinder!, queryClient, TH.ThingBank)
     minder.goodbye()
     minder.hello()
     await minder.get(TH.BoxScope)
     expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
     minder.goodbye()
-    const { minder: next } = sharingMinderOf(vaultDB, queryClient, TH.ThingBank)
+    const { minder: next } = sharingMinderOf(vaultDB, bankMinder!, queryClient, TH.ThingBank)
     await next.get(TH.BoxScope)
     expect(next.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
   })
@@ -145,11 +174,12 @@ describe("a minder on a shared client, after goodbye", () => {
 describe("a shared client's cache", () => {
   it("settles nothing a fetch lands under a key of a bank no minder is minding", async () => {
     const vaultDB     = await storedBanksOf(new MemoryVaultDB(), [TH.ThingBank, OtherUserBank])
-    const queryClient = ThingMinder.makeClient()
-    const mine        = sharingMinderOf(vaultDB, queryClient, TH.ThingBank)
-    sharingMinderOf(vaultDB, queryClient, OtherUserBank).minder.goodbye()
-    const queryKey    = ThingMinder.itemQueryKeyOf(scopeIn(OtherUserBank, 'box/openai'))
-    const listKey     = ThingMinder.listQueryKeyOf(scopeIn(OtherUserBank, 'box'))
+    const [bankMinder, otherBankMinder] = await sharedBankMindersOf(vaultDB, [TH.ThingBank, OtherUserBank])
+    const queryClient = VaultMinder.makeClient()
+    const mine        = sharingMinderOf(vaultDB, bankMinder!, queryClient, TH.ThingBank)
+    sharingMinderOf(vaultDB, otherBankMinder!, queryClient, OtherUserBank).minder.goodbye()
+    const queryKey    = VaultMinder.itemQueryKeyOf(scopeIn(OtherUserBank, 'box/openai'))
+    const listKey     = VaultMinder.listQueryKeyOf(scopeIn(OtherUserBank, 'box'))
     queryClient.setQueryData(listKey, [])
     await queryClient.query({ queryKey, queryFn: () => boxIn(OtherUserBank) })
     expect(queryClient.getQueryData(listKey)).to.deep.equal([])
@@ -159,9 +189,10 @@ describe("a shared client's cache", () => {
 
   it("refuses a second minder of a bank at hello while the first is minding", async () => {
     const vaultDB     = await storedBanksOf(new MemoryVaultDB(), [TH.ThingBank])
-    const queryClient = ThingMinder.makeClient()
-    const mine        = sharingMinderOf(vaultDB, queryClient, TH.ThingBank)
-    const twin        = ThingMinder.make({ vaultDB, queryClient }, fakeBankOf())
+    const [bankMinder] = await sharedBankMindersOf(vaultDB, [TH.ThingBank])
+    const queryClient = VaultMinder.makeClient()
+    const mine        = sharingMinderOf(vaultDB, bankMinder!, queryClient, TH.ThingBank)
+    const twin        = VaultMinder.make({ vaultDB, bankMinder: bankMinder!, queryClient }, fakeBankOf())
     TH.expectSyncRefusal(() => { twin.hello() }, 'bad_record')
     await mine.minder.get(TH.BoxScope)
     expect(mine.minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])

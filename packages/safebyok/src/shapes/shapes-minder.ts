@@ -1,9 +1,9 @@
-/** The shapes of a ThingMinder's arguments, options and answers, and of the records its items have, with their checks. */
+/** The shapes of a minder's arguments, options and answers, and of the records its items have, with their checks, and the options every minder pins. */
 
 import * as TSQ from '@tanstack/query-core'
 import type * as Z from 'zod'
 import { type Errors, Validator } from 'safebyok-big/internals'
-import type { ThingMinder } from '../minding/thing-minder'
+import type { BankMinder } from '../minding/bank-minder'
 import type { Bank } from '../models/bank'
 import type { RecordOfKind } from '../models/base-thing'
 import * as Phrases from '../phrases'
@@ -12,7 +12,6 @@ import type { Banklabel, BoxLabelpath, EpochMillis, Labelpath, Lifepath, Lifeseq
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, type VoidSentinel, ThingChecks, ThingFormat } from './shapes-thing'
 import { type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, AskChecks } from './shapes-asks'
 import type { BankAskDraft } from './shapes-bankish'
-import type { LiveOf, ShellOf } from './shapes-sealers'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis
 
@@ -41,8 +40,6 @@ export const FixedQueryCacheOpts = Object.freeze({
   persister:       (queryFn: TSQ.QueryFunction, context: TSQ.QueryFunctionContext): unknown => queryFn(context),
   // Initial data would seed each query as it is built with a record no vaultDB answered, fresh as of then.
   initialData:     (): undefined => undefined,
-  // TanStack's query() hands back what select makes of the data, so a get or a list would answer the host's transform.
-  select:          (val: unknown): unknown => val,
 } as const)
 
 // TanStack Query passes a finite staleTime to a timer unchanged, and a timer longer than 2^31 - 1 milliseconds
@@ -73,7 +70,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
   // A field left out, or the whole, defaults from DefaultQueryCacheOpts.
   const queryCacheOptsOrDefault = orDefault(queryCacheOpts, DefaultQueryCacheOpts)
   // A live object passes whole where these checks pass: parsing it would hand back a copy, its getters read once.
-  const friendFields     = obj({ scope: AskChecks.thingWatchScope, rootBox: obj({ ...ThingChecks.thingScope.shape, lifepath: ThingChecks.thingCited.shape.lifepath }), makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
+  const friendFields     = obj({ scope: AskChecks.thingWatchScope, makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.MinderFriendExpected)
   const minderListener   = fn<(event: MinderEvent) => void>()
   const feedVersion      = lit(MinderEventFormat, Phrases.FeedVersionOther)
@@ -85,7 +82,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
   return { queryCacheOpts, queryCacheOptsOrDefault, tsqStaleTime, minderFriend, minderListener, feedVersion, minderLabelpath, minderTryAtOpts, minderGetOpts, minderInvalidateOpts }
 })
 
-/** The checks of a ThingMinder's arguments and options.
+/** The checks of a minder's arguments and options.
  * Also `DefaultQueryCacheOpts` and `MaxTimerMillis`, the bounds of the cache options a host may choose.
  */
 export const MinderChecks = Object.freeze({ ...RawChecks, DefaultQueryCacheOpts, MaxTimerMillis })
@@ -107,13 +104,11 @@ export type MinderGetOpts    = Z.input<typeof MinderChecks.minderGetOpts>
 export type MinderTryAtOpts  = Z.input<typeof MinderChecks.minderTryAtOpts>
 /** `invalidate`'s options, which it requires: `list: 'all'` marks every listing under the labelpath stale. */
 export type MinderInvalidateOpts = Z.input<typeof MinderChecks.minderInvalidateOpts>
-/** What a minder is made with: its bank's scope and root box, the builders of the asks it sends, and where trouble no caller waits on goes.
+/** What a minder is made with: its bank's scope, the builders of the asks it sends, and where trouble no caller waits on goes.
  * A Device is one, and so is a {@link Bank}.
  */
 export interface MinderFriend {
   readonly scope:   ThingWatchScope
-  /** The bank's root box, or its shell before the bank is born: a box's shell lives in its life. */
-  readonly rootBox: LiveOf<BoxRecord> | ShellOf<BoxRecord>
   /** The get ask for the Thing at `ask.labelpath` in the bank. */
   makeGetAsk(ask: BankAskDraft): GetAsk
   /** The list ask for the children of the Thing at `ask.labelpath` in the bank. */
@@ -279,15 +274,21 @@ export type ListingEvent = MinderEventOf<readonly Labelpath[], 'list'> & Readonl
 }>
 // --
 
-// == [A minder's making]: MinderOpts
+// == [A minder's making]: MinderOpts, VaultMinderOpts
 
-/** Options for {@link ThingMinder.make}. */
+/** Options for `BankMinder.make`, and the options every minder is made with. */
 export interface MinderOpts {
   /** Where the bank's Things are stored. */
   vaultDB:         VaultDB
   /** The cache's timings ({@link QueryCacheOpts}). A field left out defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?: Partial<QueryCacheOpts>
-  /** The client to cache in, made by `ThingMinder.makeClient`, which minders of other banks may share. Default: a client of its own. */
+  /** The client to cache in, made by `makeClient`, which minders of other banks may share. Default: a client of its own. */
   queryClient?:    TSQ.QueryClient | undefined
+}
+
+/** Options for `VaultMinder.make`. */
+export interface VaultMinderOpts extends MinderOpts {
+  /** The minder of the bank's roots, which the root box is read from. */
+  bankMinder:      BankMinder
 }
 // --

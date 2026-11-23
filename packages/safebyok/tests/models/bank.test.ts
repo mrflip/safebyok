@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Crypto, Errors } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
-import { type BadNews, type BankMakeRecord, bankStageVals } from '../../src/shapes/shapes-bankish'
+import { type BadNews, bankStageVals } from '../../src/shapes/shapes-bankish'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import type { LiveOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
-import { Lifeseq } from '../../src/shapes/primitives'
+import { Labelpath, Lifeseq } from '../../src/shapes/primitives'
 import type { BankStamp } from '../../src/shapes/shapes-stamps'
-import { type BoxRecord, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
-import { Thing } from '../../src/models/thing'
 import { getAskOf } from '../../src/shapes/shapes-asks'
 import * as TH from '../test-helpers'
+import type { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 
 TH.useFakeClock()
 
@@ -103,7 +103,7 @@ describe("Bank.make(record, { device, vaultDB, gate })", () => {
     expect(bank.device).to.equal(device)
     expect(bank.device_tok).to.eq(TH.DeviceTok)
     expect(bank.gate).to.equal(gate)
-    expect(bank.rootBox).to.deep.equal(record.rootBox)
+    expect(bank.rootBox).to.equal(device.bankMinder.worldAt()?.root)
     expect([bank.revtok, bank.revseq, bank.written_at]).to.deep.equal([record.revtok, 0, TH.T0])
   })
 
@@ -122,8 +122,7 @@ describe("Bank.make(record, { device, vaultDB, gate })", () => {
     const { record, bank } = await TH.buildBornBank()
     const pickle = bank.pickle()
     expect(Object.keys(pickle)).to.have.members(BankFields)
-    const { rootBox: _rootBox, ...thing } = record
-    expect(pickle).to.deep.equal(thing)
+    expect(pickle).to.deep.equal(record)
     expect(Object.isFrozen(pickle)).to.be.true
   })
 
@@ -142,21 +141,16 @@ describe("Bank.make(record, { device, vaultDB, gate })", () => {
   })
 
   const RecordCases = [
-    [(record: BankMakeRecord) => ({ ...record, am: 'x' }),                    'a tombstone'],
-    [(record: BankMakeRecord) => ({ ...record, fmt: 3000 }),                  'another fmt'],
-    [(record: BankMakeRecord) => TH.omitting(record, 'lifeseq'),              'no lifeseq'],
-    [(record: BankMakeRecord) => ({ ...record, lifepath: Life2 }),            'a lifepath not its lifeseq'],
-    [(record: BankMakeRecord) => TH.omitting(record, 'lifetok'),              'no lifetok'],
-    [(record: BankMakeRecord) => ({ ...record, lifetok: 'not-a-uuid' }),      'a lifetok that is not a UUID'],
-    [(record: BankMakeRecord) => ({ ...record, labelpath: 'gate' }),          'the labelpath of another kind'],
-    [(record: BankMakeRecord) => ({ ...record, vaultlabel: 'main' }),         'a field no bank Thing has'],
-    [(record: BankMakeRecord) => TH.omitting(record, 'rootBox'),              'no root box'],
-    [(record: BankMakeRecord) => ({ ...record, rootBox: Shell.of(TH.RootScope) }), "the root box's shell"],
-    [(record: BankMakeRecord) => ({ ...record, rootBox: TH.boxTombOf(record.rootBox) }), "the root box's tombstone"],
-    [(record: BankMakeRecord) => ({ ...record, rootBox: { ...record.rootBox, am: 'd' } }), 'a root box of a damaged row'],
-    [(record: BankMakeRecord) => ({ ...record, rootBox: Thing.sparseOf(TH.rootBoxOf()) }), "a live root box's Thing fields alone"],
-    [(record: BankMakeRecord) => ({ ...record, rootBox: { ...record.rootBox, ...Shell.Cited } }), "a root box with the shell's revision"],
-    [(record: BankMakeRecord) => ({ ...record, born_at: 'yesterday' }),       'a born_at that is not epoch millis'],
+    [(record: BankRecord) => ({ ...record, am: 'x' }),                    'a tombstone'],
+    [(record: BankRecord) => ({ ...record, fmt: 3000 }),                  'another fmt'],
+    [(record: BankRecord) => TH.omitting(record, 'lifeseq'),              'no lifeseq'],
+    [(record: BankRecord) => ({ ...record, lifepath: Life2 }),            'a lifepath not its lifeseq'],
+    [(record: BankRecord) => TH.omitting(record, 'lifetok'),              'no lifetok'],
+    [(record: BankRecord) => ({ ...record, lifetok: 'not-a-uuid' }),      'a lifetok that is not a UUID'],
+    [(record: BankRecord) => ({ ...record, labelpath: 'gate' }),          'the labelpath of another kind'],
+    [(record: BankRecord) => ({ ...record, vaultlabel: 'main' }),         'a field no bank Thing has'],
+    [(record: BankRecord) => ({ ...record, rootBox: TH.rootBoxOf() }),    'its root box beside its fields'],
+    [(record: BankRecord) => ({ ...record, born_at: 'yesterday' }),       'a born_at that is not epoch millis'],
     [() => null,                                                          'null'],
   ] as const
 
@@ -203,24 +197,28 @@ describe("Bank.make(record, { device, vaultDB, gate })", () => {
     expect(bank.gate.lifeseq).to.eq(Life2)
   })
 
-  const OtherRootCases = [
-    [{ userid: 'u2' },       "another user's"],
-    [{ banklabel: 'work' },  "the user's other bank's"],
-  ] as const
-
-  for (const [moved, blurb] of OtherRootCases) {
-    it(`refuses ${blurb} root box`, async () => {
-      const born = await TH.buildBornBank()
-      const { record, device } = born
-      TH.expectSyncRefusal(() => Bank.make({ ...record, rootBox: { ...record.rootBox, ...moved } }, { device, vaultDB: device.vaultDB, gate: makeStoredGate(born) }), 'record_conflict')
-    })
-  }
-
-  it("refuses a box other than the root box as its root box", async () => {
+  it("refuses a bank whose world its device's BankMinder has not heard of", async () => {
     const born = await TH.buildBornBank()
-    const { record, device } = born
-    const box: LiveOf<BoxRecord> = { ...TH.boxThingOf('openai'), am: 'a' }
-    TH.expectSyncRefusal(() => Bank.make({ ...record, rootBox: box }, { device, vaultDB: device.vaultDB, gate: makeStoredGate(born) }), 'record_conflict')
+    const device = TH.makeDevice({}, { vaultDB: born.device.vaultDB })
+    const gate = Gate.make(born.gateRecord, { device, vaultDB: device.vaultDB, bankStamp: born.record })
+    TH.expectSyncRefusal(() => Bank.make(born.record, { device, vaultDB: device.vaultDB, gate }), 'record_conflict')
+  })
+
+  it("refuses a bank of another life than the world its device's BankMinder has", async () => {
+    const born = await TH.buildBornBank()
+    const record = { ...born.record, lifetok: TH.OtherLifetok }
+    const gate = makeStoredGate(born, record)
+    const err = TH.expectSyncRefusal(() => Bank.make(record, { device: born.device, vaultDB: born.device.vaultDB, gate }), 'record_conflict')
+    expect(err.meta).to.deep.equal({ fieldnames: ['lifetok'] })
+  })
+
+  it("reads its root box and its track from its world, as the world hears of newer roots", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const root = TH.nextOf(bank.rootBox)
+    await TH.expectGood(device.vaultDB.tryWriteThing(TH.replaceAskOf(bank.rootBox, root)))
+    await TH.eventually(() => bank.rootBox.revtok === root.revtok)
+    expect(bank.rootBox).to.deep.equal(root)
+    expect(bank.track[Labelpath.RootBox]).to.deep.equal({ revseq: root.revseq, lifepath: root.lifepath })
   })
 
   it("refuses a device that is not a Device, a vaultDB that is not a VaultDB, a gate that is not a Gate, and no opts at all", async () => {
@@ -741,12 +739,45 @@ describe("bank.track, and the asks the bank builds", () => {
     expect(bank.makeDelAsk({ cited: box, record: TH.boxTombOf(box) })).to.deep.include({ ...scope, op: 'del', modelkind: 'box', ifAbsent: 'fail', track })
   })
 
-  it("track what this object has, though the bank stored has moved on: the answer's tracked says so", async () => {
+  it("track what the bank's world last heard of, though the bank stored has moved on: the answer's tracked says so", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const record = nextBankThingOf(bank)
+    // Stored as another device would store it, telling no watch.
+    const store = device.vaultDB as MemoryVaultDB
+    store._cheat_things(bank.scope).set('bank', record)
+    const answer = await device.vaultDB.tryGetThing(bank.makeGetAsk({ labelpath: 'bank' }))
+    expect(answer).to.deep.include({ ok: true, tracked: { bank: record, gate: 'same', box: 'same' } })
+  })
+
+  it("track the bank a write elsewhere stored, once the watch has told the bank's world of it", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const record = nextBankThingOf(bank)
+    const ask = { ...bank.makePutAsk({ cited: bank.pickle(), record }), labelpath: 'bank', modelkind: 'bank' } as const
+    await TH.expectGood(device.vaultDB.tryWriteThing(ask))
+    expect(device.bankMinder.worldAt()?.bank).to.deep.equal(record)
+    expect(bank.track.bank).to.deep.equal({ revseq: 1, lifepath: record.lifepath })
+  })
+
+  it("track the bank a put through the bank wrote: its world has it", async () => {
     const { bank, device } = await TH.buildBornBank()
     const record = nextBankThingOf(bank)
     await bank.put({ cited: bank.pickle(), record })
     const answer = await device.vaultDB.tryGetThing(bank.makeGetAsk({ labelpath: 'bank' }))
-    expect(answer).to.deep.include({ ok: true, tracked: { bank: record, gate: 'same', box: 'same' } })
+    expect(answer).to.deep.include({ ok: true, tracked: { bank: 'same', gate: 'same', box: 'same' } })
+  })
+})
+
+describe("the bank's world, beside the bank's own writes", () => {
+  it("has the bank's Thing that bank.put wrote once it resolves", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const written = await bank.put({ cited: bank.pickle(), record: nextBankThingOf(bank) })
+    expect(device.bankMinder.worldAt()?.bank).to.deep.equal(written)
+  })
+
+  it("has the main gate a gate verb wrote once the verb resolves", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const after = await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'another horse battery staple' })
+    expect(device.bankMinder.worldAt()?.gate).to.deep.equal(after.pickle())
   })
 })
 

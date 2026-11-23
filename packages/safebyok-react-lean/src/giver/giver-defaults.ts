@@ -2,7 +2,7 @@
 
 import { type QueryKey, replaceEqualDeep } from '@tanstack/react-query'
 import {
-  type GateRecord, type Gating, Labelpath, type LiveOf, type PasskeyWayinHeader, type Sparse, Thing, type ThingCited, ThingChecks, ThingMinder, type ThingRecord, type Tombstone, type Userid, type WayinHeader, type WayinRecord, newerThingOf,
+  type GateRecord, type Gating, type LiveOf, type PasskeyWayinHeader, type Sparse, Thing, type ThingCited, ThingChecks, VaultMinder, type ThingRecord, type Tombstone, type Userid, type WayinHeader, type WayinRecord, newerThingOf,
 } from 'safebyok'
 import type { GateShown, HeaderedGate } from './react-giver'
 
@@ -103,7 +103,7 @@ async function attemptGating(gating: Gating): Promise<void> { await gating.attem
 function vacateGating(_data: unknown, _err: Error | null, gating: Gating): void { gating.vacate() }
 // --
 
-// == [Keys]: formMutationKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, boxListQueryKeyOf, gateQueryKeyOf
+// == [Keys]: formMutationKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, boxListQueryKeyOf
 
 /** The host's React Query key for the mutation of the form verb `verb` in `userid`'s bank, `userid` null while nobody is signed in. */
 export function formMutationKeyOf({ userid, banklabel, verb }: Readonly<{ userid: Userid | null, banklabel: string, verb: string }>): QueryKey {
@@ -114,24 +114,19 @@ export function formMutationKeyOf({ userid, banklabel, verb }: Readonly<{ userid
 // skipped. It never matches a key the minder caches under.
 /** The React Query key for the record of the box at `labelpath`: the key the bank's minder caches its item under, or one of no user's while `userid` is null. */
 export function boxQueryKeyOf({ userid, banklabel, labelpath }: Readonly<{ userid: Userid | null, banklabel: string, labelpath: string }>): QueryKey {
-  return (userid === null) ? ['sok', null, banklabel, labelpath] : ThingMinder.itemQueryKeyOf({ userid, banklabel, labelpath })
+  return (userid === null) ? ['sok', null, banklabel, labelpath] : VaultMinder.itemQueryKeyOf({ userid, banklabel, labelpath })
 }
 
 // An item's key is its labelpath's labels and then the mark '!', so the key less its mark starts the key of every box
 // under it, and of none beside it.
 /** The key that starts the React Query key of the box at `labelpath` and of every box under it: for `invalidateQueries`. While `userid` is null, the key that starts every one of no user's. */
 export function boxesQueryKeyUnder({ userid, banklabel, labelpath }: Readonly<{ userid: Userid | null, banklabel: string, labelpath: string }>): QueryKey {
-  return (userid === null) ? ['sok', null, banklabel] : ThingMinder.itemQueryKeyOf({ userid, banklabel, labelpath }).slice(0, -1)
+  return (userid === null) ? ['sok', null, banklabel] : VaultMinder.itemQueryKeyOf({ userid, banklabel, labelpath }).slice(0, -1)
 }
 
 // The minder's keys put the kind of entry before the labels, so no key that starts a box's also starts a listing's.
 /** The React Query key for the listing of the root box's children: the key the bank's minder caches it under, or one of no user's while `userid` is null. */
 export function boxListQueryKeyOf({ userid, banklabel }: Readonly<{ userid: Userid | null, banklabel: string }>): QueryKey {
-  return (userid === null) ? ['sok', null, banklabel, 'box', '#', 'kids'] : ThingMinder.listQueryKeyOf({ userid, banklabel, labelpath: 'box' })
-}
-
-/** The React Query key for the bank's main gate: the key the bank's minder caches its item under, or one of no user's while `userid` is null. */
-export function gateQueryKeyOf({ userid, banklabel }: Readonly<{ userid: Userid | null, banklabel: string }>): QueryKey {
-  return (userid === null) ? ['sok', null, banklabel, Labelpath.MainGate] : ThingMinder.itemQueryKeyOf({ userid, banklabel, labelpath: Labelpath.MainGate })
+  return (userid === null) ? ['sok', null, banklabel, 'box', '#', 'kids'] : VaultMinder.listQueryKeyOf({ userid, banklabel, labelpath: 'box' })
 }
 // --

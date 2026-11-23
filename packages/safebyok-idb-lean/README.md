@@ -1,7 +1,7 @@
 # safebyok-idb-lean
 
 A `VaultDB` for the new safebyok core that keeps a bank's Things in this browser's
-[IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API), and a bridge that copies a `ThingMinder`'s cache
+[IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API), and a bridge that copies a `VaultMinder`'s cache
 into it. The Things are what any backend would have, ciphertext and a few unencrypted fields; nothing in them unlocks a
 bank without its passphrase or passkey.
 
@@ -33,8 +33,9 @@ minder.hello()
 
 The bridge writes each live record or tombstone that lands in one of the minder's items over the Thing at its scope,
 where it is newer than the Thing stored there (`overwriteThing`, below). It
-writes no shell, soon or listing, and deletes nothing: a Thing in IndexedDB that the minder never tells of stays. A copy
-that fails goes to `onBadNews`, a no-op if left out. `goodbye()` stops it.
+writes no shell, soon or listing, and deletes nothing: a Thing in IndexedDB that the minder never tells of stays. A
+VaultMinder's items are the boxes under the root box, so the bank, its main gate and its root box, which are a
+`BankMinder`'s, are not copied. A copy that fails goes to `onBadNews`, a no-op if left out.
 
 ## What it promises
 

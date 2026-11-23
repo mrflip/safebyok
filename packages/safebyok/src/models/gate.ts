@@ -239,10 +239,10 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
     return this
   }
 
-  /** Write `ask.record`, this gate's next revision, over `ask.cited`, and model the revision written. Resolves this gate. */
+  /** Write `ask.record`, this gate's next revision, over `ask.cited`, and model the revision written, which its bank's world then shows. Resolves this gate. */
   async #putGate(ask: PutAskDraft<GateRecord>): Promise<this> {
     this.demandEnabled()
-    const answer = await this.#vaultDB.tryWriteThing({ ...putAskOf<GateRecord>(ask), modelkind: 'gate' })
+    const answer = await this.#device.bankMinder.tryWrite({ ...putAskOf<GateRecord>(ask), modelkind: 'gate' })
     if (! answer.ok) { throw answer.err }
     // The ask's modelkind is the gate's, which the vaultDB checks what it answers against.
     this.#adopt(answer.val as GateRecord)

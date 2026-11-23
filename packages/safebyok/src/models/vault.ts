@@ -2,7 +2,7 @@ import { type Helpers, Outcome, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { BaseBox } from './base-box'
 import { Thing } from './thing'
-import { ThingMinder } from '../minding/thing-minder'
+import { VaultMinder } from '../minding/vault-minder'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 import type { BoxUnsealed } from '../shapes/shapes-bankish'
@@ -20,7 +20,7 @@ export class Vault {
   // == [Props]: #bank, #minder
 
   readonly #bank:   Bank
-  readonly #minder: ThingMinder
+  readonly #minder: VaultMinder
   // --
 
   // == [Getters]: bank, minder
@@ -29,7 +29,7 @@ export class Vault {
   get bank(): Bank { return this.#bank }
 
   /** The minder caching this bank's Things, which the vault reads and writes through. */
-  get minder(): ThingMinder { return this.#minder }
+  get minder(): VaultMinder { return this.#minder }
   // --
 
   // == [Construction]: make, constructor
@@ -37,7 +37,7 @@ export class Vault {
   /** Make the vault of `bank`'s boxes, reading and writing them through `minder`, a minder of the same bank.
    * Its gets refuse until the minder's `hello`. The bank's sweep sweeps the vault too, and so the minder. Refuses a swept bank.
    */
-  static make(bank: Bank, minder: ThingMinder): Vault {
+  static make(bank: Bank, minder: VaultMinder): Vault {
     const checked = Checks.vaultMakeArgs.parse({ bank, minder })
     Validator.checkedConsistent(checked.minder.scope, checked.bank.scope, { kind: 'record_conflict' })
     const vault = new Vault(checked.bank, checked.minder)
@@ -45,7 +45,7 @@ export class Vault {
     return vault
   }
 
-  private constructor(bank: Bank, minder: ThingMinder) {
+  private constructor(bank: Bank, minder: VaultMinder) {
     this.#bank   = bank
     this.#minder = minder
     Object.freeze(this)
@@ -54,7 +54,7 @@ export class Vault {
 
   // == [Ending]: sweep
 
-  /** Stop this vault's minder and empty its cache ({@link ThingMinder.goodbye}). Never throws. */
+  /** Stop this vault's minder and empty its cache ({@link VaultMinder.goodbye}). Never throws. */
   sweep(): this {
     // The watch's stop is the host's vaultDB code: what it throws is news, and the bank's sweep goes on.
     try { this.#minder.goodbye() } catch (err) { this.#bank.tellBadNews([err]) }
@@ -212,7 +212,7 @@ function isOfNewerLife(item: Pick<BoxRecord, 'lifepath' | 'revseq'>, soon: Pick<
 const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn }) => ({
   vaultMakeArgs: obj({
     bank:   custom<Bank>((val) => val instanceof Bank, Phrases.VaultBankExpected),
-    minder: custom<ThingMinder>((val) => val instanceof ThingMinder, Phrases.VaultMinderExpected),
+    minder: custom<VaultMinder>((val) => val instanceof VaultMinder, Phrases.VaultMinderExpected),
   }),
   fn: fn<(box: BoxUnsealed) => unknown>(),
 }))

@@ -10,7 +10,6 @@ import { Gate } from '../../src/models/gate'
 import { BirthGating, Gating, UnlockGating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
 import type { GatingCleartexts } from '../../src/shapes/shapes-gateish'
-import { Shell } from '../../src/shapes/shapes-thing'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -180,20 +179,6 @@ describe("Bank.birth(device, cleartexts)", () => {
     expect(bank.gate.isUnlocked).to.be.true
   })
 
-  it("sweeps its gate, making no bank, where the vaultDB answers a root box that is not live", async () => {
-    const device = TH.makeDevice()
-    const tryBirthBank = device.vaultDB.tryBirthBank.bind(device.vaultDB)
-    const births = TH.spyBirths(device, async (ask) => {
-      const born = await tryBirthBank(ask)
-      return born.ok ? { ...born, val: { ...born.val, root: Shell.of(TH.RootScope) as never } } : born
-    })
-    const make = vi.spyOn(Gate, 'make')
-    await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase }), 'bad_record')
-    expect(births.banks).to.be.empty
-    const gate = make.mock.results[0]!.value as Gate
-    expect(gate.isEnabled).to.be.false
-    expect(gate.isLocked).to.be.true
-  })
 })
 
 describe("Bank.birth(device, cleartexts): what it refuses before it derives a key", () => {

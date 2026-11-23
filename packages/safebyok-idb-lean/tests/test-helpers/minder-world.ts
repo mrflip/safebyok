@@ -1,17 +1,16 @@
 /** The world of an IdbMinderBridge under test. */
 import { vi } from 'vitest'
-import { type MinderFriend, type VaultError, ThingMinder } from 'safebyok'
+import { BankMinder, type MinderFriend, type VaultError, VaultMinder } from 'safebyok'
 import { type Labelpath, MemoryVaultDB, Shell, getAskOf, listAskOf } from 'safebyok/storage'
 import { BoxScope, ThingBank, birthAskOf, birthBankAskOf, boxThingOf, expectGood, rootBoxOf, trackOf } from 'safebyok/testing'
 import type { IdbVaultDB } from '../../src/idb-vault-db'
 import { IdbMinderBridge } from '../../src/idb-minder-bridge'
 import { makeIdbVaultDB } from './idb-world'
 
-/** A fake bank for a ThingMinder. Its asks track the roots at revision 0, and `tellBadNews` is a spy. */
+/** A fake bank for a VaultMinder. Its asks track the roots at revision 0, and `tellBadNews` is a spy. */
 export function fakeBankOf() {
   return {
     scope:       { ...ThingBank },
-    rootBox:     { ...rootBoxOf(), am: 'a' },
     makeGetAsk:  (args: { labelpath: Labelpath, ifAbsent?: 'nil' | 'fail' }) => getAskOf({ ...args, ...ThingBank, track: trackOf() }),
     makeListAsk: (args: { labelpath: Labelpath, ifAbsent?: 'nil' | 'fail' }) => listAskOf({ ...args, ...ThingBank, track: trackOf() }),
     tellBadNews: vi.fn<(badnews: readonly unknown[]) => void>(),
@@ -22,7 +21,7 @@ export function fakeBankOf() {
 export interface BridgedWorld {
   vaultDB:    MemoryVaultDB
   bank:       ReturnType<typeof fakeBankOf>
-  minder:     ThingMinder
+  minder:     VaultMinder
   idbVaultDB: IdbVaultDB
   onBadNews:  ReturnType<typeof vi.fn<(news: VaultError) => void>>
   bridge:     IdbMinderBridge
@@ -33,12 +32,14 @@ export interface BridgedWorld {
  * - `isBadNewsHeard` -- the bridge is made with the `onBadNews` spy (default: true)
  */
 export async function bridgedWorldOf({ isStarted = true, isBadNewsHeard = true } = {}): Promise<BridgedWorld> {
-  const vaultDB = new MemoryVaultDB()
-  await expectGood(vaultDB.tryBirthBank(birthBankAskOf()))
+  const vaultDB    = new MemoryVaultDB()
+  const bank       = fakeBankOf()
+  const bankMinder = BankMinder.make({ vaultDB }, bank)
+  bankMinder.hello()
+  await expectGood(bankMinder.tryBirthBank(birthBankAskOf()))
   const boxAsk = birthAskOf(boxThingOf(), Shell.of(BoxScope, rootBoxOf()))
   await expectGood(vaultDB.tryWriteThing(boxAsk))
-  const bank       = fakeBankOf()
-  const minder     = ThingMinder.make({ vaultDB }, bank)
+  const minder     = VaultMinder.make({ vaultDB, bankMinder }, bank)
   const idbVaultDB = makeIdbVaultDB()
   const onBadNews  = vi.fn<(news: VaultError) => void>()
   const bridge     = IdbMinderBridge.make({ minder, idbVaultDB, ...(isBadNewsHeard && { onBadNews }) })
