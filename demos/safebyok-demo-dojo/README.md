@@ -5,8 +5,9 @@ stores behind it hold afterwards. It runs on the new core (`safebyok`), its Reac
 IndexedDB storage (`safebyok-idb-lean`). It shows what the library does today; it decides nothing. Never published.
 
 ```sh
-pnpm --filter safebyok-demo-dojo dev       # builds what the dojo needs, then starts Vite
-pnpm --filter safebyok-demo-dojo fixture   # writes src/fixture/fixture.json again, after the library changes what it stores
+pnpm --filter safebyok-demo-dojo build:deps  # builds what the dojo needs
+pnpm --filter safebyok-demo-dojo dev         # starts Vite
+pnpm --filter safebyok-demo-dojo fixture     # writes src/fixture/fixture.json again, after the library changes what it stores
 ```
 
 ## The page
@@ -36,7 +37,7 @@ submits the one form. Each arrangement lasts until that outcome lands.
 | --- | --- |
 | Sign In, Save | nothing |
 | Weak | the strength checker judges every passphrase weak (`src/lib/switchable-checker.ts`); New Box also judges the password again, so its own check sees the verdict |
-| Exists | the fixture's planted rows written into the vault database behind the device's back: Nolo's bank, or a box at `login` in Hero's and Thierry's |
+| Exists | the fixture's planted rows written into the vault database behind the device's back: Nolo's bank, or a box at `login` in Hero's and Thierry's. They are written as the fixture made them, over whatever is stored: after a Save, Reset first, or the put meets an older box and refuses `record_conflict` |
 | Failed | the vaultDB refuses its next write (`src/lib/refusing-vault-db.ts`) |
 | Dismiss | Login: the form is reset, as a Cancel button would, and nothing reaches the library. New Box: the bank is locked before the submit |
 
@@ -54,5 +55,6 @@ The fixture is made by `scripts/make-fixture.ts`, through the library, under Nod
 ## Demo scaffolding
 
 * **The key deriver is real Argon2id at cheap settings** (`dojo_light`: 1 MiB, one pass), so the fixture's banks unlock
-  in milliseconds.
+  in milliseconds. These settings are for the dojo alone, whose passphrases are printed on the page: they protect
+  nothing, and a host keeps the library's own (`Argon2idWebV1`).
 * **Signing in is fake**: the userid is kept in localStorage.
