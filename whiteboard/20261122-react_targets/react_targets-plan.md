@@ -546,3 +546,48 @@ The dojo line is now #858 ← #860 ← #861 ← #862 ← #863 `dojo_practice` �
 * The form verbs: "we've got a good proposal, yes start: `gate.gatingFooAttempt(params: FormData | gatingDNA)`". Thread 7 builds the five entrypoints in the core, one call on each React hook that takes a form or a dna, a one-line helper to keep a form's text through a refusal, and moves the kit and the dojo's Login tab onto them.
 
 **Held for a ruling, with the worker's counts to come:** whether the core's older three ways for each verb (`unlockGating`, `unlock`, `tryUnlock`) and the giver's (`Knock.unlockGating`, `Knock.unlockMutationOptions`, `popField`) go once the entrypoints are in.
+
+### The dojo line ready, the form verbs built, the minder's matrix (the Coach, 2026-11-23)
+
+**Where the PRs stand.** #858 and #860 merged. Ready, each one commit, CI green: #861 ← #862 ← #863 ← #864, every base `main`; merging #864 with a merge commit lands all four. Draft: #865 `gating_attempt` (built and reviewed, awaits the rulings below), #866 `minder_matrix` (tests only, from main; in rework), #859 (this plan and the threat model). The react_free PRs (#819, #822, #832, #834, #835, #836, #838, #843) carry the label `sidelined`.
+
+**Ruled:**
+
+* **PRs:** "would you pull the prs out of draft as they're ready?" and, on squashing the dojo's back-and-forth, "No need to have green commits, just a green final result." #861 to #864 were squashed to one commit each with their trees unchanged; the old tips are local tags `20261123-<label>-presquash`.
+* **`device.bankMinder` stays a public getter.** The session's lean to hide it was withdrawn at the Coach's question: "The record is cached in indexeddb and queryable by vaultdb -- what fields should be secret? What boundaries are significant?" The gate's record reaches a host through its own vaultDB anyway. The boundaries that matter are the private methods that see cleartext, what leaves by itself (a spread, `toJSON`, an error, a log, the masked view), and the device's edge.
+* **A form verb handed a form at a stage that has no bank: no fix, a row in `notes/wontfix.md`** (on #865). The Coach: "remember that when an agent comes forward with a crossing like this to have them describe the path that leads here ... To this edge case, you're adding machinery in the form submit of every single attempt, that maligns a form you don't own." The path is a host showing a form at a stage it is not for, or a bank ending under a shown form.
+* **The workshop's records** (this plan, `dojo-findings.md`, the memory) "are for you to dip into, or read when it's likely to help": not a reading list.
+
+**The minder's matrix test** (#866, `packages/safebyok/tests/minding/vault-minder/vault-minder-chains.test.ts`). The Coach asked for "a matrix test for sequences of records coming via get and #sendToTSQ": a table of `[liveness, lifeseq, revseq]` précis tuples a scenario runner constructs and feeds in order, by gets, by the feed, and mixed. His rulings on it:
+
+* "wanted is what should hold, written from four principles -- just so"; "Where today's code ends elsewhere, the row also carries today -- great idea".
+* The listing: "any change in life (vacant, full/soon, dead) should invalidate the listing, eventually invalidating old records".
+* Size: "a->b -- (live+soon/live/dead/dead+soon/bare+soon) to (live+soon/live/dead/dead+soon/bare+soon) x (older/newer) I think that's 50".
+* A later life's soon over an earlier life's item: "I think the item is removed from cache in this case: our best prior is not 'here, but out of date' but rather 'null, then vacant, but out of date'."
+* "there aren't sparse tombstones and the lifeseq tick/tocks; every tombstone has an off lifeseq, since incremented each time and starting with zero". The core counts `revseq` on across lives, so his tuples that restart it at a new life were mapped onto one history.
+* A get behind a bare soon of the same life: "It should not be stale_read to have soon,4,6+bare met by full,4,3: For any full record coming in on a bare record of that life, it's better than what was there, and should be shown to the customer." This changes the get's contract in `minder.ts` ("refuses `stale_read`, and changes nothing") for that one case; the minder thread makes the change, the table states it.
+* "Keep the record generator, because we're likely generating the wrong tree shape."
+* "fix the tests to instead assert the correct state": read by the session as the seed check, each seeded start asserted against what the principles give for it, with today's state as its tripwire, where the 13 dead+soon rows asserted a state the principles do not allow.
+
+**What the table found** (40 of 69 rows end elsewhere today; the reviewer reproduced the first three through real writes and the watch):
+
+* The listing is never marked after the first record stored: ordinary.
+* A dead record is kept once a later life is live: ordinary.
+* A later life's soon does not end the earlier life: ordinary. So dead+soon is reachable today.
+* An earlier life's record lands under a later life's soon: needs redelivery or a lagging replica.
+* A get behind the cache refuses `stale_read` where the feed lands the same record: get only.
+
+**Open on #865, the form verbs** (`gate.gating<Verb>Attempt(params: FormData | dna)` in the core; `attempt`, `wasRefused`, `keepTextIfRefused` on each React hook). Each with the session's recommendation:
+
+1. `keepTextIfRefused(event, onEmptied?)`, so a host's own clearing (the dojo's `newPassphrase.forget`) cannot be ordered wrongly. Recommended; about three lines.
+2. The old ways for each verb. Recommended: remove now those with no caller in `src` (`tryUnlock` and its siblings; `Knock.<verb>Gating` and a hook's `.gating`; `Knock.<verb>MutationOptions`); the core's `gate.unlock({…})` and siblings go in a later pass, after a sweep of about 75 test call sites, and `popField` and the makers' `isInCleartextNames` bridge go with them.
+3. Names: `wasRefused` breaks `isFoo`, and "dna" names a form verb's fieldnames as well as a maker's object.
+4. Which kit forms keep their text through a refusal. Recommended: create-vault and replace-passphrase only.
+5. `method="post"` on `UnlockForm` moves a passphrase submitted before hydration from the URL to the request body. Recommended: record it, build nothing.
+
+**Open elsewhere:**
+
+* The table of what a form keeps after each outcome (`docs/threat-model.md`, *Text typed into a form*) is still the session's proposal, not ruled. Once #865 lands, that doc's *Not built yet* line on forms keeping their text is out of date.
+* Scenarios claim E9, "It saves in the background: nothing goes away in the form", is "cannot today" because `useDraft`'s `put` ends with `discard()`. Whether "in the background" means the user keeps typing while it saves decides what `useDraft` owes (findings 18 to 27).
+* Two threads recommended, neither started: the minder (mark the listing on any change of life; drop the dead record at a rebirth; a later life's soon ends the earlier life; a full record lands on a bare soon of its life), with #866's table as its acceptance test; and `useDraft` (typing kept across a save, a pending state, a reveal without moving focus).
+* A flaky test on main fails CI now and then: `passkey-forms.test.tsx`, "drops a wrong-passphrase message when the next attempt ends at a dismissed prompt". A two-line fix sits uncommitted in the worktree `byok-test_races`, not this session's.
