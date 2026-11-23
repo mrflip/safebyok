@@ -20,6 +20,8 @@ Option **B** of `box_persist-plan.md`: one boxes snapshot per user and bank.
     `roots`/`boxes`), `minder-persist.test.ts` (scope saves only its bank from a shared client), idb-lean's device
     restore through per-bank `IdbPersister`s.
   * `safebyok-idb-lean` README and `IdbPersisterOpts` doc show the per-bank record. TODO.md has the size-limit entry.
+  * Ride-along from thread 13's review ([#855](https://github.com/mrflip/safebyok/pull/855)): `SoonEvent`'s doc block
+    (`shapes-minder.ts`) says the minder fetches an item an observer keeps active again by itself. `#markBehinds` untouched.
 * **Decisions made**:
   * The four plan questions as the handoff decided them. Stage: the boxes restore runs inside `#bringUp` before the
     cached world is attached, so the stage stays `starting` through it; no new stage.
