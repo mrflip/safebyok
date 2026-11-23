@@ -3,7 +3,7 @@ import { type MinderEvent, MinderEventFormat } from '../../../src/shapes/shapes-
 import type { Labelpath } from '../../../src/shapes/primitives'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
-import { isListingEvent, listenerOf, minderWorldOf, storedBoxOf } from './world'
+import { isListingEvent, listenerOf, minderWorldOf, storedBoxOf, labelpathsOf } from './world'
 
 /** The event a listener is told when the listing of the Thing at `labelpath` is invalidated, in {@link toldOf}'s form. */
 function invalidationOf(labelpath: Labelpath) {
@@ -91,8 +91,8 @@ describe("VaultMinder.invalidate", () => {
     minder.invalidate('box', { list: 'all' })
     vaultDB._cheat_things(TH.ThingBank).set('box/anthropic', TH.boxThingOf('anthropic'))
     minder.listen(heard, MinderEventFormat)
-    expect(await minder.list('box')).to.deep.equal(['box/anthropic', 'box/openai'])
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/anthropic', 'box/openai'])
+    expect(labelpathsOf(await minder.list('box'))).to.deep.equal(['box/anthropic', 'box/openai'])
+    expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/anthropic', 'box/openai'])
     expect(heard.mock.calls.map(([event]) => event.eventkind)).to.include('list')
     minder.invalidate('box', { list: 'all' })
     expect(toldOf(heard).filter((told) => told.action === 'invalidate')).to.deep.equal([invalidationOf('box')])

@@ -215,13 +215,13 @@ async function setupListing() {
 }
 
 describe("useBoxList over the minder's own listing", () => {
-  it("lists once, and shows a box another device writes without listing again", async () => {
+  it("lists once, and lists again to show a box another device writes", async () => {
     const { world, result, lists } = await setupListing()
     await waitFor(() => { expect(result.current.data).to.deep.equal([TH.JokesPath]) })
     expect(lists.count).to.eq(1)
     await act(() => world._cheat_otherVault!.putBoxOnce('box/puns', { sidecar: { service: 'puns' } }, { whisper: LeanTH.Whisper }))
     await waitFor(() => { expect(result.current.data).to.deep.equal([TH.JokesPath, 'puns']) })
-    expect(lists.count).to.eq(1)
+    expect(lists.count).to.eq(2)
   })
 
   it("lists again when the minder marks its listing stale", async () => {

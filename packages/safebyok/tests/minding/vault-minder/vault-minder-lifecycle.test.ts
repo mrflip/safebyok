@@ -3,10 +3,10 @@ import { DefaultQueryCacheOpts, MaxTimerMillis } from '../../../src/shapes/shape
 import { VaultMinder } from '../../../src/minding/vault-minder'
 import { BankMinder } from '../../../src/minding/bank-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
-import { Shell } from '../../../src/shapes/shapes-thing'
+import { Absent } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { Hours24, fakeBankOf, minderOf, minderWorldOf, storedBoxOf, boxScopeOf, cheatBox } from './world'
+import { Hours24, fakeBankOf, minderOf, minderWorldOf, storedBoxOf, boxScopeOf, cheatBox, labelpathsOf } from './world'
 
 describe("VaultMinder.make", () => {
   const vaultDB = new MemoryVaultDB()
@@ -110,7 +110,7 @@ describe("VaultMinder.hello", () => {
     await TH.expectRefusal(minder.get(TH.BoxScope), 'storage_issue')
   })
 
-  it("answers under the root box the BankMinder's birth of the bank lands, after a get was refused", async () => {
+  it("answers a get once the BankMinder's birth of the bank lands, after a get was refused", async () => {
     const vaultDB    = new MemoryVaultDB()
     const bankMinder = BankMinder.make({ vaultDB }, fakeBankOf())
     bankMinder.hello()
@@ -118,8 +118,7 @@ describe("VaultMinder.hello", () => {
     minder.hello()
     await TH.expectRefusal(minder.get(TH.BoxScope), 'storage_issue')
     await TH.expectGood(bankMinder.tryBirthBank(TH.birthBankAskOf()))
-    const shell = Shell.of(TH.BoxScope, TH.rootBoxOf())
-    expect(await minder.get(TH.BoxScope)).to.deep.equal(shell)
+    expect(await minder.get(TH.BoxScope)).to.deep.equal(Absent)
   })
 
   it("has every cached item, soon and listing until goodbye, however long after", async () => {
@@ -136,7 +135,7 @@ describe("VaultMinder.hello", () => {
       await vi.advanceTimersByTimeAsync(Hours24)
       expect(minder.at(boxScopeOf('anthropic'))).to.deep.equal(anthropic)
       expect(minder.soonAt(TH.BoxScope)).to.deep.equal(Thing.sparseOf(box))
-      expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/anthropic', 'box/openai'])
+      expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/anthropic', 'box/openai'])
       minder.goodbye()
       expect([minder.at(boxScopeOf('anthropic')), minder.soonAt(TH.BoxScope)]).to.deep.equal([undefined, undefined])
     } finally {

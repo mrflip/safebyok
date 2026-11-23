@@ -3,7 +3,7 @@ import type { Bank } from '../../src/models/bank'
 import { Vault } from '../../src/models/vault'
 import { type BadNews, type BoxUnsealed } from '../../src/shapes/shapes-bankish'
 import { type BoxLabelpath, Lifeseq } from '../../src/shapes/primitives'
-import { type BoxRecord, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
+import { type BoxRecord, Absent, Shell, ThingFormat, isAbsent } from '../../src/shapes/shapes-thing'
 import { Thing } from '../../src/models/thing'
 import { VaultMinder } from '../../src/minding/vault-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -24,20 +24,22 @@ function scopeAt<LabelpathT extends string>(bank: Bank, labelpath: LabelpathT) {
 /** The rows of `bank`'s MemoryVaultDB, by labelpath, to plant a record as another device would, telling no watch. */
 function rowsOf(bank: Bank): Map<string, unknown> { return (bank.vaultDB as MemoryVaultDB)._cheat_things(bank.scope) }
 
-/** Unseal the whole record `vault`'s minder gets of {@link Openai}, a box or a tombstone. */
+/** Unseal the whole record `vault`'s minder gets of {@link Openai}, a box, or where it gets Absent, its tombstone. */
 async function unsealedAt(vault: Vault): Promise<BoxUnsealed> {
-  const record = await vault.minder.get(scopeAt(vault.bank, Openai))
-  if (Thing.isVoidSentinel(record)) { throw new Error('the item is the shell') }
+  const scope  = scopeAt(vault.bank, Openai)
+  const got    = await vault.minder.get(scope)
+  const record = isAbsent(got) ? vault.minder.deadAt(scope) : got
+  if (record === undefined) { throw new Error('no box is stored') }
   // A tombstone the minder got is whole, though its type admits the sparse one.
   return vault.bank.unsealBox(record as BoxRecord)
 }
 
-/** The design's put flow: get the box or its shell, add one to its count of apicalls, seal and put it over what it got. */
+/** The design's put flow: get the box, add one to its count of apicalls, seal and put it over what it got, or over its labelpath where it got Absent. */
 async function bumpApicalls(vault: Vault): Promise<BoxRecord> {
   const newest   = await vault.minder.get(scopeAt(vault.bank, Openai))
-  const old      = (newest.am === 'a') ? await vault.bank.unsealBox(newest) : null
+  const old      = isAbsent(newest) ? null : await vault.bank.unsealBox(newest)
   const apicalls = Number(old?.whisper['apicalls'] ?? 0) + 1
-  return vault.putBoxOnce(newest, { sidecar: { account: 'work' } }, { whisper: { ...TH.Whisper, apicalls } })
+  return vault.putBoxOnce(isAbsent(newest) ? Openai : newest, { sidecar: { account: 'work' } }, { whisper: { ...TH.Whisper, apicalls } })
 }
 
 /** A vault of `bank` beside the one its device made, with a minder of its own, befriending the bank, that has not said `hello`. */
@@ -116,7 +118,7 @@ describe("bank.sweep() and device.sweep(), over the vaults made on the bank", ()
     await minder.get(scopeAt(bank, Openai))
     bank.sweep()
     minder.hello()
-    expect(await minder.get(scopeAt(bank, Openai))).to.include({ am: 'x', lifeseq: Shell.VoidLifeseq })
+    expect(await minder.get(scopeAt(bank, Openai))).to.deep.equal(Absent)
   })
 
   it("go on past a watch whose stop throws, telling onBadNews", async () => {
@@ -151,14 +153,15 @@ describe("bank.sweep() and device.sweep(), over the vaults made on the bank", ()
 describe("the box flows, through a vault and its bank's MemoryVaultDB", () => {
   it("lists no boxes under the bank's root box, before any is put", async () => {
     const { minder } = await TH.buildBornVault()
-    expect(await minder.list('box')).to.deep.equal([])
+    expect(await minder.list('box')).to.deep.include({ items: {}, gones: {} })
   })
 
-  it("gets the shell of a box not stored, under the root box's life, for its first revision to cite", async () => {
-    const { bank, minder } = await TH.buildBornVault()
-    const shell = await minder.get(scopeAt(bank, Openai))
-    expect(Thing.isVoidSentinel(shell)).to.be.true
-    expect(shell).to.include({ ...bank.scope, labelpath: Openai, label: 'openai', am: 'x', lifeseq: Shell.VoidLifeseq, lifepath: `${bank.rootBox.lifeseq}/${Shell.VoidLifeseq}` })
+  it("gets Absent for a box not stored, and its first put by labelpath cites the shell under the root box's life", async () => {
+    const { bank, vault, minder } = await TH.buildBornVault()
+    expect(await minder.get(scopeAt(bank, Openai))).to.deep.equal(Absent)
+    const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    expect(written.mock.calls[0]![0].cited).to.include({ revseq: -1, am: 'x', lifeseq: Shell.VoidLifeseq, lifepath: `${bank.rootBox.lifeseq}/${Shell.VoidLifeseq}` })
   })
 
   it("puts a box over its shell, and again over itself, each put unsealing what the one before sealed", async () => {
@@ -169,7 +172,7 @@ describe("the box flows, through a vault and its bank's MemoryVaultDB", () => {
     const unsealed = await unsealedAt(vault)
     expect(unsealed).to.include({ revseq: 1, am: 'a' })
     expect(unsealed.whisper).to.deep.equal({ ...TH.Whisper, apicalls: 2 })
-    expect(await minder.list('box')).to.deep.equal([Openai])
+    expect(await minder.list('box')).to.deep.include({ items: { openai: { lifeseq: Lifeseq.ofLifenum(0) } }, gones: {} })
   })
 
   it("deletes a box by its sealed tombstone, which unseals, is listed, and which a put brings back to life", async () => {
@@ -179,7 +182,7 @@ describe("the box flows, through a vault and its bank's MemoryVaultDB", () => {
     const unsealed = await unsealedAt(vault)
     expect(unsealed).to.include({ am: 'x', lifeseq: Lifeseq.ofLifenum(1) })
     expect(unsealed.whisper).to.deep.equal({})
-    expect(await minder.list('box')).to.deep.equal([Openai])
+    expect(await minder.list('box')).to.deep.include({ items: {}, gones: { openai: { lifeseq: Lifeseq.ofLifenum(1) } } })
 
     const reborn = await bumpApicalls(vault)
     expect(reborn).to.include({ am: 'a', lifeseq: Lifeseq.ofLifenum(2) })
@@ -201,7 +204,7 @@ describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
 
   it("writes a put ask over the box it was given, cited sparse, in its bank's scope and track", async () => {
     const { bank, vault } = await TH.buildBornVault()
-    const shell   = await vault.minder.get(scopeAt(bank, Openai))
+    const shell   = Shell.of(scopeAt(bank, Openai), bank.rootBox)
     const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
     const box     = await TH.expectGood(vault.tryPutBoxOnce(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }))
     expect(written).toHaveBeenCalledTimes(1)
@@ -229,13 +232,12 @@ describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
 })
 
 describe("vault.putBoxOnce(cited, patch, secrets)", () => {
-  it("resolves a birth with the stored box already in its item and in its parent's listing", async () => {
+  it("resolves a birth with the stored box already in its item", async () => {
     // putBoxOnce @example
     const { bank, vault, minder } = await TH.buildBornVault()
     const box = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     expect(box).to.include({ labelpath: Openai, revseq: 0, am: 'a' })
     expect(minder.at(scopeAt(bank, Openai))).to.deep.equal(box)
-    expect(minder.listingAt(scopeAt(bank, 'box'))).to.deep.equal([Openai])
     expect(await bank.unsealBox(box)).to.deep.include({ whisper: TH.Whisper, sidecar: TH.Sidecar })
   })
 
@@ -346,13 +348,13 @@ describe("vault.tryDelBoxOnce(labelpath)", () => {
 })
 
 describe("vault.delBoxOnce(labelpath)", () => {
-  it("writes the tombstone over the newest revision: its item has the tombstone, and it stays listed", async () => {
+  it("writes the tombstone over the newest revision: its item is Absent, and its dead entry has the tombstone", async () => {
     const { bank, vault, minder } = await TH.buildBornVault()
     const box = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const tombstone = await vault.delBoxOnce(Openai)
     expect(tombstone).to.include({ labelpath: Openai, am: 'x', revseq: box.revseq + 1 })
-    expect(minder.at(scopeAt(bank, Openai))).to.deep.equal(tombstone)
-    expect(minder.listingAt(scopeAt(bank, 'box'))).to.deep.equal([Openai])
+    expect(minder.at(scopeAt(bank, Openai))).to.deep.equal(Absent)
+    expect(minder.deadAt(scopeAt(bank, Openai))).to.deep.equal(tombstone)
   })
 
   it("refuses a box never stored, or already deleted", async () => {
@@ -453,7 +455,8 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     rowsOf(bank).set(Openai, tombstone)
     const fn = vi.fn()
     await TH.expectRefusal(vault.withWhisper(Openai, fn), 'stale_read')
-    expect(minder.at(scopeAt(bank, Openai))).to.include({ revtok: tombstone.revtok })
+    expect(minder.at(scopeAt(bank, Openai))).to.deep.equal(Absent)
+    expect(minder.deadAt(scopeAt(bank, Openai))).to.include({ revtok: tombstone.revtok })
     expect(fn).not.toHaveBeenCalled()
   })
 

@@ -150,7 +150,7 @@ export const BankRootsMissing = "A bank is stored without its main gate or its r
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: MinderFriendExpected, BankMinderExpected, NotMinded, WorldNotHeard, MinderClientExpected, BankMindedInClient, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, NotARecord, RecordsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
+// == [Minding]: MinderFriendExpected, BankMinderExpected, NotMinded, WorldNotHeard, MinderClientExpected, BankMindedInClient, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, RecordsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
 
 /** A minder made without a friend: a device or a bank. */
 export const MinderFriendExpected = 'A minder is made with its friend: the device or bank whose Things it minds.'
@@ -181,9 +181,6 @@ export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of mil
 
 /** A minder's `listen` given a feed version other than `MinderEventFormat`. */
 export const FeedVersionOther = "A minder's listen is given the version of the feed its listener reads, MinderEventFormat, and this listener was written for another: its events are not shaped as it expects."
-
-/** A value handed to newerThingOf that is not a Thing's record. */
-export const NotARecord = "newerThingOf compares the records of one Thing, and was given a value that is not a Thing's record, tombstone or shell."
 
 /** Two records of different Things handed to newerThingOf. */
 export const RecordsOfOtherThings = "newerThingOf compares the records of one Thing, and was given the records of two different Things."

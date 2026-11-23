@@ -275,7 +275,7 @@ export type Sparse<RecordT extends Sparse<ThingRecord>> = Pick<RecordT, ThingFie
 // A shell is made only from the void: each of its fixed fields defaults to the shell's, and refuses any other value.
 
 /** A shell, whole: every Thing field of a tombstone and no body, its revseq -1.
- * A VaultMinder caches it for a scope with nothing stored.
+ * A write cites it to make a Thing's first revision.
  */
 export type VoidSentinel = ShellOf<ThingRecord>
 
@@ -380,6 +380,21 @@ export const Shell = Object.freeze({
     return lifepathWithParentageChecker.parse({ lifeseq, lifepath })
   },
 })
+// --
+
+// == [Absent]: Absent, isAbsent
+
+/** What a get answers, and a minder's item has, for a Thing with no live record: none stored, or a tombstone.
+ * It is one frozen object, but tell it by {@link isAbsent}, never by identity: a copy of it is Absent too.
+ */
+export const Absent = Object.freeze({ modelkind: 'absent' } as const)
+/** The shape of {@link Absent}. */
+export type Absent = typeof Absent
+
+/** True for {@link Absent}, or a copy of it. */
+export function isAbsent(val: unknown): val is Absent {
+  return CX.isPlainBag(val) && (val['modelkind'] === Absent.modelkind)
+}
 // --
 
 // == [Reading records]: Tombstone

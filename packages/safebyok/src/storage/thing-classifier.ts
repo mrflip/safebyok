@@ -1,11 +1,12 @@
 /** Classify a vaultDB ask against the Thing stored, by big's act tables in `notes/answer-contract.md`. */
 
 import { sortBy } from 'es-toolkit'
+import { v7 as uuidv7 } from 'uuid'
 import { CX, EX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/internals'
 import { policyRefusalOf } from './policies'
 import { Labelpath } from '../shapes/primitives'
-import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
-import { type StoredCited, type ThingCited, type ThingRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
+import type { Actual, BirthBankActual, DamagedThing, KidEntry, Kids, ListThingsActual, ReadTc } from './vault-db'
+import { type Sparse, type StoredCited, type ThingCited, type ThingRecord, type ThingScope, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
 import { Thing } from '../models/thing'
 import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
@@ -232,7 +233,7 @@ function trackedEntryOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>
 }
 // --
 
-// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, isChildLabelpath, classifyBirthBank
+// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, isChildLabelpath, kidsOf, readTcNow, readTcOf, classifyBirthBank
 // Each is given the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`;
 // a birth is given the bank's three roots, and where it is born, reports the world its puts wrote.
 
@@ -262,21 +263,22 @@ export function classifyWriteThing(ask: WriteAsk, raw: unknown, worldFetched: Wo
   return { ok: true, act, world: worldOf(ask, worldFetched), record: ask.record, ...trackedFieldOf(ask, worldFetched.tracked) }
 }
 
-/** The raw rows a concrete adapter fetched for a listing: the parent (null for none), and each child one label under it, with its labelpath. */
-export type ThingsFetched = Readonly<{ parent: unknown, children: readonly Readonly<{ labelpath: Labelpath, raw: unknown }>[] }>
+/** The raw rows a concrete adapter fetched for a listing: the parent (null for none), each child one label under it with its labelpath, and when it read them ({@link readTcNow}). */
+export type ThingsFetched = Readonly<{ parent: unknown, children: readonly Readonly<{ labelpath: Labelpath, raw: unknown }>[], read_tc: unknown }>
 
-/** Classify a listing against the {@link ThingsFetched} rows: the parent's get act, the parent, the children of its live life in labelpath order,
- * and the children that fail their checks.
+/** Classify a listing against the {@link ThingsFetched} rows: the parent's get act, the children of its live life as a {@link Kids} value,
+ * the parent as its `parentage`, each child sparse as its `deltas` in labelpath order, and the children that fail their checks.
  */
-export function classifyListThings(ask: ListAsk, { parent: rawParent, children }: ThingsFetched, worldFetched: WorldFetched): ListThingsActual {
-  const stored = storedThingOf(ask, rawParent)
-  const act    = getActOf(ask, stored)
-  const parent = (stored === null) ? null : Thing.sparseOf(stored)
-  const world  = worldOf(ask, worldFetched)
-  const beside = trackedFieldOf(ask, worldFetched.tracked)
-  if (isRefusedAct(act))  { return { ok: false, act, world, listed: [], parent, damaged_rows: [], ...beside } }
+export function classifyListThings(ask: ListAsk, { parent: rawParent, children, read_tc: rawReadTc }: ThingsFetched, worldFetched: WorldFetched): ListThingsActual {
+  const stored    = storedThingOf(ask, rawParent)
+  const act       = getActOf(ask, stored)
+  const read_tc   = readTcOf(rawReadTc)
+  const parentage = (stored === null) ? [] : [Thing.sparseOf(stored)]
+  const world     = worldOf(ask, worldFetched)
+  const beside    = trackedFieldOf(ask, worldFetched.tracked)
+  if (isRefusedAct(act))  { return { ok: false, act, world, parentage, deltas: [], damaged_rows: [], ...beside } }
   // A tombstone or none has no children.
-  if (stored?.am !== 'a') { return { ok: true, act, world, listed: [], parent, damaged_rows: [], ...beside } }
+  if (stored?.am !== 'a') { return { ok: true, act, world, kids: kidsOf(ask, stored, [], read_tc), parentage, deltas: [], damaged_rows: [], ...beside } }
   const { userid, banklabel } = ask
   // A child hangs off its parent's live lifepath: an earlier life's children are not its.
   const lifepathUnder = `${stored.lifepath}/`
@@ -287,8 +289,8 @@ export function classifyListThings(ask: ListAsk, { parent: rawParent, children }
     const child = listedThingOf({ userid, banklabel, labelpath }, raw)
     if (child === null) { damaged_rows.push({ userid, banklabel, labelpath, am: 'd' }) } else if (child.lifepath.startsWith(lifepathUnder)) { living.push(child) }
   }
-  const listed = sortBy(living, [(thing) => thing.labelpath]).map((thing) => Thing.sparseOf(thing))
-  return { ok: true, act, world, listed, parent, damaged_rows, ...beside }
+  const deltas = sortBy(living, [(thing) => thing.labelpath]).map((thing) => Thing.sparseOf(thing))
+  return { ok: true, act, world, kids: kidsOf(ask, stored, deltas, read_tc), parentage, deltas, damaged_rows, ...beside }
 }
 
 /** True when `labelpath` is one label under the listing's parent, of the parent's kind. */
@@ -296,6 +298,31 @@ function isChildLabelpath(ask: ListAsk, labelpath: Labelpath): boolean {
   const label = labelpath.slice(ask.labelpath.length + 1)
   return labelpath.startsWith(`${ask.labelpath}/`) && (! label.includes('/')) && Labelpath.isOfModelkind(labelpath, ask.modelkind)
 }
+
+// Object.fromEntries makes each label an own key, `__proto__` among them.
+/** The {@link Kids} value of `deltas`, the children of `parent` stored at the listing's scope, null for none. */
+function kidsOf(ask: ListAsk, parent: ThingRecord | null, deltas: readonly Sparse<ThingRecord>[], read_tc: ReadTc): Kids {
+  const entryOf = ({ label, lifeseq }: Sparse<ThingRecord>): [string, KidEntry] => [label, { lifeseq }]
+  return {
+    modelkind:  'kids',
+    parentpath: ask.labelpath,
+    parentlife: parent?.lifepath ?? Shell.VoidLifeseq,
+    items:      Object.fromEntries(deltas.filter((delta) => delta.am === 'a').map((delta) => entryOf(delta))),
+    gones:      Object.fromEntries(deltas.filter((delta) => delta.am !== 'a').map((delta) => entryOf(delta))),
+    read_tc,
+  }
+}
+
+// A concrete adapter with a clock of its own in the statement that reads may report its own UUID version 7 in place of this one.
+/** A {@link ReadTc} made now, for a concrete adapter to report as the `read_tc` of a listing it reads in the same step. */
+export function readTcNow(): ReadTc { return uuidv7() }
+
+/** The `read_tc` a concrete adapter reported, checked as a UUID version 7. Throws `storage_issue` for anything else. */
+function readTcOf(raw: unknown): ReadTc {
+  if ((typeof raw !== 'string') || (! ReadTcPattern.test(raw))) { throw Throwers.storageIssue() }
+  return raw
+}
+const ReadTcPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 /** Classify a bank's birth, by its three `puts`, against the raw roots a concrete adapter fetched.
  * Under `born`, `things` and `world` are made of the puts' records, for the concrete adapter to write in one step. It then reports

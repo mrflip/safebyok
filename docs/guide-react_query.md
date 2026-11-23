@@ -71,7 +71,7 @@ const unlock = useMutation({ mutationFn: vault.unlock })
 ## Doppler-lite: many secrets, each with settings
 
 ```tsx
-const { data: labelpaths } = useBoxList()              // the live boxes' labelpaths: the same array until one joins or leaves
+const { data: labelpaths } = useBoxList()              // the boxes' labelpaths, deleted ones too; undefined until the first list; a new box shows once its list lands
 labelpaths?.map((labelpath) => <Row key={labelpath} labelpath={labelpath} />)   // each Row's useBox redraws for its own box alone
 const { data: boxes } = useBoxes()                     // every live record, sealed: for sorting, counts and "nothing here yet"
 

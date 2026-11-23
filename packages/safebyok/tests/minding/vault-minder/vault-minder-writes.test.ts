@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { VaultMinder } from '../../../src/minding/vault-minder'
-import { type BoxRecord, Shell } from '../../../src/shapes/shapes-thing'
+import { type BoxRecord, Absent, Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import { MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
-import { QuietVaultDB, LateWriteVaultDB, minderWorldOf, bornOf, storedBoxOf, noticeOf, cheatBox, listenerOf, boxBirthAskOf } from './world'
+import { QuietVaultDB, LateWriteVaultDB, minderWorldOf, bornOf, storedBoxOf, noticeOf, cheatBox, listenerOf, boxBirthAskOf, isListingStaleAt, labelpathsOf } from './world'
 
 describe("VaultMinder.tryWrite", () => {
   it("answers as the vaultDB did, once the record written is in its item", async () => {
@@ -72,11 +72,11 @@ describe("VaultMinder.tryWrite", () => {
     const writing = minder.tryWrite(boxBirthAskOf())
     await TH.eventually(() => vaultDB.isHolding)
     expect(minder.at(TH.BoxScope)).to.be.undefined
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal([])
+    expect(isListingStaleAt(minder, TH.RootScope)).to.be.false
     expect(heard.mock.calls).to.have.lengthOf(0)
     vaultDB.release()
     await writing
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
+    expect(isListingStaleAt(minder, TH.RootScope)).to.be.true
   })
 
   it("tells a listener of the new record before a caller's await of the write returns", async () => {
@@ -102,7 +102,7 @@ describe("VaultMinder.tryWrite", () => {
     expect(minder.at(TH.BoxScope)).to.eq(record)
     expect(minder.listingAt(TH.RootScope)).to.eq(listing)
     expect(record).to.deep.equal(TH.boxThingOf())
-    expect(listing).to.deep.equal(['box/openai'])
+    expect(isListingStaleAt(minder, TH.RootScope)).to.be.true
   })
 
   it("changes nothing when the answer arrives after the watch's notice of the same write", async () => {
@@ -119,19 +119,20 @@ describe("VaultMinder.tryWrite", () => {
     expect(minder.at(TH.BoxScope)).to.eq(record)
     expect(minder.listingAt(TH.RootScope)).to.eq(listing)
     expect(record).to.deep.equal(TH.boxThingOf())
-    expect(listing).to.deep.equal(['box/openai'])
+    expect(isListingStaleAt(minder, TH.RootScope)).to.be.true
   })
 
-  it("leaves a deleted box's tombstone in its item and its labelpath in the root box's listing", async () => {
+  it("leaves a deleted box Absent in its item, its tombstone in its dead entry, and its labelpath in the root box's listing", async () => {
     const vaultDB = new QuietVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { minder } = await minderWorldOf(vaultDB)
     await minder.list('box')
     const tombstone = TH.boxTombOf(TH.boxThingOf())
     const answer    = await minder.tryWrite(TH.delAskFor(box, tombstone))
-    expect(answer).to.deep.include({ ok: true, act: 'deleted' })
-    expect(minder.at(TH.BoxScope)).to.deep.equal(tombstone)
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
+    expect(answer).to.deep.include({ ok: true, act: 'deleted', val: tombstone })
+    expect(minder.at(TH.BoxScope)).to.deep.equal(Absent)
+    expect(minder.deadAt(TH.BoxScope)).to.deep.equal(tombstone)
+    expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/openai'])
   })
 
   it("writes a box the bank sealed, then the tombstone it sealed, through the put and del asks the bank makes", async () => {
@@ -146,8 +147,9 @@ describe("VaultMinder.tryWrite", () => {
     const tombstone = await bank.sealBox(box, { am: 'x' })
     const delAsk    = bank.makeDelAsk<BoxRecord>({ cited: Thing.sparseOf(box), record: tombstone })
     await TH.expectGood(minder.tryWrite(delAsk))
-    expect(minder.at(TH.BoxScope)).to.deep.equal(tombstone)
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
+    expect(minder.at(TH.BoxScope)).to.deep.equal(Absent)
+    expect(minder.deadAt(TH.BoxScope)).to.deep.equal(tombstone)
+    expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/openai'])
   })
 
   it("answers the refusal, and asks the vaultDB nothing, while not minding", async () => {

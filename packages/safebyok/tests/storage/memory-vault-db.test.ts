@@ -15,7 +15,7 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
   it("answers with a copy, which the caller can change without changing the store", async () => {
     const vaultDB = new MemoryVaultDB()
     await TH.expectGood(vaultDB.tryWriteThing(TH.birthAskOf()))
-    const val = await TH.expectGood(vaultDB.tryGetThing(TH.getGateAskOf())) as { auth: { planted?: boolean } }
+    const val = await TH.expectGood<unknown>(vaultDB.tryGetThing(TH.getGateAskOf())) as { auth: { planted?: boolean } }
     val.auth.planted = true
     const again = await vaultDB.tryGetThing(TH.getGateAskOf())
     expect(again).to.deep.include({ val: TH.gateThingOf() })
@@ -54,6 +54,13 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
 describe("Classifier.classifyListThings(ask, fetched, roots)", () => {
   it("refuses, as a broken store, a child a store fetched from outside the parent", () => {
     const child = { labelpath: 'box/aa/deep', raw: TH.boxThingOf('deep') }
-    TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), { parent: TH.rootBoxOf(), children: [child] }, { bank: null, maingate: null }), 'storage_issue')
+    const fetched = { parent: TH.rootBoxOf(), children: [child], read_tc: Classifier.readTcNow() }
+    TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), fetched, { bank: null, maingate: null }), 'storage_issue')
+  })
+
+  it("refuses, as a broken store, a read_tc that is no UUID version 7", () => {
+    for (const read_tc of [undefined, crypto.randomUUID(), Classifier.readTcNow().toUpperCase()]) {
+      TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), { parent: TH.rootBoxOf(), children: [], read_tc }, { bank: null, maingate: null }), 'storage_issue')
+    }
   })
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { newerThingOf } from '../../src/minding/newer-thing'
-import { Shell } from '../../src/shapes/shapes-thing'
+import { type ThingRecord, type Tombstone, Absent, Shell } from '../../src/shapes/shapes-thing'
 import { Thing } from '../../src/models/thing'
 import * as TH from '../test-helpers'
 
@@ -42,12 +42,40 @@ describe("newerThingOf", () => {
     TH.expectSyncRefusal(() => newerThingOf(Box0, { ...Box1, banklabel: 'zz' }), 'bad_record')
   })
 
-  const NotRecords = [
-    [Box0,      undefined,                   'refuses a next of undefined'],
-    [Box0,      { labelpath: 'box/openai' }, 'refuses a next with no revision'],
-    [42,        Box0,                        'refuses a prior that is no record'],
+  const deadAtTomb = (): Tombstone<ThingRecord> => Tomb as Tombstone<ThingRecord>
+  const AbsentCases = [
+    [Box1,    Absent,                Absent, deadAtTomb, 'answers Absent over the revision its tombstone deletes'],
+    [Absent,  Box1,                  Absent, deadAtTomb, 'keeps Absent over the revision its tombstone deletes'],
+    [Absent,  Reborn,                Reborn, deadAtTomb, 'answers a later life over Absent for a tombstone'],
+    [Absent,  Box0,                  Box0,   undefined,  'answers a first life over Absent where no tombstone is found'],
+    [Box0,    Absent,                Box0,   undefined,  'keeps a life over Absent where no tombstone is found'],
   ] as const
-  for (const [prior, next, blurb] of NotRecords) {
-    it(blurb, () => { TH.expectSyncRefusal(() => newerThingOf(prior, next), 'bad_record') })
+  for (const [prior, next, expected, deadAt, blurb] of AbsentCases) {
+    it(blurb, () => { expect(newerThingOf(prior, next, deadAt)).to.eq(expected) })
   }
+
+  it("keeps prior of two Absents, telling Absent by its shape", () => {
+    expect(newerThingOf(Absent, structuredClone(Absent), deadAtTomb)).to.eq(Absent)
+  })
+
+  it("looks the tombstone up at the scope of the record beside Absent", () => {
+    const scopes: unknown[] = []
+    newerThingOf(Box1, Absent, (scoped) => { scopes.push(scoped); return Tomb as Tombstone<ThingRecord> })
+    expect(scopes).to.deep.equal([Box1])
+  })
+
+  const NotRecords = [
+    [Box0,      undefined,                   undefined,                   'passes a next of undefined through'],
+    [Box0,      { labelpath: "box/openai" }, { labelpath: "box/openai" }, 'passes a next with no revision through'],
+    [42,        Box0,                        Box0,                        'passes a next through over a prior that is no record'],
+  ] as const
+  for (const [prior, next, expected, blurb] of NotRecords) {
+    it(blurb, () => { expect(newerThingOf(prior, next)).to.deep.equal(expected) })
+  }
+
+  it("shares the parts of a select's result equal to the last one's, as TanStack's default does", () => {
+    const prior = { title: 'Work', tags: ['a'] }
+    const next  = { title: 'Work', tags: ['a'] }
+    expect(newerThingOf(prior, next)).to.eq(prior)
+  })
 })

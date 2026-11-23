@@ -227,6 +227,18 @@ describe("useDraft", () => {
     expect([seen.draft?.base?.revseq, seen.draft?.sidecar]).to.deep.equal([2, { service: 'jokes', tier: 'ultra' }])
   })
 
+  it("over a deleted box, once edited is behind the box another device puts again, its put refusing stale_write", async () => {
+    const { world, seen } = await renderDraftEditor()
+    await waitFor(() => { expect(seen.draft?.base).to.not.be.undefined })
+    await act(() => world._cheat_otherVault!.delBoxOnce(`box/${TH.JokesPath}`))
+    await waitFor(() => { expect(seen.draft?.base).to.be.null })
+    act(() => { screen.getByText('Go pro').click() })
+    await act(() => world._cheat_otherVault!.putBoxOnce(`box/${TH.JokesPath}`, { sidecar: { service: 'jokes' } }, { whisper: LeanTH.Whisper }))
+    await screen.findByText('Dirty and behind')
+    act(() => { screen.getByText('Save').click() })
+    await waitFor(() => { expect(isVaultError(seen.putErr) && seen.putErr.refusalkind).to.eq('stale_write') })
+  })
+
   it("forgets what was typed when its form's action refuses the put, clean again, so the next put writes nothing typed", async () => {
     const { world, device, input, seen } = await renderDraftEditor({ isLocked: true, isInForm: true })
     typeKeyInto(input)

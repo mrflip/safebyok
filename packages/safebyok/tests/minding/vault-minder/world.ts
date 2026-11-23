@@ -6,11 +6,11 @@ import { VaultMinder } from '../../../src/minding/vault-minder'
 import { BankMinder } from '../../../src/minding/bank-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import type { Labelpath, Revtok } from '../../../src/shapes/primitives'
-import { type BoxRecord, type ThingRecord, type ThingScope, Shell } from '../../../src/shapes/shapes-thing'
+import { type BoxRecord, type ThingRecord, type ThingScope, Shell, isAbsent } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import { type GetAsk, type WriteAsk, getAskOf, listAskOf } from '../../../src/shapes/shapes-asks'
 import type { BankScope } from '../../../src/shapes/shapes-stamps'
-import type { GetThingAnswer, ThingNotice, WriteThingAnswer } from '../../../src/storage/vault-db'
+import type { GetThingAnswer, Kids, ThingNotice, WriteThingAnswer } from '../../../src/storage/vault-db'
 import * as TH from '../../test-helpers'
 
 /** The get ask a minder sends the vaultDB for the box at `TH.BoxScope`: the bank's, tracking the roots at revision 0. */
@@ -147,10 +147,9 @@ export function noticeOf(thing: ThingNotice['val']): ThingNotice {
   return { ok: true, act: Thing.isLive(thing) ? 'gotlive' : 'gotgone', val: thing }
 }
 
-/** The revtok of the item of the box at `TH.BoxScope`, or undefined for nothing or the void sentinel. */
+/** The revtok of the item of the box at `TH.BoxScope`, or undefined for nothing or Absent. */
 export function revtokAt(minder: VaultMinder): Revtok | undefined {
-  const record: DeliverableThing | undefined = minder.at(TH.BoxScope)
-  return ((record === undefined) || Thing.isVoidSentinel(record)) ? undefined : record.revtok
+  return TH.itemRevtokOf(minder.at(TH.BoxScope))
 }
 
 /** The act of `answer`, a tryAt's answer. */
@@ -161,6 +160,17 @@ export function boxScopeOf(boxlabel: string): ThingScope { return { ...TH.ThingB
 
 /** Put `box` in `vaultDB`'s datastore as another device would, telling no watch. */
 export function cheatBox(vaultDB: MemoryVaultDB, box: DeliverableThing): void { vaultDB._cheat_things(TH.ThingBank).set(box.labelpath, box) }
+
+/** The labelpaths `kids` names, live and gone, in labelpath order, or undefined for no listing. */
+export function labelpathsOf(kids: Kids | undefined): Labelpath[] | undefined {
+  if (kids === undefined) { return undefined }
+  return [...Object.keys(kids.items), ...Object.keys(kids.gones)].map((label) => `${kids.parentpath}/${label}`).toSorted((one, other) => one.localeCompare(other, 'en'))
+}
+
+/** True when `minder`'s listing at `scope` is cached and marked stale. */
+export function isListingStaleAt(minder: VaultMinder, scope: ThingScope): boolean {
+  return minder.queryClient.getQueryState(minder.listQueryKey(scope))?.isInvalidated === true
+}
 
 /** A listener that records each event it is told. */
 export function everyEventListenerOf() { return vi.fn<(event: MinderEvent) => void>() }
@@ -179,18 +189,19 @@ export function isListingEvent(event: MinderEvent): event is ListingEvent {
   return event.eventkind === 'list'
 }
 
-/** What an item's event tells: `'behind'` for its falling behind, `'removed'` for its removal, else whether its record is live, gone or the shell (`'void'`), or undefined for no record. */
-export type ToldSort = 'live' | 'gone' | 'void' | 'behind' | 'removed' | undefined
+/** What an item's event tells: `'behind'` for its falling behind, `'removed'` for its removal, else whether it has a live record or Absent, or undefined for neither. */
+export type ToldSort = 'live' | 'absent' | 'behind' | 'removed' | undefined
 
 /** A summary of each event `listener` recorded, in order:
- * - an item's    -- `[labelpath, ToldSort]` ({@link ToldSort})
- * - a soon's     -- `['soon', labelpath, revseq]`, with `'removed'` in place of the revseq for its removal
- * - a listing's  -- `['listing']`
+ * - an item's       -- `[labelpath, ToldSort]` ({@link ToldSort})
+ * - a soon's        -- `['soon', labelpath, revseq]`, with `'removed'` in place of the revseq for its removal
+ * - a dead entry's  -- `['dead', labelpath, revseq]`, likewise
+ * - a listing's     -- `['listing']`
  */
-export function toldOf(listener: ReturnType<typeof listenerOf>): (readonly [Labelpath, ToldSort] | readonly ['soon', Labelpath, number | 'removed' | undefined] | readonly ['listing'])[] {
+export function toldOf(listener: ReturnType<typeof listenerOf>): (readonly [Labelpath, ToldSort] | readonly ['soon' | 'dead', Labelpath, number | 'removed' | undefined] | readonly ['listing'])[] {
   return listener.mock.calls.map(([event]) => {
     if (event.eventkind === 'item') { return [event.labelpath, toldSortOf(event)] as const }
-    if (event.eventkind === 'soon') { return ['soon', event.labelpath, (event.type === 'removed') ? 'removed' : event.revseq] as const }
+    if ((event.eventkind === 'soon') || (event.eventkind === 'dead')) { return [event.eventkind, event.labelpath, (event.type === 'removed') ? 'removed' : event.revseq] as const }
     return ['listing'] as const
   })
 }
@@ -201,8 +212,7 @@ function toldSortOf(event: ThingEvent): ToldSort {
   if (event.action?.type === 'invalidate') { return 'behind' }
   const record = event.state.data
   if (record === undefined)                { return undefined }
-  if (Thing.isVoidSentinel(record))        { return 'void' }
-  return Thing.isGone(record) ? 'gone' : 'live'
+  return isAbsent(record) ? 'absent' : 'live'
 }
 
 /** The ask that births the box `boxlabel` under the root box, over its shell. */

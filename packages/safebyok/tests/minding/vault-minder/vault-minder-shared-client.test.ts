@@ -10,7 +10,7 @@ import { type ThingScope, Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
-import { fakeBankOf, listenerOf, minderOf, toldOf } from './world'
+import { fakeBankOf, isListingStaleAt, labelpathsOf, listenerOf, minderOf, toldOf } from './world'
 
 /** Another user's bank of the same banklabel as {@link TH.ThingBank}. */
 const OtherUserBank: BankScope = Object.freeze({ userid: 'u2', banklabel: 'acme' })
@@ -95,19 +95,16 @@ for (const [otherBank, blurb] of [[OtherUserBank, 'two users'], [OtherLabelBank,
       expect(theirs.minder.at(scopeIn(otherBank, 'box/openai'))).to.be.undefined
       expect(toldOf(theirs.heard)).to.deep.equal([])
       expect(await theirs.minder.get(scopeIn(otherBank, 'box/openai'))).to.deep.equal(boxIn(otherBank))
-      // A get's record joins its parent's listing as the cache's onSuccess settles it.
-      expect(mine.minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
-      expect(theirs.minder.listingAt(scopeIn(otherBank, 'box'))).to.deep.equal(['box/openai'])
-      expect(toldOf(mine.heard)).to.deep.equal([['box/openai', 'live'], ['listing']])
-      expect(toldOf(theirs.heard)).to.deep.equal([['box/openai', 'live'], ['listing']])
+      expect(toldOf(mine.heard)).to.deep.equal([['box/openai', 'live']])
+      expect(toldOf(theirs.heard)).to.deep.equal([['box/openai', 'live']])
     })
 
-    it("each land a list's labelpaths and the soons it brings in its own bank alone", async () => {
+    it("each land a list's Kids value and the soons it brings in its own bank alone", async () => {
       const { mine, theirs } = await sharedWorldOf(otherBank)
-      expect(await mine.minder.list('box')).to.deep.equal(['box/openai'])
+      expect(labelpathsOf(await mine.minder.list('box'))).to.deep.equal(['box/openai'])
       expect(mine.minder.soonAt(TH.BoxScope)).to.deep.equal(Thing.sparseOf(boxIn(TH.ThingBank)))
       expect(theirs.minder.soonAt(scopeIn(otherBank, 'box/openai'))).to.be.undefined
-      expect(theirs.minder.isListingBareAt(scopeIn(otherBank, 'box'))).to.be.true
+      expect(theirs.minder.listingAt(scopeIn(otherBank, 'box'))).to.be.undefined
       expect(toldOf(theirs.heard)).to.deep.equal([])
       await theirs.minder.list('box')
       expect(theirs.minder.soonAt(scopeIn(otherBank, 'box/openai'))).to.deep.equal(Thing.sparseOf(boxIn(otherBank)))
@@ -125,7 +122,7 @@ for (const [otherBank, blurb] of [[OtherUserBank, 'two users'], [OtherLabelBank,
       await TH.eventually(() => toldOf(mine.heard).some(([labelpath]) => labelpath === 'box/mistral'))
       expect(theirs.minder.at(scopeIn(otherBank, 'box/groq'))).to.be.undefined
       expect(theirs.minder.soonAt(scopeIn(otherBank, 'box/mistral'))).to.be.undefined
-      expect(theirs.minder.listingAt(scopeIn(otherBank, 'box'))).to.deep.equal([])
+      expect(theirs.minder.listingAt(scopeIn(otherBank, 'box'))).to.be.undefined
       expect(toldOf(theirs.heard)).to.deep.equal([])
     })
 
@@ -148,7 +145,7 @@ for (const [otherBank, blurb] of [[OtherUserBank, 'two users'], [OtherLabelBank,
       expect(theirs.minder.at(scopeIn(otherBank, 'box/openai'))).to.deep.equal(boxIn(otherBank))
       await theirs.minder.write(boxBirthAskIn(otherBank, 'groq'))
       await TH.wakeupAtNextTick()
-      expect(theirs.minder.listingAt(scopeIn(otherBank, 'box'))).to.deep.equal(['box/groq', 'box/openai'])
+      expect(theirs.minder.at(scopeIn(otherBank, 'box/groq'))).to.deep.equal(boxIn(otherBank, 'groq'))
       expect(toldOf(theirs.heard).filter(([, told]) => told === 'removed')).to.deep.equal([])
     })
   })
@@ -162,12 +159,15 @@ describe("a minder on a shared client, after goodbye", () => {
     const { minder }  = sharingMinderOf(vaultDB, bankMinder!, queryClient, TH.ThingBank)
     minder.goodbye()
     minder.hello()
+    // The cache's onSuccess settles a get's record: its soon is removed once the item catches up.
+    await minder.list('box')
     await minder.get(TH.BoxScope)
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
+    expect([minder.at(TH.BoxScope), minder.soonAt(TH.BoxScope)]).to.deep.equal([boxIn(TH.ThingBank), undefined])
     minder.goodbye()
     const { minder: next } = sharingMinderOf(vaultDB, bankMinder!, queryClient, TH.ThingBank)
+    await next.list('box')
     await next.get(TH.BoxScope)
-    expect(next.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
+    expect([next.at(TH.BoxScope), next.soonAt(TH.BoxScope)]).to.deep.equal([boxIn(TH.ThingBank), undefined])
   })
 })
 
@@ -180,10 +180,11 @@ describe("a shared client's cache", () => {
     sharingMinderOf(vaultDB, otherBankMinder!, queryClient, OtherUserBank).minder.goodbye()
     const queryKey    = VaultMinder.itemQueryKeyOf(scopeIn(OtherUserBank, 'box/openai'))
     const listKey     = VaultMinder.listQueryKeyOf(scopeIn(OtherUserBank, 'box'))
-    queryClient.setQueryData(listKey, [])
+    queryClient.setQueryData(listKey, await mine.minder.list('box'))
+    mine.heard.mockClear()
     await queryClient.query({ queryKey, queryFn: () => boxIn(OtherUserBank) })
-    expect(queryClient.getQueryData(listKey)).to.deep.equal([])
-    expect(mine.minder.listingAt(TH.RootScope)).to.deep.equal([])
+    expect(queryClient.getQueryState(listKey)?.isInvalidated).to.be.false
+    expect(isListingStaleAt(mine.minder, TH.RootScope)).to.be.false
     expect(toldOf(mine.heard)).to.deep.equal([])
   })
 
@@ -194,7 +195,6 @@ describe("a shared client's cache", () => {
     const mine        = sharingMinderOf(vaultDB, bankMinder!, queryClient, TH.ThingBank)
     const twin        = VaultMinder.make({ vaultDB, bankMinder: bankMinder!, queryClient }, fakeBankOf())
     TH.expectSyncRefusal(() => { twin.hello() }, 'bad_record')
-    await mine.minder.get(TH.BoxScope)
-    expect(mine.minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
+    expect(await mine.minder.get(TH.BoxScope)).to.deep.equal(boxIn(TH.ThingBank))
   })
 })

@@ -4,7 +4,7 @@
 import 'fake-indexeddb/auto'
 import { noop } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Shell, VaultError } from 'safebyok/storage'
+import { Absent, Shell, VaultError } from 'safebyok/storage'
 import { IdbVaultDB } from '../src/idb-vault-db'
 import { VaultDBVersion } from '../src/vault-shelf'
 import * as TH from './test-helpers'
@@ -38,7 +38,7 @@ describe("IdbVaultDB's options", () => {
 describe("IdbVaultDB's databases", () => {
   it("names its database for this library, its dbName and its version", async () => {
     const idbVaultDB = TH.makeIdbVaultDB()
-    await TH.expectGood(idbVaultDB.tryGetThing(TH.getGateAskOf()))
+    await TH.expectGood<unknown>(idbVaultDB.tryGetThing(TH.getGateAskOf()))
     expect(await dbNamesNow()).to.include(`safebyok-${TH.dbNameIn(idbVaultDB)}:vault-v${VaultDBVersion}`)
     expect(VaultDBVersion).to.match(/^\d{3}-\d{3}-\d{3}$/)
   })
@@ -47,15 +47,15 @@ describe("IdbVaultDB's databases", () => {
     const idbVaultDB = TH.makeIdbVaultDB()
     const other = TH.makeIdbVaultDB()
     await TH.expectGood(idbVaultDB.tryBirthBank(TH.birthBankAskOf()))
-    const gotten = await TH.expectGood(other.tryGetThing(TH.getGateAskOf()))
-    expect(gotten).to.be.null
+    const gotten = await TH.expectGood<unknown>(other.tryGetThing(TH.getGateAskOf()))
+    expect(gotten).to.deep.equal(Absent)
   })
 
   it("keeps its Things for a new instance on the same database", async () => {
     const idbVaultDB = TH.makeIdbVaultDB()
     await TH.expectGood(idbVaultDB.tryBirthBank(TH.birthBankAskOf()))
     const twin = TH.makeTwin(idbVaultDB)
-    const gotten = await TH.expectGood(twin.tryGetThing(TH.getGateAskOf()))
+    const gotten = await TH.expectGood<unknown>(twin.tryGetThing(TH.getGateAskOf()))
     expect(gotten).to.deep.equal(TH.gateThingOf())
   })
 
@@ -70,8 +70,9 @@ describe("IdbVaultDB's databases", () => {
     const grandchild = { ...TH.boxThingOf('deep'), labelpath: 'box/openai/deep' }
     await rows.plant(otherBankBox, otherBankBox)
     await rows.plant(grandchild, grandchild)
-    const listed = await TH.expectGood(idbVaultDB.tryListThings(TH.listAskAt('box')))
-    expect(listed.map(({ labelpath }) => labelpath)).to.deep.equal([box.labelpath])
+    const answer = await idbVaultDB.tryListThings(TH.listAskAt('box'))
+    await TH.expectGood(answer)
+    expect(answer.deltas.map(({ labelpath }) => labelpath)).to.deep.equal([box.labelpath])
   })
 })
 

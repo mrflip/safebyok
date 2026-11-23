@@ -1,31 +1,48 @@
 /** `newerThingOf`: the merge every record a minder caches lands through. */
-import { Validator } from 'safebyok-big/internals'
-import * as Phrases from '../phrases'
+import * as TSQ from '@tanstack/query-core'
 import * as Throwers from '../refusals/throwers'
-import { ThingChecks } from '../shapes/shapes-thing'
+import { type Absent, type ThingCited, type ThingRecord, type ThingScope, type Tombstone, Shell, ThingChecks, isAbsent } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
-import type { DeliverableThing } from '../shapes/shapes-minder'
 
-// == [Merging]: newerThingOf
+// == [Merging]: newerThingOf, DeadAt
 
-// TanStack Query types the values it hands structural sharing as unknown, so both are checked as records.
-/** The newer of two records of one Thing, by life and then revision, with `prior` on a tie and `next` where `prior` is undefined.
- * It serves as structural sharing for a TanStack query of one Thing's records. Refuses anything but a record, and two records of different Things.
+/** Where {@link newerThingOf} finds the tombstone that {@link Absent} stands for at a scope: undefined where none is cached. */
+export type DeadAt = (scope: ThingScope) => Tombstone<ThingRecord> | undefined
+
+// TanStack Query runs structural sharing on what a host's `select` returns as well as on the entry's own values, and
+// types both as unknown.
+/** The newer of two values of one Thing's item, soon or tombstone, by life and then revision, with `prior` on a tie and `next` where `prior` is undefined.
+ * It serves as structural sharing for a TanStack query of one Thing's records. {@link Absent} stands for the tombstone `deadAt`
+ * finds at the other value's scope, or, where it finds none, for nothing stored, older than every record. Of two Absents, `prior`.
+ * Anything that is neither a record nor Absent gets TanStack's own default. Refuses two records of different Things.
  */
-export function newerThingOf(prior: unknown, next: unknown): DeliverableThing {
-  const nextRecord = Checks.record.parse(next)
-  if (prior === undefined) { return nextRecord }
-  const priorRecord = Checks.record.parse(prior)
-  if (! Thing.haveSameScope(priorRecord, nextRecord)) { throw Throwers.recordsOfOtherThings() }
-  return (Thing.cmp(priorRecord, nextRecord) > 0) ? nextRecord : priorRecord
+export function newerThingOf(prior: unknown, next: unknown, deadAt?: DeadAt): unknown {
+  if (prior === undefined) { return next }
+  if (! (isEntryVal(prior) && isEntryVal(next))) { return TSQ.replaceEqualDeep(prior, next) }
+  if (isAbsent(prior)) { return isAbsent(next) ? prior : newerOfCited(prior, next, citedOf(prior, next, deadAt), next) }
+  if (isAbsent(next))  { return newerOfCited(prior, next, prior, citedOf(next, prior, deadAt)) }
+  if (! Thing.haveSameScope(prior, next)) { throw Throwers.recordsOfOtherThings() }
+  return newerOfCited(prior, next, prior, next)
 }
 // --
 
-// == [Checks]: Checks
+// == [Helpers]: EntryRecord, isEntryVal, citedOf, newerOfCited
 
-/** The check of a record handed to {@link newerThingOf}. */
-const Checks = Validator.Checkers('bad_record', ({ custom }) => ({
-  // A record passes through as it is, so that the record answered is the one given.
-  record: custom<DeliverableThing>((val) => ThingChecks.scopedCited.safeParse(val).success, Phrases.NotARecord),
-}))
+/** A record a minder's entry may have: a Thing's scope and citation, live or a tombstone, sparse or whole. */
+type EntryRecord = ThingScope & ThingCited
+
+/** True for a record, or {@link Absent}. */
+function isEntryVal(val: unknown): val is EntryRecord | Absent {
+  return isAbsent(val) || ThingChecks.scopedCited.safeParse(val).success
+}
+
+/** The citation `val` compares by: its own, or where it is Absent, that of the tombstone at `scoped`'s scope, else the shell's. */
+function citedOf(val: EntryRecord | Absent, scoped: ThingScope, deadAt: DeadAt | undefined): Pick<ThingCited, 'lifepath' | 'revseq'> {
+  return isAbsent(val) ? (deadAt?.(scoped) ?? Shell.Cited) : val
+}
+
+/** `next` where `nextCited` is newer than `priorCited`, else `prior`. */
+function newerOfCited(prior: unknown, next: unknown, priorCited: Pick<ThingCited, 'lifepath' | 'revseq'>, nextCited: Pick<ThingCited, 'lifepath' | 'revseq'>): unknown {
+  return (Thing.cmp(priorCited, nextCited) > 0) ? next : prior
+}
 // --

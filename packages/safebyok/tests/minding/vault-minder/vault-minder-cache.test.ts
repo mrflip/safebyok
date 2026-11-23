@@ -1,10 +1,11 @@
+import * as TSQ from '@tanstack/query-core'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { MaxTimerMillis } from '../../../src/shapes/shapes-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
-import { type BoxRecord, type Sparse, type ThingRecord, type Tombstone, Shell } from '../../../src/shapes/shapes-thing'
+import { type BoxRecord, type Sparse, type ThingRecord, type Tombstone, Absent } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { Hours24, BoxGetAsk, DownVaultDB, QuietVaultDB, fakeBankOf, minderOf, minderWorldOf, bornOf, storedBoxOf, noticeOf, sparseNoticeOf, actOf, boxScopeOf, cheatBox, boxBirthAskOf } from './world'
+import { Hours24, BoxGetAsk, DownVaultDB, fakeBankOf, minderOf, minderWorldOf, bornOf, storedBoxOf, noticeOf, sparseNoticeOf, actOf, boxScopeOf, cheatBox, boxBirthAskOf, isListingStaleAt, labelpathsOf } from './world'
 
 describe("VaultMinder.at", () => {
   it("has nothing before any get", async () => {
@@ -63,9 +64,10 @@ describe("VaultMinder.at", () => {
     const { minder } = await minderWorldOf(new MemoryVaultDB())
     // Known only when run, as a host's labels are.
     const [label, labelpath] = ['openai' as string, 'box/openai' as string]
-    expectTypeOf(minder.at(TH.BoxScope)).toEqualTypeOf<BoxRecord | Tombstone<BoxRecord> | undefined>()
-    expectTypeOf(minder.at({ ...TH.ThingBank, labelpath: `box/${label}` as const })).toEqualTypeOf<BoxRecord | Tombstone<BoxRecord> | undefined>()
-    expectTypeOf(minder.at({ ...TH.ThingBank, labelpath })).toEqualTypeOf<ThingRecord | Tombstone<ThingRecord> | undefined>()
+    expectTypeOf(minder.at(TH.BoxScope)).toEqualTypeOf<BoxRecord | Absent | undefined>()
+    expectTypeOf(minder.at({ ...TH.ThingBank, labelpath: `box/${label}` as const })).toEqualTypeOf<BoxRecord | Absent | undefined>()
+    expectTypeOf(minder.at({ ...TH.ThingBank, labelpath })).toEqualTypeOf<ThingRecord | Absent | undefined>()
+    expectTypeOf(minder.deadAt(TH.BoxScope)).toEqualTypeOf<Tombstone<BoxRecord> | undefined>()
   })
 })
 
@@ -155,87 +157,62 @@ describe("VaultMinder.isBehindAt", () => {
 })
 
 describe("VaultMinder.listingAt", () => {
-  it("lists each box received before the root box's first list", async () => {
+  it("has nothing before the first list, whatever boxes arrive", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
-    const { minder, receive } = await minderWorldOf(vaultDB, { isWorldHeard: false })
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal([])
+    const { minder, receive } = await minderWorldOf(vaultDB)
     await minder.get(TH.BoxScope)
     receive(noticeOf(TH.nextOf(box)))
     receive(noticeOf(TH.boxThingOf('anthropic')))
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/anthropic', 'box/openai'])
+    expect(minder.listingAt(TH.RootScope)).to.be.undefined
   })
 
-  it("has the labelpaths a list answers, tombstones included, in labelpath order, frozen", async () => {
+  it("has the Kids value a list answers, the live and the tombstones apart, frozen", async () => {
     const vaultDB = new MemoryVaultDB()
-    await storedBoxOf(vaultDB)
-    cheatBox(vaultDB, TH.boxTombOf(TH.boxThingOf('anthropic')))
+    const box     = await storedBoxOf(vaultDB)
+    const gone    = TH.boxTombOf(TH.boxThingOf('anthropic'))
+    cheatBox(vaultDB, gone)
     const { minder } = await minderWorldOf(vaultDB)
-    await minder.list('box')
-    const listing = minder.listingAt(TH.RootScope)
-    expect(listing).to.deep.equal(['box/anthropic', 'box/openai'])
-    expect(Object.isFrozen(listing)).to.be.true
+    const kids    = await minder.list('box')
+    expect(minder.listingAt(TH.RootScope)).to.deep.equal({
+      modelkind: 'kids', parentpath: 'box', parentlife: TH.rootBoxOf().lifepath,
+      items: { openai: { lifeseq: box.lifeseq } }, gones: { anthropic: { lifeseq: gone.lifeseq } }, read_tc: kids.read_tc,
+    })
+    expect(Object.isFrozen(minder.listingAt(TH.RootScope)?.items)).to.be.true
   })
 
-  it("adds a box a get or a notice delivers, live or gone, but never a shell", async () => {
+  it("is replaced whole by a later list, never joined to", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { minder, receive } = await minderWorldOf(vaultDB)
     await minder.list('box')
-    cheatBox(vaultDB, TH.boxThingOf('anthropic'))
-    await minder.get(boxScopeOf('anthropic'))
-    const mistralTomb = TH.boxTombOf(TH.boxThingOf('mistral'))
-    receive(noticeOf(mistralTomb))
-    const cohere = await minder.get(boxScopeOf('cohere'))
-    expect(Thing.isVoidSentinel(cohere)).to.be.true
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/anthropic', 'box/mistral', 'box/openai'])
-  })
-
-  it("still lists a box whose tombstone arrives", async () => {
-    const vaultDB = new MemoryVaultDB()
-    await storedBoxOf(vaultDB)
-    const { minder, receive } = await minderWorldOf(vaultDB)
-    await minder.list('box')
-    const tombstone = TH.boxTombOf(TH.boxThingOf())
-    receive(noticeOf(tombstone))
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
-  })
-
-  it("still lists a labelpath a later list does not answer", async () => {
-    const vaultDB = new MemoryVaultDB()
-    await storedBoxOf(vaultDB)
-    const { minder } = await minderWorldOf(vaultDB)
-    await minder.list('box')
+    receive(noticeOf(TH.boxThingOf('anthropic')))
+    expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/openai'])
     vaultDB._cheat_things(TH.ThingBank).delete(TH.BoxScope.labelpath)
-    expect(await minder.list('box')).to.deep.equal([])
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
+    await minder.list('box')
+    expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal([])
   })
 
-  it("returns the same array until a labelpath joins it", async () => {
+  it("keeps a listing read later than one set after it", async () => {
     const vaultDB = new MemoryVaultDB()
-    const box     = await storedBoxOf(vaultDB)
-    const { minder, receive } = await minderWorldOf(vaultDB)
-    await minder.list('box')
-    const listing = minder.listingAt(TH.RootScope)
-    receive(noticeOf(TH.nextOf(box)))
-    await minder.get(TH.BoxScope)
-    await minder.list('box')
-    expect(minder.listingAt(TH.RootScope)).to.eq(listing)
-    receive(noticeOf(TH.boxThingOf('anthropic')))
-    expect(minder.listingAt(TH.RootScope)).to.not.eq(listing)
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/anthropic', 'box/openai'])
+    await storedBoxOf(vaultDB)
+    const { minder } = await minderWorldOf(vaultDB)
+    const earlier = await minder.list('box')
+    const later   = await minder.list('box')
+    minder.queryClient.setQueryData(minder.listQueryKey(TH.RootScope), earlier)
+    expect(minder.listingAt(TH.RootScope)?.read_tc).to.eq(later.read_tc)
   })
 
-  it("lists a box born on another device by the watch alone", async () => {
+  it("keeps its items and gones the same objects while each list answers them the same", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { minder } = await minderWorldOf(vaultDB)
     await minder.list('box')
-    const shell = Shell.of(boxScopeOf('anthropic'), TH.rootBoxOf())
-    const birth = TH.birthAskOf(TH.boxThingOf('anthropic'), shell)
-    await TH.expectGood(vaultDB.tryWriteThing(birth))
-    await TH.eventually(() => minder.listingAt(TH.RootScope)?.length === 2)
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/anthropic', 'box/openai'])
+    const first = minder.listingAt(TH.RootScope)
+    await minder.list('box')
+    expect(minder.listingAt(TH.RootScope)).to.not.eq(first)
+    expect([minder.listingAt(TH.RootScope)?.items, minder.listingAt(TH.RootScope)?.gones]).to.deep.equal([first?.items, first?.gones])
+    expect(minder.listingAt(TH.RootScope)?.items).to.eq(first?.items)
   })
 
   it("has another Thing's listing only once it is listed", async () => {
@@ -244,7 +221,7 @@ describe("VaultMinder.listingAt", () => {
     const { minder } = await minderWorldOf(vaultDB)
     expect(minder.listingAt(TH.BoxScope)).to.be.undefined
     await minder.list('box/openai')
-    expect(minder.listingAt(TH.BoxScope)).to.deep.equal([])
+    expect(minder.listingAt(TH.BoxScope)).to.deep.include({ parentpath: 'box/openai', items: {}, gones: {} })
   })
 
   it("caches nothing a list answers after goodbye", async () => {
@@ -264,11 +241,9 @@ describe("VaultMinder.listingAt", () => {
       await storedBoxOf(vaultDB)
       const minder  = await minderOf(vaultDB)
       minder.hello()
-      await vi.advanceTimersByTimeAsync(Hours24)
-      expect(minder.listingAt(TH.RootScope)).to.deep.equal([])
       await minder.list('box')
       await vi.advanceTimersByTimeAsync(Hours24)
-      expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
+      expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/openai'])
       minder.goodbye()
       expect(minder.listingAt(TH.RootScope)).to.be.undefined
     } finally {
@@ -289,66 +264,76 @@ describe("VaultMinder.listingAt", () => {
   }
 })
 
-describe("VaultMinder.isListingBareAt", () => {
-  it("is true of the root box's listing while boxes join it", async () => {
-    const vaultDB = new QuietVaultDB()
-    await storedBoxOf(vaultDB)
-    const { minder, receive } = await minderWorldOf(vaultDB)
-    expect(minder.isListingBareAt(TH.RootScope)).to.be.true
+/** A minder over one stored box, its root box's listing listed. */
+async function listedWorld() {
+  const vaultDB = new MemoryVaultDB()
+  const box     = await storedBoxOf(vaultDB)
+  const world   = await minderWorldOf(vaultDB)
+  await world.minder.list('box')
+  return { ...world, vaultDB, box }
+}
+
+describe("VaultMinder, a child's first landing", () => {
+
+  it("marks nothing stale for a list's own children, which land while it is under way", async () => {
+    const { minder } = await listedWorld()
+    expect(isListingStaleAt(minder, TH.RootScope)).to.be.false
+  })
+
+  it("marks the parent's listing stale for a box new to it, whole or sparse", async () => {
+    for (const notice of [noticeOf(TH.boxThingOf('anthropic')), sparseNoticeOf(TH.boxThingOf('anthropic'))]) {
+      const { minder, receive } = await listedWorld()
+      receive(notice)
+      expect(isListingStaleAt(minder, TH.RootScope)).to.be.true
+      expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/openai'])
+    }
+  })
+
+  it("marks the parent's listing stale for a box born on another device, by the watch alone", async () => {
+    const { minder, vaultDB } = await listedWorld()
+    await TH.expectGood(vaultDB.tryWriteThing(boxBirthAskOf('anthropic')))
+    await TH.eventually(() => isListingStaleAt(minder, TH.RootScope))
+  })
+
+  it("marks the parent's listing stale for a box this device writes over the Absent it got", async () => {
+    const { minder } = await listedWorld()
+    expect(await minder.get(boxScopeOf('anthropic'))).to.deep.equal(Absent)
+    expect(isListingStaleAt(minder, TH.RootScope)).to.be.false
+    await TH.expectGood(minder.tryWrite(boxBirthAskOf('anthropic')))
+    expect(isListingStaleAt(minder, TH.RootScope)).to.be.true
+    await minder.list('box')
+    expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/anthropic', 'box/openai'])
+  })
+
+  it("marks nothing stale for the first get of a box a list brought in, nor a later revision of it", async () => {
+    const { minder, receive, box } = await listedWorld()
     await minder.get(TH.BoxScope)
-    receive(noticeOf(TH.boxThingOf('mistral')))
-    await TH.expectGood(minder.tryWrite(boxBirthAskOf('cohere')))
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/cohere', 'box/mistral', 'box/openai'])
-    expect(minder.isListingBareAt(TH.RootScope)).to.be.true
+    receive(noticeOf(TH.nextOf(box)))
+    expect(isListingStaleAt(minder, TH.RootScope)).to.be.false
   })
 
-  it("is true of the root box's listing after an invalidate and a join", async () => {
-    const { minder, receive } = await minderWorldOf(new MemoryVaultDB())
-    minder.invalidate('box', { list: 'all' })
-    receive(noticeOf(TH.boxThingOf()))
-    expect(minder.isListingBareAt(TH.RootScope)).to.be.true
-  })
-
-  it("is false from the first list on, whatever it answers", async () => {
-    const vaultDB = await bornOf(new MemoryVaultDB())
-    const { minder, receive } = await minderWorldOf(vaultDB)
-    expect(await minder.list('box')).to.deep.equal([])
-    expect(minder.isListingBareAt(TH.RootScope)).to.be.false
-    receive(noticeOf(TH.boxThingOf()))
-    expect(minder.isListingBareAt(TH.RootScope)).to.be.false
-  })
-
-  it("is false of a listing not cached or set by a list", async () => {
-    const vaultDB = await bornOf(new MemoryVaultDB())
-    const { minder } = await minderWorldOf(vaultDB)
-    expect(minder.isListingBareAt(TH.BoxScope)).to.be.false
-    await minder.list('box/openai')
-    expect(minder.isListingBareAt(TH.BoxScope)).to.be.false
-    minder.goodbye()
-    expect(minder.isListingBareAt(TH.RootScope)).to.be.false
-  })
-
-  it("is true of the root box's listing, empty again, after goodbye and hello", async () => {
+  it("marks nothing stale where the parent has no listing cached", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
-    const { minder } = await minderWorldOf(vaultDB)
-    await minder.list('box')
-    minder.goodbye()
-    minder.hello()
-    expect(minder.listingAt(TH.RootScope)).to.deep.equal([])
-    expect(minder.isListingBareAt(TH.RootScope)).to.be.true
+    const { minder, receive } = await minderWorldOf(vaultDB)
+    receive(noticeOf(TH.boxThingOf('anthropic')))
+    expect(minder.listingAt(TH.RootScope)).to.be.undefined
+    expect(minder.queryClient.getQueryState(minder.listQueryKey(TH.RootScope))).to.be.undefined
   })
 
-  const ForeignScopes = [
-    [{ ...TH.RootScope, userid: 'u2' },        "refuses bad_record for another user's scope"],
-    [{ ...TH.RootScope, labelpath: 'Box' },    "refuses bad_record for a labelpath that is no Thing's"],
-  ] as const
-  for (const [scoped, blurb] of ForeignScopes) {
-    it(blurb, async () => {
-      const { minder } = await minderWorldOf(new MemoryVaultDB())
-      TH.expectSyncRefusal(() => minder.isListingBareAt(scoped), 'bad_record')
-    })
-  }
+  it("lists again while a host observes the listing", async () => {
+    const { minder, vaultDB, receive } = await listedWorld()
+    const observer = new TSQ.QueryObserver(minder.queryClient, { queryKey: minder.listQueryKey(TH.RootScope) })
+    const unsubscribe = observer.subscribe(() => undefined)
+    try {
+      cheatBox(vaultDB, TH.boxThingOf('anthropic'))
+      receive(noticeOf(TH.boxThingOf('anthropic')))
+      await TH.eventually(() => labelpathsOf(minder.listingAt(TH.RootScope))?.length === 2)
+      expect(isListingStaleAt(minder, TH.RootScope)).to.be.false
+    } finally {
+      unsubscribe()
+    }
+  })
 })
 
 describe("VaultMinder.tryAt", () => {
@@ -403,17 +388,29 @@ describe("VaultMinder.tryAt", () => {
     expect(answer).to.have.property('refreshedAt').above(0)
   })
 
-  it("answers gotvoid, with a null val, where storage has nothing", async () => {
+  it("answers gotvoid, with Absent and no dbhas, where storage has nothing", async () => {
     const { minder } = await minderWorldOf(await bornOf(new MemoryVaultDB()))
     await minder.get(TH.BoxScope)
-    expect(minder.tryAt(TH.BoxScope)).to.deep.include({ ok: true, act: 'gotvoid', val: null, isTimely: true })
+    const answer = minder.tryAt(TH.BoxScope)
+    expect(answer).to.deep.include({ ok: true, act: 'gotvoid', val: Absent, record: Absent, isTimely: true })
+    expect(answer).to.not.have.property('dbhas')
   })
 
-  it("answers gotgone with a tombstone", async () => {
+  it("answers gotgone with Absent, and the tombstone as its dbhas", async () => {
     const { minder, receive } = await minderWorldOf(new MemoryVaultDB())
     const tombstone = TH.boxTombOf(TH.boxThingOf())
     receive(noticeOf(tombstone))
-    expect(minder.tryAt(TH.BoxScope)).to.deep.include({ ok: true, act: 'gotgone', val: tombstone })
+    expect(minder.tryAt(TH.BoxScope)).to.deep.include({ ok: true, act: 'gotgone', val: Absent, dbhas: tombstone })
+  })
+
+  it("answers gotlive for a box born again, its old tombstone left in the dead entry", async () => {
+    const { minder, receive } = await minderWorldOf(new MemoryVaultDB())
+    const tombstone = TH.boxTombOf(TH.boxThingOf())
+    const reborn    = TH.boxRebornOf(tombstone)
+    receive(noticeOf(tombstone))
+    receive(noticeOf(reborn))
+    expect(minder.tryAt(TH.BoxScope)).to.deep.include({ ok: true, act: 'gotlive', val: reborn })
+    expect(minder.deadAt(TH.BoxScope)).to.equal(tombstone)
   })
 
   it("reads the cache alone under ifStale: 'get'", async () => {

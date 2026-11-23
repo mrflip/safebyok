@@ -37,7 +37,7 @@ describe("IdbMinderBridge", () => {
     await vi.waitFor(async () => { expect(await rows.rawAt(TH.BoxScope)).to.deep.equal(tomb) })
   })
 
-  it("writes nothing for a soon or a shell", async () => {
+  it("writes nothing for a soon or an item that is Absent", async () => {
     const { minder, idbVaultDB, onBadNews } = await TH.bridgedWorldOf()
     const rows = TH._cheat_idbThingsOf(idbVaultDB)
     await minder.list('box')

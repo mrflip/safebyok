@@ -6,7 +6,7 @@ export { type Watcher, MemoryVaultDB } from './storage/memory-vault-db'
 export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
   type AnyThingRecord, type BankRecord, type BoxRecord, type GateRecord, type Modelkind, type Sealed, type Sparse, type StoredCited, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind,
-  type VoidSentinel, type Wayins, Shell, ThingChecks, ThingFormat, thingkindVals,
+  type VoidSentinel, type Wayins, Absent, Shell, ThingChecks, ThingFormat, isAbsent, thingkindVals,
 } from './shapes/shapes-thing'
 export { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from './shapes/shapes-thingkinds'
 export type { LiveOf, ShellOf, TombstoneOf } from './shapes/shapes-sealers'
@@ -21,7 +21,7 @@ export * as Classifier from './storage/thing-classifier'
 export { type BankScope, type BankStamp, type BoxStamp, type GateStamp, StampChecks } from './shapes/shapes-stamps'
 export {
   type Actual, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer,
-  type ListThingsActual, type ListThingsAnswer, type ListedBeside, type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,
+  type KidEntry, type Kids, type ListThingsActual, type ListThingsAnswer, type ListedBeside, type ReadTc, type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,
 } from './storage/vault-db'
 
 // From safebyok-big: what an adapter's `do*` methods answer and are named with, its throwers, and the checkers it checks its

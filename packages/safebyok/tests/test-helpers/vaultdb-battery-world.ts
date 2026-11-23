@@ -65,7 +65,7 @@ export function describeVaultDBWorld({ fresh, bornBank, withGate, boxesBorn, row
       const vaultDB = await bornBank()
       await rowsOf(vaultDB).plant(GateScope, { ...gateThingOf(), wayins: { main: {}, passkey0: null } })
       expect(await vaultDB.tryGetThing(getAskAt('box'))).to.deep.include({ ok: true, act: 'gotlive', val: rootBoxOf(), world: null })
-      expect(await vaultDB.tryListThings(listAskAt('box'))).to.deep.include({ ok: true, val: [], world: null })
+      expect(await vaultDB.tryListThings(listAskAt('box'))).to.deep.include({ ok: true, deltas: [], world: null })
     })
   })
 }

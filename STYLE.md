@@ -194,7 +194,12 @@ The tag smushing above is for a label that names a thing (`boxlabel`).
 
 **A time is UTC epoch milliseconds, an integer** (`registered_at: 1760000000000`), in a stored
 record, a snapshot, a test fixture and the demo alike: not an ISO string or a `Date`. `nowMillis()`
-yields one, and a field named `*_at` is one, checked by `epochMillis`.
+yields one, and a field named `*_at` is one, checked by `epochMillis`. **A field named `*_tc`, a time code, is a
+string that sorts by time** as text, never an integer of milliseconds: a list's `read_tc` is a UUID version 7, compared
+as a string and never with the device's clock.
+
+**Base-32, in this project, is lowercase `0-9a-v`**, as JavaScript's `.toString(32)` writes it and `parseInt(text, 32)`
+reads it back (a lifeseq's digits): it sorts in numeric order as text. Not RFC 4648's alphabet, nor Crockford's.
 
 Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obvious: `title`, not
 `titleStr`. When genericity is exactly the point, use the tag bare: `encode(bytes)`.
