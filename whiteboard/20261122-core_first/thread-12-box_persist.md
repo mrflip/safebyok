@@ -1,6 +1,6 @@
 # Thread 12: box_persist (2026-11-23)
 
-Branch `20261123-box_persist`, PR #TBD, stacked on [#854](https://github.com/mrflip/safebyok/pull/854). Proved: `safebyok` 1459 tests, `safebyok-idb-lean` 112, lint and typecheck of both; `pnpm justify` pending.
+Branch `20261123-box_persist`, PR [#856](https://github.com/mrflip/safebyok/pull/856), stacked on [#854](https://github.com/mrflip/safebyok/pull/854). Proved: `safebyok` 1459 tests, `safebyok-idb-lean` 112, lint and typecheck of both; `pnpm justify` pending.
 
 Option **B** of `box_persist-plan.md`: one boxes snapshot per user and bank.
 
