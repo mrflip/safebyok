@@ -240,7 +240,7 @@ describe("a gating's vacating of the passkey answers it is handed", () => {
     const device = TH.makeDevice()
     await device.signIn(TH.WorldScope.userid)
     // Whether the check accepts a bare buffer is not this test's subject: the bytes are vacated either way.
-    await Bank.tryBirth(device, { passphraseCleartext: TH.TestPassphrase, passkeyCleartext: { ...TH.passkeyAnswerOf(), prfBytes: prfBuffer as never } })
+    await device.birthGating({ passphrase: TH.TestPassphrase, passkeyAnswer: { ...TH.passkeyAnswerOf(), prfBytes: prfBuffer as never } }).tryAttempt()
     expect(TH.isZeroed(new Uint8Array(prfBuffer))).to.be.true
   })
 })

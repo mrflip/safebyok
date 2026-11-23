@@ -23,7 +23,7 @@ import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import type { DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
 import type { ShellOf } from '../../src/shapes/shapes-sealers'
 import type { BankRecord, BoxRecord, GateRecord } from '../../src/shapes/shapes-thing'
-import type { GateRevisionedStamp, GatingCleartexts, LeaseGate, ProvingDevice, StrengthChecker } from '../../src/shapes/shapes-gateish'
+import { type GateRevisionedStamp, type GatingCleartexts, type LeaseGate, type ProvingDevice, type StrengthChecker, GatingChecks } from '../../src/shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
@@ -208,7 +208,7 @@ export function _cheat_gatingOf(cleartexts: unknown, body: (cleartexts: GatingCl
 
 /** A gating whose body is any function, made by {@link _cheat_gatingOf}. */
 class CheatGating extends Gating {
-  constructor(cleartexts: unknown, body: (cleartexts: GatingCleartexts) => Promise<unknown>) { super(cleartexts, body) }
+  constructor(cleartexts: unknown, body: (cleartexts: GatingCleartexts) => Promise<unknown>) { super(cleartexts, GatingChecks.unlockGating, body) }
 }
 // --
 

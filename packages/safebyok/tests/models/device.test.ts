@@ -360,7 +360,7 @@ describe("device.signIn(userid)", () => {
     expect(device.bank!.scope).to.deep.equal(born.bank.scope)
     expect(device.vault!.bank).to.equal(device.bank)
     expect(device.vault!.minder).to.equal(device.minder)
-    await TH.expectGood(device.bank!.gate.tryUnlock({ passphraseCleartext: TH.TestPassphrase }))
+    await device.bank!.gate.gatingUnlockAttempt({ passphrase: TH.TestPassphrase })
     expect(device.getSnapshot().bank).to.include({ stage: 'unlocked' })
   })
 
@@ -372,7 +372,7 @@ describe("device.signIn(userid)", () => {
     void device.signIn(TH.WorldScope.userid)
     await TH.eventually(() => device.bank !== null)
     expect(stages).to.deep.equal(['signed_out', 'starting', 'locked'])
-    await TH.expectGood(device.bank!.gate.tryUnlock({ passphraseCleartext: TH.TestPassphrase }))
+    await device.bank!.gate.gatingUnlockAttempt({ passphrase: TH.TestPassphrase })
     expect(device.getSnapshot().bank).to.include({ stage: 'unlocked' })
   })
 

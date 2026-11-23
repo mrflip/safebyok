@@ -67,6 +67,49 @@ export type GatingCleartexts = Partial<BirthCleartexts & UnlockCleartexts & Pass
 export type ProvedCleartexts = { passphraseCleartext: GX.PassphraseCleartext, passkeyCleartext?: never } | { passkeyCleartext: GX.PasskeyAnswer, passphraseCleartext?: never }
 // --
 
+// == [The form verbs' dnas]: GatingChecks, DnaCheck, HandedCleartexts, FormSecretFieldnames, BirthDna, UnlockDna, ReplacePassphraseDna, AddPasskeyDna, RevokePasskeyDna
+
+// A dna keeps a form's fieldnames, and its check renames each into the cleartext its gating's body takes. It judges no
+// value, as a gating's own check does not: any field it does not know, a username or a host's own, is ignored.
+/** The checks of a form verb's dna, each named for its gating: each answers the cleartexts the gating takes. */
+export const GatingChecks = Validator.Checkers('bad_record', ({ obj, unk }) => ({
+  birthGating:             obj({ passphrase: unk.optional(), passkeyAnswer: unk.optional() }).loose()
+    .transform(({ passphrase, passkeyAnswer }) => ({ passphraseCleartext: passphrase, passkeyCleartext: passkeyAnswer })),
+  unlockGating:            obj({ passphrase: unk.optional(), passkeyAnswer: unk.optional() }).loose()
+    .transform(({ passphrase, passkeyAnswer }) => ({ passphraseCleartext: passphrase, passkeyCleartext: passkeyAnswer })),
+  replacePassphraseGating: obj({ passphrase: unk.optional(), passkeyAnswer: unk.optional(), nextPassphrase: unk.optional() }).loose()
+    .transform(({ passphrase, passkeyAnswer, nextPassphrase }) => ({ passphraseCleartext: passphrase, passkeyCleartext: passkeyAnswer, nextPassphraseCleartext: nextPassphrase })),
+  addPasskeyGating:        obj({ passphrase: unk.optional(), nextPasskeyAnswer: unk.optional() }).loose()
+    .transform(({ passphrase, nextPasskeyAnswer }) => ({ passphraseCleartext: passphrase, nextPasskeyCleartext: nextPasskeyAnswer })),
+  revokePasskeyGating:     obj({ passphrase: unk.optional(), passkeyAnswer: unk.optional() }).loose()
+    .transform(({ passphrase, passkeyAnswer }) => ({ passphraseCleartext: passphrase, passkeyCleartext: passkeyAnswer })),
+}))
+
+/** A form verb's check of its dna, from {@link GatingChecks}: it answers the cleartexts its gating takes, unjudged. */
+export type DnaCheck = Readonly<{ parse: (dna: unknown) => HandedCleartexts }>
+
+/** The cleartexts handed to a gating, in the names its body takes, before any is judged. */
+export type HandedCleartexts = Partial<Record<keyof GatingCleartexts, unknown>>
+
+/** The fields a form verb takes out of a `FormData`, whichever verb it is: the passphrase, the new passphrase, and the confirmation of either. */
+export const FormSecretFieldnames = Object.freeze(['passphrase', 'nextPassphrase', 'confirmation'] as const)
+
+/** What a birth is handed: the new passphrase, a new passkey's answer or none, and the confirmation, which is ignored. */
+export type BirthDna = { passphrase: string, passkeyAnswer?: GX.PasskeyAnswer | null | undefined, confirmation?: string | undefined }
+
+/** What an unlock is handed: the passphrase, or the passkey's answer. Given both, the passphrase is tried. */
+export type UnlockDna = { passphrase?: string | undefined, passkeyAnswer?: GX.PasskeyAnswer | null | undefined }
+
+/** What a passphrase replacement is handed: the proof, by the passphrase or the passkey's answer, the new passphrase, and its confirmation, which is ignored. */
+export type ReplacePassphraseDna = { passphrase?: string | undefined, passkeyAnswer?: GX.PasskeyAnswer | null | undefined, nextPassphrase: string, confirmation?: string | undefined }
+
+/** What adding a passkey is handed: the passphrase, and the new passkey's answer. */
+export type AddPasskeyDna = { passphrase: string, nextPasskeyAnswer: GX.PasskeyAnswer }
+
+/** What revoking the passkey is handed: the proof, by the passphrase or the passkey's answer. */
+export type RevokePasskeyDna = { passphrase?: string | undefined, passkeyAnswer?: GX.PasskeyAnswer | null | undefined }
+// --
+
 // == [Given to a gating]: BirthGatingFriend, GateGatingFriend
 
 /** The gate's private unlock, for {@link Bank.birth}'s gating to call on the gate it makes, and the attaching of the bank it births to whoever made the gating. Internal. */
