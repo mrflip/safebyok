@@ -151,4 +151,8 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   Metadata Leakage from Encrypted Files and Communication with PURBs", PETS 2019), which leaks O(log log n) bits of the
   length for at most about 12% more bytes. A record sealed before the change still unseals. "A customer can pad too"
   (the Coach, 2026-11-23).
+* **A lease's own fields are its loggable.** STYLE.md says a stateful object's own fields are its loggable fields, but a
+  lease's own enumerable fields are still its stamp: whole tokens, and no `isEvicted`, so `{ ...lease }` differs from
+  `lease.loggable`. Make them agree, keep the stamp as a getter for what a ctx binds, and retire `LeaseSparse`, which
+  nothing answers since `toJSON` answers the loggable (the Coach, 2026-11-23, dojo_backdoor's second review).
 
