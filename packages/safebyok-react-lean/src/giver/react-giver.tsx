@@ -378,7 +378,8 @@ function makeBankGiver(friend: BankFriend) {
    * `data` is the record, null when none is stored or it was deleted, and undefined while pending or until the bank is brought up.
    * A record overtaken by a newer revision shows until the newer one arrives.
    * `opts` are React Query's options that shape what this one hook shows. A `select` given there is handed the whole record, or
-   * null where none is stored or it was deleted: {@link liveOf} is the default.
+   * null where none is stored or it was deleted: {@link liveOf} is the default. A `select` that returns a record should return it, or the item's own null,
+   * never a null of its own: the hook reads null as nothing stored.
    * @example
    *   const { data: box } = Knock.useBox('jokes')
    *   const mask = Knock.useBox('jokes', { select: (thing) => liveOf(thing)?.sidecar['mask'] }).data

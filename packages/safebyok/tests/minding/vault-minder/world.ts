@@ -195,7 +195,7 @@ export type ToldSort = 'live' | 'null' | 'behind' | 'removed' | undefined
 /** A summary of each event `listener` recorded, in order:
  * - an item's       -- `[labelpath, ToldSort]` ({@link ToldSort})
  * - a soon's        -- `['soon', labelpath, revseq]`, with `'removed'` in place of the revseq for its removal
- * - a dead entry's  -- `['dead', labelpath, revseq]`, likewise
+ * - a dead record's -- `['dead', labelpath, revseq]`, likewise
  * - a listing's     -- `['listing']`
  */
 export function toldOf(listener: ReturnType<typeof listenerOf>): (readonly [Labelpath, ToldSort] | readonly ['soon' | 'dead', Labelpath, number | 'removed' | undefined] | readonly ['listing'])[] {

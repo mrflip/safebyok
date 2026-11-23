@@ -26,7 +26,7 @@ export const DefaultQueryCacheOpts: Readonly<QueryCacheOpts> = Object.freeze({ s
 // Each is an option a client's defaults could set, and that would change what lands in the cache, what a fetch answers
 // the minder, or when a fetch runs. Options only an observer reads (refetchInterval, the refetchOn* and enabled) are left
 // to whoever observes: the minder has no observer, and an observer's fetch still lands through the minder's queryFn.
-/** The TanStack Query options of every minder's entries, set by `makeClient`, which no host can change: a get asks the vaultDB even offline, is never retried, and its item stays cached until `goodbye`. */
+/** The TanStack Query options of every minder's queries, set by `makeClient`, which no host can change: a get asks the vaultDB even offline, is never retried, and its item stays cached until `goodbye`. */
 export const FixedQueryCacheOpts = Object.freeze({
   // Under TanStack's own networkMode, 'online', a get made while the browser reports itself offline waits, and so does its caller.
   networkMode:     'always',
@@ -170,10 +170,10 @@ export type ScopeAt<LabelpathT extends Labelpath> = ThingScope & Readonly<{ labe
 // The emitted event pragmatically mimics the incoming TSQ event: it spreads TanStack Query's cache event into our own,
 // under TanStack's field names (`type`, `action`, `queryKey`, `queryHash`, `state`), so that a reader who knows its events
 // reads ours. Its version is MinderEventFormat, which `listen` is given.
-/** An event a minder's `listen` tells: an item's query changed, a soon's, a dead entry's or a listing's, as its `eventkind` says. */
+/** An event a minder's `listen` tells: an item's query changed, a soon's, a dead record's or a listing's, as its `eventkind` says. */
 export type MinderEvent = ThingEvent | SoonEvent | DeadEvent | ListingEvent
 
-/** The kind of entry a minder's event is about, as its query key names it: `'item'`, `'soon'`, `'dead'` or `'list'`. */
+/** The kind of query a minder's event is about, as its query key names it: `'item'`, `'soon'`, `'dead'` or `'list'`. */
 export type MinderEventkind = 'item' | 'soon' | 'dead' | 'list'
 
 /** TanStack Query's action that changed a query's state, as its cache tells it. */
@@ -191,12 +191,12 @@ export type MinderActionOf<DataT> = MinderActionTyped<TSQQueryAction, DataT>
 
 /** The fields every minder event carries: TanStack Query's cache event, less its live query, and the scope of the Thing it is about. */
 export type MinderEventOf<DataT, EventkindT extends MinderEventkind = MinderEventkind> = Readonly<{
-  /** The kind of entry the event is about, read from its query key: narrow a {@link MinderEvent} on it. */
+  /** The kind of query the event is about, read from its query key: narrow a {@link MinderEvent} on it. */
   eventkind: EventkindT
   /** `'added'` when the cache made the query, `'updated'` when its state changed, `'removed'` when the cache dropped it. */
   type:      'added' | 'updated' | 'removed'
   /** A frozen copy of TanStack's action that changed the state, or undefined where the query was added or removed. Its `type`:
-   * - `'success'`    -- a record arrived in the item, the soon or the dead entry, or a list set the listing
+   * - `'success'`    -- a record arrived in the item, the soon or the dead record, or a list set the listing
    * - `'error'`      -- a get or a list was refused
    * - `'invalidate'` -- the item fell behind a newer revision heard of, or the listing was marked stale
    * - `'fetch'`, `'pause'`, `'continue'`, `'failed'`, `'setState'` -- as TanStack dispatches them
@@ -214,11 +214,11 @@ export type MinderEventOf<DataT, EventkindT extends MinderEventkind = MinderEven
   userid:    Userid
   /** The bank. */
   banklabel: Banklabel
-  /** Where the Thing is stored in its bank: the Thing an item, a soon or a dead entry is of, or whose children a listing lists. */
+  /** Where the Thing is stored in its bank: the Thing an item, a soon or a dead record is of, or whose children a listing lists. */
   labelpath: Labelpath
 }>
 
-/** The fields an item's, a soon's and a dead entry's event add: the Thing's modelkind, and the revision and life of the record cached, each undefined where none is, or the item is null. */
+/** The fields an item's, a soon's and a dead record's event add: the Thing's modelkind, and the revision and life of the record cached, each undefined where none is, or the item is null. */
 export type RecordEventFields<KindT extends Thingkind = Thingkind> = Readonly<{
   /** The modelkind of the Thing, which its labelpath starts with. */
   modelkind: KindT
@@ -226,7 +226,7 @@ export type RecordEventFields<KindT extends Thingkind = Thingkind> = Readonly<{
   revtok:    Revtok | undefined
   /** The revseq of the record. */
   revseq:    number | undefined
-  /** The am of the record: `'a'` in an item or a soon, `'x'` in a dead entry. */
+  /** The am of the record: `'a'` in an item or a soon, `'x'` in a dead record. */
   am:        DeliverableThing['am'] | undefined
   /** The lifeseq of the record. */
   lifeseq:   Lifeseq | undefined
@@ -239,7 +239,7 @@ export type RecordEventFields<KindT extends Thingkind = Thingkind> = Readonly<{
  * `state.isInvalidated` is true while the item is behind a newer revision heard of, or since its last get was refused.
  * Its `action.type`:
  * - `'success'`    -- a live whole record or null landed, even one that changes only the item's time. A tombstone's
- *   dead entry tells its `success` first ({@link DeadEvent}).
+ *   dead record tells its `success` first ({@link DeadEvent}).
  * - `'error'`      -- a get was refused, and the item is unchanged
  * - `'invalidate'` -- the item fell behind, just after the soon's `success`. It is told once, and not at all where a
  *   refused get already left the item invalidated.
@@ -260,9 +260,9 @@ export type SoonEvent<KindT extends Thingkind = Thingkind> = KindT extends Thing
   ? MinderEventOf<Sparse<RecordOfKind<KindT>>, 'soon'> & RecordEventFields<KindT>
   : never
 
-/** A dead entry's query changed, its `eventkind` `'dead'`: a tombstone of the Thing landed (`success`), just before
+/** A dead record's query changed, its `eventkind` `'dead'`: a tombstone of the Thing landed (`success`), just before
  * a null lands in its item, or it was removed at `goodbye`. `state.data` is the tombstone, and its {@link RecordEventFields} are that tombstone's.
- * A Thing born again keeps its dead entry, of the older life.
+ * A Thing born again keeps its dead record, of the older life.
  */
 export type DeadEvent<KindT extends Thingkind = Thingkind> = KindT extends Thingkind
   ? MinderEventOf<Tombstone<RecordOfKind<KindT>>, 'dead'> & RecordEventFields<KindT>

@@ -8,7 +8,7 @@ import { Thing } from '../models/thing'
 /** Where {@link newerThingOf} finds the tombstone that null stands for at a scope: undefined where none is cached. */
 export type DeadAt = (scope: ThingScope) => Tombstone<ThingRecord> | undefined
 
-// TanStack Query runs structural sharing on what a host's `select` returns as well as on the entry's own values, and
+// TanStack Query runs structural sharing on what a host's `select` returns as well as on the query's own values, and
 // types both as unknown.
 /** The newer of two values of one Thing's item, soon or tombstone, by life and then revision, with `prior` on a tie and `next` where `prior` is undefined.
  * It serves as structural sharing for a TanStack query of one Thing's records. Null stands for the tombstone `deadAt`
@@ -26,7 +26,7 @@ export function newerThingOf(prior: unknown, next: unknown, deadAt?: DeadAt): un
 
 // == [Helpers]: EntryRecord, isEntryVal, citedOf, newerOfCited
 
-/** A record a minder's entry may have: a Thing's scope and citation, live or a tombstone, sparse or whole. */
+/** A record a minder's query may hold: a Thing's scope and citation, live or a tombstone, sparse or whole. */
 type EntryRecord = ThingScope & ThingCited
 
 /** True for a record, or null. */

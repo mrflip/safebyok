@@ -35,10 +35,10 @@ export type Labelpathed = { labelpath: Labelpath }
 /** This device's cache of the Things of one bank it minds, kept from everything the vaultDB tells of them.
  * A subclass says which Things it minds: a VaultMinder the boxes under the root box, a BankMinder the bank, its main gate and its root box.
  * Each Thing minded has an item, with what a host shows: its live whole record, or null where none is stored live.
- * It may also have a soon, a sparse record newer than the item, removed once the item catches up; and a dead entry, its
+ * It may also have a soon, a sparse record newer than the item, removed once the item catches up; and a dead record, its
  * tombstone that last landed. Each Thing whose children it minds has a listing of them, once listed.
  * Records arrive from gets, lists, good writes, the world each answer carries, and the watch, in any order, late or more
- * than once. A live whole record lands in the item, a sparse record in the soon, and a tombstone in the dead entry and
+ * than once. A live whole record lands in the item, a sparse record in the soon, and a tombstone in the dead record and
  * then, as null, in the item. A listing is the {@link Kids} value a list answered, replaced whole by the next. Of a Thing
  * it does not mind, only what a get or list of it answers is cached, and no later record brings that up to date: get and
  * list only the Things it minds. It caches only from `hello` until `goodbye`, and `goodbye` empties its cache.
@@ -46,7 +46,7 @@ export type Labelpathed = { labelpath: Labelpath }
  * ## Invariants
  * - For a caller or listener using it as documented, what it shows depends only on which records the minder has heard
  *   of, never on the order they arrived in.
- * - An item, a soon and a dead entry never go back. An item that is null counts as its dead entry's tombstone, or
+ * - An item, a soon and a dead record never go back. An item that is null counts as its dead record's tombstone, or
  *   where it has none, as nothing stored, older than every record. The item has the newest whole record or tombstone
  *   heard of, a tombstone as null, and the soon the newest sparse record while that is newer than the item. A newer
  *   life replaces an older one whole.
@@ -59,18 +59,18 @@ export type Labelpathed = { labelpath: Labelpath }
  *   fetches the newest whole record.
  * - A sparse record lands in the soon before its item is invalidated, so from the soon's `success` on, every read and
  *   get finds the item behind ({@link SoonEvent}). A refused get leaves the item invalidated too, until a record lands in it.
- * - A listener is told of each item, soon, dead entry and listing in the order the cache changes, and what it is told
- *   never goes back either: each record told of an item, a soon or a dead entry is no older than the last, and each
+ * - A listener is told of each item, soon, dead record and listing in the order the cache changes, and what it is told
+ *   never goes back either: each record told of an item, a soon or a dead record is no older than the last, and each
  *   listing was read no earlier than the last. Only a removal breaks the run, and what is told after it starts over. A
- *   soon is removed whenever the item catches up with it; the cache removes any other entry only at `goodbye`.
+ *   soon is removed whenever the item catches up with it; the cache removes any other query only at `goodbye`.
  *   {@link ThingEvent}, {@link SoonEvent}, {@link DeadEvent} and {@link ListingEvent} give the order of the events.
  * - A get answered with a revision older than the newest cached when it began refuses `stale_read`, and changes nothing.
  *   An answer of null counts as its tombstone, or as nothing stored.
  * - A good get resolves what the item holds once it resolves: its record, or null. A `tryAt` that answers `gotlive`,
- *   `gotgone` or `gotvoid` has the same as its `val`, and where that is null, the dead entry's tombstone, or null, as its `dbhas`.
+ *   `gotgone` or `gotvoid` has the same as its `val`, and where that is null, the dead record's tombstone, or null, as its `dbhas`.
  * - A listing is what the vaultDB last answered a list of its parent with, never joined to: a list landing replaces it
  *   whole, unless the listing cached was read later, by `read_tc`. A list refused leaves it as it was.
- * - A child's first stored record to land, in its item, its soon or its dead entry while the others have none, marks its
+ * - A child's first stored record to land, in its item, its soon or its dead record while the others have none, marks its
  *   parent's listing stale, and a listing a host observes is listed again. A null item is no stored record, and marks nothing;
  *   nor does a get's record that replaces it.
  * - An operation caches its own good answer (the record got or written, or the {@link Kids} value listed, never a write's
@@ -115,10 +115,10 @@ export abstract class Minder {
 
   // TanStack calls the cache's onSuccess right after a fetch's record lands, and never for setQueryData: sendToTSQ does
   // the same for every other record. The client's own defaults are left to whoever owns it: TanStack matches query
-  // defaults by key prefix, and every minder key starts with MinderKeyRoot, so every entry of every bank takes these from
+  // defaults by key prefix, and every minder key starts with MinderKeyRoot, so every query of every bank takes these from
   // the start, a restored one included. Where an option differs by bank, it asks the minder minding the key's bank; by
-  // kind of entry, it reads the key's kind, or the value's for structural sharing, which TanStack hands no key.
-  /** Make a QueryClient that minders of several banks can share, each minding its own bank's entries.
+  // kind of query, it reads the key's kind, or the value's for structural sharing, which TanStack hands no key.
+  /** Make a QueryClient that minders of several banks can share, each minding its own bank's queries.
    * Hand it to `make` as `queryClient`. Its cache fetches, and settles a fetched record, only while a minder of the key's bank is minding.
    */
   static makeClient(): TSQ.QueryClient {
@@ -162,11 +162,11 @@ export abstract class Minder {
   }
 
   // TanStack's own restore and save, with our defaults where its own would drop what we keep: a refused get's item, and a
-  // snapshot more than a day old. A restore builds each entry with its saved state and the client's query defaults, so no
+  // snapshot more than a day old. A restore builds each query with its saved state and the client's query defaults, so no
   // structural sharing or onSuccess runs.
   /** Restore `queryClient`, a client {@link makeClient} made, from the snapshot `persister` keeps, then save the whole client to it at each change.
    * Call it before any minder attached to the client says `hello`: what a minder caches then lands over what was restored.
-   * Every entry with a record or a listing is saved, an item whose last get was refused among them, and restored however
+   * Every query with a record or a listing is saved, an item whose last get was refused among them, and restored however
    * old, unless it was saved under another {@link ThingFormat}. No mutation is saved, paused or not.
    * Rejects where the restore fails, discarding the snapshot; saving goes on.
    */
@@ -194,7 +194,7 @@ export abstract class Minder {
     )
   }
 
-  /** Stop minding, and remove this bank's entries from the cache. A later `hello` starts minding again. */
+  /** Stop minding, and remove this bank's queries from the cache. A later `hello` starts minding again. */
   goodbye(): void {
     this.#isReady = false
     if (this.#unwatch) { this.#unwatch() }
@@ -274,7 +274,7 @@ export abstract class Minder {
    * A list called while another of the same labelpath is under way answers what that one does.
    * The listing at `labelpath` ({@link listingAt}) takes the answer, unless it has one read later. The parent and each child
    * listed land first: a live child as its soon where it is newer than the item, so the next get fetches the item whole; a
-   * tombstone in its dead entry, and null in its item, so a get of it answers from the cache. A Thing stored damaged is left out, and reported to the bank's `tellBadNews`.
+   * tombstone in its dead record, and null in its item, so a get of it answers from the cache. A Thing stored damaged is left out, and reported to the bank's `tellBadNews`.
    */
   async list(labelpath: Labelpath): Promise<Kids> {
     MinderChecks.minderLabelpath.parse(labelpath)
@@ -369,7 +369,7 @@ export abstract class Minder {
     return (item === undefined) ? fetched : item
   }
 
-  // The minder never fetches a soon or a dead entry: each takes its record only from sendToTSQ.
+  // The minder never fetches a soon or a dead record: each takes its record only from sendToTSQ.
   /** Fetch what `queryKey`, the key of one of this bank's items or listings, caches. */
   async #fetchAt(queryKey: TSQ.QueryKey): Promise<ThingRecord | null | Kids> {
     const scope = this.#scopeOfQueryKey(queryKey)
@@ -415,7 +415,7 @@ export abstract class Minder {
     return this.#tsq.getQueryData<Sparse<ThingRecord>>(this.soonQueryKey(scoped))
   }
 
-  /** The tombstone `scoped`'s dead entry has, or undefined for none. */
+  /** The tombstone `scoped`'s dead record has, or undefined for none. */
   #deadAt(scoped: Labelpathed): Tombstone<ThingRecord> | undefined {
     return this.#tsq.getQueryData<Tombstone<ThingRecord>>(this.deadQueryKey(scoped))
   }
@@ -446,8 +446,8 @@ export abstract class Minder {
   // Every record but a get's lands here: TanStack lands a get's record in the item itself, then calls #landedByFetch.
   // A whole record at the item's revision lands, and makes the item fresh as of now, as TanStack counts a confirmation from
   // the server. An older one lands nowhere: it would make the newer record read fresh as of its arrival. A tombstone
-  // lands in its dead entry before a null lands in the item, so a listener on the item's success finds it there.
-  /** Cache `record` in its item, soon or dead entry while minding, where this minder minds its Thing.
+  // lands in its dead record before a null lands in the item, so a listener on the item's success finds it there.
+  /** Cache `record` in its item, soon or dead record while minding, where this minder minds its Thing.
    * A whole record or tombstone older than the record the item counts as, or a sparse one no newer than the soonest cached, lands nowhere.
    */
   protected sendToTSQ(record: DeliverableThing): void {
@@ -480,7 +480,7 @@ export abstract class Minder {
     this.sendToTSQ(maingate)
   }
 
-  // A listing's fetch needs nothing more: the Things it lists landed through the watch before it. A soon or a dead entry is
+  // A listing's fetch needs nothing more: the Things it lists landed through the watch before it. A soon or a dead record is
   // never fetched. A get's live record over a null item is no first landing: only the item's own count of landings tells one.
   /** Settle the item a fetch just landed `val` in, where `queryKey`, a key of this bank, is an item's. */
   #landedByFetch(val: unknown, queryKey: TSQ.QueryKey): void {
@@ -501,7 +501,7 @@ export abstract class Minder {
     void this.#tsq.invalidateQueries({ queryKey: this.listQueryKey({ labelpath: Labelpath.parentOf(scoped.labelpath) }), exact: true }, { cancelRefetch: false })
   }
 
-  /** True when `scoped`'s soon or dead entry has a record. */
+  /** True when `scoped`'s soon or dead record has a record. */
   #hasStoredBesideItem(scoped: Labelpathed): boolean {
     return (this.#soonAt(scoped) !== undefined) || (this.#deadAt(scoped) !== undefined)
   }
@@ -524,9 +524,9 @@ export abstract class Minder {
 
   // == [TSQ Asks]: itemQueryKeyOf, listQueryKeyOf, bankQueryKeyOf, itemQueryKey, soonQueryKey, deadQueryKey, listQueryKey, #tsqQueryOptions, #staleTimeOf, #askAt
 
-  // A key is the bank's three segments, the kind of entry ('item', 'soon', 'dead' or 'list'), the labelpath's labels with
-  // '/' between them, then a mark: '!' for the item, '~' for the soon, '+' for the dead entry, '#' and 'kids' for the
-  // listing. TanStack matches query defaults and invalidation by key prefix, so the kind's prefix singles out every entry
+  // A key is the bank's three segments, the kind of query ('item', 'soon', 'dead' or 'list'), the labelpath's labels with
+  // '/' between them, then a mark: '!' for the item, '~' for the soon, '+' for the dead record, '#' and 'kids' for the
+  // listing. TanStack matches query defaults and invalidation by key prefix, so the kind's prefix singles out every query
   // of that kind, and a Thing's listing key without its mark covers every listing under it too. Without a mark the root
   // box's item key would start every box's. No label is '!', '~', '+', '/' or '#', so no mark is mistaken for one. A
   // labelpath starts with its modelkind.
@@ -553,7 +553,7 @@ export abstract class Minder {
   /** The query key `labelpathed`'s soon is cached under. */
   soonQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...bankKeyHeadOf(this.scope), Soonkind, ...labelsOf(labelpathed.labelpath), '~'] }
 
-  /** The query key `labelpathed`'s dead entry is cached under. */
+  /** The query key `labelpathed`'s dead record is cached under. */
   deadQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...bankKeyHeadOf(this.scope), Deadkind, ...labelsOf(labelpathed.labelpath), '+'] }
 
   /** The query key the listing of `labelpathed`'s children is cached under. */
@@ -640,9 +640,9 @@ export abstract class Minder {
   }
 
   // The emitted event pragmatically mimics the incoming TSQ event.
-  // A key's kind says what its query caches: an item, a soon, a dead entry or a listing. A removed query still has its last
+  // A key's kind says what its query caches: an item, a soon, a dead record or a listing. A removed query still has its last
   // state, which its event tells, though the cache no longer has it. An item is invalidated when it falls behind its soon,
-  // or its get is refused; a listing, by `invalidate` or a refused list. A soon or a dead entry is never invalidated or fetched.
+  // or its get is refused; a listing, by `invalidate` or a refused list. A soon or a dead record is never invalidated or fetched.
   /** The event a listener is told of `tsqEvent`, an event of the minder's cache, or undefined for an observer's or another bank's. */
   #minderEventOf(tsqEvent: TSQ.QueryCacheNotifyEvent): MinderEvent | undefined {
     if (! isTellableTSQEvent(tsqEvent)) { return undefined }
@@ -677,7 +677,7 @@ export abstract class Minder {
 const Itemkind = 'item'
 /** The entrykind segment of a soon's query key. */
 const Soonkind = 'soon'
-/** The entrykind segment of a dead entry's query key. */
+/** The entrykind segment of a dead record's query key. */
 const Deadkind = 'dead'
 /** The entrykind segment of a listing's query key. */
 const Listkind = 'list'
@@ -764,7 +764,7 @@ const PersistBuster: string = ThingFormat
 const RestoreOpts: TSQ.HydrateOptions = Object.freeze({ defaultOptions: { deserializeData: deepFreeze } })
 
 // A mutation's variables may hold the cleartexts it was handed: a whisper put, a passphrase for a gating.
-/** What {@link Minder.persist} saves: every entry with a record or a listing, whatever its last fetch did, and no mutation. */
+/** What {@link Minder.persist} saves: every query with a record or a listing, whatever its last fetch did, and no mutation. */
 const SaveOpts: TSQ.DehydrateOptions = Object.freeze({ shouldDehydrateQuery: (tsqQuery: TSQ.Query) => (tsqQuery.state.data !== undefined), shouldDehydrateMutation: () => false })
 
 // --

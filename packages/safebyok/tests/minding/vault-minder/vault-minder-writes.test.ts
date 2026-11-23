@@ -122,7 +122,7 @@ describe("VaultMinder.tryWrite", () => {
     expect(isListingStaleAt(minder, TH.RootScope)).to.be.true
   })
 
-  it("leaves a deleted box null in its item, its tombstone in its dead entry, and its labelpath in the root box's listing", async () => {
+  it("leaves a deleted box null in its item, its tombstone in its dead record, and its labelpath in the root box's listing", async () => {
     const vaultDB = new QuietVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { minder } = await minderWorldOf(vaultDB)

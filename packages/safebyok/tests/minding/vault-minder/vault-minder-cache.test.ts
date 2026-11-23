@@ -272,7 +272,7 @@ async function listedWorld() {
 
 describe("VaultMinder, a child's first landing", () => {
 
-  it("marks nothing stale for a list's own children, which land while it is under way", async () => {
+  it("leaves the root listing not stale once it has been listed over a stored box", async () => {
     const { minder } = await listedWorld()
     expect(isListingStaleAt(minder, TH.RootScope)).to.be.false
   })
@@ -401,7 +401,7 @@ describe("VaultMinder.tryAt", () => {
     expect(minder.tryAt(TH.BoxScope)).to.deep.include({ ok: true, act: 'gotgone', val: null, dbhas: tombstone })
   })
 
-  it("answers gotlive for a box born again, its old tombstone left in the dead entry", async () => {
+  it("answers gotlive for a box born again, its old tombstone left in the dead record", async () => {
     const { minder, receive } = await minderWorldOf(new MemoryVaultDB())
     const tombstone = TH.boxTombOf(TH.boxThingOf())
     const reborn    = TH.boxRebornOf(tombstone)

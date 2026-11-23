@@ -189,7 +189,7 @@ describe("VaultMinder.listen", () => {
     expect(items[1]).to.have.nested.property('state.data', cached)
   })
 
-  it("tells null, and then a tombstone in the dead entry before null again in the item", async () => {
+  it("tells null, and then a tombstone in the dead record before null again in the item", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder, receive } = await minderWorldOf(vaultDB)
     await minder.get(TH.BoxScope)

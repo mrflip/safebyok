@@ -136,7 +136,7 @@ for (const [otherBank, blurb] of [[OtherUserBank, 'two users'], [OtherLabelBank,
       expect([toldOf(mine.heard), toldOf(theirs.heard)]).to.deep.equal([[], []])
     })
 
-    it("each keep their entries and attachment when the other says goodbye", async () => {
+    it("each keep their queries and attachment when the other says goodbye", async () => {
       const { mine, theirs } = await sharedWorldOf(otherBank)
       await mine.minder.get(TH.BoxScope)
       await theirs.minder.get(scopeIn(otherBank, 'box/openai'))

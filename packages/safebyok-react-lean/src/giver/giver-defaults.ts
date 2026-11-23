@@ -129,7 +129,7 @@ export function boxesQueryKeyUnder({ userid, banklabel, labelpath }: Readonly<{ 
   return (userid === null) ? ['sok', null, banklabel] : VaultMinder.itemQueryKeyOf({ userid, banklabel, labelpath }).slice(0, -1)
 }
 
-// The minder's keys put the kind of entry before the labels, so no key that starts a box's also starts a listing's.
+// The minder's keys put the kind of query before the labels, so no key that starts a box's also starts a listing's.
 /** The React Query key for the listing of the root box's children: the key the bank's minder caches it under, or one of no user's while `userid` is null. */
 export function boxListQueryKeyOf({ userid, banklabel }: Readonly<{ userid: Userid | null, banklabel: string }>): QueryKey {
   return (userid === null) ? ['sok', null, banklabel, 'box', '#', 'kids'] : VaultMinder.listQueryKeyOf({ userid, banklabel, labelpath: 'box' })
