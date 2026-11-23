@@ -325,8 +325,8 @@ describe("a VaultMinder's cache after a chain of records", () => {
   describe("each arriving by a fetch", () => {
     for (const row of ChainCases) {
       const routes = row.chain.map(() => 'g').join('')
-      const blurb = titleOf(row)
-      it(blurb, async () => {
+      const title = titleOf(row)
+      it(title, async () => {
         const run = await runChain(row, routes)
         expect(run.seeded).to.deep.equal(row.initial)
         expect(run.cache).to.deep.equal(expectedOf(row, routes, run))
@@ -337,8 +337,8 @@ describe("a VaultMinder's cache after a chain of records", () => {
   describe("each arriving by the feed", () => {
     for (const row of ChainCases) {
       const routes = row.chain.map(() => 'f').join('')
-      const blurb = titleOf(row)
-      it(blurb, async () => {
+      const title = titleOf(row)
+      it(title, async () => {
         const run = await runChain(row, routes)
         expect(run.seeded).to.deep.equal(row.initial)
         expect(run.cache).to.deep.equal(expectedOf(row, routes, run))
@@ -351,8 +351,8 @@ describe("a VaultMinder's cache after a chain of records", () => {
     for (const row of ChainCases) {
       const mixes = routeSetsOf(row.chain).filter((routes) => routes.includes('g') && routes.includes('f'))
       if (mixes.length === 0) { continue }
-      const blurb = titleOf(row)
-      it(blurb, async () => {
+      const title = titleOf(row)
+      it(title, async () => {
         const misses = []
         for (const routes of mixes) {
           const run = await runChain(row, routes)
