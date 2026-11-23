@@ -125,7 +125,7 @@ Today's package has `reactGiver(config)` at module scope, `SOK.Provider`, and ho
 
 * `SafebyokProvider` with the config as props, owning the device; hooks imported by name; `'main'` as the bank's label.
 * `useVault()`, one handle for the calls and the factories (today: `Knock.*`, `Knock.boxQuery`, `SOK.useQueryOptions`).
-* Gate verbs as calls that take the form (today: a gating, mutation options and a hook for each verb).
+* Gate verbs as calls that take the form (today: a hook for each verb, `Knock.useUnlock()`, whose `attempt` takes the form).
 * `vault.putBoxMutationOptions`, the twin of the Suspense guide's `putBoxAction`, exists as `Knock.putBoxMutationOptions`.
 * `useBoxes`; a `useBoxList` without deleted boxes (today: they stay listed, and their `useBox` answers null).
 * `idbVaultDB`: no browser vaultDB is ported to the new core.

@@ -460,3 +460,20 @@ not write.
 Reasoning for wontfix: the only reader is a component the host wrote, inside the form the user typed the secret into,
 where it could read the input itself; nothing retains the secret; and each alternative costs every host more than this
 costs any. Ruled by the Coach, 2026-11-22.
+
+### A form verb handed a form at a stage that has no bank leaves the form's secret fields in it
+
+* current outcome: `Knock`'s form verbs and each hook's `attempt` refuse `absent_vault` (the birth: with nobody signed
+  in) before the core's maker runs, so the `FormData` keeps `passphrase`, `nextPassphrase` and `confirmation`, and
+  React keeps that `FormData` as the form's status. `attempt` resolves refused, with nothing in the mutation's `error`.
+  The core's own entrypoints empty the form at every stage.
+* alternatives:
+  - take the secret fields out in the giver before it looks for the bank: a step in every attempt, for a form that is
+    not shown at this stage.
+* workaround: show each form only at its own stage (`useBank().stage`), as the kit's forms are documented.
+
+Steps to reproduce: render an unlock form at stage `unborn`, or before the bank is brought up; type a passphrase; submit.
+
+Reasoning for wontfix: the paths here are a host showing a form at a stage it is not for, and a bank that ends under a
+shown form; the host is not the threat model, and an ending is answered by a page reload. Written by the workshop's
+thread 7 (gating_attempt), 2026-11-23.
