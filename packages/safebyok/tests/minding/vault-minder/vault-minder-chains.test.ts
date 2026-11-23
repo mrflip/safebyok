@@ -177,6 +177,10 @@ const ChainCases: readonly ChainCase[] = [
   { initial: Live,     chain: [["item", 4, 11]],                  wanted: { ...Live, isRefused: false },       blurb: 'its item again' },
   { initial: BareSoon, chain: [["soon", 4, 12]],                  wanted: BareSoon,                            blurb: 'its soon again' },
   { initial: Dead,     chain: [["gone", 5, 15]],                  wanted: { ...Dead, isRefused: false },       blurb: 'its tombstone again' },
+  // Each start with a soon, the whole record at its soon's revision:
+  { initial: LiveSoon, chain: [["item", 4, 12]],                  wanted: { item: ["item", 4, 12] },           blurb: 'the item its soon told of' },
+  { initial: BareSoon, chain: [["item", 4, 12]],                  wanted: { item: ["item", 4, 12] },           blurb: 'the item its soon told of' },
+  { initial: DeadSoon, chain: [["item", 6, 16]],                  wanted: Live6,                               today: { ...Live6, dead: ["gone", 5, 15] }, blurb: 'the item its soon told of' },
 ]
 // --
 

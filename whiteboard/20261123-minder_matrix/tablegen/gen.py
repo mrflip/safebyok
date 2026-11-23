@@ -1,7 +1,9 @@
 """Generate the chain table: rows with wanted from the principles, and today/todayBy from dump.json if present.
 
 today and todayBy come from a run of today's minder, so regenerating them once the minder changes would re-baseline every
-tripwire. After that change, regenerate wanted only: move dump.json aside, and keep each row's today and todayBy as the table has them.
+tripwire. After that change, regenerate wanted only. This script cannot do that by itself: with no dump.json it writes no
+today at all, and splice.py replaces the whole table. So delete dump.json, run gen.py and splice.py once, and put back by
+hand, from git, the today and todayBy of each row the minder has not yet been changed for.
 """
 import json, os, sys
 
@@ -33,6 +35,9 @@ OLDER_SAME_ON = {"bare+soon"}
 # A record the start has cached, arriving again: the feed redelivering it, or a fetch answering at the revision cached.
 AGAIN = [("live+soon", I(4, 11), "its item again"), ("live+soon", S(4, 12), "its soon again"), ("live", I(4, 11), "its item again"),
          ("bare+soon", S(4, 12), "its soon again"), ("dead", G(5, 15), "its tombstone again")]
+# A whole record arriving at its soon's own revision: a list, then a get of what it told of.
+AT_SOON = [("live+soon", I(4, 12), "the item its soon told of"), ("bare+soon", I(4, 12), "the item its soon told of"),
+           ("dead+soon", I(6, 16), "the item its soon told of")]
 NAMED = {("live+soon", "bare+soon, newer"): "(a) ", ("live+soon", "dead, newer"): "(b) ", ("dead", "live, newer"): "(c) "}
 ORDER = ["live+soon", "live", "dead", "dead+soon", "bare+soon"]
 
@@ -97,6 +102,7 @@ for a in ORDER:
   rs = [(c, ch, NAMED.get((a, bl), "") + bl) for (c, ch, bl) in rs]
   groups.append((f"On {a}:", rs))
 groups.append(("Each start, a record it has cached again:", [(STATES[a][0], [p], bl) for (a, p, bl) in AGAIN]))
+groups.append(("Each start with a soon, the whole record at its soon's revision:", [(STATES[a][0], [p], bl) for (a, p, bl) in AT_SOON]))
 
 CONSTS = {"Empty": {}, **{c: st for (c, st) in STATES.values()}}
 CONST_NAMES = {"Empty": "nothing", **{c: n for n, (c, _) in STATES.items()}}
