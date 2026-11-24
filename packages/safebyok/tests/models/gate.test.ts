@@ -6,7 +6,8 @@ import { Lease } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
 import type { GateOpts } from '../../src/shapes/shapes-gateish'
-import { type GateRecord, ThingFormat } from '../../src/shapes/shapes-thing'
+import type { ShellOf } from '../../src/shapes/shapes-sealers'
+import { type GateRecord, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { Lifeseq } from '../../src/shapes/primitives'
 import * as TH from '../test-helpers'
 
@@ -22,7 +23,7 @@ function worldOpts(): GateOpts {
 }
 
 /** The gate of `record` made by the world of `opts.device`, which hands `Gate.make` its friend. */
-function makeGate(record: GateRecord, opts: GateOpts = worldOpts()): Gate { return opts.device.world.makeGate(record, opts.bankStamp) }
+function makeGate(record: GateRecord | ShellOf<GateRecord>, opts: GateOpts = worldOpts()): Gate { return opts.device.world.makeGate(record, opts.bankStamp) }
 
 interface DnaWayins { main: Wayin, passkey0: Wayin | null }
 
@@ -84,7 +85,7 @@ describe("Gate.makeRecord(dna)", () => {
 describe("Gate.make(record, { device, bankStamp }, friend), by world.makeGate(record, bankStamp)", () => {
   it("makes the same gate again from a gate's pickle", async () => {
     const gate = makeGate(await gateRecordOf(true))
-    const again = makeGate(gate.pickle())
+    const again = makeGate(TH.livePickleOf(gate))
     expect(again.pickle()).to.deep.equal(gate.pickle())
     expect(again.stamp).to.deep.equal(gate.stamp)
   })
@@ -153,7 +154,7 @@ describe("Gate.make(record, { device, bankStamp }, friend), by world.makeGate(re
 describe("what a gate shows", () => {
   it("pickle() is the gate Thing, its wayin records frozen", async () => {
     const gate = makeGate(await gateRecordOf(true))
-    const pickle = gate.pickle()
+    const pickle = TH.livePickleOf(gate)
     expect(Object.keys(pickle)).to.have.members(GateFields)
     expect(pickle.wayins.main).to.deep.equal(gate.main.pickle())
     expect(pickle.wayins.passkey0).to.deep.equal(gate.passkey0!.pickle())
@@ -203,6 +204,85 @@ describe("what a gate shows", () => {
 
   it("is a gate by its modelkind", async () => {
     expect(makeGate(await gateRecordOf()).modelkind).to.eq('gate')
+  })
+})
+
+describe("a gate over the shell or a tombstone", () => {
+  const RefusingMembers = [
+    [(gate: Gate) => gate.stamp,                     'its stamp'],
+    [(gate: Gate) => gate.main,                      'its passphrase wayin'],
+    [(gate: Gate) => gate.passkey0,                  'its passkey wayin'],
+    [(gate: Gate) => { gate.demandPasskeyAddable() }, 'its check that a passkey may be added'],
+  ] as const
+
+  for (const [read, blurb] of RefusingMembers) {
+    it(`refuses ${blurb} over the shell`, () => {
+      TH.expectSyncRefusal(() => read(makeGate(TH.gateShellOf())), 'absent_thing')
+    })
+  }
+
+  it("is made from the shell, which it pickles to, with no wayins and the scope, bank stamp and citation of the shell", () => {
+    const gate = makeGate(TH.gateShellOf())
+    expect(gate.pickle()).to.deep.equal(TH.gateShellOf())
+    expect(Object.hasOwn(gate, 'wayins')).to.be.false
+    expect(gate.wayins).to.be.undefined
+    expect(gate.scope).to.deep.equal(TH.GateScope)
+    expect(gate.bankStamp).to.deep.equal(TH.WorldBankStamp)
+    expect(gate.citable).to.deep.equal(Shell.Cited)
+    expect(gate.modelkind).to.eq('gate')
+  })
+
+  it("refuses a shell of another bank than its bank's", () => {
+    TH.expectSyncRefusal(() => makeGate({ ...TH.gateShellOf(), banklabel: 'other' }), 'record_conflict')
+  })
+
+  it("takes in a gating's cleartexts over the shell, and refuses and vacates it at its attempt", async () => {
+    const gate = makeGate(TH.gateShellOf())
+    const form = new FormData()
+    form.set('passphrase', TH.TestPassphrase)
+    const gating = gate.unlockGating(form)
+    expect(form.has('passphrase')).to.be.false
+    await TH.expectRefusal(gating.attempt(), 'absent_thing')
+    await TH.expectRefusal(gating.attempt(), 'gating_concluded')
+  })
+
+  it("refuses every form verb over the shell", async () => {
+    const gate = makeGate(TH.gateShellOf())
+    await TH.expectRefusal(gate.unlock({ passphraseCleartext: TH.TestPassphrase }), 'absent_thing')
+    await TH.expectRefusal(gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'a different passphrase, just as long' }), 'absent_thing')
+    await TH.expectRefusal(gate.addPasskey({ passphraseCleartext: TH.TestPassphrase, nextPasskeyCleartext: TH.passkeyAnswerOf() }), 'absent_thing')
+    await TH.expectRefusal(gate.revokePasskey({ passphraseCleartext: TH.TestPassphrase }), 'absent_thing')
+  })
+
+  it("receives a whole record over the shell, and then answers its wayins, frozen", async () => {
+    const gate = makeGate(TH.gateShellOf())
+    const record = await gateRecordOf(true)
+    expect(gate.receive(TH.thingEventOf(record)).length).to.be.greaterThan(0)
+    expect(gate.stamp).to.deep.equal(TH.WorldGateStamp)
+    expect(gate.main.pickle()).to.deep.equal(record.wayins.main)
+    expect(gate.passkey0!.pickle()).to.deep.equal(record.wayins.passkey0)
+    expect(gate.wayins).to.deep.equal(record.wayins)
+    expect(Object.isFrozen(gate.wayins)).to.be.true
+    expect(Object.isFrozen(gate.wayins?.main)).to.be.true
+  })
+
+  it("stops answering its wayins once it receives a tombstone of a later life", async () => {
+    const gate = makeGate(await gateRecordOf())
+    const later = Lifeseq.ofLifenum(1)
+    const tombstone = { ...TH.GateScope, label: 'gate', fmt: ThingFormat, revtok: TH.revtokOf('gone'), revseq: 1, am: 'x', lifeseq: later, lifepath: later, born_at: TH.T0, written_at: TH.T0 + 1 } as const
+    gate.receive(TH.thingEventOf<GateRecord>(tombstone))
+    expect(gate.pickle()).to.equal(tombstone)
+    expect(Object.hasOwn(gate, 'wayins')).to.be.false
+    TH.expectSyncRefusal(() => gate.main, 'absent_thing')
+    await TH.expectRefusal(gate.unlock({ passphraseCleartext: TH.TestPassphrase }), 'absent_thing')
+  })
+
+  it("adopts a newer revision it receives, answering that revision's wayins", async () => {
+    const gate = makeGate(await gateRecordOf())
+    const next = Gate.makeNextRecord(TH.livePickleOf(gate), await wayinsOf(true))
+    gate.receive(TH.thingEventOf(next))
+    expect(gate.revseq).to.eq(1)
+    expect(gate.passkey0!.pickle()).to.deep.equal(next.wayins.passkey0)
   })
 })
 

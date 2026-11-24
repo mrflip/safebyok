@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { PlainThing } from '../../src/models/plain-thing'
-import { Thing } from '../../src/models/thing'
+import { type Adoptable, Thing } from '../../src/models/thing'
 import { type Lifepath, Lifeseq, Revseq, VoidLifeseq } from '../../src/shapes/primitives'
-import { Shell } from '../../src/shapes/shapes-thing'
+import { type ThingRecord, type ThingScope, Shell } from '../../src/shapes/shapes-thing'
 import type { Agekind, Agerank, Lifekind, Liveness, SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
 import { readAtOf, readTcNow } from '../../src/storage/thing-classifier'
 import type { ReadTc } from '../../src/storage/vault-db'
@@ -489,6 +489,30 @@ function recordOf([liveness, life, revseq]: Seen): SeenThing {
   return (liveness === 'soon') ? Thing.sparseOf(whole) : whole
 }
 
+// A subclass's adopt may check what it adopts, as Gate's does its wayins: this one refuses outright.
+/** A Thing whose adopt throws for a record of revseq {@link RefusingThing.RefusedRevseq} */
+class RefusingThing extends Thing<ThingRecord, ThingScope, undefined, Adoptable<ThingRecord>> {
+  /** The revseq whose record this Thing's adopt refuses. */
+  static readonly RefusedRevseq = 3
+  /** What its adopt says as it refuses. */
+  static readonly Refusal = "This record is refused."
+
+  /** A Thing begun from `seen`. */
+  static make(seen: SeenThing): RefusingThing { return new RefusingThing(seen) }
+
+  /** Where this Thing is stored. */
+  get scope(): ThingScope { return { userid: this.userid, banklabel: this.banklabel, labelpath: this.labelpath } }
+
+  /** No stamp. */
+  get stamp(): undefined { return }
+
+  /** Adopt `record`, refusing one of revseq {@link RefusingThing.RefusedRevseq}. */
+  protected override adopt(record: Adoptable<ThingRecord>): void {
+    if (record.revseq === RefusingThing.RefusedRevseq) { throw new Error(RefusingThing.Refusal) }
+    super.adopt(record)
+  }
+}
+
 /** The chunk `seen` was read in */
 function chunkOf(seen: Seen): Chunk { return seen[3] ?? 0 }
 
@@ -824,6 +848,16 @@ describe("Thing's props, record and citable", () => {
     const thing = PlainThing.make(TH.boxThingOf())
     expect(thing.scope).to.deep.equal(TH.BoxScope)
     expect(thing.stamp).to.eq(undefined)
+  })
+
+  it("is left as it was by a receive whose adopt throws", () => {
+    const live2 = TH.boxThingOf('openai', { revseq: 2 })
+    const thing = RefusingThing.make(live2)
+    thing.receive(eventOf(live2))
+    const before = [thing.agerank, thing.read_at, thing.citable, thing.pickle(), thing.revseq]
+    const refused = TH.boxThingOf('openai', { revseq: RefusingThing.RefusedRevseq, revtok: TH.revtokOf('three') })
+    expect(() => thing.receive(eventOf(refused, readTcOf(1)))).to.throw(RefusingThing.Refusal)
+    expect([thing.agerank, thing.read_at, thing.citable, thing.pickle(), thing.revseq]).to.deep.equal(before)
   })
 })
 

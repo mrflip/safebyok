@@ -7,6 +7,7 @@ import {
 } from '../../src/shapes/shapes-thing'
 import type { SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
 import { itemSeenOf } from '../../src/storage/agerank'
+import { readTcNow } from '../../src/storage/thing-classifier'
 import { PlainThing } from '../../src/models/plain-thing'
 import { WayinChecks } from '../../src/shapes/shapes-wayin'
 import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
@@ -49,8 +50,11 @@ export const Life0 = Lifeseq.ofLifenum(0)
 /** The fields every Thing here starts from: revision 0 of life 0, born and written at {@link T0}. */
 const FirstRevision = { am: 'a', revtok: FirstRevtok, revseq: 0, lifeseq: Life0, born_at: T0, written_at: T0 } as const
 
+/** What a track reads of a record, of any life. */
+export type TrackedRecord = Pick<ThingRecord, 'revseq' | 'lifepath'>
+
 /** The track of the bank, main gate and root box `bank`, `gate` and `box`: their revseq and lifepath. */
-export function trackOf(bank: ThingRecord = bankThingOf(), gate: ThingRecord = gateThingOf(), box: ThingRecord = rootBoxOf()): Track {
+export function trackOf(bank: TrackedRecord = bankThingOf(), gate: TrackedRecord = gateThingOf(), box: TrackedRecord = rootBoxOf()): Track {
   return {
     bank: { revseq: bank.revseq, lifepath: bank.lifepath },
     gate: { revseq: gate.revseq, lifepath: gate.lifepath },
@@ -165,6 +169,12 @@ export function itemEventOf(record: SeenThing, bank_lifetok?: Lifetok): VaultIte
   const { userid, banklabel, labelpath } = record
   const unsorted = { agerank: undefined, agerankWas: undefined, bank_lifetok, sourcelabel: undefined, read_tc: AnyReadTc }
   return { eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), ...unsorted, ...itemSeenOf(record) }
+}
+
+// itemEventOf types its record as of any kind; a Thing of one kind receives only events of its own.
+/** The `item` event a SortedVaultDB hands the Thing of `record` to receive, read now, typed as of `record`'s kind. */
+export function thingEventOf<RecordT extends ThingRecord>(record: SeenThing<RecordT>): VaultItemEvent<RecordT> {
+  return { ...itemEventOf(record), read_tc: readTcNow() } as VaultItemEvent<RecordT>
 }
 
 /** The revtok of `val`, what a minder's item or soon has, or undefined for none or null. */

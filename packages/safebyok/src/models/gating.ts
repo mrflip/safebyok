@@ -17,7 +17,7 @@ import type { PutAskDraft } from '../shapes/shapes-asks'
 import type { StampedGate } from '../shapes/shapes-stamps'
 import { Labelpath } from '../shapes/primitives'
 import { type GateRecord, Shell } from '../shapes/shapes-thing'
-import { BoxChecks } from '../shapes/shapes-thingkinds'
+import { BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import * as Throwers from '../refusals/throwers'
 
 // == [The gating]: Gating, GatingMarker
@@ -154,12 +154,13 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
   // The root box is sealed under the lease the birth builds, and the bank stored is made with the gate the birth makes.
   // The lease reaches the device's world, unlocking it, only with the bank. Where the birth refuses, or the vaultDB's
   // answer is broken, the lease is evicted, and the world is as it was.
-  const gate  = device.world.makeGate(Gate.makeRecord({ ...gateStamp, wayins: { main, passkey0 } }), bankStamp)
+  const gateRecord = Gate.makeRecord({ ...gateStamp, wayins: { main, passkey0 } })
+  const gate  = device.world.makeGate(gateRecord, bankStamp)
   const lease = await friend.leaseByProving(gate, passphraseProving)
   try {
     const root   = await lease.seal(BaseBox, rootShell, { sidecar: {} }, { whisper: {} })
     // The roots it answers, written or found stored, are then the bank's world in the device's BankMinder.
-    const answer = await device.bankMinder.tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gate.pickle(), root, bank_lifetok: bankRecord.lifetok })
+    const answer = await device.bankMinder.tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gateRecord, root, bank_lifetok: bankRecord.lifetok })
     if (! answer.ok) { throw answer.err }
     // The user must hear that their passphrase was not set: the bank stored is another's.
     if (answer.val.bank.revtok !== bankRecord.revtok) { throw Throwers.gateMadeElsewhere() }
@@ -176,7 +177,7 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
 async function unlockGate(gate: Gate, cleartexts: unknown, friend: Pick<GateGatingFriend, 'unlockByProving'>): Promise<Gate> {
   gate.demandEnabled()
   const proof  = CleartextChecks.unlock.parse(cleartexts)
-  const proved = await provingOf(gate.device, gate, proof)
+  const proved = await provingOf(gate.device, anteOf(gate), proof)
   return await friend.unlockByProving(proved)
 }
 
@@ -237,10 +238,11 @@ interface Ante extends StampedGate {
   passkey0: Wayin | null
 }
 
-/** The revision `gate` models now, as a gate change proves against it and carries it forward. */
+/** The revision `gate` models now, as a gating proves against it and a gate change carries it forward. Refuses a gate that is not live. */
 function anteOf(gate: Gate): Ante {
-  const record = gate.pickle()
-  return { record, bankStamp: gate.bankStamp, stamp: gate.stamp, wayins: record.wayins, main: gate.main, passkey0: gate.passkey0 }
+  const { stamp, main, passkey0, bankStamp } = gate
+  const record = GateChecks.record.parse(gate.pickle())
+  return { record, bankStamp, stamp, wayins: record.wayins, main, passkey0 }
 }
 
 /** Refuse `weak_passphrase` unless `device`'s strength checker judges `passphraseCleartext` strong. */

@@ -4,7 +4,7 @@ import { Bank } from '../../src/models/bank'
 import { type BadNews, bankStageVals } from '../../src/shapes/shapes-bankish'
 import type { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
-import type { LiveOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
+import type { LiveOf, ShellOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
 import { Labelpath, Lifeseq } from '../../src/shapes/primitives'
 import type { BankStamp } from '../../src/shapes/shapes-stamps'
 import { type BankRecord, type BoxRecord, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
@@ -127,10 +127,9 @@ describe("Bank.make(record, { device, gate })", () => {
     expect(Object.isFrozen(pickle)).to.be.true
   })
 
-  it("shows its Thing fields alone, frozen, and serializes no wrapped bankKey", async () => {
+  it("shows its Thing fields alone, read-only, and serializes no wrapped bankKey", async () => {
     const { bank } = await TH.buildBornBank()
     expect(Object.keys(bank)).to.have.members(BankProps)
-    expect(Object.isFrozen(bank)).to.be.true
     expect(() => { (bank as { lifeseq: Lifeseq }).lifeseq = Life2 }).to.throw(TypeError)
     expect(JSON.stringify(bank)).to.not.include('ciphertext_b64')
     expect(bank.modelkind).to.eq('bank')
@@ -233,6 +232,70 @@ describe("Bank.make(record, { device, gate })", () => {
   it("refuses no opts at all", async () => {
     const { record } = await TH.buildBornBank()
     TH.expectSyncRefusal(() => Bank.make(record, undefined as never), 'bad_record')
+  })
+})
+
+describe("a bank over the shell or a tombstone", () => {
+  /** A bank of `record`, the bank's shell or a tombstone, made on a device that has heard of no world, with its main gate's shell. */
+  function makeBankOf(record: BankRecord | ShellOf<BankRecord>): Bank {
+    const device = TH.makeDevice()
+    return Bank.make(record, { device, gate: device.world.makeGate(TH.gateShellOf(), TH.WorldBankStamp) })
+  }
+
+  /** A whole tombstone of the bank, in its second life. */
+  const BankTombstone = TH.bankThingOf({ am: 'x', lifeseq: Life1, lifepath: Life1, revtok: TH.revtokOf('gone'), revseq: 1, written_at: TH.T0 + 1 })
+
+  const RefusingCalls = [
+    [(bank: Bank) => bank.stamp,                                                           'its stamp'],
+    [(bank: Bank) => bank.rootBox,                                                         'its root box'],
+    [(bank: Bank) => bank.makeGetAsk({ labelpath: 'box/openai' }),                         'a get ask'],
+    [(bank: Bank) => bank.makeListAsk({ labelpath: 'box' }),                               'a list ask'],
+    [(bank: Bank) => bank.makePutAsk({ cited: TH.boxShellOf(), record: TH.boxThingOf() }),  'a put ask'],
+  ] as const
+
+  for (const [call, blurb] of RefusingCalls) {
+    it(`refuses ${blurb} over the shell and over a tombstone`, () => {
+      TH.expectSyncRefusal(() => call(makeBankOf(TH.bankShellOf())), 'absent_thing')
+      TH.expectSyncRefusal(() => call(makeBankOf(BankTombstone)), 'absent_thing')
+    })
+  }
+
+  it("refuses a put, a seal and an unseal over the shell, and its try forms resolve the refusal", async () => {
+    const bank = makeBankOf(TH.bankShellOf())
+    await TH.expectRefusal(bank.put({ cited: TH.bankShellOf(), record: TH.bankThingOf() }), 'absent_thing')
+    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'absent_thing')
+    await TH.expectRefusal(bank.unsealBox(TH.boxThingOf()), 'absent_thing')
+    expect(await bank.trySealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })).to.deep.include({ ok: false })
+    expect(await bank.tryUnsealBox(TH.boxThingOf())).to.deep.include({ ok: false })
+  })
+
+  it("is made from the shell with no world heard of, which it pickles to, with no lifetok and the scope and citation of the shell", () => {
+    const bank = makeBankOf(TH.bankShellOf())
+    expect(bank.pickle()).to.deep.equal(TH.bankShellOf())
+    expect(bank.lifetok).to.be.undefined
+    expect(bank.scope).to.deep.equal(TH.ThingBank)
+    expect(bank.citable).to.deep.equal(Shell.Cited)
+    expect([bank.isLocked, bank.isEnabled, bank.modelkind]).to.deep.equal([true, true, 'bank'])
+    expect(bank.gate.labelpath).to.eq('gate')
+  })
+
+  it("is made from a whole tombstone, which keeps the lifetok of the life it ends", () => {
+    const bank = makeBankOf(BankTombstone)
+    expect(bank.pickle()).to.deep.equal(BankTombstone)
+    expect(bank.lifetok).to.eq(BankTombstone.lifetok)
+  })
+
+  it("refuses a shell of another bank than its device's", () => {
+    TH.expectSyncRefusal(() => makeBankOf({ ...TH.bankShellOf(), userid: 'u2' }), 'record_conflict')
+  })
+
+  it("receives a whole live record over the shell, and then answers its stamp and lifetok", () => {
+    const bank = makeBankOf(TH.bankShellOf())
+    const record = TH.bankThingOf()
+    bank.receive(TH.thingEventOf(record))
+    expect(bank.pickle()).to.equal(record)
+    expect(bank.stamp).to.deep.equal(TH.WorldBankStamp)
+    expect(bank.lifetok).to.eq(record.lifetok)
   })
 })
 
@@ -709,7 +772,7 @@ describe("bank.sealBox(donor, { am: 'x' }), and the unseal of a tombstone", () =
 })
 
 /** The revision of `bank`'s Thing after the one in hand, written a millisecond later. */
-function nextBankThingOf(bank: Bank) {
+function nextBankThingOf(bank: TH.LiveBank) {
   return { ...bank.pickle(), revtok: Crypto.randomId(), revseq: bank.revseq + 1, written_at: bank.written_at + 1 }
 }
 

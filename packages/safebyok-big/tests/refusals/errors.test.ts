@@ -105,6 +105,7 @@ const FamilyCases = [
   ["absent_box",          "condition", 'a box deleted on another device is a normal part of syncing'],
   ["absent_vault",        "condition", 'a vault with no gate yet is set up the first time it is unlocked'],
   ["absent_wayin",        "condition", 'a passkey removed on another device is a normal part of syncing'],
+  ["absent_thing",        "condition", 'a bank read before it is born, or after it is deleted, is shown its stage, not a fault'],
   ["box_too_large",       "condition", "a box too heavy for one record is the user's whisper and note, not the code"],
   ["vault_full",          "condition", 'a full vault tells the user to remove a box'],
   ["damaged_whisper",     "bad_news",  'a box stored damaged is reported to the user, who may remove it'],

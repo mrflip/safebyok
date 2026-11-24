@@ -214,9 +214,8 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
     .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
     .refine(isLifepathDeep, Phrases.LifepathDepth)
     .refine(isParityRight,  Phrases.LifeseqParity)
-  const boxShell     = obj({
+  const shellFields  = {
     ...sparse.shape,
-    labelpath:      boxLabelpath,
     fmt:            lit(ThingFormat),
     revtok:         lit(SX.VoidRevisionTok),
     revseq:         lit(SX.VoidRevisionSeq),
@@ -225,14 +224,22 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
     lifepath:       voidLifepath,
     born_at:        lit(SX.VoidTime),
     written_at:     lit(SX.VoidTime),
-  }).strict()
-    .refine(isLabelLast,    Phrases.LabelNotLast)
-    .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
-    .refine(isLifepathDeep, Phrases.LifepathDepth)
-  const boxRecordOrShell = union([boxRecord, boxShell])
+  }
+  /** The check of the shell of a Thing whose labelpath passes `kindLabelpath`: its Thing fields alone, at the void revision */
+  function shellAt(kindLabelpath: Z.ZodType<string>) {
+    return obj({ ...shellFields, labelpath: kindLabelpath }).strict()
+      .refine(isLabelLast,    Phrases.LabelNotLast)
+      .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
+      .refine(isLifepathDeep, Phrases.LifepathDepth)
+  }
+  // The bank is a root, its labelpath, label and lifepath fixed: the rules shellAt refines by hold of them already.
+  const bankShell    = obj({ ...shellFields, labelpath: bankLabelpath, label: lit('bank'), lifepath: lit(VoidLifeseq) }).strict()
+  const boxRecordOrShell = union([boxRecord, shellAt(boxLabelpath)])
+  const bankThingOrShell = union([bankThing, bankShell])
+  const gateThingOrShell = union([gateThing, shellAt(gateLabelpath)])
   return {
     bankLabelpath, gateLabelpath, boxLabelpath, wayins, storedWayins, storedLifetok,
-    bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord, boxRecordOrShell,
+    bankThing, bankCited, bankThingOrShell, gateThing, gateCited, gateThingOrShell, boxThing, boxCited, boxSealable, boxRecord, boxRecordOrShell,
   }
 }))
 

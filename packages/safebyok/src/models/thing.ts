@@ -110,18 +110,21 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
     const agerankWas = this.#agerank
     const agerank = raisedOf(agerankWas, { lifepath: val.lifepath, revseq: val.revseq, time: timeOf(read_tc) }, liveness !== 'soon')
     if (agerank === undefined) { return NoEvents }
-    this.#agerank = agerank
-    this.#raiseReadAt(val, readAtOf(read_tc))
-    if (BaseThing.cmp(this.#citable, val) > 0) { this.#citable = citedOf(val) }
+    // Adopted first, so that an adopt that throws leaves this Thing as it was. Read before it, since adopt may move citable.
+    const readAt = this.#readAtAfter(val, readAtOf(read_tc))
     if (liveness !== 'soon') { this.adopt(val) }
+    this.#agerank = agerank
+    this.#readAt  = readAt
+    if (BaseThing.cmp(this.#citable, val) > 0) { this.#citable = citedOf(val) }
     return eventsOf(proposed, agerankWas, agerank)
   }
 
   // The time belongs to the newest revision, as the agerank's does: a newer one brings its own, the same one the later.
-  /** Move `read_at` to `readAt` where `seen` is the newest revision seen, or newer */
-  #raiseReadAt(seen: Pick<ThingCited, 'lifepath' | 'revseq'>, readAt: EpochMillis): void {
+  /** The `read_at` after `seen` is read at `readAt`: moved where `seen` is the newest revision seen, or newer */
+  #readAtAfter(seen: Pick<ThingCited, 'lifepath' | 'revseq'>, readAt: EpochMillis): EpochMillis {
     const order = BaseThing.cmp(this.#citable, seen)
-    if ((order > 0) || (this.#readAt === undefined)) { this.#readAt = readAt } else if (order === 0) { this.#readAt = Math.max(this.#readAt, readAt) }
+    if ((order > 0) || (this.#readAt === undefined)) { return readAt }
+    return (order === 0) ? Math.max(this.#readAt, readAt) : this.#readAt
   }
   // --
 

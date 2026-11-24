@@ -1,5 +1,5 @@
 import { Clock, Crypto, type Errors, Validator } from 'safebyok-big/internals'
-import { Thing } from './thing'
+import { type Adoptable, Thing } from './thing'
 import type { Bank } from './bank'
 import type { Device } from './device'
 import { AddPasskeyGating, BirthGating, ReplacePassphraseGating, RevokePasskeyGating, UnlockGating } from './gating'
@@ -22,12 +22,13 @@ import * as Throwers from '../refusals/throwers'
 /** A bank's gate: its passphrase wayin and its passkey wayin if it has one.
  * Its form verbs prove the user's cleartexts against its wayins, and an `unlock` gating builds a lease, which it hands to its device's world.
  * A gate change writes the gate, and this object then models the revision written.
+ * Over the shell or a tombstone, its stamp, `main` and `passkey0` refuse `absent_thing`, and so does a gating's attempt, though its maker still takes in the cleartexts.
  */
-export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements GateStamp {
-  // == [Props]: wayins, #device, #world, #friend, #bankStamp, #main, #passkey0
+export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<GateRecord>> implements GateStamp {
+  // == [Props]: wayins, #device, #world, #friend, #bankStamp
 
-  /** The wayin records, frozen. */
-  declare readonly wayins: Wayins
+  /** The wayin records, frozen, or absent over the shell or a tombstone. */
+  declare readonly wayins?: Wayins
 
   readonly #device:    Device
   /** The world that holds the leases this gate builds. */
@@ -35,12 +36,6 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
   /** The world's lease verbs. */
   readonly #friend:    WorldGateFriend
   readonly #bankStamp: BankStamp
-
-  // Set again where a gate change lands, from the record written.
-  /** The passphrase wayin. */
-  #main:     Wayin
-  /** The passkey wayin, or null for none. */
-  #passkey0: Wayin | null
   // --
 
   // == [Getters]: device, main, passkey0, scope, stamp, bankStamp, leaseEndsAt, leaseLoggable
@@ -48,17 +43,20 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
   /** The device this gate's bank is on. */
   get device(): Device { return this.#device }
 
-  /** The passphrase wayin. */
-  get main(): Wayin { return this.#main }
+  /** The passphrase wayin, a new Wayin on each read. */
+  get main(): Wayin { return Wayin.make(this.#demandLive().wayins.main) }
 
-  /** The passkey wayin, or null if the gate has none. */
-  get passkey0(): Wayin | null { return this.#passkey0 }
+  /** The passkey wayin, a new Wayin on each read, or null if the gate has none. */
+  get passkey0(): Wayin | null {
+    const { passkey0 } = this.#demandLive().wayins
+    return (passkey0 === null) ? null : Wayin.make(passkey0)
+  }
 
   /** This gate's scope: its bank's, and its `labelpath`. */
   get scope(): ThingScope { return ThingChecks.thingScope.parse(this) }
 
   /** This gate's stamp, fixed for its life. A wayin's wrapped bankKey is bound to it. */
-  get stamp(): GateStamp { return GateChecks.stamp.parse(this) }
+  get stamp(): GateStamp { return GateChecks.stamp.parse(this.#demandLive()) }
 
   /** The stamp of this gate's bank. A wayin's wrapped bankKey is bound to it, and to the gate's own `stamp`, and every ctx under the gate's lease binds it first. */
   get bankStamp(): BankStamp { return this.#bankStamp }
@@ -70,31 +68,33 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
   get leaseLoggable(): LeaseLoggable | null { return this.#world.leaseLoggable }
   // --
 
-  // == [Construction]: make, constructor, makeRecord, makeNextRecord
+  // == [Construction]: make, constructor, adopt, makeRecord, makeNextRecord
 
   /** Make the gate of `record`, of the bank stamped `opts.bankStamp`, on `opts.device`, handing its leases to the world through `friend`. Locked, and nothing is fetched or stored.
-   * Internal: make a gate with `device.world.makeGate`.
+   * `record` is a whole gate record or the gate's shell. Internal: make a gate with `device.world.makeGate`.
    */
-  static make(record: GateRecord, opts: GateOpts, friend: WorldGateFriend): Gate {
-    const { record: gateRecord, opts: { device, bankStamp }, friend: worldFriend } = Checks.gateMakeArgs.parse({ record, opts, friend })
+  static make(record: GateRecord | Sealers.ShellOf<GateRecord>, opts: GateOpts, friend: WorldGateFriend): Gate {
+    const { record: begun, opts: { device, bankStamp }, friend: worldFriend } = Checks.gateMakeArgs.parse({ record, opts, friend })
     // A gate's life is its own, so only the bank's scope is checked: a gate of another life of the bank passes.
     Validator.checkedConsistent(StampChecks.bankScope.parse(bankStamp), device.scope, { kind: 'record_conflict' })
-    Validator.checkedConsistent(gateRecord, StampChecks.bankScope.parse(bankStamp), { kind: 'record_conflict' })
-    return new Gate(gateRecord, { device, bankStamp }, worldFriend)
+    Validator.checkedConsistent(begun, StampChecks.bankScope.parse(bankStamp), { kind: 'record_conflict' })
+    return new Gate(begun, { device, bankStamp }, worldFriend)
   }
 
-  private constructor(gateRecord: GateRecord, opts: GateOpts, friend: WorldGateFriend) {
-    const main = Wayin.make(gateRecord.wayins.main)
-    const passkey0 = (gateRecord.wayins.passkey0 === null) ? null : Wayin.make(gateRecord.wayins.passkey0)
-    super({ ...gateRecord, wayins: wayinsOf({ main, passkey0 }) })
+  private constructor(begun: GateRecord | Sealers.ShellOf<GateRecord>, opts: GateOpts, friend: WorldGateFriend) {
+    super(begun)
     this.#device    = opts.device
     this.#world     = opts.device.world
     this.#friend    = friend
     this.#bankStamp = Object.freeze(opts.bankStamp)
-    this.#main      = main
-    this.#passkey0  = passkey0
     // The world's sweep lets go of this listener.
     this.#world.subscribe(() => { this.#tell() })
+  }
+
+  // Thing's constructor calls this before this gate's own fields exist, so it reads and sets none of them.
+  /** Model `record`, each wayin record of a live one checked and frozen as its Wayin keeps it. */
+  protected override adopt(record: Adoptable<GateRecord>): void {
+    super.adopt((record.am === 'a') ? { ...record, wayins: frozenWayinsOf(record.wayins) } : record)
   }
 
   /** The first record of a new main gate, made from `dna`, born at its stamp's `born_at`. */
@@ -246,18 +246,9 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
     const answer = await this.#device.bankMinder.tryWrite({ ...putAskOf<GateRecord>(ask), modelkind: 'gate' })
     if (! answer.ok) { throw answer.err }
     // The ask's modelkind is the gate's, which the vaultDB checks what it answers against.
-    this.#adopt(answer.val as GateRecord)
-    return this
-  }
-
-  /** Model `record`, a newer revision of this gate's life: its Thing fields and its wayins. */
-  #adopt(record: GateRecord): void {
-    const main = Wayin.make(record.wayins.main)
-    const passkey0 = (record.wayins.passkey0 === null) ? null : Wayin.make(record.wayins.passkey0)
-    this.adopt({ ...record, wayins: wayinsOf({ main, passkey0 }) })
-    this.#main     = main
-    this.#passkey0 = passkey0
+    this.adopt(answer.val as GateRecord)
     this.#tell()
+    return this
   }
   // --
 
@@ -305,7 +296,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
   }
   // --
 
-  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, demandEnabled, demandPasskeyAddable
+  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, demandEnabled, demandPasskeyAddable, demandLive
 
   /** True until this gate's world is swept or its device ends. */
   get isEnabled(): boolean { return this.#world.isEnabled }
@@ -330,7 +321,14 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
 
   /** Demand that this gate has no passkey wayin yet. */
   demandPasskeyAddable(): void {
-    if (this.#passkey0 !== null) { throw Throwers.passkeyAlreadyAdded() }
+    if (this.#demandLive().wayins.passkey0 !== null) { throw Throwers.passkeyAlreadyAdded() }
+  }
+
+  /** The live record this gate models, refusing the shell or a tombstone */
+  #demandLive(): GateRecord {
+    const record = this.pickle()
+    if (record.am !== 'a') { throw Throwers.thingNotLive(this.labelpath) }
+    return record
   }
   // --
 
@@ -341,12 +339,17 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
   static override readonly modelkind = 'gate'
 }
 
-// == [Helpers]: wayinsOf
+// == [Helpers]: wayinsOf, frozenWayinsOf
 
 // A Wayin's pickle is typed as either kind; the gate record's parse checks each is the kind its label wants.
 /** The frozen records of `wayins`, its passkey0 null for none. */
 function wayinsOf({ main, passkey0 }: GateDna['wayins']): Wayins {
   return Object.freeze({ main: main.pickle(), passkey0: passkey0?.pickle() ?? null }) as Wayins
+}
+
+/** `wayins`, each record as its Wayin keeps it, frozen */
+function frozenWayinsOf({ main, passkey0 }: Wayins): Wayins {
+  return wayinsOf({ main: Wayin.make(main), passkey0: (passkey0 === null) ? null : Wayin.make(passkey0) })
 }
 // --
 
@@ -359,7 +362,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn }) => {
   const wayins = obj({ main: wayin, passkey0: wayin.nullable() })
   return {
     gateMakeArgs:   obj({
-      record: GateChecks.record,
+      record: GateChecks.recordOrShell,
       opts:   obj({
         device:    custom<Device>(),
         bankStamp: BankChecks.stamp,

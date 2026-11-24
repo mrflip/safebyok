@@ -2,7 +2,6 @@ import { describe, expect, it, type Mock, vi } from 'vitest'
 import type { Deriver } from 'safebyok-big/internals'
 import { Consts, Crypto, Errors, GX, Phrases } from 'safebyok-big/internals'
 import { BaseBox } from '../../src/models/base-box'
-import type { Gate } from '../../src/models/gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
 import type { ProvingDevice } from '../../src/shapes/shapes-gateish'
 import type { StampedGate } from '../../src/shapes/shapes-stamps'
@@ -39,26 +38,26 @@ function novelPasskey(answer = TH.passkeyAnswerOf(), device: ProvingDevice = TH.
 }
 
 /** The main gate of a bank born with both wayins, beside a function giving a fresh copy of the answer that unwraps its passkey's. */
-async function gateWithBoth(): Promise<{ gate: Gate, answerOf: () => GX.PasskeyAnswer }> {
+async function gateWithBoth(): Promise<{ gate: TH.LiveGate, answerOf: () => GX.PasskeyAnswer }> {
   const answer = TH.passkeyAnswerOf()
   const { bank } = await TH.buildBornBank({ passkeyCleartext: TH.copyOfAnswer(answer) })
   return { gate: bank.gate, answerOf: () => TH.copyOfAnswer(answer) }
 }
 
 /** The main gate of a bank born with its passphrase's wayin alone. */
-async function gateWithPassphrase(): Promise<Gate> {
+async function gateWithPassphrase(): Promise<TH.LiveGate> {
   const { bank } = await TH.buildBornBank()
   return bank.gate
 }
 
 /** The gate of `record`, of {@link TH.WorldBankStamp}'s bank. */
-function gateOf(record: unknown): Gate {
+function gateOf(record: unknown): TH.LiveGate {
   const device = TH.makeDevice()
-  return device.world.makeGate(record as never, TH.WorldBankStamp)
+  return TH.liveGateOf(device.world.makeGate(record as never, TH.WorldBankStamp))
 }
 
 /** The arguments of a proving of `gate`, under a bank's stamp and a gate's stamp each moved by `moves`: the stamps a Gate would refuse to be made under. */
-function movedGate(gate: Gate, moves: { bank?: object, gate?: object }): StampedGate {
+function movedGate(gate: TH.LiveGate, moves: { bank?: object, gate?: object }): StampedGate {
   return { bankStamp: { ...TH.WorldBankStamp, ...moves.bank }, stamp: { ...TH.WorldGateStamp, ...moves.gate }, wayins: gate.wayins }
 }
 

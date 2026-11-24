@@ -86,8 +86,8 @@ export class World {
     Object.freeze(this)
   }
 
-  /** Make the gate of `record`, of the bank stamped `bankStamp`, whose leases this world holds. Locked, and nothing is fetched or stored. */
-  makeGate(record: GateRecord, bankStamp: BankStamp): Gate { return Gate.make(record, { device: this.#device, bankStamp }, this.#gateFriend()) }
+  /** Make the gate of `record`, a whole gate record or its shell, of the bank stamped `bankStamp`, whose leases this world holds. Locked, and nothing is fetched or stored. */
+  makeGate(record: GateRecord | Sealers.ShellOf<GateRecord>, bankStamp: BankStamp): Gate { return Gate.make(record, { device: this.#device, bankStamp }, this.#gateFriend()) }
 
   /** Take `sortedVaultDB`, the signed-in user's bank's records, sorted. A second call does nothing. */
   hello(sortedVaultDB: SortedVaultDB): void {
