@@ -1,6 +1,6 @@
 # Thread 6: world_facade, the World with behaviour unchanged (2026-11-24)
 
-Branch `20261124-world_facade`, PR #TBD, stacked on #871 (`20261124-things_ring`). Thread A of `world-design.md`.
+Branch `20261124-world_facade`, PR #872, stacked on #871 (`20261124-things_ring`). Thread A of `world-design.md`.
 Proved: `safebyok` typecheck and lint clean, tests 1875 passed and the seven `vault-minder` tests red on purpose
 (listen 4, writes 2, staleness 1), no others; `safebyok-idb-lean` 113, `safebyok-postgres` 354, `safebyok-react-lean`
 320, each typecheck and lint clean. `pnpm justify` after the catch-up: see the PR's **Tests:** line.
