@@ -1,4 +1,4 @@
-import { type Helpers, Outcome } from 'safebyok-big/internals'
+import { Errors, type Helpers, Outcome } from 'safebyok-big/internals'
 import type { Bank } from './bank'
 import { BaseBox } from './base-box'
 import { Box } from './box'
@@ -187,7 +187,7 @@ export class Vault {
   /** Call `fn` with the box at `labelpath` unsealed, on an unlocked bank, and resolve what `fn` resolves.
    * It never waits for an `unlock` gating: on a locked bank it refuses `bank_locked`. Call it where the bank shows unlocked, or call {@link withWhisper}.
    * The box is got only where this device has seen a newer revision than it holds whole, or none. A refused get rejects
-   * with its own refusal where this device has seen nothing of the box, and otherwise rejects nothing by itself.
+   * with its refusal, unless it is `storage_unavailable` over a box this device holds, which runs on that box.
    * `fn` gets the whole box, in a revision stored at a moment during the call: its whisper, its sidecar and its record's fields.
    * That box may be behind a revision of the same life heard of since.
    * It refuses `stale_read` where the newest revision heard of is a sparse record of a newer life, and `absent_box` for a box deleted or never stored.
@@ -200,11 +200,12 @@ export class Vault {
     VaultChecks.fn.parse(fn)
     this.#bank.demandEnabled()
     if (this.#bank.isLocked) { throw Throwers.needUnlocked() }
-    // A refused get is thrown only where nothing is known of the box: otherwise the demand judges what this device holds at the last moment.
+    // Storage out of reach is no news of the box: the page already shows the box this device holds, and so may its whisper.
+    // The vault TSQ's get is TanStack's, which rejects: there is no outcome to branch on.
     try {
       await this.#vaultTSQ.getOnce(scope)
     } catch (err) {
-      if (this.#boxAt(scope) === undefined) { throw err }
+      if (! Errors.isVaultError(err, 'storage_unavailable') || (this.#boxAt(scope) === undefined)) { throw err }
     }
     return await fn(await this.unsealBox(this.#demandReadableBox(scope)))
   }

@@ -642,6 +642,34 @@ describe("vault.withUnlockedWhisper(labelpath, fn)", () => {
     expect(fn).not.toHaveBeenCalled()
   })
 
+  it("runs on the box it holds where storage is out of reach, the box's item showing the refusal beside its record", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    const box = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const queryKey = VaultTSQ.itemQueryKeyOf(openaiScopeOf(bank))
+    await bank.device.vaultTsqClient.invalidateQueries({ queryKey })
+    const asked = refuseGets(bank)
+    expect(await vault.withUnlockedWhisper(Openai, ({ whisper }) => String(whisper['apiKey']))).to.equal('sk-test-0000')
+    expect(boxGetsOf(asked)).to.equal(1)
+    expect(bank.device.vaultTsqClient.getQueryState(queryKey)).to.deep.include({ status: 'error', data: box })
+    expect(bank.device.vaultTsqClient.getQueryState(queryKey)?.error).to.include({ refusalkind: 'storage_unavailable' })
+  })
+
+  it("rejects with any other refusal of the get, for a box it holds, never calling fn", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    await bank.device.vaultTsqClient.invalidateQueries({ queryKey: VaultTSQ.itemQueryKeyOf(openaiScopeOf(bank)) })
+    refuseGets(bank, Throwers.storageIssue())
+    const fn = vi.fn()
+    await TH.expectRefusal(vault.withUnlockedWhisper(Openai, fn), 'storage_issue')
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it("rejects with the get's refusal for a box it has seen nothing of", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    refuseGets(bank)
+    await TH.expectRefusal(vault.withUnlockedWhisper(Openai, () => undefined), 'storage_unavailable')
+  })
+
   it("refuses an fn that is not a function, or a labelpath that is not a box's", async () => {
     const { vault } = await TH.buildBornVault()
     await TH.expectRefusal(vault.withUnlockedWhisper(Openai, undefined as never), 'bad_record')
@@ -1040,8 +1068,7 @@ function boxGetsOf(asked: { mock: { calls: [GetAsk][] } }): number {
   return asked.mock.calls.filter(([ask]) => ask.labelpath === Openai).length
 }
 
-/** Make `bank`'s vaultDB refuse every get from now on, `storage_unavailable`, and return the spy that saw them. */
-function refuseGets(bank: Bank) {
-  const refusal = Throwers.storageUnavailable(new Error('connection refused'))
+/** Make `bank`'s vaultDB refuse every get from now on with `refusal`, by default `storage_unavailable`, and return the spy that saw them. */
+function refuseGets(bank: Bank, refusal = Throwers.storageUnavailable(new Error('connection refused'))) {
   return vi.spyOn(bank.device.vaultDB, 'tryGetThing').mockImplementation((ask) => Promise.resolve(refusedAnswerOf(ask, refusal)))
 }
