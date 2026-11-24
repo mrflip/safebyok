@@ -63,7 +63,7 @@ describe("Device.make(record, opts)", () => {
     expect([tryGetThing.mock.calls.length, watch.mock.calls.length]).to.deep.equal([0, 0])
     await device.signin(TH.WorldScope.userid)
     // A get of the root box, then, none being stored, one of the bank, and one watch, which everything listening shares
-    // through the device's SortedVaultDB.
+    // through the device's VaultMinder.
     expect([tryGetThing.mock.calls.length, watch.mock.calls.length]).to.deep.equal([2, 1])
   })
 
@@ -260,7 +260,7 @@ describe("a device's persisters", () => {
     void device.signin(TH.WorldScope.userid)
     await TH.eventually(() => device.bank !== null)
     const scope = { ...TH.WorldScope, labelpath: 'box/openai' }
-    expect(device.world.demandSortedVaultDB().thingAt(scope)?.pickle()).to.deep.equal(box.pickle())
+    expect(device.world.demandVaultMinder().thingAt(scope)?.pickle()).to.deep.equal(box.pickle())
     expect(device.vaultTsqClient.getQueryData(VaultTSQ.itemQueryKeyOf(scope))).to.deep.equal(box.pickle())
   })
 
@@ -307,7 +307,7 @@ describe("a device's persisters", () => {
     const device     = TH.makeDevice({ userid: null }, { vaultDB: vault.bank.device.vaultDB, persisters })
     await device.signin(otherScope.userid)
     await nextTick()
-    expect(device.world.demandSortedVaultDB().thingAt({ ...otherScope, labelpath: 'box/openai' })).to.be.undefined
+    expect(device.world.demandVaultMinder().thingAt({ ...otherScope, labelpath: 'box/openai' })).to.be.undefined
     expect(device.vaultTsqClient.getQueryCache().getAll().map((tsqQuery) => tsqQuery.queryKey[1])).to.not.include(TH.WorldScope.userid)
     for (const persisterOf of [persisters.roots, persisters.boxes]) {
       const savedUserids = (await persisterOf(TH.WorldScope).restoreClient())!.clientState.queries.map((saved) => saved.queryKey[1])
@@ -446,14 +446,14 @@ describe("device.signin(userid)", () => {
     expect(device.getSnapshot().bank).to.equal(bank.getSnapshot())
   })
 
-  it("has its world's SortedVaultDB build asks that carry no banktok until it has a bank, and the bank's after", async () => {
+  it("has its world's VaultMinder build asks that carry no banktok until it has a bank, and the bank's after", async () => {
     const device = TH.makeDevice({ userid: null })
     await device.signin(TH.WorldScope.userid)
-    const sortedVaultDB = device.world.demandSortedVaultDB()
-    expect(sortedVaultDB.makeGetAsk({ labelpath: 'bank' })).to.not.have.property('banktok')
-    expect(sortedVaultDB.makeListAsk({ labelpath: 'box' })).to.not.have.property('banktok')
+    const vaultMinder = device.world.demandVaultMinder()
+    expect(vaultMinder.makeGetAsk({ labelpath: 'bank' })).to.not.have.property('banktok')
+    expect(vaultMinder.makeListAsk({ labelpath: 'box' })).to.not.have.property('banktok')
     const bank = await device.birthGating({ passphraseCleartext: TH.TestPassphrase }).attempt()
-    expect(sortedVaultDB.makeGetAsk({ labelpath: 'bank' })).to.deep.include({ banktok: bank.lifetok })
+    expect(vaultMinder.makeGetAsk({ labelpath: 'bank' })).to.deep.include({ banktok: bank.lifetok })
   })
 
   it("shows the refusal as failed where its bank cannot be read, and never rejects", async () => {
@@ -699,7 +699,7 @@ describe("device.maskedView()", () => {
     const { whisper_sealed } = TH.livePickleOf(box)
     const named = [gateRecord.wayins.main.bank_key_wayin_wrapped, whisper_sealed.key_wrapped, whisper_sealed.ciphered].map(({ ciphertext_b64 }) => ciphertext_b64)
     // Every ciphertext the vault TSQ and the roots' Things hold, the root box's among them, not only those named above.
-    const roots     = ['bank', 'gate', 'box'].map((labelpath) => device.world.demandSortedVaultDB().thingAt({ ...TH.WorldScope, labelpath })?.pickle())
+    const roots     = ['bank', 'gate', 'box'].map((labelpath) => device.world.demandVaultMinder().thingAt({ ...TH.WorldScope, labelpath })?.pickle())
     const keptJsons = [...device.vaultTsqClient.getQueryCache().getAll().map(({ state }) => state.data), ...roots].map((val) => JSON.stringify(val ?? null))
     const ciphertexts = new Set(keptJsons.flatMap((json) => [...json.matchAll(/"ciphertext_b64":"([^"]+)"/g)].map(([, ciphertext]) => ciphertext!)))
     expect([...ciphertexts]).to.include.members(named)

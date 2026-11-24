@@ -17,8 +17,8 @@ import { type BankStamp, type LeaseLoggable, StampChecks } from '../shapes/shape
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type Thingkind, Shell } from '../shapes/shapes-thing'
 import { type SeenThing, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { type EpochMillis, Labelpath } from '../shapes/primitives'
-import type { SortedVaultDB } from '../storage/sorted-vault-db'
-import { isSortedVaultDB } from '../shapes/shapes-sorted-vault-db'
+import type { VaultMinder } from '../minding/vault-minder'
+import { isVaultMinder } from '../shapes/shapes-vault-minder'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
@@ -27,15 +27,15 @@ export type WorldThing = Bank | Gate | Box
 
 /** The signed-in user's bank as this device locks, unlocks and ends it: its lease, the wait for an unlock, its end, and its snapshot.
  * Made with its device, it lives as long. Its gates build leases and hand them to it, and boxes are sealed and unsealed under the lease it holds, which no member hands out.
- * Its snapshot's stage is read from the bank, the main gate and the root box its SortedVaultDB keeps, and from the lease.
+ * Its snapshot's stage is read from the bank, the main gate and the root box its VaultMinder keeps, and from the lease.
  */
 export class World {
-  // == [Props]: #device, #sortedVaultDB, #lease, #unlockWait, #endCause, #lastErr, #vaults, #snapshot, #subscribers, #getSnapshot, #subscribe
+  // == [Props]: #device, #vaultMinder, #lease, #unlockWait, #endCause, #lastErr, #vaults, #snapshot, #subscribers, #getSnapshot, #subscribe
 
   readonly #device: Device
 
   /** The signed-in user's bank's records, sorted, from `signin`; null until then. */
-  #sortedVaultDB: SortedVaultDB | null = null
+  #vaultMinder: VaultMinder | null = null
 
   /** The attached lease, null while locked. */
   #lease: Lease | null = null
@@ -62,24 +62,24 @@ export class World {
   }
   // --
 
-  // == [Getters]: sortedVaultDB, bank, gate, rootBox, bankStamp, leaseEndsAt, leaseLoggable, getSnapshot, subscribe
+  // == [Getters]: vaultMinder, bank, gate, rootBox, bankStamp, leaseEndsAt, leaseLoggable, getSnapshot, subscribe
 
   /** The signed-in user's bank's records, sorted, as handed to {@link signin}, or null until then. */
-  get sortedVaultDB(): SortedVaultDB | null { return this.#sortedVaultDB }
+  get vaultMinder(): VaultMinder | null { return this.#vaultMinder }
 
-  /** The bank's Thing in the {@link sortedVaultDB}, of whatever life, or null where no record of it has been heard of. */
+  /** The bank's Thing in the {@link vaultMinder}, of whatever life, or null where no record of it has been heard of. */
   get bank(): Bank | null {
     const thing = this.#thingAt('bank')
     return (thing instanceof Bank) ? thing : null
   }
 
-  /** The main gate's Thing in the {@link sortedVaultDB}, of whatever life, or null where no record of it has been heard of. */
+  /** The main gate's Thing in the {@link vaultMinder}, of whatever life, or null where no record of it has been heard of. */
   get gate(): Gate | null {
     const thing = this.#thingAt(Labelpath.MainGate)
     return (thing instanceof Gate) ? thing : null
   }
 
-  /** The root box's Thing in the {@link sortedVaultDB}, of whatever life, or null where no record of it has been heard of. */
+  /** The root box's Thing in the {@link vaultMinder}, of whatever life, or null where no record of it has been heard of. */
   get rootBox(): Box | null {
     const thing = this.#thingAt(Labelpath.RootBox)
     return (thing instanceof Box) ? thing : null
@@ -141,13 +141,13 @@ export class World {
 
   // == [Signing in]: signin, showSigninRefusal, birthGating, birthFriend
 
-  /** Take `sortedVaultDB`, the signed-in user's bank's records, sorted, and listen to it for as long as the world lives. A second call does nothing. */
-  signin(sortedVaultDB: SortedVaultDB): void {
-    Checks.sortedVaultDB.parse(sortedVaultDB)
-    if (this.#sortedVaultDB !== null) { return }
-    this.#sortedVaultDB = sortedVaultDB
+  /** Take `vaultMinder`, the signed-in user's bank's records, sorted, and listen to it for as long as the world lives. A second call does nothing. */
+  signin(vaultMinder: VaultMinder): void {
+    Checks.vaultMinder.parse(vaultMinder)
+    if (this.#vaultMinder !== null) { return }
+    this.#vaultMinder = vaultMinder
     // The vault TSQ, listening beside it, tells the device of a record refused.
-    sortedVaultDB.listen({ hear: (event) => { this.#hear(event) }, onBadNews: noop })
+    vaultMinder.listen({ hear: (event) => { this.#hear(event) }, onBadNews: noop })
     this.align()
   }
 
@@ -300,7 +300,7 @@ export class World {
   }
   // --
 
-  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, areRootsLive, demandEnabled, demandRootsLive, demandSortedVaultDB, demandLease, thingAt
+  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, areRootsLive, demandEnabled, demandRootsLive, demandVaultMinder, demandLease, thingAt
 
   /** True until this world is swept or its device ends. */
   get isEnabled(): boolean { return this.endCause === null }
@@ -336,10 +336,10 @@ export class World {
     return bank
   }
 
-  /** The {@link sortedVaultDB}, refusing until {@link signin}. */
-  demandSortedVaultDB(): SortedVaultDB {
-    if (this.#sortedVaultDB === null) { throw Throwers.nobodySignedIn() }
-    return this.#sortedVaultDB
+  /** The {@link vaultMinder}, refusing until {@link signin}. */
+  demandVaultMinder(): VaultMinder {
+    if (this.#vaultMinder === null) { throw Throwers.nobodySignedIn() }
+    return this.#vaultMinder
   }
 
   /** The attached lease. Demands that the world is enabled and unlocked. */
@@ -349,8 +349,8 @@ export class World {
     return this.#lease
   }
 
-  /** The Thing at `labelpath` in the signed-in user's bank's SortedVaultDB, or undefined for none */
-  #thingAt(labelpath: Labelpath): unknown { return this.#sortedVaultDB?.thingAt({ ...this.#device.scope, labelpath }) }
+  /** The Thing at `labelpath` in the signed-in user's bank's VaultMinder, or undefined for none */
+  #thingAt(labelpath: Labelpath): unknown { return this.#vaultMinder?.thingAt({ ...this.#device.scope, labelpath }) }
   // --
 
   // == [Snapshot]: hear, align, stageOf, makeSnapshot
@@ -483,7 +483,7 @@ function makeWait(): Wait {
 /** The checks of {@link World.make}'s arguments, {@link World.signin}'s, {@link World.sweep}'s and {@link World.hostVault}'s. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
   worldOpts:     obj({ device: custom<Device>() }),
-  sortedVaultDB: custom<SortedVaultDB>(isSortedVaultDB, Phrases.SortedVaultDBExpected),
+  vaultMinder: custom<VaultMinder>(isVaultMinder, Phrases.VaultMinderExpected),
   endCause:      custom<Errors.VaultError>(Errors.isVaultError, BigPhrases.VaultErrorExpected).nullable(),
   hostedVault:   custom<HostedVault>((val) => typeof (val as Partial<HostedVault> | null)?.sweep === 'function', Phrases.HostedVaultExpected),
 }))

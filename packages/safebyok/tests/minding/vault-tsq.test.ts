@@ -28,7 +28,7 @@ const BoxShell = Shell.of(TH.BoxScope, TH.rootBoxOf())
 /** A mutationFn, which resolves `'done'`. */
 function putDone(): Promise<string> { return Promise.resolve('done') }
 
-/** A world whose box at `TH.BoxScope` was put at {@link Box0} through its SortedVaultDB. */
+/** A world whose box at `TH.BoxScope` was put at {@link Box0} through its VaultMinder. */
 async function worldWithBox(): Promise<TSQWorld<MemoryVaultDB>> {
   const world = await tsqWorldOf(new MemoryVaultDB())
   await world.sorted.putOnce({ record: Box0, cited: Shell.childCited(TH.Life0) })
@@ -56,10 +56,10 @@ describe("VaultTSQ.make", () => {
     expect(queryClient.defaultQueryOptions({ queryKey: BoxKey, retry: 2, networkMode: 'online' })).to.include({ retry: 2, networkMode: 'online' })
   })
 
-  it("refuses a QueryClient or a SortedVaultDB that is not one", async () => {
+  it("refuses a QueryClient or a VaultMinder that is not one", async () => {
     const { sorted, queryClient } = await tsqWorldOf(new MemoryVaultDB())
     expect(() => VaultTSQ.make({ vaultMinder: sorted, queryClient: {} as never, scope: TH.ThingBank })).to.throw('Expected a TanStack Query QueryClient')
-    expect(() => VaultTSQ.make({ vaultMinder: {} as never, queryClient, scope: TH.ThingBank })).to.throw('Expected a SortedVaultDB')
+    expect(() => VaultTSQ.make({ vaultMinder: {} as never, queryClient, scope: TH.ThingBank })).to.throw('Expected a VaultMinder')
   })
 })
 
@@ -84,7 +84,7 @@ describe("an item's structural sharing", () => {
   })
 })
 
-describe("VaultTSQ's writer, on each event the SortedVaultDB tells", () => {
+describe("VaultTSQ's writer, on each event the VaultMinder tells", () => {
   it("sets a whole live record as the item, the Thing's own object, at the time it was read", async () => {
     const world   = await worldWithBox()
     const read_tc = readTcNow()

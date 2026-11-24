@@ -8,6 +8,10 @@
 export * from './core'
 export * from './storage'
 /* eslint-enable import-x/export */
+export { VaultMinder } from './minding/vault-minder'
+export {
+  type DelOnceArgs, type PutOnceArgs, type ReceivingThing, type ThingMaker, type VaultMinderListener, type VaultMinderOpts, VaultMinderChecks, isVaultMinder,
+} from './shapes/shapes-vault-minder'
 export { VaultTSQ } from './minding/vault-tsq'
 export {
   type GetOnceOpts, type ItemQueryOptions, type TsqStaleTime, type VaultMutationOptions, type VaultTSQOpts, MaxTimerHours, MaxTimerMillis, VaultTSQChecks, isQueryClient,

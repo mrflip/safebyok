@@ -1,4 +1,4 @@
-/** `VaultEvent`, the notice a vaultDB's watcher gets and the event a `SortedVaultDB`'s listener hears, `Agerank`, which orders the records seen of a Thing, and the checks of what a Thing is begun from or receives. */
+/** `VaultEvent`, the notice a vaultDB's watcher gets and the event a `VaultMinder`'s listener hears, `Agerank`, which orders the records seen of a Thing, and the checks of what a Thing is begun from or receives. */
 
 import { Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
@@ -78,9 +78,9 @@ export type VaultEventOf<EventkindT extends VaultEventkind> = Readonly<{
   agerank:    Agerank | undefined
   /** The Thing's agerank before this event's record, or undefined for none. */
   agerankWas: Agerank | undefined
-  /** The lifetok of the bank's life, where the event's source knew it: from a `SortedVaultDB`, the answer's `banktok`, or the one the notice or the event rung carried, else the bank's as last read. Undefined in a vaultDB's raw watch where the datastore did not hand over the bank. */
+  /** The lifetok of the bank's life, where the event's source knew it: from a `VaultMinder`, the answer's `banktok`, or the one the notice or the event rung carried, else the bank's as last read. Undefined in a vaultDB's raw watch where the datastore did not hand over the bank. */
   banktok:    Lifetok | undefined
-  /** Who dispatched this event's record: a `SortedVaultDB` names the vaultDB it wraps, or the device database that rang what its `receive` was handed. Undefined in a vaultDB's raw watch. */
+  /** Who dispatched this event's record: a `VaultMinder` names the vaultDB it wraps, or the device database that rang what its `receive` was handed. Undefined in a vaultDB's raw watch. */
   sourcelabel: string | undefined
   /** When this event's record was read, shared by every event of one dispatch. Undefined only where a vaultDB's watch does not say. */
   read_tc:    ReadTc | undefined

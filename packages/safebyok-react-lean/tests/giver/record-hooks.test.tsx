@@ -1,8 +1,8 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { noop } from 'es-toolkit'
 import { type ReactNode, useEffect, useLayoutEffect } from 'react'
-import { type BoxRecord, type GateRecord, type PasskeyWayinHeader, type PersistedClient, type Persister, MemoryPersister, VaultTSQ } from 'safebyok'
-import { Classifier, SortedVaultDB, storageUnavailable } from 'safebyok/storage'
+import { type BoxRecord, type GateRecord, type PasskeyWayinHeader, type PersistedClient, type Persister, MemoryPersister, VaultMinder, VaultTSQ } from 'safebyok'
+import { Classifier, storageUnavailable } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { type BoxSelected, passkeyHeaderOf } from '../../src/index'
@@ -323,9 +323,9 @@ describe("useGate over the world's gate Thing", () => {
     }
     const { container } = render(TH.providerTreeOf(world, <GateProbe />, { userid: TH.ProviderUser }))
     await waitFor(() => { expect(header).to.be.null })
-    // The SortedVaultDB freezes, so the spy goes on its class, counting the giver's device's calls alone.
-    const { sortedVaultDB } = world._cheat_device().world
-    const get = vi.spyOn(SortedVaultDB.prototype, 'tryGetThing')
+    // The VaultMinder freezes, so the spy goes on its class, counting the giver's device's calls alone.
+    const { vaultMinder } = world._cheat_device().world
+    const get = vi.spyOn(VaultMinder.prototype, 'tryGetThing')
     onTestFinished(() => { get.mockRestore() })
     const other = LeanTH.makeDevice({}, { vaultDB: world.vaultDB })
     await act(async () => {
@@ -333,7 +333,7 @@ describe("useGate over the world's gate Thing", () => {
       await other.bank!.gate.addPasskey({ passphraseCleartext: LeanTH.TestPassphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })
     })
     await waitFor(() => { expect(header?.wayinkind).to.eq('passkey') })
-    expect(get.mock.contexts.filter((context) => context === sortedVaultDB)).to.have.lengthOf(0)
+    expect(get.mock.contexts.filter((context) => context === vaultMinder)).to.have.lengthOf(0)
     // The gate's Thing has the whole gate, by design; the giver's client and the page have none of it.
     const stored = world.vaultDB._cheat_things(LeanTH.WorldScope).get('gate') as GateRecord
     TH.expectTextUnheld(stored.wayins.passkey0!.bank_key_wayin_wrapped.ciphertext_b64, container, world.client)

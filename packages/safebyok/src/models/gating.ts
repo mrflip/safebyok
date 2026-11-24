@@ -152,14 +152,14 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
   const bankRecord = Bank.makeRecord(bankStamp)
   const rootShell  = BoxChecks.liveOrShell.parse(Shell.of({ ...device.scope, labelpath: Labelpath.RootBox }))
   // The root box is sealed under the lease the birth builds, against the stamps it minted. The lease reaches the
-  // device's world, unlocking it, only once the bank the world's SortedVaultDB keeps is this one. Where the birth refuses,
+  // device's world, unlocking it, only once the bank the world's VaultMinder keeps is this one. Where the birth refuses,
   // or the vaultDB's answer is broken, the lease is evicted, and the world holds no lease of it.
   const gateRecord = Gate.makeRecord({ ...gateStamp, wayins: { main, passkey0 } })
   const lease = await friend.leaseByProving(passphraseProving, bankStamp, gateRecord)
   try {
     const root   = await lease.seal(BaseBox, rootShell, { sidecar: {} }, { whisper: {} })
     // The roots it answers, written or found stored, are then the Things of the device's world, which shows them locked.
-    const answer = await device.world.demandSortedVaultDB().tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gateRecord, root, banktok: bankRecord.lifetok })
+    const answer = await device.world.demandVaultMinder().tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gateRecord, root, banktok: bankRecord.lifetok })
     if (! answer.ok) { throw answer.err }
     // The user must hear that their passphrase was not set: the bank stored is another's.
     if (answer.val.bank.revtok !== bankRecord.revtok) { throw Throwers.gateMadeElsewhere() }

@@ -24,7 +24,7 @@ export type VaultDBRowCheats = {
   remove: (scope: ThingScope) => Helpers.Awaitable<void>
 }
 
-/** What the battery runs over: a vaultDB, or a `SortedVaultDB`, which answers the four verbs and has no watch. */
+/** What the battery runs over: a vaultDB, or a `VaultMinder`, which answers the four verbs and has no watch. */
 export type BatteryVaultDB = Omit<VaultDB, 'watch'>
 
 /** The options of {@link describeVaultDBBattery}: how to make a vaultDB, and the cheat into what it stores. */
@@ -33,7 +33,7 @@ export type VaultDBBatteryOpts<DBT extends BatteryVaultDB = VaultDB> = {
   makeVaultDB:   () => Helpers.Awaitable<DBT>
   /** The cheat into a vaultDB's stored Things. */
   _cheat_rowsOf: (vaultDB: DBT) => VaultDBRowCheats
-  /** False to leave out the cases of a raw vaultDB's watch: for a vaultDB whose watch notifies nothing, or one with no watch (a `SortedVaultDB`). */
+  /** False to leave out the cases of a raw vaultDB's watch: for a vaultDB whose watch notifies nothing, or one with no watch (a `VaultMinder`). */
   watches?:      boolean
 }
 // --

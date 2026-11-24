@@ -20,7 +20,7 @@ function strengthChecker(passphrase: string) { return (passphrase === 'weak' ? {
 
 /** The main gate stored for `bank`, as its vaultDB answers it. */
 async function storedGateOf(bank: Bank): Promise<GateRecord> {
-  const answer = await bank.device.vaultDB.tryGetThing(bank.device.world.demandSortedVaultDB().makeGetAsk({ labelpath: 'gate' }))
+  const answer = await bank.device.vaultDB.tryGetThing(bank.device.world.demandVaultMinder().makeGetAsk({ labelpath: 'gate' }))
   if (! answer.ok) { throw answer.err }
   return answer.val as GateRecord
 }

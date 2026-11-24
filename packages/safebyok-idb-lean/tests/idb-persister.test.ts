@@ -108,7 +108,7 @@ describe("a device restored through IdbPersisters", () => {
     await settle()
     const device = TH.makeDevice({}, { vaultDB: vault.bank.device.vaultDB, persisters: persistersOf() })
     await device.signin(TH.WorldScope.userid)
-    expect(device.world.demandSortedVaultDB().thingAt({ ...TH.WorldScope, labelpath: 'box/openai' })?.pickle()).to.deep.equal(box.pickle())
+    expect(device.world.demandVaultMinder().thingAt({ ...TH.WorldScope, labelpath: 'box/openai' })?.pickle()).to.deep.equal(box.pickle())
     const stored = await new IdbPersister({ recordlabel: `boxes:${TH.WorldScope.userid}:${TH.WorldScope.banklabel}`, dbName }).restoreClient()
     expect(stored?.clientState.queries).to.not.be.empty
   })

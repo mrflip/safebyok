@@ -35,7 +35,7 @@ function rowsOf(bank: Bank): Map<string, unknown> { return (bank.device.vaultDB 
 
 /** The Thing `vault`'s device's world holds at {@link Openai}, or undefined for none. */
 function boxAt(vault: Vault): Box | undefined {
-  const thing = vault.bank.device.world.demandSortedVaultDB().thingAt(openaiScopeOf(vault.bank))
+  const thing = vault.bank.device.world.demandVaultMinder().thingAt(openaiScopeOf(vault.bank))
   return (thing instanceof Box) ? thing : undefined
 }
 
@@ -113,10 +113,10 @@ describe("bank.sweep() and device.sweep(), over the vaults made on the bank", ()
       const stored = await vault.sealBox(TH.livePickleOf(box), {}, { whisper: TH.Whisper })
       sweepOf(born)
       rowsOf(bank).set(Openai, stored)
-      await bank.device.world.demandSortedVaultDB().tryGetOnce(openaiScopeOf(bank))
+      await bank.device.world.demandVaultMinder().tryGetOnce(openaiScopeOf(bank))
       expect(boxAt(vault)).to.include({ revtok: stored.revtok })
       expect(itemAt(vault)).to.equal(first)
-      // The device's SortedVaultDB has the one watch, which only the device's sweep stops.
+      // The device's VaultMinder has the one watch, which only the device's sweep stops.
       expect(unwatched.calls).to.have.lengthOf(unwatchCount)
     })
   }

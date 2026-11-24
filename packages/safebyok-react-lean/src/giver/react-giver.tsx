@@ -418,7 +418,7 @@ function makeBankGiver(friend: BankFriend) {
   }
 
   // The gate is read from the world's gate Thing at each render, and React keeps only the gate shown: the whole gate, with
-  // the bankKeys its wayins wrap, stays in the Thing. The SortedVaultDB tells of every record of the gate that is news,
+  // the bankKeys its wayins wrap, stays in the Thing. The VaultMinder tells of every record of the gate that is news,
   // which the Thing's own subscribers do not hear of; the snapshot is the same object until the gate's record changes.
   /** The bank's main gate: its wayins' headers, never the bankKey they wrap. Synchronous: it never waits and never suspends.
    * `data` is the gate, null when no bank is stored, and undefined until the device's sign-in answers.
@@ -728,11 +728,11 @@ function isFetchStage(bank: BankSnapshot): boolean {
   return (bank.stage === 'unborn') || (bank.stage === 'locked') || (bank.stage === 'unlocked')
 }
 
-/** Call `onChange` on each event of `device`'s main gate its SortedVaultDB tells, until the function returned is called. */
+/** Call `onChange` on each event of `device`'s main gate its VaultMinder tells, until the function returned is called. */
 function listenToGate(device: Device, onChange: () => void): () => void {
-  const { sortedVaultDB } = device.world
-  if (sortedVaultDB === null) { return unsubscribeFromNothing }
-  return sortedVaultDB.listen({
+  const { vaultMinder } = device.world
+  if (vaultMinder === null) { return unsubscribeFromNothing }
+  return vaultMinder.listen({
     hear:      (event) => { if (event.labelpath === Labelpath.MainGate) { onChange() } },
     onBadNews: (news) => { device.tellBadNews([news]) },
   })

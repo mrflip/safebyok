@@ -80,7 +80,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
   /** Make the gate of `record`, on `opts.device`, handing its leases to the world through `friend`. Locked, and nothing is fetched or stored.
    * `record` is a whole gate record or the gate's shell.
-   * Internal: the device's world makes the gate its SortedVaultDB keeps.
+   * Internal: the device's world makes the gate its VaultMinder keeps.
    */
   static make(record: GateRecord | Sealers.ShellOf<GateRecord>, opts: GateOpts, friend: WorldGateFriend): Gate {
     const { opts: { device }, friend: worldFriend } = Checks.gateMakeArgs.parse({ record, opts, friend })
@@ -239,7 +239,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   /** Write `ask.record`, this gate's next revision, over `ask.cited`, and tell this gate's subscribers. Resolves this gate, which then models the revision written. */
   async #putGate(ask: PutAskDraft<GateRecord>): Promise<this> {
     this.demandEnabled()
-    await this.#world.demandSortedVaultDB().putOnce(ask)
+    await this.#world.demandVaultMinder().putOnce(ask)
     this.#tell()
     return this
   }

@@ -5,18 +5,18 @@ import { Thing } from '../../src/models/thing'
 import { type ThingRecord, Shell } from '../../src/shapes/shapes-thing'
 import type { ReadTc, SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { SortedVaultDB } from '../../src/storage/sorted-vault-db'
+import { VaultMinder } from '../../src/minding/vault-minder'
 import { readTcNow } from '../../src/storage/thing-classifier'
 import type { VaultDB } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
-/** The store in memory each SortedVaultDB the battery makes stands over. */
-const InnerOf = new WeakMap<SortedVaultDB, MemoryVaultDB>()
+/** The store in memory each VaultMinder the battery makes stands over. */
+const InnerOf = new WeakMap<VaultMinder, MemoryVaultDB>()
 
-TH.describeVaultDBBattery('SortedVaultDB over a MemoryVaultDB', {
+TH.describeVaultDBBattery('VaultMinder over a MemoryVaultDB', {
   makeVaultDB: () => {
     const inner = new MemoryVaultDB()
-    const vaultDB = SortedVaultDB.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing })
     InnerOf.set(vaultDB, inner)
     return vaultDB
   },
@@ -44,17 +44,17 @@ function stubVaultDBOf(stop: () => void) {
   } satisfies VaultDB
 }
 
-/** A SortedVaultDB over a MemoryVaultDB, and that MemoryVaultDB, to write beside it. */
-function sortedOverMemory(): { vaultDB: SortedVaultDB<TH.PlainThing>, inner: MemoryVaultDB } {
+/** A VaultMinder over a MemoryVaultDB, and that MemoryVaultDB, to write beside it. */
+function sortedOverMemory(): { vaultDB: VaultMinder<TH.PlainThing>, inner: MemoryVaultDB } {
   const inner = new MemoryVaultDB()
-  return { vaultDB: SortedVaultDB.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing }), inner }
+  return { vaultDB: VaultMinder.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing }), inner }
 }
 
-/** A SortedVaultDB over a MemoryVaultDB whose own watch notifies nothing, so that every event it tells is of an answer's records. */
-function sortedOverQuietMemory(): { vaultDB: SortedVaultDB<TH.PlainThing>, inner: MemoryVaultDB } {
+/** A VaultMinder over a MemoryVaultDB whose own watch notifies nothing, so that every event it tells is of an answer's records. */
+function sortedOverQuietMemory(): { vaultDB: VaultMinder<TH.PlainThing>, inner: MemoryVaultDB } {
   const inner = new MemoryVaultDB()
   vi.spyOn(inner, 'watch').mockReturnValue(noop)
-  return { vaultDB: SortedVaultDB.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing }), inner }
+  return { vaultDB: VaultMinder.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing }), inner }
 }
 
 /** The item event a device database might ring for `record`, from `'other_tab'` at `read_tc`. */
@@ -66,7 +66,7 @@ function rungOf(record: SeenThing, read_tc: ReadTc = readTcNow()): VaultItemEven
 function cheatStored(inner: MemoryVaultDB, record: ThingRecord): void { inner._cheat_things(record).set(record.labelpath, structuredClone(record)) }
 
 /** A listener to `vaultDB`: the events it hears, the bad news it is told, and the end of its listen. */
-function heardOf(vaultDB: SortedVaultDB): { events: VaultEvent[], badNews: Errors.VaultError[], end: () => void } {
+function heardOf(vaultDB: VaultMinder): { events: VaultEvent[], badNews: Errors.VaultError[], end: () => void } {
   const events: VaultEvent[] = []
   const badNews: Errors.VaultError[] = []
   const end = vaultDB.listen({ hear: (event) => { events.push(event) }, onBadNews: (news) => { badNews.push(news) } })
@@ -87,10 +87,10 @@ function firstSeen(labelpath: string): string[][] { return [['item', labelpath, 
 /** The shorthands of a Thing seen first, sparse and live. */
 function firstSeenSparse(labelpath: string): string[][] { return [['item', labelpath, 'soon'], ['life', labelpath, 'born'], ['aged', labelpath, 'bare']] }
 
-describe("SortedVaultDB, what only a wrapper can show", () => {
+describe("VaultMinder, what only a wrapper can show", () => {
   it("hands each verb's ask to the vaultDB it wraps, and answers that vaultDB's own answer", async () => {
     const inner = stubVaultDBOf(() => undefined)
-    const vaultDB = SortedVaultDB.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing })
     const asks = { get: TH.getGateAskOf(), write: TH.birthAskOf(), list: TH.listAskAt('box'), birth: TH.birthBankAskOf() }
     expect(await vaultDB.tryGetThing(asks.get)).to.equal(await inner.tryGetThing.mock.results[0]!.value)
     expect(await vaultDB.tryWriteThing(asks.write)).to.equal(await inner.tryWriteThing.mock.results[0]!.value)
@@ -105,7 +105,7 @@ describe("SortedVaultDB, what only a wrapper can show", () => {
   it("watches its bank in the vaultDB it wraps once, from when it is made, whoever listens to it, asking nothing", () => {
     const stop = vi.fn()
     const inner = stubVaultDBOf(stop)
-    const vaultDB = SortedVaultDB.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing })
     expect(inner.watch.mock.calls.map(([scope]) => scope)).to.deep.equal([TH.ThingBank])
     const ends = [heardOf(vaultDB).end, heardOf(vaultDB).end]
     for (const end of ends) { end() }
@@ -127,7 +127,7 @@ describe("SortedVaultDB, what only a wrapper can show", () => {
 
   it("calls the wrapped watch's stop once, however often swept", () => {
     const stop = vi.fn()
-    const vaultDB = SortedVaultDB.make(TH.ThingBank, { vaultDB: stubVaultDBOf(stop), makeThing: TH.makePlainThing })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: stubVaultDBOf(stop), makeThing: TH.makePlainThing })
     vaultDB.sweep()
     vaultDB.sweep()
     expect(stop).toHaveBeenCalledTimes(1)
@@ -145,7 +145,7 @@ describe("SortedVaultDB, what only a wrapper can show", () => {
 
   for (const [scope, opts, blurb] of BadArgs) {
     it(`refuses ${blurb}`, () => {
-      TH.expectSyncRefusal(() => SortedVaultDB.make(scope as never, opts as never), 'bad_record')
+      TH.expectSyncRefusal(() => VaultMinder.make(scope as never, opts as never), 'bad_record')
     })
   }
 
@@ -164,7 +164,7 @@ describe("SortedVaultDB, what only a wrapper can show", () => {
   }
 })
 
-describe("SortedVaultDB's listeners, of what an answer carries", () => {
+describe("VaultMinder's listeners, of what an answer carries", () => {
   it("tells of of a refused write's bank, main gate and root box, out to in, before the write answers, and of its dbhas seen once", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await inner.tryBirthBank(TH.birthBankAskOf())
@@ -316,7 +316,7 @@ describe("SortedVaultDB's listeners, of what an answer carries", () => {
   it("tells every listener's onBadNews of a record of an answer it refuses, and answers unchanged", async () => {
     const theirs = { ok: true, act: 'born', ask: TH.ThingBank, world: null, read_tc: readTcNow(), val: TH.gateThingOf({ lifepath: 'not a lifepath' }) }
     const inner  = { ...stubVaultDBOf(noop), tryWriteThing: vi.fn<VaultDB['tryWriteThing']>(() => Promise.resolve(theirs as never)) }
-    const vaultDB = SortedVaultDB.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing })
     const listeners = [heardOf(vaultDB), heardOf(vaultDB)]
     expect(await vaultDB.tryWriteThing(TH.birthAskOf())).to.equal(theirs)
     for (const { events, badNews } of listeners) {
@@ -326,7 +326,7 @@ describe("SortedVaultDB's listeners, of what an answer carries", () => {
   })
 })
 
-describe("SortedVaultDB's listeners, where each event came from and when it was read", () => {
+describe("VaultMinder's listeners, where each event came from and when it was read", () => {
   it("stamps every event of an answer with the wrapped vaultDB as its source and the answer's own read_tc", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await inner.tryBirthBank(TH.birthBankAskOf())
@@ -334,8 +334,8 @@ describe("SortedVaultDB's listeners, where each event came from and when it was 
     const track = { bank: TH.BankStaleTrack.bank, gate: TH.GateStaleTrack.gate, box: TH.RootStaleTrack.box }
     const answer = await vaultDB.tryGetThing({ ...TH.getGateAskOf(), track })
     expect(events).to.have.lengthOf(6)
-    for (const event of events) { expect(event).to.deep.include({ sourcelabel: SortedVaultDB.VaultDBSourcelabel, read_tc: answer.read_tc, banktok: TH.bankThingOf().lifetok }) }
-    expect(SortedVaultDB.VaultDBSourcelabel).to.eq('vault_db')
+    for (const event of events) { expect(event).to.deep.include({ sourcelabel: VaultMinder.VaultDBSourcelabel, read_tc: answer.read_tc, banktok: TH.bankThingOf().lifetok }) }
+    expect(VaultMinder.VaultDBSourcelabel).to.eq('vault_db')
   })
 
   it("stamps an answer's events with its own banktok, never its ask's, and a received event's with its own, else the newest world's", async () => {
@@ -369,7 +369,7 @@ describe("SortedVaultDB's listeners, where each event came from and when it was 
   })
 })
 
-describe("SortedVaultDB.receive(event)", () => {
+describe("VaultMinder.receive(event)", () => {
   it("tells of the record of an item event received, sorted with an answer's, at the event's own sourcelabel and read_tc", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await inner.tryBirthBank(TH.birthBankAskOf())
@@ -438,7 +438,7 @@ describe("SortedVaultDB.receive(event)", () => {
   }
 })
 
-describe("SortedVaultDB.thingAt(scoped)", () => {
+describe("VaultMinder.thingAt(scoped)", () => {
   it("answers the one Thing it keeps at a labelpath, the same object across records and lives", async () => {
     const { vaultDB } = sortedOverQuietMemory()
     await vaultDB.tryBirthBank(TH.birthBankAskOf())
@@ -455,7 +455,7 @@ describe("SortedVaultDB.thingAt(scoped)", () => {
 
   it("answers undefined for a labelpath it has learned of no record at, or only a record its Thing refused", () => {
     const inner = stubVaultDBOf(noop)
-    const vaultDB = SortedVaultDB.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing })
     const { badNews } = heardOf(vaultDB)
     expect(vaultDB.thingAt(TH.BoxScope)).to.eq(undefined)
     const [, onNotice] = inner.watch.mock.calls[0]!
@@ -466,7 +466,7 @@ describe("SortedVaultDB.thingAt(scoped)", () => {
 
   it("makes each Thing once, with the first record it learns of at that labelpath", () => {
     const makeThing = vi.fn(TH.makePlainThing)
-    const vaultDB = SortedVaultDB.make(TH.ThingBank, { vaultDB: new MemoryVaultDB(), makeThing })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: new MemoryVaultDB(), makeThing })
     heardOf(vaultDB)
     const soon = Thing.sparseOf(TH.boxThingOf('openai', { revseq: 2 }))
     vaultDB.receive(rungOf(soon))
@@ -484,7 +484,7 @@ describe("SortedVaultDB.thingAt(scoped)", () => {
   })
 })
 
-describe("SortedVaultDB.listen(listener)", () => {
+describe("VaultMinder.listen(listener)", () => {
   it("tells every listener every event, in one order, each the same frozen event", async () => {
     const { vaultDB } = sortedOverMemory()
     const listeners = [heardOf(vaultDB), heardOf(vaultDB)]
@@ -531,7 +531,7 @@ describe("SortedVaultDB.listen(listener)", () => {
   })
 })
 
-describe("SortedVaultDB's asks: makeGetAsk, makeListAsk, makePutAsk and makeDelAsk", () => {
+describe("VaultMinder's asks: makeGetAsk, makeListAsk, makePutAsk and makeDelAsk", () => {
   it("fill in the bank's scope, the modelkind and the default flags, and carry no banktok and no track before the bank is heard of", () => {
     const { vaultDB } = sortedOverMemory()
     expect(vaultDB.makeGetAsk({ labelpath: 'box/openai' })).to.deep.equal({ ...TH.ThingBank, labelpath: 'box/openai', op: 'get', modelkind: 'box', ifAbsent: 'nil' })
@@ -605,7 +605,7 @@ describe("SortedVaultDB's asks: makeGetAsk, makeListAsk, makePutAsk and makeDelA
   })
 })
 
-describe("SortedVaultDB.tryGetOnce(scoped) and getOnce(scoped)", () => {
+describe("VaultMinder.tryGetOnce(scoped) and getOnce(scoped)", () => {
   it("resolve the record the Thing at the scope holds, its events told before it resolves, with the bank's own get ask", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
@@ -666,7 +666,7 @@ describe("SortedVaultDB.tryGetOnce(scoped) and getOnce(scoped)", () => {
   })
 })
 
-describe("SortedVaultDB.tryListOnce(labelpath) and listOnce(labelpath)", () => {
+describe("VaultMinder.tryListOnce(labelpath) and listOnce(labelpath)", () => {
   it("resolve the listing once the parent and each child are told, with the bank's own list ask", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
@@ -704,7 +704,7 @@ describe("SortedVaultDB.tryListOnce(labelpath) and listOnce(labelpath)", () => {
   })
 })
 
-describe("SortedVaultDB's writes: tryPutOnce, putOnce, tryDelOnce and delOnce", () => {
+describe("VaultMinder's writes: tryPutOnce, putOnce, tryDelOnce and delOnce", () => {
   it("put over the citable of the Thing at the record's labelpath, resolving the record stored, which the Thing holds", async () => {
     const { vaultDB } = sortedOverQuietMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))

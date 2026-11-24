@@ -531,7 +531,7 @@ const ReadTcChunk0 = readTcOf(0)
 /** The tcchunk an agerank spells for a read_tc in `chunk` */
 function tcchunkOf(chunk: Chunk): string { return chunk.toString(16).padStart(8, '0') }
 
-/** The item event of `record` read at `read_tc`, as a SortedVaultDB builds it, with no source or bank lifetok */
+/** The item event of `record` read at `read_tc`, as a VaultMinder builds it, with no source or bank lifetok */
 function eventOf(record: SeenThing, read_tc: ReadTc = ReadTcChunk0): VaultItemEvent {
   return { ...TH.itemEventOf(record), read_tc }
 }

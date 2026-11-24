@@ -101,7 +101,7 @@ export interface ProviderWorld {
   client:  QueryClient
   /** The host's QueryClient, and the one each device the giver made caches in: every client a secret could reach. */
   clients(): readonly QueryClient[]
-  /** How many watches have been opened on {@link vaultDB} since the world was built, one for each device started over it, which its SortedVaultDB opens, and how many gets it has been asked. */
+  /** How many watches have been opened on {@link vaultDB} since the world was built, one for each device started over it, which its VaultMinder opens, and how many gets it has been asked. */
   counts:  { watches: number, gets: number }
   /** Pause every get {@link vaultDB} is asked from now on before it reads, until the function returned is called. */
   pauseGets(): () => void

@@ -2,26 +2,26 @@ import { type QueryKey, QueryClient, QueryObserver } from '@tanstack/query-core'
 import { vi } from 'vitest'
 import { VaultTSQ } from '../../../src/minding/vault-tsq'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
-import { SortedVaultDB } from '../../../src/storage/sorted-vault-db'
+import { VaultMinder } from '../../../src/minding/vault-minder'
 import { readTcNow } from '../../../src/storage/thing-classifier'
 import type { ReadTc, SeenThing, VaultItemEvent } from '../../../src/shapes/shapes-vault-event'
 import type { ThingScope } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
 
-/** A bank's VaultTSQ on a fresh QueryClient, the SortedVaultDB it hears, and a way to hand the vaultDB's watcher a notice. */
+/** A bank's VaultTSQ on a fresh QueryClient, the VaultMinder it hears, and a way to hand the vaultDB's watcher a notice. */
 export interface TSQWorld<VaultDBT extends MemoryVaultDB> {
   vaultDB:     VaultDBT
-  sorted:      SortedVaultDB
+  sorted:      VaultMinder
   queryClient: QueryClient
   vaultTSQ:    VaultTSQ
   /** Hand `event` to the vaultDB's watcher, as the datastore would push it. */
   notify:      (event: VaultItemEvent) => void
 }
 
-/** The VaultTSQ of `TH.ThingBank` over `vaultDB`, on a fresh QueryClient, with the bank born through its SortedVaultDB, which so knows the roots at revision 0. */
+/** The VaultTSQ of `TH.ThingBank` over `vaultDB`, on a fresh QueryClient, with the bank born through its VaultMinder, which so knows the roots at revision 0. */
 export async function tsqWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT): Promise<TSQWorld<VaultDBT>> {
   const watching    = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
-  const sorted      = SortedVaultDB.make(TH.ThingBank, { vaultDB, makeThing: TH.makePlainThing })
+  const sorted      = VaultMinder.make(TH.ThingBank, { vaultDB, makeThing: TH.makePlainThing })
   const queryClient = new QueryClient()
   const vaultTSQ    = VaultTSQ.make({ vaultMinder: sorted, queryClient, scope: TH.ThingBank })
   await TH.expectGood(sorted.tryBirthBank(TH.birthBankAskOf()))

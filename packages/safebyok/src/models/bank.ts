@@ -80,7 +80,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   // == [Construction]: make, constructor, mintStamps, makeRecord
 
   /** Make the bank of `record`, a whole bank record, live or a tombstone, or the bank's shell, on `opts.device`. Nothing is fetched or stored.
-   * It is locked or unlocked as its device's world is, and finds its main gate there. Internal: the device's world makes the bank its SortedVaultDB keeps.
+   * It is locked or unlocked as its device's world is, and finds its main gate there. Internal: the device's world makes the bank its VaultMinder keeps.
    */
   static make(record: BankRecord | ShellOf<BankRecord>, opts: BankOpts): Bank { return new Bank(record, opts) }
 
@@ -126,7 +126,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   async put(ask: PutAskDraft<BankRecord>): Promise<BankRecord> {
     this.demandEnabled()
     this.#demandLive()
-    return await this.#world.demandSortedVaultDB().putOnce(ask)
+    return await this.#world.demandVaultMinder().putOnce(ask)
   }
   // --
 

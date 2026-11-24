@@ -10,7 +10,7 @@ import type { MaskedRow } from '../shapes/shapes-masked-view'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type ThingRecord, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
 import type { VaultEvent } from '../shapes/shapes-vault-event'
-import type { SortedVaultDB } from '../storage/sorted-vault-db'
+import type { VaultMinder } from './vault-minder'
 import { maskedRowsOf } from './masked-rows'
 import { bankKeyHeadOf, labelsOf } from './query-keys'
 
@@ -20,7 +20,7 @@ import { bankKeyHeadOf, labelsOf } from './query-keys'
 // queries and mutations may hold cleartexts. No host is handed its client.
 /** One bank's records between page loads: each root's and each box's newest whole record or tombstone, in a QueryClient of its own, under a key of its own.
  * A record's key has the shape of a vault TSQ's item key, so a devtool reads the roots' rows as it read them before.
- * It is filled from what the bank's SortedVaultDB tells, and from what a persister restores.
+ * It is filled from what the bank's VaultMinder tells, and from what a persister restores.
  */
 export class PersistScaffold {
   // == [Props]: #queryClient, #scope
@@ -80,10 +80,10 @@ export class PersistScaffold {
 
   // == [Listening]: listen
 
-  // The vault TSQ tells the device of trouble the SortedVaultDB tells: here it would be told twice.
-  /** Keep each whole record or tombstone of a root or a box that `sortedVaultDB` tells of, until the function it returns is called. */
-  listen(sortedVaultDB: SortedVaultDB): () => void {
-    return sortedVaultDB.listen({ hear: (event) => { this.#hear(event) }, onBadNews: noop })
+  // The vault TSQ tells the device of trouble the VaultMinder tells: here it would be told twice.
+  /** Keep each whole record or tombstone of a root or a box that `vaultMinder` tells of, until the function it returns is called. */
+  listen(vaultMinder: VaultMinder): () => void {
+    return vaultMinder.listen({ hear: (event) => { this.#hear(event) }, onBadNews: noop })
   }
   // --
 
@@ -113,7 +113,7 @@ export class PersistScaffold {
 /** Which of a device's two persisters: the bank's roots', or its boxes'. */
 export type RootsOrBoxes = 'roots' | 'boxes'
 
-/** The labelpaths of a bank's roots, in the order a SortedVaultDB tells them: the bank, its main gate and its root box. */
+/** The labelpaths of a bank's roots, in the order a VaultMinder tells them: the bank, its main gate and its root box. */
 const RootLabelpaths: readonly Labelpath[] = Object.freeze(['bank', Labelpath.MainGate, Labelpath.RootBox])
 
 /** The kind segment of a record's key, as a vault TSQ's item key has it. */
