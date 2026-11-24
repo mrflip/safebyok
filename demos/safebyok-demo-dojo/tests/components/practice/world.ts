@@ -9,7 +9,7 @@ export const ApiKey = 'sk-dojo-made-up-key-0001'
 /** How long the vaultDB holds a save here, in place of the page's six seconds. */
 export const HoldMs = 400
 
-/** The Practice tab on a fresh page with `userid` signed in, its bank brought up and unlocked where `isUnlocked`, a save the dojo holds waiting {@link HoldMs}. */
+/** The Practice tab on a fresh page with `userid` signed in, its sign-in answered and its bank unlocked where `isUnlocked`, a save the dojo holds waiting {@link HoldMs}. */
 export async function practiceTab(userid: string, isUnlocked: boolean): Promise<HTMLElement> {
   // The page comes back on the tab last shown; on this one, the header's Unlock has a namesake in the kit's unlock form.
   localStorage.removeItem('dojo:tab')

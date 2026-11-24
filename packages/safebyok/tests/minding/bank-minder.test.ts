@@ -5,7 +5,7 @@ import { getAskOf } from '../../src/shapes/shapes-asks'
 import * as TH from '../test-helpers'
 import { DownVaultDB, badnewsOf, bornOf, fakeBankOf, minderOf, sortedOf, storedBoxOf } from './vault-minder/world'
 
-/** A BankMinder of `TH.ThingBank` over `vaultDB`, minding, and the friend it was made with, whose get asks track nothing, as a device's do before its bank is brought up. */
+/** A BankMinder of `TH.ThingBank` over `vaultDB`, minding, and the friend it was made with, whose get asks track nothing, as a device's do before its sign-in answers. */
 function bankMinderOver(vaultDB: MemoryVaultDB = new MemoryVaultDB()) {
   const bank       = { ...fakeBankOf(), makeGetAsk: (ask: { labelpath: string }) => getAskOf({ ...ask, ...TH.ThingBank }) }
   const bankMinder = BankMinder.make({}, bank)

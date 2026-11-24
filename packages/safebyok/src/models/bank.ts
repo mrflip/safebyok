@@ -165,7 +165,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   /** Birth the bank of `device`'s scope with the user's new passphrase and optional passkey, and resolve it unlocked. The device's bank is then this one.
    * A weak passphrase refuses `weak_passphrase`: show {@link Device.judgeStrength}'s verdict as the user types.
    * Where a live bank is already stored, it refuses `gate_made_elsewhere`, and the passphrase is not set.
-   * Call it once the device's `signIn` shows the stage `'unborn'`.
+   * Call it once the device's `signin` shows the stage `'unborn'`.
    */
   static async birth(device: Device, cleartexts: BirthCleartexts): Promise<Bank> { return await Checks.device.parse(device).birthGating(cleartexts).attempt() }
 

@@ -101,14 +101,14 @@ export function provingDeviceOf({ keyDeriver = testDeriver, strengthChecker = an
 /** What a {@link makeDevice} device is made of: its record, and the user it signs in, or null to leave it signed out. */
 export type DeviceGiven = Partial<DeviceRecord & { userid: Userid | null }>
 
-/** A Device of {@link WorldScope}'s banklabel and {@link DeviceTok}, signed in as its user and bringing up that user's bank, with `given` laid over them:
+/** A Device of {@link WorldScope}'s banklabel and {@link DeviceTok}, signed in as its user, its sign-in under way, with `given` laid over them:
  * over `testDeriver`, a checker that passes everything, a quiet logger and a fresh MemoryVaultDB, with `opts` laid over those.
- * Await `device.signIn(device.userid!)` for its bank to come up.
+ * Await `device.signin(device.userid!)` for its bank to come up.
  */
 export function makeDevice(given: DeviceGiven = {}, opts: Partial<DeviceOpts> = {}): Device {
   const { userid = WorldScope.userid, ...record } = given
   const device = Device.make({ banklabel: WorldScope.banklabel, device_tok: DeviceTok, ...record }, { keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, vaultDB: new MemoryVaultDB(), ...opts })
-  if (userid !== null) { void device.signIn(userid) }
+  if (userid !== null) { void device.signin(userid) }
   return device
 }
 
@@ -174,7 +174,7 @@ export interface BornBank {
  * Its proving is a stored proving of the main gate, by {@link TestPassphrase}.
  */
 export async function buildBornBank({ passkeyCleartext, device = makeDevice() }: BornBankGiven = {}): Promise<BornBank> {
-  await device.signIn(device.userid ?? WorldScope.userid)
+  await device.signin(device.userid ?? WorldScope.userid)
   const mintStamps = vi.spyOn(Bank, 'mintStamps').mockReturnValue({ bankStamp: WorldBankStamp, gateStamp: WorldGateStamp })
   try {
     const bank = await Bank.birth(device, { passphraseCleartext: TestPassphrase, passkeyCleartext: passkeyCleartext && copyOfAnswer(passkeyCleartext) })

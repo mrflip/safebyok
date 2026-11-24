@@ -14,8 +14,8 @@ export const NobodySignedIn = 'Nobody is signed in: mount the provider with a us
 /** A call that needs the bank, made while none is stored for the user. */
 export const BankAbsent = 'No bank is stored for this user yet: birth it first.'
 
-/** A call that needs the bank, made while it is still being brought up. */
-export const BankNotStarted = 'The bank is not brought up: wait for the stage to show `locked` or `unlocked`.'
+/** A call that needs the bank, made before the device's sign-in answers. */
+export const BankNotStarted = 'The bank is not started: wait for the stage to show `locked` or `unlocked`.'
 
 /** A call that needs the bank, made after it failed to come up. */
 export const BankFailed = "The bank failed to come up, as its snapshot's `lastErr` says: nothing reaches it until the page is loaded again."

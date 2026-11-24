@@ -21,12 +21,12 @@ import * as TH from '../test-helpers'
 describe("a page that is not a secure context", () => {
   afterEach(() => { vi.unstubAllGlobals() })
 
-  it("refuses hello and signIn, though it makes the device", () => {
+  it("refuses hello and signin, though it makes the device", () => {
     vi.stubGlobal('isSecureContext', false)
     const device = TH.makeDevice({ userid: null })
     const err = TH.expectSyncRefusal(() => device.hello(), 'insecure_context')
     expect(err.message).to.match(/https/)
-    TH.expectSyncRefusal(() => device.signIn(TH.WorldScope.userid), 'insecure_context')
+    TH.expectSyncRefusal(() => device.signin(TH.WorldScope.userid), 'insecure_context')
     expect(device.userid).to.be.null
   })
 
@@ -59,7 +59,7 @@ describe("Device.make(record, opts)", () => {
     const device = TH.makeDevice({ userid: null }, { vaultDB })
     await device.hello()
     expect([tryGetThing.mock.calls.length, watch.mock.calls.length]).to.deep.equal([0, 0])
-    await device.signIn(TH.WorldScope.userid)
+    await device.signin(TH.WorldScope.userid)
     // A get of the root box, then, none being stored, one of the bank, and one watch, which the user's two minders and
     // its world share through the device's SortedVaultDB.
     expect([tryGetThing.mock.calls.length, watch.mock.calls.length]).to.deep.equal([2, 1])
@@ -88,11 +88,11 @@ describe("Device.make(record, opts)", () => {
     expect(TH.makeDevice({}, { queryCacheOpts: { staleTime: 5 } }).minder).to.be.an('object')
   })
 
-  it("makes its QueryClient with it, empty, its VaultMinder's, the same before and after signIn", () => {
+  it("makes its QueryClient with it, empty, its VaultMinder's, the same before and after signin", () => {
     const device = TH.makeDevice({ userid: null })
     const { vaultTsqClient } = device
     expect(vaultTsqClient.getQueryCache().getAll()).to.have.lengthOf(0)
-    void device.signIn(TH.WorldScope.userid)
+    void device.signin(TH.WorldScope.userid)
     expect([device.vaultTsqClient, device.minder.tsqClient]).to.deep.equal([vaultTsqClient, vaultTsqClient])
   })
 
@@ -167,7 +167,7 @@ describe("Device.make(record, opts)", () => {
     [{ device_tok: undefined },            'no device_tok'],
     [{ device_tok: 'device_one' },         'a device_tok that is a label'],
     [{ banklabel: '' },                    'an empty banklabel'],
-    [{ userid: 'u1' },                     'a userid, which signIn takes'],
+    [{ userid: 'u1' },                     'a userid, which signin takes'],
     [{ gates: ['main'] },                  'a field a device record does not have'],
   ] as const
 
@@ -206,7 +206,7 @@ describe("device.hello()", () => {
 })
 
 describe("a device's persisters", () => {
-  it("restore the roots at signIn, and the stage stays starting until they have, asking the vaultDB nothing before", async () => {
+  it("restore the roots at signin, and the stage stays starting until they have, asking the vaultDB nothing before", async () => {
     const { born, device, persisters } = await bornAndReloaded()
     const rootsPersister = persisters.roots(TH.WorldScope)
     const saved       = rootsPersister.restoreClient()
@@ -214,7 +214,7 @@ describe("a device's persisters", () => {
     vi.spyOn(rootsPersister, 'restoreClient').mockReturnValue(new Promise((resolve) => { land = () => { resolve(saved) } }))
     const tryGetThing = vi.spyOn(born.device.vaultDB, 'tryGetThing')
     const stages      = stagesOf(device)
-    const signingIn   = device.signIn(TH.WorldScope.userid)
+    const signingIn   = device.signin(TH.WorldScope.userid)
     await nextTick()
     expect([device.getSnapshot().bank.stage, tryGetThing.mock.calls.length]).to.deep.equal(['starting', 0])
     land()
@@ -230,12 +230,12 @@ describe("a device's persisters", () => {
     await first.minder.list('box')
     await nextTick()
     const device = TH.makeDevice({}, { vaultDB: vault.bank.device.vaultDB, persisters })
-    await device.signIn(TH.WorldScope.userid)
+    await device.signin(TH.WorldScope.userid)
     expect(Object.keys(device.minder.listingAt({ ...TH.WorldScope, labelpath: 'box' })?.items ?? {})).to.deep.equal(['openai'])
     expect(device.minder.at({ ...TH.WorldScope, labelpath: 'box/openai' })).to.have.property('labelpath', 'box/openai')
   })
 
-  it("restore the signed-in bank's roots and boxes at signIn, from the persisters its scope gives, and the stage stays starting until they have", async () => {
+  it("restore the signed-in bank's roots and boxes at signin, from the persisters its scope gives, and the stage stays starting until they have", async () => {
     const persisters     = memoryPersisters()
     const born           = await TH.buildBornBank({ device: TH.makeDevice({}, { persisters }) })
     await nextTick()
@@ -248,7 +248,7 @@ describe("a device's persisters", () => {
     const device      = TH.makeDevice({ userid: null }, { vaultDB: born.device.vaultDB, persisters: { roots, boxes } })
     const tryGetThing = vi.spyOn(born.device.vaultDB, 'tryGetThing')
     await device.hello()
-    const signingIn = device.signIn(TH.WorldScope.userid)
+    const signingIn = device.signin(TH.WorldScope.userid)
     await nextTick()
     expect([device.getSnapshot().bank.stage, tryGetThing.mock.calls.length]).to.deep.equal(['starting', 0])
     expect([roots.mock.calls, boxes.mock.calls]).to.deep.equal([[[TH.WorldScope]], [[TH.WorldScope]]])
@@ -265,7 +265,7 @@ describe("a device's persisters", () => {
     await nextTick()
     const otherScope = { ...TH.WorldScope, userid: 'u_other' }
     const device     = TH.makeDevice({ userid: null }, { vaultDB: vault.bank.device.vaultDB, persisters })
-    await device.signIn(otherScope.userid)
+    await device.signin(otherScope.userid)
     await nextTick()
     expect(device.minder.at({ ...otherScope, labelpath: 'box/openai' })).to.be.undefined
     for (const { tsqClient } of [device.bankMinder, device.minder]) {
@@ -283,7 +283,7 @@ describe("a device's persisters", () => {
     const onBadNews              = vi.fn()
     const { device, persisters } = await bornAndReloaded({ onBadNews })
     vi.spyOn(persisters.boxes(TH.WorldScope), 'restoreClient').mockRejectedValue(new Error('disk on fire'))
-    await device.signIn(TH.WorldScope.userid)
+    await device.signin(TH.WorldScope.userid)
     expect(device.getSnapshot().bank).to.include({ stage: 'locked' })
     expect(onBadNews).toHaveBeenCalledTimes(1)
     expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'storage_unavailable' })
@@ -295,7 +295,7 @@ describe("a device's persisters", () => {
     const onBadNews              = vi.fn()
     const { device, persisters } = await bornAndReloaded({ onBadNews })
     vi.spyOn(persisters.roots(TH.WorldScope), 'restoreClient').mockRejectedValue(new Error('disk on fire'))
-    await device.signIn(TH.WorldScope.userid)
+    await device.signin(TH.WorldScope.userid)
     expect(device.getSnapshot().bank).to.include({ stage: 'locked' })
     expect(onBadNews).toHaveBeenCalledTimes(1)
     expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'storage_unavailable' })
@@ -349,12 +349,12 @@ async function bornAndReloaded(opts: Partial<DeviceOpts> = {}): Promise<{ born: 
   return { born, device: TH.makeDevice({ userid: null }, { vaultDB: born.device.vaultDB, persisters, ...opts }), persisters }
 }
 
-describe("device.signIn(userid)", () => {
+describe("device.signin(userid)", () => {
   it("finds the bank stored for its scope and shows it locked, with its vault", async () => {
     const born   = await TH.buildBornBank()
     const device = TH.makeDevice({ userid: null }, { vaultDB: born.device.vaultDB })
     const stages = stagesOf(device)
-    await device.signIn(TH.WorldScope.userid)
+    await device.signin(TH.WorldScope.userid)
     expect(stages).to.deep.equal(['signed_out', 'starting', 'locked'])
     expect([device.userid, device.scope]).to.deep.equal([TH.WorldScope.userid, TH.WorldScope])
     expect(device.bank).to.be.instanceOf(Bank)
@@ -372,7 +372,7 @@ describe("device.signIn(userid)", () => {
     const vaultDB = born.device.vaultDB as MemoryVaultDB
     vi.spyOn(vaultDB, 'tryGetThing').mockReturnValue(new Promise(noop))
     const stages = stagesOf(device)
-    void device.signIn(TH.WorldScope.userid)
+    void device.signin(TH.WorldScope.userid)
     await TH.eventually(() => device.bank !== null)
     expect(stages).to.deep.equal(['signed_out', 'starting', 'locked'])
     expect(device.bank).to.equal(device.world.bank)
@@ -380,12 +380,12 @@ describe("device.signIn(userid)", () => {
     expect(device.getSnapshot().bank).to.include({ stage: 'unlocked' })
   })
 
-  it("keeps the bank brought up from the cache, and tells onBadNews, where the vaultDB is unavailable", async () => {
+  it("keeps the bank it restored from the cache, and tells onBadNews, where the vaultDB is unavailable", async () => {
     const onBadNews        = vi.fn()
     const { born, device } = await bornAndReloaded({ onBadNews })
     const vaultDB          = born.device.vaultDB as MemoryVaultDB
     vi.spyOn(vaultDB, 'tryGetThing').mockImplementation((ask) => Promise.resolve(refusedAnswerOf(ask, new Errors.VaultError('storage_unavailable', "Down."))))
-    await device.signIn(TH.WorldScope.userid)
+    await device.signin(TH.WorldScope.userid)
     expect(device.getSnapshot().bank).to.include({ stage: 'locked' })
     await TH.eventually(() => onBadNews.mock.calls.length === 1)
     expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'storage_unavailable' })
@@ -394,7 +394,7 @@ describe("device.signIn(userid)", () => {
   it("shows its bank unborn where none is stored, and the bank born on it after, locked and then unlocked", async () => {
     const device = TH.makeDevice({ userid: null })
     const stages = stagesOf(device)
-    await device.signIn(TH.WorldScope.userid)
+    await device.signin(TH.WorldScope.userid)
     expect(device.getSnapshot().bank).to.include({ stage: 'unborn', isLocked: true, lastErr: null })
     expect(device.bank).to.be.null
     expect(device.vault).to.be.null
@@ -411,7 +411,7 @@ describe("device.signIn(userid)", () => {
 
   it("builds asks that carry no bank_lifetok until it has a bank, and the bank's after", async () => {
     const device = TH.makeDevice({ userid: null })
-    await device.signIn(TH.WorldScope.userid)
+    await device.signin(TH.WorldScope.userid)
     expect(device.makeGetAsk({ labelpath: 'bank' })).to.not.have.property('bank_lifetok')
     expect(device.makeListAsk({ labelpath: 'box' })).to.not.have.property('bank_lifetok')
     const bank = await device.birthGating({ passphraseCleartext: TH.TestPassphrase }).attempt()
@@ -423,7 +423,7 @@ describe("device.signIn(userid)", () => {
     const vaultDB = born.device.vaultDB as MemoryVaultDB
     vaultDB._cheat_things(born.bank.scope).set('bank', { mangled: true })
     const device = TH.makeDevice({}, { vaultDB })
-    await device.signIn(TH.WorldScope.userid)
+    await device.signin(TH.WorldScope.userid)
     const shown = device.getSnapshot().bank
     expect(shown).to.include({ stage: 'failed', isLocked: true })
     expect(shown.lastErr).to.include({ refusalkind: 'storage_issue' })
@@ -435,36 +435,36 @@ describe("device.signIn(userid)", () => {
     const vaultDB = new MemoryVaultDB()
     vi.spyOn(vaultDB, 'watch').mockImplementation(() => { throw new Error('no watching here') })
     const device = TH.makeDevice({}, { vaultDB })
-    await device.signIn(TH.WorldScope.userid)
+    await device.signin(TH.WorldScope.userid)
     expect(device.getSnapshot().bank).to.include({ stage: 'failed' })
     expect(device.getSnapshot().bank.lastErr).to.not.be.null
   })
 
   it("answers the same promise each time, and keeps the bank born on it since", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const signingIn = device.signIn(TH.WorldScope.userid)
-    expect(device.signIn(TH.WorldScope.userid)).to.equal(signingIn)
+    const signingIn = device.signin(TH.WorldScope.userid)
+    expect(device.signin(TH.WorldScope.userid)).to.equal(signingIn)
     await signingIn
     expect(device.bank).to.equal(bank)
   })
 
   it("refuses a userid that is not one", () => {
     const device = TH.makeDevice({ userid: null })
-    for (const userid of [42, '', undefined]) { TH.expectSyncRefusal(() => device.signIn(userid as never), 'bad_record') }
+    for (const userid of [42, '', undefined]) { TH.expectSyncRefusal(() => device.signin(userid as never), 'bad_record') }
     expect(device.userid).to.be.null
   })
 })
 
 describe("device.birthGating(cleartexts)", () => {
-  it("refuses until `signIn` answers", async () => {
+  it("refuses until `signin` answers", async () => {
     const device = TH.makeDevice()
-    const signingIn = device.signIn(TH.WorldScope.userid)
+    const signingIn = device.signin(TH.WorldScope.userid)
     TH.expectSyncRefusal(() => device.birthGating({ passphraseCleartext: TH.TestPassphrase }), 'disabled')
     await signingIn
     expect(device.birthGating({ passphraseCleartext: TH.TestPassphrase })).to.be.instanceOf(BirthGating)
   })
 
-  it("zeroes the passkey answer when it refuses before `signIn` answers", () => {
+  it("zeroes the passkey answer when it refuses before `signin` answers", () => {
     const passkeyCleartext = TH.passkeyAnswerOf()
     TH.expectSyncRefusal(() => TH.makeDevice().birthGating({ passphraseCleartext: TH.TestPassphrase, passkeyCleartext }), 'disabled')
     expect(TH.isZeroed(passkeyCleartext.prfBytes)).to.be.true
@@ -472,7 +472,7 @@ describe("device.birthGating(cleartexts)", () => {
 
   it("keeps no bank where the birth is refused", async () => {
     const device = TH.makeDevice({}, { strengthChecker: () => ({ strong: false, reason: 'too short' }) })
-    await device.signIn(TH.WorldScope.userid)
+    await device.signin(TH.WorldScope.userid)
     await TH.expectRefusal(device.birthGating({ passphraseCleartext: TH.TestPassphrase }).attempt(), 'weak_passphrase')
     expect(device.bank).to.be.null
     expect(device.getSnapshot().bank).to.include({ stage: 'unborn' })
@@ -506,7 +506,7 @@ describe("device.sweep()", () => {
 
   it("does nothing on a device with no bank, which births one after it", async () => {
     const device = TH.makeDevice()
-    await device.signIn(TH.WorldScope.userid)
+    await device.signin(TH.WorldScope.userid)
     device.sweep()
     const bank = await device.birthGating({ passphraseCleartext: TH.TestPassphrase }).attempt()
     expect(device.getSnapshot().bank).to.equal(bank.getSnapshot())
@@ -557,7 +557,7 @@ function snapshotsOf(device: Device): DeviceSnapshot[] {
 }
 
 describe("device.getSnapshot() and device.subscribe(listener)", () => {
-  it("shows the pending bank from signIn until a bank is found", () => {
+  it("shows the pending bank from signin until a bank is found", () => {
     const device = TH.makeDevice()
     expect(device.getSnapshot()).to.deep.equal({ bank: PendingBank })
     expect(Object.isFrozen(device.getSnapshot())).to.be.true
@@ -626,7 +626,7 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
 })
 
 describe("device.maskedView()", () => {
-  it("answers EmptyMaskedView before signIn", () => {
+  it("answers EmptyMaskedView before signin", () => {
     expect(TH.makeDevice({ userid: null }).maskedView()).to.equal(EmptyMaskedView)
     expect(EmptyMaskedView).to.deep.equal({ bankTSQ: [], vaultTSQ: [], lease: { active: false } })
   })

@@ -71,7 +71,7 @@ export const makeAuth = (): Auth => createAuth({ banklabel: 'acme', dbStorage: m
 export const LiveSessionBar = ({ auth }: { auth: Auth }) => <SessionBar auth={auth} session={useSession(auth)} />
 
 /** Type `userlabelText` into the sign-in strip and press Sign in. */
-export const signInAs = (userlabelText: string) => {
+export const signinAs = (userlabelText: string) => {
   fireEvent.change(screen.getByPlaceholderText('username'), { target: { value: userlabelText } })
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 }

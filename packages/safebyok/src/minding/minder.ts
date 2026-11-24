@@ -586,7 +586,7 @@ export abstract class Minder {
 
   // == [Checks]: userid, banklabel, scope, tsqClient, #demandOwnScope, #demandItemScope, #checkedDelivered, #demandReady, #scopeOfQueryKey
 
-  /** The user whose bank this minder minds: its friend's. Refuses where its friend's scope does, as a device's until `signIn`. */
+  /** The user whose bank this minder minds: its friend's. Refuses where its friend's scope does, as a device's until `signin`. */
   get userid(): Userid { return this.scope.userid }
 
   /** The label of the bank this minder minds: its friend's. Refuses where its friend's scope does. */

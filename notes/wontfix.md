@@ -298,11 +298,11 @@ thread 12 worker, rewritten by the thread 15 worker, 2026-11-21, awaiting a ruli
 * alternatives:
   - have `Vault.sweep` leave the minder be, and `device.sweep` stop it: the device then decides when its minder stops,
     which is part of the ends work below, not of this note.
-  - have the device restart its minder after a sweep: a new path through bring-up for a device whose bank was swept,
+  - have the device restart its minder after a sweep: a new path through sign-in for a device whose bank was swept,
     which nothing yet needs.
 * workaround: make a new device after a sweep, as a page reload does.
 
-Steps to reproduce: bring up a device whose bank is stored, sweep it with `device.sweep()`, then call
+Steps to reproduce: sign in on a device whose bank is stored, sweep it with `device.sweep()`, then call
 `device.minder.get` on the root box: it refuses `disabled`.
 
 Reasoning for wontfix: who stops the minder belongs to how ownership is apportioned among device, bank and vault, which
@@ -372,22 +372,22 @@ Reasoning for wontfix: a clock running ahead is a broken system, and the fix is 
 and no secret moves. Ruled by the Coach, 2026-11-24: "I don't want to complicate the common code for a broken system,
 and it would have to be the customer's call whether to tolerate it or panic."
 
-### A device's sweep while `signIn` restores its caches leaves the vaultDB watched
+### A device's sweep while `signin` restores its caches leaves the vaultDB watched
 
-* current outcome: `signIn` makes the device's `SortedVaultDB`, which watches the host's vaultDB, only once both
+* current outcome: `signin` makes the device's `SortedVaultDB`, which watches the host's vaultDB, only once both
   persisters have restored. A `Device.sweep` that lands while they restore finds no `SortedVaultDB` to stop; the one
   made after it watches until the page goes, and the minders hear what it tells.
 * alternatives:
   - make the `SortedVaultDB` before the restores, as it was: its sorter would sort records no minder hears, and drop them
     as repeats once the minders listen.
-  - have the sweep mark the device so the bring-up stops: a state and a check in the bring-up for a sweep landing in a
+  - have the sweep mark the device so the sign-in stops: a state and a check in the sign-in for a sweep landing in a
     window of milliseconds.
 * workaround: none needed; the device sweeps again, or the page reloads.
 
-Steps to reproduce: give a device persisters whose restore is slow; call `signIn`, then `sweep` before the restore
+Steps to reproduce: give a device persisters whose restore is slow; call `signin`, then `sweep` before the restore
 resolves; ring the vaultDB's watch.
 
-Reasoning for wontfix: a sweep crossing a bring-up is an end-of-life event landing in a millisecond window (CLAUDE.md,
+Reasoning for wontfix: a sweep crossing a sign-in is an end-of-life event landing in a millisecond window (CLAUDE.md,
 *Hours separate updates*), and the fix is a state and a check in the common path of every sign-in. Nothing stored
 changes and no secret moves: a watch notifies records the bankDB already holds. Recorded under that rule by thread 4 of
 feed_sorter, 2026-11-24.
@@ -517,7 +517,7 @@ costs any. Ruled by the Coach, 2026-11-22.
     not shown at this stage.
 * workaround: show each form only at its own stage (`useBank().stage`), as the kit's forms are documented.
 
-Steps to reproduce: render an unlock form at stage `unborn`, or before the bank is brought up; type a passphrase; submit.
+Steps to reproduce: render an unlock form at stage `unborn`, or before the device's sign-in answers; type a passphrase; submit.
 
 Reasoning for wontfix: the paths here are a host showing a form at a stage it is not for, and a bank that ends under a
 shown form; the host is not the threat model, and an ending is answered by a page reload. Written by the workshop's

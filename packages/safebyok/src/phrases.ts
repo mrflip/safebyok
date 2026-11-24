@@ -1,6 +1,6 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, SortedVaultDBExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, BankNotBroughtUp, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, BoxSoonestBare
+// == [Models]: VaultDBExpected, SortedVaultDBExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, BoxSoonestBare
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
@@ -23,11 +23,11 @@ export const VaultBoxIsRoot = "A vault's boxes are under its bank's root box: gi
 /** A call on a bank after its sweep. */
 export const BankSwept = 'This bank was swept, so it answers nothing more: make it again with Bank.make.'
 
-/** A birth on a device whose `signIn` has not answered. */
-export const BankNotBroughtUp = "This device's bank is not brought up yet: call `signIn`, and birth the bank once the stage shows `'unborn'`."
+/** A birth on a device whose `signin` has not answered. */
+export const SigninUnanswered = "This device's sign-in has not answered yet: call `signin`, and birth the bank once the stage shows `'unborn'`."
 
 /** A call that needs a user, on a device nobody is signed in to. */
-export const NobodySignedIn = "Nobody is signed in on this device: call `signIn` with the user's id first."
+export const NobodySignedIn = "Nobody is signed in on this device: call `signin` with the user's id first."
 
 /** A call that needs a live bank or gate, on one not born yet or deleted. */
 export const ThingNotLive = "This bank or gate is not stored live: it is not born yet, or was deleted. Wait for the stage to show 'locked' or 'unlocked'."

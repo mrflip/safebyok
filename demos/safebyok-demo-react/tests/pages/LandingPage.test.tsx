@@ -23,7 +23,7 @@ afterEach(() => {
 describe("LandingPage", () => {
   it("shows a signed-in user only the widget form, and a link to the labs", async () => {
     render(<LandingPage />)
-    TH.signInAs('margo')
+    TH.signinAs('margo')
     await screen.findByRole('heading', { name: 'Widget form' })
     expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).to.deep.equal(['Widget form'])
     expect(screen.queryByRole('complementary', { name: 'Developer tools' })).to.be.null

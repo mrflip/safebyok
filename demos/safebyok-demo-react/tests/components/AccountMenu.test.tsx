@@ -7,7 +7,7 @@ import * as TH from '../test-helpers'
 const renderSignedIn = async () => {
   const auth = TH.makeAuth()
   const { bankDB, deviceDB } = await TH.renderInBank(<><TH.LiveSessionBar auth={auth} /><TH.VaultProbe /></>)
-  TH.signInAs('margo')
+  TH.signinAs('margo')
   await screen.findByText('margo')
   await TH.expectProbe('absent none')
   return { auth, bankDB, deviceDB }
@@ -26,7 +26,7 @@ const renderWithVault = async () => {
 const renderBankless = async () => {
   const auth = TH.makeAuth()
   await TH.renderInBank(<><TH.LiveSessionBar auth={auth} /><TH.VaultProbe /></>, { isBankBuilt: false })
-  TH.signInAs('margo')
+  TH.signinAs('margo')
   fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }))
   await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
   await TH.expectProbe('bankless none')
@@ -39,7 +39,7 @@ describe("AccountMenu", () => {
   it("says who is signed in, builds the bank never built from its dialog, then the vault from a click", async () => {
     const auth = TH.makeAuth()
     await TH.renderInBank(<><TH.LiveSessionBar auth={auth} /><TH.VaultProbe /></>, { isBankBuilt: false })
-    TH.signInAs('margo')
+    TH.signinAs('margo')
     await screen.findByText('margo')
     expect(screen.getByText(`(${auth.getSnapshot()?.user_id ?? ''})`)).to.not.be.null
     await TH.answerPassphraseDialog()

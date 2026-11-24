@@ -32,7 +32,7 @@ describe("LabsPage", () => {
 
   it("signs a user in to the flows, and out again", async () => {
     render(<LabsPage />)
-    TH.signInAs('margo')
+    TH.signinAs('margo')
     await screen.findByText('margo')
     await screen.findByRole('heading', { name: 'DOM form' })
     const titles = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
@@ -44,7 +44,7 @@ describe("LabsPage", () => {
 
   it("says the backend is off while the outage switch is", async () => {
     render(<LabsPage />)
-    TH.signInAs('margo')
+    TH.signinAs('margo')
     // A new user's bankDB is empty: the provider opens its dialog to build the bank, which leaves it unlocked.
     await TH.answerPassphraseDialog()
     // Add key is enabled from sign-in, as it brings the bank up itself: wait for the build to land before the outage.

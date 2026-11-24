@@ -52,7 +52,7 @@ function expectUnheld(page: Awaited<ReturnType<typeof loadPage>>): void {
 function region(title: string): HTMLElement { return screen.getByRole('region', { name: title }) }
 
 /** Sign in as Hue. */
-async function signIn(): Promise<void> {
+async function signin(): Promise<void> {
   fireEvent.change(await screen.findByLabelText('Username'), { target: { value: 'hue' } })
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 }
@@ -85,7 +85,7 @@ function knock(): void {
 /** A new user, signed in, with a vault and the key saved: the page that did it. */
 async function loadWithKey() {
   const page = await loadPage()
-  await signIn()
+  await signin()
   await createVault()
   await saveKey()
   return page

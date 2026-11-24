@@ -55,7 +55,7 @@ export interface HostedVault {
 /** The banklabel of the bank a device serves where its record names none. */
 export const DefaultBanklabel = 'main'
 
-/** The checks of a {@link DeviceRecord}, and of the userid `Device.signIn` is handed. */
+/** The checks of a {@link DeviceRecord}, and of the userid `Device.signin` is handed. */
 export const BankishChecks = Validator.Checkers('bad_record', ({ obj, user_id, banklabel, device_tok }) => ({
   deviceRecord: obj({ banklabel: banklabel.default(DefaultBanklabel), device_tok }).strict(),
   userid:       user_id,
@@ -92,7 +92,7 @@ export interface DeviceOpts {
   onBadNews?:       BadNewsHandler | undefined
   /** The defaults each user's minder sets on its items and lists in the device's QueryClient. A missing field defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?:  Partial<QueryCacheOpts> | undefined
-  /** Where the device keeps the signed-in bank's caches between page loads, restored at `signIn` before the vaultDB is asked anything. Without them, each page load starts with its caches empty. */
+  /** Where the device keeps the signed-in bank's caches between page loads, restored at `signin` before the vaultDB is asked anything. Without them, each page load starts with its caches empty. */
   persisters?:      DevicePersisters | undefined
   /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
   deviceDB?:        unknown
@@ -105,7 +105,7 @@ export interface DeviceOpts {
 export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'swept', 'failed'] as const
 /** Where the user stands with their bank, for a host's screen to switch on:
  * - `'signed_out'` -- nobody is signed in, or the bank was vacated or signed out of
- * - `'starting'`   -- signed in, and the bank is being brought up
+ * - `'starting'`   -- signed in, and the device's sign-in has not answered
  * - `'unborn'`     -- no bank is stored for this user, or it was deleted
  * - `'locked'`     -- the bank is stored, and needs the passphrase or passkey before a whisper can be read
  * - `'unlocked'`   -- the bank has a lease, and whispers can be read and written
@@ -141,12 +141,12 @@ export interface BankSnapshot {
 }
 
 // isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
-/** The bank snapshot a device shows from `signIn` until it finds its user's bank stored or not. */
+/** The bank snapshot a device shows from `signin` until it finds its user's bank stored or not. */
 export const PendingBank: BankSnapshot = Object.freeze({
   stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false,
 })
 
-/** The bank snapshot a device shows until `signIn`, while nobody is signed in on it. */
+/** The bank snapshot a device shows until `signin`, while nobody is signed in on it. */
 export const SignedOutBank: BankSnapshot = Object.freeze({ ...PendingBank, stage: 'signed_out' })
 
 /** A device's state, for a host to render. */

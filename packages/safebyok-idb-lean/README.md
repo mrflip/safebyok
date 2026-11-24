@@ -35,7 +35,7 @@ const persisters = {
 const device = Device.make(record, { vaultDB, persisters, onBadNews: ({ news }) => { reportRefusal(news) } })
 ```
 
-The device restores the signed-in bank's roots and boxes at `signIn`. Every bank's records stay stored.
+The device restores the signed-in bank's roots and boxes at `signin`. Every bank's records stay stored.
 The device's `onBadNews` hears of a restore that fails, and each persister's of a save that fails: report both in one
 place, as here.
 

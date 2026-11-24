@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { formTextOf } from '../lib/form-text'
-import { type Session, signIn, signOut } from '../lib/session'
+import { type Session, signin, signOut } from '../lib/session'
 
 /** Who is signed in, with Sign out; or, while nobody is, the fake sign-in form. */
 export function SessionBar({ session }: Readonly<{ session: Session | null }>) {
@@ -16,7 +16,7 @@ export function SessionBar({ session }: Readonly<{ session: Session | null }>) {
   /** Sign in as the username typed, or say why it will not do. */
   const action = (form: FormData): void => {
     try {
-      signIn(formTextOf(form, 'username'))
+      signin(formTextOf(form, 'username'))
     } catch (err) {
       setGripe((err as Error).message)
     }

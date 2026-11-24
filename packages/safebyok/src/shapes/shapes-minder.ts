@@ -70,7 +70,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
   // A field left out, or the whole, defaults from DefaultQueryCacheOpts.
   const queryCacheOptsOrDefault = orDefault(queryCacheOpts, DefaultQueryCacheOpts)
   // A live object passes whole where these checks pass: parsing it would hand back a copy, its getters read once. Its
-  // scope is not read: a device's refuses until `signIn`, and a minder reads it at each use.
+  // scope is not read: a device's refuses until `signin`, and a minder reads it at each use.
   const friendFields     = obj({ makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.MinderFriendExpected)
   const minderListener   = fn<(event: MinderEvent) => void>()

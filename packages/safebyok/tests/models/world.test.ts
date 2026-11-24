@@ -14,7 +14,7 @@ TH.useFakeClock()
 /** A device signed in to a bank none of whose records it has heard of. */
 async function signedInDevice(): Promise<Device> {
   const device = TH.makeDevice()
-  await device.signIn(TH.WorldScope.userid)
+  await device.signin(TH.WorldScope.userid)
   return device
 }
 

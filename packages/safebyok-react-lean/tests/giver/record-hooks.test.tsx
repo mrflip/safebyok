@@ -289,7 +289,7 @@ describe("useGate over the BankMinder's world", () => {
     onTestFinished(() => { get.mockRestore() })
     const other = LeanTH.makeDevice({}, { vaultDB: world.vaultDB })
     await act(async () => {
-      await other.signIn(TH.ProviderUser)
+      await other.signin(TH.ProviderUser)
       await other.bank!.gate.addPasskey({ passphraseCleartext: LeanTH.TestPassphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })
     })
     await waitFor(() => { expect(header?.wayinkind).to.eq('passkey') })

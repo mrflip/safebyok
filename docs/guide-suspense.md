@@ -110,7 +110,7 @@ const unlockByPasskey = useMutation({ mutationFn: async () => vault.unlock({ pas
 ## Not built yet
 
 * `useSuspenseBox`, `useSuspenseBoxList`, `useSuspenseBoxes`, and `vault.suspenseBox`. Today a box's
-  query is skipped (`skipToken`) until the bank is brought up, which `useSuspenseQuery` does not
+  query is skipped (`skipToken`) until the device's sign-in answers, which `useSuspenseQuery` does not
   accept: the suspending factory refuses `absent_vault` instead.
 * `actionOf(verb)`. Today each gate verb's hook has an `attempt` that takes the form, to hand a
   form's `action`.

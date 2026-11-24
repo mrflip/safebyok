@@ -28,7 +28,7 @@ package is from it. The other guides ([Suspense](guide-suspense.md), [Next.js](g
 
 const bank = useBank()                       // synchronous, never suspends, never null
 switch (bank.stage) {                        // one field drives the screen
-  case 'signed_out': return <SignIn />
+  case 'signed_out': return <Signin />
   case 'starting':   return <Spinner />
   case 'unborn':     return <CreateVault />  // nothing stored for this user yet
   case 'locked':                             // records show, sealed; a whisper needs the user

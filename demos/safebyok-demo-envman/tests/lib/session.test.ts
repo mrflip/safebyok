@@ -19,7 +19,7 @@ describe("the fake sign-in", () => {
     const session = await loadSession()
     const heard = vi.fn()
     session.subscribeSession(heard)
-    session.signIn('hue')
+    session.signin('hue')
     expect(heard).toHaveBeenCalledOnce()
     const signedIn = session.getSession()
     expect(signedIn?.username).to.eq('hue')
@@ -29,13 +29,13 @@ describe("the fake sign-in", () => {
 
   it("gives the same username the same userid at each sign-in, and another username another", async () => {
     const session = await loadSession()
-    session.signIn('hue')
+    session.signin('hue')
     const hue = session.getSession()?.userid
     localStorage.removeItem('envman:session')
     const again = await loadSession()
-    again.signIn('hue')
+    again.signin('hue')
     expect(again.getSession()?.userid).to.eq(hue)
-    again.signIn('mo_2')
+    again.signin('mo_2')
     expect(again.getSession()?.userid).to.not.eq(hue)
   })
 
@@ -49,7 +49,7 @@ describe("the fake sign-in", () => {
   for (const [username, blurb] of UsernameCases) {
     it(`refuses ${blurb}`, async () => {
       const session = await loadSession()
-      expect(() => { session.signIn(username) }).to.throw('A username is')
+      expect(() => { session.signin(username) }).to.throw('A username is')
       expect(session.getSession()).to.be.null
     })
   }
@@ -58,7 +58,7 @@ describe("the fake sign-in", () => {
     const reload = vi.fn()
     vi.stubGlobal('location', { reload })
     const session = await loadSession()
-    session.signIn('hue')
+    session.signin('hue')
     session.signOut()
     expect(reload).toHaveBeenCalledOnce()
     const reloaded = await loadSession()

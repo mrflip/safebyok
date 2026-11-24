@@ -33,7 +33,7 @@ export class World {
 
   readonly #device: Device
 
-  /** The signed-in user's bank's records, sorted, from `hello`; null until then. */
+  /** The signed-in user's bank's records, sorted, from `signin`; null until then. */
   #sortedVaultDB: SortedVaultDB | null = null
 
   /** The attached lease, null while locked. */
@@ -63,7 +63,7 @@ export class World {
 
   // == [Getters]: sortedVaultDB, bank, gate, rootBox, bankStamp, leaseEndsAt, leaseLoggable, getSnapshot, subscribe
 
-  /** The signed-in user's bank's records, sorted, as handed to {@link hello}, or null until then. */
+  /** The signed-in user's bank's records, sorted, as handed to {@link signin}, or null until then. */
   get sortedVaultDB(): SortedVaultDB | null { return this.#sortedVaultDB }
 
   /** The bank's Thing in the {@link sortedVaultDB}, of whatever life, or null where no record of it has been heard of. */
@@ -108,7 +108,7 @@ export class World {
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   // --
 
-  // == [Construction]: make, constructor, makeThing, hello
+  // == [Construction]: make, constructor, makeThing
 
   /** Make the world of `opts.device`, locked, showing nobody signed in. Internal: a device makes its own. */
   static make(opts: WorldOpts): World {
@@ -136,9 +136,12 @@ export class World {
     const thingClass: ThingClass = thingClassOf(Labelpath.modelkindOf(labelpath))
     return thingClass.make(begun, { device: this.#device }, this.#gateFriend())
   }
+  // --
+
+  // == [Signing in]: signin, showSigninRefusal, birthGating, birthFriend
 
   /** Take `sortedVaultDB`, the signed-in user's bank's records, sorted, and listen to it for as long as the world lives. A second call does nothing. */
-  hello(sortedVaultDB: SortedVaultDB): void {
+  signin(sortedVaultDB: SortedVaultDB): void {
     Checks.sortedVaultDB.parse(sortedVaultDB)
     if (this.#sortedVaultDB !== null) { return }
     this.#sortedVaultDB = sortedVaultDB
@@ -146,12 +149,9 @@ export class World {
     sortedVaultDB.listen({ hear: (event) => { this.#hear(event) }, onBadNews: noop })
     this.align()
   }
-  // --
-
-  // == [Signing in]: showSignInRefusal, birthGating, birthFriend
 
   /** Show `err` as the snapshot's `lastErr`, at stage `'failed'`, while the bank's roots are not all live. Internal: the device's sign-in calls it. */
-  showSignInRefusal(err: unknown): void {
+  showSigninRefusal(err: unknown): void {
     this.#lastErr = refusalSnapshotOf(err)
     this.align()
   }
@@ -473,7 +473,7 @@ function makeWait(): Wait {
 // == [Checks]: Checks
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link World.make}'s arguments, {@link World.hello}'s, {@link World.sweep}'s and {@link World.hostVault}'s. */
+/** The checks of {@link World.make}'s arguments, {@link World.signin}'s, {@link World.sweep}'s and {@link World.hostVault}'s. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
   worldOpts:     obj({ device: custom<Device>() }),
   sortedVaultDB: custom<SortedVaultDB>(isSortedVaultDB, Phrases.SortedVaultDBExpected),

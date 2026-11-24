@@ -24,7 +24,7 @@ async function signedInElsewhere(userid: string): Promise<Device> {
   const vaultDB = new IdbVaultDB({ dbName: DojoDBName })
   const device = Device.make({ banklabel: Banklabel, device_tok: globalThis.crypto.randomUUID() }, { vaultDB, keyDeriver: dojoDeriver, strengthChecker: switchableChecker })
   await device.hello()
-  await device.signIn(userid)
+  await device.signin(userid)
   return device
 }
 

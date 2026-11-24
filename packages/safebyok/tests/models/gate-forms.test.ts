@@ -34,7 +34,7 @@ async function bankAndElsewhere(given: TH.BornBankGiven = {}) {
   const born = await TH.buildBornBank({ ...given, device: TH.makeDevice({}, { vaultDB }) })
   born.bank.lock()
   const device = TH.makeDevice({}, { vaultDB })
-  await device.signIn(TH.WorldScope.userid)
+  await device.signin(TH.WorldScope.userid)
   return { ...born, elsewhere: device.bank! }
 }
 
@@ -230,7 +230,7 @@ describe("bank.gate.replacePassphrase(cleartexts)", () => {
     const born = await TH.buildBornBank()
     born.bank.lock()
     const device = TH.makeDevice({}, { vaultDB: born.device.vaultDB })
-    await device.signIn(TH.WorldScope.userid)
+    await device.signin(TH.WorldScope.userid)
     const after = await device.bank!.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
     await TH.eventually(() => born.bank.gate.revtok === after.revtok)
     await TH.expectRefusal(born.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase }), 'wrong_passphrase')

@@ -53,7 +53,7 @@ async function signedInDevice(userid: string, persisters?: { roots: MemoryPersis
     ...(persisters && { persisters: { roots: () => persisters.roots, boxes: () => persisters.boxes } }),
   })
   await device.hello()
-  await device.signIn(userid)
+  await device.signin(userid)
   return device
 }
 

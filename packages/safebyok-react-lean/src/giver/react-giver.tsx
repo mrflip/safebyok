@@ -55,7 +55,7 @@ export type GateSelected = HeaderedGate | null | undefined
 /** `useGate`'s options: `select` makes what the hook answers from the gate shown. */
 export type GateOpts<SelT> = Readonly<{ select?: ((gate: GateShown) => SelT) | undefined }>
 
-/** What `useGate` answers: `data`, what its `select` makes of the gate, or undefined until the bank is brought up. */
+/** What `useGate` answers: `data`, what its `select` makes of the gate, or undefined until the device's sign-in answers. */
 export type GateResult<SelT> = Readonly<{ data: SelT | undefined }>
 
 /** The `queryOptions` of a box, for `useQuery`, `useQueries`, `queryClient.query` and the rest, run in the giver's QueryClient. */
@@ -190,7 +190,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     return device
   }
 
-  /** The signed-in user's bank. Refuses `absent_vault` while nobody is signed in, while the bank is unborn, until it is brought up, or where it failed to come up. */
+  /** The signed-in user's bank. Refuses `absent_vault` while nobody is signed in, while the bank is unborn, until the device's sign-in answers, or where it failed to come up. */
   function demandBank(): Bank {
     const signedIn = demandDevice()
     if (signedIn.bank === null) { throw bankAbsentOf(signedIn) }
@@ -221,10 +221,10 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     }))
     /** The device, once a userid is signed in on it. */
     const [signedIn, setSignedIn] = useState<Device | null>(null)
-    // The device serves its first user for its life: each later `signIn`, StrictMode's second run of the effect among them,
+    // The device serves its first user for its life: each later `signin`, StrictMode's second run of the effect among them,
     // answers as the first and starts nothing more.
-    const signIn = useEffectEvent((user: string) => {
-      void device.signIn(user)
+    const signin = useEffectEvent((user: string) => {
+      void device.signin(user)
       setSignedIn(device)
     })
     useEffect(() => {
@@ -232,7 +232,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
       void device.hello()
       return () => { if (mounted === device) { mounted = null } }
     }, [device])
-    useEffect(() => { if (typeof userid === 'string') { signIn(userid) } }, [userid])
+    useEffect(() => { if (typeof userid === 'string') { signin(userid) } }, [userid])
     const shown = useMemo(() => shownOf(signedIn, userid, device.vaultTsqClient), [signedIn, userid, device])
     return <ShownContext value={shown}><GiverContext value={given}>{children}</GiverContext></ShownContext>
   }
@@ -273,18 +273,18 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
 
   /** The query factories of the signed-in user's bank, by banklabel, for the host's own `useQuery` and its kin, with the QueryClient they run in.
    * Every key it makes is the user's: it re-renders when the user changes, so each query made from it changes key with them.
-   * Until the bank is brought up, a query from it fetches nothing.
+   * Until the device's sign-in answers, a query from it fetches nothing.
    * @example
    *   const sok = SOK.useQueryOptions()
    *   const { data: box } = useQuery(sok.knock.box('jokes'), sok.knock.client)
    */
   function useQueryOptions(): Readonly<Record<BanklabelT, BoxQueries>> {
     const { device: shownDevice, client } = useShown()
-    const isUp = bankGiver.useBank(isBroughtUp)
+    const isFetchable = bankGiver.useBank(isFetchStage)
     return useMemo(() => {
-      const queries: BoxQueries = Object.freeze({ box: (labelpath: string) => boxQueryOf(shownDevice, labelpath, isUp), client })
+      const queries: BoxQueries = Object.freeze({ box: (labelpath: string) => boxQueryOf(shownDevice, labelpath, isFetchable), client })
       return Object.freeze({ [banklabel]: queries }) as Record<BanklabelT, BoxQueries>
-    }, [shownDevice, isUp, client])
+    }, [shownDevice, isFetchable, client])
   }
 
   // The device stays out of a host's reach: what leaves is the core's copy, each ciphertext masked, and the lease's loggable.
@@ -360,25 +360,25 @@ function makeBankGiver(friend: BankFriend) {
   }
 
   // One factory serves render and the calls outside it: a hook hands it the device it shows, `boxQuery` the one signed in.
-  /** The `queryOptions` of the box at `labelpath` in `device`'s bank, skipping the fetch unless `isUp`, the bank brought up. */
-  function boxQueryOf(device: Device | null, labelpath: string, isUp: boolean): BoxQueryOptions {
-    return queryOptions({ ...boxQueryBaseOf(device, labelpath, isUp), select: liveOf<BoxRecord> })
+  /** The `queryOptions` of the box at `labelpath` in `device`'s bank, skipping the fetch unless `isFetchable`, true at a stage the bank's boxes are fetched at. */
+  function boxQueryOf(device: Device | null, labelpath: string, isFetchable: boolean): BoxQueryOptions {
+    return queryOptions({ ...boxQueryBaseOf(device, labelpath, isFetchable), select: liveOf<BoxRecord> })
   }
 
   // Left with no queryFn, a query of the minder's item fetches by the client's own, which asks the minder of the item's
   // bank and lands the record as a get's.
   /** {@link boxQueryOf}, less its `select`. */
-  function boxQueryBaseOf(device: Device | null, labelpath: string, isUp: boolean): Pick<UseQueryOptions<BoxShown>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
+  function boxQueryBaseOf(device: Device | null, labelpath: string, isFetchable: boolean): Pick<UseQueryOptions<BoxShown>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
     const boxLabelpath = boxLabelpathOf(labelpath)
     return {
       ...recordQueryDefaults(boxLabelpath, () => isBehindAt(device, boxLabelpath), (scoped) => device?.minder.deadAt(scoped)),
       queryKey: boxQueryKeyOf({ userid: useridOf(device), banklabel, labelpath: boxLabelpath }),
-      ...((! isUp || (device === null)) && { queryFn: skipToken }),
+      ...((! isFetchable || (device === null)) && { queryFn: skipToken }),
     }
   }
 
   /** The `queryOptions` of the box at `labelpath`, for whoever is signed in when called: for a route loader or a prefetch.
-   * Run it in {@link queryClient}'s client, not the host's. Its `data` is what {@link useBox} answers. Until the bank is brought up,
+   * Run it in {@link queryClient}'s client, not the host's. Its `data` is what {@link useBox} answers. Until the device's sign-in answers,
    * it fetches nothing, and `query` rejects: a loader waits for the stage to show `locked` or `unlocked` first.
    * In a component, take the giver's `useQueryOptions()` instead, as {@link queryClient} says.
    * @example
@@ -386,7 +386,7 @@ function makeBankGiver(friend: BankFriend) {
    */
   function boxQuery(labelpath: string): BoxQueryOptions {
     const device = signedIn()
-    return boxQueryOf(device, labelpath, (device !== null) && isBroughtUp(device.getSnapshot().bank))
+    return boxQueryOf(device, labelpath, (device !== null) && isFetchStage(device.getSnapshot().bank))
   }
 
   /** The QueryClient that {@link boxQuery}'s queries and {@link keys} run in: the provider's mounted when called, or one where every query fetches nothing while none is.
@@ -398,7 +398,7 @@ function makeBankGiver(friend: BankFriend) {
   function queryClient(): QueryClient { return clientNow() }
 
   /** The box's stored record, through React Query, its whisper still sealed.
-   * `data` is the record, null when none is stored or it was deleted, and undefined while pending or until the bank is brought up.
+   * `data` is the record, null when none is stored or it was deleted, and undefined while pending or until the device's sign-in answers.
    * A record overtaken by a newer revision shows until the newer one arrives.
    * `opts` are React Query's options that shape what this one hook shows. A `select` given there is handed the whole record, or
    * null where none is stored or it was deleted: {@link liveOf} is the default. A `select` that returns a record should return it, or the item's own null,
@@ -409,15 +409,15 @@ function makeBankGiver(friend: BankFriend) {
    */
   function useBox<SelT = BoxSelected>(labelpath: string, opts: BoxQueryOpts<BoxShown, SelT> = {}): UseQueryResult<SelT> {
     const { device, client } = useShown()
-    const isUp = useBank(isBroughtUp)
+    const isFetchable = useBank(isFetchStage)
     const shaping = pick(opts, BoxShapingOptnames)
-    return useQuery<BoxShown, Error, SelT>({ ...boxQueryBaseOf(device, labelpath, isUp), select: liveOf as (thing: BoxShown) => SelT, ...shaping }, client)
+    return useQuery<BoxShown, Error, SelT>({ ...boxQueryBaseOf(device, labelpath, isFetchable), select: liveOf as (thing: BoxShown) => SelT, ...shaping }, client)
   }
 
   // The gate is read from the world in the device's BankMinder at each render, and React keeps only the gate shown: the
   // whole gate, with the bankKeys its wayins wrap, stays in the BankMinder.
   /** The bank's main gate: its wayins' headers, never the bankKey they wrap. Synchronous: it never waits and never suspends.
-   * `data` is the gate, null when no bank is stored, and undefined until the bank is brought up.
+   * `data` is the gate, null when no bank is stored, and undefined until the device's sign-in answers.
    * Its `wayins.passkey0` is the header of the bank's passkey, or null while it has none: a passkey added or revoked on any device shows here.
    * Given `select`, `data` is what `select` makes of the gate.
    * @example
@@ -426,10 +426,10 @@ function makeBankGiver(friend: BankFriend) {
    */
   function useGate<SelT = GateSelected>(opts: GateOpts<SelT> = {}): GateResult<SelT> {
     const { device } = useShown()
-    const isUp = useBank(isBroughtUp)
+    const isFetchable = useBank(isFetchStage)
     const { select = liveGateOf as (gate: GateShown) => SelT } = opts
     const subscribe = useCallback((onChange: () => void) => ((device === null) ? unsubscribeFromNothing : device.bankMinder.subscribe(onChange)), [device])
-    const shownNow = () => ((isUp && (device !== null)) ? gateShownOfWorld(device) : undefined)
+    const shownNow = () => ((isFetchable && (device !== null)) ? gateShownOfWorld(device) : undefined)
     const shown = useSyncExternalStore(subscribe, shownNow, shownNow)
     return { data: (shown === undefined) ? undefined : select(shown) }
   }
@@ -446,10 +446,10 @@ function makeBankGiver(friend: BankFriend) {
    */
   function useBoxList(): UseQueryResult<readonly string[]> {
     const { device, client } = useShown()
-    const isUp = useBank(isBroughtUp)
+    const isFetchable = useBank(isFetchStage)
     return useQuery<Kids, Error, readonly string[]>({
       queryKey: boxListQueryKeyOf({ userid: useridOf(device), banklabel }),
-      ...((! isUp || (device === null)) && { queryFn: skipToken }),
+      ...((! isFetchable || (device === null)) && { queryFn: skipToken }),
       select:   hostLabelpathsOf,
       staleTime: Infinity,
     }, client)
@@ -706,15 +706,15 @@ function makeBankGiver(friend: BankFriend) {
 }
 // --
 
-// == [Helpers]: useridOf, isBroughtUp, isBehindAt, GateShownOfCkey, gateShownOfWorld, BoxShapingOptnames, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
+// == [Helpers]: useridOf, isFetchStage, isBehindAt, GateShownOfCkey, gateShownOfWorld, BoxShapingOptnames, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
 
 /** `device`'s userid, or null for no device. */
 function useridOf(device: Device | null): Userid | null {
   return (device === null) ? null : device.userid
 }
 
-/** True while `bank` is brought up, unborn, locked or unlocked: the stages its boxes and gate are fetched at. */
-function isBroughtUp(bank: BankSnapshot): boolean {
+/** True while `bank` is unborn, locked or unlocked: the stages its boxes and gate are fetched at. */
+function isFetchStage(bank: BankSnapshot): boolean {
   return (bank.stage === 'unborn') || (bank.stage === 'locked') || (bank.stage === 'unlocked')
 }
 

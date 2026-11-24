@@ -2,7 +2,7 @@ import { useId, useState } from 'react'
 import { ModalDialog, UnlockForm } from 'safebyok-react-lean/kit'
 import { Dojo } from '../lib/dojo'
 import { Fixture } from '../lib/fixture'
-import { resetStores, signInAs, signOut } from '../lib/session'
+import { resetStores, signinAs, signOut } from '../lib/session'
 
 /** Who is signed in and the bank's stage, Lock/Unlock, Sign out, Reset, and a button for each fixture user, with their passphrase. */
 export function Header({ userid }: Readonly<{ userid: string | null }>) {
@@ -23,7 +23,7 @@ export function Header({ userid }: Readonly<{ userid: string | null }>) {
       <ul className="users">
         {Fixture.users.map((user) => (
           <li key={user.userid}>
-            <button type="button" onClick={() => { signInAs(user.userid) }}>{user.title}</button>
+            <button type="button" onClick={() => { signinAs(user.userid) }}>{user.title}</button>
             {' '}<span className="quiet">{user.blurb} Passphrase: <code>{user.passphrase}</code></span>
           </li>
         ))}

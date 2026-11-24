@@ -716,7 +716,7 @@ async function renderUnlocked<ResultT>(hook: (world: TH.ProviderWorld) => Result
   const rendered = await renderUnder(hook, { stored: 'jokes' })
   const device = await waitFor(() => rendered.world._cheat_device())
   await act(async () => {
-    await device.signIn(TH.ProviderUser)
+    await device.signin(TH.ProviderUser)
     await device.bank!.gate.unlock({ passphraseCleartext: Passphrase })
   })
   return rendered
@@ -1093,7 +1093,7 @@ async function renderKeyEditor(opts: Partial<PutBoxActionOpts> = {}) {
   const rendered = render(TH.providerTreeOf(world, <editor.KeyEditor />, { userid: TH.ProviderUser }))
   const device = await waitFor(() => world._cheat_device())
   await act(async () => {
-    await device.signIn(TH.ProviderUser)
+    await device.signin(TH.ProviderUser)
     await device.bank!.gate.unlock({ passphraseCleartext: Passphrase })
   })
   return { world, ...editor, ...rendered }
@@ -1272,7 +1272,7 @@ async function renderMutationKeyEditor(opts: Partial<PutBoxActionOpts> = {}) {
   const rendered = render(TH.providerTreeOf(world, <editor.KeyEditor />, { userid: TH.ProviderUser }))
   const device = await waitFor(() => world._cheat_device())
   await act(async () => {
-    await device.signIn(TH.ProviderUser)
+    await device.signin(TH.ProviderUser)
     await device.bank!.gate.unlock({ passphraseCleartext: Passphrase })
   })
   return { world, ...editor, ...rendered }
