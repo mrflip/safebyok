@@ -3,7 +3,10 @@
 Branch `20261124-names`, PR [#876](https://github.com/mrflip/safebyok/pull/876), stacked on
 [#875](https://github.com/mrflip/safebyok/pull/875). Red on purpose: the 18 `vault-minder` tests red from #870 up (listen 4,
 writes 2, staleness 1, and 11 rows of `vault-minder-chains.test.ts`), the same 18 by name before and after. Proved:
-see the PR's **Tests:** line.
+`pnpm justify` after the catch-up (as cut, onto #875's 6d98b27c4): lint, typecheck, build clean; `safebyok` 18 failed
+(those 18, diffed by name), 2084 passed; it stops there, so the packages above the core ran by hand at the same tree:
+`safebyok-react-lean` 320, `safebyok-idb-lean` 113, `safebyok-postgres` 354, `safebyok-graphql` 448, `demo-envman` 24,
+`demo-knockknock` 26, `demo-react` 99, `demo-dojo` 110 passed and 1 failed (red at #875's tip, below).
 
 Two commits and this file: `api:` for `signin`, `storage:` for `banktok`, and `plan:`.
 
