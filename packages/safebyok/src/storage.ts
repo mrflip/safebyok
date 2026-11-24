@@ -3,7 +3,7 @@
 // own code reaches for, re-exported so that each stays one binding across both packages.
 export { type Received, AdapterVaultDB } from './storage/adapter-vault-db'
 export { type Watcher, MemoryVaultDB } from './storage/memory-vault-db'
-export { type ReceivingThing, type SortedVaultDBListener, type SortedVaultDBOpts, type ThingMaker, SortedVaultDB, isSortedVaultDB } from './storage/sorted-vault-db'
+export { type DelOnceArgs, type PutOnceArgs, type ReceivingThing, type SortedVaultDBListener, type SortedVaultDBOpts, type ThingMaker, SortedVaultDB, isSortedVaultDB } from './storage/sorted-vault-db'
 export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
   type AnyThingRecord, type BankRecord, type BoxRecord, type GateRecord, type Modelkind, type Sealed, type Sparse, type StoredCited, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind,
