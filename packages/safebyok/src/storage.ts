@@ -23,6 +23,12 @@ export {
   type Actual, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer,
   type KidEntry, type Kids, type ListThingsActual, type ListThingsAnswer, type ListedBeside, type ReadTc, type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,
 } from './storage/vault-db'
+// The events a feed of vault records tells, and its sorter, which orders what a feed has seen of each Thing.
+export { FeedSorter } from './storage/feed-sorter'
+export {
+  type Agekind, type Agerank, type Lifekind, type Recordkind, type SeenThing, type VaultAgedEvent, type VaultEvent, type VaultEventOf, type VaultEventkind, type VaultItemEvent, type VaultLifeEvent,
+  agekindVals, lifekindVals, recordkindVals, vaultEventkindVals,
+} from './shapes/shapes-vault-event'
 // What a host's persister is written against: TanStack Query's own interface, as a device takes it.
 export { type DevicePersisters, type PersistedClient, type Persister, type PersisterOfBank, MemoryPersister, isPersister } from './storage/persister'
 
