@@ -50,7 +50,7 @@ Reasoning for wontfix: the gain is at most one answer's time in flight, and only
 fix would date an answer outside the library. Ruled by the Coach, 2026-11-15, vault_minder; narrowed to a get by
 the Coach, 2026-11-20, soon_item rework.
 
-### The SortedVaultDB detects no conflict among the records it holds
+### The VaultMinder detects no conflict among the records it holds
 
 * current outcome: a Thing's agerank orders records by lifepath and then revseq, and reads no revtok: two records of one
   revision with different revtoks are one revision to it. A VaultTSQ's get answers what the box's Thing holds once storage
@@ -88,7 +88,7 @@ the datastore has lost or damaged either row.
 Reasoning for wontfix: the device was sent revisions of both rows, so either case means storage has gone wrong
 underneath it: work stops until the page reloads, or until a developer catches the error and restarts the system.
 Pinned by a type-level test that each `tracked` entry is exactly its record or `'same'`, and by a `//` comment at the
-`tracked` type and at `SortedVaultDB`'s `rootsOf` pointing here. Ruled by the Coach, 2026-11-15, lean_buttonup T1.
+`tracked` type and at `VaultMinder`'s `rootsOf` pointing here. Ruled by the Coach, 2026-11-15, lean_buttonup T1.
 
 ### Changing only a box's sidecar needs the bank unlocked and the whisper in hand
 
@@ -248,9 +248,9 @@ thread 12 worker, rewritten by the thread 15 worker, 2026-11-21, awaiting a ruli
 ### A bank's sweep stops its device's vault TSQ, which the device owns
 
 * current outcome: `bank.sweep()` sweeps each vault made on the bank, and `Vault.sweep` sweeps the vault's vault TSQ,
-  which stops hearing the SortedVaultDB. That vault TSQ is the device's: the device makes it at `signin` and hands it to
+  which stops hearing the VaultMinder. That vault TSQ is the device's: the device makes it at `signin` and hands it to
   the vault of its bank, once. After a sweep of the device's bank (`device.sweep()`, or `bank.sweep()` itself), the
-  device stays enabled, but its vault TSQ's items and listings no longer follow what the SortedVaultDB tells, and a
+  device stays enabled, but its vault TSQ's items and listings no longer follow what the VaultMinder tells, and a
   second `device.signin` answers the first and starts nothing.
 * alternatives:
   - have `Vault.sweep` leave the vault TSQ be, and `device.sweep` stop it: the device then decides when its vault TSQ
@@ -260,7 +260,7 @@ thread 12 worker, rewritten by the thread 15 worker, 2026-11-21, awaiting a ruli
 * workaround: make a new device after a sweep, as a page reload does.
 
 Steps to reproduce: sign in on a device whose bank is stored, sweep it with `bank.sweep()`, then write a new revision
-of a box from another device: the device's SortedVaultDB tells of it, and the box's item in `device.vaultTSQ` keeps the
+of a box from another device: the device's VaultMinder tells of it, and the box's item in `device.vaultTSQ` keeps the
 old one.
 
 Reasoning for wontfix: who stops the vault TSQ belongs to how ownership is apportioned among device, bank and vault,
@@ -307,7 +307,7 @@ what the bankDB holds. Unspecified and unguarded; reviewer, 2026-11-22, awaiting
 
 ### A `read_tc` from a clock running ahead pins a Thing's agerank time in the future
 
-* current outcome: a `SortedVaultDB` keeps, as the last field of each Thing's agerank, the first eight hexadecimal
+* current outcome: a `VaultMinder` keeps, as the last field of each Thing's agerank, the first eight hexadecimal
   digits of the `read_tc` its newest revision was last seen at, whatever their time. A source whose clock runs ahead (a
   datastore's, or another device's records rung and handed to its `receive`) hands a `read_tc` in the future, and the
   time is pinned there: a true sighting of that revision tells nothing until real time passes it. A newer revision or a
@@ -322,7 +322,7 @@ what the bankDB holds. Unspecified and unguarded; reviewer, 2026-11-22, awaiting
 * workaround: the customer keeps its datastore's and its devices' clocks in step, or refetches what it shows; the bankDB
   is the ground truth.
 
-Steps to reproduce: listen to a `SortedVaultDB`; hand its `receive` an event of a record at a `read_tc` an hour ahead
+Steps to reproduce: listen to a `VaultMinder`; hand its `receive` an event of a record at a `read_tc` an hour ahead
 of now; hand it the same record again at a `read_tc` of now. The second tells nothing.
 
 Reasoning for wontfix: a clock running ahead is a broken system, and the fix is a check in the common code against it
@@ -332,11 +332,11 @@ and it would have to be the customer's call whether to tolerate it or panic."
 
 ### A device's sweep while `signin` restores its caches leaves the vaultDB watched
 
-* current outcome: `signin` makes the device's `SortedVaultDB`, which watches the host's vaultDB, only once both
-  persisters have restored. A `Device.sweep` that lands while they restore finds no `SortedVaultDB` to stop; the one
+* current outcome: `signin` makes the device's `VaultMinder`, which watches the host's vaultDB, only once both
+  persisters have restored. A `Device.sweep` that lands while they restore finds no `VaultMinder` to stop; the one
   made after it watches until the page goes, and the vault TSQ, the world and the persisters' scaffold hear what it tells.
 * alternatives:
-  - make the `SortedVaultDB` before the restores, as it was: its sorter would sort records no listener hears, and drop
+  - make the `VaultMinder` before the restores, as it was: its sorter would sort records no listener hears, and drop
     them as repeats once they listen.
   - have the sweep mark the device so the sign-in stops: a state and a check in the sign-in for a sweep landing in a
     window of milliseconds.
