@@ -1,4 +1,4 @@
-/** The `SortedVaultDB` class: a vaultDB over another. */
+/** `SortedVaultDB`, a vaultDB that wraps another. */
 
 import { type Errors, Validator } from 'safebyok-big/internals'
 import type { BirthBankAsk, GetAsk, ListAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
@@ -8,24 +8,24 @@ import type { BirthBankAnswer, GetThingAnswer, ListThingsAnswer, VaultDB, WriteT
 
 // == [SortedVaultDB]: SortedVaultDBOpts, SortedVaultDB
 
-/** The options a {@link SortedVaultDB} is made with. */
+/** Options for {@link SortedVaultDB.make}. */
 export interface SortedVaultDBOpts {
-  /** The vaultDB it asks. */
+  /** The vaultDB to wrap. */
   vaultDB: VaultDB
 }
 
 // Each verb hands what it is given to the vaultDB it wraps, which checks it, and answers a refusal rather than throwing.
-/** A vaultDB that asks another: each verb answers as that vaultDB answers, and its watch tells what that vaultDB's watch tells. */
+/** A vaultDB that passes each verb and each watch straight through to the vaultDB it wraps. */
 export class SortedVaultDB implements VaultDB {
   // == [Props]: #vaultDB
 
-  /** The vaultDB it asks. */
+  /** The wrapped vaultDB. */
   readonly #vaultDB: VaultDB
   // --
 
   // == [Construction]: make, constructor
 
-  /** A vaultDB over `opts.vaultDB`. It asks nothing and watches nothing until it is called. */
+  /** Wrap `opts.vaultDB`, asking and watching nothing yet. */
   static make(opts: SortedVaultDBOpts): SortedVaultDB { return new SortedVaultDB(opts) }
 
   private constructor(opts: SortedVaultDBOpts) {
@@ -37,19 +37,19 @@ export class SortedVaultDB implements VaultDB {
 
   // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, watch
 
-  /** The Thing at `ask`'s scope, as the wrapped vaultDB answers ({@link VaultDB.tryGetThing}). */
+  /** {@link VaultDB.tryGetThing}, passed to the wrapped vaultDB. */
   async tryGetThing(ask: GetAsk): Promise<GetThingAnswer> { return await this.#vaultDB.tryGetThing(ask) }
 
-  /** Write `ask.record` over the Thing `ask.cited`, as the wrapped vaultDB answers ({@link VaultDB.tryWriteThing}). */
+  /** {@link VaultDB.tryWriteThing}, passed to the wrapped vaultDB. */
   async tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer> { return await this.#vaultDB.tryWriteThing(ask) }
 
-  /** The children of the Thing at `ask`'s scope, as the wrapped vaultDB answers ({@link VaultDB.tryListThings}). */
+  /** {@link VaultDB.tryListThings}, passed to the wrapped vaultDB. */
   async tryListThings(ask: ListAsk): Promise<ListThingsAnswer> { return await this.#vaultDB.tryListThings(ask) }
 
-  /** Write a new bank's three roots, or answer the roots already stored, as the wrapped vaultDB answers ({@link VaultDB.tryBirthBank}). */
+  /** {@link VaultDB.tryBirthBank}, passed to the wrapped vaultDB. */
   async tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer> { return await this.#vaultDB.tryBirthBank(ask) }
 
-  /** Watch a bank's Things through the wrapped vaultDB's watch, returning the function that stops it ({@link VaultDB.watch}). */
+  /** {@link VaultDB.watch}, passed to the wrapped vaultDB with the caller's own handlers. */
   watch(scope: ThingWatchScope, onNotice: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void): () => void { return this.#vaultDB.watch(scope, onNotice, onBadNews) }
   // --
 }
