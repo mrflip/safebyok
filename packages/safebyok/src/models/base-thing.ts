@@ -3,7 +3,7 @@ import { SX } from 'safebyok-big/internals'
 import { type Banklabel, type EpochMillis, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq, VoidLifeseq } from '../shapes/primitives'
 import type { ShellOf } from '../shapes/shapes-sealers'
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, ThingChecks } from '../shapes/shapes-thing'
-import { ThingkindChecks } from '../shapes/shapes-thingkinds'
+import { BoxChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
 
 // == [Kinds]: KindRecords, RecordOfKind, Kinded, MembersOfKind, LiveOfKind, TombstoneOfKind, VoidSentinelOfKind, WholeOfKind
 
@@ -24,10 +24,10 @@ export type MembersOfKind<ValT, RecordT extends Sparse<ThingRecord>> = ValT exte
   ? (ValT extends RecordT ? ValT : (RecordT extends ValT ? ValT : (ShellOf<RecordT> extends ValT ? ValT : never)))
   : never
 
-/** `ValT`, narrowed to a live Thing of the kind `KindT`: sparse, unless `ValT` says it is whole. */
+/** `ValT`, narrowed to a live Thing of the kind `KindT`: its Thing fields, and whole where `ValT` says so. Only a box may be sparse. */
 export type LiveOfKind<KindT extends Thingkind | null, ValT> = MembersOfKind<ValT, RecordOfKind<KindT>> & Sparse<RecordOfKind<KindT>> & Readonly<{ am: 'a' }>
 
-/** `ValT`, narrowed to a tombstone of the kind `KindT`: sparse, unless `ValT` says it is whole. */
+/** `ValT`, narrowed to a tombstone of the kind `KindT`, or its shell: its Thing fields, and whole where `ValT` says so. */
 export type TombstoneOfKind<KindT extends Thingkind | null, ValT> = MembersOfKind<ValT, RecordOfKind<KindT>> & Sparse<RecordOfKind<KindT>> & Readonly<{ am: 'x' }>
 
 /** `ValT`, narrowed to the void sentinel of the kind `KindT`. */
@@ -76,19 +76,19 @@ export abstract class BaseThing implements Sparse<ThingRecord> {
 
   // == [Guards]: isLive, isTombstone, isGone, isVoidSentinel, isWhole, isSparse
 
-  /** True when `val` is a live Thing of this class's kind, sparse or whole. */
+  /** True when `val` is a live Thing of this class's kind: whole, or a live box's sparse form. */
   static isLive<KindT extends Thingkind | null, ValT>(this: Kinded<KindT>, val: ValT): val is LiveOfKind<KindT, ValT> {
     const report = ThingChecks.scopedLive.safeParse(val)
     return report.success && isOfKind(this.modelkind, report.data.labelpath)
   }
 
-  /** True when `val` is a tombstone of this class's kind, sparse or whole, the void sentinel among them. */
+  /** True when `val` is a tombstone of this class's kind, the void sentinel among them. */
   static isTombstone<KindT extends Thingkind | null, ValT>(this: Kinded<KindT>, val: ValT): val is TombstoneOfKind<KindT, ValT> {
     const report = ThingChecks.scopedTombstone.safeParse(val)
     return report.success && isOfKind(this.modelkind, report.data.labelpath)
   }
 
-  /** True when `val` is the tombstone of a deleted Thing of this class's kind, sparse or whole: any tombstone but the void sentinel. */
+  /** True when `val` is the tombstone of a deleted Thing of this class's kind: any tombstone but the void sentinel. */
   static isGone<KindT extends Thingkind | null, ValT>(this: Kinded<KindT>, val: ValT): val is TombstoneOfKind<KindT, ValT> {
     const report = ThingChecks.scopedTombstone.safeParse(val)
     return report.success && isOfKind(this.modelkind, report.data.labelpath) && (! isVoidCited(report.data))
@@ -106,9 +106,9 @@ export abstract class BaseThing implements Sparse<ThingRecord> {
   }
 
   // Not a type predicate: TypeScript would read a false answer about a whole live record to mean it is no record at all.
-  /** True when `record` is live, of this class's kind, and not whole. */
+  /** True when `record` is a live box's sparse form, its Thing fields alone, and of this class's kind. A bank or a gate has none. */
   static isSparse<KindT extends Thingkind | null>(this: Kinded<KindT>, record: Sparse<ThingRecord>): boolean {
-    return (record.am === 'a') && isOfKind(this.modelkind, record.labelpath) && (! isWholeOfKind(this.modelkind, record))
+    return BoxChecks.sparse.safeParse(record).success && isOfKind(this.modelkind, record.labelpath)
   }
   // --
 

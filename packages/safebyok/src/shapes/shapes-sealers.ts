@@ -5,11 +5,11 @@ import { exactOptional } from 'zod'
 import { CX, type Crypto, type SX, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import type { EpochMillis, VoidLifeseq } from './primitives'
-import type { BoxRecord, Sealed, Sparse, ThingRecord } from './shapes-thing'
+import type { BoxRecord, BoxSparse, Sealed, Sparse, ThingRecord } from './shapes-thing'
 
 export type { Sealed } from './shapes-thing'
 
-// == [A record's forms]: SealedPartsOf, SealedOf, UnsealedOf, LiveOf, TombstoneOf, ShellOf, RevisionOf, BodyOf, Sealable, PublicPropsOf, LivePublicPropsOf, TombstonePublicProps
+// == [A record's forms]: SealedPartsOf, SealedOf, UnsealedOf, LiveOf, TombstoneOf, SparseOf, ShellOf, RevisionOf, BodyOf, Sealable, PublicPropsOf, LivePublicPropsOf, TombstonePublicProps
 
 /** A {@link Sealed} field at `<part>_sealed` for each part that `CleartextsT` names. */
 export type SealedPartsOf<CleartextsT> = { readonly [PartT in keyof CleartextsT & string as `${PartT}_sealed`]: Sealed }
@@ -28,6 +28,9 @@ export type LiveOf<RecordT> = RecordT & Readonly<{ am: 'a' }>
 /** The tombstones of `RecordT`. */
 export type TombstoneOf<RecordT> = RecordT & Readonly<{ am: 'x' }>
 
+/** The sparse form of `RecordT`: a live box without its body ({@link BoxSparse}), and none for a bank or a gate. */
+export type SparseOf<RecordT> = RecordT extends BoxRecord ? BoxSparse : never
+
 /** The shell of `RecordT`: the void record, without a body, that its first revision is sealed over and cites.
  * Its revision is the void one: revseq -1, and the void revtok and lifeseq.
  */
@@ -43,7 +46,7 @@ export type RevisionOf<RecordT, CleartextsT> = RecordT extends unknown ? Omit<Re
 /** The body of a live `RecordT`: its fields other than its Thing fields and its sealed parts, such as a box's sidecar. */
 export type BodyOf<RecordT, CleartextsT> = Omit<LiveOf<RecordT>, keyof Sparse<ThingRecord> | keyof SealedPartsOf<CleartextsT>>
 
-// A body field may be undefined, as a Thing's is over the shell or a sparse tombstone, so that a Thing is sealable as it stands.
+// A body field may be undefined, as it is in the shell and in a live box's sparse form, so that a Thing is sealable as it stands.
 /** The record of `RecordT`'s kind that a seal makes the next revision from: whole, sparse or unsealed, live, a tombstone or the shell.
  * The seal carries over its Thing fields and its body, and never its secrets.
  */

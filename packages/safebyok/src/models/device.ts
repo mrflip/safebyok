@@ -22,6 +22,7 @@ import { itemSeenOf, readTcNow } from '../storage/agerank'
 import { Labelpath } from '../shapes/primitives'
 import type { ReadTc, SeenThing, VaultEvent } from '../shapes/shapes-vault-event'
 import { type Modelkind, PerKindChecks, ThingChecks } from '../shapes/shapes-thing'
+import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
@@ -397,7 +398,7 @@ function maskedViewLeaseOf(world: World | undefined): MaskedViewLease {
 // == [Checks]: Checks
 
 /** The checks of {@link Device.make}'s arguments, {@link Device.signin}'s, a root read from a root shelf, and {@link tellBadNewsTo}'s. */
-const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
+const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom, union }) => ({
   userid:        BankishChecks.userid,
   deviceMakeArgs: obj({
     record: BankishChecks.deviceRecord,
@@ -414,8 +415,8 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
       deviceDB:        custom<unknown>().optional(),
     }), { refusalkind: 'bad_record' }),
   }),
-  // Loose, so the record reaches the VaultMinder whole, which checks it as it checks any record.
-  shelvedRoot:   ThingChecks.sparse.loose(),
+  // The shelf keeps the roots only while all three are live, each whole.
+  shelvedRoot:   union([BankChecks.record, GateChecks.record, BoxChecks.record]),
   tellBadNewsToArgs: obj({
     onBadNews: fn<BadNewsHandler>(),
     device:    custom<Device>(),

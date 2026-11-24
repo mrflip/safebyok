@@ -3,7 +3,7 @@ import { Errors } from 'safebyok-big/internals'
 import { describe, expect, it } from 'vitest'
 import { VaultTSQ } from '../../../src/minding/vault-tsq'
 import { Lifeseq } from '../../../src/shapes/primitives'
-import type { BoxRecord, Sparse, ThingRecord } from '../../../src/shapes/shapes-thing'
+import type { BoxRecord, BoxSparse, Sparse, ThingRecord } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
@@ -189,14 +189,14 @@ const ChainCases: readonly ChainCase[] = [
 const BoxKey = VaultTSQ.itemQueryKeyOf(TH.BoxScope)
 
 /** The record `precis` stands for: the box at `TH.BoxScope` at that revision of that life, whole or sparse. */
-function recordOf([liveness, lifenum, revseq]: Precis): BoxRecord | Sparse<BoxRecord> {
+function recordOf([liveness, lifenum, revseq]: Precis): BoxRecord | BoxSparse {
   const lifeseq = Lifeseq.ofLifenum(lifenum)
   if ((liveness === 'gone') !== Lifeseq.isTombstone(lifeseq)) { throw new Error(`no ${liveness} has the lifenum ${String(lifenum)}`) }
   const whole   = TH.boxThingOf('openai', {
     am: (liveness === 'gone') ? 'x' : 'a', lifeseq, lifepath: `${TH.Life0}/${lifeseq}`, revseq, revtok: TH.revtokOf(String(revseq)),
     born_at: TH.T0 + lifenum, written_at: TH.T0 + revseq,
   })
-  return (liveness === 'soon') ? Thing.sparseOf(whole) : whole
+  return (liveness === 'soon') ? TH.boxSparseOf(whole) : whole
 }
 
 /** The précis of the whole record `precis` is of: a soon's is its item. */

@@ -36,13 +36,13 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   // == [Body]: wayins, auth, sigs, meta
   // Read off the record adopted: a field it lacks reads as undefined.
 
-  /** The wayin records, frozen, or undefined over the shell or a sparse tombstone. */
+  /** The wayin records, frozen, or undefined over the shell. */
   get wayins(): Wayins | undefined { return wholeOf(this.pickle())?.wayins }
-  /** Reserved, and empty, or undefined over the shell or a sparse tombstone. */
+  /** Reserved, and empty, or undefined over the shell. */
   get auth(): GateRecord['auth'] | undefined { return wholeOf(this.pickle())?.auth }
-  /** Reserved, and empty, or undefined over the shell or a sparse tombstone. */
+  /** Reserved, and empty, or undefined over the shell. */
   get sigs(): GateRecord['sigs'] | undefined { return wholeOf(this.pickle())?.sigs }
-  /** Reserved, and empty, or undefined over the shell or a sparse tombstone. */
+  /** Reserved, and empty, or undefined over the shell. */
   get meta(): GateRecord['meta'] | undefined { return wholeOf(this.pickle())?.meta }
   // --
 
@@ -319,7 +319,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
 // == [Helpers]: wholeOf, wayinsOf
 
-/** `record` where it has a gate's body, else undefined: the shell, or a sparse tombstone */
+/** `record` where it has a gate's body, else undefined: the shell */
 function wholeOf(record: Adoptable<GateRecord>): GateRecord | undefined { return ('wayins' in record) ? record : undefined }
 
 // A Wayin's pickle is typed as either kind; the gate record's parse checks each is the kind its label wants.

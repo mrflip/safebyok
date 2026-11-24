@@ -96,10 +96,12 @@ export const EventModelkind = "An event's modelkind is the kind its labelpath be
 export const EventOfOtherThing = "An event's val is at the event's own scope: its userid, banklabel and labelpath."
 
 /** An event whose liveness is not its val's. */
-export const EventLiveness = "An event's liveness is its val's: soon for a sparse live record, full for a whole one, gone for a tombstone, void for the void sentinel."
+export const EventLiveness = "An event's liveness is its val's: soon for a live box's sparse form, full for a whole live record, gone for a tombstone, void for the void sentinel."
+/** A record seen in no form a Thing receives. */
+export const SeenFormUnknown = "A record seen is whole, the void sentinel, or a live box's sparse form: a tombstone, a bank and a gate are never sparse."
 
 /** An event that is not void, whose val is not a Thing's fields, or is the void sentinel. */
-export const ThingFieldsExpected = "An event that is not void has a Thing's fields as its val, sparse or whole, never the void sentinel."
+export const ThingFieldsExpected = "An event that is not void has a Thing's fields as its val, whole or a live box's sparse form, never the void sentinel."
 
 /** A citation that is half the shell. */
 export const CitedHalfShell = "What a write cites is the shell, at revseq -1, a lifepath ending in '-000000001' and the void revtok, in all three or in none."
@@ -161,6 +163,8 @@ export const PolicyNotOwn = "Only a gate's writes name storage policies: a bank 
 /** A bank stored without one of its roots, or with one damaged. */
 export const BankRootsMissing = "A bank is stored without its main gate or its root box, or with its bank or main gate damaged: the store needs mending by hand."
 
+/** A list whose parent holds a tombstone or nothing. */
+export const ListParentNotLive = "The Thing listed is not stored live: it was never stored, or was deleted, and has no children."
 /** The last resort of a vaultDB's error handler. */
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --

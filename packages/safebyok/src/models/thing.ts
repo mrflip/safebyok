@@ -10,7 +10,7 @@ import * as Throwers from '../refusals/throwers'
 
 // == [Adoptable]: Adoptable
 
-/** A record a Thing of `RecordT`'s kind models: a whole live record, a tombstone, or the void sentinel. */
+/** A record a Thing of `RecordT`'s kind models: a whole record, live or a tombstone, or the void sentinel. */
 export type Adoptable<RecordT extends ThingRecord> = RecordT | Tombstone<RecordT> | ShellOf<RecordT>
 // --
 
@@ -21,7 +21,7 @@ export type Adoptable<RecordT extends ThingRecord> = RecordT | Tombstone<RecordT
 /** A model of the stored Thing at one labelpath, across its lives, which reads as the record it last adopted.
  * Each field of that record is read-only. Its Thing fields are its own enumerable props: a spread, `{ ...thing }`, or
  * `JSON.stringify` shows nothing secret and nothing opaque. A kind's body is read by a subclass's getters off the record adopted.
- * A body field the record lacks reads as undefined: after a tombstone or the shell, a Thing answers none of its last live record's body. Its scope fields never change.
+ * After a tombstone, a Thing answers the tombstone's body, never its last live record's; over the shell, which has none, each body field reads as undefined. Its scope fields never change.
  * Its type names the Thing fields and what a subclass declares; narrow {@link pickle} for the rest of a kind's fields.
  * What Thing itself holds is records as the vaultDB stores them, and what is derived from them: never a cleartext, a key or a lease.
  * It always models a record, at worst the shell, and its {@link receive} says which item events of the Thing are news.
@@ -73,7 +73,7 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
 
   // == [Feed]: citable, agerank, agekind, read_at, receive
 
-  /** What a write over this Thing cites: the Thing fields of the newest revision seen, sparse or whole. */
+  /** What a write over this Thing cites: the Thing fields of the newest revision seen, whole or a live box's sparse form. */
   get citable(): Sparse<ThingRecord> { return this.#citable }
 
   /** How far this Thing has been seen, as {@link Agerank} spells it, or undefined until it first receives a record. */
@@ -90,8 +90,8 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
    * News is a record that leaves the agerank greater than it was: from a later life, newer than any revision seen, a whole record newer than any
    * whole one seen, or the newest revision seen again in a later tcchunk, a span of 65.536 seconds, than it was last seen in.
    * The events are `proposed` with its ageranks, then any `life`, then any `aged`, each frozen. A whole record, a tombstone
-   * or the void sentinel is adopted, unless it equals the record held, which stays the same object; a sparse live record moves only `citable`, `agerank` and `read_at`.
-   * Each subscriber is told once the news is taken in. A `life` or `aged` event returns none. Refuses an event of another Thing.
+   * or the void sentinel is adopted, unless it equals the record held, which stays the same object; a live box's sparse form moves only `citable`, `agerank` and `read_at`.
+   * Each subscriber is told once the news is taken in. A `life` or `aged` event returns none. Refuses an event of another Thing, and a record in any other form.
    */
   receive(proposed: VaultEvent<RecordT>): readonly VaultEvent<RecordT>[] {
     SeenChecks.event.parseConsistent(proposed, pick(this, ['userid', 'banklabel', 'labelpath']))

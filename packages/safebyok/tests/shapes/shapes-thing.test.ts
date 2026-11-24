@@ -429,9 +429,9 @@ describe("checkedBirthBankAsk(ask)", () => {
 describe("the ask builders", () => {
   const box = TH.boxThingOf()
 
-  it("fill in a get's ifAbsent 'nil' and a list's 'fail', and drop what is not a scope", () => {
+  it("fill in a get's ifAbsent 'nil', and drop what is not a scope", () => {
     expect(getAskOf(box)).to.deep.equal(TH.getAskAt('box/openai', 'nil'))
-    expect(listAskOf(TH.RootScope)).to.deep.equal(TH.listAskAt('box', 'fail'))
+    expect(listAskOf(TH.RootScope)).to.deep.equal(TH.listAskAt('box'))
     expect(getAskOf({ ...TH.GateScope, ifAbsent: 'fail' })).to.deep.equal(TH.getGateAskOf('fail'))
   })
 
@@ -446,7 +446,7 @@ describe("the ask builders", () => {
     const tomb = TH.boxTombOf(box)
     const banktok = TH.FirstLifetok
     expect(getAskOf({ ...TH.BoxScope, banktok })).to.deep.equal({ ...TH.getAskAt('box/openai', 'nil'), banktok })
-    expect(listAskOf({ ...TH.RootScope, banktok })).to.deep.equal({ ...TH.listAskAt('box', 'fail'), banktok })
+    expect(listAskOf({ ...TH.RootScope, banktok })).to.deep.equal({ ...TH.listAskAt('box'), banktok })
     expect(putAskOf({ cited: Shell.childCited(Life0), record: box, banktok })).to.deep.include({ banktok })
     expect(delAskOf({ cited: box, record: tomb, banktok })).to.deep.equal({ ...TH.delAskFor(box, tomb), banktok })
     expect(getAskOf(TH.BoxScope)).to.not.have.property('banktok')

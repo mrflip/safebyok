@@ -278,15 +278,16 @@ describe("a gate over the shell or a tombstone", () => {
     expect(Object.isFrozen(gate.wayins?.main)).to.be.true
   })
 
-  it("stops answering its wayins once it receives a tombstone of a later life", async () => {
-    const gate = makeGate(await gateRecordOf())
+  it("refuses a tombstone of the main gate, sparse or whole, still answering its wayins", async () => {
+    const record = await gateRecordOf()
+    const gate = makeGate(record)
     const later = Lifeseq.ofLifenum(1)
-    const tombstone = { ...TH.GateScope, label: 'gate', fmt: ThingFormat, revtok: TH.revtokOf('gone'), revseq: 1, am: 'x', lifeseq: later, lifepath: later, born_at: TH.T0, written_at: TH.T0 + 1 } as const
-    gate.receive(TH.thingEventOf<GateRecord>(tombstone))
-    expect(gate.pickle()).to.equal(tombstone)
-    expect(Object.hasOwn(gate, 'wayins')).to.be.false
-    TH.expectSyncRefusal(() => gate.main, 'absent_thing')
-    await TH.expectRefusal(gate.unlock({ passphraseCleartext: TH.TestPassphrase }), 'absent_thing')
+    const tombstone = { ...record, revtok: TH.revtokOf('gone'), revseq: 1, am: 'x', lifeseq: later, lifepath: later, written_at: TH.T0 + 1 } as const
+    for (const val of [tombstone, Thing.sparseOf(tombstone)]) {
+      TH.expectSyncRefusal(() => gate.receive(TH.thingEventOf<GateRecord>(val as never)), 'bad_record')
+    }
+    expect(gate.pickle()).to.equal(record)
+    expect(gate.wayins).to.deep.equal(record.wayins)
   })
 
   it("adopts a newer revision it receives, answering that revision's wayins", async () => {

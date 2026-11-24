@@ -70,7 +70,6 @@ function tcchunkAfter([, highWas, , tcchunkWas]: AgerankFields, revseq: string, 
 /** The greater of two agerank fields, which compare as text */
 function laterOf(ante: string, post: string): string { return (post > ante) ? post : ante }
 
-// A sparse tombstone is a tombstone like any other: a dead life has one revision, and its sparse record says all of it.
 // The caller's check passed `seen` as live or a tombstone, so what is neither the void sentinel nor live is a tombstone.
 /** The liveness of `seen`, with `seen` itself as its `val`: what an `item` event of it carries. */
 export function itemSeenOf(seen: SeenThing): ItemSeen {

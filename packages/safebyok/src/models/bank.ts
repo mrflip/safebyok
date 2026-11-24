@@ -30,8 +30,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   // == [Body]: lifetok
 
   // we are under-using the lifetok at the moment
-  // Read off the record adopted: the shell and a sparse tombstone lack it.
-  /** The token minted when this bank was born, which tells this life of the bank from any other under its banklabel. Undefined over the shell or a sparse tombstone. */
+  // Read off the record adopted: the shell lacks it.
+  /** The token minted when this bank was born, which tells this life of the bank from any other under its banklabel. Undefined over the shell. */
   get lifetok(): Lifetok | undefined {
     const record = this.pickle()
     return ('lifetok' in record) ? record.lifetok : undefined

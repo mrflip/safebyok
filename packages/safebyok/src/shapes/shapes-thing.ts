@@ -28,7 +28,7 @@ export const ThingFormat = 'a010501'
 function isLabelpath(labelpath: Labelpath): boolean { return thingkindVals.some((modelkind) => Labelpath.isOfModelkind(labelpath, modelkind)) }
 // --
 
-// == [Thing]: isLifepathDeep, isParityRight, GenericChecks, vaultDBShape, PerKindChecks, policiesByModelkind, ThingChecks, ThingScope, ScopeAt, ThingCited, StoredCited, Sealed, Wayins, Sparse, AnyThingRecord
+// == [Thing]: isLifepathDeep, isParityRight, GenericChecks, vaultDBShape, PerKindChecks, policiesByModelkind, ThingChecks, ThingScope, ScopeAt, ThingCited, StoredCited, Sealed, Wayins, Sparse, BoxSparse, AnyThingRecord
 
 // A stored lifeseq is 10 base-32 digits; the void lifeseq, -000000001, is never stored. A lifepath joins lifeseqs with '/',
 // and every one after a void one is void: a void lifepath is the void lifeseq under its parent's lifepath (void itself
@@ -55,7 +55,7 @@ export function isParityRight({ am, lifepath }: Lived): boolean { return (am ===
 function isMainGateLive({ labelpath, am }: Lived & Labelled): boolean { return (labelpath !== Labelpath.MainGate) || (am === 'a') }
 /** True unless the box is a tombstone whose sidecar is not empty. */
 function isGoneSidecarEmpty({ am, sidecar }: { am: string, sidecar: object }): boolean { return (am === 'a') || isEmptyObject(sidecar) }
-// A Thing over the shell or a sparse tombstone answers undefined for its body: a citation may be such a Thing.
+// A citation may be the shell, or a live box's sparse form, neither of which has a body.
 /** The fields of `shape`, each optional: it may be omitted, or undefined. */
 function partialOf<ShapeT extends Z.ZodRawShape>(shape: ShapeT): { [FieldT in keyof ShapeT]: Z.ZodOptional<ShapeT[FieldT]> } {
   // Object.fromEntries loses the fieldnames' types: the cast restores them.
@@ -91,10 +91,10 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
     am,
     lifepath: anyLifepath,
   })
-  // A Thing's scope and citation: what every record and tombstone has, sparse or whole. Its revseq is the shell's -1
+  // A Thing's scope and citation: what every record, tombstone and shell has, and a live box's sparse form. Its revseq is the shell's -1
   // only beside the void revtok and lifeseq, and they only beside it.
   const scopedCited  = obj({ ...thingScope.shape, ...thingCited.shape }).refine(isShellCitable, Phrases.CitedHalfShell)
-  // The fields every live Thing, and every tombstone, has, sparse or whole: what the record guards read.
+  // The fields every live Thing and every tombstone has, a live box's sparse form among them: what the record guards read.
   const scopedLive      = scopedCited.safeExtend({ am: lit('a') })
   const scopedTombstone = scopedCited.safeExtend({ am: lit('x') })
   // A checked record shows its fields in this order, for a reader's eye alone: nothing stored, compared or bound into a
@@ -165,6 +165,12 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
     whisper_sealed: sealed,
   }).strict()
   const boxLive      = boxBase.extend({ am: lit('a') })
+  // A live box without its body: the only sparse form of any record. A bank, a gate and a tombstone are whole wherever they appear.
+  const boxSparse    = obj({ ...sparse.shape, labelpath: boxLabelpath, am: lit('a') }).strict()
+    .refine(isLabelLast,    Phrases.LabelNotLast)
+    .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
+    .refine(isLifepathDeep, Phrases.LifepathDepth)
+    .refine(isParityRight,  Phrases.LifeseqParity)
 
   const bankThing    = bankBase
     .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
@@ -246,7 +252,7 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
   const boxThingOrShell  = union([boxThing, shellAt(boxLabelpath)])
   return {
     bankLabelpath, gateLabelpath, boxLabelpath, wayins, storedWayins, storedLifetok,
-    bankThing, bankCited, bankThingOrShell, gateThing, gateCited, gateThingOrShell, boxThing, boxCited, boxThingOrShell, boxSealable, boxLiveSealable, boxRecord, boxRecordOrShell,
+    bankThing, bankCited, bankThingOrShell, gateThing, gateCited, gateThingOrShell, boxThing, boxCited, boxThingOrShell, boxSparse, boxSealable, boxLiveSealable, boxRecord, boxRecordOrShell,
   }
 }))
 
@@ -286,8 +292,12 @@ export type Sealed       = Readonly<Z.infer<typeof ThingChecks.sealed>>
 /** A gate's wayins: `main`, its passphrase wayin, and `passkey0`, its passkey wayin or null for none. */
 export type Wayins       = Readonly<Z.infer<typeof PerKindChecks.wayins>>
 
-/** A record's Thing fields, without its body: what a listing returns for each Thing. */
+/** A record's Thing fields, without its body. Only a live box has a sparse form ({@link BoxSparse}): of any other record, these are its Thing fields alone. */
 export type Sparse<RecordT extends Sparse<ThingRecord>> = Pick<RecordT, ThingFieldname>
+// Stored, a sparse box has neither body field. Typed, each may be left out or undefined, so that a Box over it, whose
+// getters answer undefined, ducks as one: no other record field, of any kind or form, is optional.
+/** A live box without its body, `sidecar` and `whisper_sealed`, as a listing carries it: the only sparse form of any record. */
+export type BoxSparse    = Readonly<Z.infer<typeof PerKindChecks.boxSparse> & { sidecar?: BoxRecord['sidecar'] | undefined, whisper_sealed?: Sealed | undefined }>
 // --
 
 // == [Shells]: ShellChecks, VoidSentinel, Shell
@@ -421,8 +431,8 @@ export const Shell = Object.freeze({
 
 // == [Reading records]: Tombstone
 
-/** A tombstone of a RecordT, sparse or whole. */
-export type Tombstone<RecordT extends Sparse<ThingRecord>> = TombstoneOf<RecordT> | (Sparse<RecordT> & Readonly<{ am: 'x' }>)
+/** A tombstone of a RecordT, whole: a tombstone has no sparse form. */
+export type Tombstone<RecordT extends Sparse<ThingRecord>> = TombstoneOf<RecordT>
 // --
 
 // == [Making a Thing]: BulletproofCallback, ThingMakeOpts, ThingMakeChecks

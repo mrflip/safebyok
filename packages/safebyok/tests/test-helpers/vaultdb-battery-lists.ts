@@ -2,12 +2,11 @@
 import { describe, expect, it } from 'vitest'
 import { expectBad, expectGood } from 'safebyok-big/testing'
 import { type Labelpath, VoidLifeseq } from '../../src/shapes/primitives'
-import type { BoxRecord } from '../../src/shapes/shapes-thing'
+import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import type { Kids } from '../../src/shapes/shapes-answers'
 import type { VaultDB } from '../../src/storage/vault-db'
-import { Life0, ReadTcPattern, ThingBank, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAskFor, listAskAt, rootBoxOf } from './vaultdb-world'
+import { Life0, ReadTcPattern, RootScope, ThingBank, birthAskOf, boxRebornOf, boxSparseOf, boxThingOf, boxTombOf, delAskFor, gateThingOf, listAskAt, rootBoxOf } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
-import { Thing } from '../../src/models/thing'
 
 /** A box under the root box that fails its checks, which a datastore that keeps only a row's columns can still contain. */
 const DamagedBox = Object.freeze({ ...boxThingOf('bad'), whisper_sealed: {} })
@@ -43,14 +42,14 @@ export function describeVaultDBLists({ fresh, bornBank, bornUnder, boxesBorn, ro
   }
 
   describe("tryListThings(ask)", () => {
-    it("answers the parent's children by label, the live and the tombstones apart, with the parent and each child sparse beside", async () => {
+    it("answers the parent's children by label, the live and the tombstones apart, with each live box beside sparse and each tombstone whole", async () => {
       const vaultDB = await bornBank()
       const [zz, aa, mm] = await boxesBorn(vaultDB, boxThingOf('zz'), boxThingOf('aa'), boxThingOf('mm'))
       const mmGone = boxTombOf(mm!)
       await expectGood(vaultDB.tryWriteThing(delAskFor(mm!, mmGone)))
       const answer = await vaultDB.tryListThings(listAskAt('box'))
-      expect(answer).to.deep.include({ ok: true, act: 'gotlive', parentage: [Thing.sparseOf(rootBoxOf())], damaged_rows: [] })
-      expect(answer.deltas).to.deep.equal([aa, mmGone, zz].map((box) => Thing.sparseOf(box!)))
+      expect(answer).to.deep.include({ ok: true, act: 'gotlive', parentage: [boxSparseOf(rootBoxOf())], damaged_rows: [] })
+      expect(answer.deltas).to.deep.equal([boxSparseOf(aa!), mmGone, boxSparseOf(zz!)])
       const read_tc = answer.ok ? answer.read_tc : ''
       expect(read_tc).to.match(ReadTcPattern)
       expect(answer.ok && answer.val).to.deep.equal(kidsOf(rootBoxOf(), [aa!, mmGone, zz!], read_tc))
@@ -66,7 +65,7 @@ export function describeVaultDBLists({ fresh, bornBank, bornUnder, boxesBorn, ro
     it("lists labels byte by byte, never by a locale's order", async () => {
       const vaultDB = await bornBank()
       const [ab, az, a9] = await boxesBorn(vaultDB, boxThingOf('ab'), boxThingOf('a_z'), boxThingOf('a9'))
-      expect(await deltasAt(vaultDB, 'box')).to.deep.equal([a9, az, ab].map((box) => Thing.sparseOf(box!)))
+      expect(await deltasAt(vaultDB, 'box')).to.deep.equal([a9, az, ab].map((box) => boxSparseOf(box!)))
     })
 
     it("leaves out the children of the parent's earlier lives", async () => {
@@ -78,7 +77,7 @@ export function describeVaultDBLists({ fresh, bornBank, bornUnder, boxesBorn, ro
       const fresh = boxThingOf('fresh', { lifepath: `${rootAgain.lifepath}/${Life0}` })
       await bornUnder(vaultDB, fresh, rootAgain.lifepath)
       const answer = await vaultDB.tryListThings(listAskAt('box'))
-      expect(answer.deltas).to.deep.equal([Thing.sparseOf(fresh)])
+      expect(answer.deltas).to.deep.equal([boxSparseOf(fresh)])
       expect(answer.ok && answer.val).to.deep.equal(answer.ok && kidsOf(rootAgain, [fresh], answer.read_tc))
     })
 
@@ -88,33 +87,32 @@ export function describeVaultDBLists({ fresh, bornBank, bornUnder, boxesBorn, ro
       await rowsOf(vaultDB).plant({ ...ThingBank, labelpath: 'box/bad' }, DamagedBox)
       const answer = await vaultDB.tryListThings(listAskAt('box'))
       expect(answer).to.deep.include({ ok: true, damaged_rows: [{ ...ThingBank, labelpath: 'box/bad', am: 'd' }] })
-      expect(answer.deltas).to.deep.equal([Thing.sparseOf(aa!)])
+      expect(answer.deltas).to.deep.equal([boxSparseOf(aa!)])
     })
 
-    it("answers no children, and the parent, for a parent gone under ifAbsent 'nil', reading no child", async () => {
-      const vaultDB = await withRootGone()
-      const answer = await vaultDB.tryListThings(listAskAt('box', 'nil'))
-      expect(answer).to.deep.include({ ok: true, act: 'gotgone', deltas: [], parentage: [Thing.sparseOf(RootGone)], damaged_rows: [] })
-      expect(answer.ok && answer.val).to.deep.equal(answer.ok && kidsOf(RootGone, [], answer.read_tc))
-    })
-
-    it("refuses a parent gone under ifAbsent 'fail', with no children as dbhas and the read_tc of its read, reading no child", async () => {
+    it("refuses a parent gone, with its tombstone as dbhas, no children and the read_tc of its read, reading no child", async () => {
       const vaultDB = await withRootGone()
       const answer = await vaultDB.tryListThings(listAskAt('box'))
-      expect(answer).to.deep.include({ ok: false, act: 'gone', dbhas: [], parentage: [Thing.sparseOf(RootGone)], deltas: [], damaged_rows: [] })
+      await expectBad(Promise.resolve(answer), 'absent_thing')
+      expect(answer).to.deep.include({ ok: false, act: 'gone', dbhas: RootGone, parentage: [], deltas: [], damaged_rows: [] })
       expect(answer.read_tc).to.match(ReadTcPattern)
     })
 
-    it("answers or refuses a void parent by ifAbsent, with no children and a read_tc, reading no child", async () => {
+    it("refuses a root never stored, with its shell as dbhas, no children and a read_tc, reading no child", async () => {
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant({ ...ThingBank, labelpath: 'box/bad' }, DamagedBox)
-      const nilAnswer = await vaultDB.tryListThings(listAskAt('box', 'nil'))
-      expect(nilAnswer).to.deep.include({ ok: true, act: 'gotvoid', deltas: [], parentage: [], damaged_rows: [] })
-      expect(nilAnswer.ok && nilAnswer.val).to.deep.equal(nilAnswer.ok && kidsOf({ labelpath: 'box', lifepath: VoidLifeseq }, [], nilAnswer.read_tc))
       const answer = await vaultDB.tryListThings(listAskAt('box'))
-      await expectBad(Promise.resolve(answer), 'absent_vault')
-      expect(answer).to.deep.include({ ok: false, act: 'void', dbhas: [], parentage: [], deltas: [], damaged_rows: [] })
+      await expectBad(Promise.resolve(answer), 'absent_thing')
+      expect(answer).to.deep.include({ ok: false, act: 'void', dbhas: Shell.of(RootScope), parentage: [], deltas: [], damaged_rows: [] })
+      expect(Shell.of(RootScope)).to.deep.include({ lifepath: VoidLifeseq })
       expect(answer.read_tc).to.match(ReadTcPattern)
+    })
+
+    it("refuses a parent below the root never stored, with null as dbhas: a listing reads no lives above its parent", async () => {
+      const vaultDB = await bornBank()
+      const answer = await vaultDB.tryListThings(listAskAt('box/aa'))
+      await expectBad(Promise.resolve(answer), 'absent_thing')
+      expect(answer).to.deep.include({ ok: false, act: 'void', dbhas: null, parentage: [], deltas: [], damaged_rows: [] })
     })
 
     it("lists no children under a box below the root, nor under the main gate", async () => {
@@ -122,6 +120,11 @@ export function describeVaultDBLists({ fresh, bornBank, bornUnder, boxesBorn, ro
       const [aa] = await boxesBorn(vaultDB, boxThingOf('aa'))
       expect(await deltasAt(vaultDB, aa!.labelpath)).to.deep.equal([])
       expect(await deltasAt(vaultDB, 'gate')).to.deep.equal([])
+    })
+
+    it("carries a parent that is not a box whole", async () => {
+      const vaultDB = await bornBank()
+      expect(await vaultDB.tryListThings(listAskAt('gate'))).to.deep.include({ ok: true, act: 'gotlive', parentage: [gateThingOf()] })
     })
 
     it("refuses a parent past its kind's depth", async () => {

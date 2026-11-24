@@ -3,8 +3,8 @@
 import type * as Z from 'zod'
 import { CX, type EX, type Errors, Validator } from 'safebyok-big/internals'
 import type { Labelpath, Lifepath, Lifeseq, Lifetok } from './primitives'
-import type { Sparse, ThingRecord, ThingScope, VoidSentinel } from './shapes-thing'
-import type { TombstoneOf } from './shapes-sealers'
+import type { ThingRecord, ThingScope, VoidSentinel } from './shapes-thing'
+import type { SparseOf, TombstoneOf } from './shapes-sealers'
 import type { BankRoots, LoggableAsk, Tracked, WorldRecord } from './shapes-asks'
 import { type ReadTc, SeenChecks } from './shapes-vault-event'
 
@@ -56,9 +56,8 @@ export type KidEntry = Readonly<{ lifeseq: Lifeseq }>
 
 // Keyed by label, not labelpath. JavaScript orders an object's keys that look like whole numbers first, so a reader that
 // needs labelpath order sorts the labels.
-/** The children of one life of a Thing, by label, as the datastore read them at `read_tc`: the live ones in `items`, the tombstones in `gones`.
- * `parentpath` is the parent's labelpath, and `parentlife` the lifepath of the parent's life stored, live or a tombstone, or
- * the shell's lifeseq alone where nothing is stored there. Only a live parent has children.
+/** The children of one live life of a Thing, by label, as the datastore read them at `read_tc`: the live ones in `items`, the tombstones in `gones`.
+ * `parentpath` is the parent's labelpath, and `parentlife` the lifepath of the parent's live life.
  */
 export type Kids = Readonly<{
   modelkind:  'kids'
@@ -69,24 +68,24 @@ export type Kids = Readonly<{
   read_tc:    ReadTc
 }>
 
-/** What a listing answer carries beside its `val` or `dbhas`, good or refused:
- * - `parentage`    -- the parent, sparse, if one is stored
- * - `deltas`       -- each child the `val` names, sparse, in labelpath order
+/** What a listing answer carries beside its `val` or `dbhas`, each empty when refused. A live box is carried sparse, and any other Thing whole:
+ * - `parentage`    -- the parent
+ * - `deltas`       -- each child the `val` names, in labelpath order
  * - `damaged_rows` -- each child that fails its kind's checks
  */
 export type ListedBeside<RecordT extends ThingRecord = ThingRecord> = {
-  parentage:    readonly Sparse<RecordT>[]
-  deltas:       readonly Sparse<RecordT>[]
+  parentage:    readonly (RecordT | SparseOf<RecordT>)[]
+  deltas:       readonly (RecordT | SparseOf<RecordT>)[]
   damaged_rows: readonly DamagedThing[]
 }
 
-/** The answer to `tryListThings`: the parent's children as a {@link Kids} value, whose `read_tc` is the answer's. Its act is the parent's get act.
- * Refused under `void` or `gone`, its `dbhas` is `[]`, its `read_tc` says when the datastore read the parent, and its `parentage`
- * holds the parent's tombstone under `gone`; under `void` it says nothing of the life above the parent. If the verb threw, `dbhas` is null.
+/** The answer to `tryListThings`: the live parent's children as a {@link Kids} value, whose `read_tc` is the answer's.
+ * A parent that is not live refuses `absent_thing`, `gone` with its tombstone as `dbhas`, or `void` with the shell at a root
+ * and null below one. If the verb threw, `dbhas` is null.
  */
 export type ListThingsAnswer<RecordT extends ThingRecord = ThingRecord> =
-  | (GoodAnswer<Kids, EX.GotAct> & ListedBeside<RecordT>)
-  | (BadAnswer<Sparse<RecordT>[] | null> & ListedBeside<RecordT>)
+  | (GoodAnswer<Kids, 'gotlive'> & ListedBeside<RecordT>)
+  | (BadAnswer & ListedBeside<RecordT>)
 
 /** The answer to `tryBirthBank`: the three roots written (`born`), or found already stored (`passed`). Refused, its `dbhas` is the root stored that refused it. */
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
@@ -110,8 +109,8 @@ export const ActualChecks = Validator.Checkers('storage_issue', ({ obj, custom }
   }),
   /** Pick what a listing's report carries beside that: its `parentage`, `deltas` and `damaged_rows`. */
   listed: obj({
-    parentage:    custom<readonly Sparse<ThingRecord>[]>(Array.isArray),
-    deltas:       custom<readonly Sparse<ThingRecord>[]>(Array.isArray),
+    parentage:    custom<ListedBeside['parentage']>(Array.isArray),
+    deltas:       custom<ListedBeside['deltas']>(Array.isArray),
     damaged_rows: custom<readonly DamagedThing[]>(Array.isArray),
   }),
 }))
@@ -138,12 +137,12 @@ export type GotActual = Actual<EX.GotAct>
 /** A concrete adapter's report of a write: its `record` is the Thing it reports writing, or unwritten, the Thing stored at the scope, or the shell there where none is. */
 export type WroteActual = Actual<EX.PutAct | EX.DelAct>
 
-/** A concrete adapter's report of a listing: the parent's act, its children as a {@link Kids} value but for the report's own `read_tc`, and what the answer carries beside it.
- * Refused, it has no children.
+/** A concrete adapter's report of a listing: the live parent's children as a {@link Kids} value but for the report's own `read_tc`, and what the answer carries beside it.
+ * Refused, it has no children, and its `record` is the parent's tombstone, or the shell at a root where nothing is stored, or null.
  */
 export type ListThingsActual = ActualBeside & Readonly<ListedBeside> & (
-  | Readonly<{ ok: true,  act: EX.GotAct, kids: Omit<Kids, 'read_tc'> }>
-  | Readonly<{ ok: false, act: EX.RefusedAct }>
+  | Readonly<{ ok: true,  act: 'gotlive', kids: Omit<Kids, 'read_tc'> }>
+  | Readonly<{ ok: false, act: 'void' | 'gone', record: ThingRecord | VoidSentinel | null }>
 )
 
 /** A concrete adapter's report of a bank's birth: the three roots, written or already stored, or the first refused act with the Thing stored at that root, or its shell where none is. */

@@ -3,17 +3,17 @@
 import { Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { type Banklabel, type Lifetok, type Userid, Labelpath } from './primitives'
-import type { LiveOf, ShellOf } from './shapes-sealers'
-import { type Sparse, type ThingRecord, type Thingkind, type Tombstone, ThingChecks, isLifepathDeep, isParityRight } from './shapes-thing'
+import type { LiveOf, ShellOf, SparseOf } from './shapes-sealers'
+import { type ThingRecord, type Thingkind, type Tombstone, ThingChecks, isLifepathDeep, isParityRight } from './shapes-thing'
 import { BaseThing } from '../models/base-thing'
 import { itemSeenOf } from '../storage/agerank'
 
 // == [Kinds]: livenessVals, Liveness, lifekindVals, Lifekind, agekindVals, Agekind, vaultEventkindVals, VaultEventkind
 
 /** Liveness of a record seen:
- * - `soon` -- a sparse live record
+ * - `soon` -- a live box's sparse form
  * - `full` -- a whole live record
- * - `gone` -- a tombstone, whole or sparse
+ * - `gone` -- a whole tombstone
  * - `void` -- nothing stored
  */
 export const livenessVals = ['soon', 'full', 'gone', 'void'] as const
@@ -56,8 +56,8 @@ export type VaultEventkind = typeof vaultEventkindVals[number]
  */
 export type Agerank = string
 
-/** A record seen of a Thing of `RecordT`'s kind: whole or sparse, live or a tombstone, or the void sentinel for nothing stored. */
-export type SeenThing<RecordT extends ThingRecord = ThingRecord> = RecordT | Sparse<RecordT> | ShellOf<RecordT>
+/** A record seen of a Thing of `RecordT`'s kind: whole, live or a tombstone, a live box's sparse form, or the void sentinel for nothing stored. */
+export type SeenThing<RecordT extends ThingRecord = ThingRecord> = RecordT | SparseOf<RecordT> | ShellOf<RecordT>
 // --
 
 // == [Events]: VaultEvent, VaultEventOf, VaultItemEvent, ItemSeen, VaultLifeEvent, VaultAgedEvent
@@ -93,13 +93,13 @@ export type VaultItemEvent<RecordT extends ThingRecord = ThingRecord> = VaultEve
 
 /** The record of `RecordT`'s kind an `item` event saw, as `val`, beside its `liveness`. From a Thing's `receive`, `val` is the very object it was given.
  * - `full` -- a whole live record
- * - `soon` -- a sparse live record
- * - `gone` -- a tombstone, whole or sparse
+ * - `soon` -- a live box's sparse form: a bank or a gate has none
+ * - `gone` -- a whole tombstone
  * - `void` -- the void sentinel, for nothing stored
  */
 export type ItemSeen<RecordT extends ThingRecord = ThingRecord> =
   | Readonly<{ liveness: 'full', val: LiveOf<RecordT> }>
-  | Readonly<{ liveness: 'soon', val: Sparse<LiveOf<RecordT>> }>
+  | Readonly<{ liveness: 'soon', val: SparseOf<RecordT> }>
   | Readonly<{ liveness: 'gone', val: Tombstone<RecordT> }>
   | Readonly<{ liveness: 'void', val: ShellOf<RecordT> }>
 
@@ -118,7 +118,7 @@ export type VaultAgedEvent = VaultEventOf<'aged'> & Readonly<{
 }>
 // --
 
-// == [Checks]: ReadTc, ReadTcPattern, SeenChecks
+// == [Checks]: ReadTc, ReadTcPattern, isSeenForm, SeenChecks
 
 /** When the datastore was read, as a UUID version 7: lowercase hex of a fixed width, so that two compare as text in the order of their reads.
  * Compare two of them as strings, never with the device's clock.
@@ -127,6 +127,9 @@ export type ReadTc = string
 
 /** A UUID version 7, as text: the shape of every {@link ReadTc}. */
 export const ReadTcPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+/** True when `val` is in a form a Thing receives: whole, live or a tombstone, the void sentinel, or a live box's sparse form. */
+export function isSeenForm(val: SeenThing): boolean { return BaseThing.isWhole(val) || BaseThing.isSparse(val) }
 
 // The lifepath's depth is what lets two ageranks of one Thing compare as text: every lifepath of the Thing then has as
 // many lifeseqs, each ten characters, so the fields after it line up.
@@ -153,6 +156,7 @@ export const SeenChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom
     })
       .refine(({ labelpath, modelkind }) => Labelpath.modelkindOf(labelpath) === modelkind, Phrases.EventModelkind)
       .refine(({ val, ...scope }) => BaseThing.haveSameScope(val, scope), Phrases.EventOfOtherThing)
+      .refine(({ val }) => isSeenForm(val as SeenThing), Phrases.SeenFormUnknown)
       .refine(({ val, liveness }) => itemSeenOf(val as SeenThing).liveness === liveness, Phrases.EventLiveness),
   }
 })

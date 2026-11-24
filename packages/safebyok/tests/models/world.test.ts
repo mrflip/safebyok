@@ -2,12 +2,11 @@
 
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { Bank } from '../../src/models/bank'
-import { BaseThing } from '../../src/models/base-thing'
 import { Box } from '../../src/models/box'
 import type { Device } from '../../src/models/device'
 import { Gate } from '../../src/models/gate'
 import { type BadNews, type WorldSnapshot, PendingWorld, bankStageVals } from '../../src/shapes/shapes-bankish'
-import { Shell } from '../../src/shapes/shapes-thing'
+import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import type { SeenThing } from '../../src/shapes/shapes-vault-event'
 import { readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
@@ -40,11 +39,11 @@ describe("world.makeThing(seen)", () => {
   })
 
   it("makes the Thing of a sparse record over its kind's shell, which then cites the record it receives", () => {
-    const sparse = BaseThing.sparseOf(TH.boxThingOf())
+    const sparse = TH.boxSparseOf(TH.boxThingOf())
     const thing = TH.makeDevice().world.makeThing(sparse)
     if (! (thing instanceof Box)) { throw new TypeError("A box's sparse record made no Box.") }
     expect(thing.pickle()).to.deep.equal(Shell.inParentLivesOf(sparse))
-    thing.receive(TH.thingEventOf(sparse))
+    thing.receive(TH.thingEventOf<BoxRecord>(sparse))
     expect(thing.pickle()).to.deep.equal(Shell.inParentLivesOf(sparse))
     expect(thing.citable).to.deep.include({ revtok: sparse.revtok, revseq: sparse.revseq, lifepath: sparse.lifepath })
   })

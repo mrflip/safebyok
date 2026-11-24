@@ -22,7 +22,7 @@ export type BoxUnsealed = UnsealedOf<BoxRecord, BoxCleartexts>
 
 // == [The bank's drafts and asks]: BankAskDraft
 
-/** The draft of a get or list ask, for `VaultMinder.makeGetAsk` or `makeListAsk`: a labelpath in the bank, and `ifAbsent`, the answer when nothing is stored there.
+/** The draft of a get or list ask, for `VaultMinder.makeGetAsk` or `makeListAsk`: a labelpath in the bank, and for a get, `ifAbsent`, the answer when nothing is stored there.
  * The VaultMinder fills in the rest of the {@link GetAsk} or {@link ListAsk}.
  */
 export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent }>
