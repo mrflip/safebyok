@@ -6,7 +6,7 @@ import { type ThingRecord, Shell } from '../../src/shapes/shapes-thing'
 import type { ReadTc, SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { VaultMinder } from '../../src/minding/vault-minder'
-import { readTcNow } from '../../src/storage/thing-classifier'
+import { readTcNow } from '../../src/storage/agerank'
 import type { VaultDB } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 

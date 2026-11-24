@@ -3,7 +3,7 @@
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- a devDependency while PostgresVaultDB is not exported
 import {
   type AnyAsk, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetAsk, type GotActual, type ListThingsActual, type ListAsk,
-  type Received, type ThingWatchScope, type VaultError, type WriteAct, type WriteAsk, type WroteActual, AdapterVaultDB, Classifier, Shell, getAskOf, isVaultError, objCheck,
+  type Received, type ThingWatchScope, type VaultError, type WriteAct, type WriteAsk, type WroteActual, AdapterVaultDB, Classifier, Shell, getAskOf, isVaultError, objCheck, readTcNow,
 } from 'safebyok/storage'
 import { type PostgresListen, type PostgresQueryable, jsonOrNull, listenOrNull, refusalOf, storedNothing, unlistenOnceListening } from './postgres-bank-db'
 import { BirthRootsSql, GetThingSql, ListThingsSql, WriteThingSql } from './vault-queries'
@@ -116,7 +116,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
   /** The raw Thing at `ask`'s scope, null for none, its bank's raw world, the nearest Thing stored above it, and how the world and root box compare with what `ask` tracks, and when they were read. */
   async #fetchThing(ask: GetAsk | WriteAsk): Promise<Classifier.AboveFetched & { thing: unknown }> {
     const { userid, banklabel, labelpath, modelkind } = ask
-    const read_tc = Classifier.readTcNow()
+    const read_tc = readTcNow()
     const { thing, world, ancestor, tracked } = await this.#firstRow<FetchedThing>(GetThingSql[modelkind], [userid, banklabel, labelpath, trackParam(ask)])
     return { thing, ...world, ancestor, tracked, read_tc }
   }
@@ -139,7 +139,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
     // Whether it stored the record, the Thing as it now stands, the raw world, the nearest Thing stored above it, how the world compares with the track, and the verdicts
     // of the checks the act tables cannot name: the stored born_at kept, the stored lifetok kept (the bank's alone), and the
     // storage policies met (the gate's alone). Each verdict is true where its check does not apply.
-    const read_tc  = Classifier.readTcNow()
+    const read_tc  = readTcNow()
     const written  = await this.#firstRow<FetchedThing & { ok: boolean, born_at_ok: boolean, lifetok_ok: boolean, policies_ok: boolean }>(WriteThingSql[ask.modelkind], params)
     if (written.ok) {
       return { ok: true, act: writtenActOf(ask), world: Classifier.worldOf(ask, written.world), tracked: Classifier.trackedOf(ask, written.tracked), read_tc, record: Classifier.writtenThingOf(ask, written.thing) }
@@ -158,7 +158,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
   protected async doListThings(ask: ListAsk): Promise<ListThingsActual> {
     const { userid, banklabel, labelpath, modelkind } = ask
     const params = [userid, banklabel, labelpath, trackParam(ask)]
-    const read_tc = Classifier.readTcNow()
+    const read_tc = readTcNow()
     const { parent, children, world, tracked } = await this.#firstRow<Classifier.ThingsFetched & { world: WorldRow, tracked: Classifier.TrackedFetched }>(ListThingsSql[modelkind], params)
     return this.classifyListThings(ask, { parent, children }, { ...world, tracked, read_tc })
   }
@@ -166,7 +166,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
   protected async doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthBankActual> {
     // Whether it stored the three roots, each as it now stands, and how they compare with the track.
     const params  = [...puts.map(({ record }) => JSON.stringify(record)), trackParam(ask)]
-    const read_tc = Classifier.readTcNow()
+    const read_tc = readTcNow()
     const written = await this.#firstRow<Omit<Classifier.BankRootsFetched, 'read_tc'> & { ok: boolean }>(BirthRootsSql, params)
     if (written.ok) {
       const things = Classifier.writtenRootsOf(puts, written)

@@ -2,7 +2,7 @@ import { act, render, renderHook, screen, waitFor } from '@testing-library/react
 import { noop } from 'es-toolkit'
 import { type ReactNode, useEffect, useLayoutEffect } from 'react'
 import { type BoxRecord, type GateRecord, type PasskeyWayinHeader, type PersistedClient, type Persister, MemoryPersister, VaultMinder, VaultTSQ } from 'safebyok'
-import { Classifier, storageUnavailable } from 'safebyok/storage'
+import { readTcNow, storageUnavailable } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { type BoxSelected, passkeyHeaderOf } from '../../src/index'
@@ -196,7 +196,7 @@ describe("useBox over the vault TSQ's own items", () => {
     const gets = { count: 0 }
     world.vaultDB.tryGetThing = (ask) => {
       gets.count += 1
-      return Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, banktok: null, read_tc: Classifier.readTcNow(), dbhas: null, err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
+      return Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, banktok: null, read_tc: readTcNow(), dbhas: null, err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
     }
     await act(async () => { await expect(vaultTSQ.getOnce(JokesScope, { staleTime: 0 })).rejects.toHaveProperty('refusalkind', 'storage_unavailable') })
     await waitFor(() => { expect(seen.current?.isError).to.eq(true) })
@@ -304,7 +304,7 @@ describe("useBoxList over the vault TSQ's own listing", () => {
 
   it("shows a list refused as its error", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
-    world.vaultDB.tryListThings = (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, banktok: null, read_tc: Classifier.readTcNow(), dbhas: null, parentage: [], deltas: [], damaged_rows: [], err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
+    world.vaultDB.tryListThings = (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, banktok: null, read_tc: readTcNow(), dbhas: null, parentage: [], deltas: [], damaged_rows: [], err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
     function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
     const { result } = renderHook(() => world.Bank.useBoxList(), { wrapper: Wrapper })
     await waitFor(() => { expect(result.current.isError).to.eq(true) })

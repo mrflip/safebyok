@@ -18,6 +18,7 @@ export {
   listAskOf, putAskOf,
 } from './shapes/shapes-asks'
 export * as Classifier from './storage/thing-classifier'
+export { readAtOf, readTcNow } from './storage/agerank'
 export { type BankScope, type BankStamp, type BoxStamp, type GateStamp, StampChecks } from './shapes/shapes-stamps'
 export {
   type Actual, type ActualBeside, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer, type GotActual,

@@ -6,8 +6,7 @@ import {
   Shell, ThingFormat,
 } from '../../src/shapes/shapes-thing'
 import type { SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
-import { itemSeenOf } from '../../src/storage/agerank'
-import { readTcNow } from '../../src/storage/thing-classifier'
+import { itemSeenOf, readTcNow } from '../../src/storage/agerank'
 import { PlainThing } from './plain-thing'
 import { WayinChecks } from '../../src/shapes/shapes-wayin'
 import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'

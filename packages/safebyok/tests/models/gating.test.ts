@@ -12,7 +12,7 @@ import { Lease } from '../../src/models/lease'
 import type { GatingCleartexts } from '../../src/shapes/shapes-gateish'
 import type { BirthBankAnswer } from '../../src/shapes/shapes-answers'
 import * as TH from '../test-helpers'
-import { readTcNow } from '../../src/storage/thing-classifier'
+import { readTcNow } from '../../src/storage/agerank'
 
 /** A bank born on `device` by `Bank.birth`, once the device has signed in, from `cleartexts` as the caller hands them. */
 async function birth(device: Device, cleartexts: unknown): Promise<Bank> {

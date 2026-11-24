@@ -15,9 +15,8 @@ import { type ReadTc, type SeenThing, type VaultEvent, SeenChecks } from '../sha
 import { BaseThing } from '../models/base-thing'
 import type { Adoptable } from '../models/thing'
 import * as Throwers from '../refusals/throwers'
-import { itemSeenOf } from '../storage/agerank'
+import { itemSeenOf, readTcNow } from '../storage/agerank'
 import { refusedAnswerOf } from '../storage/refused-answer'
-import { readTcNow } from '../storage/thing-classifier'
 import type { BirthBankAnswer, GetThingAnswer, Kids, ListThingsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import type { VaultDB } from '../storage/vault-db'
 

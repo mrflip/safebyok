@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
+import { readTcNow } from '../../src/storage/agerank'
 import * as Classifier from '../../src/storage/thing-classifier'
 import { Shell } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
@@ -59,7 +60,7 @@ describe("Classifier.classifyListThings(ask, fetched, roots)", () => {
   it("refuses, as a broken store, a child a store fetched from outside the parent", () => {
     const child = { labelpath: 'box/aa/deep', raw: TH.boxThingOf('deep') }
     const fetched = { parent: TH.rootBoxOf(), children: [child] }
-    TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), fetched, { bank: null, maingate: null, tracked: null, read_tc: Classifier.readTcNow() }), 'storage_issue')
+    TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), fetched, { bank: null, maingate: null, tracked: null, read_tc: readTcNow() }), 'storage_issue')
   })
 })
 
@@ -72,7 +73,7 @@ describe("Classifier.classifyGetThing(ask, raw, above) and Classifier.classifyWr
 
   for (const [refusalkind, ancestor, blurb] of OverNothing) {
     it(blurb, () => {
-      const above = { bank: null, maingate: null, tracked: null, read_tc: Classifier.readTcNow(), ancestor }
+      const above = { bank: null, maingate: null, tracked: null, read_tc: readTcNow(), ancestor }
       TH.expectSyncRefusal(() => Classifier.classifyGetThing(TH.getAskAt('box/openai'), null, above), refusalkind)
       TH.expectSyncRefusal(() => Classifier.classifyWriteThing({ ...TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)), ifAbsent: 'fail' }, null, above), refusalkind)
     })
