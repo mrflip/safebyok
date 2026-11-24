@@ -359,7 +359,7 @@ export class Device {
    * default handler is called instead of the host's.
    */
   tellBadNews(badnews: readonly unknown[]): void {
-    const refusals = badnews.map((news) => (Errors.isVaultError(news) ? news : Throwers.unexpectedError(news)))
+    const refusals = badnews.map((news) => Throwers.refusalOfThrown(news))
     // A thing disabled since is no news: the host swept it, or its bank went away.
     tellBadNewsTo(this.isEnabled ? this.#onBadNews : DefaultOnBadNews, this, refusals.filter((refusal) => refusal.refusalkind !== 'disabled'))
   }

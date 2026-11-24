@@ -431,7 +431,7 @@ function isLive<ThingT extends WorldThing>(thing: ThingT | null): thing is Thing
 
 /** What a snapshot shows of `err`: its refusal's kind, family and message, anything but a refusal as an unexpected error */
 function refusalSnapshotOf(err: unknown): RefusalSnapshot {
-  const { refusalkind, family, message } = Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)
+  const { refusalkind, family, message } = Throwers.refusalOfThrown(err)
   return Object.freeze({ refusalkind, family, message })
 }
 

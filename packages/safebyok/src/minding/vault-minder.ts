@@ -21,10 +21,10 @@ import { readTcNow } from '../storage/thing-classifier'
 import type { BirthBankAnswer, GetThingAnswer, Kids, ListThingsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import type { VaultDB } from '../storage/vault-db'
 
-// == [VaultMinder]: Stamp, Listening, VaultMinder
+// == [VaultMinder]: Dispatch, Listening, VaultMinder
 
 /** Who dispatched a record, when it was read, and its bank's lifetok where known: every event of it carries all three. */
-type Stamp = Readonly<{ sourcelabel: string, read_tc: ReadTc, banktok: Lifetok | undefined }>
+type Dispatch = Readonly<{ sourcelabel: string, read_tc: ReadTc, banktok: Lifetok | undefined }>
 
 /** One call of `listen`, holding its listener: a listener that listens twice is told twice, and each end stops one. */
 type Listening = Readonly<{ listener: VaultMinderListener }>
@@ -302,30 +302,30 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   /** Tell every listener the events of the record in `notice`, a notice of the wrapped vaultDB's watch. */
   #tellNotice(notice: VaultEvent): void {
     if (notice.eventkind !== 'item') { return }
-    // The wrapped vaultDB stamps its notices when it classifies their records; one that does not is read now.
+    // The wrapped vaultDB gives each notice the read_tc it classified its record at; a notice without one is read now.
     this.#tell([notice.val], { sourcelabel: VaultMinder.VaultDBSourcelabel, read_tc: notice.read_tc ?? readTcNow(), banktok: notice.banktok ?? this.#newestBanktok })
   }
 
-  /** Tell every listener each event the Things return for `seens`, in order, each carrying `stamp`. A record refused goes to every listener's `onBadNews`. */
-  #tell(seens: readonly SeenThing[], stamp: Stamp): void {
+  /** Tell every listener each event the Things return for `seens`, in order, each carrying `dispatch`. A record refused goes to every listener's `onBadNews`. */
+  #tell(seens: readonly SeenThing[], dispatch: Dispatch): void {
     for (const seen of seens) {
       let events: readonly VaultEvent[]
-      try { events = this.#receiveAtThing(seen, stamp) } catch (err) { this.#tellBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)); continue }
+      try { events = this.#receiveAtThing(seen, dispatch) } catch (err) { this.#tellBadNews(Throwers.refusalOfThrown(err)); continue }
       for (const event of events) {
         for (const { listener } of this.#listenings) {
           // A listener whose hear throws has a bug in the host's code, not trouble in storage.
-          try { listener.hear(event) } catch (err) { listener.onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
+          try { listener.hear(event) } catch (err) { listener.onBadNews(Throwers.refusalOfThrown(err)) }
         }
       }
     }
   }
 
   // A Thing is kept only once it has received its first record, so a refused record leaves no Thing behind.
-  /** The events the Thing at `seen`'s labelpath returns for `seen` at `stamp`, the Thing made first where there is none */
-  #receiveAtThing(seen: SeenThing, stamp: Stamp): readonly VaultEvent[] {
+  /** The events the Thing at `seen`'s labelpath returns for `seen` at `dispatch`, the Thing made first where there is none */
+  #receiveAtThing(seen: SeenThing, dispatch: Dispatch): readonly VaultEvent[] {
     const { labelpath } = SeenChecks.seenCited.parseConsistent(seen, this.#scope)
     const proposed = Object.freeze({
-      eventkind: 'item', ...this.#scope, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: undefined, agerankWas: undefined, ...stamp, ...itemSeenOf(seen),
+      eventkind: 'item', ...this.#scope, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: undefined, agerankWas: undefined, ...dispatch, ...itemSeenOf(seen),
     } as const)
     const thing  = this.#things.get(labelpath) ?? this.#makeThing(seen)
     const events = thing.receive(proposed)
