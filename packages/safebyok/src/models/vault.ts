@@ -15,7 +15,7 @@ import type { BoxRecord, ThingScope } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 import { VaultChecks } from '../shapes/shapes-vault'
 import type { SortedVaultDB } from '../storage/sorted-vault-db'
-import type { WriteThingAnswer } from '../storage/vault-db'
+import type { WriteThingAnswer } from '../shapes/shapes-answers'
 
 /** One bank's boxes in this tab: the verbs to seal and write them, and to use their whispers.
  * Each seal is made under the bank's lease, so it needs the bank unlocked. A box a verb answers is the {@link Box} the
