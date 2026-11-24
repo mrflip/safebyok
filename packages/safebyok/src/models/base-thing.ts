@@ -112,7 +112,7 @@ export abstract class BaseThing implements Sparse<ThingRecord> {
   }
   // --
 
-  // == [Reading records]: haveSameScope, cmp, sparseOf
+  // == [Reading records]: haveSameScope, cmp, sparseOf, nextLifeOf
 
   /** True when `ante` and `post` are at one labelpath of one bank. */
   static haveSameScope(ante: ThingScope, post: ThingScope): boolean {
@@ -132,6 +132,12 @@ export abstract class BaseThing implements Sparse<ThingRecord> {
 
   /** The Thing fields of `record`, without its body. */
   static sparseOf<SparseT extends Sparse<ThingRecord>>(record: SparseT): Sparse<SparseT> { return pick(record, ThingFieldnames) }
+
+  /** The lifeseq and lifepath of the life after the life of `thing`, under the same lives above it. */
+  static nextLifeOf({ lifeseq, lifepath }: Pick<Sparse<ThingRecord>, 'lifeseq' | 'lifepath'>): Pick<Sparse<ThingRecord>, 'lifeseq' | 'lifepath'> {
+    const nextLifeseq = Lifeseq.ofLifenum(Lifeseq.lifenumOf(lifeseq) + 1)
+    return { lifeseq: nextLifeseq, lifepath: `${lifepath.slice(0, lifepath.lastIndexOf('/') + 1)}${nextLifeseq}` }
+  }
   // --
 }
 

@@ -9,6 +9,7 @@ import type { BirthBankActual, DamagedThing, GotActual, KidEntry, Kids, ListThin
 import { type Sparse, type StoredCited, type ThingCited, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
 import { Thing } from '../models/thing'
+import { ReadTcPattern } from '../shapes/shapes-vault-event'
 import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
 import * as Throwers from '../refusals/throwers'
 
@@ -354,8 +355,6 @@ function readTcOf(raw: unknown): ReadTc {
   if ((typeof raw !== 'string') || (! ReadTcPattern.test(raw))) { throw Throwers.storageIssue() }
   return raw
 }
-/** A UUID version 7, as text: the shape of every {@link ReadTc}. */
-export const ReadTcPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 /** Classify a bank's birth, by its three `puts`, against the raw roots a concrete adapter fetched.
  * Under `born`, `things` and `world` are made of the puts' records, for the concrete adapter to write in one step. It then reports

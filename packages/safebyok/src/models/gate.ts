@@ -1,4 +1,4 @@
-import { Clock, Crypto, type Errors, Validator } from 'safebyok-big/internals'
+import { Clock, Crypto, type Errors, Helpers, Validator } from 'safebyok-big/internals'
 import { type Adoptable, Thing } from './thing'
 import type { Device } from './device'
 import { AddPasskeyGating, ReplacePassphraseGating, RevokePasskeyGating, UnlockGating } from './gating'
@@ -26,8 +26,11 @@ import * as Throwers from '../refusals/throwers'
 export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<GateRecord>> implements GateStamp {
   // == [Props]: wayins, #device, #world, #friend
 
-  /** The wayin records, frozen, or absent over the shell or a tombstone. */
+  /** The wayin records, frozen, or absent over the shell or a sparse tombstone. */
   declare readonly wayins?: Wayins
+  declare readonly auth?:   GateRecord['auth']
+  declare readonly sigs?:   GateRecord['sigs']
+  declare readonly meta?:   GateRecord['meta']
 
   readonly #device:    Device
   /** The world that holds the leases this gate builds. */
@@ -73,10 +76,11 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
    * Internal: the device's world makes the gate its SortedVaultDB keeps.
    */
   static make(record: GateRecord | Sealers.ShellOf<GateRecord>, opts: GateOpts, friend: WorldGateFriend): Gate {
-    const { record: begun, opts: { device }, friend: worldFriend } = Checks.gateMakeArgs.parse({ record, opts, friend })
+    const { opts: { device }, friend: worldFriend } = Checks.gateMakeArgs.parse({ record, opts, friend })
     // A gate's life is its own, so only the bank's scope is checked: a gate of another life of the bank passes.
-    Validator.checkedConsistent(StampChecks.bankScope.parse(begun), device.scope, { kind: 'record_conflict' })
-    return new Gate(begun, { device }, worldFriend)
+    Validator.checkedConsistent(StampChecks.bankScope.parse(record), device.scope, { kind: 'record_conflict' })
+    // A gate models the very record it is handed, never the check's copy.
+    return new Gate(record, { device }, worldFriend)
   }
 
   private constructor(begun: GateRecord | Sealers.ShellOf<GateRecord>, opts: GateOpts, friend: WorldGateFriend) {
@@ -89,9 +93,17 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   }
 
   // Thing's constructor calls this before this gate's own fields exist, so it reads and sets none of them.
-  /** Model `record`, each wayin record of a live one checked and frozen as its Wayin keeps it. */
+  /** Model `record`, its wayins checked, and they and its reserved bags hidden read-only props: the shell and a sparse tombstone have none. */
   protected override adopt(record: Adoptable<GateRecord>): void {
-    super.adopt((record.am === 'a') ? { ...record, wayins: frozenWayinsOf(record.wayins) } : record)
+    if ('wayins' in record) {
+      const { wayins, auth, sigs, meta } = record
+      GateChecks.wayins.parse(wayins)
+      super.adopt(record)
+      Helpers.decorate<Gate>(this, { wayins, auth, sigs, meta }, { writable: false })
+    } else {
+      super.adopt(record)
+      for (const fieldname of ['wayins', 'auth', 'sigs', 'meta']) { Reflect.deleteProperty(this, fieldname) }
+    }
   }
 
   /** The first record of a new main gate, made from `dna`, born at its stamp's `born_at`. */
@@ -320,7 +332,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   static override readonly modelkind = 'gate'
 }
 
-// == [Helpers]: wayinsOf, frozenWayinsOf
+// == [Helpers]: wayinsOf
 
 // A Wayin's pickle is typed as either kind; the gate record's parse checks each is the kind its label wants.
 /** The frozen records of `wayins`, its passkey0 null for none. */
@@ -328,10 +340,6 @@ function wayinsOf({ main, passkey0 }: GateDna['wayins']): Wayins {
   return Object.freeze({ main: main.pickle(), passkey0: passkey0?.pickle() ?? null }) as Wayins
 }
 
-/** `wayins`, each record as its Wayin keeps it, frozen */
-function frozenWayinsOf({ main, passkey0 }: Wayins): Wayins {
-  return wayinsOf({ main: Wayin.make(main), passkey0: (passkey0 === null) ? null : Wayin.make(passkey0) })
-}
 // --
 
 // == [Checks]: Checks

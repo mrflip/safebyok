@@ -10,14 +10,14 @@ import {
 import type { BankAskDraft } from '../shapes/shapes-bankish'
 import { type BankRecord, type ThingRecord, type ThingScope, type VoidSentinel, ThingChecks, isLifepathDeep, isParityRight } from '../shapes/shapes-thing'
 import type { BankScope } from '../shapes/shapes-stamps'
-import { type SeenThing, type VaultEvent, livenessVals, vaultEventkindVals } from '../shapes/shapes-vault-event'
+import { type SeenThing, type VaultEvent, ReadTcPattern, SeenChecks, livenessVals, vaultEventkindVals } from '../shapes/shapes-vault-event'
 import { BaseThing } from '../models/base-thing'
-import { type Adoptable, type Thing, SeenChecks } from '../models/thing'
+import type { Adoptable, Thing } from '../models/thing'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 import { itemSeenOf } from './agerank'
 import { refusedAnswerOf } from './refused-answer'
-import { ReadTcPattern, readTcNow } from './thing-classifier'
+import { readTcNow } from './thing-classifier'
 import type { BirthBankAnswer, GetThingAnswer, Kids, ListThingsAnswer, ReadTc, VaultDB, WriteThingAnswer } from './vault-db'
 
 // == [SortedVaultDB]: ReceivingThing, ThingMaker, SortedVaultDBOpts, SortedVaultDBListener, PutOnceArgs, DelOnceArgs, Stamp, Listening, SortedVaultDB

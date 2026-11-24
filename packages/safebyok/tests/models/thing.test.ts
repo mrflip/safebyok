@@ -435,7 +435,7 @@ const FeedCases: readonly FeedCase[] = [
     agerank: "0000000004|0000000003|0000000003|00000001", blurb: 'while bare: the soon a chunk later, then its full record in that chunk' },
   { initial: Empty,    chain: [["full", 4, 4, 2], ["full", 4, 5, 1], ["full", 4, 5, 2]],
     streamed: [["item", "full", 4, 4, 2], ["life", "born", null, null, 4, 4], ["item", "full", 4, 5, 1], ["item", "full", 4, 5, 2]],
-    agerank: "0000000004|0000000005|0000000005|00000002", blurb: 'a newer revision read earlier than the last sighting: its time starts over at its own' },
+    agerank: "0000000004|0000000005|0000000005|00000002", blurb: 'a newer revision read earlier than the last sighting: its tcchunk starts over at its own' },
   { initial: Empty,    chain: [["full", 4, 4, 2], ["full", 4, 5, 1], ["full", 4, 4, 3]],
     streamed: [["item", "full", 4, 4, 2], ["life", "born", null, null, 4, 4], ["item", "full", 4, 5, 1]],
     agerank: "0000000004|0000000005|0000000005|00000001", blurb: 'an older revision read later returns nothing' },
@@ -461,7 +461,7 @@ const FeedCases: readonly FeedCase[] = [
 // --
 
 
-// == [Harness]: lifepathOf, lifeOf, recordOf, chunkOf, readTcOf, readTcAt, timeOf, eventOf, received, agerankOf, agerankAtBoxOf, lifeHighOf, shorthandOf, isRaised
+// == [Harness]: lifepathOf, lifeOf, recordOf, chunkOf, readTcOf, readTcAt, tcchunkOf, eventOf, received, agerankOf, agerankAtBoxOf, lifeHighOf, shorthandOf, isNewer
 
 // At box/openai, a record of life n has the lifepath `n/n` and a void of life n `n/-000000001`, each n spelled as a
 // lifeseq, so that lifepaths sort as the lives do. A void's own lifeseq is always the shell's, so its life is its parent's.
@@ -518,7 +518,7 @@ function chunkOf(seen: Seen): Chunk { return seen[3] ?? 0 }
 // A chunk's read_tc is a UUID version 7 whose first eight hexadecimal digits spell the chunk's number: chunk 0 is the
 // first 65.536 seconds of 1970.
 /** A read_tc in `chunk` */
-function readTcOf(chunk: Chunk): ReadTc { return `${timeOf(chunk)}-0000-7000-8000-000000000000` }
+function readTcOf(chunk: Chunk): ReadTc { return `${tcchunkOf(chunk)}-0000-7000-8000-000000000000` }
 
 /** A read_tc read at `millis` past the epoch */
 function readTcAt(millis: number): ReadTc {
@@ -529,8 +529,8 @@ function readTcAt(millis: number): ReadTc {
 /** A read_tc in chunk 0 */
 const ReadTcChunk0 = readTcOf(0)
 
-/** The time an agerank keeps of a read_tc in `chunk` */
-function timeOf(chunk: Chunk): string { return chunk.toString(16).padStart(8, '0') }
+/** The tcchunk an agerank spells for a read_tc in `chunk` */
+function tcchunkOf(chunk: Chunk): string { return chunk.toString(16).padStart(8, '0') }
 
 /** The item event of `record` read at `read_tc`, as a SortedVaultDB builds it, with no source or bank lifetok */
 function eventOf(record: SeenThing, read_tc: ReadTc = ReadTcChunk0): VaultItemEvent {
@@ -549,7 +549,7 @@ function propsOf(thing: TH.PlainThing): Record<string, unknown> { return { ...th
 
 /** The agerank at box/openai of a record's life and these revseqs, its newest revision last seen in `chunk`, spelled apart from the rule */
 function agerankOf(life: Life, highRevseq: number, itemRevseq: number, chunk: Chunk = 0): Agerank {
-  return `${lifepathOf(life, false)}|${Revseq.padded(highRevseq)}|${Revseq.padded(itemRevseq)}|${timeOf(chunk)}`
+  return `${lifepathOf(life, false)}|${Revseq.padded(highRevseq)}|${Revseq.padded(itemRevseq)}|${tcchunkOf(chunk)}`
 }
 
 /** The table's `agerank` at box/openai: its life field becomes the lifepath that `seens` gave that life */
@@ -586,7 +586,7 @@ function shorthandOf(event: VaultEvent, record: SeenThing, chunk: Chunk = 0): Sh
 }
 
 /** True when `event`'s agerank is above the one before it */
-function isRaised(event: VaultEvent): boolean {
+function isNewer(event: VaultEvent): boolean {
   return (event.agerank !== undefined) && ((event.agerankWas === undefined) || (event.agerank > event.agerankWas))
 }
 // --
@@ -606,7 +606,7 @@ describe("Thing.receive, over the feed table", () => {
         const vals = events.flatMap((event) => (event.eventkind === 'item') ? [event.val] : [])
         expect(vals, 'a record taken comes first, as given').to.deep.equal((events.length === 0) ? [] : [record])
         for (const event of events) {
-          expect(isRaised(event), 'each event raises the agerank').to.eq(true)
+          expect(isNewer(event), 'each event leaves the agerank greater').to.eq(true)
           expect([event.agerankWas, event.agerank], 'each event carries the agerank before and after its record').to.deep.equal([agerankBefore, thing.agerank])
         }
       }
@@ -641,7 +641,7 @@ describe("Thing.receive", () => {
     expect(events.every((event) => Object.isFrozen(event))).to.eq(true)
   })
 
-  it("returns no events, in a frozen list, and changes nothing, for a record that raises nothing", () => {
+  it("returns no events, in a frozen list, and changes nothing, for a record that is not news", () => {
     const [thing] = received(undefined, TH.boxThingOf('openai', { revseq: 2 }))
     const before = [thing.agerank, thing.read_at, thing.citable, thing.pickle()]
     for (const record of [TH.boxThingOf('openai', { revseq: 2 }), TH.boxThingOf('openai', { revseq: 1 }), Thing.sparseOf(TH.boxThingOf('openai', { revseq: 1 }))]) {
@@ -676,7 +676,7 @@ describe("Thing.receive", () => {
     const [thing] = received(undefined, TH.boxThingOf('openai', { revseq: 31 }))
     const [, events] = received(thing, Thing.sparseOf(TH.boxThingOf('openai', { revseq: 32 })))
     expect(events.map(({ eventkind }) => eventkind)).to.deep.equal(['item', 'aged'])
-    expect(events.every((event) => isRaised(event))).to.eq(true)
+    expect(events.every((event) => isNewer(event))).to.eq(true)
     expect(thing.agerank).to.eq(agerankOf(0, 32, 31))
   })
 
@@ -684,17 +684,17 @@ describe("Thing.receive", () => {
     const [thing, voidEvents] = received(undefined, Shell.of(TH.RootScope))
     expect(voidEvents.map(({ eventkind }) => eventkind)).to.deep.equal(['item', 'life'])
     expect(received(thing, TH.rootBoxOf())[1].map(({ eventkind }) => eventkind)).to.deep.equal(['item', 'life'])
-    expect(thing.agerank).to.eq(`${TH.Life0}|${Revseq.padded(0)}|${Revseq.padded(0)}|${timeOf(0)}`)
+    expect(thing.agerank).to.eq(`${TH.Life0}|${Revseq.padded(0)}|${Revseq.padded(0)}|${tcchunkOf(0)}`)
   })
 
-  it("keeps as an agerank's time the first eight hexadecimal digits of the read_tc, and puts the read_tc on each event", () => {
+  it("spells as an agerank's tcchunk the first eight hexadecimal digits of the read_tc, and puts the read_tc on each event", () => {
     const read_tc = readTcNow()
     const [, events] = received(undefined, TH.boxThingOf(), read_tc)
     expect(events.map((event) => event.read_tc)).to.deep.equal([read_tc, read_tc])
     expect(events[0]!.agerank).to.eq(`${lifepathOf(0, false)}|${Revseq.padded(0)}|${Revseq.padded(0)}|${read_tc.slice(0, 8)}`)
   })
 
-  it("takes the newest revision seen again a chunk later, its agerank raised in its time alone", () => {
+  it("takes the newest revision seen again a chunk later, its agerank moved in its tcchunk alone", () => {
     const record  = TH.boxThingOf()
     const [thing] = received(undefined, record)
     expect(thing.receive(eventOf(record))).to.deep.equal([])
@@ -859,20 +859,18 @@ describe("Thing's props, record and citable", () => {
     expect(JSON.stringify(thing)).to.eq(JSON.stringify(propsOf(thing)))
   })
 
-  it("answers every field of its record by name, its body hidden", () => {
+  it("answers its Thing fields by name, and no body: a kind writes out its own", () => {
     const record = TH.boxThingOf()
     const thing = TH.PlainThing.make(record)
-    expect(Object.getOwnPropertyNames(thing)).to.have.members(Object.keys(record))
-    expect(Reflect.get(thing, 'sidecar')).to.eq(record.sidecar)
-    expect(Reflect.get(thing, 'whisper_sealed')).to.eq(record.whisper_sealed)
-    expect(Object.getOwnPropertyDescriptor(thing, 'whisper_sealed')).to.include({ enumerable: false })
+    expect(Object.getOwnPropertyNames(thing)).to.have.members(Object.keys(Thing.sparseOf(record)))
   })
 
-  it("sets every field non-writable, its scope fields non-configurable and the rest configurable", () => {
+  it("sets every Thing field non-writable, its scope fields non-configurable and the rest configurable", () => {
     const record = TH.boxThingOf()
     const thing = TH.PlainThing.make(record)
     const scopeFieldnames = new Set(['userid', 'banklabel', 'labelpath'])
-    for (const fieldname of Object.keys(record)) {
+    const thingFieldnames = Object.keys(Thing.sparseOf(record))
+    for (const fieldname of thingFieldnames) {
       const configurable = ! scopeFieldnames.has(fieldname)
       expect(Object.getOwnPropertyDescriptor(thing, fieldname), fieldname).to.include({ writable: false, configurable })
     }
@@ -880,14 +878,11 @@ describe("Thing's props, record and citable", () => {
     expect(Reflect.deleteProperty(thing, 'labelpath')).to.eq(false)
   })
 
-  it("stops answering its live record's body once it adopts a sparse tombstone", () => {
-    const [thing] = received(undefined, TH.boxThingOf())
-    const tomb = Thing.sparseOf(TH.boxThingOf('openai', { am: 'x', lifepath: lifepathOf(1, false), lifeseq: Lifeseq.ofLifenum(1), revseq: 1 }))
-    received(thing, tomb)
-    expect(thing.pickle()).to.eq(tomb)
-    expect(Object.getOwnPropertyNames(thing)).to.have.members(Object.keys(tomb))
-    expect(Reflect.get(thing, 'sidecar')).to.eq(undefined)
-    expect(thing).to.include({ am: 'x', labelpath: tomb.labelpath })
+  it("pickles to the very record it was made from, deeply frozen", () => {
+    const record = TH.boxThingOf()
+    const thing = TH.PlainThing.make(record)
+    expect(thing.pickle()).to.eq(record)
+    expect(Object.isFrozen(record.sidecar)).to.eq(true)
   })
 
   it("is the scope of its record, and has no stamp", () => {
@@ -908,7 +903,7 @@ describe("Thing's props, record and citable", () => {
 })
 
 describe("Thing.read_at", () => {
-  it("is the time in the first 48 bits of the read_tc that raised the agerank", () => {
+  it("is the time in the first 48 bits of the read_tc that moved the agerank", () => {
     const [thing] = received(undefined, TH.boxThingOf(), '0190a1b2-c3d4-7000-8000-000000000000')
     expect(thing.read_at).to.eq(0x01_90_A1_B2_C3_D4)
   })

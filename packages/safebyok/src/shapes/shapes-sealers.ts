@@ -1,6 +1,9 @@
 /** The forms of a sealed record, the `Sealer` a lease seals and unseals with, and a box's records. */
 
-import type { CX, Crypto, SX } from 'safebyok-big/internals'
+import { isEmptyObject } from 'es-toolkit'
+import { exactOptional } from 'zod'
+import { CX, type Crypto, type SX, Validator } from 'safebyok-big/internals'
+import * as Phrases from '../phrases'
 import type { EpochMillis, VoidLifeseq } from './primitives'
 import type { BoxRecord, Sealed, Sparse, ThingRecord } from './shapes-thing'
 
@@ -106,7 +109,20 @@ export interface Sealer<RecordT extends Sparse<ThingRecord>, CleartextsT> {
 }
 // --
 
-// == [A box's records]: BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps
+// == [A box's records]: SealerChecks, BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps
+
+// Strict, since a misspelt key in any of these bags would otherwise be dropped without a word.
+/** The checks of what a box's seal is given beside its sealable: the public props of a revision and of a tombstone, and the cleartexts. */
+export const SealerChecks = Validator.Checkers('bad_record', ({ obj, lit, oneof, epochMillis }) => ({
+  boxPublicProps:          obj({ sidecar: exactOptional(CX.sidecar), am: exactOptional(oneof(['a', 'x'])), written_at: exactOptional(epochMillis) }).strict(),
+  // A tombstone's sidecar is always `{}`, and its am `'x'`: each may be given, so long as it is that.
+  boxTombstonePublicProps: obj({
+    sidecar:    exactOptional(CX.sidecar.refine(isEmptyObject, Phrases.TombstoneSidecarNotEmpty)),
+    am:         exactOptional(lit('x')),
+    written_at: exactOptional(epochMillis),
+  }).strict(),
+  boxCleartexts:           obj({ whisper: CX.whisper }).strict(),
+}))
 
 /** The cleartexts of a box: its whisper. */
 export interface BoxCleartexts {

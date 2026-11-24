@@ -186,6 +186,11 @@ describe("Bank.make(record, { device }), by the device's world", () => {
     const { record } = await TH.buildBornBank()
     TH.expectSyncRefusal(() => Bank.make(record, undefined as never), 'bad_record')
   })
+
+  it("pickles to the very record it was made from", () => {
+    const record = TH.bankThingOf()
+    expect(Bank.make(record, { device: TH.makeDevice() }).pickle()).to.eq(record)
+  })
 })
 
 describe("a bank over the shell or a tombstone", () => {

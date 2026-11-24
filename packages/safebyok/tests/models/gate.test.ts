@@ -86,6 +86,11 @@ describe("Gate.makeRecord(dna)", () => {
 })
 
 describe("Gate.make(record, { device }, friend)", () => {
+  it("pickles to the very record it was made from", async () => {
+    const record = await gateRecordOf(true)
+    expect(makeGate(record).pickle()).to.eq(record)
+  })
+
   it("makes the same gate again from a gate's pickle", async () => {
     const gate = makeGate(await gateRecordOf(true))
     const again = makeGate(TH.livePickleOf(gate))

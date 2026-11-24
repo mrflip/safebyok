@@ -1,8 +1,12 @@
-/** `VaultEvent`, the notice a vaultDB's watcher gets and the event a `SortedVaultDB`'s listener hears, and `Agerank`, which orders the records seen of a Thing. */
+/** `VaultEvent`, the notice a vaultDB's watcher gets and the event a `SortedVaultDB`'s listener hears, `Agerank`, which orders the records seen of a Thing, and the checks of what a Thing is begun from or receives. */
 
-import type { Banklabel, Labelpath, Lifetok, Userid } from './primitives'
+import { Validator } from 'safebyok-big/internals'
+import * as Phrases from '../phrases'
+import { type Banklabel, type Lifetok, type Userid, Labelpath } from './primitives'
 import type { LiveOf, ShellOf } from './shapes-sealers'
-import type { Sparse, ThingRecord, Thingkind, Tombstone } from './shapes-thing'
+import { type Sparse, type ThingRecord, type Thingkind, type Tombstone, ThingChecks, isLifepathDeep, isParityRight } from './shapes-thing'
+import { BaseThing } from '../models/base-thing'
+import { itemSeenOf } from '../storage/agerank'
 import type { ReadTc } from '../storage/vault-db'
 
 // == [Kinds]: livenessVals, Liveness, lifekindVals, Lifekind, agekindVals, Agekind, vaultEventkindVals, VaultEventkind
@@ -48,8 +52,8 @@ export type VaultEventkind = typeof vaultEventkindVals[number]
 
 /** The newest life and revisions seen of a Thing, and when the newest revision was last seen, as a string: of two for one Thing, the greater is the newer.
  * It joins with `|` the lifepath, the newest revision seen in that life, the newest whole one (-1 for none), each revseq
- * as `Revseq.padded` writes it, and the time: the first eight hexadecimal digits of the `read_tc` the newest revision was
- * last seen at, in units of 65.536 seconds.
+ * as `Revseq.padded` writes it, and the tcchunk: the first eight hexadecimal digits of the `read_tc` the newest revision
+ * was last seen at, a span of 65.536 seconds.
  */
 export type Agerank = string
 
@@ -83,8 +87,8 @@ export type VaultEventOf<EventkindT extends VaultEventkind> = Readonly<{
   read_tc:    ReadTc | undefined
 }>
 
-/** A record of the Thing. Where ageranks are kept, the record raised the Thing's agerank. Narrow it on `liveness` to know what `val` holds.
- * The newest revision seen again in a later span of time raises only the agerank's time: the event's `agerankWas` and `agerank` then differ only in their last field.
+/** A record of the Thing. Where ageranks are kept, the record left the Thing's agerank greater than it was. Narrow it on `liveness` to know what `val` holds.
+ * The newest revision seen again in a later tcchunk moves only the agerank's tcchunk: the event's `agerankWas` and `agerank` then differ only in their last field.
  */
 export type VaultItemEvent<RecordT extends ThingRecord = ThingRecord> = VaultEventOf<'item'> & ItemSeen<RecordT>
 
@@ -113,4 +117,39 @@ export type VaultAgedEvent = VaultEventOf<'aged'> & Readonly<{
   agekindWas: Agekind | undefined
   agerank:    Agerank
 }>
+// --
+
+// == [Checks]: ReadTcPattern, SeenChecks
+
+/** A UUID version 7, as text: the shape of every {@link ReadTc}. */
+export const ReadTcPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+// The lifepath's depth is what lets two ageranks of one Thing compare as text: every lifepath of the Thing then has as
+// many lifeseqs, each ten characters, so the fields after it line up.
+/** The checks of what a Thing is begun from or receives: a record, its `read_tc`, and the event it comes in. */
+export const SeenChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom }) => {
+  /** Check the scope and citation of a record or a void sentinel, keeping the rest: a lifeseq for each label, its own odd exactly for a tombstone. */
+  const seenCited = ThingChecks.scopedCited.loose()
+    .refine(isLifepathDeep, Phrases.LifepathDepth)
+    .refine(isParityRight, Phrases.LifeseqParity)
+  /** Check a `read_tc`: a UUID version 7. */
+  const readTc = custom<ReadTc>((val) => (typeof val === 'string') && ReadTcPattern.test(val), Phrases.ReadTcShape)
+  return {
+    seenCited,
+    readTc,
+    /** Check an event's kind and scope. */
+    event: obj({ ...ThingChecks.thingScope.shape, eventkind: oneof(vaultEventkindVals) }),
+    /** Check an `item` event: its scope and modelkind, and its record, liveness and `read_tc`, each consistent with the others. */
+    item:  obj({
+      ...ThingChecks.thingScope.shape,
+      modelkind: ThingChecks.modelkind,
+      liveness:  oneof(livenessVals),
+      val:       seenCited,
+      read_tc:   readTc,
+    })
+      .refine(({ labelpath, modelkind }) => Labelpath.modelkindOf(labelpath) === modelkind, Phrases.EventModelkind)
+      .refine(({ val, ...scope }) => BaseThing.haveSameScope(val, scope), Phrases.EventOfOtherThing)
+      .refine(({ val, liveness }) => itemSeenOf(val as SeenThing).liveness === liveness, Phrases.EventLiveness),
+  }
+})
 // --

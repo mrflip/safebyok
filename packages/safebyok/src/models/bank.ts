@@ -1,4 +1,4 @@
-import { Clock, Crypto, type Errors, Outcome, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
+import { Clock, Crypto, type Errors, Helpers, Outcome, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { type Adoptable, Thing } from './thing'
 import { BaseBox } from './base-box'
 import { Device } from './device'
@@ -71,19 +71,31 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   override get subscribe(): (listener: () => void) => (() => void) { return this.#world.subscribe }
   // --
 
-  // == [Construction]: make, constructor, mintStamps, makeRecord
+  // == [Construction]: make, constructor, adopt, mintStamps, makeRecord
 
   /** Make the bank of `record`, a whole bank record, live or a tombstone, or the bank's shell, on `opts.device`. Nothing is fetched or stored.
    * It is locked or unlocked as its device's world is, and finds its main gate there. Internal: the device's world makes the bank its SortedVaultDB keeps.
    */
   static make(record: BankRecord | ShellOf<BankRecord>, opts: BankOpts): Bank { return new Bank(record, opts) }
 
+  // A bank models the very record it is handed, never the check's copy.
   private constructor(record: BankRecord | ShellOf<BankRecord>, opts: BankOpts) {
-    const { record: begun, opts: { device } } = Checks.bankMakeArgs.parse({ record, opts })
-    Validator.checkedConsistent(StampChecks.bankScope.parse(begun), device.scope, { kind: 'record_conflict' })
-    super(begun)
+    const { opts: { device } } = Checks.bankMakeArgs.parse({ record, opts })
+    Validator.checkedConsistent(StampChecks.bankScope.parse(record), device.scope, { kind: 'record_conflict' })
+    super(record)
     this.#device = device
     this.#world  = device.world
+  }
+
+  // Thing's constructor calls this before this bank's own fields exist, so it reads and sets none of them.
+  /** Model `record`, its lifetok a hidden read-only prop: the shell and a sparse tombstone have none. */
+  protected override adopt(record: Adoptable<BankRecord>): void {
+    super.adopt(record)
+    if ('lifetok' in record) {
+      Helpers.decorate<Bank>(this, { lifetok: record.lifetok }, { writable: false })
+    } else {
+      Reflect.deleteProperty(this, 'lifetok')
+    }
   }
 
   /** Fresh stamps for a new bank of `scope` and its main gate, both in their first life.

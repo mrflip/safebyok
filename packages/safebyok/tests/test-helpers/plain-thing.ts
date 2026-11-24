@@ -1,8 +1,8 @@
 /** `PlainThing`, a concrete Thing of any kind, for the tests of Thing and of a SortedVaultDB. */
 
 import type { ThingRecord, ThingScope } from '../../src/shapes/shapes-thing'
-import type { SeenThing } from '../../src/shapes/shapes-vault-event'
-import { type Adoptable, SeenChecks, Thing } from '../../src/models/thing'
+import { type SeenThing, SeenChecks } from '../../src/shapes/shapes-vault-event'
+import { type Adoptable, Thing } from '../../src/models/thing'
 
 // == [PlainThing]: PlainThing
 

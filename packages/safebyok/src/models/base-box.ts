@@ -1,13 +1,10 @@
-import { isEmptyObject } from 'es-toolkit'
-import { exactOptional } from 'zod'
-import { CX, Clock, Crypto, StableJsonify, Validator } from 'safebyok-big/internals'
-import * as Phrases from '../phrases'
+import { CX, Clock, Crypto, Helpers, StableJsonify, Validator } from 'safebyok-big/internals'
 import type { BoxRecord, Sealed, ThingScope } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 import type { BoxCleartexts, BoxPublicProps, LiveOf, RevisionOf, SealTags, Sealable, Sealer, TombstoneOf } from '../shapes/shapes-sealers'
 import type { BoxStamp } from '../shapes/shapes-stamps'
-import { Lifeseq } from '../shapes/primitives'
 import * as Throwers from '../refusals/throwers'
+import { BaseThing } from './base-thing'
 import { type Adoptable, Thing } from './thing'
 
 /** The tags of a box's sealed whisper: the whisper as stable JSON, in its first schema. */
@@ -18,6 +15,30 @@ const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisp
  *  Acts as the {@link Sealer} for a box's whisper. Pass the class itself to a lease's `seal` or `unseal`.
  */
 export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Adoptable<BoxRecord>> {
+  // == [Props]: sidecar, whisper_sealed
+
+  /** What a UI may show beside the whisper while the bank is locked: `{}` for a tombstone, and absent over the shell or a sparse tombstone. */
+  declare readonly sidecar?:        BoxRecord['sidecar']
+  /** The whisper, sealed, or absent over the shell or a sparse tombstone. */
+  declare readonly whisper_sealed?: Sealed
+  // --
+
+  // == [Construction]: adopt
+
+  // Thing's constructor calls this before a box's own fields exist, so it reads and sets none of them.
+  /** Model `record`, its sidecar and sealed whisper hidden read-only props: the shell and a sparse tombstone have neither. */
+  protected override adopt(record: Adoptable<BoxRecord>): void {
+    super.adopt(record)
+    if ('whisper_sealed' in record) {
+      const { sidecar, whisper_sealed } = record
+      Helpers.decorate<BaseBox>(this, { sidecar, whisper_sealed }, { writable: false })
+    } else {
+      Reflect.deleteProperty(this, 'sidecar')
+      Reflect.deleteProperty(this, 'whisper_sealed')
+    }
+  }
+  // --
+
   // == [Kind]: modelkind
 
   /** A box's modelkind: the guards this class inherits answer for boxes alone. */
@@ -35,12 +56,12 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
 
   /** The sidecar, `am` and `written_at` of `publicProps`. Refuses any other field. */
   static publicPropsOf(publicProps: BoxPublicProps): BoxPublicProps {
-    return Checks.boxPublicProps.parse(publicProps)
+    return BoxChecks.publicProps.parse(publicProps)
   }
 
   /** The whisper of `secretProps`. Refuses any other field. */
   static secretPropsOf(secretProps: BoxCleartexts): BoxCleartexts {
-    return Checks.boxCleartexts.parse(secretProps)
+    return BoxChecks.cleartexts.parse(secretProps)
   }
 
   /** The empty whisper a tombstone seals. */
@@ -48,8 +69,6 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
   // --
 
   // == [Revisions]: nextRevisionOf, tombstoneOf
-
-  // would this simplify at all with a call to super and then mixing in the body? #earnest-question
 
   /** The next live revision after `donorProps`, without its sealed whisper.
    * After a tombstone or the shell, it begins the box's next life.
@@ -60,13 +79,13 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
     const { sidecar: donorSidecar, ...thing } = BoxChecks.sealable.parse(donorProps)
     // A tombstone's `{}` is not inherited: the next life's sidecar is given, as it is after the shell.
     const heirSidecar = (thing.am === 'a') ? donorSidecar : undefined
-    const { sidecar = heirSidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
+    const { sidecar = heirSidecar, written_at = Clock.nowMillis() } = BoxChecks.publicProps.parse(publicProps)
     if (sidecar === undefined) { throw Throwers.sidecarMissing() }
     const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'a', sidecar } as const
     if (thing.am === 'a') {
       return { ...thing, ...revision }
     }
-    return { ...thing, ...nextLifeOf(thing), ...revision, born_at: written_at }
+    return { ...thing, ...BaseThing.nextLifeOf(thing), ...revision, born_at: written_at }
   }
 
   /** The tombstone of the live box `donorProps`, without its sealed whisper.
@@ -75,10 +94,10 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
    * `publicProps` may give `am: 'x'`, a tombstone's own, and `am: 'a'` refuses.
    */
   static tombstoneOf(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps = {}): RevisionOf<TombstoneOf<BoxRecord>, BoxCleartexts> {
-    const thing                              = Checks.liveBoxSealable.parse(donorProps)
-    const { written_at = Clock.nowMillis() } = Checks.tombstonePublicProps.parse(publicProps)
+    const thing                              = BoxChecks.liveSealable.parse(donorProps)
+    const { written_at = Clock.nowMillis() } = BoxChecks.tombstonePublicProps.parse(publicProps)
     const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'x', sidecar: {} } as const
-    return { ...thing, ...nextLifeOf(thing), ...revision }
+    return { ...thing, ...BaseThing.nextLifeOf(thing), ...revision }
   }
   // --
 
@@ -94,7 +113,7 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
   static stampOf(record: RevisionOf<BoxRecord, BoxCleartexts>): BoxStamp { return BoxChecks.stamp.parse(record) }
 
   /** The whisper of `cleartexts` as stable JSON, with its keys sorted. */
-  static encode(cleartexts: BoxCleartexts): string { return StableJsonify.stableJsonify(Checks.boxCleartexts.parse(cleartexts).whisper) }
+  static encode(cleartexts: BoxCleartexts): string { return StableJsonify.stableJsonify(BoxChecks.cleartexts.parse(cleartexts).whisper) }
 
   /** The whisper in the JSON `text`. A refusal never quotes the text. */
   static decode(text: string): BoxCleartexts { return { whisper: deserializeWhisper(text) } }
@@ -114,15 +133,7 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
 }
 Object.freeze(BaseBox satisfies Sealer<BoxRecord, BoxCleartexts>)
 
-// == [Helpers]: nextLifeOf, deserializeWhisper
-
-// why is this on Box not Thing? #earnest-question
-
-/** The lifeseq and lifepath of the life after the given box's life. */
-function nextLifeOf({ lifeseq, lifepath }: Pick<BoxRecord, 'lifeseq' | 'lifepath'>): Pick<BoxRecord, 'lifeseq' | 'lifepath'> {
-  const nextLifeseq = Lifeseq.ofLifenum(Lifeseq.lifenumOf(lifeseq) + 1)
-  return { lifeseq: nextLifeseq, lifepath: `${lifepath.slice(0, lifepath.lastIndexOf('/') + 1)}${nextLifeseq}` }
-}
+// == [Helpers]: deserializeWhisper
 
 // What JSON.parse throws is replaced, never made the cause: a SyntaxError can quote the text it failed on.
 /** The whisper in the JSON `text`, or throw `damaged_whisper` */
@@ -137,23 +148,4 @@ function deserializeWhisper(text: string): CX.Whisper {
   if (! whisperReport.success) { throw Throwers.undecodedWhisper() }
   return whisperReport.data
 }
-// --
-
-// == [Checks]: Checks
-
-// Why are these here and not in the shapes? #earnest-question
-
-/** Checks for the inputs of a box's seal: a live sealable for a tombstone, the public props of a revision and of a tombstone, and the secret props. */
-const Checks = Validator.Checkers('bad_record', ({ obj, lit, oneof, epochMillis }) => ({
-  liveBoxSealable:      BoxChecks.sealable.refine(({ am }) => am === 'a', Phrases.TombstoneOfLiveOnly),
-  // Strict, since a misspelt key in any of these bags would otherwise be dropped without a word.
-  boxPublicProps:       obj({ sidecar: exactOptional(CX.sidecar), am: exactOptional(oneof(['a', 'x'])), written_at: exactOptional(epochMillis) }).strict(),
-  // A tombstone's sidecar is always `{}`, and its am `'x'`: each may be given, so long as it is that.
-  tombstonePublicProps: obj({
-    sidecar:    exactOptional(CX.sidecar.refine(isEmptyObject, Phrases.TombstoneSidecarNotEmpty)),
-    am:         exactOptional(lit('x')),
-    written_at: exactOptional(epochMillis),
-  }).strict(),
-  boxCleartexts:        obj({ whisper: CX.whisper }).strict(),
-}))
 // --

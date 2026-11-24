@@ -207,6 +207,8 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
     .refine(isLifepathDeep, Phrases.LifepathDepth)
     .refine(isParityRight,  Phrases.LifeseqParity)
     .refine(isShellCitable,   Phrases.SealableHalfShell)
+  // What a tombstone is sealed over: a live box's sealable.
+  const boxLiveSealable = boxSealable.refine(({ am }) => am === 'a', Phrases.TombstoneOfLiveOnly)
 
   // A bank has its root box whole: live once the bank is born, and its shell before.
   const boxRecord    = boxLive
@@ -240,7 +242,7 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
   const boxThingOrShell  = union([boxThing, shellAt(boxLabelpath)])
   return {
     bankLabelpath, gateLabelpath, boxLabelpath, wayins, storedWayins, storedLifetok,
-    bankThing, bankCited, bankThingOrShell, gateThing, gateCited, gateThingOrShell, boxThing, boxCited, boxThingOrShell, boxSealable, boxRecord, boxRecordOrShell,
+    bankThing, bankCited, bankThingOrShell, gateThing, gateCited, gateThingOrShell, boxThing, boxCited, boxThingOrShell, boxSealable, boxLiveSealable, boxRecord, boxRecordOrShell,
   }
 }))
 

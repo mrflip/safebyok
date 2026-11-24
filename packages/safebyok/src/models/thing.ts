@@ -1,14 +1,12 @@
-import { isEqual, pick } from 'es-toolkit'
-import { Helpers, VX, Validator } from 'safebyok-big/internals'
-import { BaseThing, ThingFieldnames } from './base-thing'
-import * as Phrases from '../phrases'
-import { type EpochMillis, Labelpath } from '../shapes/primitives'
+import { deepFreeze, isEqual, pick } from 'es-toolkit'
+import { Helpers, VX } from 'safebyok-big/internals'
+import { BaseThing } from './base-thing'
+import type { EpochMillis } from '../shapes/primitives'
 import type { ShellOf } from '../shapes/shapes-sealers'
-import { type Sparse, type ThingCited, type ThingRecord, type Tombstone, Shell, ThingChecks, isLifepathDeep, isParityRight } from '../shapes/shapes-thing'
-import { type Agekind, type Agerank, type SeenThing, type VaultEvent, livenessVals, vaultEventkindVals } from '../shapes/shapes-vault-event'
-import { agekindOf, eventsOf, itemSeenOf, raisedOf, timeOf } from '../storage/agerank'
-import { ReadTcPattern, readAtOf } from '../storage/thing-classifier'
-import type { ReadTc } from '../storage/vault-db'
+import { type Sparse, type ThingCited, type ThingRecord, type Tombstone, Shell } from '../shapes/shapes-thing'
+import { type Agekind, type Agerank, type SeenThing, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
+import { UnseenAgerank, agekindOf, eventsOf, nextAgerankOf } from '../storage/agerank'
+import { readAtOf } from '../storage/thing-classifier'
 
 // == [Adoptable]: Adoptable
 
@@ -17,23 +15,23 @@ export type Adoptable<RecordT extends ThingRecord> = RecordT | Tombstone<RecordT
 // --
 
 // TypeScript cannot type a static `make` here that returns the subclass while its constructor is private, so each
-// subclass declares its own: `make(record, opts[, friend])`, which parses what it is given.
+// subclass declares its own: `make(record, opts[, friend])`, which checks what it is given and begins from that very record.
 // A subclass whose `PickleT` leaves out a tombstone or the void sentinel must begin from a whole live record, and never
 // receive either: `pickle` answers what was adopted, typed as the subclass says.
 /** A model of the stored Thing at one labelpath, across its lives, which reads as the record it last adopted.
- * Each field of that record is a read-only prop. Only the loggable ones, its Thing fields unless a subclass names more in
- * {@link loggableFieldnames}, are enumerable: a spread, `{ ...thing }`, or `JSON.stringify` shows nothing secret and nothing opaque.
+ * Each field of that record is a read-only prop. Only its Thing fields are enumerable: a spread, `{ ...thing }`, or
+ * `JSON.stringify` shows nothing secret and nothing opaque. A kind's body is hidden, and a subclass writes it out in its {@link adopt}.
  * A field the record lacks is no prop: after a tombstone or the shell, a Thing answers none of its last live record's body. Its scope fields never change.
  * Its type names the Thing fields and what a subclass declares; narrow {@link pickle} for the rest of a kind's fields.
  * What Thing itself holds is records as the vaultDB stores them, and what is derived from them: never a cleartext, a key or a lease.
  * It always models a record, at worst the shell, and its {@link receive} says which item events of the Thing are news.
- * A subclass parses what it begins from before calling `super`, and has no other member under a record field's name. One that never receives may freeze itself last.
+ * A subclass checks what it begins from before calling `super`, and has no other member under a record field's name. One that never receives may freeze itself last.
  * A listener can {@link subscribe} to the changes a subclass tells of.
  */
 export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT extends Adoptable<RecordT> = RecordT> extends BaseThing {
   // == [Props]: #record, #citable, #agerank, #readAt, #subscribers, #subscribe
 
-  // Set by the constructor's adopt, which finds it undefined.
+  // Set by the constructor's adopt.
   #record: Adoptable<RecordT> | undefined = undefined
   /** The Thing fields of the newest revision seen. */
   #citable: Sparse<ThingRecord>
@@ -47,7 +45,7 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   }
   // --
 
-  // == [Construction]: constructor, loggableFieldnames, adopt
+  // == [Construction]: constructor, adopt
 
   // A sparse live record is cited, not adopted: the shell stands in for its record until a whole one comes.
   /** A Thing begun from `begun`, which it adopts where that is whole, a tombstone or the void sentinel.
@@ -55,39 +53,21 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
    */
   protected constructor(begun: SeenThing<RecordT>) {
     super()
+    const { userid, banklabel, labelpath } = begun
+    Helpers.tattoo(this, { userid, banklabel, labelpath }, { configurable: false })
     this.#citable = citedOf(begun)
     this.adopt((BaseThing.isSparse(begun) ? Shell.inParentLivesOf(begun) : begun) as Adoptable<RecordT>)
   }
 
-  // `adopt` reads it while `super` runs, before a subclass's fields exist: a subclass overrides the getter.
-  /** The names of the record fields a spread, a log line and `JSON.stringify` show: the Thing fields, unless a subclass names more. Never name an opaque field. */
-  protected get loggableFieldnames(): readonly string[] { return ThingFieldnames }
-
-  // just write out the fields, this is over-DRY
-  /** Make `record` the one this Thing models, of whatever life: each of its fields becomes a prop, set again, and a field it lacks is removed. */
+  // The scope fields are the constructor's: `receive` refuses a record of another scope before it adopts one.
+  // A record from an adapter is frozen already; one that reaches a Thing another way is frozen here.
+  /** Make `record` the one this Thing models, of whatever life, its Thing fields shown as read-only props.
+   * A subclass whose kind has a body shows its fields as hidden read-only props, and removes them for a record that has none: the shell, or a sparse tombstone.
+   */
   protected adopt(record: Adoptable<RecordT>): void {
-    Object.freeze(record)
-    const was = this.#record // lose this
-    this.#record = record
-    // The record will have all the fields, perfectly valid, so just use it
-    const { lifepath, revseq, other, mutable, fields } = record
-    decorate(this, { fields, that, should, be, non, enumerable })
-    tattoo(this, { fields, that, should, be, enumerable })
-    this.#privateField = privateField
-    done
-
-    const loggable = this.loggableFieldnames
-    const dropped = Object.keys(was ?? {}).filter((ckey) => ! Object.hasOwn(record, ckey))
-    for (const ckey of dropped) { Reflect.deleteProperty(this, ckey) }
-    for (const [ckey, val] of Object.entries(record)) {
-      if (ScopeFieldnames.has(ckey)) {
-        if (was === undefined) { Helpers.tattooProp(this, ckey, val, { configurable: false }) }
-      } else if (loggable.includes(ckey)) {
-        Helpers.tattooProp(this, ckey, val)
-      } else {
-        Helpers.adorn(this, ckey, val, { writable: false })
-      }
-    }
+    this.#record = deepFreeze(record)
+    const { label, fmt, lifepath, lifeseq, revtok, revseq, born_at, written_at, am } = record
+    Helpers.tattoo(this, { label, fmt, lifepath, lifeseq, revtok, revseq, born_at, written_at, am })
     if (BaseThing.cmp(this.#citable, record) > 0) { this.#citable = citedOf(record) }
   }
   // --
@@ -108,19 +88,19 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   get read_at(): EpochMillis | undefined { return this.#readAt }
 
   /** Take `proposed`, an event of this Thing, and return the events that are news: none, and nothing changed, unless its record is news.
-   * News is a record that raises the agerank: from a later life, newer than any revision seen, a whole record newer than any
-   * whole one seen, or the newest revision seen again in a later span of 65.536 seconds than it was last seen in.
+   * News is a record that leaves the agerank greater than it was: from a later life, newer than any revision seen, a whole record newer than any
+   * whole one seen, or the newest revision seen again in a later tcchunk, a span of 65.536 seconds, than it was last seen in.
    * The events are `proposed` with its ageranks, then any `life`, then any `aged`, each frozen. A whole record, a tombstone
    * or the void sentinel is adopted, unless it equals the record held, which stays the same object; a sparse live record moves only `citable`, `agerank` and `read_at`.
    * A `life` or `aged` event returns none. Refuses an event of another Thing.
    */
   receive(proposed: VaultEvent<RecordT>): readonly VaultEvent<RecordT>[] {
-    Checks.event.parseConsistent(proposed, pick(this, ['userid', 'banklabel', 'labelpath']))
+    SeenChecks.event.parseConsistent(proposed, pick(this, ['userid', 'banklabel', 'labelpath']))
     if (proposed.eventkind !== 'item') { return NoEvents }
-    const { read_tc } = Checks.item.parse(proposed)
+    const { read_tc } = SeenChecks.item.parse(proposed)
     const { val, liveness } = proposed
-    const agerankWas = this.#agerank
-    const agerank = raisedOf(agerankWas, { lifepath: val.lifepath, revseq: val.revseq, time: timeOf(read_tc) }, liveness !== 'soon')
+    const agerankWas = this.#agerank ?? UnseenAgerank
+    const agerank = nextAgerankOf(agerankWas, val, read_tc, liveness !== 'soon')
     if (agerank === undefined) { return NoEvents }
     // Adopted first, so that an adopt that throws leaves this Thing as it was. Read before it, since adopt may move citable.
     const readAt = this.#readAtAfter(val, readAtOf(read_tc))
@@ -131,7 +111,7 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
     return eventsOf(proposed, agerankWas, agerank)
   }
 
-  // The time belongs to the newest revision, as the agerank's does: a newer one brings its own, the same one the later.
+  // The time belongs to the newest revision, as the agerank's tcchunk does: a newer one brings its own, the same one the later.
   /** The `read_at` after `seen` is read at `readAt`: moved where `seen` is the newest revision seen, or newer */
   #readAtAfter(seen: Pick<ThingCited, 'lifepath' | 'revseq'>, readAt: EpochMillis): EpochMillis {
     const order = BaseThing.cmp(this.#citable, seen)
@@ -175,49 +155,11 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   // --
 }
 
-// == [Helpers]: ScopeFieldnames, NoEvents, citedOf
-
-/** The names of the scope fields, set once, as a Thing begins. */
-const ScopeFieldnames: ReadonlySet<string> = new Set(['userid', 'banklabel', 'labelpath'])
+// == [Helpers]: NoEvents, citedOf
 
 /** What `receive` returns for an event that is not news. */
 const NoEvents: readonly never[] = Object.freeze([])
 
 /** The Thing fields of `seen`, frozen */
 function citedOf(seen: Sparse<ThingRecord>): Sparse<ThingRecord> { return Object.freeze(BaseThing.sparseOf(seen)) }
-// --
-
-// == [Checks]: SeenChecks, Checks
-
-// Documentarian needed on these comments, not readable
-
-// A lifepath as deep as its labelpath is what lets two ageranks of one Thing compare as strings: each lifeseq and revseq
-// is ten characters and the time eight, so each `/` and `|` falls at one place.
-// ReadTcPattern is read only as a check runs: thing-classifier imports this module, so the pattern may not be defined
-// yet while this module loads.
-/** The checks of a record a Thing is begun from or receives, and of when it was read. */
-export const SeenChecks = Validator.Checkers('bad_record', ({ custom }) => ({
-  /** Check the scope and citation of a record or a void sentinel, keeping the rest: a lifeseq for each label, its own odd exactly for a tombstone. */
-  seenCited: ThingChecks.scopedCited.loose()
-    .refine(isLifepathDeep, Phrases.LifepathDepth)
-    .refine(isParityRight, Phrases.LifeseqParity),
-  /** Check a `read_tc`: a UUID version 7. */
-  readTc:    custom<ReadTc>((val) => (typeof val === 'string') && ReadTcPattern.test(val), Phrases.ReadTcShape),
-}))
-
-// move these to the shapes
-/** The checks of an event a Thing receives: its kind and scope, then an item's record, liveness and `read_tc`. */
-const Checks = Validator.Checkers('bad_record', ({ obj, oneof }) => ({
-  event:  obj({ ...ThingChecks.thingScope.shape, eventkind: oneof(vaultEventkindVals) }),
-  item:   obj({
-    ...ThingChecks.thingScope.shape,
-    modelkind: ThingChecks.modelkind,
-    liveness:  oneof(livenessVals),
-    val:       SeenChecks.seenCited,
-    read_tc:   SeenChecks.readTc,
-  })
-    .refine(({ labelpath, modelkind }) => Labelpath.modelkindOf(labelpath) === modelkind, Phrases.EventModelkind)
-    .refine(({ val, ...scope }) => BaseThing.haveSameScope(val, scope), Phrases.EventOfOtherThing)
-    .refine(({ val, liveness }) => itemSeenOf(val as SeenThing).liveness === liveness, Phrases.EventLiveness),
-}))
 // --
