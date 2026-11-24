@@ -32,19 +32,16 @@ const BlankVerdict: GX.PassphraseVerdict = Object.freeze({ strong: false, reason
  */
 export function guardStrengthChecker(hostChecker: StrengthChecker): GuardedStrengthChecker {
   const host = GateishChecks.strengthChecker.parse(hostChecker, { where: 'strengthChecker' })
+  // The spread reads each field here, inside the guard, so a getter or proxy of the host's that throws is replaced, and the parse below reads plain data.
+  const judge = bulletproofAsyncHandlerOf(async (typed: string, told: BankScope) => ({ ...await host(typed, told) }), {
+    ifError: 'fail', transformer: (err) => HostErrorSanitizer.refusalFor(err, 'unexpected_error', Phrases.StrengthCheckerThrew),
+  })
   const check = async (passphrase: string, scope: BankScope): Promise<GX.PassphraseVerdict> => {
     // Frozen, so the host's checker can change nothing of what it is told.
     const told = Object.freeze(StampChecks.bankScope.parse(scope))
     const typed = GX.passphraseCleartext.parse(passphrase)
     if (! typed.trim()) { return BlankVerdict }
-    let answered: unknown
-    try {
-      // The spread reads each field here, inside the guard, so a getter or proxy of the host's that throws is replaced, and the parse below reads plain data.
-      answered = { ...await host(typed, told) }
-    } catch (err) {
-      throw HostErrorSanitizer.refusalFor(err, 'unexpected_error', Phrases.StrengthCheckerThrew)
-    }
-    const verdict = GX.passphraseVerdict.parse(answered, { advice: Phrases.StrengthCheckerMisanswered })
+    const verdict = GX.passphraseVerdict.parse(await judge(typed, told), { advice: Phrases.StrengthCheckerMisanswered })
     return verdict.strong ? Strength.StrongVerdict : verdict
   }
   const load = bulletproofAsyncHandlerOf(async () => { await host.load?.() }, {
