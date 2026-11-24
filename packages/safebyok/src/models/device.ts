@@ -264,13 +264,14 @@ export class Device {
       this.#unlistenScaffold = scaffold.listen(vaultMinder)
       this.#world.signin(vaultMinder)
       // Scaffolding until sign-in is one get of the roots: a get of the root box, whose answer's world brings the bank and
-      // main gate. Where none is stored, the bank is asked for, and its shell shows the stage `'unborn'`.
+      // main gate. Where none is stored, the bank is asked for, and its shell or tombstone shows the stage `'unborn'`; a
+      // bank stored live without the others is broken.
       const rootAnswer = await vaultMinder.tryGetOnce({ ...this.scope, labelpath: Labelpath.RootBox })
       if (! rootAnswer.ok) { throw rootAnswer.err }
       if ((rootAnswer.act === 'gotvoid') && (rootAnswer.world === null)) {
         const bankAnswer = await vaultMinder.tryGetOnce({ ...this.scope, labelpath: 'bank' })
         if (! bankAnswer.ok) { throw bankAnswer.err }
-        return
+        if (bankAnswer.act !== 'gotlive') { return }
       }
       // Roots answered that are not all live in the world are broken: reported as the sign-in's refusal.
       if (! this.#world.areRootsLive) { throw Throwers.bankRootsMissing() }

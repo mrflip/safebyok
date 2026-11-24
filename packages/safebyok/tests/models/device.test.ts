@@ -12,6 +12,7 @@ import { Bank } from '../../src/models/bank'
 import { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from '../../src/models/device'
 import { BirthGating } from '../../src/models/gating'
 import { VaultTSQ } from '../../src/minding/vault-tsq'
+import { BankRootsMissing } from '../../src/phrases'
 import { EmptyMaskedView } from '../../src/shapes/shapes-masked-view'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { type DevicePersisters, MemoryPersister } from '../../src/storage/persister'
@@ -466,6 +467,19 @@ describe("device.signin(userid)", () => {
     expect(shown).to.include({ stage: 'failed', isLocked: true })
     expect(shown.lastErr).to.include({ refusalkind: 'storage_issue' })
     expect(Object.isFrozen(shown.lastErr)).to.be.true
+    expect(device.bank).to.be.null
+  })
+
+  it("shows the roots missing as failed where the bank is stored live with no main gate or root box, and never rejects", async () => {
+    const born    = await TH.buildBornBank()
+    const vaultDB = born.device.vaultDB as MemoryVaultDB
+    vaultDB._cheat_things(born.bank.scope).delete('gate')
+    vaultDB._cheat_things(born.bank.scope).delete('box')
+    const device = TH.makeDevice({}, { vaultDB })
+    await device.signin(TH.WorldScope.userid)
+    const shown = device.getSnapshot().bank
+    expect(shown).to.include({ stage: 'failed', isLocked: true })
+    expect(shown.lastErr).to.include({ refusalkind: 'storage_issue', message: BankRootsMissing })
     expect(device.bank).to.be.null
   })
 
