@@ -96,8 +96,9 @@ export type Track           = Readonly<Z.infer<typeof AskChecks.trackShape>>
 export type GetAsk          = Readonly<Z.infer<typeof AskChecks.getAsk>>
 /** An ask for the children of the Thing at its scope. Its `ifAbsent` is the parent's. */
 export type ListAsk         = Readonly<Z.infer<typeof AskChecks.listAsk>>
+// Any other field may be undefined, as a Thing's body is over the shell or a sparse tombstone, so that a Thing may be cited as it stands.
 /** A write's citation of a Thing of `RecordT`'s kind: {@link ThingCited}, and optionally any other of its fields. */
-export type CitedOf<RecordT extends ThingRecord> = ThingCited & Partial<Omit<RecordT, keyof ThingCited>>
+export type CitedOf<RecordT extends ThingRecord> = ThingCited & { [FieldT in Exclude<keyof RecordT, keyof ThingCited>]?: RecordT[FieldT] | undefined }
 /** The flags of a write ask, its modelkind and records aside. */
 export type WriteAskFlags = Readonly<Omit<Z.infer<typeof AskChecks.writeAsk>, 'modelkind' | 'cited' | 'record'>>
 /** A write ask of the bank: see {@link WriteAsk}. */

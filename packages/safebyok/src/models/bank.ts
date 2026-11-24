@@ -1,4 +1,4 @@
-import { Clock, Crypto, type Errors, Helpers, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
+import { Clock, Crypto, type Errors, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { type Adoptable, Thing } from './thing'
 import { Device } from './device'
 import type { Gate } from './gate'
@@ -19,16 +19,23 @@ import * as Throwers from '../refusals/throwers'
  * Over the shell or a tombstone, what needs a live record refuses `absent_thing`: its stamp, its root box and a put.
  */
 export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<BankRecord>> {
-  // == [Props]: lifetok, #device, #world
-
-  // we are under-using the lifetok at the moment
-  /** The token minted when this bank was born, which tells this life of the bank from any other under its banklabel. Absent over the shell. */
-  declare readonly lifetok?: Lifetok
+  // == [Props]: #device, #world
 
   readonly #device:   Device
 
   /** The device's world, which locks, unlocks and ends this bank. */
   readonly #world: World
+  // --
+
+  // == [Body]: lifetok
+
+  // we are under-using the lifetok at the moment
+  // Read off the record adopted: the shell and a sparse tombstone lack it.
+  /** The token minted when this bank was born, which tells this life of the bank from any other under its banklabel. Undefined over the shell or a sparse tombstone. */
+  get lifetok(): Lifetok | undefined {
+    const record = this.pickle()
+    return ('lifetok' in record) ? record.lifetok : undefined
+  }
   // --
 
   // == [Getters]: device, device_tok, scope, stamp, gate, rootBox, getSnapshot, subscribe
@@ -70,7 +77,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   override get subscribe(): (listener: () => void) => (() => void) { return this.#world.subscribe }
   // --
 
-  // == [Construction]: make, constructor, adopt, mintStamps, makeRecord
+  // == [Construction]: make, constructor, mintStamps, makeRecord
 
   /** Make the bank of `record`, a whole bank record, live or a tombstone, or the bank's shell, on `opts.device`. Nothing is fetched or stored.
    * It is locked or unlocked as its device's world is, and finds its main gate there. Internal: the device's world makes the bank its SortedVaultDB keeps.
@@ -84,17 +91,6 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
     super(record)
     this.#device = device
     this.#world  = device.world
-  }
-
-  // Thing's constructor calls this before this bank's own fields exist, so it reads and sets none of them.
-  /** Model `record`, its lifetok a hidden read-only prop: the shell and a sparse tombstone have none. */
-  protected override adopt(record: Adoptable<BankRecord>): void {
-    super.adopt(record)
-    if ('lifetok' in record) {
-      Helpers.decorate<Bank>(this, { lifetok: record.lifetok }, { writable: false })
-    } else {
-      Reflect.deleteProperty(this, 'lifetok')
-    }
   }
 
   /** Fresh stamps for a new bank of `scope` and its main gate, both in their first life.

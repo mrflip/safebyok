@@ -19,13 +19,13 @@ export type Adoptable<RecordT extends ThingRecord> = RecordT | Tombstone<RecordT
 // A subclass whose `PickleT` leaves out a tombstone or the void sentinel must begin from a whole live record, and never
 // receive either: `pickle` answers what was adopted, typed as the subclass says.
 /** A model of the stored Thing at one labelpath, across its lives, which reads as the record it last adopted.
- * Each field of that record is a read-only prop. Only its Thing fields are enumerable: a spread, `{ ...thing }`, or
- * `JSON.stringify` shows nothing secret and nothing opaque. A kind's body is hidden, and a subclass writes it out in its {@link adopt}.
- * A field the record lacks is no prop: after a tombstone or the shell, a Thing answers none of its last live record's body. Its scope fields never change.
+ * Each field of that record is read-only. Its Thing fields are its own enumerable props: a spread, `{ ...thing }`, or
+ * `JSON.stringify` shows nothing secret and nothing opaque. A kind's body is read by a subclass's getters off the record adopted.
+ * A body field the record lacks reads as undefined: after a tombstone or the shell, a Thing answers none of its last live record's body. Its scope fields never change.
  * Its type names the Thing fields and what a subclass declares; narrow {@link pickle} for the rest of a kind's fields.
  * What Thing itself holds is records as the vaultDB stores them, and what is derived from them: never a cleartext, a key or a lease.
  * It always models a record, at worst the shell, and its {@link receive} says which item events of the Thing are news.
- * A subclass checks what it begins from before calling `super`, and has no other member under a record field's name. One that never receives may freeze itself last.
+ * A subclass checks what it begins from before calling `super`, and has no member under a record field's name but its body's getters. One that never receives may freeze itself last.
  * A listener can {@link subscribe} to the changes a subclass tells of.
  */
 export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT extends Adoptable<RecordT> = RecordT> extends BaseThing {
@@ -61,9 +61,7 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
 
   // The scope fields are the constructor's: `receive` refuses a record of another scope before it adopts one.
   // A record from an adapter is frozen already; one that reaches a Thing another way is frozen here.
-  /** Make `record` the one this Thing models, of whatever life, its Thing fields shown as read-only props.
-   * A subclass whose kind has a body shows its fields as hidden read-only props, and removes them for a record that has none: the shell, or a sparse tombstone.
-   */
+  /** Make `record` the one this Thing models, of whatever life, its Thing fields shown as read-only props. */
   protected adopt(record: Adoptable<RecordT>): void {
     this.#record = deepFreeze(record)
     const { label, fmt, lifepath, lifeseq, revtok, revseq, born_at, written_at, am } = record

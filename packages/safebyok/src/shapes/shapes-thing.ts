@@ -3,7 +3,7 @@
 import { isEmptyObject } from 'es-toolkit'
 import type { AllUnionFields } from 'type-fest'
 import type * as Z from 'zod'
-import { exactOptional, uuid } from 'zod'
+import { exactOptional, optional, uuid } from 'zod'
 import { CX, EX, SX, Validator } from 'safebyok-big/internals'
 import type { ShellOf, TombstoneOf } from './shapes-sealers'
 import * as Phrases from '../phrases'
@@ -55,10 +55,11 @@ export function isParityRight({ am, lifepath }: Lived): boolean { return (am ===
 function isMainGateLive({ labelpath, am }: Lived & Labelled): boolean { return (labelpath !== Labelpath.MainGate) || (am === 'a') }
 /** True unless the box is a tombstone whose sidecar is not empty. */
 function isGoneSidecarEmpty({ am, sidecar }: { am: string, sidecar: object }): boolean { return (am === 'a') || isEmptyObject(sidecar) }
-/** The fields of `shape`, each optional: it may be omitted, but not undefined. */
-function exactPartialOf<ShapeT extends Z.ZodRawShape>(shape: ShapeT): { [FieldT in keyof ShapeT]: Z.ZodExactOptional<ShapeT[FieldT]> } {
+// A Thing over the shell or a sparse tombstone answers undefined for its body: a citation may be such a Thing.
+/** The fields of `shape`, each optional: it may be omitted, or undefined. */
+function partialOf<ShapeT extends Z.ZodRawShape>(shape: ShapeT): { [FieldT in keyof ShapeT]: Z.ZodOptional<ShapeT[FieldT]> } {
   // Object.fromEntries loses the fieldnames' types: the cast restores them.
-  return Object.fromEntries(Object.entries(shape).map(([fieldname, check]) => [fieldname, exactOptional(check)])) as { [FieldT in keyof ShapeT]: Z.ZodExactOptional<ShapeT[FieldT]> }
+  return Object.fromEntries(Object.entries(shape).map(([fieldname, check]) => [fieldname, optional(check)])) as { [FieldT in keyof ShapeT]: Z.ZodOptional<ShapeT[FieldT]> }
 }
 
 /** True when a citation is the shell in all three of its marks, or in none. */
@@ -183,19 +184,19 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
     .refine(isGoneSidecarEmpty, Phrases.TombstoneSidecarNotEmpty)
 
   // A citation must carry what ThingCited names; any other field of its kind it carries must check.
-  const bankCited    = obj({ ...exactPartialOf(bankBase.shape), ...thingCited.shape }).strict()
+  const bankCited    = obj({ ...partialOf(bankBase.shape), ...thingCited.shape }).strict()
     .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
-  const gateCited    = obj({ ...exactPartialOf(gateBase.shape), ...thingCited.shape }).strict()
+  const gateCited    = obj({ ...partialOf(gateBase.shape), ...thingCited.shape }).strict()
     .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
   // A box's shell, as a bank gives it, carries the shell's lifeseq.
-  const boxCited     = obj({ ...exactPartialOf(boxBase.shape), lifeseq: exactOptional(anyLifeseq), ...thingCited.shape }).strict()
+  const boxCited     = obj({ ...partialOf(boxBase.shape), lifeseq: anyLifeseq.optional(), ...thingCited.shape }).strict()
     .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
 
   // A box's sealable has only its Thing fields and sidecar, so a whisper given with it, sealed or not, is dropped. The
-  // shell has no stored row, so its revseq, lifeseq and lifepath may be the shell's.
+  // shell has no stored row, so its revseq, lifeseq and lifepath may be the shell's, and a Box over it answers an undefined sidecar.
   const boxSealable  = obj({
     ...sparse.shape,
     labelpath:      boxLabelpath,
@@ -203,7 +204,7 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
     revseq:         thingCited.shape.revseq,
     lifeseq:        anyLifeseq,
     lifepath:       thingCited.shape.lifepath,
-    sidecar:        exactOptional(CX.sidecar),
+    sidecar:        CX.sidecar.optional(),
   })
     .refine(isLabelLast,    Phrases.LabelNotLast)
     .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)

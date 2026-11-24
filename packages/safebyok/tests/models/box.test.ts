@@ -1,10 +1,13 @@
 /** A Box: what `Box.make` takes, its props, and its scope and stamp. */
 
 import { describe, expect, it } from 'vitest'
+import { omit } from 'es-toolkit'
+import { BaseBox } from '../../src/models/base-box'
 import { Box } from '../../src/models/box'
 import { Thing } from '../../src/models/thing'
 import { Lifeseq } from '../../src/shapes/primitives'
 import { Shell } from '../../src/shapes/shapes-thing'
+import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
 import * as TH from '../test-helpers'
 
 describe("Box.make(record)", () => {
@@ -32,6 +35,8 @@ describe("Box.make(record)", () => {
   const RefusedCases = [
     [TH.gateThingOf(),                                     'a record of another kind'],
     [{ ...TH.boxThingOf(), whisper_sealed: undefined },    'a box record with no sealed whisper'],
+    [{ ...TH.boxThingOf(), sidecar: undefined },           'a box record whose sidecar is undefined'],
+    [omit(TH.boxThingOf(), ['sidecar']),                   'a box record with no sidecar'],
     [null,                                                 'no record at all'],
   ] as const
 
@@ -43,25 +48,33 @@ describe("Box.make(record)", () => {
 })
 
 describe("a Box's props", () => {
-  it("answers every field of its record by name, its body hidden", () => {
+  it("answers every field of its record by name: its Thing fields as its own props, its body by getters", () => {
     const record = TH.boxThingOf()
     const box = Box.make(record)
-    expect(Object.getOwnPropertyNames(box)).to.have.members(Object.keys(record))
+    expect(Object.getOwnPropertyNames(box)).to.have.members(Object.keys(Thing.sparseOf(record)))
     expect(box.sidecar).to.eq(record.sidecar)
     expect(box.whisper_sealed).to.eq(record.whisper_sealed)
-    expect(Object.getOwnPropertyDescriptor(box, 'whisper_sealed')).to.include({ enumerable: false })
   })
 
-  it("sets every field non-writable, its scope fields non-configurable and the rest configurable", () => {
+  it("sets every Thing field non-writable, its scope fields non-configurable and the rest configurable, and its body read-only", () => {
     const record = TH.boxThingOf()
     const box = Box.make(record)
     const scopeFieldnames = new Set(['userid', 'banklabel', 'labelpath'])
-    for (const fieldname of Object.keys(record)) {
+    const thingFieldnames = Object.keys(Thing.sparseOf(record))
+    for (const fieldname of thingFieldnames) {
       const configurable = ! scopeFieldnames.has(fieldname)
       expect(Object.getOwnPropertyDescriptor(box, fieldname), fieldname).to.include({ writable: false, configurable })
     }
     expect(() => { (box as { revseq: number }).revseq = 9 }).to.throw(TypeError)
+    expect(() => { (box as { sidecar: object }).sidecar = {} }).to.throw(TypeError)
     expect(Reflect.deleteProperty(box, 'labelpath')).to.eq(false)
+  })
+
+  it("answers an undefined body over the shell, and is sealable and citable as it stands", () => {
+    const box = Box.make(Shell.inParentLivesOf(TH.boxThingOf()))
+    expect([box.sidecar, box.whisper_sealed]).to.deep.equal([undefined, undefined])
+    expect(BaseBox.nextRevisionOf(box, { sidecar: {} })).to.deep.include({ am: 'a', revseq: 0, sidecar: {} })
+    expect(BoxChecks.cited.parse(box)).to.deep.include(box.citable)
   })
 
   it("stops answering its live record's body once it adopts a sparse tombstone", () => {

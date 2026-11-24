@@ -1,4 +1,4 @@
-import { CX, Clock, Crypto, Helpers, StableJsonify, Validator } from 'safebyok-big/internals'
+import { CX, Clock, Crypto, StableJsonify, Validator } from 'safebyok-big/internals'
 import type { BoxRecord, Sealed, ThingScope } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 import type { BoxCleartexts, BoxPublicProps, LiveOf, RevisionOf, SealTags, Sealable, Sealer, TombstoneOf } from '../shapes/shapes-sealers'
@@ -15,28 +15,14 @@ const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisp
  *  Acts as the {@link Sealer} for a box's whisper. Pass the class itself to a lease's `seal` or `unseal`.
  */
 export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Adoptable<BoxRecord>> {
-  // == [Props]: sidecar, whisper_sealed
+  // == [Body]: sidecar, whisper_sealed
+  // Read off the record adopted: a field it lacks reads as undefined.
 
-  /** What a UI may show beside the whisper while the bank is locked: `{}` for a tombstone, and absent over the shell or a sparse tombstone. */
-  declare readonly sidecar?:        BoxRecord['sidecar']
-  /** The whisper, sealed, or absent over the shell or a sparse tombstone. */
-  declare readonly whisper_sealed?: Sealed
-  // --
+  /** What a UI may show beside the whisper while the bank is locked: `{}` for a tombstone, and undefined over the shell or a sparse tombstone. */
+  get sidecar(): BoxRecord['sidecar'] | undefined { return wholeOf(this.pickle())?.sidecar }
 
-  // == [Construction]: adopt
-
-  // Thing's constructor calls this before a box's own fields exist, so it reads and sets none of them.
-  /** Model `record`, its sidecar and sealed whisper hidden read-only props: the shell and a sparse tombstone have neither. */
-  protected override adopt(record: Adoptable<BoxRecord>): void {
-    super.adopt(record)
-    if ('whisper_sealed' in record) {
-      const { sidecar, whisper_sealed } = record
-      Helpers.decorate<BaseBox>(this, { sidecar, whisper_sealed }, { writable: false })
-    } else {
-      Reflect.deleteProperty(this, 'sidecar')
-      Reflect.deleteProperty(this, 'whisper_sealed')
-    }
-  }
+  /** The whisper, sealed, or undefined over the shell or a sparse tombstone. */
+  get whisper_sealed(): Sealed | undefined { return wholeOf(this.pickle())?.whisper_sealed }
   // --
 
   // == [Kind]: modelkind
@@ -133,7 +119,10 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
 }
 Object.freeze(BaseBox satisfies Sealer<BoxRecord, BoxCleartexts>)
 
-// == [Helpers]: deserializeWhisper
+// == [Helpers]: wholeOf, deserializeWhisper
+
+/** `record` where it has a box's body, live or a tombstone, else undefined: the shell, or a sparse tombstone */
+function wholeOf(record: Adoptable<BoxRecord>): BoxRecord | undefined { return ('whisper_sealed' in record) ? record : undefined }
 
 // What JSON.parse throws is replaced, never made the cause: a SyntaxError can quote the text it failed on.
 /** The whisper in the JSON `text`, or throw `damaged_whisper` */

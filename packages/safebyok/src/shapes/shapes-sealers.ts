@@ -43,10 +43,13 @@ export type RevisionOf<RecordT, CleartextsT> = RecordT extends unknown ? Omit<Re
 /** The body of a live `RecordT`: its fields other than its Thing fields and its sealed parts, such as a box's sidecar. */
 export type BodyOf<RecordT, CleartextsT> = Omit<LiveOf<RecordT>, keyof Sparse<ThingRecord> | keyof SealedPartsOf<CleartextsT>>
 
+// A body field may be undefined, as a Thing's is over the shell or a sparse tombstone, so that a Thing is sealable as it stands.
 /** The record of `RecordT`'s kind that a seal makes the next revision from: whole, sparse or unsealed, live, a tombstone or the shell.
  * The seal carries over its Thing fields and its body, and never its secrets.
  */
-export type Sealable<RecordT extends Sparse<ThingRecord>> = Omit<Sparse<RecordT>, 'am'> & Readonly<{ am: Sparse<ThingRecord>['am'] }> & Partial<Omit<LiveOf<RecordT>, keyof Sparse<ThingRecord>>>
+export type Sealable<RecordT extends Sparse<ThingRecord>> = Omit<Sparse<RecordT>, 'am'> & Readonly<{ am: Sparse<ThingRecord>['am'] }> & {
+  [FieldT in Exclude<keyof LiveOf<RecordT>, keyof Sparse<ThingRecord>>]?: LiveOf<RecordT>[FieldT] | undefined
+}
 
 /** A seal's public props: the fields it is given that are not secret, each optional.
  * - the body's fields -- replace those of the sealable

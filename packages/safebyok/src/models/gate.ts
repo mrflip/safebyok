@@ -1,4 +1,4 @@
-import { Clock, Crypto, type Errors, Helpers, Validator } from 'safebyok-big/internals'
+import { Clock, Crypto, type Errors, Validator } from 'safebyok-big/internals'
 import { type Adoptable, Thing } from './thing'
 import type { Device } from './device'
 import { AddPasskeyGating, ReplacePassphraseGating, RevokePasskeyGating, UnlockGating } from './gating'
@@ -24,19 +24,26 @@ import * as Throwers from '../refusals/throwers'
  * Over the shell or a tombstone, its stamp, `main` and `passkey0` refuse `absent_thing`, and so does a gating's attempt, though its maker still takes in the cleartexts.
  */
 export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<GateRecord>> implements GateStamp {
-  // == [Props]: wayins, #device, #world, #friend
-
-  /** The wayin records, frozen, or absent over the shell or a sparse tombstone. */
-  declare readonly wayins?: Wayins
-  declare readonly auth?:   GateRecord['auth']
-  declare readonly sigs?:   GateRecord['sigs']
-  declare readonly meta?:   GateRecord['meta']
+  // == [Props]: #device, #world, #friend
 
   readonly #device:    Device
   /** The world that holds the leases this gate builds. */
   readonly #world:     World
   /** The world's lease verbs. */
   readonly #friend:    WorldGateFriend
+  // --
+
+  // == [Body]: wayins, auth, sigs, meta
+  // Read off the record adopted: a field it lacks reads as undefined.
+
+  /** The wayin records, frozen, or undefined over the shell or a sparse tombstone. */
+  get wayins(): Wayins | undefined { return wholeOf(this.pickle())?.wayins }
+  /** Reserved, and empty, or undefined over the shell or a sparse tombstone. */
+  get auth(): GateRecord['auth'] | undefined { return wholeOf(this.pickle())?.auth }
+  /** Reserved, and empty, or undefined over the shell or a sparse tombstone. */
+  get sigs(): GateRecord['sigs'] | undefined { return wholeOf(this.pickle())?.sigs }
+  /** Reserved, and empty, or undefined over the shell or a sparse tombstone. */
+  get meta(): GateRecord['meta'] | undefined { return wholeOf(this.pickle())?.meta }
   // --
 
   // == [Getters]: device, main, passkey0, scope, stamp, bankStamp, leaseEndsAt, leaseLoggable
@@ -93,17 +100,10 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   }
 
   // Thing's constructor calls this before this gate's own fields exist, so it reads and sets none of them.
-  /** Model `record`, its wayins checked, and they and its reserved bags hidden read-only props: the shell and a sparse tombstone have none. */
+  /** Model `record`, its wayins checked first where it has them. */
   protected override adopt(record: Adoptable<GateRecord>): void {
-    if ('wayins' in record) {
-      const { wayins, auth, sigs, meta } = record
-      GateChecks.wayins.parse(wayins)
-      super.adopt(record)
-      Helpers.decorate<Gate>(this, { wayins, auth, sigs, meta }, { writable: false })
-    } else {
-      super.adopt(record)
-      for (const fieldname of ['wayins', 'auth', 'sigs', 'meta']) { Reflect.deleteProperty(this, fieldname) }
-    }
+    if ('wayins' in record) { GateChecks.wayins.parse(record.wayins) }
+    super.adopt(record)
   }
 
   /** The first record of a new main gate, made from `dna`, born at its stamp's `born_at`. */
@@ -332,7 +332,10 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   static override readonly modelkind = 'gate'
 }
 
-// == [Helpers]: wayinsOf
+// == [Helpers]: wholeOf, wayinsOf
+
+/** `record` where it has a gate's body, else undefined: the shell, or a sparse tombstone */
+function wholeOf(record: Adoptable<GateRecord>): GateRecord | undefined { return ('wayins' in record) ? record : undefined }
 
 // A Wayin's pickle is typed as either kind; the gate record's parse checks each is the kind its label wants.
 /** The frozen records of `wayins`, its passkey0 null for none. */
