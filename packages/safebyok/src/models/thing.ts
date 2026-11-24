@@ -5,7 +5,7 @@ import type { EpochMillis } from '../shapes/primitives'
 import type { ShellOf } from '../shapes/shapes-sealers'
 import { type Sparse, type ThingCited, type ThingRecord, type Tombstone, Shell } from '../shapes/shapes-thing'
 import { type Agekind, type Agerank, type SeenThing, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
-import { UnseenAgerank, agekindOf, eventsOf, nextAgerankOf } from '../storage/agerank'
+import { agekindOf, eventsOf, nextAgerankOf } from '../storage/agerank'
 import { readAtOf } from '../storage/thing-classifier'
 
 // == [Adoptable]: Adoptable
@@ -97,7 +97,7 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
     if (proposed.eventkind !== 'item') { return NoEvents }
     const { read_tc } = SeenChecks.item.parse(proposed)
     const { val, liveness } = proposed
-    const agerankWas = this.#agerank ?? UnseenAgerank
+    const agerankWas = this.#agerank
     const agerank = nextAgerankOf(agerankWas, val, read_tc, liveness !== 'soon')
     if (agerank === undefined) { return NoEvents }
     // Adopted first, so that an adopt that throws leaves this Thing as it was. Read before it, since adopt may move citable.
