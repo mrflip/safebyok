@@ -165,7 +165,7 @@ describe("VaultMinder, what only a wrapper can show", () => {
 })
 
 describe("VaultMinder's listeners, of what an answer carries", () => {
-  it("tells of of a refused write's bank, main gate and root box, out to in, before the write answers, and of its dbhas seen once", async () => {
+  it("tells of a refused write's bank, main gate and root box, out to in, before the write answers, and of its dbhas seen once", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await inner.tryBirthBank(TH.birthBankAskOf())
     const { events, badNews } = heardOf(vaultDB)
@@ -176,7 +176,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     expect(badNews).to.deep.equal([])
   })
 
-  it("tells of of a listing's parent, then each Thing listed, sparse and in labelpath order, after the bank and main gate", async () => {
+  it("tells of a listing's parent, then each Thing listed, sparse and in labelpath order, after the bank and main gate", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await inner.tryBirthBank(TH.birthBankAskOf())
     for (const label of ['openai', 'anthropic']) { await inner.tryWriteThing(TH.birthAskOf(TH.boxThingOf(label), Shell.childCited(TH.Life0))) }
@@ -190,7 +190,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     )
   })
 
-  it("tells of of a birth's roots, each write's record, and a get's record, the answers' own objects", async () => {
+  it("tells of a birth's roots, each write's record, and a get's record, the answers' own objects", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     const { events } = heardOf(vaultDB)
     const born = await vaultDB.tryBirthBank(TH.birthBankAskOf())
@@ -205,7 +205,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     expect([records[2], records[3], records[4]]).to.have.ordered.members([born.ok && born.val.root, written.ok && written.val, got.ok && got.val])
   })
 
-  it("tells of of nothing for a repeat or an older record", async () => {
+  it("tells of nothing for a repeat or an older record", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await inner.tryBirthBank(TH.birthBankAskOf())
     const { events } = heardOf(vaultDB)
@@ -221,7 +221,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     expect(shorthandsOf(events.slice(4))).to.deep.equal([['item', 'gate', 'full']])
   })
 
-  it("tells of of the newest revision seen again in a later span of time, and of nothing for it again in that span", async () => {
+  it("tells of the newest revision seen again in a later span of time, and of nothing for it again in that span", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await inner.tryBirthBank(TH.birthBankAskOf())
     const { events } = heardOf(vaultDB)
@@ -236,7 +236,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     expect(events[2]).to.deep.include({ read_tc: later })
   })
 
-  it("tells of of a whole record seen sparse first, and of a newer sparse one as aged", async () => {
+  it("tells of a whole record seen sparse first, and of a newer sparse one as aged", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await inner.tryBirthBank(TH.birthBankAskOf())
     const { events } = heardOf(vaultDB)
@@ -250,7 +250,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     ])
   })
 
-  it("tells of of the void sentinel a get's answer carries, under its parent's life as the step read it", async () => {
+  it("tells of the void sentinel a get's answer carries, under its parent's life as the step read it", async () => {
     const { vaultDB } = sortedOverMemory()
     const { events } = heardOf(vaultDB)
     await vaultDB.tryBirthBank(TH.birthBankAskOf())
@@ -263,7 +263,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     expect(voided).to.deep.include({ val: Shell.of({ ...TH.BoxScope, lifepath }) })
   })
 
-  it("tells of of the void sentinel a get's answer carries under a parent it has not seen, and under one not stored", async () => {
+  it("tells of the void sentinel a get's answer carries under a parent it has not seen, and under one not stored", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await inner.tryBirthBank(TH.birthBankAskOf())
     const { events } = heardOf(vaultDB)
@@ -275,7 +275,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     expect(unbornEvents[0]).to.deep.include({ val: Shell.of({ ...TH.BoxScope, lifepath: `${Shell.VoidLifeseq}/${Shell.VoidLifeseq}` }) })
   })
 
-  it("tells of of the shell a write refused over nothing stored carries", async () => {
+  it("tells of the shell a write refused over nothing stored carries", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await inner.tryBirthBank(TH.birthBankAskOf())
     const { events } = heardOf(vaultDB)
@@ -285,7 +285,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     expect(events[4]).to.deep.include({ val: Shell.of({ ...TH.BoxScope, lifepath: `${TH.Life0}/${Shell.VoidLifeseq}` }) })
   })
 
-  it("tells of of the void at a root as the root's own shell", async () => {
+  it("tells of the void at a root as the root's own shell", async () => {
     const { vaultDB } = sortedOverMemory()
     const { events } = heardOf(vaultDB)
     const answer = await vaultDB.tryGetThing(TH.getGateAskOf())
@@ -305,7 +305,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     expect(events).to.deep.equal([])
   })
 
-  it("tells of of nothing from an answer of another bank", async () => {
+  it("tells of nothing from an answer of another bank", async () => {
     const { vaultDB } = sortedOverMemory()
     const { events, badNews } = heardOf(vaultDB)
     expect(await vaultDB.tryGetThing({ ...TH.getGateAskOf(), banklabel: 'other' })).to.deep.include({ act: 'gotvoid' })

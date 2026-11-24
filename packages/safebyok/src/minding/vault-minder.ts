@@ -110,7 +110,8 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
 
   // == [Once verbs]: tryGetOnce, getOnce, tryListOnce, listOnce, tryPutOnce, putOnce, tryDelOnce, delOnce
   // Each sends the wrapped vaultDB one ask of this bank's, and answers once the records the answer carries are told. Each
-  // `try` form answers the vaultDB's whole answer, a refusal included; the other throws the refusal.
+  // `try` form answers the vaultDB's whole answer, a refusal included; the other throws the refusal, and `getOnce` refuses
+  // too where no Thing is kept or the Thing is known only sparse in its newest life.
 
   /** Get the Thing at `scoped`, of this bank, once. */
   async tryGetOnce(scoped: ThingScope): Promise<GetThingAnswer> {

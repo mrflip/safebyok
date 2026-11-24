@@ -259,8 +259,9 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
     return this
   }
 
-  // A subscriber is told after a gate change, and after each change to the world's snapshot: an unlock, a lock, a wait in
-  // ensureUnlocked opened or settled, and the world's end.
+  // A subscriber is told after each gate change this device writes, and after each change to the world's snapshot: an
+  // unlock, a lock, a wait in ensureUnlocked opened or settled, and the world's end. A gate change another device writes,
+  // heard by `receive`, is not one of these.
   /** Tell each subscriber of a change, handing what one throws to the device's `onBadNews`. */
   #tell(): void { this.tellSubscribers((err) => { this.#device.tellBadNews([err]) }) }
   // --
