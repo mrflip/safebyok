@@ -495,8 +495,8 @@ class RefusingThing extends Thing<ThingRecord, ThingScope, undefined, Adoptable<
   /** What its adopt says as it refuses. */
   static readonly Refusal = "This record is refused."
 
-  /** A Thing begun from `seen`. */
-  static make(seen: SeenThing): RefusingThing { return new RefusingThing(seen) }
+  /** A Thing begun from `begun`. */
+  static make(begun: Adoptable<ThingRecord>): RefusingThing { return new RefusingThing(begun) }
 
   /** Where this Thing is stored. */
   get scope(): ThingScope { return { userid: this.userid, banklabel: this.banklabel, labelpath: this.labelpath } }
