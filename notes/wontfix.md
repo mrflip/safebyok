@@ -33,34 +33,33 @@ Coach, 2026-11-15, box_ops thread 1.
 
 ### A get's late, older answer keeps the newer record, but marks it fresh
 
-* current outcome: when a get's answer lands after a newer record from another source, the VaultMinder keeps the newer
-  record, and TanStack Query marks the item fresh as of the get's answer. The record reads as timely for longer, by
-  however long that answer was in flight. A whole record older than the item from any other source (a notice, or a
-  write's answer) is dropped, and leaves the item as fresh as it was.
+* current outcome: when a get's answer lands after a newer record from another source, the vault TSQ's item keeps the
+  newer record its Thing holds, and TanStack Query marks the item fresh as of the get's answer. Under a finite
+  `staleTime` a caller names, the record reads as timely for longer, by however long that answer was in flight.
 * alternatives:
-  - skip a get's answer that `newerThingOf` would refuse: a get's queryFn must return its record, and TanStack Query
-    lands it itself.
-  - deliver with the held record's `dataUpdatedAt` as `updatedAt`: TanStack Query dates a get's answer as it lands,
-    and which record wins is known only inside `structuralSharing`, after the time has been chosen.
+  - skip a get's answer the Thing finds no newer: a get's queryFn must return a value, and TanStack Query lands it
+    itself.
+  - deliver with the held record's `dataUpdatedAt` as `updatedAt`: TanStack Query dates a queryFn's value as it lands,
+    and offers no way to date it otherwise.
 * workaround: none needed. A get with a short `staleTime` asks storage again.
 
 Steps to create: a get starts; a notice of a newer revision lands; the get's answer, of the older revision, lands
 after it.
 
-Reasoning for wontfix: the gain is at most one answer's time in flight, against a `staleTime` of an hour, and the fix
-would put a comparison outside `structuralSharing`. Ruled by the Coach, 2026-11-15, vault_minder; narrowed to a get by
+Reasoning for wontfix: the gain is at most one answer's time in flight, and only under a finite `staleTime`, and the
+fix would date an answer outside the library. Ruled by the Coach, 2026-11-15, vault_minder; narrowed to a get by
 the Coach, 2026-11-20, soon_item rework.
 
-### The VaultMinder detects no conflict among the records it holds
+### The SortedVaultDB detects no conflict among the records it holds
 
-* current outcome: `newerThingOf` returns the later record by lifepath and then revseq. Two records of one revision
-  with different revtoks keep whichever landed first. A VaultTSQ's get answers what the box's Thing holds once storage
+* current outcome: a Thing's agerank orders records by lifepath and then revseq, and reads no revtok: two records of one
+  revision with different revtoks are one revision to it. A VaultTSQ's get answers what the box's Thing holds once storage
   answers: a whole record of the Thing's newest life, older than its newest revision known, shows as the item, and an
   answer of an earlier life changes nothing. The get refuses `stale_read` only where that leaves the Thing known only
   sparse in its newest life.
 * alternatives:
-  - refuse `record_conflict` in the cache: `newerThingOf` must stay pure, since TanStack Query calls it for every
-    observer's result, so a refusal would need a state of its own outside it.
+  - refuse `record_conflict` as a record is received: a comparison of revtoks, and a refusal state, in the common path
+    of every record.
 * workaround: none needed. A write citing what the cache holds is refused by storage where storage holds otherwise,
   and the refusal carries the stored record.
 
@@ -142,58 +141,14 @@ lands is what the calls amount to in the order they ran, nothing is left inconsi
 change never unlocks. Specifying them would mean waits, dismissals or checks reaching across an attempt and the bank's
 lifecycle: new machinery in a primitive's critical path, for crossings the host avoids by awaiting its own calls.
 
-### A minder's answer that crosses a `goodbye` and a fresh `hello`
-
-* current outcome, as built, and promised nowhere: a `get`, `list` or `write` the VaultMinder began before `goodbye`,
-  answered after `goodbye` and a fresh `hello`, may land in the new cache; one whose fetch had settled may mark the new
-  root box's listing stale. What a get or a list still waiting at `goodbye` refuses, even with no `hello`, is
-  unspecified: as built, TanStack cancels it, and it rejects with TanStack's `CancelledError` (a `tryList` answers it as
-  `unexpected_error`), its listing not set. The Things such a list answers are still notified to each watch open when the
-  vaultDB answers, so a fresh `hello`'s watch caches them. A good write caches the record written, as though begun
-  after the `hello`, and answers its caller as the vaultDB answered it. A bank's sweep calls `goodbye` on the
-  minder of each vault made on it, so an answer crossing that sweep is this case too.
-* alternatives:
-  - a token for each stretch of minding, compared as each answer lands: a new state, and a check in the critical path
-    of every get, list and write, for a crossing.
-  - cancel each operation under way at `goodbye`: an abort controller in a primitive's critical path.
-* workaround: the host awaits its minder's gets, lists and writes before calling `goodbye`.
-
-Steps to reproduce: start a `list('box')` (or a write, or a get) on a started minder whose vaultDB answers late; call
-`goodbye()` and then `hello()` while it waits; let the vaultDB answer. The new cache's listing, and the item, hold what
-the earlier stretch asked for.
-
-Reasoning for wontfix: what lands is a record the vaultDB did store, so the cache is never wrong about the bank, only
-early to hear of it; and a `goodbye` and `hello` around an operation are two of the host's own calls crossing it, which
-the host sequences. Guarding against it put a token and three checks into the common case for a case no host meets by
-accident. Ruled by the Coach, 2026-11-20, vault_snapper: "The goodbye-then-hello token -- let's pull this out".
-
-### A sparse record from a newer life leaves the old life's record in the item
-
-* current outcome: when a Thing's soon is of a newer life than its item (a list or a notice tells of the Thing born again,
-  sparse), the item keeps the old life's whole record, marked invalidated, until a get fetches the new life whole. `at()`
-  answers the old life's record meanwhile, `tryAt` answers `untimely`, and `vault.withWhisper` refuses `stale_read`
-  where its get leaves the item so.
-* alternatives:
-  - remove the item when such a soon lands: `at()` then answers nothing, and a host's bridge, which ignores a removal,
-    keeps showing the old life all the same (TODO.md).
-  - keep a whole record and a sparse one together in one entry, with a merge, a liveness and checks of its own.
-* workaround: a get, which fetches the new life whole.
-
-Steps to reproduce: get a box; on another device, delete it and put it again; list its parent before getting it again.
-
-Reasoning for wontfix: the old record is marked behind, as any item behind its soon is, so nothing answers it as timely;
-removing it would add a branch to every landing for a state a get already ends. Ruled by the Coach and the orchestrator,
-2026-11-20, soon_item.
-
 ### A sparse record that lands while a get waits
 
-* current outcome: a get holds the soonest record cached when it began, and refuses only an answer older than that. A
-  sparse record that lands while it waits is cached as the Thing's soon; the get's answer lands in the item, older than
-  the soon, and the item is marked behind it at once. The get answers that older whole record.
+* current outcome: a sparse record of the box's own life that lands while a vault TSQ's get waits invalidates the item,
+  which joins the get under way (`cancelRefetch: false`). The get answers the older whole record, the item shows it, and
+  it stays stale while its Thing is cold, until an observer's next mount, focus or reconnect, or the next `getOnce`.
 * alternatives:
-  - refuse the get `stale_read` when a newer soon is cached as its answer lands: a check outside `structuralSharing`,
-    against a record the get did not begin with, in a primitive's critical path.
-* workaround: none needed. An item an observer keeps active is fetched again at once; any other, by its next get.
+  - invalidate the item again once the get answers: a second write to the tree for one sighting, on a common path.
+* workaround: `getOnce` again, which fetches the newest whole.
 
 Steps to reproduce: start a get of a box; while the vaultDB answers it, list its parent after another device wrote the
 box anew; let the get answer.
@@ -204,14 +159,14 @@ and the cache marks itself behind before any later call reads it. Ruled by the o
 
 ### A box new to a listing that lands while a list read before it is under way
 
-* current outcome: the box's first landing marks its parent's listing stale, which joins the list under way
+* current outcome: the box's new life invalidates its parent's listing, which joins the list under way
   (`cancelRefetch: false`); that list lands without the box and leaves the listing current. The box shows at the next list.
 * alternatives:
   - cancel and restart the list: a list's own children land while it is under way, and would restart it.
   - settle the listing against the cached children as it lands: surgery on a common path, for a crossing.
 * workaround: none needed. The next list lists it.
 
-Steps to reproduce: start `list('box')` on a vaultDB that answers late; write a new box through the minder after the
+Steps to reproduce: start `list('box')` on a vaultDB that answers late; write a new box through the vault after the
 datastore has read; let the list answer.
 
 Reasoning for wontfix: a crossing of a write and a list of milliseconds (CLAUDE.md, *Hours separate updates*); the
@@ -221,7 +176,7 @@ listing holds only what the vaultDB answered. Written by core_first thread 3, 20
 
 * current outcome: `PostgresVaultDB` makes a list's `read_tc` in JavaScript, on the server that runs it, just before its
   statement. Two lists over a pool, or on servers whose clocks disagree, can carry `read_tc`s in the other order from
-  their snapshots; the minder then keeps the listing read earlier, marked current, until a later list lands.
+  their snapshots. The vault TSQ compares no `read_tc`: it keeps the listing its last list answered.
 * alternatives:
   - Postgres 18's `uuidv7()` in the statement: the package supports Postgres before 18.
   - build a UUID version 7 from the datastore's clock in SQL: a construction of our own, for a crossing.
@@ -290,25 +245,26 @@ Reasoning for wontfix: a lock comes a few times a day, and a get is in flight fo
 separate updates*, `#no-slop-crossings`). Nothing is written, and the refusal shows no whisper. Written by the react_life
 thread 12 worker, rewritten by the thread 15 worker, 2026-11-21, awaiting a ruling.
 
-### A bank's sweep stops its device's minder, which the device owns
+### A bank's sweep stops its device's vault TSQ, which the device owns
 
-* current outcome: `bank.sweep()` sweeps each vault made on the bank, and `Vault.sweep` calls `goodbye` on the vault's
-  minder. That minder is the device's: the device makes it at `Device.make` and hands it to the vault of its bank, and its
-  `hello` starts it, once. After a sweep of the device's bank (`device.sweep()`, or `bank.sweep()` itself), the device
-  stays enabled, but its minder is not minding: each `minder.get` or `minder.list` refuses `disabled`, and a second
-  `device.hello()` answers the first and starts nothing.
+* current outcome: `bank.sweep()` sweeps each vault made on the bank, and `Vault.sweep` sweeps the vault's vault TSQ,
+  which stops hearing the SortedVaultDB. That vault TSQ is the device's: the device makes it at `signin` and hands it to
+  the vault of its bank, once. After a sweep of the device's bank (`device.sweep()`, or `bank.sweep()` itself), the
+  device stays enabled, but its vault TSQ's items and listings no longer follow what the SortedVaultDB tells, and a
+  second `device.signin` answers the first and starts nothing.
 * alternatives:
-  - have `Vault.sweep` leave the minder be, and `device.sweep` stop it: the device then decides when its minder stops,
-    which is part of the ends work below, not of this note.
-  - have the device restart its minder after a sweep: a new path through sign-in for a device whose bank was swept,
+  - have `Vault.sweep` leave the vault TSQ be, and `device.sweep` stop it: the device then decides when its vault TSQ
+    stops, which is part of the ends work below, not of this note.
+  - have the device make a new vault TSQ after a sweep: a new path through sign-in for a device whose bank was swept,
     which nothing yet needs.
 * workaround: make a new device after a sweep, as a page reload does.
 
-Steps to reproduce: sign in on a device whose bank is stored, sweep it with `device.sweep()`, then call
-`device.minder.get` on the root box: it refuses `disabled`.
+Steps to reproduce: sign in on a device whose bank is stored, sweep it with `bank.sweep()`, then write a new revision
+of a box from another device: the device's SortedVaultDB tells of it, and the box's item in `device.vaultTSQ` keeps the
+old one.
 
-Reasoning for wontfix: who stops the minder belongs to how ownership is apportioned among device, bank and vault, which
-is settled when the ends (vacate, delete, goodbye) are built; moving the `goodbye` now would build half of that design
+Reasoning for wontfix: who stops the vault TSQ belongs to how ownership is apportioned among device, bank and vault,
+which is settled when the ends (vacate, delete, goodbye) are built; moving its sweep now would build half of that design
 ahead of it. Nothing stored changes, and no secret material is involved. Ruled by the Coach, 2026-11-21, react_life's
 E5: "a note, no code, thanks"; then "lgtm".
 
@@ -378,10 +334,10 @@ and it would have to be the customer's call whether to tolerate it or panic."
 
 * current outcome: `signin` makes the device's `SortedVaultDB`, which watches the host's vaultDB, only once both
   persisters have restored. A `Device.sweep` that lands while they restore finds no `SortedVaultDB` to stop; the one
-  made after it watches until the page goes, and the minders hear what it tells.
+  made after it watches until the page goes, and the vault TSQ, the world and the persisters' scaffold hear what it tells.
 * alternatives:
-  - make the `SortedVaultDB` before the restores, as it was: its sorter would sort records no minder hears, and drop them
-    as repeats once the minders listen.
+  - make the `SortedVaultDB` before the restores, as it was: its sorter would sort records no listener hears, and drop
+    them as repeats once they listen.
   - have the sweep mark the device so the sign-in stops: a state and a check in the sign-in for a sweep landing in a
     window of milliseconds.
 * workaround: none needed; the device sweeps again, or the page reloads.
