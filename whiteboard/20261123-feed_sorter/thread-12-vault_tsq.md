@@ -24,9 +24,15 @@ Proved: see the PR's **Tests:** line. Red by the seven old-`Minder` tests alone 
     now fit one line.
   - `notes/wontfix.md`: the old get promise rewritten to the Thing rule; a new entry for the `getOnce` the library
     cancels.
+  - Rework from the coordinator (the Coach's rulings, mid-thread): `SortedVaultDB.getOnce(scoped)` now resolves the
+    record its Thing holds after the get (live, tombstone or shell: `thingAt(scoped).pickle()`), and refuses
+    `stale_read` (`Throwers.boxSoonestBare`) where the Thing is bare; `tryGetOnce` unchanged. Its only callers were
+    #877's tests (`tests/storage/sorted-vault-db.test.ts`) and the VaultTSQ. The VaultTSQ's types and checks moved to
+    `src/shapes/shapes-vault-tsq.ts` (`VaultTSQChecks`, `isQueryClient`), per the new CLAUDE.md rule. Caught up onto
+    #877 at 0004467d1 (`track` again: nothing of this thread named the ask's field).
 * **Decisions made**:
-  - The queryFn returns `itemValOf(thing)` after `vaultMinder.getOnce`: the live record, null for a tombstone or the
-    shell, and throws `Throwers.boxSoonestBare` where the Thing is bare.
+  - The queryFn returns what `vaultMinder.getOnce` resolves where it is live, else null; the bare rule is the
+    `SortedVaultDB`'s. The seed keeps its own bare check (`itemValOf`), since it never throws.
   - The writer's `item` full sets the Thing's `pickle()`, not the event's `val`: a revision seen again in a later span
     keeps its object, the promise of item 10.
   - `listOnce` always asks (`staleTime: 0`), as the old minder's `list` did: under the listing's `Infinity` a second
@@ -49,6 +55,7 @@ Proved: see the PR's **Tests:** line. Red by the seven old-`Minder` tests alone 
     `query.isStale()`: with no observer, `Query.isStale()` is `data === undefined || isInvalidated` and ignores
     `staleTime` (query-core `src/query.ts`), so a cold item a get answered reads fresh there.
   - `ReceivingThing` now picks `read_at` too, for the seed's time.
+  - `boxSoonestBare`'s phrase speaks of a box; `SortedVaultDB.getOnce` throws it for a bare gate or bank too, as directed.
   - `labelsOf` is exported from `minder-keys.ts`; `minder.ts` keeps its private copy, untouched by instruction, until T4.
 * **Discoveries**:
   - **`resetQueries` restores the seed.** `Query.reset()` sets the state the query was built with, `initialData`
