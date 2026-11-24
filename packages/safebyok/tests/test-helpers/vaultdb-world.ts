@@ -144,7 +144,7 @@ export const BankStaleTrack = trackOf(bankThingOf({ revseq: 3 }), gateThingOf())
 /** The track of a sender with the root box at another revision. */
 export const RootStaleTrack = trackOf(bankThingOf(), gateThingOf(), rootBoxOf({ revseq: 3 }))
 
-/** The `item` event a watch tells of `record`, with no agerank: `full` unless `recordkind` says otherwise. */
+/** The `item` notice a watcher gets for `record`, with no agerank: `full` unless `recordkind` says otherwise. */
 export function itemEventOf(record: Sparse<ThingRecord>, recordkind: Exclude<Recordkind, 'void'> = 'full'): VaultItemEvent {
   const { userid, banklabel, labelpath } = record
   return { eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: undefined, agerankWas: undefined, recordkind, record }

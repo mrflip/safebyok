@@ -351,7 +351,7 @@ function lifeHighOf(agerank: Agerank): readonly [Life, number] {
   return [lifeOf(lifepath), Number.parseInt(highPadded, 32)]
 }
 
-/** `event`, told of `record`, as shorthand */
+/** `event`, returned for `record`, as shorthand */
 function toldOf(event: VaultEvent, record: SeenThing): Told {
   switch (event.eventkind) {
   case 'item': {
@@ -401,7 +401,7 @@ describe("FeedSorter.eventify, over the feed table", () => {
 })
 
 describe("FeedSorter", () => {
-  it("tells each event with the scope and modelkind of its record, and the item with the record as given", () => {
+  it("returns each event with the scope and modelkind of its record, and the item with the record as given", () => {
     const sorter = new FeedSorter(TH.ThingBank)
     const record = Thing.sparseOf(TH.boxThingOf('openai', { revseq: 3 }))
     const events = sorter.eventify(record)
@@ -418,7 +418,7 @@ describe("FeedSorter", () => {
     expect(events.every((event) => Object.isFrozen(event))).to.eq(true)
   })
 
-  it("tells nothing, in a frozen list, for a record that raises nothing", () => {
+  it("returns no events, in a frozen list, for a record that raises nothing", () => {
     const sorter = new FeedSorter(TH.ThingBank)
     sorter.eventify(TH.boxThingOf())
     const events = sorter.eventify(TH.boxThingOf())
