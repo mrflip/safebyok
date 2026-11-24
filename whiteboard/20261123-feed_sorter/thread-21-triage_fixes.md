@@ -1,6 +1,6 @@
 # Thread 21: triage_fixes (2026-11-24)
 
-Branch `20261124-triage_fixes`, PR (see below), stacked on [#886](https://github.com/mrflip/safebyok/pull/886). Proved: see
+Branch `20261124-triage_fixes`, PR [#887](https://github.com/mrflip/safebyok/pull/887), stacked on [#886](https://github.com/mrflip/safebyok/pull/886). Proved: see
 the PR's **Tests:** line (`pnpm justify` in full).
 
 Built by hand (no /sprint): four triage items the Coach approved (A to D), each its own commit.
