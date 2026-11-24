@@ -501,6 +501,85 @@ describe("the plain form calls", () => {
   })
 })
 
+/** What a test calls of a form verb's plain call. */
+type AnyPlainCall = (params: never) => Promise<void>
+
+/** Each form verb at the main gate, its hook, its plain call, and what a page hands it, obvious fakes, new at each call: a form where it takes one, and a dna with a passkey answer. */
+const GateVerbCases = [
+  ["unlock",            (world: TH.ProviderWorld): AnyForm => world.Bank.useUnlock(),            (world: TH.ProviderWorld): AnyPlainCall => world.Bank.gatingUnlockAttempt,
+    () => [formOf({ username: 'hue', passphrase: Passphrase }), { passkeyAnswer: LeanTH.passkeyAnswerOf() }]],
+  ["replacePassphrase", (world: TH.ProviderWorld): AnyForm => world.Bank.useReplacePassphrase(), (world: TH.ProviderWorld): AnyPlainCall => world.Bank.gatingReplacePassphraseAttempt,
+    () => [formOf({ username: 'hue', passphrase: Passphrase, nextPassphrase: NewPassphrase, confirmation: NewPassphrase }), { passkeyAnswer: LeanTH.passkeyAnswerOf(), nextPassphrase: NewPassphrase }]],
+  ["addPasskey",        (world: TH.ProviderWorld): AnyForm => world.Bank.useAddPasskey(),        (world: TH.ProviderWorld): AnyPlainCall => world.Bank.gatingAddPasskeyAttempt,
+    () => [{ passphrase: Passphrase, nextPasskeyAnswer: LeanTH.passkeyAnswerOf() }]],
+  ["revokePasskey",     (world: TH.ProviderWorld): AnyForm => world.Bank.useRevokePasskey(),     (world: TH.ProviderWorld): AnyPlainCall => world.Bank.gatingRevokePasskeyAttempt,
+    () => [formOf({ username: 'hue', passphrase: Passphrase }), { passkeyAnswer: LeanTH.passkeyAnswerOf() }]],
+] as const
+
+/** Expect `params` cleared: a form holds only its username, and a dna's passkey answer has zeroed PRF bytes. */
+function expectVacated(params: FormData | Readonly<{ passkeyAnswer?: { prfBytes: Uint8Array }, nextPasskeyAnswer?: { prfBytes: Uint8Array } }>): void {
+  if (params instanceof FormData) {
+    expect([...params.keys()]).to.deep.equal(['username'])
+    return
+  }
+  const answer = params.passkeyAnswer ?? params.nextPasskeyAnswer
+  expect(TH.isZeroed(answer!.prfBytes)).to.be.true
+}
+
+/** `hook` and the bank's stage over a world with the joke service's key stored, rendered once the bank shows `failed`: its vaultDB cannot watch. */
+async function renderFailed<ResultT>(hook: (world: TH.ProviderWorld) => ResultT) {
+  const world = await TH.buildProviderWorld({ stored: 'jokes' })
+  vi.spyOn(world.vaultDB, 'watch').mockImplementation(() => { throw new Error('no watching here') })
+  function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
+  const rendered = renderHook(() => ({ stage: world.Bank.useBank((bank) => bank.stage), hooked: hook(world) }), { wrapper: Wrapper })
+  await waitFor(() => { expect(rendered.result.current.stage).to.eq('failed') })
+  return { world, ...rendered }
+}
+
+/** `hook` and the bank's stage over a world with the joke service's key stored, under a provider with no userid. */
+async function renderSignedOut<ResultT>(hook: (world: TH.ProviderWorld) => ResultT) {
+  const rendered = await renderUnder((world) => ({ stage: world.Bank.useBank((bank) => bank.stage), hooked: hook(world) }), { stored: 'jokes' }, { userid: undefined })
+  return rendered
+}
+
+/** Each stage with no bank a form verb is tested at, how to render a hook at it, and the message of its refusal. */
+const NoBankStageCases = [
+  ["starting", renderStarting, Phrases.BankNotStarted],
+  ["failed",   renderFailed,   Phrases.BankFailed],
+] as const
+
+describe("a form verb at the main gate, refused for want of a bank", () => {
+  for (const [stage, renderAt, message] of NoBankStageCases) {
+    for (const [verb, useForm, plainCallOf, paramsOfCase] of GateVerbCases) {
+      it(`clears a form's secret fields and a passkey answer, by ${verb}'s hook and its plain call, at ${stage}, refusing as the stage does`, async () => {
+        const { world, result } = await renderAt(useForm)
+        expect(result.current.stage).to.eq(stage)
+        const [hooked, plain] = [paramsOfCase(), paramsOfCase()]
+        for (const params of hooked) { await act(() => result.current.hooked.attempt(params as never)) }
+        expect([result.current.hooked.wasRefused(), world.client.getMutationCache().getAll()]).to.deep.equal([true, []])
+        for (const params of plain) {
+          const refusal = await TH.expectRefusal(plainCallOf(world)(params as never), 'absent_vault')
+          expect(refusal.message).to.eq(message)
+        }
+        for (const params of [...hooked, ...plain]) { expectVacated(params) }
+        expect(result.current.stage).to.eq(stage)
+      })
+    }
+  }
+
+  it("clears a form's secret fields and a passkey answer while nobody is signed in, refusing as the stage does", async () => {
+    const { world, result } = await renderSignedOut((world) => world.Bank.useUnlock())
+    expect(result.current.stage).to.eq('signed_out')
+    const [form, dna] = [formOf({ username: 'hue', passphrase: Passphrase }), { passkeyAnswer: LeanTH.passkeyAnswerOf() }]
+    await act(() => result.current.hooked.attempt(form))
+    expect(result.current.hooked.wasRefused()).to.be.true
+    const refusal = await TH.expectRefusal(world.Bank.gatingUnlockAttempt(dna), 'absent_vault')
+    expect(refusal.message).to.eq(Phrases.NobodySignedIn)
+    expectVacated(form)
+    expectVacated(dna)
+  })
+})
+
 /** The gate's passkey header, by `useGate`, beside the add and revoke mutations, over a world with the jokes bank stored, once it shows `locked`. */
 async function renderGate() {
   const rendered = await renderUnder((world) => ({

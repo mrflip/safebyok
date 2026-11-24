@@ -82,6 +82,11 @@ export const GatingChecks = Validator.Checkers('bad_record', ({ obj, unk }) => (
     .transform(({ passphrase, nextPasskeyAnswer }) => ({ passphraseCleartext: passphrase, nextPasskeyCleartext: nextPasskeyAnswer })),
   revokePasskeyGating:     obj({ passphrase: unk.optional(), passkeyAnswer: unk.optional() }).loose()
     .transform(({ passphrase, passkeyAnswer }) => ({ passphraseCleartext: passphrase, passkeyCleartext: passkeyAnswer })),
+  // No gating is made with it: it reads every fieldname above, to clear what was handed to a verb not attempted.
+  anyGating:               obj({ passphrase: unk.optional(), passkeyAnswer: unk.optional(), nextPassphrase: unk.optional(), nextPasskeyAnswer: unk.optional() }).loose()
+    .transform(({ passphrase, passkeyAnswer, nextPassphrase, nextPasskeyAnswer }) => ({
+      passphraseCleartext: passphrase, passkeyCleartext: passkeyAnswer, nextPassphraseCleartext: nextPassphrase, nextPasskeyCleartext: nextPasskeyAnswer,
+    })),
 }))
 
 /** A form verb's check of its dna, from {@link GatingChecks}: it answers the cleartexts its gating takes, unjudged. */

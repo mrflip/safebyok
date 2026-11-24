@@ -104,3 +104,40 @@ describe("world.demandRootsLive()", () => {
     TH.expectSyncRefusal(() => world.demandRootsLive(), 'absent_thing')
   })
 })
+
+/** A form holding a username and every secret field, obvious fakes. */
+function secretForm(): FormData {
+  const form = new FormData()
+  for (const [fieldname, text] of [['username', 'hue'], ['passphrase', 'a fake passphrase'], ['nextPassphrase', 'a fake next one'], ['confirmation', 'a fake next one']] as const) { form.append(fieldname, text) }
+  return form
+}
+
+describe("world.vacateUnlessAttemptable(handed)", () => {
+  it("changes nothing it is handed over a live bank", async () => {
+    const { device } = await TH.buildBornBank()
+    const [form, dna] = [secretForm(), { passphrase: 'a fake passphrase', passkeyAnswer: TH.passkeyAnswerOf(), nextPasskeyAnswer: TH.passkeyAnswerOf() }]
+    device.world.vacateUnlessAttemptable(form)
+    device.world.vacateUnlessAttemptable(dna)
+    expect([...form.keys()]).to.deep.equal(['username', 'passphrase', 'nextPassphrase', 'confirmation'])
+    expect([TH.isZeroed(dna.passkeyAnswer.prfBytes), TH.isZeroed(dna.nextPasskeyAnswer.prfBytes)]).to.deep.equal([false, false])
+  })
+
+  it("empties a form's secret fields and zeroes each passkey answer, whichever verb's names it is in, where no bank is live, and never throws", async () => {
+    for (const { world } of [TH.makeDevice({ userid: null }), await signedInDevice()]) {
+      const [form, dna] = [secretForm(), { passphrase: 'a fake passphrase', passkeyAnswer: TH.passkeyAnswerOf(), nextPasskeyAnswer: TH.passkeyAnswerOf() }]
+      world.vacateUnlessAttemptable(form)
+      world.vacateUnlessAttemptable(dna)
+      expect([...form.keys()]).to.deep.equal(['username'])
+      expect([TH.isZeroed(dna.passkeyAnswer.prfBytes), TH.isZeroed(dna.nextPasskeyAnswer.prfBytes)]).to.deep.equal([true, true])
+      for (const handed of ['a fake passphrase', 42, null, undefined, { passphrase: 42 }]) { world.vacateUnlessAttemptable(handed) }
+    }
+  })
+
+  it("clears what it is handed once the world is swept", async () => {
+    const { device } = await TH.buildBornBank()
+    device.sweep()
+    const dna = { passkeyAnswer: TH.passkeyAnswerOf() }
+    device.world.vacateUnlessAttemptable(dna)
+    expect(TH.isZeroed(dna.passkeyAnswer.prfBytes)).to.be.true
+  })
+})

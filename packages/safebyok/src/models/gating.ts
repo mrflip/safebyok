@@ -264,7 +264,20 @@ function nextGateAsk(ante: Ante, wayins: GateDna['wayins'], policy: EX.StoragePo
 }
 // --
 
-// == [Adopting and vacating]: adoptedCleartextsOf, handedCleartextsOf, takeSecretFields, isInCleartextNames, adoptedAnswerOf, isAnswerish, zeroAnswer, zeroBytes
+// == [Adopting and vacating]: vacateHanded, adoptedCleartextsOf, handedCleartextsOf, takeSecretFields, isInCleartextNames, adoptedAnswerOf, isAnswerish, zeroAnswer, zeroBytes
+
+/** Clear the cleartexts in `handed`, whichever form verb it was given to, as a gating made and vacated at once would: a `FormData` loses its secret fields, and each passkey answer's PRF bytes are zeroed.
+ * Anything it cannot read as a form or a dna is left as it is, and it never throws.
+ */
+export function vacateHanded(handed: unknown): void {
+  try {
+    const { passkeyCleartext, nextPasskeyCleartext } = adoptedCleartextsOf(handed, GatingChecks.anyGating)
+    zeroAnswer(passkeyCleartext)
+    zeroAnswer(nextPasskeyCleartext)
+  } catch {
+    // adoptedCleartextsOf clears what it took in before it refuses: nothing is left to clear.
+  }
+}
 
 /** A copy of the cleartexts in `params` the gating owns, each passkey answer adopted, checked only for its fields.
  * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that carries nothing of it.
