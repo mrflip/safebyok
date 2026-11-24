@@ -42,10 +42,11 @@ export const GateChecks = Object.freeze({
 })
 
 /** The checks of a box's Thing: its record, its citation and what is stored of it, the storage policies it may name (none), and its labelpath.
- * Also its sealable, its `live` record, its `liveOrShell` record, which a bank has of its root box, and its `stamp`.
+ * Also its `recordOrShell`, which a Box begins from, its sealable, its `live` record, its `liveOrShell` record, which a bank has of its root box, and its `stamp`.
  */
 export const BoxChecks = Object.freeze({
   record:       PerKindChecks.boxThing,
+  recordOrShell: PerKindChecks.boxThingOrShell,
   cited:        PerKindChecks.boxCited,
   stored:       PerKindChecks.boxThing.refusingAs('damaged_row'),
   policies:     policiesByModelkind.box,

@@ -2,11 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { Crypto, Errors } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
 import { type BadNews, bankStageVals } from '../../src/shapes/shapes-bankish'
-import type { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import type { LiveOf, ShellOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
 import { Labelpath, Lifeseq } from '../../src/shapes/primitives'
-import type { BankStamp } from '../../src/shapes/shapes-stamps'
 import { type BankRecord, type BoxRecord, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
 import { getAskOf } from '../../src/shapes/shapes-asks'
@@ -85,37 +83,29 @@ describe("Bank.makeRecord(stamp)", () => {
   })
 })
 
-/** A gate made by the world of `born`'s device from the main gate `born` stored, for the bank stamped `bankStamp`, or `born`'s own bank by default. */
-function makeStoredGate(born: TH.BornBank, bankStamp: BankStamp = born.record): Gate {
-  return born.device.world.makeGate(born.gateRecord, bankStamp)
-}
-
-describe("Bank.make(record, { device, gate })", () => {
-  it("makes a bank of the record with the gate given as its main gate, on the device, locked as its device's world is", async () => {
-    const born = await TH.buildBornBank()
-    const { record, device } = born
+describe("Bank.make(record, { device }), by the device's world", () => {
+  it("makes the bank its device's world keeps, its main gate the world's, locked as the world is", async () => {
+    const { record, device, bank } = await TH.buildBornBank()
     device.lock()
-    const gate = makeStoredGate(born)
-    const bank = Bank.make(record, { device, gate })
     expect(bank.isLocked).to.be.true
     expect(bank.isUnlocked).to.be.false
     expect(bank.stamp).to.deep.equal(TH.WorldBankStamp)
     expect(bank.scope).to.deep.equal(TH.ThingBank)
     expect(bank.device).to.equal(device)
     expect(bank.device_tok).to.eq(TH.DeviceTok)
-    expect(bank.gate).to.equal(gate)
+    expect(bank).to.equal(device.world.bank)
+    expect(bank.gate).to.equal(device.world.gate)
     expect(bank.rootBox).to.equal(device.bankMinder.worldAt()?.root)
     expect([bank.revtok, bank.revseq, bank.written_at]).to.deep.equal([record.revtok, 0, TH.T0])
   })
 
   it("is unlocked where its gate is, and locks as its gate does", async () => {
-    const born = await TH.buildBornBank()
-    const gate = makeStoredGate(born)
-    await gate.unlock({ passphraseCleartext: TH.TestPassphrase })
-    const bank = Bank.make(born.record, { device: born.device, gate })
+    const { bank, device } = await TH.buildBornBank()
+    device.lock()
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(bank.isUnlocked).to.be.true
     expect(bank.getSnapshot()).to.include({ stage: 'unlocked' })
-    gate.lock()
+    bank.gate.lock()
     expect(bank.getSnapshot()).to.include({ stage: 'locked' })
   })
 
@@ -165,7 +155,7 @@ describe("Bank.make(record, { device, gate })", () => {
   for (const [recordOf, blurb] of RecordCases) {
     it(`refuses a record with ${blurb}`, async () => {
       const born = await TH.buildBornBank()
-      TH.expectSyncRefusal(() => Bank.make(recordOf(born.record) as never, { device: born.device, gate: makeStoredGate(born) }), 'bad_record')
+      TH.expectSyncRefusal(() => Bank.make(recordOf(born.record) as never, { device: born.device }), 'bad_record')
     })
   }
 
@@ -178,47 +168,10 @@ describe("Bank.make(record, { device, gate })", () => {
     it(`refuses ${blurb}`, async () => {
       const born = await TH.buildBornBank()
       const device = TH.makeDevice(moved)
-      const err = TH.expectSyncRefusal(() => Bank.make(born.record, { device, gate: makeStoredGate(born) }), 'record_conflict')
+      const err = TH.expectSyncRefusal(() => Bank.make(born.record, { device }), 'record_conflict')
       expect(err.meta).to.deep.equal({ fieldnames: [fieldname] })
     })
   }
-
-  const OtherStampCases = [
-    [{ lifeseq: Life2 },     "lifeseq", "another life of the bank"],
-    [{ born_at: TH.T0 + 5 }, "born_at", "a bank of its scope born at another time"],
-  ] as const
-
-  for (const [moved, fieldname, blurb] of OtherStampCases) {
-    it(`refuses a gate made for ${blurb}`, async () => {
-      const born = await TH.buildBornBank()
-      const gate = makeStoredGate(born, { ...TH.WorldBankStamp, ...moved })
-      const err = TH.expectSyncRefusal(() => Bank.make(born.record, { device: born.device, gate }), 'record_conflict')
-      expect(err.meta).to.deep.equal({ fieldnames: [fieldname] })
-    })
-  }
-
-  // A gate's life is its own: a main gate born again stands in the bank's life it was born in.
-  it("accepts a main gate of a later life of its own", async () => {
-    const born = await TH.buildBornBank()
-    const gate = makeStoredGate({ ...born, gateRecord: { ...born.gateRecord, lifeseq: Life2, lifepath: Life2 } })
-    const bank = Bank.make(born.record, { device: born.device, gate })
-    expect(bank.gate.lifeseq).to.eq(Life2)
-  })
-
-  it("refuses a bank whose world its device's BankMinder has not heard of", async () => {
-    const born = await TH.buildBornBank()
-    const device = TH.makeDevice({}, { vaultDB: born.device.vaultDB })
-    const gate = device.world.makeGate(born.gateRecord, born.record)
-    TH.expectSyncRefusal(() => Bank.make(born.record, { device, gate }), 'record_conflict')
-  })
-
-  it("refuses a bank of another life than the world its device's BankMinder has", async () => {
-    const born = await TH.buildBornBank()
-    const record = { ...born.record, lifetok: TH.OtherLifetok }
-    const gate = makeStoredGate(born, record)
-    const err = TH.expectSyncRefusal(() => Bank.make(record, { device: born.device, gate }), 'record_conflict')
-    expect(err.meta).to.deep.equal({ fieldnames: ['lifetok'] })
-  })
 
   it("reads its root box and its track from its world, as the world hears of newer roots", async () => {
     const { bank, device } = await TH.buildBornBank()
@@ -236,10 +189,10 @@ describe("Bank.make(record, { device, gate })", () => {
 })
 
 describe("a bank over the shell or a tombstone", () => {
-  /** A bank of `record`, the bank's shell or a tombstone, made on a device that has heard of no world, with its main gate's shell. */
+  /** A bank of `record`, the bank's shell or a tombstone, made on a device that has heard of no world. */
   function makeBankOf(record: BankRecord | ShellOf<BankRecord>): Bank {
     const device = TH.makeDevice()
-    return Bank.make(record, { device, gate: device.world.makeGate(TH.gateShellOf(), TH.WorldBankStamp) })
+    return Bank.make(record, { device })
   }
 
   /** A whole tombstone of the bank, in its second life. */
@@ -276,7 +229,7 @@ describe("a bank over the shell or a tombstone", () => {
     expect(bank.scope).to.deep.equal(TH.ThingBank)
     expect(bank.citable).to.deep.equal(Shell.Cited)
     expect([bank.isLocked, bank.isEnabled, bank.modelkind]).to.deep.equal([true, true, 'bank'])
-    expect(bank.gate.labelpath).to.eq('gate')
+    TH.expectSyncRefusal(() => bank.gate, 'absent_thing')
   })
 
   it("is made from a whole tombstone, which keeps the lifetok of the life it ends", () => {
@@ -874,11 +827,11 @@ describe("bank.put(args)", () => {
     expect(got).to.deep.include({ ok: true, val: record })
   })
 
-  it("leaves the bank it was called on unchanged", async () => {
+  it("models the revision written once it resolves", async () => {
     const { bank } = await TH.buildBornBank()
     const record = nextBankThingOf(bank)
     await bank.put({ cited: bank.pickle(), record })
-    expect(bank.revtok).to.not.eq(record.revtok)
+    expect(bank.pickle()).to.deep.equal(record)
   })
 
   it("throws the vaultDB's refusal of a revision it does not cite", async () => {

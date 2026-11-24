@@ -237,9 +237,10 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
   const boxRecordOrShell = union([boxRecord, shellAt(boxLabelpath)])
   const bankThingOrShell = union([bankThing, bankShell])
   const gateThingOrShell = union([gateThing, shellAt(gateLabelpath)])
+  const boxThingOrShell  = union([boxThing, shellAt(boxLabelpath)])
   return {
     bankLabelpath, gateLabelpath, boxLabelpath, wayins, storedWayins, storedLifetok,
-    bankThing, bankCited, bankThingOrShell, gateThing, gateCited, gateThingOrShell, boxThing, boxCited, boxSealable, boxRecord, boxRecordOrShell,
+    bankThing, bankCited, bankThingOrShell, gateThing, gateCited, gateThingOrShell, boxThing, boxCited, boxThingOrShell, boxSealable, boxRecord, boxRecordOrShell,
   }
 }))
 

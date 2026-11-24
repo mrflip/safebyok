@@ -1,0 +1,91 @@
+/** The world's Things: what `world.makeThing` makes of each record, and the bank, main gate and bank stamp it finds in its SortedVaultDB. */
+
+import { describe, expect, expectTypeOf, it } from 'vitest'
+import { Bank } from '../../src/models/bank'
+import { BaseThing } from '../../src/models/base-thing'
+import { Box } from '../../src/models/box'
+import type { Device } from '../../src/models/device'
+import { Gate } from '../../src/models/gate'
+import { Shell } from '../../src/shapes/shapes-thing'
+import * as TH from '../test-helpers'
+
+TH.useFakeClock()
+
+/** A device signed in to a bank none of whose records it has heard of. */
+async function signedInDevice(): Promise<Device> {
+  const device = TH.makeDevice()
+  await device.signIn(TH.WorldScope.userid)
+  return device
+}
+
+describe("world.makeThing(seen)", () => {
+  it("makes a Bank, a Gate or a Box by the modelkind of the record's labelpath, holding the record", () => {
+    const { world } = TH.makeDevice()
+    const [bankRecord, gateRecord, boxRecord] = [TH.bankThingOf(), TH.gateThingOf(), TH.boxThingOf()]
+    const [bank, gate, box] = [world.makeThing(bankRecord), world.makeThing(gateRecord), world.makeThing(boxRecord)]
+    expectTypeOf(bank).toEqualTypeOf<Bank>()
+    expectTypeOf(gate).toEqualTypeOf<Gate>()
+    expectTypeOf(box).toEqualTypeOf<Box>()
+    expect([bank, gate, box].map((thing) => thing.constructor)).to.deep.equal([Bank, Gate, Box])
+    expect([bank.pickle(), gate.pickle(), box.pickle()]).to.deep.equal([bankRecord, gateRecord, boxRecord])
+  })
+
+  it("makes the Thing of the shell, holding it", () => {
+    const thing = TH.makeDevice().world.makeThing(TH.gateShellOf())
+    expect(thing).to.be.instanceOf(Gate)
+    expect(thing.pickle()).to.deep.equal(TH.gateShellOf())
+  })
+
+  it("makes the Thing of a sparse record over its kind's shell, which then cites the record it receives", () => {
+    const sparse = BaseThing.sparseOf(TH.boxThingOf())
+    const thing = TH.makeDevice().world.makeThing(sparse)
+    if (! (thing instanceof Box)) { throw new TypeError("A box's sparse record made no Box.") }
+    expect(thing.pickle()).to.deep.equal(Shell.inParentLivesOf(sparse))
+    thing.receive(TH.thingEventOf(sparse))
+    expect(thing.pickle()).to.deep.equal(Shell.inParentLivesOf(sparse))
+    expect(thing.citable).to.deep.include({ revtok: sparse.revtok, revseq: sparse.revseq, lifepath: sparse.lifepath })
+  })
+
+  const RefusedCases = [
+    [{ ...TH.bankThingOf(), labelpath: 'vault' }, 'bad_record',      'a labelpath of no kind of Thing'],
+    [{ ...TH.boxThingOf(), userid: 'u2' },        'record_conflict', "a record of another bank than its device's"],
+    [null,                                        'bad_record',      'no record at all'],
+  ] as const
+
+  for (const [seen, refusalkind, blurb] of RefusedCases) {
+    it(`refuses ${blurb}`, () => {
+      TH.expectSyncRefusal(() => TH.makeDevice().world.makeThing(seen as never), refusalkind)
+    })
+  }
+})
+
+describe("world.bank, world.gate and world.bankStamp", () => {
+  it("are the bank and main gate its SortedVaultDB keeps, and the bank's stamp, which a gate of the world's takes for its bank's", async () => {
+    const { device, bank } = await TH.buildBornBank()
+    const { world } = device
+    expect(world.bank).to.equal(bank)
+    expect(world.gate).to.equal(bank.gate)
+    expect(world.sortedVaultDB!.thingAt({ ...TH.WorldScope, labelpath: 'gate' })).to.equal(world.gate)
+    expect(world.bankStamp).to.deep.equal(bank.stamp)
+    expect(world.gate!.bankStamp).to.deep.equal(bank.stamp)
+  })
+
+  it("are null, and the stamp refuses, until the world hears of a bank", async () => {
+    const { world } = await signedInDevice()
+    expect([world.bank, world.gate]).to.deep.equal([null, null])
+    TH.expectSyncRefusal(() => world.bankStamp, 'absent_thing')
+    TH.expectSyncRefusal(() => world.makeThing(TH.gateThingOf()).bankStamp, 'absent_thing')
+  })
+})
+
+describe("world.demandRootsLive()", () => {
+  it("answers the bank of a world whose bank, main gate and root box are live", async () => {
+    const { device, bank } = await TH.buildBornBank()
+    expect(device.world.demandRootsLive()).to.equal(bank)
+  })
+
+  it("refuses a world that has heard of none of them", async () => {
+    const { world } = await signedInDevice()
+    TH.expectSyncRefusal(() => world.demandRootsLive(), 'absent_thing')
+  })
+})

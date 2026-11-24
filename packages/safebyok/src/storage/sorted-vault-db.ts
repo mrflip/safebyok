@@ -27,7 +27,7 @@ export type ThingMaker<ThingT extends ReceivingThing = ReceivingThing> = (seen: 
 export interface SortedVaultDBOpts<ThingT extends ReceivingThing = ReceivingThing> {
   /** The vaultDB to wrap. */
   vaultDB: VaultDB
-  /** Makes the Thing kept at each labelpath, once, from the first record learned of there: a plain Thing, `PlainThing.make`, holds only what was seen. */
+  /** Makes the Thing kept at each labelpath, once, from the first record learned of there: a device's world's `makeThing`. */
   makeThing: ThingMaker<ThingT>
 }
 

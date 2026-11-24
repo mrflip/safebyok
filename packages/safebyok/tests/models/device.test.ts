@@ -357,6 +357,8 @@ describe("device.signIn(userid)", () => {
     expect(stages).to.deep.equal(['signed_out', 'starting', 'locked'])
     expect([device.userid, device.scope]).to.deep.equal([TH.WorldScope.userid, TH.WorldScope])
     expect(device.bank).to.be.instanceOf(Bank)
+    expect(device.bank).to.equal(device.world.bank)
+    expect(device.bank!.gate).to.equal(device.world.gate)
     expect(device.bank!.scope).to.deep.equal(born.bank.scope)
     expect(device.vault!.bank).to.equal(device.bank)
     expect(device.vault!.minder).to.equal(device.minder)
@@ -372,6 +374,7 @@ describe("device.signIn(userid)", () => {
     void device.signIn(TH.WorldScope.userid)
     await TH.eventually(() => device.bank !== null)
     expect(stages).to.deep.equal(['signed_out', 'starting', 'locked'])
+    expect(device.bank).to.equal(device.world.bank)
     await device.bank!.gate.gatingUnlockAttempt({ passphrase: TH.TestPassphrase })
     expect(device.getSnapshot().bank).to.include({ stage: 'unlocked' })
   })
@@ -564,18 +567,6 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     expect(snapshots).to.have.lengthOf(1)
     expect(snapshots[0]!.bank).to.equal(bank.getSnapshot())
     expect(snapshots[0]!.bank).to.include({ stage: 'locked' })
-  })
-
-  it("shows its own bank still when another bank is made over the same vaultDB, which it is not told of, and which shares its world", async () => {
-    const born = await TH.buildBornBank()
-    const { bank, device } = born
-    const snapshots = snapshotsOf(device)
-    const other = TH.makeStoredBank(born)
-    expect(snapshots).to.have.lengthOf(0)
-    other.lock()
-    expect(bank.isLocked).to.be.true
-    expect(device.getSnapshot().bank).to.equal(bank.getSnapshot())
-    expect(device.bank).to.equal(bank)
   })
 
   it("shows an `unlock` gating wanted while a call waits for one, and carries no cleartext", async () => {

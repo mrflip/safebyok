@@ -6,6 +6,7 @@ import { Lease } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
 import type { GateOpts } from '../../src/shapes/shapes-gateish'
+import type { BankStamp } from '../../src/shapes/shapes-stamps'
 import type { ShellOf } from '../../src/shapes/shapes-sealers'
 import { type GateRecord, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { Lifeseq } from '../../src/shapes/primitives'
@@ -16,14 +17,17 @@ TH.useFakeClock()
 const ThingFields = ['userid', 'banklabel', 'labelpath', 'label', 'fmt', 'lifepath', 'lifeseq', 'revtok', 'revseq', 'born_at', 'written_at', 'am']
 const GateFields = [...ThingFields, 'wayins', 'auth', 'sigs', 'meta']
 
+/** What a gate made alone is made with: a device, and the stamp of its bank. */
+type PinnedGateOpts = GateOpts & { bankStamp: BankStamp }
+
 /** What a gate of {@link TH.WorldBankStamp}'s bank is made with: a new device of its scope, and the bank's stamp. */
-function worldOpts(): GateOpts {
+function worldOpts(): PinnedGateOpts {
   const device = TH.makeDevice()
   return { device, bankStamp: TH.WorldBankStamp }
 }
 
 /** The gate of `record` made by the world of `opts.device`, which hands `Gate.make` its friend. */
-function makeGate(record: GateRecord | ShellOf<GateRecord>, opts: GateOpts = worldOpts()): Gate { return opts.device.world.makeGate(record, opts.bankStamp) }
+function makeGate(record: GateRecord | ShellOf<GateRecord>, opts: PinnedGateOpts = worldOpts()): Gate { return opts.device.world.makeGate(record, opts.bankStamp) }
 
 interface DnaWayins { main: Wayin, passkey0: Wayin | null }
 
@@ -135,10 +139,10 @@ describe("Gate.make(record, { device, bankStamp }, friend), by world.makeGate(re
     expect(makeGate(record).lifeseq).to.eq(later)
   })
 
-  it("refuses opts with no bankStamp, no opts at all, or no friend", async () => {
+  it("refuses a bankStamp that is not a stamp, no opts at all, or no friend", async () => {
     const record = await gateRecordOf()
     const opts = worldOpts()
-    TH.expectSyncRefusal(() => makeGate(record, { ...opts, bankStamp: undefined } as never), 'bad_record')
+    TH.expectSyncRefusal(() => makeGate(record, { ...opts, bankStamp: { lifeseq: 'nope' } } as never), 'bad_record')
     TH.expectSyncRefusal(() => Gate.make(record, undefined as never, undefined as never))
     TH.expectSyncRefusal(() => Gate.make(record, opts, undefined as never), 'bad_record')
   })

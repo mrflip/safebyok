@@ -35,7 +35,9 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   readonly #world:     World
   /** The world's lease verbs. */
   readonly #friend:    WorldGateFriend
-  readonly #bankStamp: BankStamp
+  // Scaffolding until a birth makes no gate before its record.
+  /** The stamp of this gate's bank, where it was made before its bank's record was heard of. */
+  readonly #bankStamp: BankStamp | undefined
   // --
 
   // == [Getters]: device, main, passkey0, scope, stamp, bankStamp, leaseEndsAt, leaseLoggable
@@ -58,8 +60,8 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   /** This gate's stamp, fixed for its life. A wayin's wrapped bankKey is bound to it. */
   get stamp(): GateStamp { return GateChecks.stamp.parse(this.#demandLive()) }
 
-  /** The stamp of this gate's bank. A wayin's wrapped bankKey is bound to it, and to the gate's own `stamp`, and every ctx under the gate's lease binds it first. */
-  get bankStamp(): BankStamp { return this.#bankStamp }
+  /** The stamp of this gate's bank, from its world. A wayin's wrapped bankKey is bound to it, and to the gate's own `stamp`, and every ctx under the gate's lease binds it first. */
+  get bankStamp(): BankStamp { return this.#bankStamp ?? this.#world.bankStamp }
 
   /** When the world's lease stops unlocking the bank, or null while locked ({@link World.leaseEndsAt}). */
   get leaseEndsAt(): EpochMillis | null { return this.#world.leaseEndsAt }
@@ -70,14 +72,15 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
   // == [Construction]: make, constructor, adopt, makeRecord, makeNextRecord
 
-  /** Make the gate of `record`, of the bank stamped `opts.bankStamp`, on `opts.device`, handing its leases to the world through `friend`. Locked, and nothing is fetched or stored.
-   * `record` is a whole gate record or the gate's shell. Internal: make a gate with `device.world.makeGate`.
+  /** Make the gate of `record`, on `opts.device`, handing its leases to the world through `friend`. Locked, and nothing is fetched or stored.
+   * `record` is a whole gate record or the gate's shell. Its bank's stamp is `opts.bankStamp` where given, else its world's.
+   * Internal: the device's world makes the gate its SortedVaultDB keeps.
    */
   static make(record: GateRecord | Sealers.ShellOf<GateRecord>, opts: GateOpts, friend: WorldGateFriend): Gate {
     const { record: begun, opts: { device, bankStamp }, friend: worldFriend } = Checks.gateMakeArgs.parse({ record, opts, friend })
     // A gate's life is its own, so only the bank's scope is checked: a gate of another life of the bank passes.
-    Validator.checkedConsistent(StampChecks.bankScope.parse(bankStamp), device.scope, { kind: 'record_conflict' })
-    Validator.checkedConsistent(begun, StampChecks.bankScope.parse(bankStamp), { kind: 'record_conflict' })
+    if (bankStamp !== undefined) { Validator.checkedConsistent(StampChecks.bankScope.parse(bankStamp), device.scope, { kind: 'record_conflict' }) }
+    Validator.checkedConsistent(StampChecks.bankScope.parse(begun), device.scope, { kind: 'record_conflict' })
     return new Gate(begun, { device, bankStamp }, worldFriend)
   }
 
@@ -86,7 +89,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
     this.#device    = opts.device
     this.#world     = opts.device.world
     this.#friend    = friend
-    this.#bankStamp = Object.freeze(opts.bankStamp)
+    this.#bankStamp = (opts.bankStamp === undefined) ? undefined : Object.freeze(opts.bankStamp)
     // The world's sweep lets go of this listener.
     this.#world.subscribe(() => { this.#tell() })
   }
@@ -224,7 +227,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   }
   // --
 
-  // == [The gatings' private verbs]: unlockByProving, buildLease, putGate, adopt
+  // == [The gatings' private verbs]: unlockByProving, buildLease, putGate
 
   /** Unlock this gate's world under a lease `proved` builds, citing the revision this gate models.
    * A lease the world holds is renewed: the new one keeps its `born_at`.
@@ -237,16 +240,14 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
   /** A lease `proved` builds, granted in this gate's world under its bank's stamp and citing the revision this gate models, keeping the `born_at` of `renewed` where given. */
   async #buildLease(proved: Proving, renewed: Pick<LeaseStamp, 'born_at'> | null): Promise<Lease> {
-    return await proved.buildLease(this.#friend.leaseGateOf(this.#bankStamp), this, renewed)
+    return await proved.buildLease(this.#friend.leaseGateOf(this.bankStamp), this, renewed)
   }
 
-  /** Write `ask.record`, this gate's next revision, over `ask.cited`, and model the revision written, which its bank's world then shows. Resolves this gate. */
+  /** Write `ask.record`, this gate's next revision, over `ask.cited`, and tell this gate's subscribers. Resolves this gate, which then models the revision written. */
   async #putGate(ask: PutAskDraft<GateRecord>): Promise<this> {
     this.demandEnabled()
     const answer = await this.#device.bankMinder.tryWrite({ ...putAskOf<GateRecord>(ask), modelkind: 'gate' })
     if (! answer.ok) { throw answer.err }
-    // The ask's modelkind is the gate's, which the vaultDB checks what it answers against.
-    this.adopt(answer.val as GateRecord)
     this.#tell()
     return this
   }
@@ -365,7 +366,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn }) => {
       record: GateChecks.recordOrShell,
       opts:   obj({
         device:    custom<Device>(),
-        bankStamp: BankChecks.stamp,
+        bankStamp: BankChecks.stamp.optional(),
       }),
       friend: obj({ leaseGateOf: fn<WorldGateFriend['leaseGateOf']>(), renewal: fn<WorldGateFriend['renewal']>(), attachLease: fn<WorldGateFriend['attachLease']>() }),
     }),

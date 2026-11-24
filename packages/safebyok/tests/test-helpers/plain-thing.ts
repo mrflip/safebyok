@@ -1,8 +1,12 @@
-import type { ThingRecord, ThingScope } from '../shapes/shapes-thing'
-import type { SeenThing } from '../shapes/shapes-vault-event'
-import { type Adoptable, SeenChecks, Thing } from './thing'
+/** `PlainThing`, a concrete Thing of any kind, for the tests of Thing and of a SortedVaultDB. */
 
-/** A Thing of any kind that holds only the records seen of it, with no device, gate or lease: what a `SortedVaultDB` keeps where nothing more is wanted.
+import type { ThingRecord, ThingScope } from '../../src/shapes/shapes-thing'
+import type { SeenThing } from '../../src/shapes/shapes-vault-event'
+import { type Adoptable, SeenChecks, Thing } from '../../src/models/thing'
+
+// == [PlainThing]: PlainThing
+
+/** A Thing of any kind that holds only the records seen of it, with no device, gate or lease.
  * Begun from a sparse record, it models the shell until it receives a whole one. It binds no ctx, so it has no stamp.
  */
 export class PlainThing extends Thing<ThingRecord, ThingScope, undefined, Adoptable<ThingRecord>> {
@@ -26,3 +30,4 @@ export class PlainThing extends Thing<ThingRecord, ThingScope, undefined, Adopta
   get stamp(): undefined { return }
   // --
 }
+// --

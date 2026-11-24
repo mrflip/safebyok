@@ -147,8 +147,8 @@ export type GateDna = GateStamp & { wayins: { main: Wayin, passkey0: Wayin | nul
 export interface GateOpts {
   /** The device the gate's bank is on. */
   device:    Device
-  /** The stamp of the gate's bank, which its scope must match. */
-  bankStamp: BankStamp
+  /** The stamp of the gate's bank, which its scope must match, for a gate made before its bank's record is heard of. Its world's bank stamp where left out. */
+  bankStamp?: BankStamp | undefined
 }
 // --
 

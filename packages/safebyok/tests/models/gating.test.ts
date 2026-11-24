@@ -172,11 +172,14 @@ describe("Bank.birth(device, cleartexts)", () => {
     expect([bank.revseq, bank.rootBox.revseq]).to.deep.equal([0, 0])
   })
 
-  it("makes one gate, which seals the root box and is the bank's main gate, unlocked", async () => {
+  it("makes a gate to seal the root box, and the bank's main gate is the one its device's world keeps, unlocked", async () => {
     const make = vi.spyOn(Gate, 'make')
-    const bank = await birth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase })
-    expect(make).toHaveBeenCalledOnce()
-    expect(make.mock.results[0]!.value).to.equal(bank.gate)
+    const device = TH.makeDevice()
+    const bank = await birth(device, { passphraseCleartext: TH.TestPassphrase })
+    expect(make).toHaveBeenCalledTimes(2)
+    expect(make.mock.results[0]!.value).to.not.equal(bank.gate)
+    expect(make.mock.results[1]!.value).to.equal(bank.gate)
+    expect(bank.gate).to.equal(device.world.gate)
     expect(bank.gate.isUnlocked).to.be.true
   })
 

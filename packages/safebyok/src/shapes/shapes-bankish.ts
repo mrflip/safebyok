@@ -4,7 +4,6 @@ import type * as Z from 'zod'
 import { CX, type Deriver, type EX, type Errors, type Logger, Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
 import type { DefaultOnBadNews, Device } from '../models/device'
-import type { Gate } from '../models/gate'
 import type { World } from '../models/world'
 import type { VaultDB } from '../storage/vault-db'
 import type { DevicePersisters } from '../storage/persister'
@@ -35,8 +34,6 @@ export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbse
 export interface BankOpts {
   /** The device the bank is on. Its scope must be the bank's. */
   device:  Device
-  /** The bank's main gate, made for this bank's stamp. */
-  gate:    Gate
 }
 
 /** The options of {@link World.make}. */

@@ -8,7 +8,7 @@ import type { BoxCleartexts, BoxPublicProps, LiveOf, RevisionOf, SealTags, Seala
 import type { BoxStamp } from '../shapes/shapes-stamps'
 import { Lifeseq } from '../shapes/primitives'
 import * as Throwers from '../refusals/throwers'
-import { Thing } from './thing'
+import { type Adoptable, Thing } from './thing'
 
 /** The tags of a box's sealed whisper: the whisper as stable JSON, in its first schema. */
 const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisper_v1' })
@@ -17,7 +17,7 @@ const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisp
 /** The record-level operations for the Box model.
  *  Acts as the {@link Sealer} for a box's whisper. Pass the class itself to a lease's `seal` or `unseal`.
  */
-export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp> {
+export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Adoptable<BoxRecord>> {
   // == [Kind]: modelkind
 
   /** A box's modelkind: the guards this class inherits answer for boxes alone. */

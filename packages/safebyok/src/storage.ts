@@ -13,7 +13,6 @@ export { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from './shapes/sha
 export type { LiveOf, ShellOf, TombstoneOf } from './shapes/shapes-sealers'
 export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
 export { type Adoptable, Thing } from './models/thing'
-export { PlainThing } from './models/plain-thing'
 export {
   type AnyAsk, type BankRoots, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAskDraft, type GetAsk, type ListAskDraft,
   type ListAsk, type LoggableAsk, type PutAskDraft, type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk, type WriteAskFlags, AskChecks, delAskOf, getAskOf,

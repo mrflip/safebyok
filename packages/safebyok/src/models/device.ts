@@ -2,7 +2,6 @@ import type { QueryClient } from '@tanstack/query-core'
 import { isEqual } from 'es-toolkit'
 import { Consts, Deriver, Errors, type GX, Helpers, Logger, Outcome, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
-import { PlainThing } from './plain-thing'
 import type { BirthGating } from './gating'
 import { Proving, guardKeyDeriver } from './proving'
 import { Vault } from './vault'
@@ -18,6 +17,9 @@ import type { BankScope } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
 import { SortedVaultDB } from '../storage/sorted-vault-db'
+import { itemSeenOf } from '../storage/agerank'
+import { readTcNow } from '../storage/thing-classifier'
+import { Labelpath } from '../shapes/primitives'
 import type { DevicePersisters, PersisterOfBank } from '../storage/persister'
 import { type Modelkind, ThingChecks } from '../shapes/shapes-thing'
 import * as Throwers from '../refusals/throwers'
@@ -233,28 +235,30 @@ export class Device implements MinderFriend {
    */
   async gatingBirthAttempt(params: FormData | BirthDna): Promise<Bank> { return await this.birthGating(params).attempt() }
 
-  // The world fetched lands in the BankMinder, where a bank brought up from the cache reads it; a failure to fetch it,
-  // once that bank is up, is no caller's to hear.
+  // The world fetched lands in the BankMinder, and in the world's Things, where a bank brought up from the cache reads it;
+  // a failure to fetch it, once that bank is up, is no caller's to hear.
   // The SortedVaultDB is made right before the minders hello it, with nothing awaited between: its Things remember what
   // they take, so a record it took with no minder listening would reach them later only as a repeat, which it drops.
+  // The roots restored are the exception: the minders have them already.
   /** Bring up the signed-in user's bank, with `bankMinder` minding its roots and `minder` its boxes over a SortedVaultDB of the bank they share: from the world cached, where there is one, and from the world the vaultDB answers. */
   async #bringUp(bankMinder: BankMinder, minder: VaultMinder): Promise<void> {
     try {
       await this.#restore(bankMinder, this.#persisters?.roots)
       await this.#restore(minder, this.#persisters?.boxes)
-      const sortedVaultDB = SortedVaultDB.make(this.scope, { vaultDB: this.vaultDB, makeThing: (seen) => PlainThing.make(seen) })
+      const sortedVaultDB = SortedVaultDB.make(this.scope, { vaultDB: this.vaultDB, makeThing: (seen) => this.#world.makeThing(seen) })
+      const cached = bankMinder.worldAt()
+      if (cached !== undefined) { receiveRestored(sortedVaultDB, cached) }
       this.#world.hello(sortedVaultDB)
       bankMinder.hello(sortedVaultDB)
       minder.hello(sortedVaultDB)
-      const cached = bankMinder.worldAt()
-      if ((cached !== undefined) && Bank.isLive(cached.bank)) { this.#attachWorld(cached) }
+      if ((cached !== undefined) && Bank.isLive(cached.bank)) { this.#attachWorld() }
       const world = await bankMinder.fetchWorld()
       if (this.#bank !== null) { return }
       if ((world === null) || (! Bank.isLive(world.bank))) {
         this.#world.showStandIn(Object.freeze({ ...PendingBank, stage: 'unborn' }))
         return
       }
-      this.#attachWorld(world)
+      this.#attachWorld()
     } catch (err) {
       if (this.#bank !== null) {
         this.tellBadNews([err])
@@ -264,12 +268,8 @@ export class Device implements MinderFriend {
     }
   }
 
-  // Gate.make checks the gate and Bank.make the root box: a tombstone of either refuses.
-  /** Make the bank of `world`, and its main gate, this device's bank. */
-  #attachWorld(world: BankRoots): void {
-    const gate = this.#world.makeGate(world.gate, world.bank)
-    this.#attachBank(Bank.make(world.bank, { device: this, gate }))
-  }
+  /** Make the bank of this device's world its bank, refusing unless the bank, its main gate and its root box are live there. */
+  #attachWorld(): void { this.#attachBank(this.#world.demandRootsLive()) }
 
   /** Make `bank` this device's bank. */
   #attachBank(bank: Bank): void {
@@ -406,7 +406,7 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 }
 // --
 
-// == [Helpers]: millisOf, checkSecureContext, refusalSnapshotOf, maskedViewLeaseOf
+// == [Helpers]: millisOf, checkSecureContext, RestoredSourcelabel, receiveRestored, refusalSnapshotOf, maskedViewLeaseOf
 
 // A host's Infinity minutes, for never, becomes ForeverMillis: past the entrypoint, nothing is infinite.
 /** `minutes` in milliseconds, capped at `ForeverMillis`, or `fallback` for none. */
@@ -415,6 +415,22 @@ function millisOf(minutes: number | undefined, fallback: number): number { retur
 /** Refuse to run outside a secure context, where WebCrypto is missing */
 function checkSecureContext(): void {
   if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw Throwers.insecureContext() }
+}
+
+/** The `sourcelabel` of the events of the roots a device's persister restored. */
+const RestoredSourcelabel = 'persister'
+
+// Scaffolding until the minders start from the roots the world restores.
+/** Hand `sortedVaultDB` each of `roots`, the bank's roots restored, read now */
+function receiveRestored(sortedVaultDB: SortedVaultDB, roots: BankRoots): void {
+  const read_tc = readTcNow()
+  for (const root of [roots.bank, roots.gate, roots.root]) {
+    const { userid, banklabel, labelpath } = root
+    sortedVaultDB.receive({
+      eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: undefined, agerankWas: undefined,
+      sourcelabel: RestoredSourcelabel, read_tc, bank_lifetok: roots.bank.lifetok, ...itemSeenOf(root),
+    })
+  }
 }
 
 /** What a snapshot shows of `err`: its refusal's kind, family and message, anything but a refusal as an unexpected error. */

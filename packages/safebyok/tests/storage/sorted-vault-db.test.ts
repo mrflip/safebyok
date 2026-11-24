@@ -1,7 +1,6 @@
 import { noop } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import type { Errors } from 'safebyok-big/internals'
-import type { PlainThing } from '../../src/models/plain-thing'
 import { Thing } from '../../src/models/thing'
 import { type ThingRecord, Shell } from '../../src/shapes/shapes-thing'
 import type { SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
@@ -46,13 +45,13 @@ function stubVaultDBOf(stop: () => void) {
 }
 
 /** A SortedVaultDB over a MemoryVaultDB, and that MemoryVaultDB, to write beside it. */
-function sortedOverMemory(): { vaultDB: SortedVaultDB<PlainThing>, inner: MemoryVaultDB } {
+function sortedOverMemory(): { vaultDB: SortedVaultDB<TH.PlainThing>, inner: MemoryVaultDB } {
   const inner = new MemoryVaultDB()
   return { vaultDB: SortedVaultDB.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing }), inner }
 }
 
 /** A SortedVaultDB over a MemoryVaultDB whose own watch notifies nothing, so that every event it tells is of an answer's records. */
-function sortedOverQuietMemory(): { vaultDB: SortedVaultDB<PlainThing>, inner: MemoryVaultDB } {
+function sortedOverQuietMemory(): { vaultDB: SortedVaultDB<TH.PlainThing>, inner: MemoryVaultDB } {
   const inner = new MemoryVaultDB()
   vi.spyOn(inner, 'watch').mockReturnValue(noop)
   return { vaultDB: SortedVaultDB.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing }), inner }

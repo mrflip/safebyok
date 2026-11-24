@@ -20,7 +20,7 @@ import * as Throwers from '../refusals/throwers'
  * Over the shell or a tombstone, what needs a live record refuses `absent_thing`: its stamp, its root box, an ask, a seal, an unseal and a put.
  */
 export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<BankRecord>> {
-  // == [Props]: lifetok, #device, #world, #gate
+  // == [Props]: lifetok, #device, #world
 
   // we are under-using the lifetok at the moment
   /** The token minted when this bank was born, which tells this life of the bank from any other under its banklabel. Absent over the shell. */
@@ -30,9 +30,6 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
 
   /** The device's world, which locks, unlocks and ends this bank. */
   readonly #world: World
-
-  /** The main gate. */
-  readonly #gate: Gate
   // --
 
   // == [Getters]: device, device_tok, scope, stamp, gate, rootBox, track, getSnapshot, subscribe
@@ -49,8 +46,14 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   /** This bank's {@link BankStamp}, which every ctx under it binds first. */
   get stamp(): BankStamp { return BankChecks.stamp.parse(this.#demandLive()) }
 
-  /** The bank's main gate: the wayins a user unlocks with, and the form verbs that change them. The same object across a gate change. */
-  get gate(): Gate { return this.#gate }
+  /** The bank's main gate: the wayins a user unlocks with, and the form verbs that change them. The same object across a gate change.
+   * Refuses `absent_thing` until the device's world has heard of it.
+   */
+  get gate(): Gate {
+    const { gate } = this.#world
+    if (gate === null) { throw Throwers.thingNotLive(Labelpath.MainGate) }
+    return gate
+  }
 
   /** The root box, as last heard of. Every box of this bank is under it. */
   get rootBox(): BoxRecord {
@@ -81,20 +84,17 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
 
   // == [Construction]: make, constructor, mintStamps, makeRecord
 
-  /** Make the bank of `record`, a whole bank record, live or a tombstone, or the bank's shell, with `opts.gate` as its main gate, on `opts.device`. Nothing is fetched or stored.
-   * For a live record, the device's BankMinder must hold the world of its life, its root box live: fetch the world, or birth the bank, first.
-   * It is locked or unlocked as its device's world is. The device is not told of it: a device makes its own bank in its `signIn`, and is handed the bank its birth makes.
+  /** Make the bank of `record`, a whole bank record, live or a tombstone, or the bank's shell, on `opts.device`. Nothing is fetched or stored.
+   * It is locked or unlocked as its device's world is, and finds its main gate there. Internal: the device's world makes the bank its SortedVaultDB keeps.
    */
   static make(record: BankRecord | ShellOf<BankRecord>, opts: BankOpts): Bank { return new Bank(record, opts) }
 
   private constructor(record: BankRecord | ShellOf<BankRecord>, opts: BankOpts) {
-    const { record: begun, opts: { device, gate } } = Checks.bankMakeArgs.parse({ record, opts })
+    const { record: begun, opts: { device } } = Checks.bankMakeArgs.parse({ record, opts })
     Validator.checkedConsistent(StampChecks.bankScope.parse(begun), device.scope, { kind: 'record_conflict' })
-    if (begun.am === 'a') { checkRootsAgree(begun, device, gate) }
     super(begun)
     this.#device = device
     this.#world  = device.world
-    this.#gate   = gate
   }
 
   /** Fresh stamps for a new bank of `scope` and its main gate, both in their first life.
@@ -145,7 +145,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
 
   // == [Methods]: put
 
-  /** Write `ask.record`, this bank's next revision, over `ask.cited`. Resolves the bank's Thing the store reports writing, and its world shows it. This Bank object is not updated. */
+  /** Write `ask.record`, this bank's next revision, over `ask.cited`. Resolves the bank's Thing the store reports writing, which the bank in the device's world then models. */
   async put(ask: PutAskDraft<BankRecord>): Promise<BankRecord> {
     this.demandEnabled()
     const answer = await this.#device.bankMinder.tryWrite({ ...this.makePutAsk(ask), labelpath: 'bank', modelkind: 'bank' })
@@ -288,20 +288,10 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   static override readonly modelkind = 'bank'
 }
 
-// == [Helpers]: trackPairOf, checkRootsAgree
+// == [Helpers]: trackPairOf
 
 /** The revseq and lifepath of a Thing: the pair a `track` has. */
 function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
-
-// Scaffolding until the world finds its roots as Things in its SortedVaultDB.
-/** Refuse the live `record` unless `gate` is of its life and the world in `device`'s BankMinder is too, its root box live */
-function checkRootsAgree(record: BankRecord, device: Device, gate: Gate): void {
-  Validator.checkedConsistent(gate.bankStamp, BankChecks.stamp.parse(record), { kind: 'record_conflict' })
-  const world = device.bankMinder.worldAt()
-  if (world === undefined) { throw Throwers.worldNotHeard() }
-  Validator.checkedConsistent(BankChecks.stamp.parse(world.bank), BankChecks.stamp.parse(record), { kind: 'record_conflict' })
-  BoxChecks.live.parse(world.root)
-}
 // --
 
 // == [Checks]: Checks
@@ -314,7 +304,6 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
     record: BankChecks.recordOrShell,
     opts:   obj({
       device:  custom<Device>(),
-      gate:    custom<Gate>(),
     }),
   }),
 }))

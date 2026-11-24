@@ -121,7 +121,7 @@ export function passkeyAnswerOf(overrides: Partial<GX.PasskeyAnswer> = {}): GX.P
 export function copyOfAnswer(answer: GX.PasskeyAnswer): GX.PasskeyAnswer { return { ...answer, prfBytes: new Uint8Array(answer.prfBytes) } }
 // --
 
-// == [A born bank]: LiveGate, LiveBank, liveGateOf, livePickleOf, BornBankGiven, BornBank, buildBornBank, makeStoredBank, BornVault, buildBornVault
+// == [A born bank]: LiveGate, LiveBank, liveGateOf, livePickleOf, BornBankGiven, BornBank, buildBornBank, BornVault, buildBornVault
 
 // The narrowed members come first: TypeScript reads an intersection's methods as overloads, in order.
 /** A gate that models a live record: its pickle is whole and its wayins present. */
@@ -163,7 +163,7 @@ export interface BornBankGiven {
 export interface BornBank {
   device:     Device
   bank:       LiveBank
-  /** The bank's Thing, as the birth stored it: what `Bank.make` takes. */
+  /** The bank's Thing, as the birth stored it. */
   record:     BankRecord
   /** The main gate's Thing, as the birth stored it. */
   gateRecord: GateRecord
@@ -186,12 +186,6 @@ export async function buildBornBank({ passkeyCleartext, device = makeDevice() }:
   }
 }
 
-/** Another Bank over the records a {@link buildBornBank} birth stored, as a device's `signIn` makes one. Its device is not told of it, and it shares that device's world: it is locked or unlocked as the world is. */
-export function makeStoredBank({ device, record, gateRecord }: Pick<BornBank, 'device' | 'record' | 'gateRecord'>): Bank {
-  const gate = device.world.makeGate(gateRecord, record)
-  return Bank.make(record, { device, gate })
-}
-
 /** A {@link buildBornBank} bank, beside the vault of its boxes and that vault's minder. */
 export interface BornVault extends BornBank {
   vault:  Vault
@@ -207,7 +201,7 @@ export async function buildBornVault(given: BornBankGiven = {}): Promise<BornVau
 
 // == [Births]: BirthSpy, spyBirths
 
-/** The births {@link spyBirths} saw, in call order: each bank `Bank.make` made, and each call to the vaultDB's `tryBirthBank`. */
+/** The births {@link spyBirths} saw, in call order: each bank `Bank.make` made, which the device's world makes as it first hears of one, and each call to the vaultDB's `tryBirthBank`. */
 export interface BirthSpy {
   banks:        Bank[]
   tryBirthBank: MockInstance<VaultDB['tryBirthBank']>

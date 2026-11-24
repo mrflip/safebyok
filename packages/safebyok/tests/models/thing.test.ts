@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { PlainThing } from '../../src/models/plain-thing'
 import { type Adoptable, Thing } from '../../src/models/thing'
 import { type Lifepath, Lifeseq, Revseq, VoidLifeseq } from '../../src/shapes/primitives'
 import { type ThingRecord, type ThingScope, Shell } from '../../src/shapes/shapes-thing'
@@ -539,14 +538,14 @@ function eventOf(record: SeenThing, read_tc: ReadTc = ReadTcChunk0): VaultItemEv
 }
 
 /** Hand `thing`'s receive the event of `record` read at `read_tc`, a plain Thing begun from `record` where there is none yet, and return the Thing and the events it returns */
-function received(thing: PlainThing | undefined, record: SeenThing, read_tc: ReadTc = ReadTcChunk0): readonly [PlainThing, readonly VaultEvent[]] {
-  const receiver = thing ?? PlainThing.make(record)
+function received(thing: TH.PlainThing | undefined, record: SeenThing, read_tc: ReadTc = ReadTcChunk0): readonly [TH.PlainThing, readonly VaultEvent[]] {
+  const receiver = thing ?? TH.PlainThing.make(record)
   return [receiver, receiver.receive(eventOf(record, read_tc))]
 }
 
 // The spread is the subject: what a host's `{ ...thing }` sees of a Thing.
 /** `thing`'s props, as its spread shows them */
-function propsOf(thing: PlainThing): Record<string, unknown> { return { ...thing } } // eslint-disable-line @typescript-eslint/no-misused-spread
+function propsOf(thing: TH.PlainThing): Record<string, unknown> { return { ...thing } } // eslint-disable-line @typescript-eslint/no-misused-spread
 
 /** The agerank at box/openai of a record's life and these revseqs, its newest revision last seen in `chunk`, spelled apart from the rule */
 function agerankOf(life: Life, highRevseq: number, itemRevseq: number, chunk: Chunk = 0): Agerank {
@@ -595,7 +594,7 @@ function isRaised(event: VaultEvent): boolean {
 describe("Thing.receive, over the feed table", () => {
   for (const [rowIndex, { initial, chain, streamed, agerank, blurb }] of FeedCases.entries()) {
     it(`${blurb}, from ${StartNames.get(initial) ?? 'elsewhere'} (row ${String(rowIndex + 1)})`, () => {
-      let thing: PlainThing | undefined
+      let thing: TH.PlainThing | undefined
       for (const seen of initial) { [thing] = received(thing, recordOf(seen), readTcOf(chunkOf(seen))) }
       const shorthands: Shorthand[] = []
       for (const seen of chain) {
@@ -631,7 +630,7 @@ describe("Thing.receive", () => {
   it("keeps the sourcelabel, read_tc and bank_lifetok of the event it receives on every event", () => {
     const record = Thing.sparseOf(TH.boxThingOf('openai', { revseq: 3 }))
     const stamp  = { sourcelabel: 'other_tab', read_tc: readTcNow(), bank_lifetok: TH.FirstLifetok }
-    const events = PlainThing.make(record).receive({ ...eventOf(record), ...stamp })
+    const events = TH.PlainThing.make(record).receive({ ...eventOf(record), ...stamp })
     expect(events).to.have.lengthOf(3)
     for (const event of events) { expect(event).to.include(stamp) }
   })
@@ -656,7 +655,7 @@ describe("Thing.receive", () => {
   it("returns no events for a life or aged event, and changes nothing", () => {
     const soon = Thing.sparseOf(TH.boxThingOf('openai', { revseq: 3 }))
     const [thing, events] = received(undefined, soon)
-    const later = PlainThing.make(soon).receive(eventOf(soon, readTcOf(2)))
+    const later = TH.PlainThing.make(soon).receive(eventOf(soon, readTcOf(2)))
     for (const event of [...events.slice(1), ...later.slice(1)]) {
       expect(thing.receive(event)).to.deep.equal([])
     }
@@ -756,12 +755,12 @@ describe("Thing's props, record and citable", () => {
 
     it("pickles as the shell under a later life of the root box, where the soon names one", () => {
       const soon = Thing.sparseOf(TH.boxThingOf('openai', { lifepath: lifepathOf(2, false), lifeseq: Lifeseq.ofLifenum(2), revseq: 1 }))
-      expect(PlainThing.make(soon).pickle()).to.deep.equal(Shell.of({ ...TH.BoxScope, lifepath: `${Lifeseq.ofLifenum(2)}/${VoidLifeseq}` }))
+      expect(TH.PlainThing.make(soon).pickle()).to.deep.equal(Shell.of({ ...TH.BoxScope, lifepath: `${Lifeseq.ofLifenum(2)}/${VoidLifeseq}` }))
     })
 
     it("pickles as a root's own shell, begun by a soon of the root", () => {
       const soon = Thing.sparseOf(TH.rootBoxOf({ revseq: 3 }))
-      expect(PlainThing.make(soon).pickle()).to.deep.equal(Shell.of(TH.RootScope))
+      expect(TH.PlainThing.make(soon).pickle()).to.deep.equal(Shell.of(TH.RootScope))
     })
 
     it("has the shell's props", () => {
@@ -794,14 +793,14 @@ describe("Thing's props, record and citable", () => {
   it("adopts the record it is begun from where that is whole, a tombstone or the void sentinel", () => {
     const tomb = TH.boxThingOf('openai', { am: 'x', lifepath: lifepathOf(1, false), lifeseq: Lifeseq.ofLifenum(1), revseq: 0 })
     for (const record of [TH.boxThingOf(), tomb, Shell.of({ ...TH.BoxScope, lifepath: lifepathOf(0, true) })]) {
-      const thing = PlainThing.make(record)
+      const thing = TH.PlainThing.make(record)
       expect(thing.pickle()).to.eq(record)
       expect(propsOf(thing)).to.deep.equal(Thing.sparseOf(record))
     }
   })
 
   it("has no agerank and no read_at until it first receives a record", () => {
-    const thing = PlainThing.make(TH.boxThingOf())
+    const thing = TH.PlainThing.make(TH.boxThingOf())
     expect([thing.agerank, thing.read_at]).to.deep.equal([undefined, undefined])
   })
 
@@ -815,7 +814,7 @@ describe("Thing's props, record and citable", () => {
 
   it("answers every field of its record by name, its body hidden", () => {
     const record = TH.boxThingOf()
-    const thing = PlainThing.make(record)
+    const thing = TH.PlainThing.make(record)
     expect(Object.getOwnPropertyNames(thing)).to.have.members(Object.keys(record))
     expect(Reflect.get(thing, 'sidecar')).to.eq(record.sidecar)
     expect(Reflect.get(thing, 'whisper_sealed')).to.eq(record.whisper_sealed)
@@ -824,7 +823,7 @@ describe("Thing's props, record and citable", () => {
 
   it("sets every field non-writable, its scope fields non-configurable and the rest configurable", () => {
     const record = TH.boxThingOf()
-    const thing = PlainThing.make(record)
+    const thing = TH.PlainThing.make(record)
     const scopeFieldnames = new Set(['userid', 'banklabel', 'labelpath'])
     for (const fieldname of Object.keys(record)) {
       const configurable = ! scopeFieldnames.has(fieldname)
@@ -845,7 +844,7 @@ describe("Thing's props, record and citable", () => {
   })
 
   it("is the scope of its record, and has no stamp", () => {
-    const thing = PlainThing.make(TH.boxThingOf())
+    const thing = TH.PlainThing.make(TH.boxThingOf())
     expect(thing.scope).to.deep.equal(TH.BoxScope)
     expect(thing.stamp).to.eq(undefined)
   })
@@ -931,7 +930,7 @@ describe("Thing refusals", () => {
 
   it("refuses to begin from anything but a record of a Thing", () => {
     for (const val of [undefined, 42, {}, { ...live, lifepath: TH.Life0, lifeseq: TH.Life0 }]) {
-      TH.expectSyncRefusal(() => PlainThing.make(val as never), 'bad_record')
+      TH.expectSyncRefusal(() => TH.PlainThing.make(val as never), 'bad_record')
     }
   })
 })
