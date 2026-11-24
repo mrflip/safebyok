@@ -286,7 +286,7 @@ export function fakeLeaseGateOf(overrides: Partial<BankStamp> = {}): FakeLeaseGa
 /** A test cheat: a lease `proving` builds, granted to `gate` and citing `cited`, beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */
 export async function _cheat_grantedLease(proving: Proving, gate: LeaseGate, cited: GateRevisionedStamp = WorldGate): Promise<{ lease: Lease, record: LeaseRecord }> {
   const make = vi.spyOn(Lease, 'make')
-  const lease = await proving.buildLease(gate, cited)
+  const lease = await proving.buildLease(gate, cited, null)
   const [record] = make.mock.calls.at(-1)!
   make.mockRestore()
   return { lease, record: record as LeaseRecord }

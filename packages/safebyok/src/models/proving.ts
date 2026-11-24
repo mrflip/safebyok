@@ -95,7 +95,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   /** Build a lease granted to `gate`, citing its revision `cited`. The bankKey this proving unwraps is wrapped under a fresh, non-extractable leaseKey.
    * Given `renewed`, the lease the gate holds, the new lease keeps its `born_at`; given null, it is born when it is proved.
    */
-  async buildLease(gate: LeaseGate, cited: GateRevisionedStamp, renewed: Pick<LeaseStamp, 'born_at'> | null = null): Promise<Lease> {
+  async buildLease(gate: LeaseGate, cited: GateRevisionedStamp, renewed: Pick<LeaseStamp, 'born_at'> | null): Promise<Lease> {
     const { gate: { bankStamp }, cited: gateRevision, renewed: renewedStamp } = Checks.provingLeaseArgs.parse({ gate, cited, renewed })
     Validator.checkedConsistent(bankStamp,    this.bankStamp, { kind: 'unexpected_error', message: BigPhrases.LeaseOfOtherGate })
     Validator.checkedConsistent(gateRevision, this.gateStamp, { kind: 'unexpected_error', message: BigPhrases.LeaseOfOtherGate })
