@@ -30,8 +30,8 @@ TH.describeVaultDBBattery('VaultMinder over a MemoryVaultDB', {
   watches: false,
 })
 
-/** An answer of no bank, named for the verb that answers it. */
-function stubAnswerOf(verbname: string): never { return { ask: {}, verbname } as never }
+/** A refused answer carrying no record, named for the verb that answers it. */
+function stubAnswerOf(verbname: string): never { return { ok: false, ask: {}, verbname, world: null, dbhas: null, parentage: [], deltas: [], read_tc: readTcNow(), banktok: null } as never }
 
 /** A vaultDB whose every verb answers {@link stubAnswerOf} its own name, and whose watch answers `stop`. */
 function stubVaultDBOf(stop: () => void) {
@@ -305,12 +305,12 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     expect(events).to.deep.equal([])
   })
 
-  it("tells of nothing from an answer of another bank", async () => {
+  it("refuses each record an answer to an ask of another bank carries, telling it to onBadNews and hearing nothing", async () => {
     const { vaultDB } = sortedOverMemory()
     const { events, badNews } = heardOf(vaultDB)
-    expect(await vaultDB.tryGetThing({ ...TH.getGateAskOf(), banklabel: 'other' })).to.deep.include({ act: 'gotvoid' })
-    await TH.aWhile()
-    expect([...events, ...badNews]).to.deep.equal([])
+    await vaultDB.tryGetThing({ ...TH.getGateAskOf(), banklabel: 'other' })
+    expect([events, badNews.map((news) => news.refusalkind)]).to.deep.equal([[], ['bad_record']])
+    expect(vaultDB.thingAt(TH.GateScope)).to.be.undefined
   })
 
   it("tells every listener's onBadNews of a record of an answer it refuses, and answers unchanged", async () => {

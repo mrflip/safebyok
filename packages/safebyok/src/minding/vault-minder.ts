@@ -1,10 +1,10 @@
 /** `VaultMinder`, which answers a vaultDB's verbs over another, and tells one bank's records that are news as an ordered feed. */
 
 import { once } from 'es-toolkit'
-import { Errors, Validator } from 'safebyok-big/internals'
+import { Errors } from 'safebyok-big/internals'
 import { type Lifetok, Labelpath } from '../shapes/primitives'
 import {
-  type BirthBankAsk, type CitedOf, type DelAskDraft, type GetAsk, type ListAsk, type LoggableAsk, type PutAskDraft, type Track, type Tracked, type WorldRecord, type WriteAsk,
+  type BirthBankAsk, type CitedOf, type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type Tracked, type WorldRecord, type WriteAsk,
   delAskOf, getAskOf, listAskOf, putAskOf,
 } from '../shapes/shapes-asks'
 import type { BankAskDraft } from '../shapes/shapes-bankish'
@@ -77,7 +77,6 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   /** {@link VaultDB.tryGetThing}: a get that finds nothing tells the shell its answer carries. */
   async tryGetThing(ask: GetAsk): Promise<GetThingAnswer> {
     const answer = await this.#vaultDB.tryGetThing(ask)
-    if (! this.#isOwnBank(answer.ask)) { return answer }
     this.#tellAnswer(answer, [...rootsOf(answer), ...gotRecordsOf(answer)])
     return answer
   }
@@ -85,7 +84,6 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   /** {@link VaultDB.tryWriteThing}: a write refused over nothing stored tells the shell its answer carries. */
   async tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer> {
     const answer = await this.#vaultDB.tryWriteThing(ask)
-    if (! this.#isOwnBank(answer.ask)) { return answer }
     this.#tellAnswer(answer, [...rootsOf(answer), ...writtenRecordsOf(answer)])
     return answer
   }
@@ -93,7 +91,6 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   /** {@link VaultDB.tryListThings}: the parent and each Thing listed are told sparse, in labelpath order. */
   async tryListThings(ask: ListAsk): Promise<ListThingsAnswer> {
     const answer = await this.#vaultDB.tryListThings(ask)
-    if (! this.#isOwnBank(answer.ask)) { return answer }
     this.#tellAnswer(answer, [...rootsOf(answer), ...answer.parentage, ...answer.deltas])
     return answer
   }
@@ -101,7 +98,6 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   /** {@link VaultDB.tryBirthBank} */
   async tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer> {
     const answer = await this.#vaultDB.tryBirthBank(ask)
-    if (! this.#isOwnBank(answer.ask)) { return answer }
     this.#tellAnswer(answer, [...rootsOf(answer), ...bornRecordsOf(answer)])
     return answer
   }
@@ -256,8 +252,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
    * Refuses an event of another bank.
    */
   receive(event: VaultEvent): void {
-    const rung = VaultMinderChecks.rungEvent.parse(event)
-    Validator.demandConsistent(rung, this.#scope)
+    const rung = VaultMinderChecks.rungEvent.parseConsistent(event, this.#scope)
     if (event.eventkind !== 'item') { return }
     const { liveness } = VaultMinderChecks.rungItem.parse(event)
     if (liveness === 'void') { VaultMinderChecks.rungVoid.parseConsistent(event.val, rung) } else { VaultMinderChecks.rungThing.parseConsistent(event.val, rung) }
@@ -285,12 +280,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   }
   // --
 
-  // == [Telling]: #isOwnBank, #tellAnswer, #tellNotice, #tell, #receiveAtThing, #tellBadNews
-
-  /** True when `scoped` is of this vaultDB's bank. */
-  #isOwnBank(scoped: LoggableAsk): boolean {
-    return (scoped.userid === this.#scope.userid) && (scoped.banklabel === this.#scope.banklabel)
-  }
+  // == [Telling]: #tellAnswer, #tellNotice, #tell, #receiveAtThing, #tellBadNews
 
   /** Tell every listener the events of `seens`, the records `answer` carries, from the wrapped vaultDB at the answer's `read_tc` and `banktok`. */
   #tellAnswer(answer: { banktok: Lifetok | null, read_tc: ReadTc }, seens: readonly SeenThing[]): void {
