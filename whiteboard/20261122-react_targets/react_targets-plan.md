@@ -447,3 +447,189 @@ Findings, none repaired, each open with the Coach:
 
 Also noted: a selecting `useBank` renders once more, when the device appears; the tests' search of the host's client for a wrapped bankKey is now nearly vacuous, since nothing of ours goes there.
 
+
+## 2026-11-23: both lines land, the minder made simple, the threat model, the dojo
+
+Where things stand, replacing what earlier sections say of open PRs. The workshop's own PR (#817) has merged, so *How
+the Coach wants it run* above no longer describes a line: a round is now a PR of its own from main, or stacked on the
+one it needs.
+
+### What merged
+
+* The workshop's line, #818 … #837 and #817, then core_first's, #844 … #857 and #839. Main is `683175bef`.
+* **`one_client` ([#857](https://github.com/mrflip/safebyok/pull/857)).** The Coach asked which of three shapes the minder should have: a split between what manages the QueryClient and what queries it, one minder shared by all users, or "minder and TSQ have the same lifetime". He did not mind the first or third: "we don't need the common use case to be awesome, we need all use cases to be simple and work and to prove there are no races". Built as the third, with the lifetime the device's: one minder, one client, made together by the device before anyone signs in; persisters per user and bank, restored at `signIn`. It reverses #831's shared client. The reason: a device serves its first user for its life, so no client ever had a second minder, and restoring every user's roots before anyone is identified loaded wrapped bankKeys nobody asked for.
+* **Thread 12's F4 is closed in substance:** the roots are in a client no host reaches. F2 is closed by `useBoxList`'s doc, not checked by a run.
+
+### The threat model (the Coach, 2026-11-23)
+
+Written as `docs/threat-model.md` ([#859](https://github.com/mrflip/safebyok/pull/859), a draft). What the Coach ruled or said, in his words:
+
+* Time is a dimension of it, and "some of them do defend against a script in the page": `withWhisper`, the strength check, compare-and-swap and stamps. A script in the page is bounded by time, not out of the model.
+* A stolen device belongs beside the walk-up.
+* Two lease clocks: "only after we have things working. And it's a customer option: a password manager or doppler is one thing, a price-capped 96-character PAT is another." "Assume the common use case has lock times of days or nevers." "This is void if they have control over the clock."
+* A freshness bound on the gate: "also real, also a TODO, also clock".
+* The session-replay marker on the parts: "TODO that!". "Masking a field at the tab-sleep notification or a timer is quite reasonable." All four are in `TODO.md`.
+* Forms: "We offer uncontrolled fields with bells and whistles: eyeball unmasking, timer and page lock, mask display schedule, placeholder text. sidecar fields are controlled; customer defines how the sidecar and whisper fields map to box elements."
+* Reloading the page to switch users or sign out: "I don't think a customer will stand for this."
+
+Proposed by the session, not ruled:
+
+* **The table of what a form keeps after each outcome** (kept through a refusal or a failure; cleared when stored or cancelled).
+* ~~Sign-out comes into bounds, alone, as the next core thread.~~ Refused by the Coach the same day; endings stay out of bounds. His forecast of how it would go: "the agent implements all the things to wipe data or disable items. Now the code has some number of extra guards everywhere, and combinatorial places where data exists fully/partially/not/damaged/healthy. Next come bug reports about various network events happening in the liminal period ... After that come crossings of the thing being started ... Meanwhile, neither of us know what a gating is." The gating talk comes first. The dojo's Reset keeps reloading the page ("yes").
+* **The roots reach a host as records with the key material left out, not as the client:** `useGate` does this for the gate already. For the dojo's Inspect tab the Coach ruled: "mask the keys as they come out of the back door, but do include a taste of them for the dev to understand how the library works. This is for experimentation, not to be installed in a real app." A worker is building it, stacked on #860.
+* ~~An async step on `putBoxAction` and `putBoxMutationOptions`, for "test the key before saving".~~ Withdrawn the same day. The Coach: testing a key "should be a button under control of the user", and a button's handler is not a submit, so the key stays in its field and no form is emptied. For strength, "the in-form check would just disable submit, our check runs async just fine": the verb judges inside the library, after it has taken the passphrase, where awaiting costs nothing. The dojo needed its ten lines only because its Weak button forces a submit past a disabled one.
+* **The react_free PRs (#819, #822, #832, #834, #835, #836, #838, #843) are closed once a new sprint has mined them,** not reworked: the surface work rewrites the same hooks.
+
+Found by experiment (jsdom only): React's reset of a form Action goes through the form's cancelable `reset` event, so a form that cancels it when the action ended in a refusal keeps its uncontrolled fields, a secret's among them, and still clears when stored.
+
+Small matters: `landedKidsOf` keeps `>` on `read_tc` (the session's lean, lightly held; a comment is owed, since `>` already returns `prior` for the same read). `UsernameField` should return `null` for no username and its five callers drop their condition: a directive for the next thread through the kit.
+
+### The dojo
+
+`demos/safebyok-demo-dojo` ([#858](https://github.com/mrflip/safebyok/pull/858), reviewed and ready; [#860](https://github.com/mrflip/safebyok/pull/860) stacked on it, under review): each outcome of a vault-creation form and a box-put form on demand, and an Inspect tab over the stores. What each form keeps today, and what the library made awkward, are in `whiteboard/20261123-dojo/dojo-findings.md`. The finding that matters: the library empties only the `FormData`, and React's reset empties every uncontrolled field after every outcome of a form Action.
+
+Ruled by the Coach: the second tab adds a box ("yes, box"); the outcomes come about for real ("perfect"); the Thing's fields are `label, am, lifepath, lifeseq, revtok, revseq, written_at, born_at, fmt` after its scope, "the thing's body follows fmt the last common field", and the Inspect table leaves out everything before `label`; the table keeps each row's ckey; a shell lists its fields as a record does ("good call").
+
+Open from the dojo, each with the Coach: after `gate_made_elsewhere` the stage stays `unborn` though the message says to unlock; the form verbs hand back no texts, so a hand-built vault form loses its username on a refusal; `stale_write` and `bank_locked` reach a user as a bare kind and a developer's instruction; `safebyok-idb-lean` exports no database or store names; nobody has run the dojo in a real browser.
+
+### What is next
+
+"Before we can do the gating we need to demonstrate the target": the dojo is that demonstration. Then the gating talk (what a gate is, the gate verbs as calls that take the form), dynamic instances, and error routing, none yet discussed.
+
+Two words the Coach set straight (2026-11-23): "mask display schedule" meant the map from a text's length to how many stars show and how many characters from each end, which the code calls `MaskSchedule`; with fields that mask again on a timer, that map "needs a new word". He proposed `MaskingPolicy`, "to define the space-time extent of masked text": the length map and the timed masking under one name (in `TODO.md`). "Placeholder text" meant only an input's light gray placeholder.
+
+The inspection back door, further (the Coach, 2026-11-23): "8 chars is good" for the taste. It also answers the lease's metadata, "active, born_at, proven_at, other metadata", and none of its key material. "I don't mind it being its own package if you want full deniability: safebyok-raw": the session kept it as one call in the core handed on by the giver, since a package of its own would still need the React package to hand it the device, and the call answers only cut data.
+
+### The gating talk opens, and the back door's review (2026-11-23)
+
+**What a gating is at the tip:** a one-shot capsule of a form verb's cleartexts and the change they prove, emptied after every attempt, a refusal included. It exists because TanStack keeps a mutation's variables; each of five verbs comes three ways (a gating maker, mutation options, a hook), and a host writes `unlock.mutate(unlock.gating({ passphraseCleartext: popField(form, 'passphrase') }))`. The Coach: "That is unpleasant, and mixes concerns." He names three things in it: "swallow plaintext into private vars with limited disclosure (this was for a while separate, called a 'cloak')", "funny business to divorce and reattach data to form fields", and "the attempt".
+
+**Ruled:** "We should have an entrypoint for a gating Attempt that accepts reasonable fieldnames", the bag handed straight in with humane field names and renamed inside (`const { passphrase: passphraseCleartext } = GX.fooGating.parse(formCleartext)`). One method, not two, for a `FormData` and a bag: the entrypoint's parse turns a `FormData` into a bag first, then runs the same check ("Perfect").
+
+**The session's reading, not yet ruled:** emptying a form works only for a `FormData`, and is needed only when the form is a TanStack mutation's variables. A form Action or a handler that awaits the verb leaves nothing holding the form, so the verb need never delete from one, and the `Gating` class can be private or go. Held until the back door's rework lands, since both pass through `gate.ts`.
+
+**The Forms tab** (the Coach's spec, being built as a PR stacked on #861): rows that each build the same form one way, "how to do it and how not to do it"; each button slow-plays a save for six seconds; a mirror written by JavaScript that is not React shows where the secret's text is in the DOM; the result reads "ok @ 5:44pm" or "err @ 5:44pm: <message>"; a form library is welcome, "anything goes for the dojo".
+
+**The back door** ([#861](https://github.com/mrflip/safebyok/pull/861), a draft): its review found that two prefixes of the passphrase wayin's wrapped bankKey, taken across a passphrase replace, XOR to keystream alone, a check for an offline guess as good as the whole wrap. The Coach: "Aren't we supposed to include a never-reused salt next to every wrap or encryption? It's supposed to be safe to expose these." They are, in that nothing leaks without a guess and each guess costs a key-deriver run; the finding is that a masked view was meant to show less than the whole wrap. Ruled: show the end, "three chars is enough, just to be able to say 'yes this is the same record here as there'", as `…xyz(64)`; call it a "masked view", not a taste; the lease shows a `loggable`, not its stamp; the rule that `{ ...thing }` "only reveals things you'd want in a log (not secret, not opaque)" goes into STYLE.md and "into the invariants of Thing's doc block"; the BankMinder's QueryClient is "the bank TSQ", since "query, client and cache will never be unambiguous". A sealed whisper's length is the backend's to see today: padding by Padmé is in `TODO.md`.
+
+### The Forms tab, and what the library offers for forms (the Coach, 2026-11-23)
+
+The dojo's Forms tab ([#862](https://github.com/mrflip/safebyok/pull/862), a draft on #861) builds one form with a secret ten ways, and its reviews settled the facts the form verbs rest on (all in `whiteboard/20261123-dojo/dojo-findings.md`):
+
+* React keeps a form Action's `FormData` as the form's pending status, the same object the action is handed. An action that deletes the secret from it before it returns keeps the secret out of React's hands; one that does not leaves it there for the whole save. So a verb handed a `FormData` takes the secret out before it first awaits, which reverses the session's earlier lean that it need never delete.
+* A mutation handed the form shows the secret to TanStack's mutation-cache subscribers once, before any `mutationFn` runs. A mutation handed nothing, which reads the form itself, shows nothing.
+* A controlled input's text is written into its `value` attribute, for a password field too. A form library's store keeps a registered field's text as typed.
+* Cancelling the form's `reset` event on a refusal keeps an uncontrolled secret through a refused form Action, in one line.
+* A second submit queued behind a pending save under `useActionState` sits in React's status, secret included, until the first ends: disable the button while pending.
+
+The Coach's framing for a host: "First, choose your tradeoff: would you like the value cleared on save, but kept for edit or retry on error? Or would you like it cleared immediately -- but require the user re-enter on a problem?" "Have the docs recommend only ones where it's a good idea."
+
+**Ruled** ("I endorse your recommendations on which to recommend and the library offerings to drop and keep"):
+
+* Recommend: a form Action whose form cancels its reset on a refusal; a plain `onSubmit` form; a TanStack mutation handed nothing; a form library given every field but the secret; and, for a shared screen, a form that empties the field at once.
+* The library offers: secret inputs that cannot be controlled; one verb per action that takes a form or a bag; for form Actions, an action that empties its form at once, with a one-line helper to cancel the reset on a refusal.
+* The library drops `putBoxMutationOptions` as documented, which is the mutation handed the form; its docs show the mutation handed nothing. No cloak is offered: it would cure only that one row, which handing the mutation nothing already does.
+
+Also ruled: "masking a field shouldn't validate it: that would be surprising behavior trying to log a field", so `maskUuid` checks nothing, and `safebyok/utils` again loads none of the vault. A "things to do right" tab is being built (validation by zod with the message by its input, no double submit, why a debounce is wrong, inviting and disinviting a password manager, and more), stacked on #862.
+
+
+### Two more tabs, the masked view's nod, and the form verbs start (the Coach, 2026-11-23)
+
+The dojo line is now #858 ← #860 ← #861 ← #862 ← #863 `dojo_practice` ← #864 `dojo_scenarios` ← thread 7 `gating_attempt`, every base `main`.
+
+**Ruled:**
+
+* The masked view shows **2** characters, not 3: "you mentioned last 3 chars was safe, do 2 anyway". By the same counting, up to 21 masked wraps of one bankKey check no guess, where it was 14 (`notes/security.md` has the amendment). This is taken as the nod that held #861 in draft.
+* `Entrykind` is `Qkeykind`, and STYLE's example says "stored records", not "entries" (done on #861).
+* "LeaseStamp should be the stamp, lease sparse doesn't sound useful as a type"; Wayin and Proving break the spread rule, to fix; whether a box's record keeps the spread rule waits on the form verbs; `Knock.vaultTsqClient()` "in a later pass" (all four in `TODO.md`).
+* The Inspect tab's TSQ panel re-reading each second while shown: "that's OK".
+* The form verbs: "we've got a good proposal, yes start: `gate.gatingFooAttempt(params: FormData | gatingDNA)`". Thread 7 builds the five entrypoints in the core, one call on each React hook that takes a form or a dna, a one-line helper to keep a form's text through a refusal, and moves the kit and the dojo's Login tab onto them.
+
+**Held for a ruling, with the worker's counts to come:** whether the core's older three ways for each verb (`unlockGating`, `unlock`, `tryUnlock`) and the giver's (`Knock.unlockGating`, `Knock.unlockMutationOptions`, `popField`) go once the entrypoints are in.
+
+### The dojo line ready, the form verbs built, the minder's matrix (the Coach, 2026-11-23)
+
+**Where the PRs stand.** #858 and #860 merged. Ready, each one commit, CI green: #861 ← #862 ← #863 ← #864, every base `main`; merging #864 with a merge commit lands all four. Draft: #865 `gating_attempt` (built and reviewed, awaits the rulings below), #866 `minder_matrix` (tests only, from main; in rework), #859 (this plan and the threat model). The react_free PRs (#819, #822, #832, #834, #835, #836, #838, #843) carry the label `sidelined`.
+
+**Ruled:**
+
+* **PRs:** "would you pull the prs out of draft as they're ready?" and, on squashing the dojo's back-and-forth, "No need to have green commits, just a green final result." #861 to #864 were squashed to one commit each with their trees unchanged; the old tips are local tags `20261123-<label>-presquash`.
+* **`device.bankMinder` stays a public getter.** The session's lean to hide it was withdrawn at the Coach's question: "The record is cached in indexeddb and queryable by vaultdb -- what fields should be secret? What boundaries are significant?" The gate's record reaches a host through its own vaultDB anyway. The boundaries that matter are the private methods that see cleartext, what leaves by itself (a spread, `toJSON`, an error, a log, the masked view), and the device's edge.
+* **A form verb handed a form at a stage that has no bank: no fix, a row in `notes/wontfix.md`** (on #865). The Coach: "remember that when an agent comes forward with a crossing like this to have them describe the path that leads here ... To this edge case, you're adding machinery in the form submit of every single attempt, that maligns a form you don't own." The path is a host showing a form at a stage it is not for, or a bank ending under a shown form.
+* **The workshop's records** (this plan, `dojo-findings.md`, the memory) "are for you to dip into, or read when it's likely to help": not a reading list.
+
+**The minder's matrix test** (#866, `packages/safebyok/tests/minding/vault-minder/vault-minder-chains.test.ts`). The Coach asked for "a matrix test for sequences of records coming via get and #sendToTSQ": a table of `[liveness, lifeseq, revseq]` précis tuples a scenario runner constructs and feeds in order, by gets, by the feed, and mixed. His rulings on it:
+
+* "wanted is what should hold, written from four principles -- just so"; "Where today's code ends elsewhere, the row also carries today -- great idea".
+* The listing: "any change in life (vacant, full/soon, dead) should invalidate the listing, eventually invalidating old records".
+* Size: "a->b -- (live+soon/live/dead/dead+soon/bare+soon) to (live+soon/live/dead/dead+soon/bare+soon) x (older/newer) I think that's 50".
+* A later life's soon over an earlier life's item: "I think the item is removed from cache in this case: our best prior is not 'here, but out of date' but rather 'null, then vacant, but out of date'."
+* "there aren't sparse tombstones and the lifeseq tick/tocks; every tombstone has an off lifeseq, since incremented each time and starting with zero". The core counts `revseq` on across lives, so his tuples that restart it at a new life were mapped onto one history.
+* A get behind a bare soon of the same life: "It should not be stale_read to have soon,4,6+bare met by full,4,3: For any full record coming in on a bare record of that life, it's better than what was there, and should be shown to the customer." This changes the get's contract in `minder.ts` ("refuses `stale_read`, and changes nothing") for that one case; the minder thread makes the change, the table states it.
+* "Keep the record generator, because we're likely generating the wrong tree shape."
+* "fix the tests to instead assert the correct state": read by the session as the seed check, each seeded start asserted against what the principles give for it, with today's state as its tripwire, where the 13 dead+soon rows asserted a state the principles do not allow.
+
+**What the table found** (40 of 69 rows end elsewhere today; the reviewer reproduced the first three through real writes and the watch):
+
+* The listing is never marked after the first record stored: ordinary.
+* A dead record is kept once a later life is live: ordinary.
+* A later life's soon does not end the earlier life: ordinary. So dead+soon is reachable today.
+* An earlier life's record lands under a later life's soon: needs redelivery or a lagging replica.
+* A get behind the cache refuses `stale_read` where the feed lands the same record: get only.
+
+**Open on #865, the form verbs** (`gate.gating<Verb>Attempt(params: FormData | dna)` in the core; `attempt`, `wasRefused`, `keepTextIfRefused` on each React hook). Each with the session's recommendation:
+
+1. `keepTextIfRefused(event, onEmptied?)`, so a host's own clearing (the dojo's `newPassphrase.forget`) cannot be ordered wrongly. Recommended; about three lines.
+2. The old ways for each verb. Recommended: remove now those with no caller in `src` (`tryUnlock` and its siblings; `Knock.<verb>Gating` and a hook's `.gating`; `Knock.<verb>MutationOptions`); the core's `gate.unlock({…})` and siblings go in a later pass, after a sweep of about 75 test call sites, and `popField` and the makers' `isInCleartextNames` bridge go with them.
+3. Names: `wasRefused` breaks `isFoo`, and "dna" names a form verb's fieldnames as well as a maker's object.
+4. Which kit forms keep their text through a refusal. Recommended: create-vault and replace-passphrase only.
+5. `method="post"` on `UnlockForm` moves a passphrase submitted before hydration from the URL to the request body. Recommended: record it, build nothing.
+
+**Open elsewhere:**
+
+* The table of what a form keeps after each outcome (`docs/threat-model.md`, *Text typed into a form*) is still the session's proposal, not ruled. Once #865 lands, that doc's *Not built yet* line on forms keeping their text is out of date.
+* Scenarios claim E9, "It saves in the background: nothing goes away in the form", is "cannot today" because `useDraft`'s `put` ends with `discard()`. Whether "in the background" means the user keeps typing while it saves decides what `useDraft` owes (findings 18 to 27).
+* Two threads recommended, neither started: the minder (mark the listing on any change of life; drop the dead record at a rebirth; a later life's soon ends the earlier life; a full record lands on a bare soon of its life), with #866's table as its acceptance test; and `useDraft` (typing kept across a save, a pending state, a reveal without moving focus).
+* A flaky test on main fails CI now and then: `passkey-forms.test.tsx`, "drops a wrong-passphrase message when the next attempt ends at a dismissed prompt". A two-line fix sits uncommitted in the worktree `byok-test_races`, not this session's.
+
+### The form verbs ruled, the two whisper modes, and the forms sketch (the Coach, 2026-11-23)
+
+**Ruled on #865** (the five matters above): "verbs: 1,2,4; is 5 difficult? if not do it; 3 I don't mind the names as they are; add 'wasFoo or hasFoo are acceptable where it's more natural or the distinction is important'".
+
+* 1: `keepTextIfRefused(event, onEmptied?)`. 2: the older ways with no caller in `src` go now; `gate.unlock({…})` and its siblings, `popField` and the makers' `isInCleartextNames` bridge go in a later pass (`TODO.md`). 4: create-vault and replace-passphrase are the kit forms that keep their text through a refusal.
+* 5, read by the session as: a passphrase submitted before hydration should not leave the page, if that is cheap by React's own idiom; else build nothing and report the cost.
+* 3: the names `wasRefused` and "dna" stay, and STYLE.md's *Naming* gains his line.
+
+**On the table of what a form keeps:** "passphrase column yes." For whispers he named two modes:
+
+* **Editing a box:** "I made a change, please apply them while I continue to work; predictably veil and unveil fields without being intrusive".
+* **Committing a box:** "take this away, store it, my next steps are elsewhere and/or I won't want to read this (and if I do it will be in a new edit session)".
+
+This settles Scenarios claim E9: "in the background" means the user keeps working while it saves, so `useDraft` owes an editing mode whose `put` discards nothing.
+
+**`formClearing`.** The Coach: "keepTextIfRefused -- may we call it formClearing({ onRefused, onSuccess, onComplete }) or whatever the vernacular field names would be? if the arguments would be tags, accept something like `ifRefused: 'nil' | 'same'`; if it's callbacks use the traditional conventions; if it's going to be both, do `ifRefused: 'nil' | 'same' | 'call'` and a separate callback arg, with a refine() discouraging call without a callback or non-call with one." The session's proposal, in the sketch and not yet agreed: `formClearing({ ifSuccess = 'clear', ifRefused = 'keep', onCleared }?)`, an `onReset` handler. Tags for the policy, in the words `'clear'` and `'keep'`; one callback, `onCleared`, which runs whenever the form does empty (the user's own Cancel included), so it never overlaps a tag and needs no `'call'` value or refine. It is a thread of its own after #865.
+
+**The forms sketch:** `whiteboard/20261123-react_poured/dream_interface.md`, asked for by the Coach as a new version of `whiteboard/20261121-react_life/dream_interface.md`: four kinds of form (a passphrase, committing a box, editing a box, a form that uses a secret), three ways to submit (a form Action, `onSubmit`, no form), and the four modalities of `docs/react-overview.md`. It proposes one hook shape for every form, `usePutBox` among them. Not ruled.
+
+**PRs:** #866 is ready (reviewed twice; one row's `wanted`, a get of the item already cached under a newer soon, awaits a ruling). The react_free PRs carry the label `sidelined`.
+
+### #865 reworked, reviewed and ready (2026-11-23)
+
+Tip `d4b99a315`, CI green. Built as ruled: `keepTextIfRefused(event, onEmptied?)`; the core's `try<Verb>` wrappers, the giver's `<verb>Gating` and form-verb `<verb>MutationOptions`, and each hook's `.gating` removed; `CreateVaultForm` and `ReplacePassphraseForm` keep their text through a refusal; STYLE.md's *Naming* has the `wasFoo` / `hasFoo` line.
+
+* **Before hydration** (ruling 5). The kit's four Action forms were already safe: React holds an early submit and replays it once hydrated. `UnlockForm`, which submits from a handler, posted its passphrase to the page's URL. The worker first disabled every `SubmitButton` until hydrated; after review the session narrowed the guard to `UnlockForm`'s own button (`useIsHydrated`, private to the kit), so `SubmitButton` keeps its promise for a host's forms. The reviewer's argument for narrowing: a host's server render that is never hydrated would have left its `SubmitButton` disabled for good, and a host's Action form would have lost React's replay. Not ruled by the Coach; one commit puts the wider guard back.
+* **Left open, none blocking:** `mutate` and `mutateAsync` remain on each form hook, taking a gating the giver no longer makes (to go with `formClearing`); whether the core checks `confirmation` (the session and the worker: no, a form's concern); Enter in a field before hydration rests on the HTML spec, since jsdom has no implicit submission.
+* **The flaky add-passkey test** (`passkey-forms.test.tsx`, "drops a wrong-passphrase message when the next attempt ends at a dismissed prompt") is fixed on #865 by the same two lines that sit uncommitted in the worktree `byok-test_races`.
+
+The ready line is now #861 ← #862 ← #863 ← #864 ← #865, every base `main`; merging #865 with a merge commit lands all five. #866 is ready on its own, from main.
+
+### The forms sketch approved (the Coach, 2026-11-23)
+
+The Coach on `whiteboard/20261123-react_poured/dream_interface.md`: "looks great", and a thumbs up. The session reads that as agreeing what the sketch proposes: `formClearing({ ifSuccess = 'clear', ifRefused = 'keep', onCleared }?)` with no `'call'` value, `usePutBox`, and `useDraft` as the editing mode. None is built; each is a thread to be issued.
+
+* **"Write always as a real developer would. I would not write these on one line, especially with the awaits."** The sketch's handlers are now named functions over several lines. The guides in `docs/` have the same one-line habit (`onSubmit={(event) => { event.preventDefault(); unlock.mutate(…) }}`) and still say `mutate` where #865 has `attempt`: owed when the guides are next rewritten.
+* **Callbacks inline.** The Coach asked whether any callback needs `useCallback` or to live up in scope. None does: React replaces a handler on a DOM element at no cost, and a hook is to read its options afresh on each render, as `useMutation` does; the sketch now says so, which binds `usePutBox`. Today `attempt` is a new function on every render, which matters only in an effect's dependencies or as a prop of a memoized child; the `formClearing` thread should make it stable, as TanStack's `mutate` is.
+* **The hydration guard:** "don't know what this is, as long as it is well tested I'm ok". It stays on `UnlockForm` alone. Tested (`tests/kit/unlock-form.test.tsx`): a server render has Unlock disabled, a click on it submits nothing, and once hydrated the button is enabled with no mismatch and React cancels the submit. Not tested: Enter in the field before hydration, which jsdom cannot run.
+* **#866's one row** (a get of the item already cached under a newer soon): "don't worry about the get/soon stuff that's being fixed". Dropped from this workshop's open matters.
+* **`docs/threat-model.md`** has the two whisper modes in its table of what a form keeps, and its *Not built yet* line on forms says what stands once #865 lands: the kit's two passkey forms and `putBoxAction` still empty after every outcome. #859 should merge after #865.
+* **The dojo line merged** (the Coach, 2026-11-23): #861 to #864 are on main. The Coach asked whether the commits left would benefit from squashing, and how much was rework. #865's 30 commits were 4 of the first build, 9 of the rework on the rulings, and 17 of upkeep (review fixes, style, plan, notes); one was a true reversal, the hydration guard put on every `SubmitButton` and then moved to `UnlockForm`. Squashed to three by layer (`f7c8ba894` the core, `45f6d3071` the client with the dojo's Login, `0f3b5f187` the notes), the tree unchanged from the reviewed `d4b99a315` (tag `20261123-gating_attempt-presquash2`), CI green. The core commit alone typechecks the client and the dojo; the client's commit carries the dojo's Login because the dojo does not typecheck without it.

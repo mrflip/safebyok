@@ -130,3 +130,41 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   persister's `onBadNews`, and the last snapshot stands; with boxes persisted per bank, the limit bounds one user's boxes.
   TanStack's `PersistRetryer`, with `removeOldestQuery`, is the way to shrink a snapshot until it fits (the Coach,
   2026-11-22, box_persist).
+* **A marker on the parts for session-replay tools.** A revealed secret is plain text in the DOM, and a replay tool
+  records it. Give `WhisperText`, `WhisperInput` and `PassphraseInput` a stable attribute a host can tell its replay
+  tool to mask (docs/threat-model.md, *Not built yet*; the Coach, 2026-11-23).
+* **`MaskingPolicy`: one name for where and when text is masked.** "To define the space-time extent of masked text"
+  (the Coach, 2026-11-23). Its space half is today's `MaskSchedule`, the map from a text's length to how many stars show
+  and how many characters from each end; rename it when `mask` is ported out of `safebyok-big`. Its time half is not
+  built: a revealed field masks again when the tab is hidden, or on a timer ("Masking a field at the tab-sleep
+  notification or a timer is quite reasonable").
+* **A freshness bound on the gate.** A lease stands until this device hears of a newer gate revision, however long
+  that takes. Let a host set a period within which the gate must be confirmed from the vaultDB for the lease to stand.
+  Void against whoever controls the clock (the Coach, 2026-11-23).
+* **A second lease clock, for idleness, as a host's option.** "Only after we have things working." The common case has
+  lock times of days or never: a password manager is one thing, a price-capped token typed once and put in a header is
+  another. Today nothing locks a bank when its lease ends: the snapshot only reports `leaseEndsAt` (the Coach,
+  2026-11-23).
+* **Pad a whisper's text before it is sealed, so the ciphertext's length says little.** A sealed whisper is as long as
+  its text, and an API key's length often says whose it is; the backend sees that length today. The whisper is sealed as
+  JSON, which reads the same with spaces after it, so pad the text to a length chosen by Padmé (Nikitin et al., "Reducing
+  Metadata Leakage from Encrypted Files and Communication with PURBs", PETS 2019), which leaks O(log log n) bits of the
+  length for at most about 12% more bytes. A record sealed before the change still unseals. "A customer can pad too"
+  (the Coach, 2026-11-23).
+* **A lease's own fields are its loggable.** STYLE.md says a stateful object's own fields are its loggable fields, but a
+  lease's own enumerable fields are still its stamp: whole tokens, and no `isEvicted`, so `{ ...lease }` differs from
+  `lease.loggable`. Make them agree, keep the stamp as a getter for what a ctx binds, and retire `LeaseSparse`, which
+  nothing answers since `toJSON` answers the loggable (the Coach, 2026-11-23, dojo_backdoor's second review).
+  "`LeaseStamp` should be the stamp, lease sparse doesn't sound useful as a type" (the Coach, 2026-11-23).
+* **Wayin and Proving break the spread rule.** `{ ...wayin }` shows its whole record, the wrapped bankKey included, and
+  `{ ...proving }` its header's salts and credential id. STYLE.md's rule is that a spread shows only what belongs in a
+  log. Device, Bank, Gate, Vault and Gating keep it; fix these two (the Coach, 2026-11-23).
+* **Whether a box's record keeps the spread rule.** No box model is ever made: a box is handed out as a `BoxRecord`,
+  whose spread shows `whisper_sealed`, so Thing's promise about its spread is empty for a box. Decide it with the form
+  verbs, which settle what a host is handed (the Coach, 2026-11-23).
+* **`Knock.queryClient()` becomes `Knock.vaultTsqClient()`,** in a later pass: it is the vault TSQ, as
+  `device.vaultTsqClient` already says (the Coach, 2026-11-23).
+* **Remove the core's older gate verbs** (`gate.unlock({…})` and its siblings) once their tests, about 75 call
+  sites, are moved onto the form verbs (`gate.gatingUnlockAttempt` and its siblings). `popField` and the makers'
+  `isInCleartextNames` bridge go with them (the Coach, 2026-11-23).
+
