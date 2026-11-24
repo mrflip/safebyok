@@ -1,6 +1,6 @@
 # Thread 18: vault_minder (2026-11-24)
 
-Branch `20261124-vault_minder`, PR #TBD, stacked on #883 (`20261124-minders_out`). Proved: see the PR body's **Tests:** line.
+Branch `20261124-vault_minder`, PR #884, stacked on #883 (`20261124-minders_out`). Proved: see the PR body's **Tests:** line.
 
 * **Built**: `SortedVaultDB` is `VaultMinder`, a rename with no behaviour change.
   - **Identifiers**: `SortedVaultDB` -> `VaultMinder`; `sortedVaultDB` -> `vaultMinder` (`world.vaultMinder`, locals, and the
