@@ -21,7 +21,7 @@ const BoxListKey = VaultTSQ.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'b
 
 /** The stage of the world's bank, as a page shows it. */
 function StageShown({ world }: Readonly<{ world: TH.ProviderWorld }>) {
-  return <p>{world.Bank.useBank((bank) => bank.stage)}</p>
+  return <p>{world.Bank.useWorld((snap) => snap.stage)}</p>
 }
 
 /** What `useBox` of the jokes box showed at its latest commit, read in render as a component reads it: React Query re-renders a hook only for the fields it has read. */
@@ -337,7 +337,7 @@ describe("the record hooks outside every provider", () => {
   it("show signed_out and fetch nothing", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     const { result } = renderHook(() => ({
-      stage: world.Bank.useBank((bank) => bank.stage), box: world.Bank.useBox(TH.JokesPath), gate: world.Bank.useGate(), list: world.Bank.useBoxList(),
+      stage: world.Bank.useWorld((snap) => snap.stage), box: world.Bank.useBox(TH.JokesPath), gate: world.Bank.useGate(), list: world.Bank.useBoxList(),
     }))
     const { stage, box, gate, list } = result.current
     expect([stage, box.data, box.fetchStatus, gate.data, list.data]).to.deep.equal(['signed_out', undefined, 'idle', undefined, undefined])

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { flushSync } from 'react-dom'
-import type { BankSnapshot, BoxUnsealed, Whisper } from 'safebyok'
+import type { WorldSnapshot, BoxUnsealed, Whisper } from 'safebyok'
 
 // == [Types]: Reveal, RevealFriend
 
@@ -24,7 +24,7 @@ export type Reveal = Readonly<{
 
 /** What a reveal reads of its bank's giver. */
 export type RevealFriend = Readonly<{
-  useBank:     <SelT>(select: (snap: BankSnapshot) => SelT) => SelT
+  useWorld:     <SelT>(select: (snap: WorldSnapshot) => SelT) => SelT
   withWhisper: <ResultT>(labelpath: string, fn: (whisper: Whisper, box: BoxUnsealed) => ResultT | Promise<ResultT>) => Promise<ResultT>
 }>
 // --
@@ -33,7 +33,7 @@ export type RevealFriend = Readonly<{
 
 /** Which field of the whisper of the box at `labelpath` the page shows, never its text. Locking the bank masks it. */
 export function useReveal(bank: RevealFriend, labelpath: string): Reveal {
-  const isLocked = bank.useBank((snap) => snap.isLocked)
+  const isLocked = bank.useWorld((snap) => snap.isLocked)
   const [shown, setShown] = useState<Readonly<{ fieldname: string, isRevealed: boolean }> | null>(null)
   if (isLocked && (shown?.isRevealed === true)) { setShown(null) }
 

@@ -94,7 +94,7 @@ export function makeUseDraft(bank: DraftFriend) {
    */
   function useDraft(labelpath: string): Draft {
     const stored = bank.useBox(labelpath, { select: wholeThingOf }).data
-    const isLocked = bank.useBank((snap) => snap.isLocked)
+    const isLocked = bank.useWorld((snap) => snap.isLocked)
     const [pinned, setPinned] = useState<BoxShown | undefined>(undefined)
     const [sidecarSet, setSidecarSet] = useState<Sidecar | null>(null)
     const [dirtyFieldnames, setDirtyFieldnames] = useState<ReadonlySet<string>>(NoFieldnames)

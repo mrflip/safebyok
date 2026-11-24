@@ -3,12 +3,12 @@
  */
 
 import { type DataTag, type QueryKey, type UseMutationOptions, type UseMutationResult, type UseQueryOptions, type UseQueryResult, QueryClient, mutationOptions, queryOptions, skipToken, useMutation, useQuery } from '@tanstack/react-query'
-import { noop, pick } from 'es-toolkit'
+import { pick } from 'es-toolkit'
 import { type ReactNode, type SyntheticEvent, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  type AddPasskeyDna, type Bank, type BankSnapshot, type BankStage, type BirthDna, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type ItemQueryOptions, type KeyDeriver, type Kids, Labelpath,
+  type AddPasskeyDna, type Bank, type BankStage, type BirthDna, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type ItemQueryOptions, type KeyDeriver, type Kids, Labelpath,
   type LiveOf, type LivePublicPropsOf, type MaskedView, type PasskeyWayinHeader, type PassphraseVerdict, type PassphraseWayinHeader,
-  type ReplacePassphraseDna, type RevokePasskeyDna, type UnlockDna, EmptyMaskedView, PendingBank, Shell, type Sidecar, SignedOutBank, type Tombstone, type TombstoneOf, type Userid, type Vault, VaultError, type VaultDB, VaultTSQ, type Whisper, bulletproofHandlerOf, vacateHanded,
+  type ReplacePassphraseDna, type RevokePasskeyDna, type UnlockDna, EmptyMaskedView, PendingWorld, Shell, type Sidecar, SignedOutWorld, type Tombstone, type TombstoneOf, type Userid, type Vault, VaultError, type VaultDB, VaultTSQ, type Whisper, type WorldSnapshot, bulletproofHandlerOf, vacateHanded,
 } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
@@ -140,8 +140,8 @@ export type ReactGiver<BanklabelT extends string = string> = ReturnType<typeof r
 /** The hooks and calls of a giver's bank, from `SOK.bank(banklabel)`. */
 export type BankGiver = ReturnType<ReactGiver['bank']>
 
-/** What a provider shows the hooks under it: its user's device, or none and the bank snapshot shown meanwhile; and the QueryClient they observe. */
-type Shown = Readonly<{ client: QueryClient } & ({ device: Device, bank: null } | { device: null, bank: BankSnapshot })>
+/** What a provider shows the hooks under it: its user's device, or none and the world snapshot shown meanwhile; and the QueryClient they observe. */
+type Shown = Readonly<{ client: QueryClient } & ({ device: Device, snapshot: null } | { device: null, snapshot: WorldSnapshot })>
 
 /** What a bank's hooks and calls read of their giver. */
 type BankFriend = Readonly<{
@@ -176,7 +176,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
   const outsideClient = new QueryClient()
   // One context for each giver, so a hook of one giver never reads the device of another giver's provider.
   /** The device the nearest provider of this giver shows its children, or signed out outside every one. */
-  const ShownContext = createContext<Shown>({ device: null, bank: SignedOutBank, client: outsideClient })
+  const ShownContext = createContext<Shown>({ device: null, snapshot: SignedOutWorld, client: outsideClient })
 
   /** The device of the provider mounted, while someone is signed in on it, or null. */
   function signedInDevice(): Device | null {
@@ -257,7 +257,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     return <ShownContext value={shown}><GiverContext value={given}>{children}</GiverContext></ShownContext>
   }
 
-  /** What the nearest provider shows its children: its user's device, or none and the bank snapshot shown meanwhile. */
+  /** What the nearest provider shows its children: its user's device, or none and the world snapshot shown meanwhile. */
   function useShown(): Shown { return useContext(ShownContext) }
 
   // Only the verdict of the latest call to `judge` lands: an earlier one, such as a checker's first while it loads its
@@ -300,7 +300,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
    */
   function useQueryOptions(): Readonly<Record<BanklabelT, BoxQueries>> {
     const { device: shownDevice, client } = useShown()
-    const isFetchable = bankGiver.useBank(isFetchStage)
+    const isFetchable = bankGiver.useWorld(isFetchStage)
     return useMemo(() => {
       const queries: BoxQueries = Object.freeze({ box: (labelpath: string) => boxQueryOf(shownDevice, labelpath, isFetchable), client })
       return Object.freeze({ [banklabel]: queries }) as Record<BanklabelT, BoxQueries>
@@ -319,7 +319,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     useStrengthVerdict,
     useQueryOptions,
     maskedView,
-    /** The hooks and calls of the giver's bank, refusing any other banklabel. Name the result in PascalCase (`const Knock = SOK.bank('knock')`), so the rules-of-hooks lint checks `Knock.useBank()`. */
+    /** The hooks and calls of the giver's bank, refusing any other banklabel. Name the result in PascalCase (`const Knock = SOK.bank('knock')`), so the rules-of-hooks lint checks `Knock.useWorld()`. */
     bank: (banklabelAsked: BanklabelT) => {
       ScopeChecks.bankScoped.parseConsistent({ banklabel: banklabelAsked }, { banklabel })
       return bankGiver
@@ -335,8 +335,8 @@ const Unjudged = Object.freeze({ verdict: null, isJudging: false, lastErr: null 
 
 /** What a provider handed `userid` shows its children of `device`, its device once signed in: none while it is another user's or nobody is signed in on it, stage `starting` for a userid and `signed_out` for none. */
 function shownOf(device: Device | null, userid: string | null | undefined, client: QueryClient): Shown {
-  if ((device !== null) && ((typeof userid !== 'string') || (device.userid === userid))) { return { device, bank: null, client } }
-  return { device: null, bank: (typeof userid === 'string') ? PendingBank : SignedOutBank, client }
+  if ((device !== null) && ((typeof userid !== 'string') || (device.userid === userid))) { return { device, snapshot: null, client } }
+  return { device: null, snapshot: (typeof userid === 'string') ? PendingWorld : SignedOutWorld, client }
 }
 // --
 
@@ -346,19 +346,19 @@ function shownOf(device: Device | null, userid: string | null | undefined, clien
 function makeBankGiver(friend: BankFriend) {
   const { banklabel, signedIn, clientNow, demandDeviceOrVacate, demandBankOrVacate, demandVault, useShown } = friend
 
-  /** The bank's snapshot. Synchronous: it never waits and never suspends.
+  /** The world's snapshot: where the user stands with the bank. Synchronous: it never waits and never suspends.
    * Switch a screen on its `stage`.
    * Given `select`, it re-renders only when what `select` returns changes: return a field of the snapshot or a primitive, never a new object.
    */
-  function useBank(): BankSnapshot
-  function useBank<SelT>(select: (snap: BankSnapshot) => SelT): SelT
-  function useBank<SelT>(select?: (snap: BankSnapshot) => SelT): BankSnapshot | SelT {
-    const { device, bank } = useShown()
+  function useWorld(): WorldSnapshot
+  function useWorld<SelT>(select: (snap: WorldSnapshot) => SelT): SelT
+  function useWorld<SelT>(select?: (snap: WorldSnapshot) => SelT): WorldSnapshot | SelT {
+    const { device, snapshot } = useShown()
     const pickOf = () => {
-      const snap = (device === null) ? bank : device.getSnapshot().bank
+      const snap = (device === null) ? snapshot : device.world.getSnapshot()
       return select ? select(snap) : snap
     }
-    return useSyncExternalStore((device === null) ? subscribeToNothing : device.subscribe, pickOf, pickOf)
+    return useSyncExternalStore((device === null) ? subscribeToNothing : device.world.subscribe, pickOf, pickOf)
   }
 
   /** Call `onChange` after each render that shows the bank at a new stage, with the stage before it: never on the first render.
@@ -368,7 +368,7 @@ function makeBankGiver(friend: BankFriend) {
    */
   function useStageChange(onChange: (stage: BankStage, prevStage: BankStage) => void): void {
     Checks.fn.parse(onChange)
-    const stage = useBank((snap) => snap.stage)
+    const stage = useWorld((snap) => snap.stage)
     const prevStageRef = useRef(stage)
     const changed = useEffectEvent((prevStage: BankStage) => { onChange(stage, prevStage) })
     useEffect(() => {
@@ -408,7 +408,7 @@ function makeBankGiver(friend: BankFriend) {
    */
   function boxQuery(labelpath: string): BoxQueryOptions {
     const device = signedIn()
-    return boxQueryOf(device, labelpath, (device !== null) && isFetchStage(device.getSnapshot().bank))
+    return boxQueryOf(device, labelpath, (device !== null) && isFetchStage(device.world.getSnapshot()))
   }
 
   /** The QueryClient that {@link boxQuery}'s queries and {@link keys} run in: the provider's mounted when called, or one where every query fetches nothing while none is.
@@ -432,14 +432,15 @@ function makeBankGiver(friend: BankFriend) {
    */
   function useBox<SelT = BoxSelected>(labelpath: string, opts: BoxQueryOpts<BoxShown, SelT> = {}): UseQueryResult<SelT> {
     const { device, client } = useShown()
-    const isFetchable = useBank(isFetchStage)
+    const isFetchable = useWorld(isFetchStage)
     const shaping = pick(opts, BoxShapingOptnames)
     return useQuery<BoxShown, Error, SelT>({ ...boxQueryBaseOf(device, labelpath, isFetchable), select: liveOf as (thing: BoxShown) => SelT, ...shaping }, client)
   }
 
   // The gate is read from the world's gate Thing at each render, and React keeps only the gate shown: the whole gate, with
-  // the bankKeys its wayins wrap, stays in the Thing. The VaultMinder tells of every record of the gate that is news,
-  // which the Thing's own subscribers do not hear of; the snapshot is the same object until the gate's record changes.
+  // the bankKeys its wayins wrap, stays in the Thing, which tells its subscribers of every record of it that is news. The
+  // snapshot is the same object until the gate's record changes. The Thing is made by the time the stage shows its bank
+  // unborn, locked or unlocked, or as a birth lands, which changes the stage too, so the render that follows subscribes to it.
   /** The bank's main gate: its wayins' headers, never the bankKey they wrap. Synchronous: it never waits and never suspends.
    * `data` is the gate, null when no bank is stored, and undefined until the device's sign-in answers.
    * Its `wayins.passkey0` is the header of the bank's passkey, or null while it has none: a passkey added or revoked on any device shows here.
@@ -450,11 +451,11 @@ function makeBankGiver(friend: BankFriend) {
    */
   function useGate<SelT = GateSelected>(opts: GateOpts<SelT> = {}): GateResult<SelT> {
     const { device } = useShown()
-    const isFetchable = useBank(isFetchStage)
+    const isFetchable = useWorld(isFetchStage)
     const { select = liveGateOf as (gate: GateShown) => SelT } = opts
-    const subscribe = useCallback((onChange: () => void) => ((isFetchable && (device !== null)) ? listenToGate(device, onChange) : unsubscribeFromNothing), [isFetchable, device])
+    const gate = (isFetchable && (device !== null)) ? device.world.gate : null
     const shownNow = () => ((isFetchable && (device !== null)) ? gateShownOfWorld(device) : undefined)
-    const shown = useSyncExternalStore(subscribe, shownNow, shownNow)
+    const shown = useSyncExternalStore(gate?.subscribe ?? subscribeToNothing, shownNow, shownNow)
     return { data: (shown === undefined) ? undefined : select(shown) }
   }
 
@@ -471,7 +472,7 @@ function makeBankGiver(friend: BankFriend) {
    */
   function useBoxList(): UseQueryResult<readonly string[]> {
     const { device, client } = useShown()
-    const isFetchable = useBank(isFetchStage)
+    const isFetchable = useWorld(isFetchStage)
     // Its cache time is the vault TSQ's default: a listing collected while no hook observes it would list again at a remount.
     return useQuery<Kids, Error, readonly string[]>({
       queryKey: boxListQueryKeyOf({ userid: useridOf(device), banklabel }),
@@ -494,7 +495,7 @@ function makeBankGiver(friend: BankFriend) {
   })
 
   /** Call `fn` with the box's whisper, and resolve what `fn` resolves. On a locked bank, it first waits for the unlock form.
-   * Call it once the stage shows `locked` or `unlocked`: before then it refuses. While it waits, `useBank((bank) => bank.isUnlockWanted)` is true: show the unlock form, or call {@link dismissUnlock}, which rejects the wait `dismissed`.
+   * Call it once the stage shows `locked` or `unlocked`: before then it refuses. While it waits, `useWorld((snap) => snap.isUnlockWanted)` is true: show the unlock form, or call {@link dismissUnlock}, which rejects the wait `dismissed`.
    * `fn` also gets the whole box, unsealed. Use the whisper only inside `fn`, and return only what is safe to retain:
    * what `fn` throws is rethrown as thrown.
    * @example
@@ -627,7 +628,7 @@ function makeBankGiver(friend: BankFriend) {
    */
   function dismissUnlock(): void { signedIn()?.bank?.dismissUnlock() }
 
-  // Each form verb below resolves nothing: the bank's snapshot says what changed. Its error is the verb's refusal, to
+  // Each form verb below resolves nothing: the world's snapshot says what changed. Its error is the verb's refusal, to
   // branch on by `family`: a `condition` is the user's to correct, at the field or in a banner, with the form left open.
   // Each verb refuses `absent_vault` at a stage it has no bank for: show each form only at its own stage.
   // The birth refuses `disabled` at `'starting'`, until the device's sign-in answers.
@@ -748,10 +749,10 @@ function makeBankGiver(friend: BankFriend) {
     return demandBankOrVacate(params).gate.revokePasskeyGating(params)
   }
 
-  const useDraft = makeUseDraft({ useBank, useBox, withWhisper, demandVault })
+  const useDraft = makeUseDraft({ useWorld, useBox, withWhisper, demandVault })
 
   const bankGiver = Object.freeze({
-    useBank, useStageChange, useGate, useBox, useBoxList, boxQuery, queryClient, keys, withWhisper, withLockableWhisper, putBoxOnce, delBoxOnce, putBoxAction, putBoxMutationOptions, useDraft, lock, dismissUnlock,
+    useWorld, useStageChange, useGate, useBox, useBoxList, boxQuery, queryClient, keys, withWhisper, withLockableWhisper, putBoxOnce, delBoxOnce, putBoxAction, putBoxMutationOptions, useDraft, lock, dismissUnlock,
     useBirth, useUnlock, useReplacePassphrase, useAddPasskey, useRevokePasskey,
     gatingBirthAttempt, gatingUnlockAttempt, gatingReplacePassphraseAttempt, gatingAddPasskeyAttempt, gatingRevokePasskeyAttempt,
   })
@@ -759,27 +760,16 @@ function makeBankGiver(friend: BankFriend) {
 }
 // --
 
-// == [Helpers]: useridOf, isFetchStage, listenToGate, GateShownOfCkey, gateShownOfWorld, BoxShapingOptnames, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
+// == [Helpers]: useridOf, isFetchStage, GateShownOfCkey, gateShownOfWorld, BoxShapingOptnames, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
 
 /** `device`'s userid, or null for no device. */
 function useridOf(device: Device | null): Userid | null {
   return (device === null) ? null : device.userid
 }
 
-/** True while `bank` is unborn, locked or unlocked: the stages its boxes and gate are fetched at. */
-function isFetchStage(bank: BankSnapshot): boolean {
-  return (bank.stage === 'unborn') || (bank.stage === 'locked') || (bank.stage === 'unlocked')
-}
-
-/** Call `onChange` on each event of `device`'s main gate its VaultMinder tells, until the function returned is called. */
-function listenToGate(device: Device, onChange: () => void): () => void {
-  const { vaultMinder } = device.world
-  if (vaultMinder === null) { return unsubscribeFromNothing }
-  // The vault TSQ, listening beside it, tells the device of a record refused.
-  return vaultMinder.listen({
-    hear:      (event) => { if (event.labelpath === Labelpath.MainGate) { onChange() } },
-    onBadNews: noop,
-  })
+/** True while `snap` shows the bank unborn, locked or unlocked: the stages its boxes and gate are fetched at. */
+function isFetchStage(snap: WorldSnapshot): boolean {
+  return (snap.stage === 'unborn') || (snap.stage === 'locked') || (snap.stage === 'unlocked')
 }
 
 // useSyncExternalStore wants the same snapshot until the store changes, and the gate Thing's record is the same frozen
@@ -809,7 +799,7 @@ function unsubscribeFromNothing(): void { /* Nothing was subscribed. */ }
 
 /** The refusal of a call that needs `device`'s bank, while it has none: unborn, still coming up, or failed. */
 function bankAbsentOf(device: Device): VaultError {
-  const { stage } = device.getSnapshot().bank
+  const { stage } = device.world.getSnapshot()
   if (stage === 'unborn') { return new VaultError('absent_vault', Phrases.BankAbsent) }
   return new VaultError('absent_vault', (stage === 'failed') ? Phrases.BankFailed : Phrases.BankNotStarted)
 }
