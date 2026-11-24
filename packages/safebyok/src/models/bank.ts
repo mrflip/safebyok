@@ -1,23 +1,22 @@
-import { Clock, Crypto, type Errors, Helpers, Outcome, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
+import { Clock, Crypto, type Errors, Helpers, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { type Adoptable, Thing } from './thing'
-import { BaseBox } from './base-box'
 import { Device } from './device'
 import type { Gate } from './gate'
 import type { BirthGating } from './gating'
 import type { World } from './world'
 import type { BirthCleartexts, BirthDna } from '../shapes/shapes-gateish'
-import type { BankOpts, BankSnapshot, BoxUnsealed, HostedVault } from '../shapes/shapes-bankish'
-import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, ShellOf, TombstoneOf } from '../shapes/shapes-sealers'
+import type { BankOpts, BankSnapshot, HostedVault } from '../shapes/shapes-bankish'
+import type { ShellOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import { type DeviceTok, type Lifetok, Labelpath, Lifeseq } from '../shapes/primitives'
 import { type BankRecord, type BoxRecord, type Modelkind, ThingFormat } from '../shapes/shapes-thing'
-import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
+import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import type { PutAskDraft } from '../shapes/shapes-asks'
 import * as Throwers from '../refusals/throwers'
 
 /** The signed-in user's bank on this device: its main gate and its root box.
- * Boxes are sealed and unsealed under the lease its device's world holds. Its roots, as last heard of, are the Things its device's world keeps.
- * Over the shell or a tombstone, what needs a live record refuses `absent_thing`: its stamp, its root box, a seal, an unseal and a put.
+ * Its roots, as last heard of, are the Things its device's world keeps.
+ * Over the shell or a tombstone, what needs a live record refuses `absent_thing`: its stamp, its root box and a put.
  */
 export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<BankRecord>> {
   // == [Props]: lifetok, #device, #world
@@ -180,52 +179,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   hostVault(vault: HostedVault): void { this.#world.hostVault(vault) }
   // --
 
-  // == [Boxes]: sealBox, trySealBox, unsealBox, tryUnsealBox
-  // The world's seal and unseal, for this bank's own boxes: only the bank knows its root box, whose lifeseq begins each box's
-  // lifepath. A vault writes what they seal, refusing a locked bank; only its withWhisper waits for the unlock.
-
-  /** Seal and return the next revision of the box `donorProps`. Needs the bank unlocked.
-   * The revision applies `publicProps`, and encrypts the whisper of `secretProps`. An unknown key in either refuses.
-   * Pass `donorProps` as you have it: whole or sparse, sealed or unsealed, a tombstone or the shell. It must be a box of this bank.
-   * A whole live box's revision keeps its sidecar unless `publicProps` gives one. Over a sparse box, a tombstone or the shell,
-   * `publicProps` must give the sidecar. After a tombstone or the shell, the revision begins the box's next life.
-   * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live box instead, whose sealed empty whisper authenticates
-   * it, and refuses `secretProps` or any sidecar but `{}`.
-   * Its `written_at` is `publicProps.written_at`, or now.
-   * @example
-   *   const box = await bank.sealBox(donor, { sidecar: { account: 'work' } }, { whisper })
-   */
-  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxTombstonePublicProps): Promise<TombstoneOf<BoxRecord>>
-  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<LiveOf<BoxRecord>>
-  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxRecord>
-  async sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxRecord> {
-    this.demandEnabled()
-    this.#demandOwnBox(donorProps)
-    return await this.#world.seal(BaseBox, donorProps, publicProps, secretProps)
-  }
-
-  /** {@link sealBox}, resolving an `Outcome` instead of throwing. */
-  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxTombstonePublicProps): Promise<Outcome.Outcome<TombstoneOf<BoxRecord>>>
-  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<Outcome.Outcome<LiveOf<BoxRecord>>>
-  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<Outcome.Outcome<BoxRecord>>
-  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<Outcome.Outcome<BoxRecord>> {
-    return Outcome.outcomeOf(() => this.sealBox(donorProps, publicProps, secretProps))
-  }
-
-  /** Unseal `box`, returning it with its whisper in place of the sealed one. Needs the bank unlocked.
-   * It authenticates the box, all but its sidecar. For a tombstone, that checks its seal.
-   */
-  async unsealBox(box: BoxRecord): Promise<BoxUnsealed> {
-    this.demandEnabled()
-    this.#demandOwnBox(box)
-    return await this.#world.unseal(BaseBox, box)
-  }
-
-  /** {@link unsealBox}, resolving an `Outcome` instead of throwing. */
-  tryUnsealBox(box: BoxRecord): Promise<Outcome.Outcome<BoxUnsealed>> { return Outcome.outcomeOf(() => this.unsealBox(box)) }
-  // --
-
-  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, demandEnabled, demandLive, demandOwnBox
+  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, demandEnabled, demandLive
 
   /** True until this bank's world is swept or its device ends. */
   get isEnabled(): boolean { return this.#world.isEnabled }
@@ -250,12 +204,6 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
     const record = this.pickle()
     if (record.am !== 'a') { throw Throwers.thingNotLive(this.labelpath) }
     return record
-  }
-
-  /** Demand that `box` is a box of this bank, under its current root box. */
-  #demandOwnBox(box: unknown): void {
-    const { lifepath } = BoxChecks.sealable.parseConsistent(box, this.scope, { kind: 'record_conflict' })
-    if (lifepath.split('/', 1)[0] !== this.rootBox.lifeseq) { throw Throwers.boxOfOtherRoot() }
   }
   // --
 

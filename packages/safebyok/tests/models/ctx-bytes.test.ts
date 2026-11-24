@@ -44,7 +44,7 @@ function changed(val: unknown): unknown { return ((typeof val === 'number') ? va
 /** A born bank, a box it sealed, the box's stamp as the seal binds it, and the bankKey, read through a cheat. */
 async function sealedWorld() {
   const { bank } = await TH.buildBornBank()
-  const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+  const box = await bank.device.vault!.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
   return { bank, box, boxStamp: BaseBox.stampOf(box), bankKey: await TH._cheat_bankKeyOf(bank) }
 }
 

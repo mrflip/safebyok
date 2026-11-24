@@ -350,7 +350,7 @@ describe("gate.seal(sealer, donor, publicProps, secretProps) and gate.unseal(sea
     const { bank } = await TH.buildBornBank()
     const box = await bank.gate.seal(BaseBox, TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     expect(await bank.gate.unseal(BaseBox, box)).to.deep.include({ whisper: TH.Whisper })
-    expect(await bank.unsealBox(box)).to.deep.include({ whisper: TH.Whisper })
+    expect(await bank.device.vault!.unsealBox(box)).to.deep.include({ whisper: TH.Whisper })
   })
 
   it("refuse 'bank_locked' while the gate is locked, and its end cause once it is swept", async () => {

@@ -9,7 +9,8 @@ import type { BankScope } from '../shapes/shapes-stamps'
 import { type ItemQueryOptions, type VaultMutationOptions, type VaultTSQOpts, VaultTSQChecks } from '../shapes/shapes-vault-tsq'
 import type { VaultEvent } from '../shapes/shapes-vault-event'
 import { BaseThing } from '../models/base-thing'
-import type { ReceivingThing, SortedVaultDB } from '../storage/sorted-vault-db'
+import type { ReceivingThing } from '../shapes/shapes-sorted-vault-db'
+import type { SortedVaultDB } from '../storage/sorted-vault-db'
 import { readAtOf } from '../storage/thing-classifier'
 import type { Kids } from '../storage/vault-db'
 import * as Throwers from '../refusals/throwers'
@@ -40,12 +41,12 @@ export class VaultTSQ {
 
   // TanStack Query merges every query default whose key is a prefix of a query's key, and a query's own options over
   // them, so a host's options win and nothing outside the bank's key is touched.
-  /** Keep the bank's boxes in `opts.queryClient` from what `opts.vaultMinder` tells, from now on.
+  /** Keep the bank's boxes in `opts.queryClient` from what `opts.vaultMinder` tells, from now on, telling `opts.onBadNews` of trouble.
    * Its query and mutation defaults go under the bank's key, where a host's own options override them.
    */
   static make(opts: VaultTSQOpts): VaultTSQ { return new VaultTSQ(VaultTSQChecks.makeArgs.parse(opts)) }
 
-  private constructor({ vaultMinder, queryClient, scope }: VaultTSQOpts) {
+  private constructor({ vaultMinder, queryClient, scope, onBadNews = noop }: VaultTSQOpts) {
     this.#vaultMinder = vaultMinder
     this.#queryClient = queryClient
     this.#scope       = Object.freeze({ userid: scope.userid, banklabel: scope.banklabel })
@@ -62,8 +63,7 @@ export class VaultTSQ {
       staleTime: Infinity,
     })
     // Synchronous on purpose: the SortedVaultDB tells an answer's records before its verb resolves.
-    // Bad news reaches every listener of the SortedVaultDB, and the vault TSQ has nothing to add to it.
-    this.#unlisten = vaultMinder.listen({ hear: (event) => { this.#hear(event) }, onBadNews: noop })
+    this.#unlisten = vaultMinder.listen({ hear: (event) => { this.#hear(event) }, onBadNews })
     Object.freeze(this)
   }
   // --

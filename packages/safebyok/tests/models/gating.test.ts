@@ -141,7 +141,7 @@ describe("Bank.birth(device, cleartexts)", () => {
     if (! answer.ok) { throw answer.err }
     expect(answer.val.root).to.include({ ...TH.RootScope, revseq: 0, am: 'a', lifeseq: TH.Life0, lifepath: TH.Life0 })
     expect(bank.rootBox).to.deep.equal(answer.val.root)
-    expect(await bank.unsealBox(answer.val.root)).to.deep.include({ whisper: {} })
+    expect(await bank.device.vault!.unsealBox(answer.val.root)).to.deep.include({ whisper: {} })
   })
 
   // The vaultDB answers retcon, not passed, to a birth it stored already; passed on this bank is a vaultDB's answer alone.

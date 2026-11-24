@@ -141,11 +141,11 @@ describe("VaultMinder.tryWrite", () => {
     const minder = VaultMinder.make({}, bank)
     minder.hello(sortedOf(device.vaultDB))
     const shell  = Shell.of({ ...bank.scope, labelpath: TH.BoxScope.labelpath }, bank.rootBox)
-    const box    = await bank.sealBox(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const box    = await bank.device.vault!.sealBox(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const putAsk = bank.device.world.demandSortedVaultDB().makePutAsk<BoxRecord>({ cited: Thing.sparseOf(shell), record: box })
     await TH.expectGood(minder.tryWrite(putAsk))
     await minder.list('box')
-    const tombstone = await bank.sealBox(box, { am: 'x' })
+    const tombstone = await bank.device.vault!.sealBox(box, { am: 'x' })
     const delAsk    = bank.device.world.demandSortedVaultDB().makeDelAsk<BoxRecord>({ cited: Thing.sparseOf(box), record: tombstone })
     await TH.expectGood(minder.tryWrite(delAsk))
     expect(minder.at(TH.BoxScope)).to.be.null

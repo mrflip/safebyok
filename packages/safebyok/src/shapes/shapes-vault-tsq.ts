@@ -1,9 +1,10 @@
 /** The shapes of a VaultTSQ's options and of the query and mutation options it gives a host, with their checks. */
 
 import type * as TSQ from '@tanstack/query-core'
-import { Validator } from 'safebyok-big/internals'
+import { type Errors, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { type SortedVaultDB, isSortedVaultDB } from '../storage/sorted-vault-db'
+import type { SortedVaultDB } from '../storage/sorted-vault-db'
+import { isSortedVaultDB } from './shapes-sorted-vault-db'
 import { Labelpath } from './primitives'
 import type { BankScope } from './shapes-stamps'
 import { type ThingRecord, ThingChecks } from './shapes-thing'
@@ -18,6 +19,8 @@ export type VaultTSQOpts = Readonly<{
   queryClient: TSQ.QueryClient
   /** The bank. */
   scope:       BankScope
+  /** Hears each refusal no caller waits on: a record the SortedVaultDB refuses, or what the vault TSQ fails to keep. Default: none hears it. */
+  onBadNews?:  ((news: Errors.VaultError) => void) | undefined
 }>
 
 /** The query key and seed of a box's item, for a host's query of it (`VaultTSQ.itemQueryOptions`). */
@@ -45,6 +48,7 @@ export const VaultTSQChecks = Validator.Checkers('bad_record', ({ obj, custom, f
     vaultMinder: custom<SortedVaultDB>(isSortedVaultDB, Phrases.SortedVaultDBExpected),
     queryClient: custom<TSQ.QueryClient>(isQueryClient, Phrases.QueryClientExpected),
     scope:       ThingChecks.bankScope,
+    onBadNews:   fn<(news: Errors.VaultError) => void>().optional(),
   }),
   /** A scope whose children a VaultTSQ lists: a box's. */
   listScope:  ThingChecks.thingScope.refine(({ labelpath }) => Labelpath.isBox(labelpath), Phrases.ListOfBoxes),

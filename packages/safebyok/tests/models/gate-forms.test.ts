@@ -178,12 +178,12 @@ describe("bank.gate.replacePassphrase(cleartexts)", () => {
 
   it("unlocks by the new passphrase afterwards, and refuses the old one, under the same bankKey", async () => {
     const { bank } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const box = await bank.device.vault!.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
     bank.lock()
     await TH.expectRefusal(bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase }), 'wrong_passphrase')
     await bank.gate.unlock({ passphraseCleartext: NextPassphrase })
-    expect(await bank.unsealBox(box)).to.deep.include({ whisper: TH.Whisper })
+    expect(await bank.device.vault!.unsealBox(box)).to.deep.include({ whisper: TH.Whisper })
   })
 
   it("refuses the same passphrase, before the strength check or any key derivation, writing nothing", async () => {

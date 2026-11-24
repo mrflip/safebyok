@@ -68,7 +68,8 @@ async function setupShown(opts: Parameters<typeof setupShowing>[0] = {}) {
 
 /** Write the jokes box's next revision, of tier `pro`, from the other device, as another tab would, resolving it. */
 async function putFromOtherTab(world: TH.ProviderWorld): Promise<BoxRecord> {
-  return await world._cheat_otherVault!.putBoxOnce(JokesBoxPath, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: LeanTH.Whisper })
+  const box = await world._cheat_otherVault!.putBoxOnce(JokesBoxPath, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: LeanTH.Whisper })
+  return box.pickle() as BoxRecord
 }
 
 describe("useBox, mounted before anyone is signed in", () => {

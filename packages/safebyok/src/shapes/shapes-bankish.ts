@@ -1,5 +1,6 @@
 /** The checks and types of the bank and the device: what each is made from and given, and the bank's drafts and answers. */
 
+import type { QueryClient } from '@tanstack/query-core'
 import type * as Z from 'zod'
 import { CX, type Deriver, type EX, type Errors, type Logger, Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
@@ -8,7 +9,6 @@ import type { World } from '../models/world'
 import type { VaultDB } from '../storage/vault-db'
 import type { DevicePersisters } from '../storage/persister'
 import type { StrengthChecker } from './shapes-gateish'
-import type { DefaultQueryCacheOpts, QueryCacheOpts } from './shapes-minder'
 import type { BoxCleartexts, UnsealedOf } from './shapes-sealers'
 import type { BoxRecord } from './shapes-thing'
 import type { GetAsk, ListAsk } from './shapes-asks'
@@ -90,8 +90,8 @@ export interface DeviceOpts {
   autolockMinutes?: number | undefined
   /** Hears each refusal no caller waits on. Default: {@link DefaultOnBadNews}, a warning on the device's logger. */
   onBadNews?:       BadNewsHandler | undefined
-  /** The defaults each user's minder sets on its items and lists in the device's QueryClient. A missing field defaults from {@link DefaultQueryCacheOpts}. */
-  queryCacheOpts?:  Partial<QueryCacheOpts> | undefined
+  /** The QueryClient the signed-in user's boxes are kept in, under their bank's key: your own, so one client serves your queries and the vault's. Default: one the device makes. */
+  queryClient?:     QueryClient | undefined
   /** Where the device keeps the signed-in bank's caches between page loads, restored at `signin` before the vaultDB is asked anything. Without them, each page load starts with its caches empty. */
   persisters?:      DevicePersisters | undefined
   /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */

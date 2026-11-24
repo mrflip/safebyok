@@ -5,50 +5,22 @@ import { Errors, Validator } from 'safebyok-big/internals'
 import { type Lifetok, Labelpath } from '../shapes/primitives'
 import {
   type BirthBankAsk, type CitedOf, type DelAskDraft, type GetAsk, type ListAsk, type LoggableAsk, type PutAskDraft, type Track, type Tracked, type WorldRecord, type WriteAsk,
-  AskChecks, delAskOf, getAskOf, listAskOf, putAskOf,
+  delAskOf, getAskOf, listAskOf, putAskOf,
 } from '../shapes/shapes-asks'
 import type { BankAskDraft } from '../shapes/shapes-bankish'
-import { type BankRecord, type ThingRecord, type ThingScope, type VoidSentinel, ThingChecks, isLifepathDeep, isParityRight } from '../shapes/shapes-thing'
+import { type BankRecord, type ThingRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
 import type { BankScope } from '../shapes/shapes-stamps'
-import { type SeenThing, type VaultEvent, ReadTcPattern, SeenChecks, livenessVals, vaultEventkindVals } from '../shapes/shapes-vault-event'
+import { type DelOnceArgs, type PutOnceArgs, type ReceivingThing, type SortedVaultDBListener, type SortedVaultDBOpts, type ThingMaker, SortedVaultDBChecks } from '../shapes/shapes-sorted-vault-db'
+import { type SeenThing, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { BaseThing } from '../models/base-thing'
-import type { Adoptable, Thing } from '../models/thing'
-import * as Phrases from '../phrases'
+import type { Adoptable } from '../models/thing'
 import * as Throwers from '../refusals/throwers'
 import { itemSeenOf } from './agerank'
 import { refusedAnswerOf } from './refused-answer'
 import { readTcNow } from './thing-classifier'
 import type { BirthBankAnswer, GetThingAnswer, Kids, ListThingsAnswer, ReadTc, VaultDB, WriteThingAnswer } from './vault-db'
 
-// == [SortedVaultDB]: ReceivingThing, ThingMaker, SortedVaultDBOpts, SortedVaultDBListener, PutOnceArgs, DelOnceArgs, Stamp, Listening, SortedVaultDB
-
-/** What a {@link SortedVaultDB} reads of each Thing it keeps. */
-export type ReceivingThing = Pick<Thing<ThingRecord, unknown, unknown, Adoptable<ThingRecord>>, 'receive' | 'agerank' | 'agekind' | 'citable' | 'read_at' | 'pickle'>
-
-/** Make the Thing a {@link SortedVaultDB} keeps at a labelpath, from `seen`, the first record it learns of there. */
-export type ThingMaker<ThingT extends ReceivingThing = ReceivingThing> = (seen: SeenThing) => ThingT
-
-/** Options for {@link SortedVaultDB.make}. */
-export interface SortedVaultDBOpts<ThingT extends ReceivingThing = ReceivingThing> {
-  /** The vaultDB to wrap. */
-  vaultDB: VaultDB
-  /** Makes the Thing kept at each labelpath, once, from the first record learned of there: a device's world's `makeThing`. */
-  makeThing: ThingMaker<ThingT>
-}
-
-/** What listens to a {@link SortedVaultDB}: it hears each event that is news, and is told of trouble. */
-export type SortedVaultDBListener = Readonly<{
-  /** Hear `event`, of a record that is news. */
-  hear: (event: VaultEvent) => void
-  /** Be told of `news`, trouble no caller is waiting on: a record that fails its checks, or what `hear` threw. */
-  onBadNews: (news: Errors.VaultError) => void
-}>
-
-/** What {@link SortedVaultDB.putOnce} writes: a put ask's draft, whose `cited` defaults to the citable of the Thing at the record's labelpath. */
-export type PutOnceArgs<RecordT extends ThingRecord = ThingRecord> = Readonly<Omit<PutAskDraft<RecordT>, 'cited' | 'track' | 'banktok'> & { cited?: CitedOf<RecordT> }>
-
-/** What {@link SortedVaultDB.delOnce} writes: the tombstone, and the revision it cites, by default the citable of the Thing at its labelpath. */
-export type DelOnceArgs<RecordT extends ThingRecord = ThingRecord> = Readonly<Omit<DelAskDraft<RecordT>, 'cited' | 'track' | 'banktok'> & { cited?: CitedOf<RecordT> }>
+// == [SortedVaultDB]: Stamp, Listening, SortedVaultDB
 
 /** Who dispatched a record, when it was read, and its bank's lifetok where known: every event of it carries all three. */
 type Stamp = Readonly<{ sourcelabel: string, read_tc: ReadTc, banktok: Lifetok | undefined }>
@@ -89,7 +61,7 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
   static make<ThingT extends ReceivingThing>(scope: BankScope, opts: SortedVaultDBOpts<ThingT>): SortedVaultDB<ThingT> { return new SortedVaultDB(scope, opts) }
 
   private constructor(scope: BankScope, opts: SortedVaultDBOpts<ThingT>) {
-    const { scope: bankScope, opts: { vaultDB } } = Checks.makeArgs.parse({ scope, opts })
+    const { scope: bankScope, opts: { vaultDB } } = SortedVaultDBChecks.makeArgs.parse({ scope, opts })
     this.#vaultDB   = vaultDB
     this.#scope     = Object.freeze({ userid: bankScope.userid, banklabel: bankScope.banklabel })
     this.#makeThing = opts.makeThing
@@ -268,7 +240,7 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
    * - What `hear` throws goes to the listener's own `onBadNews`.
    */
   listen(listener: SortedVaultDBListener): () => void {
-    Checks.listener.parse(listener)
+    SortedVaultDBChecks.listener.parse(listener)
     const listening: Listening = Object.freeze({ listener })
     this.#listenings.add(listening)
     return () => { this.#listenings.delete(listening) }
@@ -283,11 +255,11 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
    * Refuses an event of another bank.
    */
   receive(event: VaultEvent): void {
-    const rung = Checks.rungEvent.parse(event)
+    const rung = SortedVaultDBChecks.rungEvent.parse(event)
     Validator.demandConsistent(rung, this.#scope)
     if (event.eventkind !== 'item') { return }
-    const { liveness } = Checks.rungItem.parse(event)
-    if (liveness === 'void') { Checks.rungVoid.parseConsistent(event.val, rung) } else { Checks.rungThing.parseConsistent(event.val, rung) }
+    const { liveness } = SortedVaultDBChecks.rungItem.parse(event)
+    if (liveness === 'void') { SortedVaultDBChecks.rungVoid.parseConsistent(event.val, rung) } else { SortedVaultDBChecks.rungThing.parseConsistent(event.val, rung) }
     this.#tell([event.val], { sourcelabel: rung.sourcelabel, read_tc: rung.read_tc, banktok: rung.banktok ?? this.#newestBanktok })
   }
   // --
@@ -380,22 +352,6 @@ function isStored(record: Adoptable<ThingRecord> | undefined): record is ThingRe
 function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
 // --
 
-// == [Recognizing]: SortedVaultDBMembernames, isSortedVaultDB
-
-/** The members of {@link SortedVaultDB} that are functions. */
-const SortedVaultDBMembernames = [
-  'tryGetThing', 'tryWriteThing', 'tryListThings', 'tryBirthBank', 'listen', 'receive', 'thingAt', 'sweep',
-  'tryGetOnce', 'getOnce', 'tryListOnce', 'listOnce', 'tryPutOnce', 'putOnce', 'tryDelOnce', 'delOnce', 'makeGetAsk', 'makeListAsk', 'makePutAsk', 'makeDelAsk',
-] as const satisfies readonly (keyof SortedVaultDB)[]
-
-/** True for an object with a function for each member of {@link SortedVaultDB}. */
-export function isSortedVaultDB(val: unknown): val is SortedVaultDB {
-  if (typeof val !== 'object' || val === null) { return false }
-  const members: Partial<Record<string, unknown>> = val
-  return SortedVaultDBMembernames.every((membername) => typeof members[membername] === 'function')
-}
-// --
-
 // == [Records of an answer]: rootsOf, bankOfWorld, gotRecordsOf, writtenRecordsOf, bornRecordsOf
 
 // The world and tracked of one step agree, so a root they both carry is told once: its Thing drops the second.
@@ -430,32 +386,4 @@ function bornRecordsOf(answer: BirthBankAnswer): SeenThing[] {
   if (answer.ok) { return [answer.val.bank, answer.val.gate, answer.val.root] }
   return (answer.dbhas === null) ? [] : [answer.dbhas]
 }
-// --
-
-// == [Checks]: Checks
-
-/** The checks of {@link SortedVaultDB.make}'s arguments, of a listener, and of what a device database rang, handed to `receive`. */
-const Checks = Validator.Checkers('bad_record', ({ obj, oneof, str, custom, fn }) => ({
-  makeArgs:          obj({ scope: ThingChecks.bankScope, opts: obj({ vaultDB: ThingChecks.vaultDBShape, makeThing: fn<ThingMaker>() }) }),
-  listener:          obj({ hear: fn(), onBadNews: fn() }),
-  /** An event rung: its kind and scope, who dispatched it, when it was read, and its bank's lifetok if any. Its `val` is checked apart, and the rest is not read. */
-  rungEvent:         obj({
-    ...ThingChecks.thingScope.shape,
-    eventkind:    oneof(vaultEventkindVals),
-    sourcelabel:  ThingChecks.label,
-    read_tc:      str.regex(ReadTcPattern, Phrases.ReadTcShape),
-    banktok:      AskChecks.loggableAsk.shape.banktok,
-  }),
-  /** The liveness of an `item` event rung, which says which check its `val` gets. */
-  rungItem:          obj({ liveness: oneof(livenessVals) }),
-  /** The `val` of a `void` event rung: the void sentinel, its lifepath as deep as its labelpath. */
-  rungVoid:          custom<VoidSentinel>((val) => BaseThing.isVoidSentinel(val), Phrases.VoidSentinelExpected)
-    .refine(isLifepathDeep, Phrases.LifepathDepth)
-    .refine(isParityRight, Phrases.LifeseqParity),
-  /** The `val` of any other `item` event rung: a Thing's fields, sparse or whole, never the void sentinel; its lifepath as deep as its labelpath, its own lifeseq odd exactly for a tombstone. */
-  rungThing:         ThingChecks.sparse
-    .refine((val) => ! BaseThing.isVoidSentinel(val), Phrases.ThingFieldsExpected)
-    .refine(isLifepathDeep, Phrases.LifepathDepth)
-    .refine(isParityRight, Phrases.LifeseqParity),
-}))
 // --

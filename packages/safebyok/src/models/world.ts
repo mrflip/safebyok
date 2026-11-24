@@ -17,7 +17,8 @@ import { type BankStamp, type LeaseLoggable, StampChecks } from '../shapes/shape
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type Thingkind, Shell } from '../shapes/shapes-thing'
 import { type SeenThing, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { type EpochMillis, Labelpath } from '../shapes/primitives'
-import { type SortedVaultDB, isSortedVaultDB } from '../storage/sorted-vault-db'
+import type { SortedVaultDB } from '../storage/sorted-vault-db'
+import { isSortedVaultDB } from '../shapes/shapes-sorted-vault-db'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 

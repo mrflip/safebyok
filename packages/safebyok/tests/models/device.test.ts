@@ -1,5 +1,6 @@
 /** The device: its options, the host's functions it wraps, and its sweep, over its MemoryVaultDB. */
 
+import { QueryClient } from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 // fake-indexeddb installs IndexedDB's globals, for the device database browserOpts() opens: no browser.
@@ -10,6 +11,7 @@ import { maskUuid } from '../../src/helpers/mask-uuid'
 import { Bank } from '../../src/models/bank'
 import { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from '../../src/models/device'
 import { BirthGating } from '../../src/models/gating'
+import { VaultTSQ } from '../../src/minding/vault-tsq'
 import { EmptyMaskedView } from '../../src/shapes/shapes-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { type DevicePersisters, MemoryPersister } from '../../src/storage/persister'
@@ -83,9 +85,41 @@ describe("Device.make(record, opts)", () => {
     expect(err.message).to.include('vaultDB: ')
   })
 
-  it("refuses a queryCacheOpts the minder refuses, and gives its minder the one it is given", () => {
-    TH.expectSyncRefusal(() => TH.makeDevice({}, { queryCacheOpts: { retry: 3 } } as never), 'bad_record')
-    expect(TH.makeDevice({}, { queryCacheOpts: { staleTime: 5 } }).minder).to.be.an('object')
+  it("refuses queryCacheOpts, an option it does not take", () => {
+    TH.expectSyncRefusal(() => TH.makeDevice({}, { queryCacheOpts: { staleTime: 5 } } as never), 'bad_record')
+  })
+
+  it("keeps the boxes in the host's QueryClient, under the bank's key, beside the host's own queries", async () => {
+    const queryClient = new QueryClient()
+    queryClient.setQueryData(['host', 'notes'], { note: 'mine' })
+    const { device, vault } = await TH.buildBornVault({ device: TH.makeDevice({}, { queryClient }) })
+    expect(device.tsqClient).to.equal(queryClient)
+    await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const keys = queryClient.getQueryCache().getAll().map(({ queryKey }) => queryKey)
+    expect(keys).to.deep.include(['host', 'notes'])
+    expect(keys).to.deep.include(VaultTSQ.itemQueryKeyOf({ ...TH.WorldScope, labelpath: 'box/openai' }))
+    expect(queryClient.getQueryData(['host', 'notes'])).to.deep.equal({ note: 'mine' })
+  })
+
+  it("refuses a queryClient that is not one", () => {
+    TH.expectSyncRefusal(() => TH.makeDevice({}, { queryClient: { query: vi.fn() } } as never), 'bad_record')
+  })
+
+  it("makes a QueryClient of its own where the host gives none, empty, the same before and after signin", async () => {
+    const device = TH.makeDevice({ userid: null })
+    const { tsqClient } = device
+    expect(tsqClient.getQueryCache().getAll()).to.have.lengthOf(0)
+    await device.signin(TH.WorldScope.userid)
+    expect(device.tsqClient).to.equal(tsqClient)
+    expect(device.tsqClient).to.not.equal(TH.makeDevice({ userid: null }).tsqClient)
+  })
+
+  it("makes the vault TSQ at signin, refusing it before then", async () => {
+    const device = TH.makeDevice({ userid: null })
+    TH.expectSyncRefusal(() => device.vaultTSQ, 'absent_vault')
+    await device.signin(TH.WorldScope.userid)
+    expect(device.vaultTSQ).to.be.instanceOf(VaultTSQ)
+    expect(device.vaultTSQ).to.equal(device.vaultTSQ)
   })
 
   it("makes its QueryClient with it, empty, its VaultMinder's, the same before and after signin", () => {
@@ -222,17 +256,19 @@ describe("a device's persisters", () => {
     expect(stages).to.deep.equal(['signed_out', 'starting', 'locked'])
   })
 
-  it("restore the boxes and listings its vault cached", async () => {
+  it("restore the boxes and listings its vault cached, each box's record reaching its Thing, and none the host's QueryClient", async () => {
     const persisters = memoryPersisters()
     const first      = TH.makeDevice({}, { persisters })
     const { vault }  = await TH.buildBornVault({ device: first })
-    await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const box        = await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     await first.minder.list('box')
     await nextTick()
     const device = TH.makeDevice({}, { vaultDB: vault.bank.device.vaultDB, persisters })
     await device.signin(TH.WorldScope.userid)
     expect(Object.keys(device.minder.listingAt({ ...TH.WorldScope, labelpath: 'box' })?.items ?? {})).to.deep.equal(['openai'])
     expect(device.minder.at({ ...TH.WorldScope, labelpath: 'box/openai' })).to.have.property('labelpath', 'box/openai')
+    expect(device.world.demandSortedVaultDB().thingAt({ ...TH.WorldScope, labelpath: 'box/openai' })?.pickle()).to.deep.equal(box.pickle())
+    expect(device.tsqClient.getQueryCache().getAll()).to.have.lengthOf(0)
   })
 
   it("restore the signed-in bank's roots and boxes at signin, from the persisters its scope gives, and the stage stays starting until they have", async () => {
@@ -362,7 +398,7 @@ describe("device.signin(userid)", () => {
     expect(device.bank!.gate).to.equal(device.world.gate)
     expect(device.bank!.scope).to.deep.equal(born.bank.scope)
     expect(device.vault!.bank).to.equal(device.bank)
-    expect(device.vault!.minder).to.equal(device.minder)
+    expect(device.vault!.bank.device).to.equal(device)
     await device.bank!.gate.gatingUnlockAttempt({ passphrase: TH.TestPassphrase })
     expect(device.getSnapshot().bank).to.include({ stage: 'unlocked' })
   })

@@ -497,7 +497,7 @@ function makeBankGiver(friend: BankFriend) {
     const { ifLocked } = Checks.withLockableWhisperOpts.parse(opts) as WithLockableWhisperOpts<ResultT>
     const vault = demandVault()
     if (vault.bank.isUnlocked) { return await vault.withUnlockedWhisper(boxLabelpath, (box) => fn(box.whisper, box)) }
-    const box = liveOf<BoxRecord>(await vault.minder.get({ ...vault.bank.scope, labelpath: boxLabelpath }))
+    const box = liveOf<BoxRecord>(await vault.bank.device.minder.get({ ...vault.bank.scope, labelpath: boxLabelpath }))
     // A sparse record has no sidecar to read, so it refuses as a deleted box does.
     if ((box === null) || (box === undefined)) { throw new VaultError('absent_box', Phrases.BoxAbsent) }
     return await ifLocked(box)
@@ -518,7 +518,9 @@ function makeBankGiver(friend: BankFriend) {
 
   /** {@link putBoxOnce} of the box at `boxLabelpath`. */
   async function putBoxOnceAt(boxLabelpath: BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<LiveOf<BoxRecord>> {
-    return await demandVault().putBoxOnce(boxLabelpath, patch, secrets)
+    const box = await demandVault().putBoxOnce(boxLabelpath, patch, secrets)
+    // The box a put answers holds a live box.
+    return box.pickle() as LiveOf<BoxRecord>
   }
 
   /** Delete the box `boxNamed` names, resolving its stored tombstone. It tries once, over the newest revision the minder has heard of.
@@ -526,7 +528,9 @@ function makeBankGiver(friend: BankFriend) {
    */
   async function delBoxOnce(boxNamed: BoxNamed): Promise<TombstoneOf<BoxRecord>> {
     const boxLabelpath = boxLabelpathOfNamed(boxNamed)
-    return await demandVault().delBoxOnce(boxLabelpath)
+    const box = await demandVault().delBoxOnce(boxLabelpath)
+    // The box a delete answers holds a tombstone.
+    return box.pickle() as TombstoneOf<BoxRecord>
   }
 
   // React shows the form's FormData to the components inside it, through `useFormStatus().data`, until the action settles.

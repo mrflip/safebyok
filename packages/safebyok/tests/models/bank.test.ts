@@ -3,11 +3,10 @@ import { Crypto, Errors } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
 import { type BadNews, bankStageVals } from '../../src/shapes/shapes-bankish'
 import { Lease } from '../../src/models/lease'
-import type { LiveOf, ShellOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
+import type { ShellOf } from '../../src/shapes/shapes-sealers'
 import { Lifeseq } from '../../src/shapes/primitives'
-import { type BankRecord, type BoxRecord, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
+import { type BankRecord, ThingFormat } from '../../src/shapes/shapes-thing'
 import { Thing } from '../../src/models/thing'
-import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
 import { getAskOf } from '../../src/shapes/shapes-asks'
 import * as TH from '../test-helpers'
 
@@ -18,11 +17,10 @@ const BankFields = Object.keys(TH.bankThingOf())
 /** The fields a bank shows as props: the Thing fields every kind has. Its `lifetok` is a getter. */
 const BankProps = BankFields.filter((fieldname) => fieldname !== 'lifetok')
 
-/** The lifeseqs of a box's first lives: live, gone, live again, gone again. Life 0 is the root box's too. */
+/** The lifeseqs of a bank's first lives: live, gone, live again. */
 const Life0 = Lifeseq.ofLifenum(0)
 const Life1 = Lifeseq.ofLifenum(1)
 const Life2 = Lifeseq.ofLifenum(2)
-const Life3 = Lifeseq.ofLifenum(3)
 
 describe("Bank.mintStamps(scope)", () => {
   it("mints the stamp of the bank's first life and its main gate's, of the scope, born now", () => {
@@ -215,13 +213,9 @@ describe("a bank over the shell or a tombstone", () => {
     })
   }
 
-  it("refuses a put, a seal and an unseal over the shell, and its try forms resolve the refusal", async () => {
+  it("refuses a put over the shell", async () => {
     const bank = makeBankOf(TH.bankShellOf())
     await TH.expectRefusal(bank.put({ cited: TH.bankShellOf(), record: TH.bankThingOf() }), 'absent_thing')
-    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'absent_thing')
-    await TH.expectRefusal(bank.unsealBox(TH.boxThingOf()), 'absent_thing')
-    expect(await bank.trySealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })).to.deep.include({ ok: false })
-    expect(await bank.tryUnsealBox(TH.boxThingOf())).to.deep.include({ ok: false })
   })
 
   it("is made from the shell with no world heard of, which it pickles to, with no lifetok and the scope and citation of the shell", () => {
@@ -281,7 +275,6 @@ describe("bank.lock() and bank.sweep()", () => {
     const { bank } = await TH.buildBornBank()
     bank.sweep()
     TH.expectSyncRefusal(() => bank.demandEnabled(), 'disabled')
-    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'disabled')
     await TH.expectRefusal(bank.put({ cited: bank.pickle(), record: nextBankThingOf(bank) }), 'disabled')
   })
 
@@ -414,333 +407,10 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
   })
 })
 
-describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)", () => {
-  it("seals a new box over its shell: the first revision of its first life, born now", async () => {
-    const { bank } = await TH.buildBornBank()
-    vi.setSystemTime(TH.T0 + 7)
-    const shell = TH.boxShellOf()
-    const box = await bank.sealBox(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    expect(box).to.include({ labelpath: 'box/anthropic_api_key', am: 'a', revseq: 0, lifeseq: Life0, lifepath: `${Life0}/${Life0}`, born_at: TH.T0 + 7, written_at: TH.T0 + 7 })
-    expect(box.revtok).to.not.eq(shell.revtok)
-    expect(box.sidecar).to.deep.equal(TH.Sidecar)
-    expect(box.whisper_sealed).to.include({ codectag: 'json_v1', schematag: 'whisper_v1' })
-    expect(JSON.stringify(box)).to.not.include('sk-test-0000')
-    expect(BoxChecks.record.parse(box)).to.deep.equal(box)
-  })
-
-  it("unseals the box's whisper in place of its sealed one", async () => {
-    const { bank } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const unsealed = await bank.unsealBox(box)
-    const { whisper_sealed: _sealed, ...rest } = box
-    expect(unsealed).to.deep.equal({ ...rest, whisper: TH.Whisper })
-    expect(Object.isFrozen(unsealed)).to.be.true
-  })
-
-  it("seals the next revision of a live box, in the same life, from the stored box with a new sidecar", async () => {
-    // sealBox @example
-    const { bank } = await TH.buildBornBank()
-    const first = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    vi.setSystemTime(TH.T0 + 9)
-    const next = await bank.sealBox(first, { sidecar: { account: 'home' } }, { whisper: { apiKey: 'sk-test-1111' } })
-    expect(next).to.include({ lifeseq: first.lifeseq, lifepath: first.lifepath, born_at: first.born_at, revseq: 1, written_at: TH.T0 + 9, am: 'a' })
-    expect(next.revtok).to.not.eq(first.revtok)
-    expect(await bank.unsealBox(next)).to.deep.include({ whisper: { apiKey: 'sk-test-1111' }, sidecar: { account: 'home' } })
-  })
-
-  it("seals the same whisper differently each time: a fresh part key and cipher iv", async () => {
-    const { bank } = await TH.buildBornBank()
-    const shell = TH.boxShellOf()
-    const one = await bank.sealBox(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const two = await bank.sealBox(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    expect(one.whisper_sealed.ciphered.ciphertext_b64).to.not.eq(two.whisper_sealed.ciphered.ciphertext_b64)
-    expect(one.whisper_sealed.key_wrapped.ciphertext_b64).to.not.eq(two.whisper_sealed.key_wrapped.ciphertext_b64)
-  })
-
-  it("unseals a box sealed before the bank locked and unlocked again", async () => {
-    const { bank } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    bank.lock()
-    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
-    const { whisper } = await bank.unsealBox(box)
-    expect(whisper).to.deep.equal(TH.Whisper)
-  })
-
-  // The seal leaves the sidecar out.
-  it("unseals with its sidecar altered", async () => {
-    const { bank } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const unsealed = await bank.unsealBox({ ...box, sidecar: { account: 'home' } })
-    expect(unsealed).to.deep.include({ whisper: TH.Whisper, sidecar: { account: 'home' } })
-  })
-
-  // Each alteration still passes the box's check, so only the seal can catch it. The box's userid and banklabel are bound
-  // too, but a box claiming another bank is refused before the unseal, below.
-  const AlteredCases = [
-    [(box: LiveOf<BoxRecord>) => ({ ...box, revtok: TH.OtherRevtok }),                          'its revtok'],
-    [(box: LiveOf<BoxRecord>) => ({ ...box, revseq: box.revseq + 1 }),                                             'its revseq'],
-    [(box: LiveOf<BoxRecord>) => ({ ...box, born_at: box.born_at + 1 }),                                           'its born_at'],
-    [(box: LiveOf<BoxRecord>) => ({ ...box, written_at: box.written_at + 1 }),                                     'its written_at'],
-    [(box: LiveOf<BoxRecord>) => ({ ...box, labelpath: 'box/openai_api_key', label: 'openai_api_key' }),           'its labelpath and label'],
-    [(box: LiveOf<BoxRecord>) => ({ ...box, lifeseq: Life2, lifepath: `${Life0}/${Life2}` }),                       'its lifeseq'],
-    [(box: LiveOf<BoxRecord>) => ({ ...box, whisper_sealed: { ...box.whisper_sealed, codectag: 'json_v2' } }),     'its codectag'],
-    [(box: LiveOf<BoxRecord>) => ({ ...box, whisper_sealed: { ...box.whisper_sealed, schematag: 'whisper_v2' } }), 'its schematag'],
-  ] as const
-
-  for (const [alter, blurb] of AlteredCases) {
-    it(`refuses 'damaged_whisper' for a box with ${blurb} altered`, async () => {
-      const { bank } = await TH.buildBornBank()
-      const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-      await TH.expectRefusal(bank.unsealBox(alter(box)), 'damaged_whisper')
-    })
-  }
-
-  const UncheckedCases = [
-    [(box: LiveOf<BoxRecord>) => ({ ...box, fmt: 'a010502' }),                                                 'its fmt not its one value'],
-    [(box: LiveOf<BoxRecord>) => ({ ...box, am: 'd' }),                                                        'am d'],
-    [(box: LiveOf<BoxRecord>) => ({ ...box, label: 'openai_api_key' }),                                        'a label not the last of its labelpath'],
-    [(box: LiveOf<BoxRecord>) => ({ ...box, whisper_sealed: { ...box.whisper_sealed, codectag: 'JSON v1' } }), 'a codectag that is not a label'],
-    [(box: LiveOf<BoxRecord>) => ({ ...box, whisper_sealed: { ...box.whisper_sealed, extra: 'field' } }),      'a field no sealed part has'],
-    [(box: LiveOf<BoxRecord>) => TH.omitting(box, 'whisper_sealed'),                                           'no sealed whisper'],
-    [() => null,                                                                                       'null'],
-  ] as const
-
-  for (const [alter, blurb] of UncheckedCases) {
-    it(`refuses a box with ${blurb}, before unsealing`, async () => {
-      const { bank } = await TH.buildBornBank()
-      const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-      await TH.expectRefusal(bank.unsealBox(alter(box) as never), 'bad_record')
-    })
-  }
-
-  it("refuses 'damaged_whisper' for one box's sealed whisper on another box", async () => {
-    const { bank } = await TH.buildBornBank()
-    const one = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const two = await bank.sealBox(TH.boxShellOf({ labelpath: 'box/openai_api_key', label: 'openai_api_key' }), { sidecar: TH.Sidecar }, { whisper: { apiKey: 'sk-test-2222' } })
-    await TH.expectRefusal(bank.unsealBox({ ...two, whisper_sealed: one.whisper_sealed }), 'damaged_whisper')
-    await TH.expectRefusal(bank.unsealBox({ ...two, whisper_sealed: { ...two.whisper_sealed, ciphered: one.whisper_sealed.ciphered } }), 'damaged_whisper')
-    await TH.expectRefusal(bank.unsealBox({ ...two, whisper_sealed: { ...two.whisper_sealed, key_wrapped: one.whisper_sealed.key_wrapped } }), 'damaged_whisper')
-  })
-
-  it("refuses 'damaged_whisper' for tampered ciphertext, quoting none of it", async () => {
-    const { bank } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const ciphertext_b64 = TH.tweakB64(box.whisper_sealed.ciphered.ciphertext_b64)
-    const whisper_sealed = { ...box.whisper_sealed, ciphered: { ...box.whisper_sealed.ciphered, ciphertext_b64 } }
-    const err = await TH.expectRefusal(bank.unsealBox({ ...box, whisper_sealed }), 'damaged_whisper')
-    expect(TH.thrownText(err)).to.not.include(ciphertext_b64)
-  })
-
-  it("refuses 'damaged_whisper' for a box another bank of the same stamp sealed", async () => {
-    const { bank } = await TH.buildBornBank()
-    const { bank: other } = await TH.buildBornBank()
-    const box = await other.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    await TH.expectRefusal(bank.unsealBox(box), 'damaged_whisper')
-    expect(bank.isUnlocked).to.be.true
-  })
-
-  const OtherBanks = [
-    [{ userid: 'u2' },       "another user's"],
-    [{ banklabel: 'other' }, 'another banklabel'],
-  ] as const
-
-  for (const [moved, blurb] of OtherBanks) {
-    it(`refuses 'record_conflict' at the seal, the tombstone and the unseal for a box claiming ${blurb}`, async () => {
-      const { bank } = await TH.buildBornBank()
-      await TH.expectRefusal(bank.sealBox(TH.boxShellOf(moved), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'record_conflict')
-      const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-      await TH.expectRefusal(bank.sealBox({ ...box, ...moved }, { am: 'x' }), 'record_conflict')
-      await TH.expectRefusal(bank.unsealBox({ ...box, ...moved }), 'record_conflict')
-      expect(bank.isUnlocked).to.be.true
-    })
-  }
-
-  // A box sealed under another life of the bank's root box would refuse 'damaged_whisper' at the unseal, as its root
-  // lifeseq is bound; the bank refuses it before any seal.
-  it("refuses at the seal, the tombstone and the unseal a box under another life of the root box", async () => {
-    const { bank } = await TH.buildBornBank()
-    await TH.expectRefusal(bank.sealBox(TH.boxShellOf({ lifepath: `${Life2}/${Shell.VoidLifeseq}` }), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'record_conflict')
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const moved = { lifepath: `${Life2}/${box.lifeseq}` }
-    await TH.expectRefusal(bank.sealBox({ ...box, ...moved }, { am: 'x' }), 'record_conflict')
-    await TH.expectRefusal(bank.unsealBox({ ...box, ...moved }), 'record_conflict')
-    expect(bank.isUnlocked).to.be.true
-  })
-
-  it("refuses 'bank_locked' at the seal, the tombstone and the unseal once the bank locks", async () => {
-    const { bank } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    bank.lock()
-    await TH.expectRefusal(bank.unsealBox(box), 'bank_locked')
-    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bank_locked')
-    await TH.expectRefusal(bank.sealBox(box, { am: 'x' }), 'bank_locked')
-  })
-
-  it("refuses at the seal, the tombstone and the unseal on a swept device", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    device.sweep()
-    await TH.expectRefusal(bank.unsealBox(box), 'disabled')
-    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'disabled')
-    await TH.expectRefusal(bank.sealBox(box, { am: 'x' }), 'disabled')
-  })
-
-  const DonorCases = [
-    [() => ({ ...TH.boxShellOf(), am: 'd' }),                'a donor of a damaged row'],
-    [() => ({ ...TH.boxShellOf(), revseq: 0 }),              'half the shell: its revseq moved, its revtok and lifeseq not'],
-    [() => ({ ...TH.boxShellOf(), labelpath: 'gate/main' }), 'a donor of another kind'],
-    [() => ({ ...TH.boxShellOf(), revseq: -2 }),             'a revseq below the shell'],
-    [() => null,                                             'null'],
-  ] as const
-
-  for (const [donorOf, blurb] of DonorCases) {
-    it(`refuses to seal ${blurb}`, async () => {
-      const { bank } = await TH.buildBornBank()
-      await TH.expectRefusal(bank.sealBox(donorOf() as never, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bad_record')
-    })
-  }
-
-  it("refuses a misspelt key in publicProps, and a key beside the whisper in secretProps", async () => {
-    const { bank } = await TH.buildBornBank()
-    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), { sidcar: TH.Sidecar } as never, { whisper: TH.Whisper }), 'bad_record')
-    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper, sidecar: TH.Sidecar } as never), 'bad_record')
-  })
-
-  it("refuses to seal a box when neither the donor nor publicProps has a sidecar", async () => {
-    const { bank } = await TH.buildBornBank()
-    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), {}, { whisper: TH.Whisper }), 'bad_record')
-  })
-
-  const WhisperCases = [
-    [{ whisper: 'sk-test-0000' },    'a whisper that is a string'],
-    [{ whisper: null },              'a null whisper'],
-    [{},                             'no whisper'],
-    [null,                           'no cleartexts at all'],
-  ] as const
-
-  for (const [cleartexts, blurb] of WhisperCases) {
-    it(`refuses to seal ${blurb}`, async () => {
-      const { bank } = await TH.buildBornBank()
-      await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, cleartexts as never))
-    })
-  }
-})
-
-describe("bank.sealBox(donor, { am: 'x' }), and the unseal of a tombstone", () => {
-  it("makes the tombstone of a live box: its next revision, at the next lifeseq, with the sidecar `{}`, born when the box was", async () => {
-    const { bank } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    vi.setSystemTime(TH.T0 + 11)
-    const tombstone = await bank.sealBox(box, { am: 'x' })
-    expect(tombstone).to.include({ am: 'x', revseq: box.revseq + 1, lifeseq: Life1, lifepath: `${Life0}/${Life1}`, born_at: box.born_at, written_at: TH.T0 + 11 })
-    expect(tombstone.revtok).to.not.eq(box.revtok)
-    expect(tombstone.sidecar).to.deep.equal({})
-    expect(tombstone.whisper_sealed).to.include({ codectag: 'json_v1', schematag: 'whisper_v1' })
-    expect(BoxChecks.record.parse(tombstone)).to.deep.equal(tombstone)
-  })
-
-  it("writes the tombstone at the written_at given, and seals it: a tombstone whose written_at moved will not unseal", async () => {
-    const { bank } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const tombstone = await bank.sealBox(box, { written_at: TH.T0 + 21, am: 'x' })
-    expect(tombstone).to.include({ am: 'x', written_at: TH.T0 + 21 })
-    expect(await bank.unsealBox(tombstone)).to.deep.include({ whisper: {} })
-    await TH.expectRefusal(bank.unsealBox({ ...tombstone, written_at: TH.T0 + 22 }), 'damaged_whisper')
-  })
-
-  it("refuses a tombstone given secret props", async () => {
-    const { bank } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    await TH.expectRefusal(bank.sealBox(box, { am: 'x' }, { whisper: TH.Whisper }), 'bad_record')
-  })
-
-  it("writes a tombstone given the sidecar `{}`, a tombstone's own", async () => {
-    const { bank } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const tombstone = await bank.sealBox(box, { sidecar: {}, am: 'x' })
-    expect(tombstone).to.deep.include({ am: 'x', sidecar: {} })
-  })
-
-  it("refuses a tombstone given any other sidecar", async () => {
-    const { bank } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    await TH.expectRefusal(bank.sealBox(box, { sidecar: TH.Sidecar, am: 'x' }), 'bad_record')
-  })
-
-  it("unseals a tombstone to its Thing fields and an empty whisper", async () => {
-    const { bank } = await TH.buildBornBank()
-    const live = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const tombstone = await bank.sealBox(live, { am: 'x' })
-    const { whisper_sealed: _sealed, ...rest } = tombstone
-    expect(await bank.unsealBox(tombstone)).to.deep.equal({ ...rest, whisper: {} })
-  })
-
-  it("starts the box's next life over its tombstone, born now", async () => {
-    const { bank } = await TH.buildBornBank()
-    const live = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const tombstone = await bank.sealBox(live, { am: 'x' })
-    vi.setSystemTime(TH.T0 + 13)
-    const reborn = await bank.sealBox(tombstone, { sidecar: { account: 'home' } }, { whisper: TH.Whisper })
-    expect(reborn).to.include({ am: 'a', revseq: tombstone.revseq + 1, lifeseq: Life2, lifepath: `${Life0}/${Life2}`, born_at: TH.T0 + 13 })
-    expect(await bank.unsealBox(reborn)).to.deep.include({ whisper: TH.Whisper, sidecar: { account: 'home' } })
-  })
-
-  it("refuses the tombstone of a tombstone or of the shell", async () => {
-    const { bank } = await TH.buildBornBank()
-    const live = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const tombstone = await bank.sealBox(live, { am: 'x' })
-    await TH.expectRefusal(bank.sealBox(tombstone, { am: 'x' }), 'bad_record')
-    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), { am: 'x' }), 'bad_record')
-  })
-
-  // A tombstone's seal is its sealed empty whisper, and the unseal is its check.
-  it("refuses 'damaged_whisper' for a tombstone made up without the bankKey, or sealed with its live box's seal", async () => {
-    const { bank } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const madeUp = { ...box, sidecar: {}, revtok: TH.revtokOf('madeup'), revseq: box.revseq + 1, am: 'x', lifeseq: Life1, lifepath: `${Life0}/${Life1}`, whisper_sealed: TH.FakeSealed } as const
-    await TH.expectRefusal(bank.unsealBox(madeUp), 'damaged_whisper')
-    await TH.expectRefusal(bank.unsealBox({ ...madeUp, whisper_sealed: box.whisper_sealed }), 'damaged_whisper')
-  })
-
-  it("refuses 'damaged_whisper' for a tombstone carrying another tombstone's seal", async () => {
-    const { bank } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const one = await bank.sealBox(box, { am: 'x' })
-    const two = await bank.sealBox(box, { am: 'x' })
-    await TH.expectRefusal(bank.unsealBox({ ...two, whisper_sealed: one.whisper_sealed }), 'damaged_whisper')
-  })
-
-  const AlteredCases = [
-    [(tombstone: TombstoneOf<BoxRecord>) => ({ ...tombstone, revtok: TH.OtherRevtok }),          'its revtok'],
-    [(tombstone: TombstoneOf<BoxRecord>) => ({ ...tombstone, written_at: tombstone.written_at + 1 }),            'its written_at'],
-    [(tombstone: TombstoneOf<BoxRecord>) => ({ ...tombstone, lifeseq: Life3, lifepath: `${Life0}/${Life3}` }),   'its lifeseq'],
-  ] as const
-
-  for (const [alter, blurb] of AlteredCases) {
-    it(`refuses 'damaged_whisper' for a tombstone with ${blurb} altered`, async () => {
-      const { bank } = await TH.buildBornBank()
-      const live = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-      const tombstone = await bank.sealBox(live, { am: 'x' })
-      await TH.expectRefusal(bank.unsealBox(alter(tombstone)), 'damaged_whisper')
-    })
-  }
-})
-
 /** The revision of `bank`'s Thing after the one in hand, written a millisecond later. */
 function nextBankThingOf(bank: TH.LiveBank) {
   return { ...bank.pickle(), revtok: Crypto.randomId(), revseq: bank.revseq + 1, written_at: bank.written_at + 1 }
 }
-
-describe("bank.trySealBox(donor, publicProps, secretProps) and bank.tryUnsealBox(box)", () => {
-  it("resolve a good outcome of what sealBox and unsealBox resolve, and the refusal they throw", async () => {
-    const { bank } = await TH.buildBornBank()
-    const box = await TH.expectGood(bank.trySealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }))
-    expect(await TH.expectGood(bank.tryUnsealBox(box))).to.deep.include({ whisper: TH.Whisper })
-    bank.lock()
-    await TH.expectBad(bank.trySealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bank_locked')
-    await TH.expectBad(bank.tryUnsealBox(box), 'bank_locked')
-  })
-})
 
 describe("the bank's world, beside the bank's own writes", () => {
   it("has the bank's Thing that bank.put wrote once it resolves", async () => {

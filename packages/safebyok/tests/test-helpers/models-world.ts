@@ -12,16 +12,18 @@ import type { Deriver } from 'safebyok-big/internals'
 import { Consts, Crypto, GX, SX } from 'safebyok-big/internals'
 import { anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testing'
 import { Bank } from '../../src/models/bank'
+import type { Box } from '../../src/models/box'
 import type { Gate } from '../../src/models/gate'
 import { Device } from '../../src/models/device'
 import { Gating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
 import type { Vault } from '../../src/models/vault'
 import type { VaultMinder } from '../../src/minding/vault-minder'
+import type { VaultTSQ } from '../../src/minding/vault-tsq'
 import { PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
 import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import type { DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
-import type { ShellOf } from '../../src/shapes/shapes-sealers'
+import type { LiveOf, ShellOf } from '../../src/shapes/shapes-sealers'
 import type { BankRecord, BoxRecord, GateRecord, Wayins } from '../../src/shapes/shapes-thing'
 import { type GateRevisionedStamp, type GatingCleartexts, type LeaseGate, type ProvingDevice, type StrengthChecker, GatingChecks } from '../../src/shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/shapes/shapes-stamps'
@@ -139,7 +141,8 @@ export function liveGateOf(gate: Gate): LiveGate {
 /** The whole live record `thing` models, narrowed from its pickle. Throws where it models the shell or a tombstone. */
 export function livePickleOf(thing: Gate): GateRecord
 export function livePickleOf(thing: Bank): BankRecord
-export function livePickleOf(thing: Gate | Bank): GateRecord | BankRecord {
+export function livePickleOf(thing: Box): LiveOf<BoxRecord>
+export function livePickleOf(thing: Gate | Bank | Box): GateRecord | BankRecord | BoxRecord {
   const record = thing.pickle()
   if (record.am !== 'a') { throw new Error(`The Thing at ${thing.labelpath} models no live record.`) }
   return record
@@ -186,16 +189,17 @@ export async function buildBornBank({ passkeyCleartext, device = makeDevice() }:
   }
 }
 
-/** A {@link buildBornBank} bank, beside the vault of its boxes and that vault's minder. */
+/** A {@link buildBornBank} bank, beside the vault of its boxes, its device's vault TSQ, and its device's minder of the boxes. */
 export interface BornVault extends BornBank {
-  vault:  Vault
-  minder: VaultMinder
+  vault:    Vault
+  vaultTSQ: VaultTSQ
+  minder:   VaultMinder
 }
 
 /** A {@link buildBornBank} bank, unlocked, and the vault of its boxes its device made at the birth. */
 export async function buildBornVault(given: BornBankGiven = {}): Promise<BornVault> {
   const born = await buildBornBank(given)
-  return { ...born, vault: born.device.vault!, minder: born.device.minder }
+  return { ...born, vault: born.device.vault!, vaultTSQ: born.device.vaultTSQ, minder: born.device.minder }
 }
 // --
 

@@ -205,7 +205,9 @@ export function makeUseDraft(bank: DraftFriend) {
         const draftSidecar = sidecarSet ?? ((pinned === undefined) ? unsealed.sidecar : baseSidecar)
         const patch = { sidecar: sidecarOf ? sidecarOf(nextWhisper, draftSidecar) : draftSidecar }
         const vault = bank.demandVault()
-        return await vault.putBoxOnce(citedOf(vault, pinned, unsealed), patch, { whisper: nextWhisper })
+        const written = await vault.putBoxOnce(citedOf(vault, pinned, unsealed), patch, { whisper: nextWhisper })
+        // The box a put answers holds a live box.
+        return written.pickle() as LiveOf<BoxRecord>
       })
       discard()
       return box
@@ -242,7 +244,7 @@ function citedOf(vault: Vault, pinned: BoxShown | undefined, unsealed: BoxUnseal
   if (pinned === undefined) { return Thing.sparseOf(unsealed) }
   if (pinned !== null) { return pinned }
   const scope = { userid: unsealed.userid, banklabel: unsealed.banklabel, labelpath: unsealed.labelpath }
-  return vault.minder.deadAt(scope) ?? Shell.of(scope, vault.bank.rootBox)
+  return vault.bank.device.minder.deadAt(scope) ?? Shell.of(scope, vault.bank.rootBox)
 }
 
 // React hands a ref callback null only where it returned no cleanup, which this one always does.
