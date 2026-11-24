@@ -1,13 +1,9 @@
-"""Generate the chain table: rows with wanted from the principles, and today/todayBy from dump.json if present.
+"""Generate the chain table's rows: each start, the chain that arrives on it, and where it should end, from the principles.
 
-today and todayBy come from a run of today's minder, so regenerating them once the minder changes would re-baseline every
-tripwire. After that change, regenerate wanted only. This script cannot do that by itself: with no dump.json it writes no
-today at all, and splice.py replaces the whole table. So delete dump.json, run gen.py and splice.py once, and put back by
-hand, from git, the today and todayBy of each row the minder has not yet been changed for.
+Run from this folder, then splice the rows into the test file in place of its table:
+  python3 gen.py > table.ts && python3 splice.py ../../../packages/safebyok/tests/minding/vault-minder/vault-minder-chains.test.ts table.ts && rm table.ts
 """
-import json, os, sys
-
-HERE = os.path.dirname(__file__)
+import sys
 
 def I(l, r): return ("item", l, r)
 def G(l, r): return ("gone", l, r)
@@ -138,12 +134,6 @@ def fmtCache(c):
     inner = "{ " + ", ".join(parts) + " }" if parts else "{}"
   return f"marked({inner})" if c.get("isListingStale") else inner
 
-dump = {}
-if os.path.exists(os.path.join(HERE, "dump.json")):
-  for d in json.load(open(os.path.join(HERE, "dump.json"))): dump.setdefault(d["key"], {})[d["routes"]] = d
-def keyOf(init, chain): return CONST_NAMES[init] + " " + json.dumps([list(p) for p in chain], separators=(",", ":"))
-def thaw(v): return {k: (None if x is None else (tuple(x) if isinstance(x, list) else x)) for k, x in v.items()}
-
 lines = []
 for comment, rs in groups:
   lines.append(("comment", comment))
@@ -153,30 +143,6 @@ for comment, rs in groups:
     if isGetAnswered(start, chain): w["isRefused"] = False
     fields = [f"initial: {init},", "chain: [" + ", ".join(fmtP(p) for p in chain) + "],", f"wanted: {fmtCache(w)},"]
     extra = []
-    obs = dump.get(keyOf(init, chain))
-    if obs:
-      diffs, actuals = {}, {}
-      for routes, d in obs.items():
-        actual = thaw(d["cache"])
-        if d["stale"]: actual["isListingStale"] = True
-        if "isRefused" in w: actual["isRefused"] = d["refused"]
-        exp = dict(w)
-        if d["hasListStep"]:
-          exp.pop("isListingStale", None)
-          if d["derived"]: exp["isListingStale"] = True
-        actuals[routes] = actual
-        if actual != exp: diffs[routes] = actual
-      if diffs:
-        counts = {}
-        for v in diffs.values(): counts[json.dumps(v, sort_keys=True)] = counts.get(json.dumps(v, sort_keys=True), 0) + 1
-        topval = thaw(json.loads(max(counts, key=counts.get)))
-        withToday = {r: a for r, a in actuals.items() if a != topval}
-        if len(withToday) < len(diffs):
-          extra.append(f"today: {fmtCache(topval)},")
-          chosen = withToday
-        else:
-          chosen = diffs
-        if chosen: extra.append("todayBy: { " + ", ".join((f'"{r}"' if len(r) == 1 else r) + f": {fmtCache(v)}" for r, v in sorted(chosen.items())) + " },")
     if blurb: extra.append(f"blurb: '{blurb}',")
     lines.append(("row", fields + extra))
 
@@ -192,7 +158,7 @@ for kind, f in lines:
   else:
     cells = [f[i].ljust(widths[i]) for i in range(3)] + f[3:]
     row = ("  { " + " ".join(cells)).rstrip().rstrip(",") + " },"
-    # A row too wide for a screen takes its today, todayBy and blurb onto a line of their own.
+    # A row too wide for a screen takes its blurb onto a line of its own.
     if len(row) > 205: row = "  { " + " ".join(cells[:2] + [f[2]]) + "\n    " + " ".join(f[3:]).rstrip(",") + " },"
     out.append(row)
 print("\n".join(out))
