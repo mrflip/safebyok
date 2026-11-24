@@ -5,7 +5,7 @@ import type { BoxRecord, Sparse, ThingRecord } from '../../../src/shapes/shapes-
 import { Thing } from '../../../src/models/thing'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
-import { type MinderWorld, bornOf, cheatBox, isListingStaleAt, minderWorldOf, noticeOf } from './world'
+import { type MinderWorld, bornOf, cheatBox, isListingStaleAt, minderWorldOf } from './world'
 
 // == [Précis]: Liveness, Precis, CachePrecis, EndPrecis, ChainCase, Route
 
@@ -238,7 +238,7 @@ function cachePrecisOf({ minder }: MinderWorld<MemoryVaultDB>): CachePrecis {
 async function arrive(world: MinderWorld<MemoryVaultDB>, precis: Precis, route: Route): Promise<boolean> {
   const [liveness] = precis
   if (route === 'f') {
-    world.receive(noticeOf(recordOf(precis)))
+    world.receive(TH.itemEventOf(recordOf(precis), (liveness === 'item') ? 'full' : liveness))
     return false
   }
   cheatBox(world.vaultDB, recordOf(wholeOf(precis)))
