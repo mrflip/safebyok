@@ -10,7 +10,7 @@ import { itemSeenOf } from '../../src/storage/agerank'
 import { readTcNow } from '../../src/storage/thing-classifier'
 import { PlainThing } from './plain-thing'
 import { WayinChecks } from '../../src/shapes/shapes-wayin'
-import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type KnownRoots, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
+import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { FirstLifetok, FirstRevtok, T0, revtokOf } from './models-world'
 
 /** The bank the Things stand in. */
@@ -50,11 +50,11 @@ export const Life0 = Lifeseq.ofLifenum(0)
 /** The fields every Thing here starts from: revision 0 of life 0, born and written at {@link T0}. */
 const FirstRevision = { am: 'a', revtok: FirstRevtok, revseq: 0, lifeseq: Life0, born_at: T0, written_at: T0 } as const
 
-/** What `known_roots` reads of a record, of any life. */
+/** What a track reads of a record, of any life. */
 export type TrackedRecord = Pick<ThingRecord, 'revseq' | 'lifepath'>
 
-/** The `known_roots` of the bank, main gate and root box `bank`, `gate` and `box`: their revseq and lifepath. */
-export function knownRootsOf(bank: TrackedRecord = bankThingOf(), gate: TrackedRecord = gateThingOf(), box: TrackedRecord = rootBoxOf()): KnownRoots {
+/** The track of the bank, main gate and root box `bank`, `gate` and `box`: their revseq and lifepath. */
+export function trackOf(bank: TrackedRecord = bankThingOf(), gate: TrackedRecord = gateThingOf(), box: TrackedRecord = rootBoxOf()): Track {
   return {
     bank: { revseq: bank.revseq, lifepath: bank.lifepath },
     gate: { revseq: gate.revseq, lifepath: gate.lifepath },
@@ -143,12 +143,12 @@ export function birthBankAskOf(overrides: Partial<BirthBankAsk> = {}): BirthBank
   return { ...ThingBank, op: 'birth', bank: bankThingOf(), gate: gateThingOf(), root: rootBoxOf(), ...overrides }
 }
 
-/** The `known_roots` of a sender with the main gate of another life. */
-export const GateStaleKnownRoots = knownRootsOf(bankThingOf(), gateThingOf({ lifepath: Lifeseq.ofLifenum(2) }))
-/** The `known_roots` of a sender with the bank at another revision. */
-export const BankStaleKnownRoots = knownRootsOf(bankThingOf({ revseq: 3 }), gateThingOf())
-/** The `known_roots` of a sender with the root box at another revision. */
-export const RootStaleKnownRoots = knownRootsOf(bankThingOf(), gateThingOf(), rootBoxOf({ revseq: 3 }))
+/** The track of a sender with the main gate of another life. */
+export const GateStaleTrack = trackOf(bankThingOf(), gateThingOf({ lifepath: Lifeseq.ofLifenum(2) }))
+/** The track of a sender with the bank at another revision. */
+export const BankStaleTrack = trackOf(bankThingOf({ revseq: 3 }), gateThingOf())
+/** The track of a sender with the root box at another revision. */
+export const RootStaleTrack = trackOf(bankThingOf(), gateThingOf(), rootBoxOf({ revseq: 3 }))
 
 /** A UUID version 7, the shape of every `read_tc`. */
 export const ReadTcPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/

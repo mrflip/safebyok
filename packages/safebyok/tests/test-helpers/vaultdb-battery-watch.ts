@@ -7,7 +7,7 @@ import type { VaultDB } from '../../src/storage/vault-db'
 import type { VaultEvent } from '../../src/shapes/shapes-vault-event'
 import { Shell } from '../../src/shapes/shapes-thing'
 import {
-  BankStaleKnownRoots, GateStaleKnownRoots, Life0, RootStaleKnownRoots, ThingBank, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, boxTombOf, delAskFor, gateThingOf, getAskAt, itemEventOf, listAskAt, maskedReadTcsOf, nextGateOf, replaceAskOf, rootBoxOf,
+  BankStaleTrack, GateStaleTrack, Life0, RootStaleTrack, ThingBank, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, boxTombOf, delAskFor, gateThingOf, getAskAt, itemEventOf, listAskAt, maskedReadTcsOf, nextGateOf, replaceAskOf, rootBoxOf,
 } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 import { OtherRevtok } from './models-world'
@@ -67,14 +67,14 @@ export function describeVaultDBWatch({ fresh, bornBank }: VaultDBBatteryWorld): 
       await vaultDB.tryWriteThing(delAskFor(box, boxTombOf(box)))
       await aWhile()
       const { events, badNews } = noticesOf(vaultDB)
-      const known_roots = { bank: BankStaleKnownRoots.bank, gate: GateStaleKnownRoots.gate, box: RootStaleKnownRoots.box }
+      const track = { bank: BankStaleTrack.bank, gate: GateStaleTrack.gate, box: RootStaleTrack.box }
       const gate  = gateThingOf()
       const theirs = gateThingOf({ revtok: OtherRevtok })
-      expect(await vaultDB.tryWriteThing({ ...birthAskOf(theirs), known_roots })).to.deep.include({ ok: false, dbhas: gate })
+      expect(await vaultDB.tryWriteThing({ ...birthAskOf(theirs), track })).to.deep.include({ ok: false, dbhas: gate })
       const policied = replaceAskOf(gate, nextGateOf(gate), { policies: ['revoke_passkey'] })
       expect(await vaultDB.tryWriteThing(policied)).to.deep.include({ ok: false, act: 'policied' })
-      expect(await vaultDB.tryGetThing({ ...getAskAt(box.labelpath), known_roots })).to.deep.include({ ok: true, act: 'gotgone' })
-      expect(await vaultDB.tryListThings({ ...listAskAt('box'), known_roots })).to.deep.include({ ok: true })
+      expect(await vaultDB.tryGetThing({ ...getAskAt(box.labelpath), track })).to.deep.include({ ok: true, act: 'gotgone' })
+      expect(await vaultDB.tryListThings({ ...listAskAt('box'), track })).to.deep.include({ ok: true })
       await aWhile()
       expect(events).to.deep.equal([])
       expect(badNews).to.deep.equal([])

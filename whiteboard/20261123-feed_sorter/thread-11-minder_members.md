@@ -93,3 +93,10 @@ Commits: `storage:` (the members), `storage:` (the ask's `track` is `known_roots
     database's `receive` freezes a host's event `val` at its top, as before). Recommended: keep until those paths go.
   * **Renaming the Postgres function's parameter** makes `CREATE OR REPLACE` fail over a database installed before it
     (Postgres refuses to rename an input parameter). No back-compat is owed; noted for anyone with a dev database.
+
+## After the report: the ask's field is `track` again
+
+The Coach (2026-11-24): "known_roots was my suggested name for whatever in `device` or `world` was supplying the value
+for `track` in ask. ask's field should not be renamed." So the rename of the ask's field is reverted, in the core and in
+`safebyok-postgres` (its SQL function's parameter is `track` again), and the `SortedVaultDB`'s getter `knownRoots` is
+what supplies an ask's `track`: the revision of the whole record each root's Thing holds.

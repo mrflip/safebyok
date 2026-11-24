@@ -22,7 +22,7 @@ describe("VaultMinder.tryWrite", () => {
   it("gives no other minder the bank, the main gate or a tracked root box the answer reports stored", async () => {
     const vaultDB = await bornOf(new QuietVaultDB())
     const { minder, bankMinder } = await minderWorldOf(vaultDB, { isWorldHeard: false })
-    const answer = await minder.tryWrite({ ...boxBirthAskOf(), known_roots: TH.RootStaleKnownRoots })
+    const answer = await minder.tryWrite({ ...boxBirthAskOf(), track: TH.RootStaleTrack })
     expect(answer.world).to.not.be.null
     expect(Object.values(answer.tracked ?? {})).to.deep.include(TH.rootBoxOf())
     expect(bankMinder.worldAt()).to.be.undefined

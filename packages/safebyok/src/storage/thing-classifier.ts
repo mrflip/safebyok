@@ -9,7 +9,7 @@ import type { BirthBankActual, DamagedThing, GotActual, KidEntry, Kids, ListThin
 import { type Sparse, type StoredCited, type ThingCited, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
 import { Thing } from '../models/thing'
-import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type KnownRoots, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
+import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
 import * as Throwers from '../refusals/throwers'
 
 // == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeMismatch
@@ -220,21 +220,21 @@ function ancestorOf({ userid, banklabel, labelpath }: ThingScope, raw: unknown):
 /** A concrete adapter's report on the bank, main gate and root box an ask tracks: for each, `'same'` or the raw Thing. Null or left out for an ask that tracks nothing. */
 export type TrackedFetched = Readonly<{ bank: unknown, [Labelpath.MainGate]: unknown, [Labelpath.RootBox]: unknown }> | null
 
-/** The raw bank, main gate and root box a concrete adapter fetched, each null for none, under its key in an ask's `known_roots`. */
+/** The raw bank, main gate and root box a concrete adapter fetched, each null for none, under its key in a `track`. */
 export type TrackedRows = Readonly<{ bank: unknown, [Labelpath.MainGate]: unknown, [Labelpath.RootBox]: unknown }>
 
 /** The {@link TrackedFetched} report of what `ask` tracks against the raw rows a concrete adapter fetched, for one that compares in TypeScript. */
-export function trackedFetchedOf({ known_roots }: AnyAsk, rows: TrackedRows): TrackedFetched {
-  if (known_roots === undefined) { return null }
+export function trackedFetchedOf({ track }: AnyAsk, rows: TrackedRows): TrackedFetched {
+  if (track === undefined) { return null }
   return {
-    bank:                 trackedRawOf(known_roots.bank, rows.bank),
-    [Labelpath.MainGate]: trackedRawOf(known_roots[Labelpath.MainGate], rows[Labelpath.MainGate]),
-    [Labelpath.RootBox]:  trackedRawOf(known_roots[Labelpath.RootBox], rows[Labelpath.RootBox]),
+    bank:                 trackedRawOf(track.bank, rows.bank),
+    [Labelpath.MainGate]: trackedRawOf(track[Labelpath.MainGate], rows[Labelpath.MainGate]),
+    [Labelpath.RootBox]:  trackedRawOf(track[Labelpath.RootBox], rows[Labelpath.RootBox]),
   }
 }
 
 /** `'same'` where `raw` has the revseq and lifepath of `pair`, else `raw`. */
-function trackedRawOf(pair: KnownRoots['bank'], raw: unknown): unknown {
+function trackedRawOf(pair: Track['bank'], raw: unknown): unknown {
   return (CX.isPlainBag(raw) && (raw['revseq'] === pair.revseq) && (raw['lifepath'] === pair.lifepath)) ? 'same' : raw
 }
 

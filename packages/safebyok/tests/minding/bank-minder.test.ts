@@ -52,7 +52,7 @@ describe("bankMinder.fetchWorld()", () => {
     const { vaultDB, bankMinder } = await fetchedWorldOf()
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
     await bankMinder.fetchWorld()
-    expect(asked.mock.calls).to.deep.equal([[getAskOf({ ...TH.RootScope, ifAbsent: 'nil', known_roots: TH.knownRootsOf(), banktok: TH.bankThingOf().lifetok })]])
+    expect(asked.mock.calls).to.deep.equal([[getAskOf({ ...TH.RootScope, ifAbsent: 'nil', track: TH.trackOf(), banktok: TH.bankThingOf().lifetok })]])
   })
 
   it("answers null, and has no world, where no bank is stored", async () => {
@@ -93,7 +93,7 @@ describe("a BankMinder's watch", () => {
   it("keeps the main gate's record, the same object, when the watch notifies it again", async () => {
     const { vaultDB, bankMinder } = await fetchedWorldOf()
     const gate = bankMinder.at(TH.GateScope)
-    const staleGet = { ...TH.getAskAt('box'), known_roots: TH.GateStaleKnownRoots }
+    const staleGet = { ...TH.getAskAt('box'), track: TH.GateStaleTrack }
     await TH.expectGood<unknown>(vaultDB.tryGetThing(staleGet))
     await TH.expectGood<unknown>(vaultDB.tryGetThing(staleGet))
     await TH.wakeupAtNextTick()

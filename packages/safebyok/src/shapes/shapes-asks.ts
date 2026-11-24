@@ -10,7 +10,7 @@ import {
 } from './shapes-thing'
 import * as Throwers from '../refusals/throwers'
 
-// == [Asks]: RawChecks, loggableAsk, AskChecks, KnownRoots, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, WorldRecord, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
+// == [Asks]: RawChecks, loggableAsk, AskChecks, Track, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, WorldRecord, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
 type Kinded   = { modelkind: Thingkind, labelpath: Labelpath }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
@@ -35,25 +35,25 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof,
     /** The storage policies the write must meet, each over the Thing stored. */
     policies: arr(oneof(EX.storagePolicyVals)),
   }).strict()
-  const knownRoot       = obj({ revseq: ThingChecks.sparse.shape.revseq, lifepath: ThingChecks.sparse.shape.lifepath }).strict()
-  const knownRoots      = obj({ bank: knownRoot, [Labelpath.MainGate]: knownRoot, [Labelpath.RootBox]: knownRoot }).strict()
-  const known_roots     = knownRoots.optional()
+  const trackPair       = obj({ revseq: ThingChecks.sparse.shape.revseq, lifepath: ThingChecks.sparse.shape.lifepath }).strict()
+  const trackShape      = obj({ bank: trackPair, [Labelpath.MainGate]: trackPair, [Labelpath.RootBox]: trackPair }).strict()
+  const track           = trackShape.optional()
   // The sender's, not the datastore's: a vaultDB neither compares it with the bank stored nor refuses on it.
   const banktok         = PerKindChecks.storedLifetok.shape.lifetok.optional()
   return {
     thingOptions,
-    knownRoots,
-    getAsk:          ThingChecks.thingScope.extend({ op: lit('get'), modelkind, ifAbsent: SX.ifAbsent, known_roots, banktok }).strict()
+    trackShape,
+    getAsk:          ThingChecks.thingScope.extend({ op: lit('get'), modelkind, ifAbsent: SX.ifAbsent, track, banktok }).strict()
       .refine(isModelkindOwn, Phrases.ModelkindNotOwn),
-    listAsk:         ThingChecks.thingScope.extend({ op: lit('list'), modelkind, ifAbsent: SX.ifAbsent, known_roots, banktok }).strict()
+    listAsk:         ThingChecks.thingScope.extend({ op: lit('list'), modelkind, ifAbsent: SX.ifAbsent, track, banktok }).strict()
       .refine(isModelkindOwn, Phrases.ModelkindNotOwn),
     writeAsk:        ThingChecks.thingScope.extend({
-      op: oneof(['put', 'del']), modelkind, cited: unk, record: unk, ifAbsent: SX.putIfAbsent, ifPresent: SX.ifPresent, options: thingOptions.optional(), known_roots, banktok,
+      op: oneof(['put', 'del']), modelkind, cited: unk, record: unk, ifAbsent: SX.putIfAbsent, ifPresent: SX.ifPresent, options: thingOptions.optional(), track, banktok,
     }).strict()
       .refine(isModelkindOwn, Phrases.ModelkindNotOwn)
       .refine(isDelFixed,     Phrases.DelFlagsFixed)
       .refine(isPolicyOwn,    Phrases.PolicyNotOwn),
-    birthBankAsk:    obj({ userid: user_id, banklabel: label, op: lit('birth'), bank: unk, gate: unk, root: unk, known_roots, banktok }).strict(),
+    birthBankAsk:    obj({ userid: user_id, banklabel: label, op: lit('birth'), bank: unk, gate: unk, root: unk, track, banktok }).strict(),
     thingWatchScope,
     watchArgs:       obj({ scope: thingWatchScope, onNotice: fn(), onBadNews: fn() }),
   }
@@ -64,7 +64,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof,
  */
 const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => {
   const citedFields = ThingChecks.thingCited.partial()
-  const knownRootFields = obj({ revseq: ThingChecks.sparse.shape.revseq, lifepath: ThingChecks.sparse.shape.lifepath }).partial()
+  const trackFields = obj({ revseq: ThingChecks.sparse.shape.revseq, lifepath: ThingChecks.sparse.shape.lifepath }).partial()
   return {
     op:        oneof(['get', 'list', 'put', 'del', 'birth']).optional(),
     modelkind: oneof(ThingChecks.thingkindVals).optional(),
@@ -79,7 +79,7 @@ const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => 
     bank:      citedFields.optional(),
     gate:      citedFields.optional(),
     root:      citedFields.optional(),
-    known_roots: obj({ bank: knownRootFields, [Labelpath.MainGate]: knownRootFields, [Labelpath.RootBox]: knownRootFields }).partial().optional(),
+    track:     obj({ bank: trackFields, [Labelpath.MainGate]: trackFields, [Labelpath.RootBox]: trackFields }).partial().optional(),
     banktok:   PerKindChecks.storedLifetok.shape.lifetok.optional(),
   }
 }, 'bad_record')
@@ -90,8 +90,8 @@ const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => 
  */
 export const AskChecks = Object.freeze({ ...RawChecks, loggableAsk })
 
-/** The revseq and lifepath of the last whole revision the ask's sender has seen of its bank, its main gate and its root box. The answer's `tracked` says, for each, whether it is still the one stored, or gives the newer one. */
-export type KnownRoots      = Readonly<Z.infer<typeof AskChecks.knownRoots>>
+/** The revseq and lifepath the ask's sender has of its bank, its main gate and its root box. The answer's `tracked` says, for each, whether it is still the one stored. */
+export type Track           = Readonly<Z.infer<typeof AskChecks.trackShape>>
 /** An ask for the Thing at its scope. */
 export type GetAsk          = Readonly<Z.infer<typeof AskChecks.getAsk>>
 /** An ask for the children of the Thing at its scope. Its `ifAbsent` is the parent's. */
@@ -188,34 +188,34 @@ export type ThingOptions = Readonly<Z.infer<typeof AskChecks.thingOptions>>
 /** The draft of a get ask: a Thing's scope, its `ifAbsent` (default `'nil'`), and what its sender tracks and has of the bank's life.
  * {@link getAskOf} fills in what it leaves out, to make the {@link GetAsk}.
  */
-export type GetAskDraft  = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent, known_roots?: KnownRoots, banktok?: Lifetok }>
+export type GetAskDraft  = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent, track?: Track, banktok?: Lifetok }>
 /** The draft of a list ask: the parent's scope, its `ifAbsent` (default `'fail'`), and what its sender tracks and has of the bank's life.
  * {@link listAskOf} fills in what it leaves out, to make the {@link ListAsk}.
  */
-export type ListAskDraft = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent, known_roots?: KnownRoots, banktok?: Lifetok }>
+export type ListAskDraft = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent, track?: Track, banktok?: Lifetok }>
 /** The draft of a put ask: the records, the flags (default `ifAbsent: 'add'`, `ifPresent: 'repl'`), the storage policies, and what its sender tracks and has of the bank's life.
  * {@link putAskOf} fills in what it leaves out, to make the {@link WriteAsk}.
  */
 export type PutAskDraft<RecordT extends ThingRecord = ThingRecord> = Readonly<{
-  cited: CitedOf<RecordT>, record: RecordT, ifAbsent?: EX.PutIfAbsent, ifPresent?: EX.IfPresent, options?: ThingOptions, known_roots?: KnownRoots, banktok?: Lifetok,
+  cited: CitedOf<RecordT>, record: RecordT, ifAbsent?: EX.PutIfAbsent, ifPresent?: EX.IfPresent, options?: ThingOptions, track?: Track, banktok?: Lifetok,
 }>
 /** The draft of a del ask: the records, and what its sender tracks and has of the bank's life.
  * A del's flags are fixed, so the draft has none; {@link delAskOf} fills them in to make the {@link WriteAsk}.
  */
-export type DelAskDraft<RecordT extends ThingRecord = ThingRecord> = Readonly<{ cited: CitedOf<RecordT>, record: RecordT, known_roots?: KnownRoots, banktok?: Lifetok }>
+export type DelAskDraft<RecordT extends ThingRecord = ThingRecord> = Readonly<{ cited: CitedOf<RecordT>, record: RecordT, track?: Track, banktok?: Lifetok }>
 
 /** The get ask for the Thing at `ask`'s scope. */
 export function getAskOf(ask: GetAskDraft): GetAsk {
   if (! CX.isPlainBag(ask)) { return ask }
-  const { userid, banklabel, labelpath, ifAbsent = 'nil', known_roots, banktok } = ask
-  return { userid, banklabel, labelpath, op: 'get', modelkind: modelkindGiven(labelpath), ifAbsent, ...optionalsGiven({ known_roots, banktok }) } as GetAsk
+  const { userid, banklabel, labelpath, ifAbsent = 'nil', track, banktok } = ask
+  return { userid, banklabel, labelpath, op: 'get', modelkind: modelkindGiven(labelpath), ifAbsent, ...optionalsGiven({ track, banktok }) } as GetAsk
 }
 
 /** The list ask for the children of the Thing at `ask`'s scope. */
 export function listAskOf(ask: ListAskDraft): ListAsk {
   if (! CX.isPlainBag(ask)) { return ask }
-  const { userid, banklabel, labelpath, ifAbsent = 'fail', known_roots, banktok } = ask
-  return { userid, banklabel, labelpath, op: 'list', modelkind: modelkindGiven(labelpath), ifAbsent, ...optionalsGiven({ known_roots, banktok }) } as ListAsk
+  const { userid, banklabel, labelpath, ifAbsent = 'fail', track, banktok } = ask
+  return { userid, banklabel, labelpath, op: 'list', modelkind: modelkindGiven(labelpath), ifAbsent, ...optionalsGiven({ track, banktok }) } as ListAsk
 }
 
 /** The put ask writing `ask.record` over `ask.cited`, at the record's scope. */
