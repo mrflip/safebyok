@@ -364,14 +364,12 @@ export class World {
 
   // == [Snapshot]: hear, align, stageOf, makeSnapshot
 
-  // An answer tells the bank, the main gate and the root box in that order, so the stage is read at the root box, once all
-  // three have landed: a birth shows no stage between `'unborn'` and `'locked'`. The bank's shell or a tombstone of it
-  // comes alone, as sign-in asks for it.
-  /** Realign on hearing the root box, or the bank holding no live record. */
+  // The three roots may arrive in any order, one at a time: a set of them partly live is never shown as a stage of its
+  // own. The last of them to land live brings `'locked'`, so a birth shows no stage between `'unborn'` and `'locked'`.
+  /** Realign on hearing a root, once all three are live or the bank holds no live record. */
   #hear(event: VaultEvent): void {
-    if (event.eventkind !== 'item') { return }
-    const isBankNotLive = (event.labelpath === 'bank') && ((event.liveness === 'void') || (event.liveness === 'gone'))
-    if (isBankNotLive || (event.labelpath === Labelpath.RootBox)) { this.align() }
+    if ((event.eventkind !== 'item') || ! RootLabelpaths.has(event.labelpath)) { return }
+    if (this.areRootsLive || ! isLive(this.bank)) { this.align() }
   }
 
   /** Remake the snapshot, and tell each subscriber if it changed. Internal: the device calls it once someone signs in. */
@@ -421,7 +419,10 @@ export class World {
   // --
 }
 
-// == [Helpers]: ThingClass, thingClassOf, isLive, refusalSnapshotOf, WorldLeaseGate, Wait, makeWait
+// == [Helpers]: RootLabelpaths, ThingClass, thingClassOf, isLive, refusalSnapshotOf, WorldLeaseGate, Wait, makeWait
+
+/** The labelpaths of the bank's roots, which the stage is read from. */
+const RootLabelpaths: ReadonlySet<Labelpath> = new Set(['bank', Labelpath.MainGate, Labelpath.RootBox])
 
 /** The class a world makes a Thing of one kind from, as {@link World.makeThing} calls it. */
 interface ThingClass {
