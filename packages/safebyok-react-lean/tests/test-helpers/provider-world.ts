@@ -3,7 +3,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { noop } from 'es-toolkit'
 import { onTestFinished, vi } from 'vitest'
-import { type DevicePersisters, Device, type KeyDeriver, type PassphraseVerdict, type StrengthChecker, type Vault, MemoryVaultDB } from 'safebyok'
+import { type BadNewsHandler, type DevicePersisters, Device, type KeyDeriver, type PassphraseVerdict, type StrengthChecker, type Vault, MemoryVaultDB } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { type BankGiver, type ReactGiver, reactGiver } from '../../src/giver/react-giver'
 
@@ -127,6 +127,8 @@ export interface ProviderWorldGiven {
   isWatching?:     boolean
   /** The persisters of every device the giver makes, and of the device that stores `'jokes'`, which saves what it stored to them: a page reloaded. */
   persisters?:     DevicePersisters
+  /** The host's `onBadNews`, which every device the giver makes is handed. */
+  onBadNews?:      BadNewsHandler
 }
 
 /** A memory vaultDB that reports no change of its own, as a datastore with no watch: its watches hear only what its verbs notify. */
@@ -135,7 +137,7 @@ class UnwatchedVaultDB extends MemoryVaultDB {
 }
 
 /** A giver over nothing yet started, and a vaultDB with what `given` stores. */
-export async function buildProviderWorld({ stored = 'none', isInConfig = false, isWatching = true, persisters }: ProviderWorldGiven = {}): Promise<ProviderWorld> {
+export async function buildProviderWorld({ stored = 'none', isInConfig = false, isWatching = true, persisters, onBadNews }: ProviderWorldGiven = {}): Promise<ProviderWorld> {
   const vaultDB = isWatching ? new MemoryVaultDB() : new UnwatchedVaultDB()
   let otherVault: Vault | null = null
   if (stored === 'jokes') {
@@ -182,6 +184,7 @@ export async function buildProviderWorld({ stored = 'none', isInConfig = false, 
     strengthChecker: checker,
     logger:          LeanTH.quietLogger,
     ...(persisters && { persisters }),
+    ...(onBadNews && { onBadNews }),
   })
   const client = new QueryClient()
   onTestFinished(() => { client.clear() })

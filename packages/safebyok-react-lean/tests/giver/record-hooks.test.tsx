@@ -1,7 +1,7 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { noop } from 'es-toolkit'
 import { type ReactNode, useEffect, useLayoutEffect } from 'react'
-import { type BoxRecord, type GateRecord, type PasskeyWayinHeader, type PersistedClient, type Persister, MemoryPersister, VaultMinder, VaultTSQ } from 'safebyok'
+import { type BadNewsHandler, type BoxRecord, type GateRecord, type PasskeyWayinHeader, type PersistedClient, type Persister, MemoryPersister, VaultMinder, VaultTSQ } from 'safebyok'
 import { readTcNow, storageUnavailable } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
@@ -337,6 +337,23 @@ describe("useGate over the world's gate Thing", () => {
     // The gate's Thing has the whole gate, by design; the giver's client and the page have none of it.
     const stored = world.vaultDB._cheat_things(LeanTH.WorldScope).get('gate') as GateRecord
     TH.expectTextUnheld(stored.wayins.passkey0!.bank_key_wayin_wrapped.ciphertext_b64, container, world.client)
+  })
+})
+
+describe("useGate, mounted twice", () => {
+  it("tells the host's onBadNews of one trouble in storage once", async () => {
+    const onBadNews = vi.fn<BadNewsHandler>()
+    const world = await TH.buildProviderWorld({ stored: 'jokes', onBadNews })
+    function GateProbe() { return <p>{world.Bank.useGate().data === undefined ? 'unfetched' : 'gate'}</p> }
+    render(TH.providerTreeOf(world, <><StageShown world={world} /><GateProbe /><GateProbe /></>, { userid: TH.ProviderUser }))
+    await screen.findByText('locked')
+    await waitFor(() => { expect(screen.getAllByText('gate')).to.have.lengthOf(2) })
+    world.vaultDB._cheat_things(LeanTH.WorldScope).set('box/bad', { ...LeanTH.boxThingOf('bad'), revseq: -2 })
+    await act(async () => { await world._cheat_device().world.demandVaultMinder().tryListOnce('box') })
+    await waitFor(() => { expect(onBadNews).toHaveBeenCalled() })
+    // The host's handler is called on a later turn: give a second report one to land.
+    await new Promise((resolve) => { setTimeout(resolve, 0) })
+    expect(onBadNews.mock.calls.map(([{ news }]) => [news.refusalkind, news.meta?.labelpaths])).to.deep.equal([['damaged_row', ['box/bad']]])
   })
 })
 
