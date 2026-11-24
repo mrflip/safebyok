@@ -120,11 +120,13 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return answer
   }
 
+  // The answer's world and tracked are read in the same step as its three roots, so they are told as those alone: a root
+  // its Thing refuses is then refused once.
   /** {@link VaultDB.tryGetWorld}: the three roots it answers are told in root order, the shell where none is stored. */
   async tryGetWorld(ask: GetWorldAsk): Promise<GetWorldAnswer> {
     try { this.#checkOwnAsk(ask) } catch (err) { return refusedAnswerOf(ask, err) }
     const answer = await this.#vaultDB.tryGetWorld(ask)
-    this.#tellAnswer(answer, rootsOf(answer), worldRootsOf(answer))
+    this.#tellAnswer(answer, [], worldRootsOf(answer))
     return answer
   }
 

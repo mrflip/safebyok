@@ -6,6 +6,7 @@ import type { BirthGating } from './gating'
 import { Proving, guardKeyDeriver } from './proving'
 import { Vault } from './vault'
 import { World } from './world'
+import { BaseThing } from './base-thing'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import { guardRootShelf, isRootLabelpath, peekRoots, stowRoots } from '../minding/root-shelf'
 import { VaultTSQ } from '../minding/vault-tsq'
@@ -16,6 +17,7 @@ import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthCheck
 import type { BankScope } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Lifetok, Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
+import type { WorldRoots } from '../shapes/shapes-asks'
 import { VaultMinder } from '../minding/vault-minder'
 import { VacantAgerank, itemSeenOf, readTcNow } from '../storage/agerank'
 import { Labelpath } from '../shapes/primitives'
@@ -221,13 +223,14 @@ export class Device {
    */
   async gatingBirthAttempt(params: FormData | BirthDna): Promise<Bank> { return await this.birthGating(params).attempt() }
 
-  // The world fetched lands in the world's Things, which the stage is read from; a failure to fetch it, once a bank is up
-  // from what was restored, is no caller's to hear.
+  // The roots fetched land in the world's Things, which the stage is read from. A root its Thing refuses reaches the host
+  // once, as bad news told by the VaultMinder; sign-in then reports only what the roots amount to: all three live, the
+  // bank unborn, or broken. A failure to fetch them, once a bank is up from what was restored, is no caller's to hear.
   // The VaultMinder is made right before the vault TSQ, the root shelf and the world listen to it, with nothing awaited
   // between: its Things remember what they take, so a record it took with no one listening would reach them later only as
   // a repeat, which it drops. The roots shelved are received before the root shelf listens, which would put them back
   // unchanged; the world reads its Things at its signin.
-  /** Start the signed-in user's bank over a VaultMinder of it: from the roots shelved, where there are any, and from the world the vaultDB answers. */
+  /** Start the signed-in user's bank over a VaultMinder of it: from the roots shelved, where there are any, and from the three roots the vaultDB answers. */
   async #doSignin(): Promise<void> {
     try {
       const vaultMinder = VaultMinder.make(this.scope, { vaultDB: this.vaultDB, makeThing: (seen) => this.#world.makeThing(seen) })
@@ -235,18 +238,9 @@ export class Device {
       this.#receiveShelved(vaultMinder)
       this.#listenShelf(vaultMinder)
       this.#world.signin(vaultMinder)
-      // Scaffolding until sign-in is one get of the roots: a get of the root box, whose answer's world brings the bank and
-      // main gate. Where none is stored, the bank is asked for, and its shell or tombstone shows the stage `'unborn'`; a
-      // bank stored live without the others is broken.
-      const rootAnswer = await vaultMinder.tryGetOnce({ ...this.scope, labelpath: Labelpath.RootBox })
-      if (! rootAnswer.ok) { throw rootAnswer.err }
-      if ((rootAnswer.act === 'gotvoid') && (rootAnswer.world === null)) {
-        const bankAnswer = await vaultMinder.tryGetOnce({ ...this.scope, labelpath: 'bank' })
-        if (! bankAnswer.ok) { throw bankAnswer.err }
-        if (bankAnswer.act !== 'gotlive') { return }
-      }
-      // Roots answered that are not all live in the world are broken: reported as the sign-in's refusal.
-      if (! this.#world.areRootsLive) { throw Throwers.bankRootsMissing() }
+      const answer = await vaultMinder.tryGetWorldOnce()
+      if (! answer.ok) { throw answer.err }
+      if (! (this.#world.areRootsLive || isUnbornIn(answer.val))) { throw Throwers.bankRootsMissing() }
     } catch (err) {
       if (this.bank !== null) {
         this.tellBadNews([err])
@@ -353,7 +347,7 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 }
 // --
 
-// == [Helpers]: millisOf, checkSecureContext, ShelvedSourcelabel, banktokOf, shelvedEventOf
+// == [Helpers]: millisOf, checkSecureContext, isUnbornIn, ShelvedSourcelabel, banktokOf, shelvedEventOf
 
 // A host's Infinity minutes, for never, becomes ForeverMillis: past the entrypoint, nothing is infinite.
 /** `minutes` in milliseconds, capped at `ForeverMillis`, or `fallback` for none. */
@@ -363,6 +357,10 @@ function millisOf(minutes: number | undefined, fallback: number): number { retur
 function checkSecureContext(): void {
   if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw Throwers.insecureContext() }
 }
+
+// A bank's tombstone alone is unborn too: a root stored beside a bank not live is broken.
+/** True where `roots` keep no live bank, and no main gate or root box: the bank is unborn. */
+function isUnbornIn({ bank, gate, root }: WorldRoots): boolean { return (bank.am !== 'a') && BaseThing.isVoidSentinel(gate) && BaseThing.isVoidSentinel(root) }
 
 /** The `sourcelabel` of the events of the roots a device read from its root shelf. */
 const ShelvedSourcelabel = 'root_shelf'

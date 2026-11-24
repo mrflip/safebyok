@@ -15,7 +15,8 @@ import { VaultTSQ } from '../../src/minding/vault-tsq'
 import { BankRootsMissing } from '../../src/phrases'
 import { EmptyMaskedView } from '../../src/shapes/shapes-masked-view'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { ThingFormat } from '../../src/shapes/shapes-thing'
+import { type GateRecord, ThingFormat } from '../../src/shapes/shapes-thing'
+import type { GetWorldAnswer } from '../../src/shapes/shapes-answers'
 import { refusedAnswerOf } from '../../src/storage/refused-answer'
 import { type BadNews, type DeviceOpts, SignedOutWorld } from '../../src/shapes/shapes-bankish'
 import * as TH from '../test-helpers'
@@ -57,14 +58,13 @@ describe("Device.make(record, opts)", () => {
 
   it("asks its vaultDB nothing, and watches nothing, until it signs in", async () => {
     const vaultDB = new MemoryVaultDB()
-    const [tryGetThing, watch] = [vi.spyOn(vaultDB, 'tryGetThing'), vi.spyOn(vaultDB, 'watch')]
+    const [tryGetWorld, tryGetThing, watch] = [vi.spyOn(vaultDB, 'tryGetWorld'), vi.spyOn(vaultDB, 'tryGetThing'), vi.spyOn(vaultDB, 'watch')]
     const device = TH.makeDevice({ userid: null }, { vaultDB })
     await device.hello()
-    expect([tryGetThing.mock.calls.length, watch.mock.calls.length]).to.deep.equal([0, 0])
+    expect([tryGetWorld, tryGetThing, watch].map((spied) => spied.mock.calls.length)).to.deep.equal([0, 0, 0])
     await device.signin(TH.WorldScope.userid)
-    // A get of the root box, then, none being stored, one of the bank, and one watch, which everything listening shares
-    // through the device's VaultMinder.
-    expect([tryGetThing.mock.calls.length, watch.mock.calls.length]).to.deep.equal([2, 1])
+    // One get of the bank's three roots, and one watch, which everything listening shares through the device's VaultMinder.
+    expect([tryGetWorld, tryGetThing, watch].map((spied) => spied.mock.calls.length)).to.deep.equal([1, 0, 1])
   })
 
   it("accepts the bag of browserOpts() spread in, ignoring its device database", () => {
@@ -271,11 +271,11 @@ describe("a device's root shelf", () => {
       const { born, device, rootShelf } = await bornAndReloaded()
       rootShelf.setItem(WorldShelfCkey, shelved)
       const removeItem  = vi.spyOn(rootShelf, 'removeItem')
-      const tryGetThing = vi.spyOn(born.device.vaultDB, 'tryGetThing')
+      const tryGetWorld = vi.spyOn(born.device.vaultDB, 'tryGetWorld')
       const stages      = stagesOf(device)
       await device.signin(TH.WorldScope.userid)
       expect(stages).to.deep.equal(['signed_out', 'starting', 'locked'])
-      expect(tryGetThing).toHaveBeenCalled()
+      expect(tryGetWorld).toHaveBeenCalled()
       expect(removeItem.mock.calls[0]).to.deep.equal([WorldShelfCkey])
     })
   }
@@ -295,7 +295,7 @@ describe("a device's root shelf", () => {
     const { born, device, rootShelf } = await bornAndReloaded({ onBadNews })
     const [version, bank, , rootBox] = shelvedOf(rootShelf)
     rootShelf.setItem(WorldShelfCkey, JSON.stringify([version, bank, { labelpath: 'gate' }, rootBox]))
-    vi.spyOn(born.device.vaultDB, 'tryGetThing').mockReturnValue(new Promise(noop))
+    vi.spyOn(born.device.vaultDB, 'tryGetWorld').mockReturnValue(new Promise(noop))
     void device.signin(TH.WorldScope.userid)
     await TH.eventually(() => onBadNews.mock.calls.length === 1)
     expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'bad_record' })
@@ -326,6 +326,14 @@ describe("a device's root shelf", () => {
 })
 
 /** A bank born on a device that keeps its roots on a memory shelf, and a second device over its vaultDB and the same shelf, signed out: the page reloaded. */
+// The VaultMinder reads no wayin, so the gate's Thing is the first to refuse it.
+/** `answer`, its main gate's wayins mangled in its world and its roots, at `revseq` where given */
+function withGateMangled(answer: GetWorldAnswer, revseq?: number): GetWorldAnswer {
+  if ((! answer.ok) || (answer.world === null)) { return answer }
+  const gate = { ...answer.val.gate, wayins: { main: {}, passkey0: null }, ...((revseq !== undefined) && { revseq }) } as GateRecord
+  return { ...answer, world: { ...answer.world, maingate: gate }, val: { ...answer.val, gate } }
+}
+
 async function bornAndReloaded(opts: Partial<DeviceOpts> = {}): Promise<{ born: TH.BornBank, device: Device, rootShelf: TH.MemoryShelf }> {
   const rootShelf = new TH.MemoryShelf()
   const born      = await TH.buildBornBank({ device: TH.makeDevice({}, { rootShelf }) })
@@ -353,7 +361,7 @@ describe("device.signin(userid)", () => {
   it("brings the bank up locked from the roots its root shelf keeps, and unlocks it on that gate, before the vaultDB answers", async () => {
     const { born, device } = await bornAndReloaded()
     const vaultDB = born.device.vaultDB as MemoryVaultDB
-    vi.spyOn(vaultDB, 'tryGetThing').mockReturnValue(new Promise(noop))
+    vi.spyOn(vaultDB, 'tryGetWorld').mockReturnValue(new Promise(noop))
     const stages = stagesOf(device)
     void device.signin(TH.WorldScope.userid)
     await TH.eventually(() => device.bank !== null)
@@ -367,7 +375,7 @@ describe("device.signin(userid)", () => {
     const onBadNews        = vi.fn()
     const { born, device } = await bornAndReloaded({ onBadNews })
     const vaultDB          = born.device.vaultDB as MemoryVaultDB
-    vi.spyOn(vaultDB, 'tryGetThing').mockImplementation((ask) => Promise.resolve(refusedAnswerOf(ask, new Errors.VaultError('storage_unavailable', "Down."))))
+    vi.spyOn(vaultDB, 'tryGetWorld').mockImplementation((ask) => Promise.resolve(refusedAnswerOf(ask, new Errors.VaultError('storage_unavailable', "Down."))))
     await device.signin(TH.WorldScope.userid)
     expect(device.world.getSnapshot()).to.include({ stage: 'locked' })
     await TH.eventually(() => onBadNews.mock.calls.length === 1)
@@ -402,7 +410,7 @@ describe("device.signin(userid)", () => {
     expect(vaultMinder.makeGetAsk({ labelpath: 'bank' })).to.deep.include({ banktok: bank.lifetok })
   })
 
-  it("shows the refusal as failed where its bank cannot be read, and never rejects", async () => {
+  it("shows the vaultDB's refusal as failed where its bank is stored damaged, and never rejects", async () => {
     const born    = await TH.buildBornBank()
     const vaultDB = born.device.vaultDB as MemoryVaultDB
     vaultDB._cheat_things(born.bank.scope).set('bank', { mangled: true })
@@ -410,7 +418,7 @@ describe("device.signin(userid)", () => {
     await device.signin(TH.WorldScope.userid)
     const shown = device.world.getSnapshot()
     expect(shown).to.include({ stage: 'failed', isLocked: true })
-    expect(shown.lastErr).to.include({ refusalkind: 'storage_issue' })
+    expect(shown.lastErr).to.include({ refusalkind: 'damaged_row' })
     expect(Object.isFrozen(shown.lastErr)).to.be.true
     expect(device.bank).to.be.null
   })
@@ -426,6 +434,31 @@ describe("device.signin(userid)", () => {
     expect(shown).to.include({ stage: 'failed', isLocked: true })
     expect(shown.lastErr).to.include({ refusalkind: 'storage_issue', message: BankRootsMissing })
     expect(device.bank).to.be.null
+  })
+
+  it("tells onBadNews once of a root its Thing refuses, and shows the roots missing as failed", async () => {
+    const onBadNews = vi.fn()
+    const born      = await TH.buildBornBank()
+    const vaultDB   = born.device.vaultDB as MemoryVaultDB
+    const device    = TH.makeDevice({ userid: null }, { vaultDB, onBadNews })
+    const getWorld  = vaultDB.tryGetWorld.bind(vaultDB)
+    vi.spyOn(vaultDB, 'tryGetWorld').mockImplementation(async (ask) => withGateMangled(await getWorld(ask)))
+    await device.signin(TH.WorldScope.userid)
+    expect(device.world.getSnapshot().lastErr).to.include({ refusalkind: 'storage_issue', message: BankRootsMissing })
+    await TH.eventually(() => onBadNews.mock.calls.length > 0)
+    expect(onBadNews.mock.calls.map((call) => (call[0] as BadNews).news.refusalkind)).to.deep.equal(['bad_record'])
+  })
+
+  it("tells onBadNews once of a root its Thing refuses, and keeps the bank its root shelf brought up", async () => {
+    const onBadNews        = vi.fn()
+    const { born, device } = await bornAndReloaded({ onBadNews })
+    const vaultDB          = born.device.vaultDB as MemoryVaultDB
+    const getWorld         = vaultDB.tryGetWorld.bind(vaultDB)
+    vi.spyOn(vaultDB, 'tryGetWorld').mockImplementation(async (ask) => withGateMangled(await getWorld(ask), born.bank.gate.pickle().revseq + 1))
+    await device.signin(TH.WorldScope.userid)
+    expect(device.world.getSnapshot()).to.include({ stage: 'locked', lastErr: null })
+    await TH.eventually(() => onBadNews.mock.calls.length > 0)
+    expect(onBadNews.mock.calls.map((call) => (call[0] as BadNews).news.refusalkind)).to.deep.equal(['bad_record'])
   })
 
   it("shows failed, and does not reject, where its vaultDB cannot watch", async () => {
