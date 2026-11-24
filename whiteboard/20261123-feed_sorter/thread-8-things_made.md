@@ -3,7 +3,10 @@
 Branch `20261124-things_made`, PR #874, stacked on #873 (`20261124-things_ready`). The first half of B2 in
 `world-design.md`. Proved before the catch-up: `safebyok` typecheck and lint clean, tests 1907 passed and the seven
 `vault-minder` tests red on purpose (listen 4, writes 2, staleness 1), no others; `safebyok-idb-lean` 113,
-`safebyok-postgres` 354, `safebyok-react-lean` 320, each typecheck, lint and tests clean. After the catch-up: see the PR.
+`safebyok-postgres` 354, `safebyok-react-lean` 320, each typecheck, lint and tests clean. After the catch-up onto
+#873 at 7a701953d: `pnpm justify` lint, typecheck and build clean; tests red by the seven and by
+`vault-minder-chains.test.ts` alone (`safebyok` 149 failed, 1951 passed); the chain table's 142 failing rows are the same
+142 before and after this thread's commits.
 
 * **Built** (in `packages/safebyok/src/`):
   - `models/box.ts`: `Box extends BaseBox`, a stub: `make(record)` over a whole box record (live or a tombstone) or its
