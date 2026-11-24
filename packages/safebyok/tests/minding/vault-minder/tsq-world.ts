@@ -6,6 +6,7 @@ import { VaultMinder } from '../../../src/minding/vault-minder'
 import { readTcNow } from '../../../src/storage/agerank'
 import type { ReadTc, SeenThing, VaultItemEvent } from '../../../src/shapes/shapes-vault-event'
 import type { ThingScope } from '../../../src/shapes/shapes-thing'
+import type { ThingMaker } from '../../../src/shapes/shapes-vault-minder'
 import * as TH from '../../test-helpers'
 
 /** A bank's VaultTSQ on a fresh QueryClient, the VaultMinder it hears, and a way to hand the vaultDB's watcher a notice. */
@@ -18,10 +19,12 @@ export interface TSQWorld<VaultDBT extends MemoryVaultDB> {
   notify:      (event: VaultItemEvent) => void
 }
 
-/** The VaultTSQ of `TH.ThingBank` over `vaultDB`, on a fresh QueryClient, with the bank born through its VaultMinder, which so knows the roots at revision 0. */
-export async function tsqWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT): Promise<TSQWorld<VaultDBT>> {
+/** The VaultTSQ of `TH.ThingBank` over `vaultDB`, on a fresh QueryClient, with the bank born through its VaultMinder, which so knows the roots at revision 0.
+ * Its VaultMinder's Things are made by `makeThing`, plain ones by default.
+ */
+export async function tsqWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT, makeThing: ThingMaker = TH.makePlainThing): Promise<TSQWorld<VaultDBT>> {
   const watching    = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
-  const sorted      = VaultMinder.make(TH.ThingBank, { vaultDB, makeThing: TH.makePlainThing })
+  const sorted      = VaultMinder.make(TH.ThingBank, { vaultDB, makeThing })
   const queryClient = new QueryClient()
   const vaultTSQ    = VaultTSQ.make({ vaultMinder: sorted, queryClient, scope: TH.ThingBank })
   await TH.expectGood(sorted.tryBirthBank(TH.birthBankAskOf()))

@@ -194,6 +194,16 @@ describe("VaultTSQ's items", () => {
     expect(Thing.isGone(boxHeldIn(world))).to.eq(true)
   })
 
+  it("show the refusal a newer record raises at the box's Thing as the item's error, its data kept", async () => {
+    const world = await tsqWorldOf(new MemoryVaultDB(), (shell) => TH.RefusingThing.make(shell))
+    const box2  = TH.nextOf(Box1)
+    cheatStored(world.vaultDB, box2)
+    expect(await world.vaultTSQ.getOnce(TH.BoxScope)).to.deep.equal(box2)
+    cheatStored(world.vaultDB, TH.nextOf(box2))
+    const err = await TH.expectRefusal(world.vaultTSQ.getOnce(TH.BoxScope, { staleTime: 0 }), 'unexpected_error')
+    expect(itemQueryAt(world)?.state).to.deep.include({ status: 'error', error: err, data: box2 })
+  })
+
   it("refuse stale_read where storage answers an earlier life than one known only sparse, and show an observer null", async () => {
     const world = await worldWithBox()
     world.notify(noticeOf(TH.boxSparseOf(Reborn)))

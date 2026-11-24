@@ -76,8 +76,7 @@ export class Vault {
     if (! sealed.ok) { return sealed }
     const answer = await this.#vaultMinder.tryPutOnce(sealed.val)
     if (! answer.ok) { return answer }
-    // A record told that fails its checks leaves no box: it went to onBadNews.
-    if ((this.#boxAt(answer.val) === undefined) || ! BaseBox.isLive(answer.val)) { return Outcome.bad(Throwers.storageIssue()) }
+    if (! BaseBox.isLive(answer.val)) { return Outcome.bad(Throwers.storageIssue()) }
     return Outcome.good(answer.val)
   }
 
@@ -97,8 +96,7 @@ export class Vault {
     if (! sealed.ok) { return sealed }
     const answer = await this.#vaultMinder.tryDelOnce(sealed.val)
     if (! answer.ok) { return answer }
-    // A record told that fails its checks leaves no box: it went to onBadNews.
-    if ((this.#boxAt(answer.val) === undefined) || ! BaseBox.isGone(answer.val)) { return Outcome.bad(Throwers.storageIssue()) }
+    if (! BaseBox.isGone(answer.val)) { return Outcome.bad(Throwers.storageIssue()) }
     return Outcome.good(answer.val)
   }
 

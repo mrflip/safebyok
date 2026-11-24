@@ -51,6 +51,22 @@ function sortedOverMemory(): { vaultDB: VaultMinder<TH.PlainThing>, inner: Memor
   return { vaultDB: VaultMinder.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing }), inner }
 }
 
+/** A box's revisions: `two`, which a {@link TH.RefusingThing} takes, and `three` after it, which it refuses. */
+const Revs = (() => {
+  const two = TH.nextOf(TH.nextOf(TH.boxThingOf()))
+  return { two, three: TH.nextOf(two) }
+})()
+
+/** True for a refusal of a {@link TH.RefusingThing}'s: an `unexpected_error` whose cause says the record is refused. */
+function isThingRefusal(news: Errors.VaultError): boolean { return (news.refusalkind === 'unexpected_error') && ((news.cause as Error).message === TH.RefusingThing.Refusal) }
+
+/** A VaultMinder of {@link TH.RefusingThing}s over a MemoryVaultDB whose own watch notifies nothing, and that MemoryVaultDB. */
+function refusingOverQuietMemory(): { vaultDB: VaultMinder<TH.RefusingThing>, inner: MemoryVaultDB } {
+  const inner = new MemoryVaultDB()
+  vi.spyOn(inner, 'watch').mockReturnValue(noop)
+  return { vaultDB: VaultMinder.make(TH.ThingBank, { vaultDB: inner, makeThing: (shell) => TH.RefusingThing.make(shell) }), inner }
+}
+
 /** A VaultMinder over a MemoryVaultDB whose own watch notifies nothing, so that every event it tells is of an answer's records. */
 function sortedOverQuietMemory(): { vaultDB: VaultMinder<TH.PlainThing>, inner: MemoryVaultDB } {
   const inner = new MemoryVaultDB()
@@ -465,7 +481,7 @@ describe("VaultMinder.thingAt(scoped)", () => {
     expect(thing).to.include({ am: 'x', lifepath: tomb.lifepath })
   })
 
-  it("answers undefined for a labelpath it has learned of no record at, or only a record its Thing refused", () => {
+  it("answers undefined for a labelpath it has learned of no record at, and a Thing holding the shell where it learned only of a record its Thing refused", () => {
     const inner = stubVaultDBOf(noop)
     const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing })
     const { badNews } = heardOf(vaultDB)
@@ -473,7 +489,7 @@ describe("VaultMinder.thingAt(scoped)", () => {
     const [, onNotice] = inner.watch.mock.calls[0]!
     onNotice({ ...TH.itemEventOf(TH.boxThingOf()), read_tc: crypto.randomUUID() })
     expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['bad_record'])
-    expect(vaultDB.thingAt(TH.BoxScope)).to.eq(undefined)
+    expect(vaultDB.thingAt(TH.BoxScope)?.pickle()).to.deep.equal(Shell.inParentLivesOf(TH.boxThingOf()))
   })
 
   it("answers a Thing to its own subscriber as it is told of its first record", () => {
@@ -491,7 +507,7 @@ describe("VaultMinder.thingAt(scoped)", () => {
     expect(found[0]).to.equal(vaultDB.thingAt(TH.BoxScope))
   })
 
-  it("makes each Thing once, with the first record it learns of at that labelpath", () => {
+  it("makes each Thing once, holding the shell at the first record it learns of at that labelpath", () => {
     const makeThing = vi.fn(TH.makePlainThing)
     const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: new MemoryVaultDB(), makeThing })
     heardOf(vaultDB)
@@ -500,7 +516,7 @@ describe("VaultMinder.thingAt(scoped)", () => {
     vaultDB.receive(rungOf(TH.boxThingOf('openai', { revseq: 2 })))
     vaultDB.receive(rungOf(TH.boxThingOf('openai', { revseq: 1 })))
     vaultDB.receive(rungOf(TH.boxThingOf('other')))
-    expect(makeThing.mock.calls).to.deep.equal([[soon], [TH.boxThingOf('other')]])
+    expect(makeThing.mock.calls).to.deep.equal([[Shell.inParentLivesOf(soon)], [Shell.inParentLivesOf(TH.boxThingOf('other'))]])
     expect(vaultDB.thingAt(TH.BoxScope)).to.equal(makeThing.mock.results[0]!.value)
   })
 
@@ -508,6 +524,40 @@ describe("VaultMinder.thingAt(scoped)", () => {
     const { vaultDB } = sortedOverMemory()
     TH.expectSyncRefusal(() => vaultDB.thingAt({ ...TH.BoxScope, banklabel: 'other' }), 'bad_record')
     TH.expectSyncRefusal(() => vaultDB.thingAt({ ...TH.ThingBank } as never), 'bad_record')
+  })
+})
+
+describe("VaultMinder.carAt(scoped)", () => {
+  it("holds the refusal its Thing last raised at a record, and when, and clears it at a record taken, keeping when", async () => {
+    const { vaultDB, inner } = refusingOverQuietMemory()
+    const { badNews } = heardOf(vaultDB)
+    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+    vaultDB.receive(rungOf(Revs.two))
+    expect(vaultDB.carAt(TH.BoxScope)).to.deep.equal({ thing: vaultDB.thingAt(TH.BoxScope), lastErr: null, erred_at: null })
+    cheatStored(inner, Revs.three)
+    await TH.expectRefusal(vaultDB.getOnce(TH.BoxScope), 'unexpected_error')
+    const refused = vaultDB.carAt(TH.BoxScope)!
+    expect(refused.lastErr).to.equal(badNews[0])
+    expect(isThingRefusal(badNews[0]!)).to.equal(true)
+    expect(refused.erred_at).to.be.a('number')
+    vaultDB.receive(rungOf(Revs.two))
+    expect(vaultDB.carAt(TH.BoxScope)).to.deep.equal({ thing: refused.thing, lastErr: null, erred_at: refused.erred_at })
+  })
+
+  it("is frozen, and the same object until its refusal changes", () => {
+    const { vaultDB } = refusingOverQuietMemory()
+    vaultDB.receive(rungOf(Revs.two))
+    const car = vaultDB.carAt(TH.BoxScope)
+    vaultDB.receive(rungOf(TH.nextOf(Revs.three)))
+    expect(vaultDB.carAt(TH.BoxScope)).to.equal(car)
+    expect(Object.isFrozen(car)).to.equal(true)
+  })
+
+  it("answers undefined where no record is learned of, or the record's scope is refused before a Thing is made", () => {
+    const { vaultDB } = refusingOverQuietMemory()
+    TH.expectSyncRefusal(() => { vaultDB.receive(rungOf({ ...Revs.two, lifepath: 'not a lifepath' })) }, 'bad_record')
+    expect(vaultDB.carAt(TH.BoxScope)).to.eq(undefined)
+    TH.expectSyncRefusal(() => vaultDB.carAt({ ...TH.BoxScope, banklabel: 'other' }), 'bad_record')
   })
 })
 
@@ -684,6 +734,54 @@ describe("VaultMinder.tryGetOnce(scoped) and getOnce(scoped)", () => {
     await TH.expectRefusal(vaultDB.getOnce(TH.GateScope))
   })
 
+  it("throw the refusal a newer record raises at a Thing already kept, which keeps its older record, and its try form answers it", async () => {
+    const { vaultDB, inner } = refusingOverQuietMemory()
+    const { badNews } = heardOf(vaultDB)
+    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+    cheatStored(inner, Revs.two)
+    expect(await vaultDB.getOnce(TH.BoxScope)).to.deep.equal(Revs.two)
+    cheatStored(inner, Revs.three)
+    const err = await TH.expectRefusal(vaultDB.getOnce(TH.BoxScope), 'unexpected_error')
+    expect(isThingRefusal(err)).to.equal(true)
+    expect(vaultDB.thingAt(TH.BoxScope)?.pickle()).to.deep.equal(Revs.two)
+    const answer = await vaultDB.tryGetOnce(TH.BoxScope)
+    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', dbhas: Revs.three, err: badNews[1] })
+    expect(badNews).to.deep.equal([err, badNews[1]])
+  })
+
+  it("throw the refusal a first record raises, its car staying with the Thing holding the shell", async () => {
+    const { vaultDB, inner } = refusingOverQuietMemory()
+    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+    cheatStored(inner, Revs.three)
+    const err = await TH.expectRefusal(vaultDB.getOnce(TH.BoxScope), 'unexpected_error')
+    const car = vaultDB.carAt(TH.BoxScope)!
+    expect(car.thing.pickle()).to.deep.equal(Shell.inParentLivesOf(Revs.three))
+    expect(car.lastErr).to.equal(err)
+  })
+
+  it("resolve a later answer its Thing takes as a repeat, clearing the refusal", async () => {
+    const { vaultDB, inner } = refusingOverQuietMemory()
+    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+    cheatStored(inner, Revs.two)
+    await vaultDB.getOnce(TH.BoxScope)
+    cheatStored(inner, Revs.three)
+    await TH.expectRefusal(vaultDB.getOnce(TH.BoxScope), 'unexpected_error')
+    cheatStored(inner, Revs.two)
+    expect(await vaultDB.getOnce(TH.BoxScope)).to.deep.equal(Revs.two)
+    expect(vaultDB.carAt(TH.BoxScope)?.lastErr).to.be.null
+  })
+
+  it("resolve a box whose answer carries a root its Thing refuses, telling onBadNews of the root", async () => {
+    const { vaultDB, inner } = refusingOverQuietMemory()
+    const { badNews } = heardOf(vaultDB)
+    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+    cheatStored(inner, Revs.two)
+    cheatStored(inner, TH.gateThingOf({ revseq: TH.RefusingThing.RefusedRevseq, revtok: TH.revtokOf('three') }))
+    expect(await vaultDB.getOnce(TH.BoxScope)).to.deep.equal(Revs.two)
+    expect(badNews.length > 0 && badNews.every((news) => isThingRefusal(news))).to.equal(true)
+    expect(vaultDB.carAt(TH.GateScope)?.lastErr).to.equal(badNews.at(-1))
+  })
+
   it("answer a refusal for a scope of another bank, asking the vaultDB nothing", async () => {
     const { vaultDB, inner } = sortedOverMemory()
     const asked = vi.spyOn(inner, 'tryGetThing')
@@ -795,6 +893,21 @@ describe("VaultMinder's writes: tryPutOnce, putOnce, tryDelOnce and delOnce", ()
     await TH.expectBad(vaultDB.tryPutOnce({ record: TH.boxThingOf('openai', { banklabel: 'other' }) }), 'bad_record')
     await TH.expectBad(vaultDB.tryDelOnce(null as never), 'unexpected_error')
     expect(asked).not.toHaveBeenCalled()
+  })
+
+  it("throw the refusal the record written raises at its Thing, which keeps its older record, and the try forms answer it", async () => {
+    for (const record of [Revs.three, TH.boxTombOf(Revs.two)]) {
+      const { vaultDB } = refusingOverQuietMemory()
+      await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+      const one = await vaultDB.putOnce({ record: TH.boxThingOf(), cited: Shell.childCited(TH.Life0) })
+      await vaultDB.putOnce({ record: TH.nextOf(one) })
+      await vaultDB.putOnce({ record: Revs.two })
+      const answer = (record.am === 'a') ? await vaultDB.tryPutOnce({ record }) : await vaultDB.tryDelOnce({ record })
+      expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', dbhas: record })
+      expect(isThingRefusal((answer as { err: Errors.VaultError }).err)).to.equal(true)
+      expect(vaultDB.thingAt(TH.BoxScope)?.pickle()).to.deep.equal(Revs.two)
+      await TH.expectRefusal((record.am === 'a') ? vaultDB.putOnce({ record, cited: Revs.two }) : vaultDB.delOnce({ record, cited: Revs.two }), 'unexpected_error')
+    }
   })
 
   it("delete over the citable of the Thing, resolving the tombstone stored, which the Thing holds", async () => {

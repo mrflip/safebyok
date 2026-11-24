@@ -174,7 +174,7 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
       queryKey:        [...VaultTSQ.itemQueryKeyOf(this)],
       status:          'success',
       fetchStatus:     'idle',
-      dataUpdatedAt:   this.written_at,
+      dataUpdatedAt:   this.#readAt ?? 0,
       isInvalidated:   false,
       lastRefusalkind: null,
       val:             maskedOf(this.#record),

@@ -61,6 +61,13 @@ async function bumpApicalls(vault: Vault): Promise<LiveOf<BoxRecord>> {
   return vault.putBoxOnce(newest ?? Openai, { sidecar: { account: 'work' } }, { whisper: { ...TH.Whisper, apicalls } })
 }
 
+/** Have `bank`'s vaultDB answer each write with a `read_tc` that is no time code, which the box's Thing refuses as it is told. */
+function answerWritesUntimed(bank: Bank): void {
+  const { vaultDB } = bank.device
+  const write = vaultDB.tryWriteThing.bind(vaultDB)
+  vi.spyOn(vaultDB, 'tryWriteThing').mockImplementation(async (ask) => ({ ...(await write(ask)), read_tc: crypto.randomUUID() }))
+}
+
 /** The vault of a second device signed in to `bank`'s bank over the same vaultDB, unlocked, which has seen no box. */
 async function buildVaultBeside(bank: Bank): Promise<Vault> {
   const device = TH.makeDevice({}, { vaultDB: bank.device.vaultDB })
@@ -220,6 +227,14 @@ describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
     expect(answer).to.have.nested.property('dbhas.revtok', stored.revtok)
   })
 
+  it("answers the refusal its box raises at the record its answer carries, though stored", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    answerWritesUntimed(bank)
+    await TH.expectBad(vault.tryPutBoxOnce(Openai, {}, { whisper: TH.Whisper }), 'bad_record')
+    expect(rowsOf(bank).get(Openai)).to.include({ revseq: 1 })
+  })
+
   it("answers a refusal met before the write, and writes nothing", async () => {
     const { bank, vault } = await TH.buildBornVault()
     const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
@@ -350,6 +365,14 @@ describe("vault.tryDelBoxOnce(labelpath)", () => {
     const tombstone = await TH.expectGood(vault.tryDelBoxOnce(Openai))
     expect(written).toHaveBeenCalledTimes(1)
     expect(written.mock.calls[0]![0]).to.deep.include({ ...bank.scope, op: 'del', labelpath: Openai, modelkind: 'box', cited: Thing.sparseOf(box), record: tombstone, track: TH.trackOf(bank.pickle(), bank.gate.pickle(), bank.rootBox) })
+  })
+
+  it("answers the refusal its box raises at the tombstone its answer carries, though stored", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    answerWritesUntimed(bank)
+    await TH.expectBad(vault.tryDelBoxOnce(Openai), 'bad_record')
+    expect(rowsOf(bank).get(Openai)).to.include({ am: 'x' })
   })
 
   it("answers a refusal for a box never stored, and writes nothing", async () => {
