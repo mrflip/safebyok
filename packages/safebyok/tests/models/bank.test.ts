@@ -743,14 +743,14 @@ describe("bank.track, and the asks the bank builds", () => {
   it("track what the bank's world last heard of, though the bank stored has moved on: the answer's tracked says so", async () => {
     const { bank, device } = await TH.buildBornBank()
     const record = nextBankThingOf(bank)
-    // Stored as another device would store it, telling no watch.
+    // Stored as another device would store it, notifying no watch.
     const store = device.vaultDB as MemoryVaultDB
     store._cheat_things(bank.scope).set('bank', record)
     const answer = await device.vaultDB.tryGetThing(bank.makeGetAsk({ labelpath: 'bank' }))
     expect(answer).to.deep.include({ ok: true, tracked: { bank: record, gate: 'same', box: 'same' } })
   })
 
-  it("track the bank a write elsewhere stored, once the watch has told the bank's world of it", async () => {
+  it("track the bank a write elsewhere stored, once the watch has notified the bank's world of it", async () => {
     const { bank, device } = await TH.buildBornBank()
     const record = nextBankThingOf(bank)
     const ask = { ...bank.makePutAsk({ cited: bank.pickle(), record }), labelpath: 'bank', modelkind: 'bank' } as const

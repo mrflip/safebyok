@@ -139,12 +139,12 @@ export async function storedBoxOf(vaultDB: MemoryVaultDB, revseq = 0): Promise<B
 }
 
 /** The notice a watcher gets for `record` sparse, as the vaultDB notifies of a Thing a list answers. */
-export function sparseWatchEventOf(record: ThingRecord): VaultItemEvent {
+export function sparseNoticeOf(record: ThingRecord): VaultItemEvent {
   return TH.itemEventOf(Thing.sparseOf(record), 'soon')
 }
 
 /** The notice a watcher gets for `record`, live or a tombstone. */
-export function watchEventOf(record: ThingRecord): VaultItemEvent {
+export function noticeOf(record: ThingRecord): VaultItemEvent {
   return TH.itemEventOf(record, Thing.isLive(record) ? 'full' : 'gone')
 }
 

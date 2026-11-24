@@ -22,7 +22,7 @@ const Openai: BoxLabelpath = 'box/openai'
 /** The scope of the Thing at `labelpath` in `bank`. */
 function scopeAt<LabelpathT extends string>(bank: Bank, labelpath: LabelpathT) { return { ...bank.scope, labelpath } }
 
-/** The rows of `bank`'s MemoryVaultDB, by labelpath, to plant a record as another device would, telling no watch. */
+/** The rows of `bank`'s MemoryVaultDB, by labelpath, to plant a record as another device would, notifying no watch. */
 function rowsOf(bank: Bank): Map<string, unknown> { return (bank.device.vaultDB as MemoryVaultDB)._cheat_things(bank.scope) }
 
 /** Unseal the whole record `vault`'s minder gets of {@link Openai}, a box, or where it gets null, its tombstone. */

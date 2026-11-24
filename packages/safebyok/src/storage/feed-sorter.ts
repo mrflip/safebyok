@@ -39,16 +39,16 @@ export class FeedSorter implements BankScope {
     const agerank    = raisedOf(agerankWas, cited, recordkind !== 'soon')
     if (agerank === undefined) { return Object.freeze([]) }
     this.#ageranks.set(cited.labelpath, agerank)
-    const told = { userid: this.userid, banklabel: this.banklabel, labelpath: cited.labelpath, modelkind: Labelpath.modelkindOf(cited.labelpath), agerank, agerankWas }
+    const shared = { userid: this.userid, banklabel: this.banklabel, labelpath: cited.labelpath, modelkind: Labelpath.modelkindOf(cited.labelpath), agerank, agerankWas }
     const record = (recordkind === 'void') ? null : seen
-    const events: VaultEvent[] = [Object.freeze({ eventkind: 'item', ...told, recordkind, record })]
+    const events: VaultEvent[] = [Object.freeze({ eventkind: 'item', ...shared, recordkind, record })]
     if ((agerankWas === undefined) || (partsOf(agerankWas).lifepath !== cited.lifepath)) {
       const lifekind = Lifeseq.isTombstone(Lifeseq.ofLifepath(cited.lifepath)) ? 'died' : 'born'
-      events.push(Object.freeze({ eventkind: 'life', ...told, lifekind }))
+      events.push(Object.freeze({ eventkind: 'life', ...shared, lifekind }))
     }
     const agekind = agekindOf(agerank)
     if (agekind !== 'here') {
-      events.push(Object.freeze({ eventkind: 'aged', ...told, agekind, agekindWas: (agerankWas === undefined) ? undefined : agekindOf(agerankWas) }))
+      events.push(Object.freeze({ eventkind: 'aged', ...shared, agekind, agekindWas: (agerankWas === undefined) ? undefined : agekindOf(agerankWas) }))
     }
     return Object.freeze(events)
   }

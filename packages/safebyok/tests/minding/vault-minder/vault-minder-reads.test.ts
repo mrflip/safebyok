@@ -5,7 +5,7 @@ import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, storedBoxOf, watchEventOf, revtokAt, listenerOf, toldOf, labelpathsOf } from './world'
+import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, storedBoxOf, noticeOf, revtokAt, listenerOf, toldOf, labelpathsOf } from './world'
 
 describe("VaultMinder.get", () => {
   it("refuses bad_record for a scope of another bank", async () => {
@@ -148,7 +148,7 @@ describe("VaultMinder.get", () => {
     vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, TH.boxThingOf())
     await TH.expectRefusal(minder.get(TH.BoxScope, { staleTime: 0 }), 'stale_read')
     const box2 = TH.nextOf(box1)
-    receive(watchEventOf(box2))
+    receive(noticeOf(box2))
     expect(minder.tryAt(TH.BoxScope)).to.deep.include({ act: 'gotlive', val: box2, isTimely: true })
   })
 
@@ -332,7 +332,7 @@ describe("VaultMinder.list", () => {
     const otherBirth = TH.birthAskOf(TH.boxThingOf('anthropic'), otherShell)
     await TH.expectGood(vaultDB.tryWriteThing(otherBirth))
     const { minder, receive } = await minderWorldOf(vaultDB)
-    receive(watchEventOf(box0))
+    receive(noticeOf(box0))
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
     await minder.list('box')

@@ -125,3 +125,22 @@ onBadNews" became "sends ... to onBadNews", a FeedSorter "tells" became "returns
    'each event tells the agerank before and after its record'), which are code and not titles, and the pasted table's
    blurbs ('repeats and olders tell nothing', 'a write heard of between', 'heard by a soon', 'heard twice'). Should the
    messages follow ruling 2 too?
+
+## Renames finished (the Coach's ruling: watch, watcher, notify, notice are a vaultDB's; listen, listener, tell, hear a minder's)
+
+The proposed renames above are done, and open question 4 is answered: the messages and blurbs follow the ruling.
+
+- `told` in `FeedSorter.eventify` is `shared`.
+- `heardOver` is `noticedRecordsOver` (the locals over its records, `noticedRecords`; the locals over a watcher's events, `notices`);
+  `heardOf` is `noticesOf`; `Told` / `toldOf` / `told` are `Shorthand` / `shorthandOf` / `shorthands`;
+  `watchEventOf` / `sparseWatchEventOf` are `noticeOf` / `sparseNoticeOf`.
+- The two assertion messages in `feed-sorter.test.ts` now read "a record taken comes first, as given" and "each event
+  carries the agerank before and after its record".
+- `tablegen/gen.py` words a chain as returning events, and a write or rebirth as seen; `table.ts.txt` is regenerated
+  (169 rows, principles held) and 5 blurbs changed in it and in the test; no chain, rule or row's order changed.
+- Where a vaultDB's watch was told or heard of in a file these PRs change, it now notifies: `minding/minder.ts`'s three doc
+  lines, the listing-orders test's doc block, and a title and a comment each in `models/bank.test.ts` and
+  `models/vault.test.ts`.
+- Left, in files these PRs do not change: `models/vault.ts` ("when the watch tells of it"), `shapes/shapes-minder.ts`
+  ("A record the vaultDB tells a minder of") and `tests/test-helpers/vaultdb-battery.ts` ("a vaultDB whose watch hears
+  nothing").
