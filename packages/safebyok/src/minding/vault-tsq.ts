@@ -197,10 +197,8 @@ export class VaultTSQ {
 
   /** The item of the box at `labelpath`, as its Thing holds it once a get of it answers. */
   async #itemOf(labelpath: Labelpath): Promise<ThingRecord | null> {
-    const thing = await this.#vaultMinder.getOnce(this.#scopeOf(labelpath))
-    const val   = itemValOf(thing)
-    if (val === undefined) { throw Throwers.boxSoonestBare(labelpath) }
-    return val
+    const record = await this.#vaultMinder.getOnce(this.#scopeOf(labelpath))
+    return BaseThing.isTombstone(record) ? null : record
   }
 
   /** The scope of `labelpath` in this bank */

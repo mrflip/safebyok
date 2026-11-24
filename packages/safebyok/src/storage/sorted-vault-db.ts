@@ -147,14 +147,17 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
     return await this.tryGetThing(ask)
   }
 
-  /** Get the Thing at `scoped`, of this bank, once, resolving the Thing kept there, whatever the record it now holds. */
-  async getOnce(scoped: ThingScope): Promise<ThingT> {
+  /** Get the Thing at `scoped`, of this bank, once, resolving the record it then holds: live, a tombstone or the shell, the Thing's own frozen object.
+   * Refuses `stale_read` where the Thing is known only sparse in its newest life, as where storage answers an earlier one. Call `thingAt` for the Thing.
+   */
+  async getOnce(scoped: ThingScope): Promise<ReturnType<ThingT['pickle']>> {
     const answer = await this.tryGetOnce(scoped)
     if (! answer.ok) { throw answer.err }
     // A record told that fails its checks leaves no Thing: it went to onBadNews.
     const thing = this.thingAt(scoped)
     if (thing === undefined) { throw Throwers.storageIssue() }
-    return thing
+    if (thing.agekind === 'bare') { throw Throwers.boxSoonestBare(this.#labelpathOf(scoped)) }
+    return thing.pickle() as ReturnType<ThingT['pickle']>
   }
 
   /** List the children of the Thing at `labelpath` once. A parent deleted or never stored lists none. A child stored damaged is told to each listener's `onBadNews`. */

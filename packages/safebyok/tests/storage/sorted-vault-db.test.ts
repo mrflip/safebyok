@@ -606,7 +606,7 @@ describe("SortedVaultDB's asks: makeGetAsk, makeListAsk, makePutAsk and makeDelA
 })
 
 describe("SortedVaultDB.tryGetOnce(scoped) and getOnce(scoped)", () => {
-  it("resolve the Thing at the scope, its events told before it resolves, with the bank's own get ask", async () => {
+  it("resolve the record the Thing at the scope holds, its events told before it resolves, with the bank's own get ask", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     const box = TH.boxThingOf()
@@ -614,21 +614,19 @@ describe("SortedVaultDB.tryGetOnce(scoped) and getOnce(scoped)", () => {
     const asked = vi.spyOn(inner, 'tryGetThing')
     const { events } = heardOf(vaultDB)
     const ask   = vaultDB.makeGetAsk({ labelpath: 'box/openai', ifAbsent: 'nil' })
-    const thing = await vaultDB.getOnce(TH.BoxScope)
-    expect(thing).to.equal(vaultDB.thingAt(TH.BoxScope))
-    expect(thing.pickle()).to.deep.equal(box)
+    const record = await vaultDB.getOnce(TH.BoxScope)
+    expect(record).to.equal(vaultDB.thingAt(TH.BoxScope)?.pickle()).and.deep.equal(box)
     expect(shorthandsOf(events)).to.deep.equal(firstSeen('box/openai'))
     expect(asked.mock.calls).to.deep.equal([[ask]])
   })
 
-  it("resolve the Thing holding the shell where none is stored", async () => {
+  it("resolve the shell where none is stored", async () => {
     const { vaultDB } = sortedOverMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
-    const thing = await vaultDB.getOnce(TH.BoxScope)
-    expect(thing.pickle()).to.deep.equal(Shell.of(TH.BoxScope, TH.rootBoxOf()))
+    expect(await vaultDB.getOnce(TH.BoxScope)).to.deep.equal(Shell.of(TH.BoxScope, TH.rootBoxOf()))
   })
 
-  it("resolve the Thing as it was for an answer older than it knows: never stale_read", async () => {
+  it("resolve the record the Thing holds for an answer older than a whole record it knows", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     cheatStored(inner, TH.boxThingOf())
@@ -636,8 +634,19 @@ describe("SortedVaultDB.tryGetOnce(scoped) and getOnce(scoped)", () => {
     vaultDB.receive(rungOf(newer))
     const answer = await vaultDB.tryGetOnce(TH.BoxScope)
     expect(answer).to.deep.include({ ok: true, act: 'gotlive', val: TH.boxThingOf() })
-    const thing = await vaultDB.getOnce(TH.BoxScope)
-    expect(thing.pickle()).to.equal(newer)
+    expect(await vaultDB.getOnce(TH.BoxScope)).to.equal(newer)
+  })
+
+  it("throw stale_read where the Thing is known only sparse in its newest life, and its try form answers the vaultDB's answer", async () => {
+    const { vaultDB, inner } = sortedOverQuietMemory()
+    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+    const box = TH.boxThingOf()
+    cheatStored(inner, box)
+    const reborn = TH.boxRebornOf(TH.boxTombOf(box))
+    vaultDB.receive(rungOf(Thing.sparseOf(reborn)))
+    const err = await TH.expectRefusal(vaultDB.getOnce(TH.BoxScope))
+    expect(err.refusalkind).to.eq('stale_read')
+    expect(await vaultDB.tryGetOnce(TH.BoxScope)).to.deep.include({ ok: true, act: 'gotlive', val: box })
   })
 
   it("answer, or throw, the vaultDB's refusal", async () => {
@@ -699,10 +708,10 @@ describe("SortedVaultDB's writes: tryPutOnce, putOnce, tryDelOnce and delOnce", 
   it("put over the citable of the Thing at the record's labelpath, resolving the record stored, which the Thing holds", async () => {
     const { vaultDB } = sortedOverQuietMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
-    const thing   = await vaultDB.getOnce(TH.BoxScope)
+    await vaultDB.getOnce(TH.BoxScope)
     const written = await vaultDB.putOnce({ record: TH.boxThingOf() })
     expect(written).to.deep.equal(TH.boxThingOf())
-    expect(thing.pickle()).to.equal(written)
+    expect(vaultDB.thingAt(TH.BoxScope)?.pickle()).to.equal(written)
   })
 
   it("put over a cold box, citing the newer revision known only sparse", async () => {
