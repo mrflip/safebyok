@@ -1,4 +1,4 @@
-"""Generate the feed table: each row a chain of records fed to a FeedSorter, and `streamed`, the events it tells.
+"""Generate the feed table: each row a chain of records fed to a FeedSorter, and `streamed`, the events it returns.
 
 A duplicate of whiteboard/20261123-minder_matrix/tablegen/gen.py (#866), with `streamed` in place of `wanted`, and no
 `today`: there is no earlier sorter to baseline against.
@@ -53,11 +53,11 @@ def tagOf(agerank):
   return "here" if item == high else ("bare" if item == -1 else "cold")
 
 def eventsOf(was, agerank, p):
-  """What a record taken tells: the record, then a life change, then an aging."""
+  """The events a record taken returns: the record, then a life change, then an aging."""
   kind, life, rev = p
   events = [("item", kind, life, rev)]
   lifeWas, highWas = partsOf(was)[:2] if was else (None, None)
-  # The first record of a scope tells a life too, from nothing: a listing may hear only these.
+  # The first record of a scope returns a life too, from nothing: a listing may return only these.
   if life != lifeWas:
     events.append(("life", "died" if (kind == "void" or life % 2 == 1) else "born", lifeWas, highWas, life, rev))
   # An aging says what it was before, null for nothing: cold to cold may matter where bare to cold does not.
@@ -65,7 +65,7 @@ def eventsOf(was, agerank, p):
   return events
 
 def streamOf(agerank, chain):
-  """(the events `chain` tells from `agerank`, the agerank it ends at, each agerank taken along the way)."""
+  """(the events `chain` returns from `agerank`, the agerank it ends at, each agerank taken along the way)."""
   events, taken = [], []
   for p in chain:
     raised = raisedOf(agerank, p)
@@ -94,7 +94,7 @@ def checkPrinciples():
       assert sorted(ranks) == sorted(ranks, key=partsOf), chain
       # A chain ends at one agerank in whatever order its records arrive.
       assert all(streamOf(None, perm)[1] == end for perm in itertools.permutations(chain)), chain
-      # A record told is told once: a repeat or an older one tells nothing.
+      # A record returns events once: a repeat or an older one returns none.
       items = [e for e in events if e[0] == "item"]
       assert len(items) == len(set(items)), chain
       # A dead life, a void's among them, is always here.
@@ -129,11 +129,11 @@ def relOf(was, p):
 
 CHAINS = [  # hand-written chains from nothing, each with what it is for
   ([VOID, S(4, 2), F(4, 2), G(5)],                                            "the first chain proposed: a void, a list, a get, a death"),
-  ([F(4, 2), F(4, 2), S(4, 2), S(4, 1), F(4, 1), G(3), VOID],                  "repeats and olders tell nothing"),
+  ([F(4, 2), F(4, 2), S(4, 2), S(4, 1), F(4, 1), G(3), VOID],                  "repeats and olders return no events"),
   ([F(4, 1), F(4, 2), F(4, 3)],                                               "three writes in a row"),
   ([F(4, 3), F(4, 2), F(4, 1)],                                               "three writes arriving newest first"),
   ([S(4, 2), F(4, 2), F(4, 3)],                                               "a list, a get, a write"),
-  ([S(4, 2), S(4, 2), S(4, 3), F(4, 3)],                                      "a list twice, a write heard of between, then its get"),
+  ([S(4, 2), S(4, 2), S(4, 3), F(4, 3)],                                      "a list twice, a write seen between, then its get"),
   ([F(4, 2), S(4, 2)],                                                        "a soon at the revision of the item"),
   ([F(4, 1), S(4, 2), F(4, 2), S(4, 3), F(4, 3)],                             "each soon caught up before the next"),
   ([F(4, 3), S(4, 2), S(4, 3), S(4, 4)],                                      "a full record ahead of its soons, then one soon past it"),
@@ -146,7 +146,7 @@ CHAINS = [  # hand-written chains from nothing, each with what it is for
   ([F(4, 2), G(5), F(6, 0), G(7)],                                            "die, be born, die"),
   ([G(5), S(6, 0), G(5), F(6, 0), G(7)],                                      "dead from the start, born by a soon, the old tombstone again"),
   ([G(5), G(7)],                                                              "dead to dead, the life between unseen"),
-  ([F(4, 2), S(6, 0), F(6, 1)],                                               "a birth past an unseen death, heard by a soon"),
+  ([F(4, 2), S(6, 0), F(6, 1)],                                               "a birth past an unseen death, seen by a soon"),
   ([F(4, 2), F(6, 0)],                                                        "a birth past an unseen death, by a full record"),
   ([F(4, 2), F(8, 0)],                                                        "two lives on, nothing seen between"),
   ([F(4, 2), G(7)],                                                           "on to a later death, a life unseen"),
@@ -155,11 +155,11 @@ CHAINS = [  # hand-written chains from nothing, each with what it is for
   ([F(4, 2), G(5), F(4, 3), S(4, 9), G(5)],                                   "records of the dead life after its tombstone"),
   ([G(5), S(6, 2), F(4, 9), F(6, 1), F(6, 2)],                                "a soon of a rebirth, a record of an old life, then catching up"),
   ([F(4, 1), S(4, 2), S(6, 0), F(4, 2), F(6, 0)],                             "cold across a rebirth: the catch-up of the old life comes too late"),
-  ([G(5), S(6, 0), S(6, 0), F(6, 0), F(6, 0)],                                "a rebirth heard twice and fetched twice"),
+  ([G(5), S(6, 0), S(6, 0), F(6, 0), F(6, 0)],                                "a rebirth seen twice and fetched twice"),
   ([F(4, 7), G(5), F(6, 0), S(6, 1)],                                         "revisions start over in each life"),
   ([VOID, VOID],                                                              "a void twice"),
   ([VOID, V(9), VOID, V(9)],                                                  "a void, then a void of a later life, each again"),
-  ([F(4, 2), V(5), F(4, 3), S(4, 9)],                                         "a void of a later life: records of the old life tell nothing"),
+  ([F(4, 2), V(5), F(4, 3), S(4, 9)],                                         "a void of a later life: records of the old life return no events"),
   ([F(4, 2), V(5), S(6, 0), F(6, 0), G(7)],                                   "a void of a later life, then born, written and dead"),
   ([V(5), F(4, 2), V(9)],                                                     "a void of each of two later lives, a record of an earlier life between"),
   ([F(4, 1), VOID],                                                           "a void after a record"),

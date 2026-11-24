@@ -6,18 +6,18 @@ import type { Agekind, Agerank, Lifekind, Recordkind, SeenThing, VaultEvent } fr
 import { FeedSorter } from '../../src/storage/feed-sorter'
 import * as TH from '../test-helpers'
 
-// == [Shorthand]: Life, Seen, Told, FeedCase, the starts
+// == [Shorthand]: Life, Seen, Shorthand, FeedCase, the starts
 
 /** A life at this scope, one number ordered as lifepaths are: even for a live life, odd for a dead one or a void */
 type Life = number
 /** A record, as `[recordkind, life, revseq]` */
 type Seen = readonly [Recordkind, Life, number]
 /** An event: an item as its record is, a life or an aging with what stood before (null for none) and after */
-type Told =
+type Shorthand =
   | readonly ['item', Recordkind, Life, number]
   | readonly ['life', Lifekind, Life | null, number | null, Life, number]
   | readonly ['aged', Agekind | null, Agekind, Life, number]
-type FeedCase = Readonly<{ initial: readonly Seen[], chain: readonly Seen[], streamed: readonly Told[], agerank: string, blurb: string }>
+type FeedCase = Readonly<{ initial: readonly Seen[], chain: readonly Seen[], streamed: readonly Shorthand[], agerank: string, blurb: string }>
 
 // Each start is the chain its row under "Each start, from nothing" feeds.
 const Empty:    readonly Seen[] = []
@@ -197,7 +197,7 @@ const FeedCases: readonly FeedCase[] = [
     agerank: "0000000005|0000000000|0000000000", blurb: 'the first chain proposed: a void, a list, a get, a death' },
   { initial: Empty,    chain: [["full", 4, 2], ["full", 4, 2], ["soon", 4, 2], ["soon", 4, 1], ["full", 4, 1], ["gone", 3, 0], ["void", -1, -1]],
     streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2]],
-    agerank: "0000000004|0000000002|0000000002", blurb: 'repeats and olders tell nothing' },
+    agerank: "0000000004|0000000002|0000000002", blurb: 'repeats and olders return no events' },
   { initial: Empty,    chain: [["full", 4, 1], ["full", 4, 2], ["full", 4, 3]],
     streamed: [["item", "full", 4, 1], ["life", "born", null, null, 4, 1], ["item", "full", 4, 2], ["item", "full", 4, 3]],
     agerank: "0000000004|0000000003|0000000003", blurb: 'three writes in a row' },
@@ -209,7 +209,7 @@ const FeedCases: readonly FeedCase[] = [
     agerank: "0000000004|0000000003|0000000003", blurb: 'a list, a get, a write' },
   { initial: Empty,    chain: [["soon", 4, 2], ["soon", 4, 2], ["soon", 4, 3], ["full", 4, 3]],
     streamed: [["item", "soon", 4, 2], ["life", "born", null, null, 4, 2], ["aged", null, "bare", 4, 2], ["item", "soon", 4, 3], ["aged", "bare", "bare", 4, 3], ["item", "full", 4, 3]],
-    agerank: "0000000004|0000000003|0000000003", blurb: 'a list twice, a write heard of between, then its get' },
+    agerank: "0000000004|0000000003|0000000003", blurb: 'a list twice, a write seen between, then its get' },
   { initial: Empty,    chain: [["full", 4, 2], ["soon", 4, 2]],
     streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2]],
     agerank: "0000000004|0000000002|0000000002", blurb: 'a soon at the revision of the item' },
@@ -248,7 +248,7 @@ const FeedCases: readonly FeedCase[] = [
     agerank: "0000000007|0000000000|0000000000", blurb: 'dead to dead, the life between unseen' },
   { initial: Empty,    chain: [["full", 4, 2], ["soon", 6, 0], ["full", 6, 1]],
     streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "soon", 6, 0], ["life", "born", 4, 2, 6, 0], ["aged", "here", "bare", 6, 0], ["item", "full", 6, 1]],
-    agerank: "0000000006|0000000001|0000000001", blurb: 'a birth past an unseen death, heard by a soon' },
+    agerank: "0000000006|0000000001|0000000001", blurb: 'a birth past an unseen death, seen by a soon' },
   { initial: Empty,    chain: [["full", 4, 2], ["full", 6, 0]],
     streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "full", 6, 0], ["life", "born", 4, 2, 6, 0]],
     agerank: "0000000006|0000000000|0000000000", blurb: 'a birth past an unseen death, by a full record' },
@@ -275,7 +275,7 @@ const FeedCases: readonly FeedCase[] = [
     agerank: "0000000006|0000000000|0000000000", blurb: 'cold across a rebirth: the catch-up of the old life comes too late' },
   { initial: Empty,    chain: [["gone", 5, 0], ["soon", 6, 0], ["soon", 6, 0], ["full", 6, 0], ["full", 6, 0]],
     streamed: [["item", "gone", 5, 0], ["life", "died", null, null, 5, 0], ["item", "soon", 6, 0], ["life", "born", 5, 0, 6, 0], ["aged", "here", "bare", 6, 0], ["item", "full", 6, 0]],
-    agerank: "0000000006|0000000000|0000000000", blurb: 'a rebirth heard twice and fetched twice' },
+    agerank: "0000000006|0000000000|0000000000", blurb: 'a rebirth seen twice and fetched twice' },
   { initial: Empty,    chain: [["full", 4, 7], ["gone", 5, 0], ["full", 6, 0], ["soon", 6, 1]],
     streamed: [["item", "full", 4, 7], ["life", "born", null, null, 4, 7], ["item", "gone", 5, 0], ["life", "died", 4, 7, 5, 0], ["item", "full", 6, 0], ["life", "born", 5, 0, 6, 0], ["item", "soon", 6, 1], ["aged", "here", "cold", 6, 1]],
     agerank: "0000000006|0000000001|0000000000", blurb: 'revisions start over in each life' },
@@ -285,7 +285,7 @@ const FeedCases: readonly FeedCase[] = [
     agerank: "0000000009|-000000001|-000000001", blurb: 'a void, then a void of a later life, each again' },
   { initial: Empty,    chain: [["full", 4, 2], ["void", 5, -1], ["full", 4, 3], ["soon", 4, 9]],
     streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "void", 5, -1], ["life", "died", 4, 2, 5, -1]],
-    agerank: "0000000005|-000000001|-000000001", blurb: 'a void of a later life: records of the old life tell nothing' },
+    agerank: "0000000005|-000000001|-000000001", blurb: 'a void of a later life: records of the old life return no events' },
   { initial: Empty,    chain: [["full", 4, 2], ["void", 5, -1], ["soon", 6, 0], ["full", 6, 0], ["gone", 7, 0]],
     streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "void", 5, -1], ["life", "died", 4, 2, 5, -1], ["item", "soon", 6, 0], ["life", "born", 5, -1, 6, 0], ["aged", "here", "bare", 6, 0], ["item", "full", 6, 0], ["item", "gone", 7, 0], ["life", "died", 6, 0, 7, 0]],
     agerank: "0000000007|0000000000|0000000000", blurb: 'a void of a later life, then born, written and dead' },
@@ -305,7 +305,7 @@ const FeedCases: readonly FeedCase[] = [
 ]
 // --
 
-// == [Harness]: lifepathOf, lifeOf, recordOf, agerankOf, agerankAtBoxOf, lifeHighOf, toldOf, isRaised
+// == [Harness]: lifepathOf, lifeOf, recordOf, agerankOf, agerankAtBoxOf, lifeHighOf, shorthandOf, isRaised
 
 // At box/openai, a record of life n has the lifepath `n/n` and a void of life n `n/-000000001`, each n spelled as a
 // lifeseq, so that lifepaths sort as the lives do. A void's own lifeseq is always the shell's, so its life is its parent's.
@@ -351,8 +351,8 @@ function lifeHighOf(agerank: Agerank): readonly [Life, number] {
   return [lifeOf(lifepath), Number.parseInt(highPadded, 32)]
 }
 
-/** `event`, told of `record`, as shorthand */
-function toldOf(event: VaultEvent, record: SeenThing): Told {
+/** `event`, returned for `record`, as shorthand */
+function shorthandOf(event: VaultEvent, record: SeenThing): Shorthand {
   switch (event.eventkind) {
   case 'item': {
     return ['item', event.recordkind, lifeOf(record.lifepath), record.revseq]
@@ -380,28 +380,28 @@ describe("FeedSorter.eventify, over the feed table", () => {
     it(`${blurb}, from ${StartNames.get(initial) ?? 'elsewhere'} (row ${String(rowIndex + 1)})`, () => {
       const sorter = new FeedSorter(TH.ThingBank)
       for (const seen of initial) { sorter.eventify(recordOf(seen)) }
-      const told: Told[] = []
+      const shorthands: Shorthand[] = []
       for (const seen of chain) {
         const record        = recordOf(seen)
         const agerankBefore = sorter.agerankAt(TH.BoxScope)
         const events        = sorter.eventify(record)
         const agerankAfter  = sorter.agerankAt(TH.BoxScope)
-        told.push(...events.map((event) => toldOf(event, record)))
+        shorthands.push(...events.map((event) => shorthandOf(event, record)))
         const items = events.flatMap((event) => (event.eventkind === 'item') ? [event.record] : [])
-        expect(items, 'a record taken is told first, as given').to.deep.equal((events.length === 0) ? [] : [(seen[0] === 'void') ? null : record])
+        expect(items, 'a record taken comes first, as given').to.deep.equal((events.length === 0) ? [] : [(seen[0] === 'void') ? null : record])
         for (const event of events) {
           expect(isRaised(event), 'each event raises the agerank').to.eq(true)
-          expect([event.agerankWas, event.agerank], 'each event tells the agerank before and after its record').to.deep.equal([agerankBefore, agerankAfter])
+          expect([event.agerankWas, event.agerank], 'each event carries the agerank before and after its record').to.deep.equal([agerankBefore, agerankAfter])
         }
       }
-      expect(told).to.deep.equal(streamed)
+      expect(shorthands).to.deep.equal(streamed)
       expect(sorter.agerankAt(TH.BoxScope)).to.eq(agerankAtBoxOf(agerank, [...initial, ...chain]))
     })
   }
 })
 
 describe("FeedSorter", () => {
-  it("tells each event with the scope and modelkind of its record, and the item with the record as given", () => {
+  it("returns each event with the scope and modelkind of its record, and the item with the record as given", () => {
     const sorter = new FeedSorter(TH.ThingBank)
     const record = Thing.sparseOf(TH.boxThingOf('openai', { revseq: 3 }))
     const events = sorter.eventify(record)
@@ -418,7 +418,7 @@ describe("FeedSorter", () => {
     expect(events.every((event) => Object.isFrozen(event))).to.eq(true)
   })
 
-  it("tells nothing, in a frozen list, for a record that raises nothing", () => {
+  it("returns no events, in a frozen list, for a record that raises nothing", () => {
     const sorter = new FeedSorter(TH.ThingBank)
     sorter.eventify(TH.boxThingOf())
     const events = sorter.eventify(TH.boxThingOf())
@@ -447,7 +447,7 @@ describe("FeedSorter", () => {
     sorter.eventify(Thing.sparseOf(TH.boxThingOf('openai', { revseq: 4 })))
     const tomb = Thing.sparseOf(TH.boxThingOf('openai', { am: 'x', lifepath: lifepathOf(5, false), lifeseq: Lifeseq.ofLifenum(5), revseq: 3 }))
     const events = sorter.eventify(tomb)
-    expect(events.map((event) => toldOf(event, tomb))).to.deep.equal([["item", "gone", 5, 3], ["life", "died", 0, 4, 5, 3]])
+    expect(events.map((event) => shorthandOf(event, tomb))).to.deep.equal([["item", "gone", 5, 3], ["life", "died", 0, 4, 5, 3]])
     expect(sorter.agerankAt(TH.BoxScope)).to.eq(agerankOf(5, 3, 3))
   })
 

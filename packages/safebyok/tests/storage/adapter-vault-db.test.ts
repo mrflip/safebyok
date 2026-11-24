@@ -29,25 +29,25 @@ class ScriptedVaultDB extends AdapterVaultDB {
   }
 }
 
-/** The Things a watch of the test bank hears over `vaultDB`. */
-function heardOver(vaultDB: ScriptedVaultDB): VaultItemEvent['record'][] {
-  const heard: VaultItemEvent['record'][] = []
-  vaultDB.watch(TH.ThingBank, (event) => { if (event.eventkind === 'item') { heard.push(event.record) } }, () => undefined)
-  return heard
+/** The records of the notices a watcher of the test bank gets over `vaultDB`. */
+function noticedRecordsOver(vaultDB: ScriptedVaultDB): VaultItemEvent['record'][] {
+  const noticedRecords: VaultItemEvent['record'][] = []
+  vaultDB.watch(TH.ThingBank, (event) => { if (event.eventkind === 'item') { noticedRecords.push(event.record) } }, () => undefined)
+  return noticedRecords
 }
 
 /** A value that throws on any look at it: what a broken backend might throw, or a broken host might ask. */
 const Booby = new Proxy({}, { get() { throw new Error('boom') }, getPrototypeOf() { throw new Error('boom') }, has() { throw new Error('boom') } })
 
-/** A watch whose handler throws on its first event, after two Things were received; what the handler heard and what onBadNews was told. */
+/** A watcher whose handler throws on its first notice, after two Things were received; the notices it got and the bad news onBadNews got. */
 function watchWithThrowingHandler() {
   const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
-  const heard: VaultEvent[] = []
+  const notices: VaultEvent[] = []
   const badNews: Errors.VaultError[] = []
-  vaultDB.watch(TH.ThingBank, (event) => { heard.push(event); if (heard.length === 1) { throw new Error('host bug') } }, (news) => { badNews.push(news) })
+  vaultDB.watch(TH.ThingBank, (event) => { notices.push(event); if (notices.length === 1) { throw new Error('host bug') } }, (news) => { badNews.push(news) })
   vaultDB.receive?.({ record: TH.boxThingOf(), world: null })
   vaultDB.receive?.({ record: TH.gateThingOf(), world: null })
-  return { heard, badNews }
+  return { notices, badNews }
 }
 
 describe("AdapterVaultDB, a step that throws", () => {
@@ -113,7 +113,7 @@ describe("AdapterVaultDB.tryWriteThing(ask), a store that reports oddly", () => 
 })
 
 describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
-  it("hears a sound Thing, and tells onBadNews of one that fails its checks", () => {
+  it("notifies of a sound Thing, and sends one that fails its checks to onBadNews", () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
     const events: VaultEvent[] = []
     const badNews: Errors.VaultError[] = []
@@ -125,7 +125,7 @@ describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
     expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['damaged_row', 'storage_issue'])
   })
 
-  it("tells a change as one event of its Thing, and nothing of the world beside it, sound or not", () => {
+  it("notifies of a change as one notice of its Thing, and of nothing in the world beside it, sound or not", () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
     const events: VaultEvent[] = []
     const badNews: Errors.VaultError[] = []
@@ -136,7 +136,7 @@ describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
     expect(badNews).to.deep.equal([])
   })
 
-  it("tells onBadNews of a Thing of another bank, and does not hear it", () => {
+  it("sends a Thing of another bank to onBadNews, not to onNotice", () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
     const events: VaultEvent[] = []
     const badNews: Errors.VaultError[] = []
@@ -146,14 +146,14 @@ describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
     expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['storage_issue'])
   })
 
-  it("tells onBadNews of an event handler that throws", () => {
+  it("sends onBadNews the error a notice handler throws", () => {
     const { badNews } = watchWithThrowingHandler()
     expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['unexpected_error'])
   })
 
-  it("keeps telling the handler of later events after it throws", () => {
-    const { heard } = watchWithThrowingHandler()
-    expect(heard.map(({ labelpath }) => labelpath)).to.deep.equal(['box/openai', 'gate'])
+  it("keeps notifying the handler of later Things after it throws", () => {
+    const { notices } = watchWithThrowingHandler()
+    expect(notices.map(({ labelpath }) => labelpath)).to.deep.equal(['box/openai', 'gate'])
   })
 
   it("refuses a watch with no onBadNews", () => {
@@ -162,19 +162,19 @@ describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
   })
 })
 
-describe("AdapterVaultDB, what a watch hears of a verb's answer", () => {
-  it("tells a refused get's, write's or birth's dbhas once, before the verb answers", async () => {
+describe("AdapterVaultDB, what a watcher is notified of from a verb's answer", () => {
+  it("notifies of a refused get's, write's or birth's dbhas once, before the verb answers", async () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: false, act: 'stale', world: null, record: TH.gateThingOf() }))
-    const heard = heardOver(vaultDB)
+    const noticedRecords = noticedRecordsOver(vaultDB)
     await vaultDB.tryGetThing(TH.getGateAskOf())
-    expect(heard).to.deep.equal([TH.gateThingOf()])
+    expect(noticedRecords).to.deep.equal([TH.gateThingOf()])
     await vaultDB.tryWriteThing(TH.birthAskOf())
-    expect(heard).to.have.lengthOf(2)
+    expect(noticedRecords).to.have.lengthOf(2)
     await vaultDB.tryBirthBank(TH.birthBankAskOf())
-    expect(heard).to.deep.equal([TH.gateThingOf(), TH.gateThingOf(), TH.gateThingOf()])
+    expect(noticedRecords).to.deep.equal([TH.gateThingOf(), TH.gateThingOf(), TH.gateThingOf()])
   })
 
-  it("notifies every watch of the bank of a dbhas, each with a copy of its own, or sends each one's onBadNews a dbhas that fails its checks", async () => {
+  it("notifies every watcher of the bank of a dbhas, each with a copy of its own, or sends each one's onBadNews a dbhas that fails its checks", async () => {
     const dbhases: unknown[] = [TH.gateThingOf(), { ...TH.gateThingOf(), revseq: 'nine' }]
     const vaultDB = new ScriptedVaultDB(() => ({ ok: false, act: 'stale', world: null, record: dbhases.shift() }) as never)
     const watches = [1, 2].map(() => {
@@ -194,16 +194,16 @@ describe("AdapterVaultDB, what a watch hears of a verb's answer", () => {
     expect(elsewhere).to.deep.equal([])
   })
 
-  it("tells the dbhas a thrown refusal carries once, from a get, a write or a birth", async () => {
+  it("notifies of the dbhas a thrown refusal carries once, from a get, a write or a birth", async () => {
     const vaultDB = new ScriptedVaultDB(() => { throw Throwers.gateIssue(TH.gateThingOf(), 'a test') })
-    const heard = heardOver(vaultDB)
+    const noticedRecords = noticedRecordsOver(vaultDB)
     await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'gate_issue')
     await TH.expectBad(vaultDB.tryWriteThing(TH.birthAskOf()), 'gate_issue')
     await TH.expectBad(vaultDB.tryBirthBank(TH.birthBankAskOf()), 'gate_issue')
-    expect(heard).to.deep.equal([TH.gateThingOf(), TH.gateThingOf(), TH.gateThingOf()])
+    expect(noticedRecords).to.deep.equal([TH.gateThingOf(), TH.gateThingOf(), TH.gateThingOf()])
   })
 
-  it("tells nothing of a good write's val, a null dbhas, or a throw that carries none, and only the parentage of a refused listing", async () => {
+  it("notifies of nothing for a good write's val, a null dbhas, or a throw that carries none, and only of the parentage of a refused listing", async () => {
     const steps: (() => Actual<EX.GoodAct>)[] = [
       () => ({ ok: true, act: 'born', world: null, record: TH.gateThingOf() }),
       () => ({ ok: false, act: 'stale', world: null, record: null }),
@@ -211,26 +211,26 @@ describe("AdapterVaultDB, what a watch hears of a verb's answer", () => {
     ]
     for (const step of steps) {
       const vaultDB = new ScriptedVaultDB(step)
-      const heard = heardOver(vaultDB)
+      const noticedRecords = noticedRecordsOver(vaultDB)
       await vaultDB.tryWriteThing(TH.birthAskOf())
       await TH.aWhile()
-      expect(heard).to.deep.equal([])
+      expect(noticedRecords).to.deep.equal([])
     }
     const parentage = [Thing.sparseOf(TH.rootBoxOf())]
     const listing = new ScriptedVaultDB(() => ({ ok: false, act: 'gone', world: null, parentage, deltas: [], damaged_rows: [] }) as never)
-    const heard = heardOver(listing)
+    const noticedRecords = noticedRecordsOver(listing)
     expect(await listing.tryListThings(TH.listAskAt('box'))).to.deep.include({ ok: false, dbhas: [] })
     await TH.aWhile()
-    expect(heard).to.deep.equal(parentage)
+    expect(noticedRecords).to.deep.equal(parentage)
   })
 
-  it("tells a good listing's parentage, then its deltas in labelpath order, before the listing answers", async () => {
-    const parentage = [Thing.sparseOf(TH.rootBoxOf())]
-    const deltas    = [Thing.sparseOf(TH.boxThingOf('anthropic')), Thing.sparseOf(TH.boxThingOf('openai'))]
-    const kids      = { modelkind: 'kids', parentpath: 'box', parentlife: TH.rootBoxOf().lifepath, items: {}, gones: {}, read_tc: '' }
-    const vaultDB   = new ScriptedVaultDB(() => ({ ok: true, act: 'gotlive', world: null, kids, parentage, deltas, damaged_rows: [] }) as never)
-    const heard     = heardOver(vaultDB)
+  it("notifies of a good listing's parentage, then its deltas in labelpath order, before the listing answers", async () => {
+    const parentage      = [Thing.sparseOf(TH.rootBoxOf())]
+    const deltas         = [Thing.sparseOf(TH.boxThingOf('anthropic')), Thing.sparseOf(TH.boxThingOf('openai'))]
+    const kids           = { modelkind: 'kids', parentpath: 'box', parentlife: TH.rootBoxOf().lifepath, items: {}, gones: {}, read_tc: '' }
+    const vaultDB        = new ScriptedVaultDB(() => ({ ok: true, act: 'gotlive', world: null, kids, parentage, deltas, damaged_rows: [] }) as never)
+    const noticedRecords = noticedRecordsOver(vaultDB)
     await vaultDB.tryListThings(TH.listAskAt('box'))
-    expect(heard).to.deep.equal([...parentage, ...deltas])
+    expect(noticedRecords).to.deep.equal([...parentage, ...deltas])
   })
 })

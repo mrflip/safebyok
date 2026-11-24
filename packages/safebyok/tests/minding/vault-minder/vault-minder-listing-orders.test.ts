@@ -4,7 +4,7 @@ import type { Kids } from '../../../src/storage/vault-db'
 import { MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { QuietVaultDB, minderWorldOf, storedBoxOf, watchEventOf, boxScopeOf, cheatBox, boxBirthAskOf, listenerOf, isListingEvent, isListingStaleAt, labelpathsOf } from './world'
+import { QuietVaultDB, minderWorldOf, storedBoxOf, noticeOf, boxScopeOf, cheatBox, boxBirthAskOf, listenerOf, isListingEvent, isListingStaleAt, labelpathsOf } from './world'
 
 // == [Listings in any order]: ListingStep, OrdersWithoutWrite, ListingOrders, listingAfter
 
@@ -24,7 +24,7 @@ const ListingOrders = OrdersWithoutWrite.flatMap((steps) => [0, 1, 2, 3].map((ii
 
 /** The root box's listing after `steps`, in order, and a list more where they left it stale, over a datastore with the boxes
  * openai, anthropic and mistral. The get is of anthropic, the notice of mistral, and the write births cohere. Its watch
- * tells nothing: the notice step hands the minder its one notice.
+ * notifies no one: the notice step hands the minder its one notice.
  */
 async function listingAfter(steps: readonly ListingStep[]) {
   const vaultDB = new QuietVaultDB()
@@ -36,7 +36,7 @@ async function listingAfter(steps: readonly ListingStep[]) {
     list:   async () => { await minder.list('box') },
     get:    async () => { await minder.get(boxScopeOf('anthropic')) },
     write:  async () => { await TH.expectGood(minder.tryWrite(boxBirthAskOf('cohere'))) },
-    notice: () => { receive(watchEventOf(mistral)) },
+    notice: () => { receive(noticeOf(mistral)) },
   }
   for (const step of steps) { await stepRunners[step]() }
   if (isListingStaleAt(minder, TH.RootScope)) { await minder.list('box') }
@@ -81,7 +81,7 @@ async function eventsAfter(steps: readonly ListingStep[]) {
       try { await minder.get(TH.BoxScope, { staleTime: 0 }) } catch (err) { refusalkinds.push((err as { refusalkind?: unknown }).refusalkind) }
     },
     write:  async () => { await TH.expectGood(minder.tryWrite(replaceAsk)) },
-    notice: () => { receive(watchEventOf(Reborn)) },
+    notice: () => { receive(noticeOf(Reborn)) },
   }
   for (const step of steps) { await stepRunners[step]() }
   return { events: heard.mock.calls.map(([event]) => event), refusalkinds }

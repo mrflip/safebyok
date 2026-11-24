@@ -77,7 +77,7 @@ describe("IdbVaultDB's databases", () => {
 })
 
 describe("IdbVaultDB's watch", () => {
-  it("hears a write made by another instance on the same database, as another tab's", async () => {
+  it("notifies of a write made by another instance on the same database, as another tab's", async () => {
     const idbVaultDB = TH.makeIdbVaultDB()
     const twin = TH.makeTwin(idbVaultDB)
     const events: unknown[] = []

@@ -5,7 +5,7 @@ import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { type BoxRecord, type Sparse, type ThingRecord, type Tombstone } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { Hours24, BoxGetAsk, DownVaultDB, fakeBankOf, minderOf, minderWorldOf, bornOf, storedBoxOf, watchEventOf, sparseWatchEventOf, actOf, boxScopeOf, cheatBox, boxBirthAskOf, isListingStaleAt, labelpathsOf } from './world'
+import { Hours24, BoxGetAsk, DownVaultDB, fakeBankOf, minderOf, minderWorldOf, bornOf, storedBoxOf, noticeOf, sparseNoticeOf, actOf, boxScopeOf, cheatBox, boxBirthAskOf, isListingStaleAt, labelpathsOf } from './world'
 
 describe("VaultMinder.at", () => {
   it("has nothing before any get", async () => {
@@ -107,7 +107,7 @@ describe("VaultMinder.soonAt", () => {
     const box1 = TH.nextOf(box0)
     for (const order of [[box0, box1], [box1, box0]]) {
       const { minder, receive } = await minderWorldOf(new MemoryVaultDB())
-      for (const box of order) { receive(sparseWatchEventOf(box)) }
+      for (const box of order) { receive(sparseNoticeOf(box)) }
       expect(minder.soonAt(TH.BoxScope)).to.deep.equal(Thing.sparseOf(box1))
     }
   })
@@ -115,8 +115,8 @@ describe("VaultMinder.soonAt", () => {
   it("has nothing once a whole record no older arrives", async () => {
     const { minder, receive } = await minderWorldOf(new MemoryVaultDB())
     const box0 = TH.boxThingOf()
-    receive(sparseWatchEventOf(box0))
-    receive(watchEventOf(box0))
+    receive(sparseNoticeOf(box0))
+    receive(noticeOf(box0))
     expect([minder.soonAt(TH.BoxScope), minder.at(TH.BoxScope)]).to.deep.equal([undefined, box0])
   })
 
@@ -137,13 +137,13 @@ describe("VaultMinder.isBehindAt", () => {
     const box0 = TH.boxThingOf()
     const box1 = TH.nextOf(box0)
     expect(minder.isBehindAt(TH.BoxScope)).to.be.false
-    receive(sparseWatchEventOf(box0))
+    receive(sparseNoticeOf(box0))
     expect(minder.isBehindAt(TH.BoxScope)).to.be.true
-    receive(watchEventOf(box0))
+    receive(noticeOf(box0))
     expect(minder.isBehindAt(TH.BoxScope)).to.be.false
-    receive(sparseWatchEventOf(box1))
+    receive(sparseNoticeOf(box1))
     expect(minder.isBehindAt(TH.BoxScope)).to.be.true
-    receive(watchEventOf(box1))
+    receive(noticeOf(box1))
     expect(minder.isBehindAt(TH.BoxScope)).to.be.false
   })
 
@@ -159,8 +159,8 @@ describe("VaultMinder.listingAt", () => {
     const box     = await storedBoxOf(vaultDB)
     const { minder, receive } = await minderWorldOf(vaultDB)
     await minder.get(TH.BoxScope)
-    receive(watchEventOf(TH.nextOf(box)))
-    receive(watchEventOf(TH.boxThingOf('anthropic')))
+    receive(noticeOf(TH.nextOf(box)))
+    receive(noticeOf(TH.boxThingOf('anthropic')))
     expect(minder.listingAt(TH.RootScope)).to.be.undefined
   })
 
@@ -183,7 +183,7 @@ describe("VaultMinder.listingAt", () => {
     await storedBoxOf(vaultDB)
     const { minder, receive } = await minderWorldOf(vaultDB)
     await minder.list('box')
-    receive(watchEventOf(TH.boxThingOf('anthropic')))
+    receive(noticeOf(TH.boxThingOf('anthropic')))
     expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/openai'])
     vaultDB._cheat_things(TH.ThingBank).delete(TH.BoxScope.labelpath)
     await minder.list('box')
@@ -278,7 +278,7 @@ describe("VaultMinder, a child's first landing", () => {
   })
 
   it("marks the parent's listing stale for a box new to it, whole or sparse", async () => {
-    for (const notice of [watchEventOf(TH.boxThingOf('anthropic')), sparseWatchEventOf(TH.boxThingOf('anthropic'))]) {
+    for (const notice of [noticeOf(TH.boxThingOf('anthropic')), sparseNoticeOf(TH.boxThingOf('anthropic'))]) {
       const { minder, receive } = await listedWorld()
       receive(notice)
       expect(isListingStaleAt(minder, TH.RootScope)).to.be.true
@@ -305,7 +305,7 @@ describe("VaultMinder, a child's first landing", () => {
   it("marks nothing stale for the first get of a box a list brought in, nor a later revision of it", async () => {
     const { minder, receive, box } = await listedWorld()
     await minder.get(TH.BoxScope)
-    receive(watchEventOf(TH.nextOf(box)))
+    receive(noticeOf(TH.nextOf(box)))
     expect(isListingStaleAt(minder, TH.RootScope)).to.be.false
   })
 
@@ -313,7 +313,7 @@ describe("VaultMinder, a child's first landing", () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { minder, receive } = await minderWorldOf(vaultDB)
-    receive(watchEventOf(TH.boxThingOf('anthropic')))
+    receive(noticeOf(TH.boxThingOf('anthropic')))
     expect(minder.listingAt(TH.RootScope)).to.be.undefined
     expect(minder.tsqClient.getQueryState(minder.listQueryKey(TH.RootScope))).to.be.undefined
   })
@@ -326,7 +326,7 @@ describe("VaultMinder, a child's first landing", () => {
       // A listing is stale at once, so the observer lists as it mounts.
       await TH.eventually(() => ! observer.getCurrentResult().isFetching)
       cheatBox(vaultDB, TH.boxThingOf('anthropic'))
-      receive(watchEventOf(TH.boxThingOf('anthropic')))
+      receive(noticeOf(TH.boxThingOf('anthropic')))
       await TH.eventually(() => labelpathsOf(minder.listingAt(TH.RootScope))?.length === 2)
       expect(isListingStaleAt(minder, TH.RootScope)).to.be.false
     } finally {
@@ -397,7 +397,7 @@ describe("VaultMinder.tryAt", () => {
   it("answers gotgone with null, and the tombstone as its dbhas", async () => {
     const { minder, receive } = await minderWorldOf(new MemoryVaultDB())
     const tombstone = TH.boxTombOf(TH.boxThingOf())
-    receive(watchEventOf(tombstone))
+    receive(noticeOf(tombstone))
     expect(minder.tryAt(TH.BoxScope)).to.deep.include({ ok: true, act: 'gotgone', val: null, dbhas: tombstone })
   })
 
@@ -405,8 +405,8 @@ describe("VaultMinder.tryAt", () => {
     const { minder, receive } = await minderWorldOf(new MemoryVaultDB())
     const tombstone = TH.boxTombOf(TH.boxThingOf())
     const reborn    = TH.boxRebornOf(tombstone)
-    receive(watchEventOf(tombstone))
-    receive(watchEventOf(reborn))
+    receive(noticeOf(tombstone))
+    receive(noticeOf(reborn))
     expect(minder.tryAt(TH.BoxScope)).to.deep.include({ ok: true, act: 'gotlive', val: reborn })
     expect(minder.deadAt(TH.BoxScope)).to.equal(tombstone)
   })

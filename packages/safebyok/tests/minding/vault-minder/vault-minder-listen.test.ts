@@ -6,7 +6,7 @@ import { Thing } from '../../../src/models/thing'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { type BoxRecord, type GateRecord, type Sparse, type Tombstone } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
-import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, cheatBox, storedBoxOf, watchEventOf, sparseWatchEventOf, boxScopeOf, everyEventListenerOf, listenerOf, toldOf, isListingEvent, labelpathsOf } from './world'
+import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, cheatBox, storedBoxOf, noticeOf, sparseNoticeOf, boxScopeOf, everyEventListenerOf, listenerOf, toldOf, isListingEvent, labelpathsOf } from './world'
 
 /** The last item's event `heard` was told, or undefined for none. */
 function lastItemEventOf(heard: ReturnType<typeof listenerOf>): MinderEvent | undefined {
@@ -84,7 +84,7 @@ describe("VaultMinder.listen", () => {
     const { minder, receive } = await minderWorldOf(vaultDB)
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
-    receive(watchEventOf(box0))
+    receive(noticeOf(box0))
     const { action, state } = heard.mock.calls[0]![0]
     expect(action).to.include({ type: 'success', manual: true })
     expect(action).to.have.property('data', state.data)
@@ -146,8 +146,8 @@ describe("VaultMinder.listen", () => {
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
     const box1  = TH.nextOf(box0)
-    receive(sparseWatchEventOf(box1))
-    receive(sparseWatchEventOf(TH.nextOf(box1)))
+    receive(sparseNoticeOf(box1))
+    receive(sparseNoticeOf(TH.nextOf(box1)))
     expect(toldOf(heard)).to.deep.equal([['soon', 'box/openai', box1.revseq], ['box/openai', 'behind'], ['soon', 'box/openai', box1.revseq + 1]])
     expect(heard.mock.calls[0]?.[0]).to.deep.nested.include({ type: 'updated', 'action.type': 'success', modelkind: 'box', revtok: box1.revtok, queryKey: minder.soonQueryKey(TH.BoxScope) })
     expect(heard.mock.calls[1]?.[0]).to.deep.nested.include({ type: 'updated', 'action.type': 'invalidate', revseq: box0.revseq })
@@ -181,7 +181,7 @@ describe("VaultMinder.listen", () => {
     const heard   = listenerOf()
     minder.listen(heard, MinderEventFormat)
     await minder.get(TH.BoxScope)
-    receive(watchEventOf(box))
+    receive(noticeOf(box))
     const cached = minder.at(TH.BoxScope)
     const items  = heard.mock.calls.map(([event]) => event).filter((event) => event.eventkind === 'item')
     expect(items).to.have.lengthOf(2)
@@ -196,7 +196,7 @@ describe("VaultMinder.listen", () => {
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
     const tombstone = TH.boxTombOf(TH.boxThingOf())
-    receive(watchEventOf(tombstone))
+    receive(noticeOf(tombstone))
     expect(toldOf(heard)).to.deep.equal([['dead', 'box/openai', tombstone.revseq], ['box/openai', 'null']])
     expect(heard.mock.calls[0]?.[0]).to.deep.nested.include({ type: 'updated', "action.type": 'success', modelkind: 'box', am: 'x', revtok: tombstone.revtok, queryKey: minder.deadQueryKey(TH.BoxScope) })
     expect(heard.mock.calls[0]?.[0]).to.have.nested.property('state.data', minder.deadAt(TH.BoxScope))
@@ -239,12 +239,12 @@ describe("VaultMinder.listen", () => {
     const box0    = await storedBoxOf(vaultDB)
     const box1    = TH.nextOf(box0)
     const { minder, receive } = await minderWorldOf(vaultDB)
-    receive(watchEventOf(box1))
+    receive(noticeOf(box1))
     vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, box0)
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
     await TH.expectRefusal(minder.get(TH.BoxScope, { staleTime: 0 }), 'stale_read')
-    receive(sparseWatchEventOf(TH.nextOf(box1)))
+    receive(sparseNoticeOf(TH.nextOf(box1)))
     expect(toldOf(heard)).to.deep.equal([['box/openai', 'live'], ['soon', 'box/openai', box1.revseq + 1]])
     expect(heard.mock.calls[0]?.[0]).to.have.nested.property('action.type', 'error')
     expect(minder.tryAt(TH.BoxScope)).to.deep.include({ act: 'untimely', record: box1 })
@@ -263,7 +263,7 @@ describe("VaultMinder.listen", () => {
       minder.listen((event) => {
         if ((event.eventkind === 'item') && (event.action?.type === 'success')) { acts.push(minder.tryAt(TH.BoxScope).act) }
       }, MinderEventFormat)
-      if (landing === 'notice') { receive(watchEventOf(box1)) } else { await minder.get(TH.BoxScope) }
+      if (landing === 'notice') { receive(noticeOf(box1)) } else { await minder.get(TH.BoxScope) }
       expect(acts).to.deep.equal(['gotlive'])
       expect(minder.soonAt(TH.BoxScope)).to.be.undefined
     })
@@ -279,7 +279,7 @@ describe("VaultMinder.listen", () => {
     minder.listen((event) => {
       if ((event.eventkind === 'soon') && (event.action?.type === 'success')) { seen.push([minder.soonAt(TH.BoxScope), minder.isBehindAt(TH.BoxScope)]) }
     }, MinderEventFormat)
-    receive(sparseWatchEventOf(box1))
+    receive(sparseNoticeOf(box1))
     expect(seen).to.deep.equal([[Thing.sparseOf(box1), true]])
   })
 
@@ -295,7 +295,7 @@ describe("VaultMinder.listen", () => {
     minder.listen((event) => {
       if ((event.eventkind === 'soon') && (event.action?.type === 'success')) { gets.push(minder.get(TH.BoxScope, { staleTime: Infinity })) }
     }, MinderEventFormat)
-    receive(sparseWatchEventOf(box1))
+    receive(sparseNoticeOf(box1))
     expect(await Promise.all(gets)).to.deep.equal([item])
     expect(asked).not.toHaveBeenCalled()
   })
@@ -312,7 +312,7 @@ describe("VaultMinder.listen", () => {
         seen.push([minder.isStaleAt(TH.BoxScope, { staleTime: Infinity }), minder.isStaleAt(TH.BoxScope)])
       }
     }, MinderEventFormat)
-    receive(sparseWatchEventOf(box1))
+    receive(sparseNoticeOf(box1))
     expect(seen).to.deep.equal([[false, true]])
   })
 
@@ -328,7 +328,7 @@ describe("VaultMinder.listen", () => {
     minder.listen((event) => {
       if ((event.eventkind === 'soon') && (event.action?.type === 'success')) { gets.push(minder.get(TH.BoxScope)) }
     }, MinderEventFormat)
-    receive(sparseWatchEventOf(box1))
+    receive(sparseNoticeOf(box1))
     expect(await Promise.all(gets)).to.deep.equal([box1])
     expect(asked).toHaveBeenCalledOnce()
   })
@@ -350,7 +350,7 @@ describe("VaultMinder.listen", () => {
     await minder.get(TH.BoxScope)
     await minder.list('box')
     const newer = TH.nextOf(TH.boxThingOf())
-    receive(sparseWatchEventOf(newer))
+    receive(sparseNoticeOf(newer))
     const cached = [minder.at(TH.BoxScope), minder.soonAt(TH.BoxScope), minder.listingAt(TH.RootScope)]
     expect(cached.every((val) => val !== undefined)).to.eq(true)
     const heard = listenerOf()
@@ -393,8 +393,8 @@ describe("VaultMinder.listen", () => {
     await minder.list('box')
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
-    receive(watchEventOf(TH.nextOf(box)))
-    receive(watchEventOf(TH.boxThingOf('anthropic')))
+    receive(noticeOf(TH.nextOf(box)))
+    receive(noticeOf(TH.boxThingOf('anthropic')))
     expect(toldOf(heard)).to.deep.equal([['box/openai', 'live'], ['soon', 'box/openai', 'removed'], ['box/anthropic', 'live'], ['listing']])
     expect(heard.mock.calls.at(-1)?.[0]).to.deep.nested.include({ 'action.type': 'invalidate', 'state.isInvalidated': true })
     expect(heard.mock.calls.at(-1)?.[0]).to.have.nested.property('state.data', minder.listingAt(TH.RootScope))

@@ -33,7 +33,7 @@ import * as Throwers from '../refusals/throwers'
 /** Anything naming a labelpath: a scope, an ask or a record. */
 export type Labelpathed = { labelpath: Labelpath }
 
-/** This device's cache of the Things of one bank it minds, kept from everything the vaultDB tells of them.
+/** This device's cache of the Things of one bank it minds, kept from everything the vaultDB notifies of them.
  * A subclass says which Things it minds: a VaultMinder the boxes under the root box, a BankMinder the bank, its main gate and its root box.
  * Each Thing minded has an item, with what a host shows: its live whole record, or null where none is stored live.
  * It may also have a soon, a sparse record newer than the item, removed once the item catches up; and a dead record, its
@@ -77,7 +77,7 @@ export type Labelpathed = { labelpath: Labelpath }
  * - An operation caches its own good answer (the record got or written, or the {@link Kids} value listed, never a write's
  *   ask) and the bank and main gate of the world its answer carries, refused or not. Any other record an answer carries (a
  *   refusal's `dbhas`, a list's parentage and deltas, or a tracked bank, main gate or root box) is cached only as the
- *   watch tells of it, and the watch tells of it before the operation returns.
+ *   watch notifies of it, and the watch notifies of it before the operation returns.
  * - A refused write changes no item it writes and marks nothing stale. Its `dbhas`, through the watch, may still change an item.
  * - A write's answer and the watch's notice of the same write leave the same item, in either order: the later changes nothing.
  * - `invalidate` marks listings stale, never items. It lists again only a listing an observer keeps active, and asks the
@@ -290,7 +290,7 @@ export abstract class Minder {
   // == [Writing]: tryWrite, write
 
   /** Write `ask` through the vaultDB, and return its answer, a refusal included.
-   * The record written, a tombstone as null in its item, and the bank and main gate of the answer's world, are cached before it answers, where this minder minds them. A refusal's `dbhas` is cached only as the watch tells of it.
+   * The record written, a tombstone as null in its item, and the bank and main gate of the answer's world, are cached before it answers, where this minder minds them. A refusal's `dbhas` is cached only as the watch notifies of it.
    * Before `hello`, after `goodbye`, or for a Thing this minder does not mind, it answers the refusal without asking the vaultDB.
    * Rejects, whether or not the write was made, when the answer carries a record of another bank.
    */

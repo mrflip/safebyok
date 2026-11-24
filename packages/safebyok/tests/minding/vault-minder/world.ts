@@ -49,7 +49,7 @@ export class LateVaultDB extends MemoryVaultDB {
   release(): void { for (const resolve of this.#releases.splice(0)) { resolve() } }
 }
 
-/** A vaultDB whose watch tells nothing: a test hands the minder each event itself. */
+/** A vaultDB whose watch notifies no one: a test hands the minder each notice itself. */
 export class QuietVaultDB extends MemoryVaultDB {
   override watch(): () => void { return noop }
 }
@@ -96,7 +96,7 @@ export function minderOf(vaultDB: MemoryVaultDB, queryCacheOpts: Partial<QueryCa
   return VaultMinder.make({ vaultDB, queryCacheOpts }, bank)
 }
 
-/** A bank's minder, what it stands on, and a way to hand its watch an event. */
+/** A bank's minder, what it stands on, and a way to hand its watch a notice. */
 export interface MinderWorld<VaultDBT extends MemoryVaultDB> {
   vaultDB:    VaultDBT
   bank:       ReturnType<typeof fakeBankOf>
@@ -138,13 +138,13 @@ export async function storedBoxOf(vaultDB: MemoryVaultDB, revseq = 0): Promise<B
   return box
 }
 
-/** The event a watch tells of `record` sparse, as the vaultDB tells a Thing a list answers. */
-export function sparseWatchEventOf(record: ThingRecord): VaultItemEvent {
+/** The notice a watcher gets for `record` sparse, as the vaultDB notifies of a Thing a list answers. */
+export function sparseNoticeOf(record: ThingRecord): VaultItemEvent {
   return TH.itemEventOf(Thing.sparseOf(record), 'soon')
 }
 
-/** The event a watch tells of `record`, live or a tombstone, as the vaultDB tells one. */
-export function watchEventOf(record: ThingRecord): VaultItemEvent {
+/** The notice a watcher gets for `record`, live or a tombstone. */
+export function noticeOf(record: ThingRecord): VaultItemEvent {
   return TH.itemEventOf(record, Thing.isLive(record) ? 'full' : 'gone')
 }
 
@@ -159,7 +159,7 @@ export function actOf(answer: TSQAnswer): string { return answer.act }
 /** The scope of the box under the root box labelled `boxlabel`. */
 export function boxScopeOf(boxlabel: string): ThingScope { return { ...TH.ThingBank, labelpath: `box/${boxlabel}` } }
 
-/** Put `box` in `vaultDB`'s datastore as another device would, telling no watch. */
+/** Put `box` in `vaultDB`'s datastore as another device would, notifying no watcher. */
 export function cheatBox(vaultDB: MemoryVaultDB, box: DeliverableThing): void { vaultDB._cheat_things(TH.ThingBank).set(box.labelpath, box) }
 
 /** The labelpaths `kids` names, live and gone, in labelpath order, or undefined for no listing. */
