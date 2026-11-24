@@ -31,7 +31,8 @@ import { Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { BirthBankAsk } from '../../src/shapes/shapes-asks'
-import type { BirthBankAnswer, VaultDB } from '../../src/storage/vault-db'
+import type { BirthBankAnswer } from '../../src/shapes/shapes-answers'
+import type { VaultDB } from '../../src/storage/vault-db'
 import { type Lifetok, type Userid, Lifeseq } from '../../src/shapes/primitives'
 
 // == [Time]: T0, useFakeClock

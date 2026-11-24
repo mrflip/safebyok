@@ -3,7 +3,7 @@
 import type { UseStore } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
 import type {
-  AnyAsk, BirthBankActual, BirthBankAsk, BirthPuts, GetAsk, GotActual, ListAsk, ListThingsActual, Received, ThingWatchScope, Tracked, VaultError, WorldRecord, WriteAsk, WroteActual,
+  ActualBeside, AnyAsk, BirthBankActual, BirthBankAsk, BirthPuts, GetAsk, GotActual, ListAsk, ListThingsActual, Received, ThingWatchScope, VaultError, WriteAsk, WroteActual,
 } from 'safebyok/storage'
 import { bellnameOf, childrenIn, shelfOf, thingScopepathOf } from './vault-shelf'
 
@@ -28,18 +28,19 @@ function isHeardBy(watched: ThingWatchScope, scope: ThingWatchScope): boolean {
   return (watched.userid === scope.userid) && (watched.banklabel === scope.banklabel)
 }
 
-/** The roots of `ask`'s bank, fetched raw in `store`'s transaction. */
+/** The roots of `ask`'s bank, fetched raw in `store`'s transaction, and when they were read. */
 async function rootsFetchedIn(store: IDBObjectStore, ask: AnyAsk): Promise<DB.Classifier.BankRootsFetched> {
   const { userid, banklabel } = ask
+  const read_tc = DB.Classifier.readTcNow()
   const [bank, gate, root] = await Promise.all([
     DB.rowAt(store, thingScopepathOf({ userid, banklabel, labelpath: 'bank' })),
     DB.rowAt(store, thingScopepathOf({ userid, banklabel, labelpath: DB.Labelpath.MainGate })),
     DB.rowAt(store, thingScopepathOf({ userid, banklabel, labelpath: DB.Labelpath.RootBox })),
   ])
-  return { bank, gate, root, tracked: DB.Classifier.trackedFetchedOf(ask, { bank, [DB.Labelpath.MainGate]: gate, [DB.Labelpath.RootBox]: root }) }
+  return { bank, gate, root, tracked: DB.Classifier.trackedFetchedOf(ask, { bank, [DB.Labelpath.MainGate]: gate, [DB.Labelpath.RootBox]: root }), read_tc }
 }
 
-/** The bank and main gate of `ask`'s bank, fetched raw in `store`'s transaction. */
+/** The bank and main gate of `ask`'s bank, fetched raw in `store`'s transaction, and when they were read. */
 async function worldFetchedIn(store: IDBObjectStore, ask: AnyAsk): Promise<DB.Classifier.WorldFetched> {
   const { gate: maingate, root: _root, ...fetched } = await rootsFetchedIn(store, ask)
   return { ...fetched, maingate }
@@ -55,10 +56,10 @@ async function aboveFetchedIn(store: IDBObjectStore, ask: GetAsk | WriteAsk): Pr
   return { ...world, ancestor: ancestors.find((raw) => raw !== null) ?? null }
 }
 
-/** The world of `ask`'s bank as `store`'s transaction now has it, and its {@link Tracked} if `ask` tracks the roots. */
-async function worldAfterIn(store: IDBObjectStore, ask: AnyAsk): Promise<{ world: WorldRecord | null, tracked?: Tracked }> {
+/** The world of `ask`'s bank as `store`'s transaction now has it, its `tracked` if `ask` tracks the roots, and when they were read. */
+async function worldAfterIn(store: IDBObjectStore, ask: AnyAsk): Promise<ActualBeside> {
   const fetched = await worldFetchedIn(store, ask)
-  return { world: DB.Classifier.worldOf(ask, fetched), ...DB.Classifier.trackedFieldOf(ask, fetched.tracked) }
+  return { world: DB.Classifier.worldOf(ask, fetched), tracked: DB.Classifier.trackedOf(ask, fetched.tracked), read_tc: fetched.read_tc }
 }
 // --
 
@@ -109,7 +110,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   protected async doListThings(ask: ListAsk): Promise<ListThingsActual> {
     return await DB.inOneStep(this.#shelf, 'readonly', async (store) => {
       const [parent, children, world] = await Promise.all([DB.rowAt(store, thingScopepathOf(ask)), childrenIn(store, ask), worldFetchedIn(store, ask)])
-      return this.classifyListThings(ask, { parent, children, read_tc: DB.Classifier.readTcNow() }, world)
+      return this.classifyListThings(ask, { parent, children }, world)
     })
   }
 

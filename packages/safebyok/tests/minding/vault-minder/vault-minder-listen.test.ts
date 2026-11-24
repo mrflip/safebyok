@@ -1,7 +1,7 @@
 import * as TSQ from '@tanstack/query-core'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { type DeadEvent, type ListingEvent, type MinderEvent, type SoonEvent, type ThingEvent, MinderEventFormat } from '../../../src/shapes/shapes-minder'
-import type { Kids } from '../../../src/storage/vault-db'
+import type { Kids } from '../../../src/shapes/shapes-answers'
 import { Thing } from '../../../src/models/thing'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { type BoxRecord, type GateRecord, type Sparse, type Tombstone } from '../../../src/shapes/shapes-thing'

@@ -4,7 +4,7 @@ import { Errors } from 'safebyok-big/internals'
 import * as Throwers from '../refusals/throwers'
 import { loggableAskOf } from '../shapes/shapes-asks'
 import { readTcNow } from './thing-classifier'
-import type { BadAnswer } from './vault-db'
+import type { BadAnswer } from '../shapes/shapes-answers'
 
 /** The refused answer to `ask`, for a call that threw `thrown` before the vaultDB answered.
  * Its `err` is `thrown` if that is a refusal, else an `unexpected_error`. Its act is `unclassified_storing`, its `world`, `banktok` and `dbhas` are null, and its `read_tc` is when it was made.

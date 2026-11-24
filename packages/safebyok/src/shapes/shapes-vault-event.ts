@@ -7,7 +7,7 @@ import type { LiveOf, ShellOf } from './shapes-sealers'
 import { type Sparse, type ThingRecord, type Thingkind, type Tombstone, ThingChecks, isLifepathDeep, isParityRight } from './shapes-thing'
 import { BaseThing } from '../models/base-thing'
 import { itemSeenOf } from '../storage/agerank'
-import type { ReadTc } from '../storage/vault-db'
+import type { ReadTc } from './shapes-answers'
 
 // == [Kinds]: livenessVals, Liveness, lifekindVals, Lifekind, agekindVals, Agekind, vaultEventkindVals, VaultEventkind
 

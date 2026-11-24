@@ -58,14 +58,8 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
 describe("Classifier.classifyListThings(ask, fetched, roots)", () => {
   it("refuses, as a broken store, a child a store fetched from outside the parent", () => {
     const child = { labelpath: 'box/aa/deep', raw: TH.boxThingOf('deep') }
-    const fetched = { parent: TH.rootBoxOf(), children: [child], read_tc: Classifier.readTcNow() }
-    TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), fetched, { bank: null, maingate: null }), 'storage_issue')
-  })
-
-  it("refuses, as a broken store, a read_tc that is no UUID version 7", () => {
-    for (const read_tc of [undefined, crypto.randomUUID(), Classifier.readTcNow().toUpperCase()]) {
-      TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), { parent: TH.rootBoxOf(), children: [], read_tc }, { bank: null, maingate: null }), 'storage_issue')
-    }
+    const fetched = { parent: TH.rootBoxOf(), children: [child] }
+    TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), fetched, { bank: null, maingate: null, tracked: null, read_tc: Classifier.readTcNow() }), 'storage_issue')
   })
 })
 
@@ -78,7 +72,7 @@ describe("Classifier.classifyGetThing(ask, raw, above) and Classifier.classifyWr
 
   for (const [refusalkind, ancestor, blurb] of OverNothing) {
     it(blurb, () => {
-      const above = { bank: null, maingate: null, ancestor }
+      const above = { bank: null, maingate: null, tracked: null, read_tc: Classifier.readTcNow(), ancestor }
       TH.expectSyncRefusal(() => Classifier.classifyGetThing(TH.getAskAt('box/openai'), null, above), refusalkind)
       TH.expectSyncRefusal(() => Classifier.classifyWriteThing({ ...TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)), ifAbsent: 'fail' }, null, above), refusalkind)
     })

@@ -18,7 +18,8 @@ import * as Throwers from '../refusals/throwers'
 import { itemSeenOf } from './agerank'
 import { refusedAnswerOf } from './refused-answer'
 import { readTcNow } from './thing-classifier'
-import type { BirthBankAnswer, GetThingAnswer, Kids, ListThingsAnswer, ReadTc, VaultDB, WriteThingAnswer } from './vault-db'
+import type { BirthBankAnswer, GetThingAnswer, Kids, ListThingsAnswer, ReadTc, WriteThingAnswer } from '../shapes/shapes-answers'
+import type { VaultDB } from './vault-db'
 
 // == [SortedVaultDB]: Stamp, Listening, SortedVaultDB
 

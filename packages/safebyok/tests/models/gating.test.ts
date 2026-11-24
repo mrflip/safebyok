@@ -10,7 +10,7 @@ import { Gate } from '../../src/models/gate'
 import { BirthGating, Gating, UnlockGating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
 import type { GatingCleartexts } from '../../src/shapes/shapes-gateish'
-import type { BirthBankAnswer } from '../../src/storage/vault-db'
+import type { BirthBankAnswer } from '../../src/shapes/shapes-answers'
 import * as TH from '../test-helpers'
 import { readTcNow } from '../../src/storage/thing-classifier'
 

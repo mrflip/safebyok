@@ -6,7 +6,7 @@ import { Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { type ThingRecord } from '../shapes/shapes-thing'
 import { type GetAsk, type ListAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
-import type { DamagedThing } from '../storage/vault-db'
+import type { DamagedThing } from '../shapes/shapes-answers'
 
 // == [Big's Throwers]: every thrower of safebyok-big, re-exported
 

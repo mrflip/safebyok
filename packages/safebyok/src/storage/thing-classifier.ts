@@ -5,11 +5,10 @@ import { v7 as uuidv7 } from 'uuid'
 import { CX, EX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/internals'
 import { policyRefusalOf } from './policies'
 import { type EpochMillis, Labelpath } from '../shapes/primitives'
-import type { BirthBankActual, DamagedThing, GotActual, KidEntry, Kids, ListThingsActual, ReadTc, WroteActual } from './vault-db'
+import type { BirthBankActual, DamagedThing, GotActual, KidEntry, Kids, ListThingsActual, ReadTc, WroteActual } from '../shapes/shapes-answers'
 import { type Sparse, type StoredCited, type ThingCited, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
 import { Thing } from '../models/thing'
-import { ReadTcPattern } from '../shapes/shapes-vault-event'
 import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
 import * as Throwers from '../refusals/throwers'
 
@@ -152,7 +151,7 @@ export function storedThingOf(scope: ThingScope, raw: unknown): ThingRecord | nu
 export function writtenThingOf(scope: ThingScope, raw: unknown): ThingRecord { return writtenOf<ThingRecord>(ThingkindChecks.ofLabelpath(scope.labelpath).stored, scope, raw) }
 
 /** The three roots the concrete adapter reports writing for a birth's `puts`, checked. */
-export function writtenRootsOf([bankPut, gatePut, rootPut]: BirthPuts, written: BankRootsFetched): BankRoots {
+export function writtenRootsOf([bankPut, gatePut, rootPut]: BirthPuts, written: Pick<BankRootsFetched, 'bank' | 'gate' | 'root'>): BankRoots {
   return {
     bank: writtenOf(BankChecks.stored, bankPut, written.bank),
     gate: writtenOf(GateChecks.stored, gatePut, written.gate),
@@ -176,11 +175,12 @@ export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): ThingR
   return writtenThingOf(scopeReport.data, raw)
 }
 
-/** The raw bank, main gate and root box a concrete adapter fetched for a bank's birth, each null for none, and its {@link TrackedFetched}. */
-export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: unknown, tracked?: TrackedFetched }>
+/** The raw bank, main gate and root box a concrete adapter fetched for a bank's birth, each null for none, its {@link TrackedFetched}, and when it read them ({@link readTcNow}). */
+export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: unknown, tracked: TrackedFetched, read_tc: ReadTc }>
 
-/** The raw bank and main gate a concrete adapter fetched for an ask's bank, each null for none, and its {@link TrackedFetched}. */
-export type WorldFetched = Readonly<{ bank: unknown, maingate: unknown, tracked?: TrackedFetched }>
+// Every step reads its bank's world, so when it read the world is the step's `read_tc`.
+/** The raw bank and main gate a concrete adapter fetched for an ask's bank, each null for none, its {@link TrackedFetched}, and when it read them ({@link readTcNow}). */
+export type WorldFetched = Readonly<{ bank: unknown, maingate: unknown, tracked: TrackedFetched, read_tc: ReadTc }>
 
 /** What a concrete adapter fetched for a get or a write beside the Thing at its scope: the raw world ({@link WorldFetched}), and `ancestor`, the raw nearest Thing stored above that scope.
  * `ancestor` is, of the Things stored in the ask's bank whose labelpath followed by `/` begins the ask's labelpath, the one with
@@ -190,7 +190,7 @@ export type AboveFetched = WorldFetched & Readonly<{ ancestor: unknown }>
 
 // A world is news, never the verdict: a bank or main gate that fails its checks leaves it null, and the step's answer stands.
 /** The world of the bank at `bankScope`, from its raw `fetched` bank and main gate; null where either is missing or fails its checks. */
-export function worldOf({ userid, banklabel }: ThingWatchScope, fetched: WorldFetched): WorldRecord | null {
+export function worldOf({ userid, banklabel }: ThingWatchScope, fetched: Pick<WorldFetched, 'bank' | 'maingate'>): WorldRecord | null {
   try {
     const bank     = storedOf(BankChecks.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank)
     const maingate = storedOf(GateChecks.stored, { userid, banklabel, labelpath: Labelpath.MainGate }, fetched.maingate)
@@ -214,11 +214,11 @@ function ancestorOf({ userid, banklabel, labelpath }: ThingScope, raw: unknown):
 }
 // --
 
-// == [Tracked]: TrackedFetched, TrackedRows, trackedFetchedOf, trackedFieldOf, trackedEntryOf
+// == [Tracked]: TrackedFetched, TrackedRows, trackedFetchedOf, trackedOf, trackedEntryOf
 // The concrete adapter compares what an ask tracks with the bank, main gate and root box it fetched, in the step that fetched them.
 // `AdapterVaultDB` checks each row the concrete adapter reports in place of 'same'.
 
-/** A concrete adapter's report on the bank, main gate and root box an ask tracks: for each, `'same'` or the raw Thing. Null or left out for an ask that tracks nothing. */
+/** A concrete adapter's report on the bank, main gate and root box an ask tracks: for each, `'same'` or the raw Thing. Null for an ask that tracks nothing. */
 export type TrackedFetched = Readonly<{ bank: unknown, [Labelpath.MainGate]: unknown, [Labelpath.RootBox]: unknown }> | null
 
 /** The raw bank, main gate and root box a concrete adapter fetched, each null for none, under its key in a `track`. */
@@ -239,14 +239,14 @@ function trackedRawOf(pair: Track['bank'], raw: unknown): unknown {
   return (CX.isPlainBag(raw) && (raw['revseq'] === pair.revseq) && (raw['lifepath'] === pair.lifepath)) ? 'same' : raw
 }
 
-/** The answer's `tracked`, checked, as a field to spread into it, from the concrete adapter's report for the bank at `bankScope`: none for an ask that tracks nothing. */
-export function trackedFieldOf({ userid, banklabel }: ThingWatchScope, fetched: TrackedFetched | undefined): { tracked?: Tracked } {
-  if ((fetched === null) || (fetched === undefined)) { return {} }
-  return { tracked: {
+/** The report's `tracked`, checked, from the concrete adapter's report for the bank at `bankScope`: null for an ask that tracks nothing. */
+export function trackedOf({ userid, banklabel }: ThingWatchScope, fetched: TrackedFetched): Tracked | null {
+  if (fetched === null) { return null }
+  return {
     bank:                  trackedEntryOf(BankChecks.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank),
     [Labelpath.MainGate]:  trackedEntryOf(GateChecks.stored, { userid, banklabel, labelpath: Labelpath.MainGate }, fetched[Labelpath.MainGate]),
     [Labelpath.RootBox]:   trackedEntryOf(BoxChecks.stored, { userid, banklabel, labelpath: Labelpath.RootBox }, fetched[Labelpath.RootBox]),
-  } }
+  }
 }
 
 /** `'same'`, or the Thing at `scope` checked by `check`. */
@@ -255,8 +255,8 @@ function trackedEntryOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>
 }
 // --
 
-// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, isChildLabelpath, kidsOf, readTcNow, readAtOf, readTcOfStep, readTcOf, classifyBirthBank
-// Each is given the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`;
+// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, isChildLabelpath, kidsOf, readTcNow, readAtOf, classifyBirthBank
+// Each is given the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`, with when it read them;
 // a get and a write are given the nearest Thing stored above the ask's scope; a birth is given the bank's three roots, and,
 // where it is born, reports the world its puts wrote.
 
@@ -267,9 +267,8 @@ export function classifyGetThing(ask: GetAsk, raw: unknown, above: AboveFetched)
   const stored = storedThingOf(ask, raw)
   const act    = getActOf(ask, stored)
   const record = stored ?? shellAt(ask, above.ancestor)
-  const world  = worldOf(ask, above)
-  const beside = trackedFieldOf(ask, above.tracked)
-  return isRefusedAct(act) ? { ok: false, act, world, record, ...beside } : { ok: true, act, world, record, ...beside }
+  const beside = { world: worldOf(ask, above), tracked: trackedOf(ask, above.tracked), read_tc: above.read_tc }
+  return isRefusedAct(act) ? { ok: false, act, record, ...beside } : { ok: true, act, record, ...beside }
 }
 
 /** Classify a write against the raw Thing a concrete adapter fetched at its scope, null for none, and what it fetched above it in the same step.
@@ -286,25 +285,23 @@ export function classifyWriteThing(ask: WriteAsk, raw: unknown, above: AboveFetc
     demandPolicies(ask, raw)
   }
   demandLifetokKept(ask, raw)
-  return { ok: true, act, world: worldOf(ask, above), record: ask.record, ...trackedFieldOf(ask, above.tracked) }
+  return { ok: true, act, world: worldOf(ask, above), tracked: trackedOf(ask, above.tracked), read_tc: above.read_tc, record: ask.record }
 }
 
-/** The raw rows a concrete adapter fetched for a listing: the parent (null for none), each child one label under it with its labelpath, and when it read them ({@link readTcNow}). */
-export type ThingsFetched = Readonly<{ parent: unknown, children: readonly Readonly<{ labelpath: Labelpath, raw: unknown }>[], read_tc: unknown }>
+/** The raw rows a concrete adapter fetched for a listing: the parent (null for none), and each child one label under it with its labelpath. */
+export type ThingsFetched = Readonly<{ parent: unknown, children: readonly Readonly<{ labelpath: Labelpath, raw: unknown }>[] }>
 
 /** Classify a listing against the {@link ThingsFetched} rows: the parent's get act, the children of its live life as a {@link Kids} value,
  * the parent as its `parentage`, each child sparse as its `deltas` in labelpath order, and the children that fail their checks.
  */
-export function classifyListThings(ask: ListAsk, { parent: rawParent, children, read_tc: rawReadTc }: ThingsFetched, worldFetched: WorldFetched): ListThingsActual {
+export function classifyListThings(ask: ListAsk, { parent: rawParent, children }: ThingsFetched, worldFetched: WorldFetched): ListThingsActual {
   const stored    = storedThingOf(ask, rawParent)
   const act       = getActOf(ask, stored)
-  const read_tc   = readTcOf(rawReadTc)
   const parentage = (stored === null) ? [] : [Thing.sparseOf(stored)]
-  const world     = worldOf(ask, worldFetched)
-  const beside    = trackedFieldOf(ask, worldFetched.tracked)
-  if (isRefusedAct(act))  { return { ok: false, act, world, read_tc, parentage, deltas: [], damaged_rows: [], ...beside } }
+  const beside    = { world: worldOf(ask, worldFetched), tracked: trackedOf(ask, worldFetched.tracked), read_tc: worldFetched.read_tc }
+  if (isRefusedAct(act))  { return { ok: false, act, parentage, deltas: [], damaged_rows: [], ...beside } }
   // A tombstone or none has no children.
-  if (stored?.am !== 'a') { return { ok: true, act, world, kids: kidsOf(ask, stored, [], read_tc), parentage, deltas: [], damaged_rows: [], ...beside } }
+  if (stored?.am !== 'a') { return { ok: true, act, kids: kidsOf(ask, stored, []), parentage, deltas: [], damaged_rows: [], ...beside } }
   const { userid, banklabel } = ask
   // A child hangs off its parent's live lifepath: an earlier life's children are not its.
   const lifepathUnder = `${stored.lifepath}/`
@@ -316,7 +313,7 @@ export function classifyListThings(ask: ListAsk, { parent: rawParent, children, 
     if (child === null) { damaged_rows.push({ userid, banklabel, labelpath, am: 'd' }) } else if (child.lifepath.startsWith(lifepathUnder)) { living.push(child) }
   }
   const deltas = sortBy(living, [(thing) => thing.labelpath]).map((thing) => Thing.sparseOf(thing))
-  return { ok: true, act, world, kids: kidsOf(ask, stored, deltas, read_tc), parentage, deltas, damaged_rows, ...beside }
+  return { ok: true, act, kids: kidsOf(ask, stored, deltas), parentage, deltas, damaged_rows, ...beside }
 }
 
 /** True when `labelpath` is one label under the listing's parent, of the parent's kind. */
@@ -326,8 +323,8 @@ function isChildLabelpath(ask: ListAsk, labelpath: Labelpath): boolean {
 }
 
 // Object.fromEntries makes each label an own key, `__proto__` among them.
-/** The {@link Kids} value of `deltas`, the children of `parent` stored at the listing's scope, null for none. */
-function kidsOf(ask: ListAsk, parent: ThingRecord | null, deltas: readonly Sparse<ThingRecord>[], read_tc: ReadTc): Kids {
+/** The {@link Kids} value of `deltas`, the children of `parent` stored at the listing's scope, null for none, but for its `read_tc`, which is the report's. */
+function kidsOf(ask: ListAsk, parent: ThingRecord | null, deltas: readonly Sparse<ThingRecord>[]): Omit<Kids, 'read_tc'> {
   const entryOf = ({ label, lifeseq }: Sparse<ThingRecord>): [string, KidEntry] => [label, { lifeseq }]
   return {
     modelkind:  'kids',
@@ -335,37 +332,28 @@ function kidsOf(ask: ListAsk, parent: ThingRecord | null, deltas: readonly Spars
     parentlife: parent?.lifepath ?? Shell.VoidLifeseq,
     items:      Object.fromEntries(deltas.filter((delta) => delta.am === 'a').map((delta) => entryOf(delta))),
     gones:      Object.fromEntries(deltas.filter((delta) => delta.am !== 'a').map((delta) => entryOf(delta))),
-    read_tc,
   }
 }
 
 // A concrete adapter with a clock of its own in the statement that reads may report its own UUID version 7 in place of this one.
-/** A {@link ReadTc} made now, for a concrete adapter to report as the `read_tc` of a listing it reads in the same step. */
+/** A {@link ReadTc} made now, for a concrete adapter to report as the `read_tc` of the world it fetches in the same step. */
 export function readTcNow(): ReadTc { return uuidv7() }
 
 // A UUID version 7 begins with its Unix time in milliseconds, 48 bits: the first eight hexadecimal digits and the four after the dash.
 /** When `read_tc` was read, in epoch milliseconds. */
 export function readAtOf(read_tc: ReadTc): EpochMillis { return Number.parseInt(`${read_tc.slice(0, 8)}${read_tc.slice(9, 13)}`, 16) }
 
-/** The `read_tc` a concrete adapter reported for a step, or one made now where it reported none. Throws `storage_issue` for anything but a UUID version 7. */
-export function readTcOfStep(raw: unknown): ReadTc { return (raw === undefined) ? readTcNow() : readTcOf(raw) }
-
-/** The `read_tc` a concrete adapter reported, checked as a UUID version 7. Throws `storage_issue` for anything else. */
-function readTcOf(raw: unknown): ReadTc {
-  if ((typeof raw !== 'string') || (! ReadTcPattern.test(raw))) { throw Throwers.storageIssue() }
-  return raw
-}
-
 /** Classify a bank's birth, by its three `puts`, against the raw roots a concrete adapter fetched.
- * Under `born`, `things` and `world` are made of the puts' records, for the concrete adapter to write in one step. It then reports
- * them as written, with any `tracked` read after the write. Otherwise the answer is {@link unwrittenBirthOf}'s.
+ * Under `born`, `things` and `world` are made of the puts' records, for the concrete adapter to write in one step, and `tracked` is null.
+ * It then reports them as written, with the world, `tracked` and `read_tc` read after the write. Otherwise the answer is {@link unwrittenBirthOf}'s.
  */
 export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual {
   const unwritten = unwrittenBirthOf(puts, fetched)
   if (unwritten !== null) { return unwritten }
   const [bankPut, gatePut, rootPut] = puts
   const things = { bank: bankPut.record, gate: gatePut.record, root: rootPut.record }
-  return { ok: true, act: 'born', world: { ...things.bank, maingate: things.gate }, things }
+  // Nothing is stored yet for an ask to track: what it tracks is read after the write.
+  return { ok: true, act: 'born', world: { ...things.bank, maingate: things.gate }, tracked: null, read_tc: fetched.read_tc, things }
 }
 // --
 
@@ -377,9 +365,8 @@ export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): B
  */
 export function unwrittenWriteOf(raw: unknown, { ask, act, above }: UnwrittenWrite): WroteActual {
   const record  = storedThingOf(ask, raw) ?? shellAt(ask, above.ancestor)
-  const world   = worldOf(ask, above)
-  const beside  = trackedFieldOf(ask, above.tracked)
-  return isRefusedAct(act) ? { ok: false, act, world, record, ...beside } : { ok: true, act, world, record, ...beside }
+  const beside  = { world: worldOf(ask, above), tracked: trackedOf(ask, above.tracked), read_tc: above.read_tc }
+  return isRefusedAct(act) ? { ok: false, act, record, ...beside } : { ok: true, act, record, ...beside }
 }
 
 /** An unwritten write, for {@link unwrittenWriteOf}: the write, the act the act tables found, and what the concrete adapter fetched beside the Thing at its scope. */
@@ -421,14 +408,14 @@ export function unwrittenBirthOf(puts: BirthPuts, fetched: BankRootsFetched): Bi
     const gate = storedOf(GateChecks.stored, gatePut, fetched.gate)
     const root = storedOf(BoxChecks.stored,  rootPut, fetched.root)
     if ((bank === null) || (gate === null) || (root === null)) { throw Throwers.bankRootsMissing() }
-    return { ok: true, act: 'passed', world: { ...bank, maingate: gate }, things: { bank, gate, root }, ...trackedFieldOf(bankPut, fetched.tracked) }
+    return { ok: true, act: 'passed', world: { ...bank, maingate: gate }, tracked: trackedOf(bankPut, fetched.tracked), read_tc: fetched.read_tc, things: { bank, gate, root } }
   }
   for (const [put, raw] of [[bankPut, fetched.bank], [gatePut, fetched.gate], [rootPut, fetched.root]] as const) {
     const act = putActOf(put, storedCitedOf(put, raw))
     if (! isRefusedAct(act)) { continue }
     // A root has nothing above it, so where none is stored its shell stands alone.
     const record = storedThingOf(put, raw) ?? Shell.under(put, null)
-    return { ok: false, act, world: worldOf(bankPut, { bank: fetched.bank, maingate: fetched.gate }), record, ...trackedFieldOf(bankPut, fetched.tracked) }
+    return { ok: false, act, world: worldOf(bankPut, { bank: fetched.bank, maingate: fetched.gate }), tracked: trackedOf(bankPut, fetched.tracked), read_tc: fetched.read_tc, record }
   }
   return null
 }

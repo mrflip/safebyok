@@ -12,7 +12,8 @@ import { type BoxRecord, type ThingRecord, type ThingScope, Shell } from '../../
 import { Thing } from '../../../src/models/thing'
 import { type GetAsk, type WriteAsk, getAskOf } from '../../../src/shapes/shapes-asks'
 import type { BankScope } from '../../../src/shapes/shapes-stamps'
-import type { GetThingAnswer, Kids, VaultDB, WriteThingAnswer } from '../../../src/storage/vault-db'
+import type { GetThingAnswer, Kids, WriteThingAnswer } from '../../../src/shapes/shapes-answers'
+import type { VaultDB } from '../../../src/storage/vault-db'
 import type { VaultItemEvent } from '../../../src/shapes/shapes-vault-event'
 import * as TH from '../../test-helpers'
 

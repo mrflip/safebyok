@@ -4,7 +4,7 @@ import { BaseThing } from '../models/base-thing'
 import { type Lifepath, Lifeseq, Revseq } from '../shapes/primitives'
 import type { ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
 import type { Agekind, Agerank, ItemSeen, SeenThing, VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
-import type { ReadTc } from './vault-db'
+import type { ReadTc } from '../shapes/shapes-answers'
 
 // == [Agerank]: TcchunkDigits, NoRevseq, UnseenAgerank, AgerankFields, UnseenLife, tcchunkOf, nextAgerankOf, tcchunkAfter, laterOf, itemSeenOf, eventsOf, agekindOf, fieldsOf, isOfLife
 

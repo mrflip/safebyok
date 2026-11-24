@@ -7,7 +7,8 @@ import type { SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/sha
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { SortedVaultDB } from '../../src/storage/sorted-vault-db'
 import { readTcNow } from '../../src/storage/thing-classifier'
-import type { ReadTc, VaultDB } from '../../src/storage/vault-db'
+import type { ReadTc } from '../../src/shapes/shapes-answers'
+import type { VaultDB } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
 /** The store in memory each SortedVaultDB the battery makes stands over. */

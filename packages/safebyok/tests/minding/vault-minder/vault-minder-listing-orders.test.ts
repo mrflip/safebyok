@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { type ThingRecord } from '../../../src/shapes/shapes-thing'
-import type { Kids } from '../../../src/storage/vault-db'
+import type { Kids } from '../../../src/shapes/shapes-answers'
 import { MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'

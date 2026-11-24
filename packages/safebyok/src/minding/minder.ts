@@ -16,7 +16,7 @@ import { type Sparse, type ThingRecord, type ThingScope, type Tombstone, ThingCh
 import { Thing } from '../models/thing'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetAsk, type ThingWatchScope, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
-import type { Kids, WriteThingAnswer } from '../storage/vault-db'
+import type { Kids, WriteThingAnswer } from '../shapes/shapes-answers'
 import type { SortedVaultDB } from '../storage/sorted-vault-db'
 import { isSortedVaultDB } from '../shapes/shapes-sorted-vault-db'
 import type { VaultEvent } from '../shapes/shapes-vault-event'

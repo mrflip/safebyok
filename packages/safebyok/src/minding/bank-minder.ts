@@ -5,7 +5,7 @@ import { Labelpath } from '../shapes/primitives'
 import { type BankRecord, type BoxRecord, type GateRecord, type ThingScope } from '../shapes/shapes-thing'
 import type { BankRoots, BirthBankAsk } from '../shapes/shapes-asks'
 import { type MinderEvent, type MinderFriend, type MinderOpts, type QueryCacheOpts, MinderChecks, MinderEventFormat } from '../shapes/shapes-minder'
-import type { BirthBankAnswer } from '../storage/vault-db'
+import type { BirthBankAnswer } from '../shapes/shapes-answers'
 import { Minder, MinderOptsChecks } from './minder'
 import * as Throwers from '../refusals/throwers'
 
