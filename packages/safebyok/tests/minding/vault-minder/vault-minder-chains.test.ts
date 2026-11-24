@@ -4,6 +4,7 @@ import { Lifeseq } from '../../../src/shapes/primitives'
 import type { BoxRecord, Sparse, ThingRecord } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
+import { readTcNow } from '../../../src/storage/thing-classifier'
 import * as TH from '../../test-helpers'
 import { type MinderWorld, bornOf, cheatBox, isListingStaleAt, minderWorldOf } from './world'
 
@@ -238,7 +239,7 @@ function cachePrecisOf({ minder }: MinderWorld<MemoryVaultDB>): CachePrecis {
 async function arrive(world: MinderWorld<MemoryVaultDB>, precis: Precis, route: Route): Promise<boolean> {
   const [liveness] = precis
   if (route === 'f') {
-    world.receive(TH.itemEventOf(recordOf(precis), (liveness === 'item') ? 'full' : liveness))
+    world.receive({ ...TH.itemEventOf(recordOf(precis)), read_tc: readTcNow() })
     return false
   }
   cheatBox(world.vaultDB, recordOf(wholeOf(precis)))
