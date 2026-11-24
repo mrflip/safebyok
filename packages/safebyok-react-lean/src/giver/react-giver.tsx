@@ -404,7 +404,7 @@ function makeBankGiver(friend: BankFriend) {
   /** The box's stored record, through React Query, its whisper still sealed.
    * `data` is the record, null when none is stored or it was deleted, and undefined while pending or until the device's sign-in answers.
    * A record overtaken by a newer revision of the same life shows, stale, until the newer one arrives. Once the box is known
-   * to have a newer life, deleted and written again elsewhere, and nothing of that life has arrived whole, `data` is undefined and pending while it fetches the box again.
+   * to have a newer life, deleted and written again elsewhere, and nothing of that life has arrived whole, `data` is null, stale, while it fetches the box again.
    * `opts` are React Query's options that shape what this one hook shows. A `select` given there is handed the whole record, or
    * null where none is stored or it was deleted: {@link liveOf} is the default. A `select` that returns a record should return it, or the item's own null,
    * never a null of its own: the hook reads null as nothing stored.

@@ -168,8 +168,3 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   sites, are moved onto the form verbs (`gate.gatingUnlockAttempt` and its siblings). `popField` and the makers'
   `isInCleartextNames` bridge go with them (the Coach, 2026-11-23).
 
-* **A seeded item entry shows its old record across a reset.** `VaultTSQ.itemQueryOptions` seeds an entry from its
-  Thing, and TanStack's `resetQueries` returns an entry to the seed it was built with. So an entry seeded while its box
-  was live, then reset because a newer life is known only as a sparse record, shows the old record until the refetch
-  answers. Left as it is: the entry is stale and is fetched again. One remedy, set aside as too large for the case, is
-  no seed and `gcTime: Infinity` under the bank's key (the Coach, 2026-11-24).

@@ -474,7 +474,8 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const fn = vi.fn()
     await TH.expectRefusal(vault.withWhisper(Openai, fn), 'stale_read')
     expect(boxAt(vault)).to.include({ agekind: 'bare', revtok: tombstone.revtok })
-    expect(itemAt(vault)).to.be.undefined
+    const itemKey = VaultTSQ.itemQueryKeyOf(openaiScopeOf(bank))
+    expect([itemAt(vault), bank.device.vaultTsqClient.getQueryState(itemKey)?.isInvalidated]).to.deep.equal([null, true])
     expect(fn).not.toHaveBeenCalled()
   })
 

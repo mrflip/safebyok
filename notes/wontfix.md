@@ -352,22 +352,23 @@ feed_sorter, 2026-11-24.
 
 ### A `getOnce` the library cancels when its item is reset rejects with the library's own error
 
-* current outcome: where an `aged` event to bare resets a box's item while a `vaultTSQ.getOnce` of it runs, TanStack
-  Query cancels the get's fetch silently, and the `getOnce` rejects with the library's `CancelledError`, not a refusal of
-  ours. Where an observer keeps the item active, the reset fetches again, and the cancelled get answers with that fetch
-  (`Query.reset` and `Query.fetch`, query-core 5.107.1, `src/query.ts`).
+* current outcome: where an `aged` event to bare resets a box's item that holds no data (a box not yet fetched, or
+  known only sparse) while a `vaultTSQ.getOnce` of it runs, TanStack Query cancels the get's fetch silently, and the
+  `getOnce` rejects with the library's `CancelledError`, not a refusal of ours. Where an observer keeps the item active,
+  the reset fetches again, and the cancelled get answers with that fetch (`Query.reset` and `Query.fetch`, query-core
+  5.107.1, `src/query.ts`). An item with data is never reset: it is set null and invalidated without cancelling a fetch.
 * alternatives:
   - catch the `CancelledError` in `getOnce`, and answer what the Thing holds or refuse `stale_read`: puts our guess in
     place of the library's error.
   - hold the reset until the get answers: a state of our own beside the library's, in a primitive's critical path.
 * workaround: call `getOnce` again, or observe the item, whose reset fetches it again.
 
-Steps to reproduce: start a `getOnce` of a box that no observer keeps active; while storage answers it, a list or a
-notice tells of the box in a newer life, sparse.
+Steps to reproduce: start the first `getOnce` of a box that no observer keeps active; while storage answers it, a list
+or a notice tells of the box at a newer revision, sparse.
 
-Reasoning for wontfix: it is a crossing of a get and a sighting of a newer life, and cancellation is the library's to
-own. The Coach: "I'm loath to override errors of TSQ to our helpful guess." Ruled by the Coach, 2026-11-24, feed_sorter
-(the redistribution design, section 12).
+Reasoning for wontfix: it is a crossing of a get and a sighting of a newer revision, and cancellation is the library's
+to own. The Coach: "I'm loath to override errors of TSQ to our helpful guess." Ruled by the Coach, 2026-11-24,
+feed_sorter (the redistribution design, section 12); narrowed to an item with no data by thread 20 of feed_sorter.
 
 ## React
 

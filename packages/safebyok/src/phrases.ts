@@ -165,7 +165,7 @@ export const AnswerNotMade = "The vaultDB could not make an answer for a failure
 // == [Minding]: QueryClientExpected, ListOfBoxes, NotMinded, WorldNotHeard, StaleTimeShape, ChildrenStoredDamaged
 
 /** A VaultTSQ made without a TanStack Query client. */
-export const QueryClientExpected = 'Expected a TanStack Query QueryClient: an object with setQueryDefaults, setMutationDefaults, setQueryData, query, invalidateQueries and resetQueries.'
+export const QueryClientExpected = 'Expected a TanStack Query QueryClient: an object with setQueryDefaults, setMutationDefaults, getQueryData, setQueryData, query, invalidateQueries and resetQueries.'
 
 /** A listing asked of a VaultTSQ for a Thing other than a box. */
 export const ListOfBoxes = "A VaultTSQ lists only a box's children: the root box's, or a box's under it."
