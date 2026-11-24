@@ -124,6 +124,8 @@ export abstract class AdapterVaultDB implements VaultDB {
       const listAsk     = AskChecks.listAsk.parse(ask)
       const loggableAsk = loggableAskOf(listAsk)
       const actual      = await this.doListThings(listAsk)
+      // this work is being repeated in every call. It's also picking out individual fields and then spreading them back in: just pick with a checker
+      // don't have things like actual.kids.read_tc and actual.read_tc be wandering around, have a hardened type.
       const beside      = { world: actual.world, banktok: banktokOf(actual.world), ...trackedFieldOf(actual), parentage: actual.parentage, deltas: actual.deltas, damaged_rows: actual.damaged_rows }
       return frozenAnswerOf<ListThingsAnswer>(actual.ok
         ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, read_tc: actual.kids.read_tc, val: actual.kids }
@@ -152,9 +154,20 @@ export abstract class AdapterVaultDB implements VaultDB {
     const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews })
     return this.doWatch(bankScope, ({ record, world }) => {
       let event: VaultItemEvent
-      try { event = itemEventOf(deepFreeze(Classifier.watchedThingOf(bankScope, record)), world) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
+      // this is classifying and answer-ifying the event for every listener
+      try {
+        event = itemEventOf(deepFreeze(Classifier.watchedThingOf(bankScope, record)), world)
+      } catch (err) {
+        onBadNews(Outcome.storageRefusalOf(err))
+        return
+      }
       // A notice handler that throws is a bug in the host's code, not trouble in storage.
-      try { onNotice(event) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
+      try {
+        onNotice(event)
+      } catch (err) {
+        // is sanitizeForeignError appropriate over the ternary?
+        onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err))
+      }
     }, onBadNews)
   }
   // --

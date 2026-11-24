@@ -29,6 +29,7 @@ export type BadAnswer<DbhasT = ThingRecord | VoidSentinel | null> = { ok: false,
 /** A vaultDB verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. Never thrown. */
 export type Answer<ValT, ActT extends EX.GoodAct> = GoodAnswer<ValT, ActT> | BadAnswer
 
+// where are the checkers for these? it would be better if they were close
 /** The answer to `tryGetThing`: the live Thing (`gotlive`), or a `val` of null for a tombstone (`gotgone`) or none (`gotvoid`).
  * Every answer but `gotlive` carries a `dbhas`: the tombstone under `gotgone`, and the shell under `gotvoid` or a `void` refusal.
  * The shell's lifepath is that of the nearest Thing stored above it, live or a tombstone, as the step read it, then the
@@ -94,7 +95,7 @@ export type ListThingsAnswer<RecordT extends ThingRecord = ThingRecord> =
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
 // --
 
-// == [What a concrete adapter reports]: Actual, GotActual, WroteActual, ListThingsActual, BirthBankActual
+// == [Pre-image of an answer, carrying the actual stored value]: Actual, GotActual, WroteActual, ListThingsActual, BirthBankActual
 
 /** A concrete adapter's report of one atomic step: its act, the bank's `world` as the step left it with its `tracked`, and a `record`.
  * `record` is the Thing found at the scope or, after a write, the Thing it reports writing. `AdapterVaultDB` turns it into the answer's `val` when good, its `dbhas` when refused.
@@ -115,6 +116,7 @@ export type WroteActual = Actual<EX.PutAct | EX.DelAct>
  * Refused, it has no children, and its `read_tc` says when the datastore read the parent.
  */
 export type ListThingsActual = Readonly<{ world: WorldRecord | null, tracked?: Tracked } & ListedBeside & (
+  // why would you want read_tc to be missing?
   | { ok: true,  act: EX.GotAct, kids: Kids }
   | { ok: false, act: EX.RefusedAct, read_tc: ReadTc }
 )>
@@ -123,6 +125,7 @@ export type ListThingsActual = Readonly<{ world: WorldRecord | null, tracked?: T
  * `read_tc` is as for {@link Actual}.
  */
 export type BirthBankActual =
+  // it is much better to have robust types without optional fields -- why are they sometimes missing?
   | { ok: true,  act: 'born' | 'passed', world: WorldRecord | null, tracked?: Tracked, read_tc?: ReadTc, things: BankRoots }
   | { ok: false, act: EX.RefusedAct,     world: WorldRecord | null, tracked?: Tracked, read_tc?: ReadTc, record: ThingRecord | VoidSentinel }
 // --
