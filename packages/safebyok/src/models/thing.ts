@@ -63,11 +63,19 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   /** The names of the record fields a spread, a log line and `JSON.stringify` show: the Thing fields, unless a subclass names more. Never name an opaque field. */
   protected get loggableFieldnames(): readonly string[] { return ThingFieldnames }
 
+  // just write out the fields, this is over-DRY
   /** Make `record` the one this Thing models, of whatever life: each of its fields becomes a prop, set again, and a field it lacks is removed. */
   protected adopt(record: Adoptable<RecordT>): void {
     Object.freeze(record)
-    const was = this.#record
+    const was = this.#record // lose this
     this.#record = record
+    // The record will have all the fields, perfectly valid, so just use it
+    const { lifepath, revseq, other, mutable, fields } = record
+    decorate(this, { fields, that, should, be, non, enumerable })
+    tattoo(this, { fields, that, should, be, enumerable })
+    this.#privateField = privateField
+    done
+
     const loggable = this.loggableFieldnames
     const dropped = Object.keys(was ?? {}).filter((ckey) => ! Object.hasOwn(record, ckey))
     for (const ckey of dropped) { Reflect.deleteProperty(this, ckey) }
@@ -181,6 +189,8 @@ function citedOf(seen: Sparse<ThingRecord>): Sparse<ThingRecord> { return Object
 
 // == [Checks]: SeenChecks, Checks
 
+// Documentarian needed on these comments, not readable
+
 // A lifepath as deep as its labelpath is what lets two ageranks of one Thing compare as strings: each lifeseq and revseq
 // is ten characters and the time eight, so each `/` and `|` falls at one place.
 // ReadTcPattern is read only as a check runs: thing-classifier imports this module, so the pattern may not be defined
@@ -195,6 +205,7 @@ export const SeenChecks = Validator.Checkers('bad_record', ({ custom }) => ({
   readTc:    custom<ReadTc>((val) => (typeof val === 'string') && ReadTcPattern.test(val), Phrases.ReadTcShape),
 }))
 
+// move these to the shapes
 /** The checks of an event a Thing receives: its kind and scope, then an item's record, liveness and `read_tc`. */
 const Checks = Validator.Checkers('bad_record', ({ obj, oneof }) => ({
   event:  obj({ ...ThingChecks.thingScope.shape, eventkind: oneof(vaultEventkindVals) }),

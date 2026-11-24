@@ -8,6 +8,11 @@ import type { ReadTc } from './vault-db'
 
 // == [Agerank]: AgerankTimeDigits, AgerankParts, UnseenLife, timeOf, raisedOf, timeRaisedOf, itemSeenOf, eventsOf, agerankOf, partsOf, revseqOf, agekindOf
 
+// you have three representations of the same thing: the string, the parts, and the object
+// the object has revseq as numbers, the other two as strings and you mostly use the string
+
+// please rename everywhere "time" to tcchunk -- it's not a time, it's a string of a coarsened timestamp
+
 // Eight digits make a span of 65.536 seconds: a record seen again at its revision a minute or two later is news, which
 // sits well with TanStack Query's five minutes before it collects a query.
 /** How many leading hexadecimal digits of a `read_tc` an agerank keeps as its time: a UUID version 7's first group, its Unix time in units of 65.536 seconds. */
@@ -21,6 +26,9 @@ const UnseenLife = Object.freeze({ highRevseq: -1, itemRevseq: -1, time: '' })
 
 /** The time an agerank keeps of `read_tc`: its first eight hexadecimal digits, which compare as text. */
 export function timeOf(read_tc: ReadTc): string { return read_tc.slice(0, AgerankTimeDigits) }
+
+// this method is dying under the weight of allowing undefined; I have no idea what's happening
+// "raise" is on our list of words to avoid; please reword the docblock to be readable
 
 // An earlier life, a repeat, an older record and a sighting no later than the last each leave an agerank no greater than the one before.
 /** The agerank once `cited` is seen at its `time`, or undefined if it is no greater than `agerankWas`.
@@ -47,6 +55,7 @@ function timeRaisedOf(was: Omit<AgerankParts, 'lifepath'>, revseq: number, time:
   return (time > was.time) ? time : was.time
 }
 
+// where is this called from that doesn't know whether it's alive or dead?
 // A sparse tombstone is a tombstone like any other: a dead life has one revision, and its sparse record says all of it.
 // The caller's check passed `seen` as live or a tombstone, so what is neither the void sentinel nor live is a tombstone.
 /** The liveness of `seen`, with `seen` itself as its `val`: what an `item` event of it carries. */
@@ -56,6 +65,7 @@ export function itemSeenOf(seen: SeenThing): ItemSeen {
   return { liveness: 'gone', val: seen as Tombstone<ThingRecord> }
 }
 
+// don't let agerankWas be undefined: substitute a value that compares naturally
 /** The events `proposed` returns once it has raised its Thing's agerank from `agerankWas` to `agerank`, each frozen, in a frozen list.
  * `proposed` comes first, with both ageranks. A `life` follows where its lifepath is not `agerankWas`'s, or there was none,
  * and an `aged` where the newest revision has not been seen whole. Each keeps the `sourcelabel`, `read_tc` and `banktok` of `proposed`.
@@ -80,6 +90,8 @@ function agerankOf({ lifepath, highRevseq, itemRevseq, time }: AgerankParts): Ag
   return [lifepath, Revseq.padded(highRevseq), Revseq.padded(itemRevseq), time].join('|')
 }
 
+// agerank has been zod validated to its shape (convince yourself of this)
+// just split it on the pipe.
 /** The parts of `agerank` */
 function partsOf(agerank: Agerank): AgerankParts {
   const timeAt = agerank.lastIndexOf('|')

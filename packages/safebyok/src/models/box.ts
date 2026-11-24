@@ -8,8 +8,12 @@ import { BoxChecks } from '../shapes/shapes-thingkinds'
 export class Box extends BaseBox {
   // == [Construction]: make, constructor
 
+  // don't #bury-the-lede -- putting `.make` on one line doesn't let me see where the magic is made
+  // this can also be a method on Thing, calling this.constructor.recordOrShell.parse(record)
   /** Make the box of `record`, a whole box record, live or a tombstone, or the box's shell. Nothing is fetched or stored. */
-  static make(record: BoxRecord | ShellOf<BoxRecord>): Box { return new Box(BoxChecks.recordOrShell.parse(record)) }
+  static make(record: BoxRecord | ShellOf<BoxRecord>): Box {
+    return new Box(BoxChecks.recordOrShell.parse(record))
+  }
 
   private constructor(begun: BoxRecord | ShellOf<BoxRecord>) { super(begun) }
   // --
@@ -19,7 +23,9 @@ export class Box extends BaseBox {
   /** Where this box is stored. */
   get scope(): ThingScope { return ThingChecks.thingScope.parse(this) }
 
-  /** This box's {@link BoxStamp}, which its whisper's seal is bound to. Refuses the shell, which has no revision. */
+  // BoxChecks.stamp.parse(this.pickle()) don't need the pickle, things duck as themselves
+  // this should be a method on Thing, calling this.constructor.stamp.parse(this)
+  /** This box's {@link BoxStamp}, which its whisper's seal is bound to. A 'void' box (lifeseq -1) will be refused  */
   get stamp(): BoxStamp { return BoxChecks.stamp.parse(this.pickle()) }
   // --
 }

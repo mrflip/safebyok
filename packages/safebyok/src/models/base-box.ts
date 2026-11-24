@@ -29,13 +29,19 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
   /** The Thing fields and sidecar of `donorProps`, which may be a live box, a tombstone or the shell.
    * Every other field is dropped, including a whisper, sealed or not.
    */
-  static donorPropsOf(donorProps: Sealable<LiveOf<BoxRecord>>): Sealable<LiveOf<BoxRecord>> { return BoxChecks.sealable.parse(donorProps) }
+  static donorPropsOf(donorProps: Sealable<LiveOf<BoxRecord>>): Sealable<LiveOf<BoxRecord>> {
+    return BoxChecks.sealable.parse(donorProps)
+  }
 
   /** The sidecar, `am` and `written_at` of `publicProps`. Refuses any other field. */
-  static publicPropsOf(publicProps: BoxPublicProps): BoxPublicProps { return Checks.boxPublicProps.parse(publicProps) }
+  static publicPropsOf(publicProps: BoxPublicProps): BoxPublicProps {
+    return Checks.boxPublicProps.parse(publicProps)
+  }
 
   /** The whisper of `secretProps`. Refuses any other field. */
-  static secretPropsOf(secretProps: BoxCleartexts): BoxCleartexts { return Checks.boxCleartexts.parse(secretProps) }
+  static secretPropsOf(secretProps: BoxCleartexts): BoxCleartexts {
+    return Checks.boxCleartexts.parse(secretProps)
+  }
 
   /** The empty whisper a tombstone seals. */
   static readonly tombstoneSecrets: BoxCleartexts = Object.freeze({ whisper: Object.freeze({}) })
@@ -43,13 +49,15 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
 
   // == [Revisions]: nextRevisionOf, tombstoneOf
 
+  // would this simplify at all with a call to super and then mixing in the body? #earnest-question
+
   /** The next live revision after `donorProps`, without its sealed whisper.
    * After a tombstone or the shell, it begins the box's next life.
    * Its sidecar is `publicProps.sidecar`, or else the sidecar of a live `donorProps`. One of the two must have one.
    * Its `written_at` is `publicProps.written_at`, or now.
    */
   static nextRevisionOf(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps = {}): RevisionOf<LiveOf<BoxRecord>, BoxCleartexts> {
-    const { sidecar: donorSidecar, ...thing                        } = BoxChecks.sealable.parse(donorProps)
+    const { sidecar: donorSidecar, ...thing } = BoxChecks.sealable.parse(donorProps)
     // A tombstone's `{}` is not inherited: the next life's sidecar is given, as it is after the shell.
     const heirSidecar = (thing.am === 'a') ? donorSidecar : undefined
     const { sidecar = heirSidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
@@ -108,6 +116,8 @@ Object.freeze(BaseBox satisfies Sealer<BoxRecord, BoxCleartexts>)
 
 // == [Helpers]: nextLifeOf, deserializeWhisper
 
+// why is this on Box not Thing? #earnest-question
+
 /** The lifeseq and lifepath of the life after the given box's life. */
 function nextLifeOf({ lifeseq, lifepath }: Pick<BoxRecord, 'lifeseq' | 'lifepath'>): Pick<BoxRecord, 'lifeseq' | 'lifepath'> {
   const nextLifeseq = Lifeseq.ofLifenum(Lifeseq.lifenumOf(lifeseq) + 1)
@@ -130,6 +140,8 @@ function deserializeWhisper(text: string): CX.Whisper {
 // --
 
 // == [Checks]: Checks
+
+// Why are these here and not in the shapes? #earnest-question
 
 /** Checks for the inputs of a box's seal: a live sealable for a tombstone, the public props of a revision and of a tombstone, and the secret props. */
 const Checks = Validator.Checkers('bad_record', ({ obj, lit, oneof, epochMillis }) => ({
