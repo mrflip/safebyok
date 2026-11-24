@@ -1,6 +1,6 @@
 # Thread 23: one_store (2026-11-24)
 
-Branch `20261124-one_store`, PR (see the PR's own link), stacked on [#888](https://github.com/mrflip/safebyok/pull/888). Proved: see
+Branch `20261124-one_store`, PR [#889](https://github.com/mrflip/safebyok/pull/889), stacked on [#888](https://github.com/mrflip/safebyok/pull/888). Proved: see
 the PR's **Tests:** line (`pnpm justify` in full).
 
 Built by hand (no /sprint), three pieces, S first, then F and W, each its own commits.
