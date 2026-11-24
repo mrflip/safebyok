@@ -516,6 +516,14 @@ function makeBankGiver(friend: BankFriend) {
    * @example
    *   const shown = await Knock.withLockableWhisper('jokes', ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: (box) => String(box.sidecar['mask']) })
    *   maskElement.textContent = shown
+   * @example
+   *   // A field masked whole while locked, and to its last four characters while unlocked, as the part `WhisperMask` does.
+   *   const stage = Knock.useWorld((snap) => snap.stage)
+   *   useEffect(() => {
+   *     if ((stage !== 'locked') && (stage !== 'unlocked')) { return }
+   *     void Knock.withLockableWhisper('jokes', ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: () => '••••••••' })
+   *       .then((shown) => { maskRef.current!.textContent = shown })
+   *   }, [stage])
    */
   async function withLockableWhisper<ResultT>(
     labelpath: string, fn: (whisper: Whisper, box: BoxUnsealed) => ResultT | Promise<ResultT>, opts: WithLockableWhisperOpts<ResultT>,

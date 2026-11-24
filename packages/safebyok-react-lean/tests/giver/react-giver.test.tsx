@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider, type UseMutationResult, onlineManager, useMutation, useQuery } from '@tanstack/react-query'
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
-import { type ReactNode, useActionState, useEffect, useLayoutEffect, useMemo } from 'react'
+import { type ReactNode, useActionState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { type Root, hydrateRoot } from 'react-dom/client'
 import { renderToString } from 'react-dom/server'
 import { type WorldSnapshot, type BoxRecord, type Device, type GateRecord, type Gating, type LiveOf, type Whisper, MemoryVaultDB, Thing, VaultTSQ, isVaultError } from 'safebyok'
@@ -807,6 +807,26 @@ describe("withLockableWhisper", () => {
     expect(answer).to.deep.equal(['locked', { service: 'jokes' }])
     expect(result.current.bank.isUnlockWanted).to.eq(false)
     expect(ifLocked.mock.calls.at(-1)![0]).to.not.have.property('whisper')
+  })
+
+  it("masks a field whole while the bank is locked, and to its tail while it is unlocked", async () => {
+    // withLockableWhisper @example 2
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    function JokesMask() {
+      const maskRef = useRef<HTMLElement>(null)
+      const stage = world.Bank.useWorld((snap) => snap.stage)
+      useEffect(() => {
+        if ((stage !== 'locked') && (stage !== 'unlocked')) { return }
+        void world.Bank.withLockableWhisper(TH.JokesPath, ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: () => '••••••••' })
+          .then((shown) => { maskRef.current!.textContent = shown })
+      }, [stage])
+      return <><p>{stage}</p><code ref={maskRef} /></>
+    }
+    const { container } = render(TH.providerTreeOf(world, <JokesMask />, { userid: TH.ProviderUser }))
+    await screen.findByText('locked')
+    await waitFor(() => { expect(container.querySelector('code')?.textContent).to.eq('••••••••') })
+    await act(() => world.Bank.gatingUnlockAttempt({ passphrase: Passphrase }))
+    await waitFor(() => { expect(container.querySelector('code')?.textContent).to.eq(mask(TH.JokesKey, { tail: 4 })) })
   })
 
   it("refuses on a locked bank for a box never stored", async () => {
