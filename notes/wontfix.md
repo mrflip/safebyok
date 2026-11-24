@@ -289,22 +289,6 @@ Reasoning for wontfix: a gate change comes a few times a day, and a lease is bui
 separate updates*, `#no-slop-crossings`). Nothing stored changes, and no secret moves. Written by the gate_super thread 1
 worker, 2026-11-21, awaiting a ruling.
 
-### A snapshot write already under way when `removeClient` runs can land after its delete
-
-* current outcome: `IdbPersister.removeClient` cancels the write its throttle holds and deletes the record. A write the
-  throttle had already let through, still in flight to IndexedDB, can commit after the delete, so the next
-  `restoreClient` returns that snapshot.
-* alternatives:
-  - keep the promise of the write in flight and await it before the delete: a state in the persister for a write that
-    lasts milliseconds.
-* workaround: none needed; a device that restores the snapshot refetches what it shows (the bankDB is the ground truth).
-
-Steps to reproduce: call `persistClient`, then `removeClient` in the same turn, and read the record once both settle.
-
-Reasoning for wontfix: `removeClient` runs when a bank is deleted or a user signs out, a few times a day, against a
-write in flight for milliseconds (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). The snapshot is a cache of
-what the bankDB holds. Unspecified and unguarded; reviewer, 2026-11-22, awaiting a ruling.
-
 ### A `read_tc` from a clock running ahead pins a Thing's agerank time in the future
 
 * current outcome: a `VaultMinder` keeps, as the last field of each Thing's agerank, the first eight hexadecimal
@@ -329,26 +313,6 @@ Reasoning for wontfix: a clock running ahead is a broken system, and the fix is 
 (CLAUDE.md, *The bankDB is the ground truth*: a broken state is reported, never accommodated). Nothing stored changes,
 and no secret moves. Ruled by the Coach, 2026-11-24: "I don't want to complicate the common code for a broken system,
 and it would have to be the customer's call whether to tolerate it or panic."
-
-### A device's sweep while `signin` restores its caches leaves the vaultDB watched
-
-* current outcome: `signin` makes the device's `VaultMinder`, which watches the host's vaultDB, only once both
-  persisters have restored. A `Device.sweep` that lands while they restore finds no `VaultMinder` to stop; the one
-  made after it watches until the page goes, and the vault TSQ, the world and the persisters' scaffold hear what it tells.
-* alternatives:
-  - make the `VaultMinder` before the restores, as it was: its sorter would sort records no listener hears, and drop
-    them as repeats once they listen.
-  - have the sweep mark the device so the sign-in stops: a state and a check in the sign-in for a sweep landing in a
-    window of milliseconds.
-* workaround: none needed; the device sweeps again, or the page reloads.
-
-Steps to reproduce: give a device persisters whose restore is slow; call `signin`, then `sweep` before the restore
-resolves; ring the vaultDB's watch.
-
-Reasoning for wontfix: a sweep crossing a sign-in is an end-of-life event landing in a millisecond window (CLAUDE.md,
-*Hours separate updates*), and the fix is a state and a check in the common path of every sign-in. Nothing stored
-changes and no secret moves: a watch notifies records the bankDB already holds. Recorded under that rule by thread 4 of
-feed_sorter, 2026-11-24.
 
 ### A `getOnce` the library cancels when its item is reset rejects with the library's own error
 

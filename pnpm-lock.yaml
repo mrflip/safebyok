@@ -771,9 +771,6 @@ importers:
       '@tanstack/query-core':
         specifier: ^5.107.1
         version: 5.107.1
-      '@tanstack/query-persist-client-core':
-        specifier: ^5.107.1
-        version: 5.107.1
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
@@ -1154,9 +1151,6 @@ importers:
 
   packages/safebyok-idb-lean:
     dependencies:
-      es-toolkit:
-        specifier: ^1.53.2
-        version: 1.53.2
       idb-keyval:
         specifier: ^6.3.0
         version: 6.3.0
@@ -1185,6 +1179,9 @@ importers:
       '@vitest/eslint-plugin':
         specifier: ^1.6.28
         version: 1.6.28(@typescript-eslint/eslint-plugin@8.71.1(@typescript-eslint/parser@8.72.2(eslint@10.14.0)(typescript@6.0.3))(eslint@10.14.0)(typescript@6.0.3))(eslint@10.14.0)(typescript@6.0.3)(vitest@5.1.0)
+      es-toolkit:
+        specifier: ^1.53.2
+        version: 1.53.2
       eslint:
         specifier: ^10.14.0
         version: 10.14.0
@@ -2466,9 +2463,6 @@ packages:
 
   '@tanstack/query-core@5.107.1':
     resolution: {integrity: sha512-PSyAik11oQBEVOiVy5hjZWHmoUqOXqK1WYy4v55mcxozEfKaQgpUMsgnXhWjuESzSht8JfzqMS1m6M/9CpNgvg==}
-
-  '@tanstack/query-persist-client-core@5.107.1':
-    resolution: {integrity: sha512-/qDxEcKh44xViKKFlf8MUoeITritIn58XcT3YkCOQ0Ovj4Wa2EgZtqvHSlw+tnQQGhtq9+gLVZSeUtSfkIL9Kg==}
 
   '@tanstack/react-query@5.107.1':
     resolution: {integrity: sha512-udCOOLp3ZAheUrIHLCe+ZZge6nr2ZUrGMSWcCuXsjY1Bf2JeeE09oxst97PILiCY6N8xo/7bIo3Hvz13zh06FA==}
@@ -5783,10 +5777,6 @@ snapshots:
       picomatch: 4.0.7
 
   '@tanstack/query-core@5.107.1': {}
-
-  '@tanstack/query-persist-client-core@5.107.1':
-    dependencies:
-      '@tanstack/query-core': 5.107.1
 
   '@tanstack/react-query@5.107.1(@types/react@19.3.0)(react@19.3.1)':
     dependencies:

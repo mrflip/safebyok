@@ -1,6 +1,6 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, ThingSoonestBare
+// == [Models]: VaultDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, RootShelfExpected, ThingSoonestBare
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
@@ -40,6 +40,9 @@ export const GatingSpent = 'This gating was attempted already, and a gating is a
 
 /** Something a bank is asked to host that has no sweep. */
 export const HostedVaultExpected = 'Expected a vault: an object with a sweep function.'
+
+/** A root shelf handed to `Device.make` that has not the three methods of Web Storage it is called through. */
+export const RootShelfExpected = 'Expected a root shelf, such as localStorage: an object with getItem, setItem and removeItem functions.'
 
 /** A box the device has heard a newer revision of, with no whole record of its newest life to unseal. */
 export const ThingSoonestBare = 'This device has heard of a newer revision of this record but has not fetched it yet.'

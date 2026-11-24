@@ -106,7 +106,7 @@ describe("VaultTSQ's writer, on each event the VaultMinder tells", () => {
 
   it("sets null for nothing stored", async () => {
     const world = await tsqWorldOf(new MemoryVaultDB())
-    world.sorted.receive({ ...TH.itemEventOf(BoxShell), sourcelabel: 'persister', read_tc: readTcNow() })
+    world.sorted.receive({ ...TH.itemEventOf(BoxShell), sourcelabel: 'root_shelf', read_tc: readTcNow() })
     expect(world.queryClient.getQueryData(BoxKey)).to.be.null
   })
 

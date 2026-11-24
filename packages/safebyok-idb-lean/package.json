@@ -2,7 +2,7 @@
   "name": "safebyok-idb-lean",
   "private": true,
   "version": "0.0.0",
-  "description": "IndexedDB storage for the new safebyok core: a vaultDB that keeps a bank's Things as ciphertext in this browser, and a persister that keeps a device's cache snapshots. Private until it replaces safebyok-indexeddb.",
+  "description": "IndexedDB storage for the new safebyok core: a vaultDB that keeps a bank's Things as ciphertext in this browser. Private until it replaces safebyok-indexeddb.",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -27,7 +27,6 @@
     "justify": "pnpm install && pnpm lint && pnpm typecheck && pnpm test && SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm build"
   },
   "dependencies": {
-    "es-toolkit": "^1.53.2",
     "idb-keyval": "^6.3.0",
     "safebyok": "workspace:*"
   },
@@ -39,6 +38,7 @@
     "@types/node": "^24.19.2",
     "@vitest/coverage-v8": "^5.1.0",
     "@vitest/eslint-plugin": "^1.6.28",
+    "es-toolkit": "^1.53.2",
     "eslint": "^10.14.0",
     "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-plugin-chai-expect": "^4.1.1",

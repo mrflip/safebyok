@@ -121,15 +121,6 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   unlocked would live in a store, and starting, unborn and failed could come from the bank record's fetch instead of
   stand-in snapshots. "this fits with upcoming changes, but it needs more design before anything should be
   rewritten, so leave the shim" (the Coach, 2026-11-21, react_life, survey after thread 12). Part of the ownership work, with Closer Look E11.
-* **What is the size limit on a persister's snapshot?** A persister saves each client's whole snapshot, every
-  item, soon, dead record and listing, at every change. How large can that grow before it matters: TanStack's
-  persisted snapshot (dehydrated whole, as one string), IndexedDB's limits on one record and the origin's quota,
-  and the cost of writing it whole each time. Find when a vault grows big enough to hit one, and what a host sees
-  then (thread 8, core_first, 2026-11-22).
-* **A size limit for a persisted snapshot.** A save past the origin's quota is refused `vault_full` and told to the
-  persister's `onBadNews`, and the last snapshot stands; with boxes persisted per bank, the limit bounds one user's boxes.
-  TanStack's `PersistRetryer`, with `removeOldestQuery`, is the way to shrink a snapshot until it fits (the Coach,
-  2026-11-22, box_persist).
 * **A marker on the parts for session-replay tools.** A revealed secret is plain text in the DOM, and a replay tool
   records it. Give `WhisperText`, `WhisperInput` and `PassphraseInput` a stable attribute a host can tell its replay
   tool to mask (docs/threat-model.md, *Not built yet*; the Coach, 2026-11-23).

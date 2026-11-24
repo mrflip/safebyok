@@ -1,7 +1,6 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
-import { noop } from 'es-toolkit'
 import { type ReactNode, useEffect, useLayoutEffect } from 'react'
-import { type BadNewsHandler, type BoxRecord, type GateRecord, type PasskeyWayinHeader, type PersistedClient, type Persister, MemoryPersister, VaultMinder, VaultTSQ } from 'safebyok'
+import { type BadNewsHandler, type BoxRecord, type GateRecord, type PasskeyWayinHeader, VaultMinder, VaultTSQ } from 'safebyok'
 import { readTcNow, storageUnavailable } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
@@ -70,12 +69,6 @@ async function setupShown(opts: Parameters<typeof setupShowing>[0] = {}) {
   return { ...shown, first: shown.seen.current!.data! }
 }
 
-/** A persister of each bank's records, the same one at every call: one of a device's two, kept in memory across a reload. */
-function memoryPersisterOf(): () => MemoryPersister {
-  const persister = new MemoryPersister()
-  return () => persister
-}
-
 /** Write the jokes box's next revision, of tier `pro`, from the other device, as another tab would, resolving it. */
 async function putFromOtherTab(world: TH.ProviderWorld): Promise<BoxRecord> {
   return await world._cheat_otherVault!.putBoxOnce(JokesBoxPath, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: LeanTH.Whisper })
@@ -123,34 +116,18 @@ describe("useBox, mounted before anyone is signed in", () => {
   })
 })
 
-describe("useBox on a page reloaded over a device's persisters", () => {
-  it("shows the box's restored record once restored, before the vaultDB answers, when mounted while the bank is starting", async () => {
-    const boxes: Persister = new MemoryPersister()
-    const persisters = { roots: memoryPersisterOf(), boxes: () => boxes }
-    const world      = await TH.buildProviderWorld({ stored: 'jokes', persisters })
-    const saved      = await boxes.restoreClient()
-    let land         = noop
-    vi.spyOn(boxes, 'restoreClient').mockReturnValue(new Promise<PersistedClient | undefined>((resolve) => { land = () => { resolve(saved) } }))
-    const release    = world.pauseGets()
+describe("useBox on a page reloaded over a device's root shelf", () => {
+  it("shows the bank locked from the roots kept before the vaultDB answers, and the box once it does", async () => {
+    const world   = await TH.buildProviderWorld({ stored: 'jokes', rootShelf: new LeanTH.MemoryShelf() })
+    const release = world.pauseGets()
     onTestFinished(release)
     const { BoxProbe, seen } = makeBoxProbe(world)
     render(treeOf(world, <><StageShown world={world} /><BoxProbe /></>))
-    await screen.findByText('starting')
+    await screen.findByText('locked')
     expect(seen.current?.data).to.be.undefined
-    act(() => { land() })
+    release()
     await waitFor(() => { expect(seen.current?.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
     expect(seen.mounts).to.eq(1)
-  })
-
-  it("shows the box's restored record while the stage is still starting, where no roots were kept", async () => {
-    const persisters = { roots: () => new MemoryPersister(), boxes: memoryPersisterOf() }
-    const world      = await TH.buildProviderWorld({ stored: 'jokes', persisters })
-    const release    = world.pauseGets()
-    onTestFinished(release)
-    const { BoxProbe, seen } = makeBoxProbe(world)
-    render(treeOf(world, <><StageShown world={world} /><BoxProbe /></>))
-    await waitFor(() => { expect(seen.current?.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
-    expect(screen.getByText('starting')).to.exist
   })
 })
 

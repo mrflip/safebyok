@@ -4,8 +4,9 @@ import type * as TSQ from '@tanstack/query-core'
 import { cloneDeepWith } from 'es-toolkit'
 import { Outcome } from 'safebyok-big/internals'
 import type { MaskedRow } from '../shapes/shapes-masked-view'
+import type { EpochMillis } from '../shapes/primitives'
 
-// == [Masked rows]: maskedRowsOf
+// == [Masked rows]: maskedRowsOf, maskedRecordRowOf
 
 /** The rows of every query in `queryClient` whose key starts with `keyHead`, masked for a devtool.
  * Each has its key, its state, and a copy of its record or listing with each ciphertext masked.
@@ -23,6 +24,11 @@ export function maskedRowsOf(queryClient: TSQ.QueryClient, keyHead: TSQ.QueryKey
       val:             maskedOf(val),
     }
   })
+}
+
+/** The row of `record`, a Thing's, under `queryKey`, as {@link maskedRowsOf} shows a query settled on it: written at `dataUpdatedAt`, with each ciphertext masked. */
+export function maskedRecordRowOf(queryKey: TSQ.QueryKey, record: unknown, dataUpdatedAt: EpochMillis): MaskedRow {
+  return { queryKey: [...queryKey], status: 'success', fetchStatus: 'idle', dataUpdatedAt, isInvalidated: false, lastRefusalkind: null, val: maskedOf(record) }
 }
 // --
 

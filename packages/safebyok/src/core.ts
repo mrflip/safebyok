@@ -31,11 +31,10 @@ export {
 } from './shapes/shapes-answers'
 export { type VaultDB, isVaultDB } from './storage/vault-db'
 export type { Agerank, ItemSeen, Liveness, ReadTc, VaultAgedEvent, VaultEvent, VaultEventOf, VaultEventkind, VaultItemEvent, VaultLifeEvent } from './shapes/shapes-vault-event'
-export { type DevicePersisters, type PersistedClient, type Persister, type PersisterOfBank, MemoryPersister, isPersister } from './storage/persister'
 export {
   type BadNews, type BadNewsHandler, type BankAskDraft, type BankOpts, type BankSnapshot, type BankStage, type BoxUnsealed, type DeviceJSON, type DeviceOpts, type DeviceRecord,
-  type DeviceSnapshot, type HostedVault, type RefusalSnapshot, type WorldOpts,
-  BankishChecks, DefaultBanklabel, PendingBank, SignedOutBank, bankStageVals,
+  type DeviceSnapshot, type HostedVault, type RefusalSnapshot, type RootShelf, type WorldOpts,
+  BankishChecks, DefaultBanklabel, PendingBank, SignedOutBank, bankStageVals, isRootShelf,
 } from './shapes/shapes-bankish'
 export {
   type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateGatingFriend, type GateOpts, type GateRevisionedStamp, type GatingCleartexts, type GuardedKeyDeriver,

@@ -104,3 +104,10 @@ what differs from big, in a sentence or two.
   snapshot holds the sealed boxes and their listings: what the bankDB holds, at rest on the device as well, by design.
   No naked bankKey, no handle and no cleartext is saved: the clients hold only stored records, and no mutation (whose
   variables may hold a form's cleartexts) is saved.
+
+* 2026-11-24 (feed_sorter thread 22, local_roots), G3: **The device keeps the roots on the host's root shelf.** The
+  2026-11-22 entry above drifts again: the persisters, their scaffold and `IdbPersister` are gone. Between page loads a
+  device keeps only the signed-in bank's three roots (the bank, the main gate and the root box, whole records as the
+  vaultDB stores them, each wayin's wrapped bankKey and header among them), as one JSON value under one key per bank on
+  the `rootShelf` the host hands `Device.make`, `localStorage` in a browser (`packages/safebyok/src/minding/root-shelf.ts`).
+  No box and no listing is kept at rest on the device any more; no naked bankKey, no handle and no cleartext is kept.

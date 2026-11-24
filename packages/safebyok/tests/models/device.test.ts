@@ -15,9 +15,8 @@ import { VaultTSQ } from '../../src/minding/vault-tsq'
 import { BankRootsMissing } from '../../src/phrases'
 import { EmptyMaskedView } from '../../src/shapes/shapes-masked-view'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { type DevicePersisters, MemoryPersister } from '../../src/storage/persister'
+import { ThingFormat } from '../../src/shapes/shapes-thing'
 import { refusedAnswerOf } from '../../src/storage/refused-answer'
-import type { BankScope } from '../../src/shapes/shapes-stamps'
 import { type BadNews, type DeviceOpts, type DeviceSnapshot, PendingBank, SignedOutBank } from '../../src/shapes/shapes-bankish'
 import * as TH from '../test-helpers'
 
@@ -222,169 +221,114 @@ function stagesOf(device: Device): string[] {
 }
 
 describe("device.hello()", () => {
-  it("starts the device, signing nobody in and restoring nothing, each time", async () => {
-    const persisters = { roots: vi.fn(), boxes: vi.fn() }
-    const device     = TH.makeDevice({ userid: null }, { persisters })
+  it("starts the device, signing nobody in and reading nothing from its root shelf, each time", async () => {
+    const rootShelf = new TH.MemoryShelf()
+    const getItem   = vi.spyOn(rootShelf, 'getItem')
+    const device    = TH.makeDevice({ userid: null }, { rootShelf })
     await device.hello()
     await device.hello()
     expect(device.getSnapshot()).to.deep.equal({ bank: SignedOutBank })
-    expect([persisters.roots, persisters.boxes].map((persisterOf) => persisterOf.mock.calls.length)).to.deep.equal([0, 0])
+    expect(getItem).not.toHaveBeenCalled()
   })
 })
 
-describe("a device's persisters", () => {
-  it("restore the roots at signin, and the stage stays starting until they have, asking the vaultDB nothing before", async () => {
-    const { born, device, persisters } = await bornAndReloaded()
-    const rootsPersister = persisters.roots(TH.WorldScope)
-    const saved       = rootsPersister.restoreClient()
-    let land          = noop
-    vi.spyOn(rootsPersister, 'restoreClient').mockReturnValue(new Promise((resolve) => { land = () => { resolve(saved) } }))
-    const tryGetThing = vi.spyOn(born.device.vaultDB, 'tryGetThing')
-    const stages      = stagesOf(device)
-    const signingIn   = device.signin(TH.WorldScope.userid)
-    await nextTick()
-    expect([device.getSnapshot().bank.stage, tryGetThing.mock.calls.length]).to.deep.equal(['starting', 0])
-    land()
-    await signingIn
-    expect(stages).to.deep.equal(['signed_out', 'starting', 'locked'])
-  })
-
-  it("restore the boxes its vault kept, each box's record reaching its Thing and the vault TSQ's item before the vaultDB answers", async () => {
-    const persisters = memoryPersisters()
-    const first      = TH.makeDevice({}, { persisters })
-    const { vault }  = await TH.buildBornVault({ device: first })
-    const box        = await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    await nextTick()
-    const vaultDB = vault.bank.device.vaultDB as MemoryVaultDB
-    const device  = TH.makeDevice({ userid: null }, { vaultDB, persisters })
-    vi.spyOn(vaultDB, 'tryGetThing').mockReturnValue(new Promise(noop))
-    void device.signin(TH.WorldScope.userid)
-    await TH.eventually(() => device.bank !== null)
-    const scope = { ...TH.WorldScope, labelpath: 'box/openai' }
-    expect(device.world.demandVaultMinder().thingAt(scope)?.pickle()).to.deep.equal(box)
-    expect(device.vaultTsqClient.getQueryData(VaultTSQ.itemQueryKeyOf(scope))).to.deep.equal(box)
-  })
-
-  it("read a snapshot saved under another format as empty, and the bank comes up from the vaultDB", async () => {
-    const { born, device, persisters } = await bornAndReloaded()
-    const rootsPersister = persisters.roots(TH.WorldScope)
-    rootsPersister.persistClient({ ...(await rootsPersister.restoreClient())!, buster: 'a010501' })
-    const tryGetThing = vi.spyOn(born.device.vaultDB, 'tryGetThing')
-    const stages      = stagesOf(device)
-    await device.signin(TH.WorldScope.userid)
-    expect(stages).to.deep.equal(['signed_out', 'starting', 'locked'])
-    expect(tryGetThing).toHaveBeenCalled()
-  })
-
-  it("restore the signed-in bank's roots and boxes at signin, from the persisters its scope gives, and the stage stays starting until they have", async () => {
-    const persisters     = memoryPersisters()
-    const born           = await TH.buildBornBank({ device: TH.makeDevice({}, { persisters }) })
-    await nextTick()
-    const boxesPersister = persisters.boxes(TH.WorldScope)
-    const saved          = boxesPersister.restoreClient()
-    let land             = noop
-    vi.spyOn(boxesPersister, 'restoreClient').mockReturnValue(new Promise((resolve) => { land = () => { resolve(saved) } }))
-    const roots       = vi.fn(persisters.roots)
-    const boxes       = vi.fn(persisters.boxes)
-    const device      = TH.makeDevice({ userid: null }, { vaultDB: born.device.vaultDB, persisters: { roots, boxes } })
-    const tryGetThing = vi.spyOn(born.device.vaultDB, 'tryGetThing')
-    await device.hello()
-    const signingIn = device.signin(TH.WorldScope.userid)
-    await nextTick()
-    expect([device.getSnapshot().bank.stage, tryGetThing.mock.calls.length]).to.deep.equal(['starting', 0])
-    expect([roots.mock.calls, boxes.mock.calls]).to.deep.equal([[[TH.WorldScope]], [[TH.WorldScope]]])
-    land()
-    await signingIn
-    expect(device.getSnapshot().bank).to.include({ stage: 'locked' })
-  })
-
-  it("keep each bank's roots and boxes in records of their own, so another user signing in restores none of them", async () => {
-    const persisters = memoryPersisters()
-    const first      = TH.makeDevice({}, { persisters })
-    const { vault }  = await TH.buildBornVault({ device: first })
-    await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    await nextTick()
-    const otherScope = { ...TH.WorldScope, userid: 'u_other' }
-    const device     = TH.makeDevice({ userid: null }, { vaultDB: vault.bank.device.vaultDB, persisters })
-    await device.signin(otherScope.userid)
-    await nextTick()
-    expect(device.world.demandVaultMinder().thingAt({ ...otherScope, labelpath: 'box/openai' })).to.be.undefined
-    expect(device.vaultTsqClient.getQueryCache().getAll().map((tsqQuery) => tsqQuery.queryKey[1])).to.not.include(TH.WorldScope.userid)
-    for (const persisterOf of [persisters.roots, persisters.boxes]) {
-      const savedUserids = (await persisterOf(TH.WorldScope).restoreClient())!.clientState.queries.map((saved) => saved.queryKey[1])
-      expect(new Set(savedUserids)).to.deep.equal(new Set([TH.WorldScope.userid]))
-    }
-  })
-
-  it("tell onBadNews where the signed-in bank's boxes fail to restore, and the bank comes up all the same", async () => {
-    vi.spyOn(console, 'error').mockImplementation(noop)
-    vi.spyOn(console, 'warn').mockImplementation(noop)
-    const onBadNews              = vi.fn()
-    const { device, persisters } = await bornAndReloaded({ onBadNews })
-    vi.spyOn(persisters.boxes(TH.WorldScope), 'restoreClient').mockRejectedValue(new Error('disk on fire'))
-    await device.signin(TH.WorldScope.userid)
-    expect(device.getSnapshot().bank).to.include({ stage: 'locked' })
-    expect(onBadNews).toHaveBeenCalledTimes(1)
-    expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'storage_unavailable' })
-  })
-
-  it("tell onBadNews where the signed-in bank's roots fail to restore, and the bank comes up from the vaultDB, never rejecting", async () => {
-    vi.spyOn(console, 'error').mockImplementation(noop)
-    vi.spyOn(console, 'warn').mockImplementation(noop)
-    const onBadNews              = vi.fn()
-    const { device, persisters } = await bornAndReloaded({ onBadNews })
-    vi.spyOn(persisters.roots(TH.WorldScope), 'restoreClient').mockRejectedValue(new Error('disk on fire'))
-    await device.signin(TH.WorldScope.userid)
-    expect(device.getSnapshot().bank).to.include({ stage: 'locked' })
-    expect(onBadNews).toHaveBeenCalledTimes(1)
-    expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'storage_unavailable' })
-  })
-
-  it("are refused where roots or boxes is not a function, naming it", () => {
-    const rootsErr = TH.expectSyncRefusal(() => TH.makeDevice({}, { persisters: { roots: new MemoryPersister(), boxes: memoryPersisters().boxes } } as never), 'bad_record')
-    expect(rootsErr.message).to.include('persisters.roots')
-    const boxesErr = TH.expectSyncRefusal(() => TH.makeDevice({}, { persisters: { roots: new MemoryPersister(), boxes: new MemoryPersister() } } as never), 'bad_record')
-    expect(boxesErr.message).to.include('persisters.boxes')
-  })
-})
-
-describe("a device nobody is signed in to", () => {
-  it("refuses what needs a user, absent_vault", async () => {
-    const device = TH.makeDevice({ userid: null })
-    TH.expectSyncRefusal(() => device.scope, 'absent_vault')
-    TH.expectSyncRefusal(() => device.vaultTSQ, 'absent_vault')
-    await TH.expectRefusal(device.judgeStrength(TH.TestPassphrase), 'absent_vault')
-  })
-
-  it("refuses a birth, zeroing the passkey answer", () => {
-    const passkeyCleartext = TH.passkeyAnswerOf()
-    TH.expectSyncRefusal(() => TH.makeDevice({ userid: null }).birthGating({ passphraseCleartext: TH.TestPassphrase, passkeyCleartext }))
-    expect(TH.isZeroed(passkeyCleartext.prfBytes)).to.be.true
-  })
-})
-
-/** A device's persisters, each in memory: one of each bank's roots, and one of its boxes, each the same at every call for that bank. */
-function memoryPersisters(): DevicePersisters & Readonly<{ roots: (scope: BankScope) => MemoryPersister, boxes: (scope: BankScope) => MemoryPersister }> {
-  const persisters = new Map<string, MemoryPersister>()
-  function persisterAt(recordlabel: string): MemoryPersister {
-    if (! persisters.has(recordlabel)) { persisters.set(recordlabel, new MemoryPersister()) }
-    return persisters.get(recordlabel)!
-  }
-  return {
-    roots: ({ userid, banklabel }) => persisterAt(`roots:${userid}:${banklabel}`),
-    boxes: ({ userid, banklabel }) => persisterAt(`boxes:${userid}:${banklabel}`),
-  }
+/** The value `rootShelf` keeps of the world's bank, parsed: its version, then the bank's, the main gate's and the root box's records. */
+function shelvedOf(rootShelf: TH.MemoryShelf): unknown[] {
+  return JSON.parse(rootShelf.getItem(WorldShelfCkey) ?? 'null') as unknown[]
 }
 
-/** Resolve on the next turn of the macrotask queue, by when TanStack has told its persister of what its cache last did. */
-async function nextTick(): Promise<void> { await new Promise((resolve) => { setTimeout(resolve, 0) }) }
+/** The root shelf's key of the world's bank. */
+const WorldShelfCkey = `safebyok:roots:${TH.WorldScope.banklabel}:${TH.WorldScope.userid}`
 
-/** A bank born on a device that saves its caches to a pair of memory persisters, and a second device over its vaultDB and the same persisters, signed out: the page reloaded. */
-async function bornAndReloaded(opts: Partial<DeviceOpts> = {}): Promise<{ born: TH.BornBank, device: Device, persisters: ReturnType<typeof memoryPersisters> }> {
-  const persisters = memoryPersisters()
-  const born       = await TH.buildBornBank({ device: TH.makeDevice({}, { persisters }) })
-  await nextTick()
-  return { born, device: TH.makeDevice({ userid: null }, { vaultDB: born.device.vaultDB, persisters, ...opts }), persisters }
+/** Each value at the bank's key that reads as nothing kept, and what it is. */
+const UnreadShelvedCases = [
+  ["[\"roots-a000000\",{},{},{}]", 'a value of another version'],
+  ["{\"bank\":",                    'a value that does not parse'],
+  ["[\"roots-a010501\"]",          'a value of today\'s version without its roots'],
+] as const
+
+describe("a device's root shelf", () => {
+  it("has the bank's three roots once it is born, under the bank's key, whole, after the version", async () => {
+    const rootShelf = new TH.MemoryShelf()
+    const { device, bank } = await TH.buildBornBank({ device: TH.makeDevice({}, { rootShelf }) })
+    expect([...rootShelf.items.keys()]).to.deep.equal([WorldShelfCkey])
+    const [version, ...roots] = shelvedOf(rootShelf)
+    expect(version).to.eq(`roots-${ThingFormat}`)
+    expect(roots).to.deep.equal([bank.pickle(), bank.gate.pickle(), device.world.rootBox!.pickle()])
+  })
+
+  it("has the main gate's next revision once the passphrase is replaced", async () => {
+    const rootShelf = new TH.MemoryShelf()
+    const { bank }  = await TH.buildBornBank({ device: TH.makeDevice({}, { rootShelf }) })
+    await bank.gate.gatingReplacePassphraseAttempt({ passphrase: TH.TestPassphrase, nextPassphrase: 'another fake passphrase for tests' })
+    expect(shelvedOf(rootShelf)[2]).to.deep.equal(bank.gate.pickle())
+    expect((shelvedOf(rootShelf)[2] as { revseq: number }).revseq).to.eq(1)
+  })
+
+  for (const [shelved, blurb] of UnreadShelvedCases) {
+    it(`reads ${blurb} as nothing kept, removing it, and the bank comes up from the vaultDB`, async () => {
+      const { born, device, rootShelf } = await bornAndReloaded()
+      rootShelf.setItem(WorldShelfCkey, shelved)
+      const removeItem  = vi.spyOn(rootShelf, 'removeItem')
+      const tryGetThing = vi.spyOn(born.device.vaultDB, 'tryGetThing')
+      const stages      = stagesOf(device)
+      await device.signin(TH.WorldScope.userid)
+      expect(stages).to.deep.equal(['signed_out', 'starting', 'locked'])
+      expect(tryGetThing).toHaveBeenCalled()
+      expect(removeItem.mock.calls[0]).to.deep.equal([WorldShelfCkey])
+    })
+  }
+
+  it("keeps each bank's roots under a key of its own, so another user signing in reads none of them", async () => {
+    const { device, rootShelf } = await bornAndReloaded()
+    const otherScope = { ...TH.WorldScope, userid: 'u_other' }
+    const stages     = stagesOf(device)
+    await device.signin(otherScope.userid)
+    expect(stages).to.deep.equal(['signed_out', 'starting', 'unborn'])
+    expect(device.world.bank?.pickle()).to.deep.equal({ ...TH.bankShellOf(), userid: otherScope.userid })
+    expect([...rootShelf.items.keys()]).to.deep.equal([WorldShelfCkey])
+  })
+
+  it("tells onBadNews of a damaged root, and the others still reach their Things", async () => {
+    const onBadNews = vi.fn()
+    const { born, device, rootShelf } = await bornAndReloaded({ onBadNews })
+    const [version, bank, , rootBox] = shelvedOf(rootShelf)
+    rootShelf.setItem(WorldShelfCkey, JSON.stringify([version, bank, { labelpath: 'gate' }, rootBox]))
+    vi.spyOn(born.device.vaultDB, 'tryGetThing').mockReturnValue(new Promise(noop))
+    void device.signin(TH.WorldScope.userid)
+    await TH.eventually(() => onBadNews.mock.calls.length === 1)
+    expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'bad_record' })
+    expect([device.world.bank?.pickle(), device.world.gate, device.world.rootBox?.pickle()]).to.deep.equal([bank, null, rootBox])
+    expect(device.getSnapshot().bank.stage).to.eq('starting')
+  })
+
+  it("tells onBadNews where it throws, and the bank comes up from the vaultDB, or is born, all the same", async () => {
+    const onBadNews = vi.fn()
+    const { device, rootShelf } = await bornAndReloaded({ onBadNews })
+    vi.spyOn(rootShelf, 'getItem').mockImplementation(() => { throw new Error('storage withheld') })
+    await device.signin(TH.WorldScope.userid)
+    expect(device.getSnapshot().bank).to.include({ stage: 'locked' })
+    const fullShelf = new TH.MemoryShelf()
+    vi.spyOn(fullShelf, 'setItem').mockImplementation(() => { throw new DOMException('The quota has been exceeded.', 'QuotaExceededError') })
+    const { bank } = await TH.buildBornBank({ device: TH.makeDevice({}, { rootShelf: fullShelf, onBadNews }) })
+    expect(bank.getSnapshot().stage).to.eq('unlocked')
+    await TH.eventually(() => onBadNews.mock.calls.length === 2)
+    expect(onBadNews.mock.calls.map((call) => (call[0] as BadNews).news.refusalkind)).to.deep.equal(['storage_unavailable', 'storage_unavailable'])
+  })
+
+  it("is refused where it lacks a method of the three, naming the option", () => {
+    for (const rootShelf of [{}, { getItem: noop, setItem: noop }, 'localStorage']) {
+      const err = TH.expectSyncRefusal(() => TH.makeDevice({}, { rootShelf } as never), 'bad_record')
+      expect(err.message).to.include('rootShelf')
+    }
+  })
+})
+
+/** A bank born on a device that keeps its roots on a memory shelf, and a second device over its vaultDB and the same shelf, signed out: the page reloaded. */
+async function bornAndReloaded(opts: Partial<DeviceOpts> = {}): Promise<{ born: TH.BornBank, device: Device, rootShelf: TH.MemoryShelf }> {
+  const rootShelf = new TH.MemoryShelf()
+  const born      = await TH.buildBornBank({ device: TH.makeDevice({}, { rootShelf }) })
+  return { born, device: TH.makeDevice({ userid: null }, { vaultDB: born.device.vaultDB, rootShelf, ...opts }), rootShelf }
 }
 
 describe("device.signin(userid)", () => {
@@ -405,7 +349,7 @@ describe("device.signin(userid)", () => {
     expect(device.getSnapshot().bank).to.include({ stage: 'unlocked' })
   })
 
-  it("brings the bank up locked from the world its persisters restored, and unlocks it on the cached gate, before the vaultDB answers", async () => {
+  it("brings the bank up locked from the roots its root shelf keeps, and unlocks it on that gate, before the vaultDB answers", async () => {
     const { born, device } = await bornAndReloaded()
     const vaultDB = born.device.vaultDB as MemoryVaultDB
     vi.spyOn(vaultDB, 'tryGetThing').mockReturnValue(new Promise(noop))
@@ -418,7 +362,7 @@ describe("device.signin(userid)", () => {
     expect(device.getSnapshot().bank).to.include({ stage: 'unlocked' })
   })
 
-  it("keeps the bank it restored from the cache, and tells onBadNews, where the vaultDB is unavailable", async () => {
+  it("keeps the bank its root shelf brought up, and tells onBadNews, where the vaultDB is unavailable", async () => {
     const onBadNews        = vi.fn()
     const { born, device } = await bornAndReloaded({ onBadNews })
     const vaultDB          = born.device.vaultDB as MemoryVaultDB
