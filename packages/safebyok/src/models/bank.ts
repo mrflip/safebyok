@@ -20,7 +20,11 @@ import * as Throwers from '../refusals/throwers'
  * Boxes are sealed and unsealed under its gate's lease. Its roots, as last heard of, are its world in the device's BankMinder.
  */
 export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements BankStamp {
-  // == [Props]: #device, #gate, #vaults, #endCause, #snapshot, #getSnapshot
+  // == [Props]: lifetok, #device, #gate, #vaults, #endCause, #snapshot, #getSnapshot
+
+  // we are under-using the lifetok at the moment
+  /** The token minted when this bank was born, which tells this life of the bank from any other under its banklabel. */
+  declare readonly lifetok: Lifetok
 
   readonly #device:   Device
 
@@ -38,11 +42,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   readonly #getSnapshot = (): BankSnapshot => this.#snapshot
   // --
 
-  // == [Getters]: lifetok, device, device_tok, scope, stamp, gate, rootBox, track, getSnapshot, subscribe
-
-  // we are under-using the lifetok at the moment
-  /** The token minted when this bank was born, which tells this life of the bank from any other under its banklabel. */
-  get lifetok(): Lifetok { return this.pickle().lifetok }
+  // == [Getters]: device, device_tok, scope, stamp, gate, rootBox, track, getSnapshot, subscribe
 
   /** The device this bank is on. */
   get device(): Device { return this.#device }

@@ -1,9 +1,12 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, BankNotBroughtUp, NobodySignedIn, GateSwept, UnlockDismissed, HostedVaultExpected, BoxSoonestBare
+// == [Models]: VaultDBExpected, SortedVaultDBExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, BankNotBroughtUp, NobodySignedIn, GateSwept, UnlockDismissed, HostedVaultExpected, BoxSoonestBare
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
+
+/** What a minder's hello is handed that lacks one of a SortedVaultDB's members. */
+export const SortedVaultDBExpected = 'Expected a SortedVaultDB: an object with a function for each of its verbs, listen, receive, thingAt and sweep.'
 
 /** A sealer that lacks one of its methods, its tags or its purposes. */
 export const SealerExpected = 'Expected a sealer: its tags, its purposes, and a function for each of its methods.'
@@ -80,11 +83,20 @@ export const ReadTcShape = "A read_tc is a UUID version 7, in lowercase hex."
 /** A box tombstone whose sidecar is not empty. */
 export const TombstoneSidecarNotEmpty = "A box tombstone's sidecar is always `{}`."
 
-/** A void notice whose val is not the void sentinel. */
-export const VoidSentinelExpected = "A void notice's val is the void sentinel: a tombstone at revseq -1, with the void revtok and lifeseq."
+/** A void event whose val is not the void sentinel. */
+export const VoidSentinelExpected = "A void event's val is the void sentinel: a tombstone at revseq -1, with the void revtok and lifeseq."
 
-/** A notice that is not void, whose val is not a Thing's fields, or is the void sentinel. */
-export const ThingFieldsExpected = "A notice that is not void has a Thing's fields as its val, sparse or whole, never the void sentinel."
+/** An event whose modelkind is not its labelpath's. */
+export const EventModelkind = "An event's modelkind is the kind its labelpath begins with."
+
+/** An event whose val is at another scope than the event. */
+export const EventOfOtherThing = "An event's val is at the event's own scope: its userid, banklabel and labelpath."
+
+/** An event whose liveness is not its val's. */
+export const EventLiveness = "An event's liveness is its val's: soon for a sparse live record, full for a whole one, gone for a tombstone, void for the void sentinel."
+
+/** An event that is not void, whose val is not a Thing's fields, or is the void sentinel. */
+export const ThingFieldsExpected = "An event that is not void has a Thing's fields as its val, sparse or whole, never the void sentinel."
 
 /** A citation that is half the shell. */
 export const CitedHalfShell = "What a write cites is the shell, at revseq -1, a lifepath ending in '-000000001' and the void revtok, in all three or in none."

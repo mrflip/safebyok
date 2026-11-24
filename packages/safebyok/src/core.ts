@@ -7,7 +7,7 @@ export { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from './m
 export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
 export { BaseBox } from './models/base-box'
 export { Gate } from './models/gate'
-export { Thing } from './models/thing'
+export { type Adoptable, Thing } from './models/thing'
 export { Lease, withoutSecrets } from './models/lease'
 export type { Novel, PasskeyProving, PassphraseProving, Proving } from './models/proving'
 export type {

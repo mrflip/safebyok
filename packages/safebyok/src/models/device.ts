@@ -3,6 +3,7 @@ import { isEqual } from 'es-toolkit'
 import { Consts, Deriver, Errors, type GX, Helpers, Logger, Outcome, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { Gate } from './gate'
+import { PlainThing } from './plain-thing'
 import type { BirthGating } from './gating'
 import { Proving, guardKeyDeriver } from './proving'
 import { Vault } from './vault'
@@ -62,7 +63,7 @@ export class Device implements MinderFriend {
   /** The user signed in on this device, from `signIn`. Null until then. */
   #userid: Userid | null = null
   /** The signed-in user's bank's records, sorted, over {@link vaultDB}, which the two minders share: made at `signIn`, null until then. */
-  #sortedVaultDB: SortedVaultDB | null = null
+  #sortedVaultDB: SortedVaultDB<PlainThing> | null = null
   /** The signed-in user's bank, from when the device finds it stored or a birth on this device makes it. Null until then. */
   #bank:  Bank | null = null
   /** The vault of the bank's boxes, made with the bank. */
@@ -232,14 +233,14 @@ export class Device implements MinderFriend {
 
   // The world fetched lands in the BankMinder, where a bank brought up from the cache reads it; a failure to fetch it,
   // once that bank is up, is no caller's to hear.
-  // The SortedVaultDB is made right before the minders hello it, with nothing awaited between: its sorter remembers what
-  // it sorts, so a record it sorted with no minder listening would reach them later only as a repeat, which it drops.
+  // The SortedVaultDB is made right before the minders hello it, with nothing awaited between: its Things remember what
+  // they take, so a record it took with no minder listening would reach them later only as a repeat, which it drops.
   /** Bring up the signed-in user's bank, with `bankMinder` minding its roots and `minder` its boxes over a SortedVaultDB of the bank they share: from the world cached, where there is one, and from the world the vaultDB answers. */
   async #bringUp(bankMinder: BankMinder, minder: VaultMinder): Promise<void> {
     try {
       await this.#restore(bankMinder, this.#persisters?.roots)
       await this.#restore(minder, this.#persisters?.boxes)
-      const sortedVaultDB = SortedVaultDB.make(this.scope, { vaultDB: this.vaultDB })
+      const sortedVaultDB = SortedVaultDB.make(this.scope, { vaultDB: this.vaultDB, makeThing: (seen) => PlainThing.make(seen) })
       this.#sortedVaultDB = sortedVaultDB
       bankMinder.hello(sortedVaultDB)
       minder.hello(sortedVaultDB)

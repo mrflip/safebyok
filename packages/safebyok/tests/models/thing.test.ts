@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { PlainThing } from '../../src/models/plain-thing'
 import { Thing } from '../../src/models/thing'
 import { type Lifepath, Lifeseq, Revseq, VoidLifeseq } from '../../src/shapes/primitives'
 import { Shell } from '../../src/shapes/shapes-thing'
-import type { Agekind, Agerank, Lifekind, Liveness, SeenThing, VaultEvent } from '../../src/shapes/shapes-vault-event'
-import { FeedSorter } from '../../src/storage/feed-sorter'
-import { readTcNow } from '../../src/storage/thing-classifier'
+import type { Agekind, Agerank, Lifekind, Liveness, SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
+import { readAtOf, readTcNow } from '../../src/storage/thing-classifier'
 import type { ReadTc } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -461,7 +461,8 @@ const FeedCases: readonly FeedCase[] = [
 ]
 // --
 
-// == [Harness]: lifepathOf, lifeOf, recordOf, chunkOf, readTcOf, timeOf, agerankOf, agerankAtBoxOf, lifeHighOf, shorthandOf, isRaised
+
+// == [Harness]: lifepathOf, lifeOf, recordOf, chunkOf, readTcOf, readTcAt, timeOf, eventOf, received, agerankOf, agerankAtBoxOf, lifeHighOf, shorthandOf, isRaised
 
 // At box/openai, a record of life n has the lifepath `n/n` and a void of life n `n/-000000001`, each n spelled as a
 // lifeseq, so that lifepaths sort as the lives do. A void's own lifeseq is always the shell's, so its life is its parent's.
@@ -496,13 +497,34 @@ function chunkOf(seen: Seen): Chunk { return seen[3] ?? 0 }
 /** A read_tc in `chunk` */
 function readTcOf(chunk: Chunk): ReadTc { return `${timeOf(chunk)}-0000-7000-8000-000000000000` }
 
+/** A read_tc read at `millis` past the epoch */
+function readTcAt(millis: number): ReadTc {
+  const hex = millis.toString(16).padStart(12, '0')
+  return `${hex.slice(0, 8)}-${hex.slice(8)}-7000-8000-000000000000`
+}
+
 /** A read_tc in chunk 0 */
 const ReadTcChunk0 = readTcOf(0)
 
 /** The time an agerank keeps of a read_tc in `chunk` */
 function timeOf(chunk: Chunk): string { return chunk.toString(16).padStart(8, '0') }
 
-/** The agerank at box/openai of a record's life and these revseqs, its newest revision last seen in `chunk`, spelled apart from the sorter */
+/** The item event of `record` read at `read_tc`, as a SortedVaultDB builds it, with no source or bank lifetok */
+function eventOf(record: SeenThing, read_tc: ReadTc = ReadTcChunk0): VaultItemEvent {
+  return { ...TH.itemEventOf(record), read_tc }
+}
+
+/** Hand `thing`'s receive the event of `record` read at `read_tc`, a plain Thing begun from `record` where there is none yet, and return the Thing and the events it returns */
+function received(thing: PlainThing | undefined, record: SeenThing, read_tc: ReadTc = ReadTcChunk0): readonly [PlainThing, readonly VaultEvent[]] {
+  const receiver = thing ?? PlainThing.make(record)
+  return [receiver, receiver.receive(eventOf(record, read_tc))]
+}
+
+// The spread is the subject: what a host's `{ ...thing }` sees of a Thing.
+/** `thing`'s props, as its spread shows them */
+function propsOf(thing: PlainThing): Record<string, unknown> { return { ...thing } } // eslint-disable-line @typescript-eslint/no-misused-spread
+
+/** The agerank at box/openai of a record's life and these revseqs, its newest revision last seen in `chunk`, spelled apart from the rule */
 function agerankOf(life: Life, highRevseq: number, itemRevseq: number, chunk: Chunk = 0): Agerank {
   return `${lifepathOf(life, false)}|${Revseq.padded(highRevseq)}|${Revseq.padded(itemRevseq)}|${timeOf(chunk)}`
 }
@@ -546,36 +568,35 @@ function isRaised(event: VaultEvent): boolean {
 }
 // --
 
-describe("FeedSorter.eventify, over the feed table", () => {
+describe("Thing.receive, over the feed table", () => {
   for (const [rowIndex, { initial, chain, streamed, agerank, blurb }] of FeedCases.entries()) {
     it(`${blurb}, from ${StartNames.get(initial) ?? 'elsewhere'} (row ${String(rowIndex + 1)})`, () => {
-      const sorter = new FeedSorter(TH.ThingBank)
-      for (const seen of initial) { sorter.eventify(recordOf(seen), readTcOf(chunkOf(seen))) }
+      let thing: PlainThing | undefined
+      for (const seen of initial) { [thing] = received(thing, recordOf(seen), readTcOf(chunkOf(seen))) }
       const shorthands: Shorthand[] = []
       for (const seen of chain) {
         const record        = recordOf(seen)
-        const agerankBefore = sorter.agerankAt(TH.BoxScope)
-        const events        = sorter.eventify(record, readTcOf(chunkOf(seen)))
-        const agerankAfter  = sorter.agerankAt(TH.BoxScope)
+        const agerankBefore = thing?.agerank
+        const [receiver, events] = received(thing, record, readTcOf(chunkOf(seen)))
+        thing = receiver
         shorthands.push(...events.map((event) => shorthandOf(event, record, chunkOf(seen))))
         const vals = events.flatMap((event) => (event.eventkind === 'item') ? [event.val] : [])
         expect(vals, 'a record taken comes first, as given').to.deep.equal((events.length === 0) ? [] : [record])
         for (const event of events) {
           expect(isRaised(event), 'each event raises the agerank').to.eq(true)
-          expect([event.agerankWas, event.agerank], 'each event carries the agerank before and after its record').to.deep.equal([agerankBefore, agerankAfter])
+          expect([event.agerankWas, event.agerank], 'each event carries the agerank before and after its record').to.deep.equal([agerankBefore, thing.agerank])
         }
       }
       expect(shorthands).to.deep.equal(streamed)
-      expect(sorter.agerankAt(TH.BoxScope)).to.eq(agerankAtBoxOf(agerank, [...initial, ...chain]))
+      expect(thing?.agerank).to.eq(agerankAtBoxOf(agerank, [...initial, ...chain]))
     })
   }
 })
 
-describe("FeedSorter", () => {
+describe("Thing.receive", () => {
   it("returns each event with the scope and modelkind of its record, and the item with the record as given", () => {
-    const sorter = new FeedSorter(TH.ThingBank)
     const record = Thing.sparseOf(TH.boxThingOf('openai', { revseq: 3 }))
-    const events = sorter.eventify(record, ReadTcChunk0)
+    const [, events] = received(undefined, record)
     expect(events.map(({ eventkind }) => eventkind)).to.deep.equal(['item', 'life', 'aged'])
     expect(events[0]).to.include({ liveness: 'soon', val: record })
     for (const event of events) {
@@ -583,116 +604,300 @@ describe("FeedSorter", () => {
     }
   })
 
+  it("keeps the sourcelabel, read_tc and bank_lifetok of the event it receives on every event", () => {
+    const record = Thing.sparseOf(TH.boxThingOf('openai', { revseq: 3 }))
+    const stamp  = { sourcelabel: 'other_tab', read_tc: readTcNow(), bank_lifetok: TH.FirstLifetok }
+    const events = PlainThing.make(record).receive({ ...eventOf(record), ...stamp })
+    expect(events).to.have.lengthOf(3)
+    for (const event of events) { expect(event).to.include(stamp) }
+  })
+
   it("hands out frozen events in a frozen list", () => {
-    const events = new FeedSorter(TH.ThingBank).eventify(TH.boxThingOf(), ReadTcChunk0)
+    const [, events] = received(undefined, TH.boxThingOf())
     expect(Object.isFrozen(events)).to.eq(true)
     expect(events.every((event) => Object.isFrozen(event))).to.eq(true)
   })
 
-  it("returns no events, in a frozen list, for a record that raises nothing", () => {
-    const sorter = new FeedSorter(TH.ThingBank)
-    sorter.eventify(TH.boxThingOf(), ReadTcChunk0)
-    const events = sorter.eventify(TH.boxThingOf(), ReadTcChunk0)
-    expect(events).to.deep.equal([])
-    expect(Object.isFrozen(events)).to.eq(true)
+  it("returns no events, in a frozen list, and changes nothing, for a record that raises nothing", () => {
+    const [thing] = received(undefined, TH.boxThingOf('openai', { revseq: 2 }))
+    const before = [thing.agerank, thing.read_at, thing.citable, thing.pickle()]
+    for (const record of [TH.boxThingOf('openai', { revseq: 2 }), TH.boxThingOf('openai', { revseq: 1 }), Thing.sparseOf(TH.boxThingOf('openai', { revseq: 1 }))]) {
+      const events = thing.receive(eventOf(record, readTcOf(0)))
+      expect(events).to.deep.equal([])
+      expect(Object.isFrozen(events)).to.eq(true)
+    }
+    expect([thing.agerank, thing.read_at, thing.citable, thing.pickle()]).to.deep.equal(before)
   })
 
-  it("keeps each Thing's agerank apart from another's", () => {
-    const sorter = new FeedSorter(TH.ThingBank)
-    sorter.eventify(TH.boxThingOf('openai', { revseq: 2 }), ReadTcChunk0)
-    const otherEvents = sorter.eventify(Thing.sparseOf(TH.boxThingOf('other', { revseq: 1 })), ReadTcChunk0)
-    expect(otherEvents.map(({ eventkind }) => eventkind)).to.deep.equal(['item', 'life', 'aged'])
-    expect(otherEvents.every(({ labelpath, agerankWas }) => (labelpath === 'box/other') && (agerankWas === undefined))).to.eq(true)
-    expect(sorter.eventify(TH.boxThingOf('openai', { revseq: 1 }), ReadTcChunk0)).to.deep.equal([])
-    expect(sorter.agerankAt(TH.BoxScope)).to.eq(agerankOf(0, 2, 2))
-    expect(sorter.agerankAt({ ...TH.ThingBank, labelpath: 'box/other' })).to.eq(agerankOf(0, 1, -1))
+  it("returns no events for a life or aged event, and changes nothing", () => {
+    const soon = Thing.sparseOf(TH.boxThingOf('openai', { revseq: 3 }))
+    const [thing, events] = received(undefined, soon)
+    const later = PlainThing.make(soon).receive(eventOf(soon, readTcOf(2)))
+    for (const event of [...events.slice(1), ...later.slice(1)]) {
+      expect(thing.receive(event)).to.deep.equal([])
+    }
+    expect(thing.agerank).to.eq(agerankOf(0, 3, -1))
   })
 
-  it("answers no agerank for a Thing it has taken no record of", () => {
-    expect(new FeedSorter(TH.ThingBank).agerankAt(TH.BoxScope)).to.eq(undefined)
-  })
-
-  it("counts a sparse tombstone as whole, so a dead life reads here", () => {
-    const sorter = new FeedSorter(TH.ThingBank)
-    sorter.eventify(TH.boxThingOf('openai', { revseq: 2 }), ReadTcChunk0)
-    sorter.eventify(Thing.sparseOf(TH.boxThingOf('openai', { revseq: 4 })), ReadTcChunk0)
+  it("counts a sparse tombstone as whole, so a dead life reads here, and adopts it", () => {
+    let [thing] = received(undefined, TH.boxThingOf('openai', { revseq: 2 }))
+    ;[thing] = received(thing, Thing.sparseOf(TH.boxThingOf('openai', { revseq: 4 })))
     const tomb = Thing.sparseOf(TH.boxThingOf('openai', { am: 'x', lifepath: lifepathOf(5, false), lifeseq: Lifeseq.ofLifenum(5), revseq: 3 }))
-    const events = sorter.eventify(tomb, ReadTcChunk0)
+    const [, events] = received(thing, tomb)
     expect(events.map((event) => shorthandOf(event, tomb))).to.deep.equal([["item", "gone", 5, 3], ["life", "died", 0, 4, 5, 3]])
-    expect(sorter.agerankAt(TH.BoxScope)).to.eq(agerankOf(5, 3, 3))
+    expect(thing.agerank).to.eq(agerankOf(5, 3, 3))
+    expect(thing.pickle()).to.eq(tomb)
   })
 
   it("orders revisions past the first base-32 digit", () => {
-    const sorter = new FeedSorter(TH.ThingBank)
-    sorter.eventify(TH.boxThingOf('openai', { revseq: 31 }), ReadTcChunk0)
-    const events = sorter.eventify(Thing.sparseOf(TH.boxThingOf('openai', { revseq: 32 })), ReadTcChunk0)
+    const [thing] = received(undefined, TH.boxThingOf('openai', { revseq: 31 }))
+    const [, events] = received(thing, Thing.sparseOf(TH.boxThingOf('openai', { revseq: 32 })))
     expect(events.map(({ eventkind }) => eventkind)).to.deep.equal(['item', 'aged'])
     expect(events.every((event) => isRaised(event))).to.eq(true)
-    expect(sorter.agerankAt(TH.BoxScope)).to.eq(agerankOf(0, 32, 31))
+    expect(thing.agerank).to.eq(agerankOf(0, 32, 31))
   })
 
   it("takes a root's records, its lifepath a single lifeseq", () => {
-    const sorter = new FeedSorter(TH.ThingBank)
-    expect(sorter.eventify(Shell.of(TH.RootScope), ReadTcChunk0).map(({ eventkind }) => eventkind)).to.deep.equal(['item', 'life'])
-    expect(sorter.eventify(TH.rootBoxOf(), ReadTcChunk0).map(({ eventkind }) => eventkind)).to.deep.equal(['item', 'life'])
-    expect(sorter.agerankAt(TH.RootScope)).to.eq(`${TH.Life0}|${Revseq.padded(0)}|${Revseq.padded(0)}|${timeOf(0)}`)
+    const [thing, voidEvents] = received(undefined, Shell.of(TH.RootScope))
+    expect(voidEvents.map(({ eventkind }) => eventkind)).to.deep.equal(['item', 'life'])
+    expect(received(thing, TH.rootBoxOf())[1].map(({ eventkind }) => eventkind)).to.deep.equal(['item', 'life'])
+    expect(thing.agerank).to.eq(`${TH.Life0}|${Revseq.padded(0)}|${Revseq.padded(0)}|${timeOf(0)}`)
   })
 
   it("keeps as an agerank's time the first eight hexadecimal digits of the read_tc, and puts the read_tc on each event", () => {
     const read_tc = readTcNow()
-    const events = new FeedSorter(TH.ThingBank).eventify(TH.boxThingOf(), read_tc)
+    const [, events] = received(undefined, TH.boxThingOf(), read_tc)
     expect(events.map((event) => event.read_tc)).to.deep.equal([read_tc, read_tc])
     expect(events[0]!.agerank).to.eq(`${lifepathOf(0, false)}|${Revseq.padded(0)}|${Revseq.padded(0)}|${read_tc.slice(0, 8)}`)
   })
 
   it("takes the newest revision seen again a chunk later, its agerank raised in its time alone", () => {
-    const sorter = new FeedSorter(TH.ThingBank)
-    sorter.eventify(TH.boxThingOf(), ReadTcChunk0)
-    expect(sorter.eventify(TH.boxThingOf(), ReadTcChunk0)).to.deep.equal([])
-    const events = sorter.eventify(TH.boxThingOf(), readTcOf(1))
+    const record  = TH.boxThingOf()
+    const [thing] = received(undefined, record)
+    expect(thing.receive(eventOf(record))).to.deep.equal([])
+    const events = thing.receive(eventOf(record, readTcOf(1)))
     expect(events.map(({ eventkind }) => eventkind)).to.deep.equal(['item'])
     expect([events[0]!.agerankWas, events[0]!.agerank]).to.deep.equal([agerankOf(0, 0, 0, 0), agerankOf(0, 0, 0, 1)])
   })
 })
 
-describe("FeedSorter refusals", () => {
+describe("Thing's props, record and citable", () => {
+  it("adopts a record of each later life, every prop set again from it", () => {
+    const live0 = TH.boxThingOf('openai', { revseq: 3 })
+    const tomb1 = TH.boxThingOf('openai', { am: 'x', lifepath: lifepathOf(1, false), lifeseq: Lifeseq.ofLifenum(1), revseq: 4, written_at: TH.T0 + 9 })
+    const live2 = TH.boxThingOf('openai', { lifepath: lifepathOf(2, false), lifeseq: Lifeseq.ofLifenum(2), revseq: 5, born_at: TH.T0 + 10, written_at: TH.T0 + 10 })
+    let [thing] = received(undefined, live0)
+    for (const record of [tomb1, live2]) {
+      ;[thing] = received(thing, record)
+      expect(thing).to.deep.include(Thing.sparseOf(record))
+      expect(thing.pickle()).to.eq(record)
+      expect(thing.citable).to.deep.equal({ revtok: record.revtok, revseq: record.revseq, lifepath: record.lifepath, am: record.am })
+    }
+  })
+
+  it("moves only citable on a newer soon, then adopts the whole record that catches up", () => {
+    const whole2 = TH.boxThingOf('openai', { revseq: 2 })
+    const whole4 = TH.boxThingOf('openai', { revseq: 4, revtok: TH.revtokOf('four') })
+    const [thing] = received(undefined, whole2)
+    received(thing, Thing.sparseOf(whole4))
+    expect(thing.citable).to.deep.equal({ revtok: whole4.revtok, revseq: 4, lifepath: whole4.lifepath, am: 'a' })
+    expect(thing.pickle()).to.eq(whole2)
+    expect(thing).to.include({ revseq: 2, revtok: whole2.revtok })
+    received(thing, whole4)
+    expect(thing.pickle()).to.eq(whole4)
+    expect(thing).to.include({ revseq: 4, revtok: whole4.revtok })
+    expect(thing.citable).to.deep.equal({ revtok: whole4.revtok, revseq: 4, lifepath: whole4.lifepath, am: 'a' })
+  })
+
+  it("keeps citable at the newest revision when an older whole record is adopted", () => {
+    const whole4 = TH.boxThingOf('openai', { revseq: 4, revtok: TH.revtokOf('four') })
+    const [thing] = received(undefined, Thing.sparseOf(whole4))
+    const whole2 = TH.boxThingOf('openai', { revseq: 2 })
+    expect(received(thing, whole2)[1].map(({ eventkind }) => eventkind)).to.deep.equal(['item', 'aged'])
+    expect(thing.pickle()).to.eq(whole2)
+    expect(thing.citable).to.deep.include({ revseq: 4, revtok: whole4.revtok })
+  })
+
+  describe("begun by a soon", () => {
+    const soon4 = Thing.sparseOf(TH.boxThingOf('openai', { revseq: 4, revtok: TH.revtokOf('four') }))
+    /** The shell at box/openai under the root box's life 0, which the soon's lifepath names */
+    const shell = Shell.of({ ...TH.BoxScope, lifepath: lifepathOf(0, true) })
+
+    it("pickles as the shell under the lives the soon names for the Things above it", () => {
+      const [thing] = received(undefined, soon4)
+      expect(thing.pickle()).to.deep.equal(shell)
+      expect(thing.pickle()).to.include({ lifepath: `${TH.Life0}/${VoidLifeseq}` })
+      expect(Object.isFrozen(thing.pickle())).to.eq(true)
+    })
+
+    it("pickles as the shell under a later life of the root box, where the soon names one", () => {
+      const soon = Thing.sparseOf(TH.boxThingOf('openai', { lifepath: lifepathOf(2, false), lifeseq: Lifeseq.ofLifenum(2), revseq: 1 }))
+      expect(PlainThing.make(soon).pickle()).to.deep.equal(Shell.of({ ...TH.BoxScope, lifepath: `${Lifeseq.ofLifenum(2)}/${VoidLifeseq}` }))
+    })
+
+    it("pickles as a root's own shell, begun by a soon of the root", () => {
+      const soon = Thing.sparseOf(TH.rootBoxOf({ revseq: 3 }))
+      expect(PlainThing.make(soon).pickle()).to.deep.equal(Shell.of(TH.RootScope))
+    })
+
+    it("has the shell's props", () => {
+      const [thing] = received(undefined, soon4)
+      expect(propsOf(thing)).to.deep.equal(Thing.sparseOf(shell))
+    })
+
+    it("cites the soon, and moves only its citable, agerank and read_at on a newer soon", () => {
+      const [thing] = received(undefined, soon4)
+      expect(thing.citable).to.deep.equal({ revtok: soon4.revtok, revseq: 4, lifepath: soon4.lifepath, am: 'a' })
+      expect([thing.agerank, thing.read_at]).to.deep.equal([agerankOf(0, 4, -1), 0])
+      const soon5 = Thing.sparseOf(TH.boxThingOf('openai', { revseq: 5, revtok: TH.revtokOf('five') }))
+      received(thing, soon5, readTcOf(3))
+      expect(thing.citable).to.deep.include({ revseq: 5, revtok: soon5.revtok })
+      expect([thing.agerank, thing.read_at]).to.deep.equal([agerankOf(0, 5, -1, 3), readAtOf(readTcOf(3))])
+      expect(thing.pickle()).to.deep.equal(shell)
+      expect(propsOf(thing)).to.deep.equal(Thing.sparseOf(shell))
+    })
+
+    it("adopts a whole record in place of the shell, and its props follow", () => {
+      const [thing] = received(undefined, soon4)
+      const whole4 = TH.boxThingOf('openai', { revseq: 4, revtok: TH.revtokOf('four') })
+      received(thing, whole4)
+      expect(thing.pickle()).to.eq(whole4)
+      expect(propsOf(thing)).to.deep.equal(Thing.sparseOf(whole4))
+      expect(thing.agerank).to.eq(agerankOf(0, 4, 4))
+    })
+  })
+
+  it("adopts the record it is begun from where that is whole, a tombstone or the void sentinel", () => {
+    const tomb = TH.boxThingOf('openai', { am: 'x', lifepath: lifepathOf(1, false), lifeseq: Lifeseq.ofLifenum(1), revseq: 0 })
+    for (const record of [TH.boxThingOf(), tomb, Shell.of({ ...TH.BoxScope, lifepath: lifepathOf(0, true) })]) {
+      const thing = PlainThing.make(record)
+      expect(thing.pickle()).to.eq(record)
+      expect(propsOf(thing)).to.deep.equal(Thing.sparseOf(record))
+    }
+  })
+
+  it("has no agerank and no read_at until it first receives a record", () => {
+    const thing = PlainThing.make(TH.boxThingOf())
+    expect([thing.agerank, thing.read_at]).to.deep.equal([undefined, undefined])
+  })
+
+  it("shows only its Thing fields in a spread, its keys and JSON", () => {
+    const record = TH.boxThingOf()
+    const [thing] = received(undefined, record)
+    expect(Object.keys(thing)).to.have.members(Object.keys(Thing.sparseOf(record)))
+    expect(propsOf(thing)).to.deep.equal(Thing.sparseOf(record))
+    expect(JSON.stringify(thing)).to.eq(JSON.stringify(propsOf(thing)))
+  })
+
+  it("answers every field of its record by name, its body hidden", () => {
+    const record = TH.boxThingOf()
+    const thing = PlainThing.make(record)
+    expect(Object.getOwnPropertyNames(thing)).to.have.members(Object.keys(record))
+    expect(Reflect.get(thing, 'sidecar')).to.eq(record.sidecar)
+    expect(Reflect.get(thing, 'whisper_sealed')).to.eq(record.whisper_sealed)
+    expect(Object.getOwnPropertyDescriptor(thing, 'whisper_sealed')).to.include({ enumerable: false })
+  })
+
+  it("sets every field non-writable, its scope fields non-configurable and the rest configurable", () => {
+    const record = TH.boxThingOf()
+    const thing = PlainThing.make(record)
+    const scopeFieldnames = new Set(['userid', 'banklabel', 'labelpath'])
+    for (const fieldname of Object.keys(record)) {
+      const configurable = ! scopeFieldnames.has(fieldname)
+      expect(Object.getOwnPropertyDescriptor(thing, fieldname), fieldname).to.include({ writable: false, configurable })
+    }
+    expect(() => { (thing as { revseq: number }).revseq = 9 }).to.throw(TypeError)
+    expect(Reflect.deleteProperty(thing, 'labelpath')).to.eq(false)
+  })
+
+  it("stops answering its live record's body once it adopts a sparse tombstone", () => {
+    const [thing] = received(undefined, TH.boxThingOf())
+    const tomb = Thing.sparseOf(TH.boxThingOf('openai', { am: 'x', lifepath: lifepathOf(1, false), lifeseq: Lifeseq.ofLifenum(1), revseq: 1 }))
+    received(thing, tomb)
+    expect(thing.pickle()).to.eq(tomb)
+    expect(Object.getOwnPropertyNames(thing)).to.have.members(Object.keys(tomb))
+    expect(Reflect.get(thing, 'sidecar')).to.eq(undefined)
+    expect(thing).to.include({ am: 'x', labelpath: tomb.labelpath })
+  })
+
+  it("is the scope of its record, and has no stamp", () => {
+    const thing = PlainThing.make(TH.boxThingOf())
+    expect(thing.scope).to.deep.equal(TH.BoxScope)
+    expect(thing.stamp).to.eq(undefined)
+  })
+})
+
+describe("Thing.read_at", () => {
+  it("is the time in the first 48 bits of the read_tc that raised the agerank", () => {
+    const [thing] = received(undefined, TH.boxThingOf(), '0190a1b2-c3d4-7000-8000-000000000000')
+    expect(thing.read_at).to.eq(0x01_90_A1_B2_C3_D4)
+  })
+
+  it("is when a read_tc minted now was read", () => {
+    const before  = Date.now()
+    const read_tc = readTcNow()
+    const [thing] = received(undefined, TH.boxThingOf(), read_tc)
+    expect(thing.read_at).to.be.within(before, Date.now())
+    expect(thing.read_at).to.eq(readAtOf(read_tc))
+  })
+
+  it("follows the newest revision: a newer one brings its own time, the same one the later, an older one none", () => {
+    const [thing] = received(undefined, Thing.sparseOf(TH.boxThingOf('openai', { revseq: 4 })), readTcAt(500_000))
+    received(thing, TH.boxThingOf('openai', { revseq: 2 }), readTcAt(900_000))
+    expect(thing.read_at, 'an older whole record').to.eq(500_000)
+    received(thing, TH.boxThingOf('openai', { revseq: 4 }), readTcAt(400_000))
+    expect(thing.read_at, 'the newest revision whole, read earlier').to.eq(500_000)
+    received(thing, Thing.sparseOf(TH.boxThingOf('openai', { revseq: 5 })), readTcAt(300_000))
+    expect(thing.read_at, 'a newer revision').to.eq(300_000)
+  })
+})
+
+describe("Thing refusals", () => {
   const live = TH.boxThingOf('openai', { revseq: 2 })
-  const RefusedCases = [
+  const RefusedVals = [
     // not a record:
     [42,                                                  'a number'],
     [null,                                                'null'],
     [{},                                                  'an empty bag'],
-    // a record the sorter cannot order:
+    // a record no agerank can order, or of another Thing:
     [{ ...live, userid: "u2" },                           'a record of another user'],
     [{ ...live, banklabel: "other" },                     'a record of another bank'],
+    [{ ...live, labelpath: "box/other", label: "other" }, 'a record of another Thing'],
     [{ ...live, lifepath: TH.Life0, lifeseq: TH.Life0 },  'a lifepath shallower than its labelpath'],
     [{ ...Thing.sparseOf(live), ...Shell.Cited },         "the root's shell cited at a box under it"],
     [{ ...live, am: "x" },                                'a tombstone in a live life'],
     [{ ...live, am: "d" },                                'a record marked for deletion'],
   ] as const
 
-  for (const [val, blurb] of RefusedCases) {
-    it(`refuses ${blurb}, its agerank unchanged`, () => {
-      const sorter = new FeedSorter(TH.ThingBank)
-      sorter.eventify(TH.boxThingOf('openai', { revseq: 1 }), ReadTcChunk0)
-      TH.expectSyncRefusal(() => sorter.eventify(val as never, ReadTcChunk0), 'bad_record')
-      expect(sorter.agerankAt(TH.BoxScope)).to.eq(agerankOf(0, 1, 1))
+  for (const [val, blurb] of RefusedVals) {
+    it(`refuses an event whose val is ${blurb}, its agerank unchanged`, () => {
+      const [thing] = received(undefined, TH.boxThingOf('openai', { revseq: 1 }))
+      TH.expectSyncRefusal(() => thing.receive({ ...eventOf(live), val } as never), 'bad_record')
+      expect(thing.agerank).to.eq(agerankOf(0, 1, 1))
     })
   }
 
-  it("refuses a read_tc that is no UUID version 7, its agerank unchanged", () => {
-    const sorter = new FeedSorter(TH.ThingBank)
-    sorter.eventify(TH.boxThingOf('openai', { revseq: 1 }), ReadTcChunk0)
-    TH.expectSyncRefusal(() => sorter.eventify(TH.boxThingOf('openai', { revseq: 2 }), crypto.randomUUID()), 'bad_record')
-    TH.expectSyncRefusal(() => sorter.eventify(TH.boxThingOf('openai', { revseq: 2 }), undefined as never), 'bad_record')
-    expect(sorter.agerankAt(TH.BoxScope)).to.eq(agerankOf(0, 1, 1))
-  })
+  const RefusedEvents = [
+    [{ labelpath: "box/other" },                          'of another Thing'],
+    [{ banklabel: "other" },                              'of another bank'],
+    [{ eventkind: "seen" },                               'of an unknown kind'],
+    [{ modelkind: "gate" },                               'whose modelkind is not its labelpath'],
+    [{ liveness: "soon" },                                "whose liveness is not its val's"],
+    [{ read_tc: crypto.randomUUID() },                    'read at a UUID other than version 7'],
+    [{ read_tc: undefined },                              'read at no time'],
+  ] as const
 
-  it("refuses to be made without a bank's scope", () => {
-    TH.expectSyncRefusal(() => new FeedSorter({ userid: 'u1' } as never), 'bad_record')
-  })
+  for (const [fields, blurb] of RefusedEvents) {
+    it(`refuses an event ${blurb}, its agerank unchanged`, () => {
+      const [thing] = received(undefined, TH.boxThingOf('openai', { revseq: 1 }))
+      TH.expectSyncRefusal(() => thing.receive({ ...eventOf(live), ...fields } as never), 'bad_record')
+      expect(thing.agerank).to.eq(agerankOf(0, 1, 1))
+    })
+  }
 
-  it("refuses the agerank of another bank's Thing", () => {
-    TH.expectSyncRefusal(() => new FeedSorter(TH.ThingBank).agerankAt({ ...TH.BoxScope, banklabel: 'other' }), 'bad_record')
+  it("refuses to begin from anything but a record of a Thing", () => {
+    for (const val of [undefined, 42, {}, { ...live, lifepath: TH.Life0, lifeseq: TH.Life0 }]) {
+      TH.expectSyncRefusal(() => PlainThing.make(val as never), 'bad_record')
+    }
   })
 })

@@ -64,7 +64,7 @@ export class Vault {
 
   /** Seal and write the next revision of the box `cited`, applying `patch` and encrypting `secrets`. Resolves an `Outcome` of the stored box.
    * Given a labelpath, it writes over the soonest record the minder has of the box (its soon, else its item, else its tombstone or shell where the item is null), fetching it when none is cached.
-   * It tries once. Where another revision is stored, it refuses `stale_write`, and the minder caches that revision when the watch notifies it.
+   * It tries once. Where another revision is stored, it refuses `stale_write`, and the minder caches that revision when it hears of it.
    * Over a sparse box, a tombstone or no box, `patch` must give the sidecar.
    * Misuse is a bad outcome too. Rejects, whether or not the write was made, when the answer carries a record of another bank.
    * @example

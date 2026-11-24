@@ -9,7 +9,7 @@ import type { VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
 import {
   type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
 } from '../shapes/shapes-asks'
-import { itemSeenOf } from './feed-sorter'
+import { itemSeenOf } from './agerank'
 import type { AboveFetched, BankRootsFetched, ThingsFetched, WorldFetched } from './thing-classifier'
 import * as Classifier from './thing-classifier'
 import type {

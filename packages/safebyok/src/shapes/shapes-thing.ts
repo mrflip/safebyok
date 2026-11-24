@@ -366,6 +366,11 @@ export const Shell = Object.freeze({
     const lifeseqs    = [...(above ? [above.lifepath] : []), ...labels.slice(aboveLabels.length).map(() => VoidLifeseq)]
     return Shell.of({ userid, banklabel, labelpath, lifepath: lifeseqs.join('/') })
   },
+  /** The shell at `seen`'s scope, in the lives `seen`'s lifepath names for the Things above it. */
+  inParentLivesOf(seen: Readonly<Pick<Sparse<ThingRecord>, 'userid' | 'banklabel' | 'labelpath' | 'lifepath'>>): VoidSentinel {
+    const parentpath = Labelpath.parentOf(seen.labelpath)
+    return Shell.under(seen, (parentpath === '') ? null : { labelpath: parentpath, lifepath: Lifeseq.leadingOf(seen.lifepath) })
+  },
   /** The labelpath and label of `raw`: its own labelpath, or its label under `parent`'s.
    * It does not check `raw` against `parent`: the caller does.
    */

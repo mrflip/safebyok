@@ -4,7 +4,7 @@ import { sortBy } from 'es-toolkit'
 import { v7 as uuidv7 } from 'uuid'
 import { CX, EX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/internals'
 import { policyRefusalOf } from './policies'
-import { Labelpath } from '../shapes/primitives'
+import { type EpochMillis, Labelpath } from '../shapes/primitives'
 import type { BirthBankActual, DamagedThing, GotActual, KidEntry, Kids, ListThingsActual, ReadTc, WroteActual } from './vault-db'
 import { type Sparse, type StoredCited, type ThingCited, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
@@ -254,7 +254,7 @@ function trackedEntryOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>
 }
 // --
 
-// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, isChildLabelpath, kidsOf, readTcNow, readTcOfStep, readTcOf, classifyBirthBank
+// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, isChildLabelpath, kidsOf, readTcNow, readAtOf, readTcOfStep, readTcOf, classifyBirthBank
 // Each is given the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`;
 // a get and a write are given the nearest Thing stored above the ask's scope; a birth is given the bank's three roots, and,
 // where it is born, reports the world its puts wrote.
@@ -341,6 +341,10 @@ function kidsOf(ask: ListAsk, parent: ThingRecord | null, deltas: readonly Spars
 // A concrete adapter with a clock of its own in the statement that reads may report its own UUID version 7 in place of this one.
 /** A {@link ReadTc} made now, for a concrete adapter to report as the `read_tc` of a listing it reads in the same step. */
 export function readTcNow(): ReadTc { return uuidv7() }
+
+// A UUID version 7 begins with its Unix time in milliseconds, 48 bits: the first eight hexadecimal digits and the four after the dash.
+/** When `read_tc` was read, in epoch milliseconds. */
+export function readAtOf(read_tc: ReadTc): EpochMillis { return Number.parseInt(`${read_tc.slice(0, 8)}${read_tc.slice(9, 13)}`, 16) }
 
 /** The `read_tc` a concrete adapter reported for a step, or one made now where it reported none. Throws `storage_issue` for anything but a UUID version 7. */
 export function readTcOfStep(raw: unknown): ReadTc { return (raw === undefined) ? readTcNow() : readTcOf(raw) }

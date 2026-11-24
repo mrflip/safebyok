@@ -1,8 +1,8 @@
-/** `VaultEvent`, the notice a vaultDB's watcher gets, and `Agerank`, which orders the records seen of a Thing. */
+/** `VaultEvent`, the notice a vaultDB's watcher gets and the event a `SortedVaultDB`'s listener hears, and `Agerank`, which orders the records seen of a Thing. */
 
 import type { Banklabel, Labelpath, Lifetok, Userid } from './primitives'
-import type { LiveOf } from './shapes-sealers'
-import type { Sparse, ThingRecord, Thingkind, Tombstone, VoidSentinel } from './shapes-thing'
+import type { LiveOf, ShellOf } from './shapes-sealers'
+import type { Sparse, ThingRecord, Thingkind, Tombstone } from './shapes-thing'
 import type { ReadTc } from '../storage/vault-db'
 
 // == [Kinds]: livenessVals, Liveness, lifekindVals, Lifekind, agekindVals, Agekind, vaultEventkindVals, VaultEventkind
@@ -53,14 +53,14 @@ export type VaultEventkind = typeof vaultEventkindVals[number]
  */
 export type Agerank = string
 
-/** A record for a `FeedSorter`: a Thing, whole or sparse, live or a tombstone, or the void sentinel for nothing stored. */
-export type SeenThing = ThingRecord | Sparse<ThingRecord> | VoidSentinel
+/** A record seen of a Thing of `RecordT`'s kind: whole or sparse, live or a tombstone, or the void sentinel for nothing stored. */
+export type SeenThing<RecordT extends ThingRecord = ThingRecord> = RecordT | Sparse<RecordT> | ShellOf<RecordT>
 // --
 
 // == [Events]: VaultEvent, VaultEventOf, VaultItemEvent, ItemSeen, VaultLifeEvent, VaultAgedEvent
 
-/** An event about one Thing: a record, a new life, or a newer revision not yet seen whole. Narrow it on `eventkind`. */
-export type VaultEvent = VaultItemEvent | VaultLifeEvent | VaultAgedEvent
+/** An event about one Thing: a record, a new life, or a newer revision not yet seen whole. Narrow it on `eventkind`. An `item` event's record is of `RecordT`'s kind. */
+export type VaultEvent<RecordT extends ThingRecord = ThingRecord> = VaultItemEvent<RecordT> | VaultLifeEvent | VaultAgedEvent
 
 /** The fields every {@link VaultEvent} has. */
 export type VaultEventOf<EventkindT extends VaultEventkind> = Readonly<{
@@ -75,9 +75,9 @@ export type VaultEventOf<EventkindT extends VaultEventkind> = Readonly<{
   agerank:    Agerank | undefined
   /** The Thing's agerank before this event's record, or undefined for none. */
   agerankWas: Agerank | undefined
-  /** The lifetok of the bank's life, where the event's source knew it: from a `SortedVaultDB`, the one the answer's ask or the notice carried, else the bank's as last read. Undefined from a `FeedSorter`, and in a vaultDB's raw watch where the datastore did not hand over the bank. */
+  /** The lifetok of the bank's life, where the event's source knew it: from a `SortedVaultDB`, the one the answer's ask, the notice or the event rung carried, else the bank's as last read. Undefined in a vaultDB's raw watch where the datastore did not hand over the bank. */
   bank_lifetok: Lifetok | undefined
-  /** Who dispatched this event's record: a `SortedVaultDB` names the vaultDB it wraps, or the ringer of its `bell`. Undefined in a vaultDB's raw watch, and from a `FeedSorter`. */
+  /** Who dispatched this event's record: a `SortedVaultDB` names the vaultDB it wraps, or the device database that rang what its `receive` was handed. Undefined in a vaultDB's raw watch. */
   sourcelabel: string | undefined
   /** When this event's record was read, shared by every event of one dispatch. Undefined only where a vaultDB's watch does not say. */
   read_tc:    ReadTc | undefined
@@ -86,19 +86,19 @@ export type VaultEventOf<EventkindT extends VaultEventkind> = Readonly<{
 /** A record of the Thing. Where ageranks are kept, the record raised the Thing's agerank. Narrow it on `liveness` to know what `val` holds.
  * The newest revision seen again in a later span of time raises only the agerank's time: the event's `agerankWas` and `agerank` then differ only in their last field.
  */
-export type VaultItemEvent = VaultEventOf<'item'> & ItemSeen
+export type VaultItemEvent<RecordT extends ThingRecord = ThingRecord> = VaultEventOf<'item'> & ItemSeen<RecordT>
 
-/** The record an `item` event saw, as `val`, beside its `liveness`. From a `FeedSorter`, `val` is the very object it was given.
+/** The record of `RecordT`'s kind an `item` event saw, as `val`, beside its `liveness`. From a Thing's `receive`, `val` is the very object it was given.
  * - `full` -- a whole live record
  * - `soon` -- a sparse live record
  * - `gone` -- a tombstone, whole or sparse
  * - `void` -- the void sentinel, for nothing stored
  */
-export type ItemSeen =
-  | Readonly<{ liveness: 'full', val: LiveOf<ThingRecord> }>
-  | Readonly<{ liveness: 'soon', val: Sparse<LiveOf<ThingRecord>> }>
-  | Readonly<{ liveness: 'gone', val: Tombstone<ThingRecord> }>
-  | Readonly<{ liveness: 'void', val: VoidSentinel }>
+export type ItemSeen<RecordT extends ThingRecord = ThingRecord> =
+  | Readonly<{ liveness: 'full', val: LiveOf<RecordT> }>
+  | Readonly<{ liveness: 'soon', val: Sparse<LiveOf<RecordT>> }>
+  | Readonly<{ liveness: 'gone', val: Tombstone<RecordT> }>
+  | Readonly<{ liveness: 'void', val: ShellOf<RecordT> }>
 
 /** The first life seen of the Thing, or a new one, right after the `item` event of the record that showed it. */
 export type VaultLifeEvent = VaultEventOf<'life'> & Readonly<{

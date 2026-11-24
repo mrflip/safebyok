@@ -3,6 +3,7 @@ import { DefaultQueryCacheOpts, MaxTimerMillis } from '../../../src/shapes/shape
 import { VaultMinder } from '../../../src/minding/vault-minder'
 import { BankMinder } from '../../../src/minding/bank-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
+import { SortedVaultDB } from '../../../src/storage/sorted-vault-db'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
 import { Hours24, fakeBankOf, minderOf, minderWorldOf, sortedOf, storedBoxOf, boxScopeOf, cheatBox, labelpathsOf } from './world'
@@ -74,24 +75,27 @@ describe("VaultMinder.hello", () => {
     }
   })
 
-  it("watches the bank once, for every kind of Thing", async () => {
-    const vaultDB  = new MemoryVaultDB()
-    const watching = vi.spyOn(vaultDB, 'watch')
+  it("listens once to the SortedVaultDB it is handed, which watches the bank once, for every kind of Thing", async () => {
+    const vaultDB   = new MemoryVaultDB()
+    const watching  = vi.spyOn(vaultDB, 'watch')
+    const listening = vi.spyOn(SortedVaultDB.prototype, 'listen')
     await minderWorldOf(vaultDB)
+    expect(listening.mock.contexts.filter((sorted) => sorted === sortedOf(vaultDB))).to.have.lengthOf(1)
     expect(watching.mock.calls.map(([scope]) => scope)).to.deep.equal([TH.ThingBank])
   })
 
-  it("refuses a vaultDB without the brand", () => {
+  it("refuses what is not a SortedVaultDB, a raw vaultDB among them", () => {
     // @ts-expect-error -- sloppy input is the point
-    TH.expectSyncRefusal(() => { minderOf().hello({ tryGetThing: () => 1, watch: () => 1 }) }, 'bad_record')
+    TH.expectSyncRefusal(() => { minderOf().hello({ tryGetThing: () => 1, listen: () => 1 }) }, 'bad_record')
+    TH.expectSyncRefusal(() => { minderOf().hello(new MemoryVaultDB() as never) }, 'bad_record')
   })
 
-  it("opens no second watch when called again", async () => {
-    const vaultDB  = new MemoryVaultDB()
-    const watching = vi.spyOn(vaultDB, 'watch')
+  it("listens no second time when called again", async () => {
+    const vaultDB   = new MemoryVaultDB()
     const { minder } = await minderWorldOf(vaultDB)
+    const listening = vi.spyOn(SortedVaultDB.prototype, 'listen')
     minder.hello(sortedOf(vaultDB))
-    expect(watching.mock.calls).to.have.lengthOf(1)
+    expect(listening.mock.calls).to.have.lengthOf(0)
   })
 
   it("caches nothing at hello, so the first get of a box fetches it whole", async () => {

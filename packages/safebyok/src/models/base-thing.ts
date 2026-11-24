@@ -138,7 +138,7 @@ export abstract class BaseThing implements Sparse<ThingRecord> {
 // == [Helpers]: ThingFieldnames, isOfKind, isVoidCited, isVoidSentinelOfKind, isWholeOfKind
 
 /** The name of each Thing field, which every kind of Thing has. */
-const ThingFieldnames = Object.keys(ThingChecks.sparse.shape) as (keyof Sparse<ThingRecord>)[]
+export const ThingFieldnames = Object.keys(ThingChecks.sparse.shape) as (keyof Sparse<ThingRecord>)[]
 
 /** True when the sound `labelpath` is of `modelkind`, or `modelkind` is null */
 function isOfKind(modelkind: Thingkind | null, labelpath: Labelpath): boolean {

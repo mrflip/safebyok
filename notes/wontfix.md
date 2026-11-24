@@ -351,9 +351,9 @@ what the bankDB holds. Unspecified and unguarded; reviewer, 2026-11-22, awaiting
 
 * current outcome: a `SortedVaultDB` keeps, as the last field of each Thing's agerank, the first eight hexadecimal
   digits of the `read_tc` its newest revision was last seen at, whatever their time. A source whose clock runs ahead (a
-  datastore's, or another device's records rung to the `bell`) hands a `read_tc` in the future, and the time is pinned
-  there: a true sighting of that revision notifies nothing until real time passes it. A newer revision or a later life
-  still notifies at once, since the time is the agerank's last field: only freshness is affected, never which revision
+  datastore's, or another device's records rung and handed to its `receive`) hands a `read_tc` in the future, and the
+  time is pinned there: a true sighting of that revision tells nothing until real time passes it. A newer revision or a
+  later life is still told at once, since the time is the agerank's last field: only freshness is affected, never which revision
   is newer.
 * alternatives:
   - cap an incoming time at the sorter's own present chunk: a clock read and a branch in the common path of every
@@ -364,8 +364,8 @@ what the bankDB holds. Unspecified and unguarded; reviewer, 2026-11-22, awaiting
 * workaround: the customer keeps its datastore's and its devices' clocks in step, or refetches what it shows; the bankDB
   is the ground truth.
 
-Steps to reproduce: watch a `SortedVaultDB`; ring a record to its `bell` at a `read_tc` an hour ahead of now; ring the
-same record again at a `read_tc` of now. The second notifies nothing.
+Steps to reproduce: listen to a `SortedVaultDB`; hand its `receive` an event of a record at a `read_tc` an hour ahead
+of now; hand it the same record again at a `read_tc` of now. The second tells nothing.
 
 Reasoning for wontfix: a clock running ahead is a broken system, and the fix is a check in the common code against it
 (CLAUDE.md, *The bankDB is the ground truth*: a broken state is reported, never accommodated). Nothing stored changes,
@@ -376,7 +376,7 @@ and it would have to be the customer's call whether to tolerate it or panic."
 
 * current outcome: `signIn` makes the device's `SortedVaultDB`, which watches the host's vaultDB, only once both
   persisters have restored. A `Device.sweep` that lands while they restore finds no `SortedVaultDB` to stop; the one
-  made after it watches until the page goes, and the minders hear what it notifies.
+  made after it watches until the page goes, and the minders hear what it tells.
 * alternatives:
   - make the `SortedVaultDB` before the restores, as it was: its sorter would sort records no minder hears, and drop them
     as repeats once the minders listen.

@@ -3,7 +3,7 @@
 // own code reaches for, re-exported so that each stays one binding across both packages.
 export { type Received, AdapterVaultDB } from './storage/adapter-vault-db'
 export { type Watcher, MemoryVaultDB } from './storage/memory-vault-db'
-export { type SortedVaultDBOpts, SortedVaultDB } from './storage/sorted-vault-db'
+export { type ReceivingThing, type SortedVaultDBListener, type SortedVaultDBOpts, type ThingMaker, SortedVaultDB, isSortedVaultDB } from './storage/sorted-vault-db'
 export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
   type AnyThingRecord, type BankRecord, type BoxRecord, type GateRecord, type Modelkind, type Sealed, type Sparse, type StoredCited, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind,
@@ -12,7 +12,8 @@ export {
 export { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from './shapes/shapes-thingkinds'
 export type { LiveOf, ShellOf, TombstoneOf } from './shapes/shapes-sealers'
 export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
-export { Thing } from './models/thing'
+export { type Adoptable, Thing } from './models/thing'
+export { PlainThing } from './models/plain-thing'
 export {
   type AnyAsk, type BankRoots, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAskDraft, type GetAsk, type ListAskDraft,
   type ListAsk, type LoggableAsk, type PutAskDraft, type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk, type WriteAskFlags, AskChecks, delAskOf, getAskOf,
@@ -24,8 +25,7 @@ export {
   type Actual, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer, type GotActual,
   type KidEntry, type Kids, type ListThingsActual, type ListThingsAnswer, type ListedBeside, type ReadTc, type VaultDB, type WriteThingAnswer, type WroteActual, isVaultDB,
 } from './storage/vault-db'
-// The events a vaultDB's watcher is notified with, and FeedSorter, which sorts a bank's records into events.
-export { FeedSorter } from './storage/feed-sorter'
+// The events a vaultDB's watcher is notified with.
 export {
   type Agekind, type Agerank, type ItemSeen, type Lifekind, type Liveness, type SeenThing, type VaultAgedEvent, type VaultEvent, type VaultEventOf, type VaultEventkind, type VaultItemEvent, type VaultLifeEvent,
   agekindVals, lifekindVals, livenessVals, vaultEventkindVals,

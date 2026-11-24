@@ -129,7 +129,7 @@ export type ThingAt<LabelpathT extends Labelpath> =
       : LabelpathT extends 'bank' ? BankRecord
         : ThingRecord
 
-/** A record a vaultDB's watch notifies a minder of: a Thing, whole or sparse, live or a tombstone. */
+/** A record a minder hears of from its SortedVaultDB: a Thing, whole or sparse, live or a tombstone. */
 export type DeliverableThing = ThingRecord | Sparse<ThingRecord>
 // --
 

@@ -6,7 +6,8 @@ import {
   Shell, ThingFormat,
 } from '../../src/shapes/shapes-thing'
 import type { SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
-import { itemSeenOf } from '../../src/storage/feed-sorter'
+import { itemSeenOf } from '../../src/storage/agerank'
+import { PlainThing } from '../../src/models/plain-thing'
 import { WayinChecks } from '../../src/shapes/shapes-wayin'
 import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { FirstLifetok, FirstRevtok, T0, revtokOf } from './models-world'
@@ -156,7 +157,10 @@ export function maskedReadTcsOf(events: readonly VaultEvent[]): VaultEvent[] {
   return events.map((event) => (ReadTcPattern.test(event.read_tc ?? '') ? { ...event, read_tc: AnyReadTc } : event))
 }
 
-/** The `item` notice a vaultDB's raw watch gets for `record`, at the liveness a sorter gives it, with no agerank and no source, at {@link AnyReadTc}, and with no bank lifetok unless given one. */
+/** The Thing a test's SortedVaultDB keeps at each labelpath: a plain one, as a device's is. */
+export function makePlainThing(seen: SeenThing): PlainThing { return PlainThing.make(seen) }
+
+/** The `item` notice a vaultDB's raw watch gets for `record`, at the liveness its record has, with no agerank and no source, at {@link AnyReadTc}, and with no bank lifetok unless given one. */
 export function itemEventOf(record: SeenThing, bank_lifetok?: Lifetok): VaultItemEvent {
   const { userid, banklabel, labelpath } = record
   const unsorted = { agerank: undefined, agerankWas: undefined, bank_lifetok, sourcelabel: undefined, read_tc: AnyReadTc }

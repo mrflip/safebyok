@@ -23,7 +23,10 @@ import * as Throwers from '../refusals/throwers'
  * Boxes are sealed and unsealed under its private lease, which no method hands out.
  */
 export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements GateStamp {
-  // == [Props]: #device, #bankStamp, #main, #passkey0, #lease, #unlockWait, #endCause
+  // == [Props]: wayins, #device, #bankStamp, #main, #passkey0, #lease, #unlockWait, #endCause
+
+  /** The wayin records, frozen. */
+  declare readonly wayins: Wayins
 
   readonly #device:    Device
   readonly #bankStamp: BankStamp
@@ -44,13 +47,10 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
   #endCause: Errors.VaultError | null = null
   // --
 
-  // == [Getters]: device, wayins, main, passkey0, scope, stamp, bankStamp, leaseEndsAt, leaseLoggable
+  // == [Getters]: device, main, passkey0, scope, stamp, bankStamp, leaseEndsAt, leaseLoggable
 
   /** The device this gate's bank is on. */
   get device(): Device { return this.#device }
-
-  /** The wayin records, frozen. */
-  get wayins(): Wayins { return this.pickle().wayins }
 
   /** The passphrase wayin. */
   get main(): Wayin { return this.#main }
@@ -262,7 +262,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
   #adopt(record: GateRecord): void {
     const main = Wayin.make(record.wayins.main)
     const passkey0 = (record.wayins.passkey0 === null) ? null : Wayin.make(record.wayins.passkey0)
-    this.adoptRecord({ ...record, wayins: wayinsOf({ main, passkey0 }) })
+    this.adopt({ ...record, wayins: wayinsOf({ main, passkey0 }) })
     this.#main     = main
     this.#passkey0 = passkey0
     this.#tell()

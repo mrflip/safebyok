@@ -5,7 +5,7 @@ import { Thing } from '../../../src/models/thing'
 import { MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
-import { QuietVaultDB, LateWriteVaultDB, minderWorldOf, bornOf, storedBoxOf, noticeOf, cheatBox, listenerOf, boxBirthAskOf, isListingStaleAt, labelpathsOf } from './world'
+import { QuietVaultDB, LateWriteVaultDB, minderWorldOf, bornOf, storedBoxOf, noticeOf, cheatBox, listenerOf, boxBirthAskOf, isListingStaleAt, labelpathsOf, sortedOf } from './world'
 import { readTcNow } from '../../../src/storage/thing-classifier'
 
 describe("VaultMinder.tryWrite", () => {
@@ -139,7 +139,7 @@ describe("VaultMinder.tryWrite", () => {
   it("writes a box the bank sealed, then the tombstone it sealed, through the put and del asks the bank makes", async () => {
     const { bank, device } = await TH.buildBornBank()
     const minder = VaultMinder.make({}, bank)
-    minder.hello(device.vaultDB)
+    minder.hello(sortedOf(device.vaultDB))
     const shell  = Shell.of({ ...bank.scope, labelpath: TH.BoxScope.labelpath }, bank.rootBox)
     const box    = await bank.sealBox(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const putAsk = bank.makePutAsk<BoxRecord>({ cited: Thing.sparseOf(shell), record: box })

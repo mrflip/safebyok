@@ -16,7 +16,8 @@ import { type Sparse, type ThingRecord, type ThingScope, type Tombstone, ThingCh
 import { Thing } from '../models/thing'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetAsk, type ThingWatchScope, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
-import type { Kids, VaultDB, WriteThingAnswer } from '../storage/vault-db'
+import type { Kids, WriteThingAnswer } from '../storage/vault-db'
+import { type SortedVaultDB, isSortedVaultDB } from '../storage/sorted-vault-db'
 import type { VaultEvent } from '../shapes/shapes-vault-event'
 import { refusedAnswerOf } from '../storage/refused-answer'
 import {
@@ -33,12 +34,12 @@ import * as Throwers from '../refusals/throwers'
 /** Anything naming a labelpath: a scope, an ask or a record. */
 export type Labelpathed = { labelpath: Labelpath }
 
-/** This device's cache of the Things of one bank it minds, kept from everything the vaultDB notifies of them.
+/** This device's cache of the Things of one bank it minds, kept from everything its SortedVaultDB tells of them.
  * A subclass says which Things it minds: a VaultMinder the boxes under the root box, a BankMinder the bank, its main gate and its root box.
  * Each Thing minded has an item, with what a host shows: its live whole record, or null where none is stored live.
  * It may also have a soon, a sparse record newer than the item, removed once the item catches up; and a dead record, its
  * tombstone that last landed. Each Thing whose children it minds has a listing of them, once listed.
- * Records arrive from gets, lists, good writes, the world each answer carries, and the watch, in any order, late or more
+ * Records arrive from gets, lists, good writes, the world each answer carries, and what the SortedVaultDB tells, in any order, late or more
  * than once. A live whole record lands in the item, a sparse record in the soon, and a tombstone in the dead record and
  * then, as null, in the item. A listing is the {@link Kids} value a list answered, replaced whole by the next. Of a Thing
  * it does not mind, only what a get or list of it answers is cached, and no later record brings that up to date: get and
@@ -77,25 +78,26 @@ export type Labelpathed = { labelpath: Labelpath }
  * - An operation caches its own good answer (the record got or written, or the {@link Kids} value listed, never a write's
  *   ask) and the bank and main gate of the world its answer carries, refused or not. Any other record an answer carries (a
  *   refusal's `dbhas`, a list's parentage and deltas, or a tracked bank, main gate or root box) is cached only as the
- *   watch notifies of it, and the watch notifies of it before the operation returns.
- * - A refused write changes no item it writes and marks nothing stale. Its `dbhas`, through the watch, may still change an item.
- * - A write's answer and the watch's notice of the same write leave the same item, in either order: the later changes nothing.
+ *   SortedVaultDB tells of it, and it tells of it before the operation returns.
+ * - A refused write changes no item it writes and marks nothing stale. Its `dbhas`, as the SortedVaultDB tells it, may still change an item.
+ * - A write's answer and the SortedVaultDB's event of the same write leave the same item, in either order: the later changes nothing.
  * - `invalidate` marks listings stale, never items. It lists again only a listing an observer keeps active, and asks the
  *   vaultDB nothing for the rest.
  */
 export abstract class Minder {
-  // == [Props]: #bank, #vaultDB, vaultDB, #tsq, #queryCacheOpts, #unwatch, #isReady
+  // == [Props]: #bank, #vaultDB, vaultDB, #tsq, #queryCacheOpts, #unlisten, #isReady
   readonly #bank:           MinderFriend
-  /** Where the bank's Things are stored: the vaultDB the latest `hello` was handed, null before the first. */
-  #vaultDB:                 VaultDB | null = null
+  /** Where the bank's Things are stored: the SortedVaultDB the latest `hello` was handed, null before the first. */
+  #vaultDB:                 SortedVaultDB | null = null
   readonly #tsq:            TSQ.QueryClient
   readonly #queryCacheOpts: Readonly<QueryCacheOpts>
-  #unwatch: (() => void) | null = null
+  /** Ends this minder's listen to its SortedVaultDB, null while it is not listening. */
+  #unlisten: (() => void) | null = null
   /** True while minding: from `hello` until `goodbye`. */
   #isReady = false
 
-  /** Where the bank's Things are stored: the vaultDB the latest `hello` was handed. Refuses before the first `hello`. */
-  protected get vaultDB(): VaultDB {
+  /** Where the bank's Things are stored: the SortedVaultDB the latest `hello` was handed. Refuses before the first `hello`. */
+  protected get vaultDB(): SortedVaultDB {
     if (this.#vaultDB === null) { throw Throwers.minderNotStarted() }
     return this.#vaultDB
   }
@@ -141,24 +143,23 @@ export abstract class Minder {
   }
   // --
 
-  // == [Starting and ending]: hello, #takeNotice, goodbye
+  // == [Starting and ending]: hello, #hear, goodbye
 
-  /** Start minding the bank's Things in `vaultDB`: until `goodbye`, answer gets, and cache each change it notifies. A second call does nothing. */
-  hello(vaultDB: VaultDB): void {
-    MinderOptsChecks.vaultDB.parse(vaultDB)
+  /** Start minding the bank's Things in `sortedVaultDB`: until `goodbye`, answer gets, and cache each change it tells. A second call does nothing. */
+  hello(sortedVaultDB: SortedVaultDB): void {
+    MinderOptsChecks.sortedVaultDB.parse(sortedVaultDB)
     if (this.#isReady) { return }
-    this.#isReady = true
-    this.#vaultDB = vaultDB
-    this.#unwatch = vaultDB.watch(
-      this.scope,
-      // Synchronous on purpose: the vaultDB notifies of a refusal's dbhas, each changed tracked Thing and a list's parentage and deltas before its verb returns. An await here would cache them after the operation resumes.
-      (event: VaultEvent) => { this.#takeNotice(event) },
-      (news)               => { this.#bank.tellBadNews([news]) },
-    )
+    this.#isReady  = true
+    this.#vaultDB  = sortedVaultDB
+    this.#unlisten = sortedVaultDB.listen({
+      // Synchronous on purpose: the SortedVaultDB tells a refusal's dbhas, each changed tracked Thing and a list's parentage and deltas before its verb returns. An await here would cache them after the operation resumes.
+      hear:      (event) => { this.#hear(event) },
+      onBadNews: (news)  => { this.#bank.tellBadNews([news]) },
+    })
   }
 
-  /** Cache the record of an `item` notice. A `life` or `aged` notice is not cached. */
-  #takeNotice(event: VaultEvent): void {
+  /** Cache the record of an `item` event. A `life` or `aged` event is not cached. */
+  #hear(event: VaultEvent): void {
     if (event.eventkind !== 'item') { return }
     // A void is ignored: the cache keeps what a get answers of nothing stored, never a void sentinel.
     if (event.liveness === 'void') { return }
@@ -170,8 +171,8 @@ export abstract class Minder {
   /** Stop minding, and remove this bank's queries from the cache. A later `hello` starts minding again, in the vaultDB it is handed. */
   goodbye(): void {
     this.#isReady = false
-    if (this.#unwatch) { this.#unwatch() }
-    this.#unwatch = null
+    if (this.#unlisten) { this.#unlisten() }
+    this.#unlisten = null
     this.#tsq.removeQueries({ queryKey: bankKeyHeadOf(this.scope) })
   }
   // --
@@ -307,7 +308,7 @@ export abstract class Minder {
   // == [Writing]: tryWrite, write
 
   /** Write `ask` through the vaultDB, and return its answer, a refusal included.
-   * The record written, a tombstone as null in its item, and the bank and main gate of the answer's world, are cached before it answers, where this minder minds them. A refusal's `dbhas` is cached only as the watch notifies of it.
+   * The record written, a tombstone as null in its item, and the bank and main gate of the answer's world, are cached before it answers, where this minder minds them. A refusal's `dbhas` is cached only as the minder hears of it.
    * Before `hello`, after `goodbye`, or for a Thing this minder does not mind, it answers the refusal without asking the vaultDB.
    * Rejects, whether or not the write was made, when the answer carries a record of another bank.
    */
@@ -319,7 +320,7 @@ export abstract class Minder {
       return refusedAnswerOf(ask, err)
     }
     const answer = await this.vaultDB.tryWriteThing(ask)
-    // A refusal's dbhas, and any tracked and updated bank, main gate or root box, land through the watch.
+    // A refusal's dbhas, and any tracked and updated bank, main gate or root box, land as the SortedVaultDB tells them.
     this.#landWorld(answer.world)
     if (answer.ok) { this.sendToTSQ(answer.val) }
     return answer
@@ -333,7 +334,7 @@ export abstract class Minder {
 
   // == [TSQ Direct Cache Calls]: #doGet, #fetchAt, #fetchRecord, #fetchListing, #itemAt, #soonAt, #deadAt, #itemRecordAt, #soonestAt, #isBehindAt, #tsqFind, sendToTSQ, #landWorld, #landedByFetch, #settleLanded, #hasStoredBesideItem, #markBehinds
 
-  // TanStack resolves with what the queryFn returned, not what structural sharing left in the cache: a notice that landed during the
+  // TanStack resolves with what the queryFn returned, not what structural sharing left in the cache: an event heard during the
   // get may have left the item a later record.
   /** `scoped`'s live record or null: the item's if timely within `opts.staleTime`, else from the vaultDB. */
   async #doGet(scoped: ThingScope, opts: MinderGetOpts): Promise<ThingRecord | null> {
@@ -350,7 +351,7 @@ export abstract class Minder {
     return (queryKey[QkeykindIdx] === Listkind) ? await this.#fetchListing(scope) : await this.#fetchRecord(this.#askAt(scope))
   }
 
-  // A tombstone answered is the answer's dbhas, which the watch lands before the answer resumes this fetch.
+  // A tombstone answered is the answer's dbhas, which the SortedVaultDB tells before the answer resumes this fetch.
   /** Fetch `ask`'s live record, deeply frozen, or null where the vaultDB has none live.
    * Refuses `stale_read` for an answer older than the soonest record cached when the fetch began: null counts as its tombstone, or as the void sentinel it carries for nothing stored.
    */
@@ -359,7 +360,7 @@ export abstract class Minder {
     const prior  = this.#soonestAt(ask)
     const answer = await this.vaultDB.tryGetThing(ask)
     this.#landWorld(answer.world)
-    // Thrown unchanged. The `dbhas` is delivered through the watch, never from here.
+    // Thrown unchanged. The `dbhas` is delivered as the SortedVaultDB tells it, never from here.
     if (! answer.ok) { throw answer.err }
     const answered = (answer.act === 'gotlive') ? this.#checkedDelivered(answer.val, ask) : answer.dbhas
     // TanStack leaves the item and its time as they were, marks it invalidated, and caches the refusal beside it as its error.
@@ -367,8 +368,8 @@ export abstract class Minder {
     return deepFreeze(answer.val)
   }
 
-  // Only the Kids value lands here: the vaultDB notifies the parent and each Thing listed before it answers, so each lands
-  // through the watch before the listing itself does.
+  // Only the Kids value lands here: the SortedVaultDB tells the parent and each Thing listed before it answers, so each
+  // lands before the listing itself does.
   /** Fetch the {@link Kids} value of `scoped`'s children, deeply frozen, telling the bank's `tellBadNews` of any Thing stored damaged. */
   async #fetchListing(scoped: ThingScope): Promise<Kids> {
     const ask    = this.#bank.makeListAsk({ labelpath: scoped.labelpath, ifAbsent: 'nil' })
@@ -454,7 +455,7 @@ export abstract class Minder {
     this.sendToTSQ(maingate)
   }
 
-  // A listing's fetch needs nothing more: the Things it lists landed through the watch before it. A soon or a dead record is
+  // A listing's fetch needs nothing more: the Things it lists landed, as the SortedVaultDB told them, before it. A soon or a dead record is
   // never fetched. A get's live record over a null item is no first landing: only the item's own count of landings tells one.
   /** Settle the item a fetch just landed `val` in, where `queryKey`, a key of this bank, is an item's. */
   #landedByFetch(val: unknown, queryKey: TSQ.QueryKey): void {
@@ -794,12 +795,12 @@ const SaveOpts: TSQ.DehydrateOptions = Object.freeze({
 
 // == [Checks]: MinderOptsChecks, DeliveredChecks
 
-/** The checks of the options every minder is made with, which each subclass's `make` extends, and of the vaultDB its `hello` is handed. */
-export const MinderOptsChecks = Validator.Checkers('bad_record', ({ obj }) => ({
-  minderOpts: obj({
+/** The checks of the options every minder is made with, which each subclass's `make` extends, and of the SortedVaultDB its `hello` is handed. */
+export const MinderOptsChecks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
+  minderOpts:    obj({
     queryCacheOpts: MinderChecks.queryCacheOptsOrDefault,
   }),
-  vaultDB:    ThingChecks.vaultDBShape,
+  sortedVaultDB: custom<SortedVaultDB>(isSortedVaultDB, Phrases.SortedVaultDBExpected),
 }))
 
 /** The check of a record the vaultDB delivers, refusing `unexpected_error`: a record of another scope is a bug in the vaultDB. */

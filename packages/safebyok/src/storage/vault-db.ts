@@ -149,7 +149,7 @@ export interface VaultDB {
   /** Watch a bank's Things, returning a function that stops the watch.
    * `onBadNews` gets any trouble the watch meets, including a Thing that fails its checks.
    * What a watcher is notified of is the vaultDB's own to say: an `AdapterVaultDB` notifies each change its datastore
-   * reports, when the datastore delivers it, and a `SortedVaultDB` the records it learns of that are news, in order.
+   * reports, when the datastore delivers it.
    */
   watch(scope: ThingWatchScope, onNotice: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void): () => void
 }

@@ -51,7 +51,7 @@ export class LateVaultDB extends MemoryVaultDB {
   release(): void { for (const resolve of this.#releases.splice(0)) { resolve() } }
 }
 
-/** A vaultDB whose own watch notifies no one: a test hands it each notice itself. The SortedVaultDB over it still notifies what its answers carry. */
+/** A vaultDB whose own watch notifies no one: a test hands it each notice itself. The SortedVaultDB over it still tells what its answers carry. */
 export class QuietVaultDB extends MemoryVaultDB {
   override watch(): () => void { return noop }
 }
@@ -87,7 +87,7 @@ const SortedOf = new WeakMap<VaultDB, SortedVaultDB>()
 
 /** The one SortedVaultDB of `TH.ThingBank` over `vaultDB`, made and watching it at the first call, shared by every minder over it, as a device's minders share one. */
 export function sortedOf(vaultDB: VaultDB): SortedVaultDB {
-  const sorted = SortedOf.get(vaultDB) ?? SortedVaultDB.make(TH.ThingBank, { vaultDB })
+  const sorted = SortedOf.get(vaultDB) ?? SortedVaultDB.make(TH.ThingBank, { vaultDB, makeThing: TH.makePlainThing })
   SortedOf.set(vaultDB, sorted)
   return sorted
 }
@@ -103,12 +103,12 @@ export async function bankMinderOf({ isWorldHeard = true } = {}): Promise<BankMi
   return bankMinder
 }
 
-/** A minder of `bank`, not started: its `hello` takes the vaultDB, as a device hands its minders their SortedVaultDB ({@link sortedOf}). */
+/** A minder of `bank`, not started: its `hello` takes a SortedVaultDB, as a device hands its minders theirs ({@link sortedOf}). */
 export function minderOf(queryCacheOpts: Partial<QueryCacheOpts> = {}, bank: MinderFriend = fakeBankOf()): VaultMinder {
   return VaultMinder.make({ queryCacheOpts }, bank)
 }
 
-/** A bank's minder, what it stands on, and a way to hand the vaultDB's watch a notice, which reaches the minder through the SortedVaultDB over it. */
+/** A bank's minder, what it stands on, and a way to hand the vaultDB's watcher a notice, which the SortedVaultDB over it tells the minder where it is news. */
 export interface MinderWorld<VaultDBT extends MemoryVaultDB> {
   vaultDB:    VaultDBT
   bank:       ReturnType<typeof fakeBankOf>
