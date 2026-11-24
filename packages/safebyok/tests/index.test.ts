@@ -22,10 +22,12 @@ describe("the front door, safebyok", () => {
     for (const [exportname, val] of Object.entries(Utils)) { expect(Front, exportname).to.have.property(exportname).that.eq(val) }
   })
 
-  it("exports the minder and the vault, which safebyok/core leaves out", () => {
+  it("exports the minders, the VaultTSQ and the vault, which safebyok/core leaves out", () => {
     expect(Front.VaultMinder).to.be.a('function')
+    expect(Front.VaultTSQ).to.be.a('function')
     expect(Front.Vault).to.be.a('function')
     expect(Core).to.not.have.property('VaultMinder')
+    expect(Core).to.not.have.property('VaultTSQ')
     expect(Core).to.not.have.property('Vault')
   })
 

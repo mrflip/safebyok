@@ -23,7 +23,7 @@ import type { BirthBankAnswer, GetThingAnswer, Kids, ListThingsAnswer, ReadTc, V
 // == [SortedVaultDB]: ReceivingThing, ThingMaker, SortedVaultDBOpts, SortedVaultDBListener, PutOnceArgs, DelOnceArgs, Stamp, Listening, SortedVaultDB
 
 /** What a {@link SortedVaultDB} reads of each Thing it keeps. */
-export type ReceivingThing = Pick<Thing<ThingRecord, unknown, unknown, Adoptable<ThingRecord>>, 'receive' | 'agerank' | 'agekind' | 'citable' | 'pickle'>
+export type ReceivingThing = Pick<Thing<ThingRecord, unknown, unknown, Adoptable<ThingRecord>>, 'receive' | 'agerank' | 'agekind' | 'citable' | 'read_at' | 'pickle'>
 
 /** Make the Thing a {@link SortedVaultDB} keeps at a labelpath, from `seen`, the first record it learns of there. */
 export type ThingMaker<ThingT extends ReceivingThing = ReceivingThing> = (seen: SeenThing) => ThingT

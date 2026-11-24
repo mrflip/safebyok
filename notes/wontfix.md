@@ -54,8 +54,10 @@ the Coach, 2026-11-20, soon_item rework.
 ### The VaultMinder detects no conflict among the records it holds
 
 * current outcome: `newerThingOf` returns the later record by lifepath and then revseq. Two records of one revision
-  with different revtoks keep whichever landed first. A get that storage answers older than the record cached when
-  the get began refuses `stale_read`, and the cached record stays.
+  with different revtoks keep whichever landed first. A VaultTSQ's get answers what the box's Thing holds once storage
+  answers: a whole record of the Thing's newest life, older than its newest revision known, shows as the item, and an
+  answer of an earlier life changes nothing. The get refuses `stale_read` only where that leaves the Thing known only
+  sparse in its newest life.
 * alternatives:
   - refuse `record_conflict` in the cache: `newerThingOf` must stay pure, since TanStack Query calls it for every
     observer's result, so a refusal would need a state of its own outside it.
@@ -391,6 +393,25 @@ Reasoning for wontfix: a sweep crossing a sign-in is an end-of-life event landin
 *Hours separate updates*), and the fix is a state and a check in the common path of every sign-in. Nothing stored
 changes and no secret moves: a watch notifies records the bankDB already holds. Recorded under that rule by thread 4 of
 feed_sorter, 2026-11-24.
+
+### A `getOnce` the library cancels when its item is reset rejects with the library's own error
+
+* current outcome: where an `aged` event to bare resets a box's item while a `vaultTSQ.getOnce` of it runs, TanStack
+  Query cancels the get's fetch silently, and the `getOnce` rejects with the library's `CancelledError`, not a refusal of
+  ours. Where an observer keeps the item active, the reset fetches again, and the cancelled get answers with that fetch
+  (`Query.reset` and `Query.fetch`, query-core 5.107.1, `src/query.ts`).
+* alternatives:
+  - catch the `CancelledError` in `getOnce`, and answer what the Thing holds or refuse `stale_read`: puts our guess in
+    place of the library's error.
+  - hold the reset until the get answers: a state of our own beside the library's, in a primitive's critical path.
+* workaround: call `getOnce` again, or observe the item, whose reset fetches it again.
+
+Steps to reproduce: start a `getOnce` of a box that no observer keeps active; while storage answers it, a list or a
+notice tells of the box in a newer life, sparse.
+
+Reasoning for wontfix: it is a crossing of a get and a sighting of a newer life, and cancellation is the library's to
+own. The Coach: "I'm loath to override errors of TSQ to our helpful guess." Ruled by the Coach, 2026-11-24, feed_sorter
+(the redistribution design, section 12).
 
 ## React
 

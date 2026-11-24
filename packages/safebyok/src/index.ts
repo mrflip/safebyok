@@ -16,6 +16,7 @@ export {
 export { type Labelpathed, Minder } from './minding/minder'
 export { VaultMinder } from './minding/vault-minder'
 export { BankMinder } from './minding/bank-minder'
+export { type ItemQueryOptions, type VaultMutationOptions, type VaultTSQOpts, VaultTSQ } from './minding/vault-tsq'
 export { Vault } from './models/vault'
 export { type DeadAt, newerThingOf } from './minding/newer-thing'
 export { DefaultStrengthChecker, guardStrengthChecker } from './helpers/passphrase-strength'

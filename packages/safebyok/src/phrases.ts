@@ -162,10 +162,16 @@ export const BankRootsMissing = "A bank is stored without its main gate or its r
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: MinderFriendExpected, NotMinded, WorldNotHeard, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, DeliveredOfOtherScope, ChildrenStoredDamaged
+// == [Minding]: MinderFriendExpected, QueryClientExpected, ListOfBoxes, NotMinded, WorldNotHeard, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, DeliveredOfOtherScope, ChildrenStoredDamaged
 
 /** A minder made without a friend: a device or a bank. */
 export const MinderFriendExpected = 'A minder is made with its friend: the device or bank whose Things it minds.'
+
+/** A VaultTSQ made without a TanStack Query client. */
+export const QueryClientExpected = 'Expected a TanStack Query QueryClient: an object with setQueryDefaults, setMutationDefaults, setQueryData, query, invalidateQueries and resetQueries.'
+
+/** A listing asked of a VaultTSQ for a Thing other than a box. */
+export const ListOfBoxes = "A VaultTSQ lists only a box's children: the root box's, or a box's under it."
 
 /** A write through a minder of a Thing it does not mind. */
 export const NotMinded = "A minder writes only the Things it minds: a VaultMinder the boxes under the root box, a BankMinder the bank, its main gate and its root box."
