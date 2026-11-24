@@ -1,5 +1,5 @@
 import { isEqual, noop } from 'es-toolkit'
-import { Errors, Phrases as BigPhrases, Validator, VX } from 'safebyok-big/internals'
+import { type Errors, Validator, VX } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { BaseThing } from './base-thing'
 import { Box } from './box'
@@ -10,7 +10,7 @@ import type { Lease } from './lease'
 import type { Proving } from './proving'
 import type { Adoptable } from './thing'
 import type { BankSnapshot, BankStage, HostedVault, RefusalSnapshot, WorldOpts } from '../shapes/shapes-bankish'
-import { PendingBank, SignedOutBank } from '../shapes/shapes-bankish'
+import { PendingBank, SignedOutBank, WorldChecks } from '../shapes/shapes-bankish'
 import type { BirthCleartexts, BirthDna, BirthGatingFriend, GateRevisionedStamp, LeaseGate, WorldGateFriend } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type BankStamp, type LeaseLoggable, StampChecks } from '../shapes/shapes-stamps'
@@ -249,7 +249,7 @@ export class World {
    * Its subscribers hear of the end, and of nothing after.
    */
   sweep(endCause: Errors.VaultError | null = null): this {
-    Checks.endCause.parse(endCause)
+    WorldChecks.endCause.parse(endCause)
     if (this.#endCause !== null) { return this }
     this.#endCause = endCause ?? this.#device.endCause ?? Throwers.bankSwept()
     this.#lease?.sweep()
@@ -266,7 +266,7 @@ export class World {
    * Refuses once the world is swept.
    */
   hostVault(vault: HostedVault): void {
-    Checks.hostedVault.parse(vault)
+    WorldChecks.hostedVault.parse(vault)
     this.demandEnabled()
     this.#vaults.add(vault)
   }
@@ -480,11 +480,9 @@ function makeWait(): Wait {
 // == [Checks]: Checks
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link World.make}'s arguments, {@link World.signin}'s, {@link World.sweep}'s and {@link World.hostVault}'s. */
+/** The checks of {@link World.make}'s arguments and {@link World.signin}'s. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
-  worldOpts:     obj({ device: custom<Device>() }),
+  worldOpts:   obj({ device: custom<Device>() }),
   vaultMinder: custom<VaultMinder>(isVaultMinder, Phrases.VaultMinderExpected),
-  endCause:      custom<Errors.VaultError>(Errors.isVaultError, BigPhrases.VaultErrorExpected).nullable(),
-  hostedVault:   custom<HostedVault>((val) => typeof (val as Partial<HostedVault> | null)?.sweep === 'function', Phrases.HostedVaultExpected),
 }))
 // --
