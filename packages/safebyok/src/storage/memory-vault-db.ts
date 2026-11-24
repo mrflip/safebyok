@@ -3,10 +3,10 @@
 import { type Errors, Helpers, Outcome } from 'safebyok-big/internals'
 import { AdapterVaultDB } from './adapter-vault-db'
 import { readTcNow } from './agerank'
-import type { ActualBeside, BirthBankActual, GotActual, ListThingsActual, Received, WroteActual } from '../shapes/shapes-answers'
+import type { ActualBeside, BirthBankActual, GetWorldActual, GotActual, ListThingsActual, Received, WroteActual } from '../shapes/shapes-answers'
 import { Labelpath } from '../shapes/primitives'
 import { type ThingRecord } from '../shapes/shapes-thing'
-import { type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
+import { type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldAsk, type ListAsk, type ThingWatchScope, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
 import type { AboveFetched, BankRootsFetched, WorldFetched } from './thing-classifier'
 import * as Classifier from './thing-classifier'
 
@@ -86,7 +86,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
   }
   // --
 
-  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doWatch
+  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doWatch
 
   protected doGetThing(ask: GetAsk): GotActual {
     const things = this.#thingsOf(ask)
@@ -122,6 +122,8 @@ export class MemoryVaultDB extends AdapterVaultDB {
     for (const thing of Object.values(written)) { this.#notify(thing, after.world) }
     return { ...actual, ...after, things: written }
   }
+
+  protected doGetWorld(ask: GetWorldAsk): GetWorldActual { return this.classifyGetWorld(ask, this.#rootsOf(ask)) }
 
   protected override doWatch(scope: ThingWatchScope, receive: Watcher['receive'], onBadNews: Watcher['onBadNews']): () => void {
     const watcher = { scope, receive, onBadNews }

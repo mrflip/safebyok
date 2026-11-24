@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { type EX, Errors, SX } from 'safebyok-big/internals'
 import { AnswerNotMade } from '../../src/phrases'
 import { AdapterVaultDB } from '../../src/storage/adapter-vault-db'
-import type { Actual, BirthBankActual, GotActual, ListThingsActual, Received } from '../../src/shapes/shapes-answers'
-import type { BirthBankAsk, GetAsk, ListAsk, ThingWatchScope, WriteAsk } from '../../src/shapes/shapes-asks'
+import type { Actual, BirthBankActual, GetWorldActual, GotActual, ListThingsActual, Received } from '../../src/shapes/shapes-answers'
+import type { BirthBankAsk, GetAsk, GetWorldAsk, ListAsk, ThingWatchScope, WriteAsk } from '../../src/shapes/shapes-asks'
 import { Thing } from '../../src/models/thing'
 import { Shell } from '../../src/shapes/shapes-thing'
 import type { VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
@@ -28,6 +28,7 @@ class ScriptedVaultDB extends AdapterVaultDB {
   protected doWriteThing(_ask: WriteAsk): Actual<EX.PutAct | EX.DelAct> { return this.#report() as Actual<EX.PutAct | EX.DelAct> }
   protected doListThings(_ask: ListAsk): ListThingsActual { return this.#report() as ListThingsActual }
   protected doBirthBank(_ask: BirthBankAsk): BirthBankActual { return this.#report() as BirthBankActual }
+  protected doGetWorld(_ask: GetWorldAsk): GetWorldActual { return this.#report() as GetWorldActual }
   protected override doWatch(_scope: ThingWatchScope, receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void {
     this.receive = receive
     return () => { this.receive = null }

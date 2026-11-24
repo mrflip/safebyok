@@ -41,6 +41,7 @@ function stubVaultDBOf(stop: () => void) {
     tryWriteThing: vi.fn<VaultDB['tryWriteThing']>(() => Promise.resolve(stubAnswerOf('wrote'))),
     tryListThings: vi.fn<VaultDB['tryListThings']>(() => Promise.resolve(stubAnswerOf('listed'))),
     tryBirthBank:  vi.fn<VaultDB['tryBirthBank']>(() => Promise.resolve(stubAnswerOf('born'))),
+    tryGetWorld:   vi.fn<VaultDB['tryGetWorld']>(() => Promise.resolve(stubAnswerOf('world'))),
     watch:         vi.fn<VaultDB['watch']>(() => stop),
   } satisfies VaultDB
 }
@@ -101,6 +102,9 @@ function shorthandsOf(events: readonly VaultEvent[]): string[][] {
 /** The shorthands of a Thing seen first, whole and live. */
 function firstSeen(labelpath: string): string[][] { return [['item', labelpath, 'full'], ['life', labelpath, 'born']] }
 
+/** The shorthands of a Thing seen first as the shell. */
+function voidSeen(labelpath: string): string[][] { return [['item', labelpath, 'void'], ['life', labelpath, 'died']] }
+
 /** The shorthands of a Thing seen first, sparse and live. */
 function firstSeenSparse(labelpath: string): string[][] { return [['item', labelpath, 'soon'], ['life', labelpath, 'born'], ['aged', labelpath, 'bare']] }
 
@@ -108,15 +112,17 @@ describe("VaultMinder, what only a wrapper can show", () => {
   it("hands each verb's ask to the vaultDB it wraps, and answers that vaultDB's own answer", async () => {
     const inner = stubVaultDBOf(() => undefined)
     const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing })
-    const asks = { get: TH.getGateAskOf(), write: TH.birthAskOf(), list: TH.listAskAt('box'), birth: TH.birthBankAskOf() }
+    const asks = { get: TH.getGateAskOf(), write: TH.birthAskOf(), list: TH.listAskAt('box'), birth: TH.birthBankAskOf(), world: TH.getWorldAskOf() }
     expect(await vaultDB.tryGetThing(asks.get)).to.equal(await inner.tryGetThing.mock.results[0]!.value)
     expect(await vaultDB.tryWriteThing(asks.write)).to.equal(await inner.tryWriteThing.mock.results[0]!.value)
     expect(await vaultDB.tryListThings(asks.list)).to.equal(await inner.tryListThings.mock.results[0]!.value)
     expect(await vaultDB.tryBirthBank(asks.birth)).to.equal(await inner.tryBirthBank.mock.results[0]!.value)
+    expect(await vaultDB.tryGetWorld(asks.world)).to.equal(await inner.tryGetWorld.mock.results[0]!.value)
     expect(inner.tryGetThing.mock.calls[0]![0]).to.equal(asks.get)
     expect(inner.tryWriteThing.mock.calls[0]![0]).to.equal(asks.write)
     expect(inner.tryListThings.mock.calls[0]![0]).to.equal(asks.list)
     expect(inner.tryBirthBank.mock.calls[0]![0]).to.equal(asks.birth)
+    expect(inner.tryGetWorld.mock.calls[0]![0]).to.equal(asks.world)
   })
 
   it("watches its bank in the vaultDB it wraps once, from when it is made, whoever listens to it, asking nothing", () => {
@@ -190,6 +196,17 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     const answer = await vaultDB.tryWriteThing({ ...TH.birthAskOf(TH.gateThingOf({ revtok: TH.OtherRevtok })), track })
     expect(answer).to.deep.include({ ok: false, dbhas: TH.gateThingOf() })
     expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ...firstSeen('box')])
+    expect(badNews).to.deep.equal([])
+  })
+
+  it("tells of the three roots a get of the world answers, in root order, the shell at each where none is stored, before it answers", async () => {
+    const { vaultDB, inner } = sortedOverQuietMemory()
+    const { events, badNews } = heardOf(vaultDB)
+    expect(await vaultDB.tryGetWorldOnce()).to.deep.include({ ok: true, act: 'got' })
+    expect(shorthandsOf(events)).to.deep.equal([...voidSeen('bank'), ...voidSeen('gate'), ...voidSeen('box')])
+    await inner.tryBirthBank(TH.birthBankAskOf())
+    expect(await vaultDB.tryGetWorldOnce()).to.deep.include({ ok: true, act: 'got' })
+    expect(shorthandsOf(events.slice(6))).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ...firstSeen('box')])
     expect(badNews).to.deep.equal([])
   })
 

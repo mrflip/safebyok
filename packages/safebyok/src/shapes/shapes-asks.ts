@@ -5,12 +5,12 @@ import { CX, EX, SX, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { type Lifetok, Labelpath, Lifeseq } from './primitives'
 import {
-  type BankRecord, type BoxRecord, type GateRecord, type ThingCited, type ThingRecord, type ThingScope, type Thingkind,
+  type BankRecord, type BoxRecord, type GateRecord, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, type VoidSentinel,
   PerKindChecks, Shell, ThingChecks, policiesByModelkind,
 } from './shapes-thing'
 import * as Throwers from '../refusals/throwers'
 
-// == [Asks]: RawChecks, loggableAsk, AskChecks, Track, VoidTrack, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, WorldRecord, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
+// == [Asks]: RawChecks, loggableAsk, AskChecks, Track, VoidTrack, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, GetWorldAsk, WorldRoots, ThingWatchScope, WorldRecord, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
 type Kinded   = { modelkind: Thingkind, labelpath: Labelpath }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
@@ -58,6 +58,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof,
       .refine(isDelFixed,     Phrases.DelFlagsFixed)
       .refine(isPolicyOwn,    Phrases.PolicyNotOwn),
     birthBankAsk:    obj({ userid: user_id, banklabel: label, op: lit('birth'), bank: unk, gate: unk, root: unk, track, banktok }).strict(),
+    getWorldAsk:     obj({ userid: user_id, banklabel: label, op: lit('getworld'), track, banktok: anyBanktok }).strict(),
     thingWatchScope,
     watchArgs:       obj({ scope: thingWatchScope, onNotice: fn(), onBadNews: fn() }),
   }
@@ -70,7 +71,7 @@ const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => 
   const citedFields = ThingChecks.thingCited.partial()
   const trackFields = obj({ revseq: ThingChecks.thingCited.shape.revseq, lifepath: ThingChecks.thingCited.shape.lifepath }).partial()
   return {
-    op:        oneof(['get', 'list', 'put', 'del', 'birth']).optional(),
+    op:        oneof(['get', 'list', 'put', 'del', 'birth', 'getworld']).optional(),
     modelkind: oneof(ThingChecks.thingkindVals).optional(),
     userid:    user_id.optional(),
     banklabel: label.optional(),
@@ -90,7 +91,7 @@ const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => 
 
 /** The checks of a vaultDB ask, its records aside, of a watch's scope and handlers, and of the part of an ask that is safe to log.
  * A write or birth ask's records are checked by {@link checkedWriteAsk} and {@link checkedBirthBankAsk}.
- * Every ask carries `banktok`, the lifetok its sender has of the bank's life: a vaultDB checks it, and nothing more. Only a get may carry the void lifetok.
+ * Every ask carries `banktok`, the lifetok its sender has of the bank's life: a vaultDB checks it, and nothing more. Only a get, of a Thing or of the world, may carry the void lifetok.
  */
 export const AskChecks = Object.freeze({ ...RawChecks, loggableAsk })
 
@@ -126,8 +127,12 @@ export type WriteAsk<RecordT extends ThingRecord = ThingRecord> = Extract<BankWr
 export type BankRoots       = Readonly<{ bank: BankRecord, gate: GateRecord, root: BoxRecord }>
 /** An ask to write a new bank's first Things in one step: the bank, its main gate and its root box. */
 export type BirthBankAsk    = Readonly<Omit<Z.infer<typeof AskChecks.birthBankAsk>, keyof BankRoots> & BankRoots>
-/** Any ask a vaultDB answers: a get, a list, a put or del, or a birth. */
-export type AnyAsk          = GetAsk | ListAsk | WriteAsk | BirthBankAsk
+/** An ask for a bank's three roots, read in one step. */
+export type GetWorldAsk     = Readonly<Z.infer<typeof AskChecks.getWorldAsk>>
+/** A bank's three roots as one step read them: each the whole record stored, live or a tombstone, or the shell where none is stored. */
+export type WorldRoots      = Readonly<{ bank: BankRecord | VoidSentinel, gate: GateRecord | VoidSentinel, root: BoxRecord | VoidSentinel }>
+/** Any ask a vaultDB answers: a get, a list, a put or del, a birth, or a get of the world. */
+export type AnyAsk          = GetAsk | ListAsk | WriteAsk | BirthBankAsk | GetWorldAsk
 /** The three puts of a bank's birth, one for each root. */
 export type BirthPuts       = readonly [BankWriteAsk, GateWriteAsk, BoxWriteAsk]
 /** The scope of a watch: a bank. */

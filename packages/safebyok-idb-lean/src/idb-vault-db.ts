@@ -3,7 +3,7 @@
 import type { UseStore } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
 import type {
-  ActualBeside, AnyAsk, BirthBankActual, BirthBankAsk, BirthPuts, GetAsk, GotActual, ListAsk, ListThingsActual, Received, ThingWatchScope, VaultError, WriteAsk, WroteActual,
+  ActualBeside, AnyAsk, BirthBankActual, BirthBankAsk, BirthPuts, GetAsk, GetWorldActual, GetWorldAsk, GotActual, ListAsk, ListThingsActual, Received, ThingWatchScope, VaultError, WriteAsk, WroteActual,
 } from 'safebyok/storage'
 import { bellnameOf, childrenIn, shelfOf, thingScopepathOf } from './vault-shelf'
 
@@ -81,7 +81,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   }
   // --
 
-  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doWatch
+  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doWatch
 
   // Each call is one IndexedDB transaction. It fetches the Things the ask depends on, classifies the ask against them, and
   // on a write act writes the ask's records and reads them back, with the world after, before the transaction ends.
@@ -127,6 +127,10 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
       this.#ring(Object.values(actual.things).map((record) => ({ scope: ask, received: { record, world } })))
     }
     return actual
+  }
+
+  protected async doGetWorld(ask: GetWorldAsk): Promise<GetWorldActual> {
+    return await DB.inOneStep(this.#shelf, 'readonly', async (store) => this.classifyGetWorld(ask, await rootsFetchedIn(store, ask)))
   }
 
   protected override doWatch(scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: VaultError) => void): () => void {

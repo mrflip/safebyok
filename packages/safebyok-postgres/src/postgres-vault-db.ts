@@ -2,11 +2,11 @@
 
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- a devDependency while PostgresVaultDB is not exported
 import {
-  type AnyAsk, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetAsk, type GotActual, type ListThingsActual, type ListAsk,
+  type AnyAsk, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldActual, type GetWorldAsk, type GotActual, type ListThingsActual, type ListAsk,
   type Received, type ThingWatchScope, type VaultError, type WriteAct, type WriteAsk, type WroteActual, AdapterVaultDB, Classifier, Shell, VoidLifeTok, VoidTrack, getAskOf, isVaultError, objCheck, readTcNow,
 } from 'safebyok/storage'
 import { type PostgresListen, type PostgresQueryable, jsonOrNull, listenOrNull, refusalOf, storedNothing, unlistenOnceListening } from './postgres-bank-db'
-import { BirthRootsSql, GetThingSql, ListThingsSql, WriteThingSql } from './vault-queries'
+import { BirthRootsSql, GetThingSql, GetWorldSql, ListThingsSql, WriteThingSql } from './vault-queries'
 
 // == [The driver]: PostgresVaultDBOpts, isPostgresQueryable
 
@@ -122,7 +122,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
   }
   // --
 
-  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doWatch
+  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doWatch
 
   protected async doGetThing(ask: GetAsk): Promise<GotActual> {
     const { thing, ...above } = await this.#fetchThing(ask)
@@ -176,6 +176,13 @@ export class PostgresVaultDB extends AdapterVaultDB {
     const unwritten = Classifier.unwrittenBirthOf(puts, { ...written, read_tc })
     if (unwritten === null) { throw storedNothing() }
     return unwritten
+  }
+
+  protected async doGetWorld(ask: GetWorldAsk): Promise<GetWorldActual> {
+    const { userid, banklabel } = ask
+    const read_tc = readTcNow()
+    const { world, root, tracked } = await this.#firstRow<{ world: WorldRow, root: unknown, tracked: Classifier.TrackedFetched }>(GetWorldSql, [userid, banklabel, trackParam(ask)])
+    return this.classifyGetWorld(ask, { bank: world.bank, gate: world.maingate, root, tracked, read_tc })
   }
 
   // The order and timing of an *adapter*'s notifications relative to reads, writes, or other notifications is unspecified, even for datastores that provide assurance.

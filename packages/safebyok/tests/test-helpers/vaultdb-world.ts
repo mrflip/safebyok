@@ -12,7 +12,7 @@ import { SX } from 'safebyok-big/internals'
 import { VacantAgerank, itemSeenOf, readTcNow } from '../../src/storage/agerank'
 import { PlainThing } from './plain-thing'
 import { WayinChecks } from '../../src/shapes/shapes-wayin'
-import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, VoidTrack, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
+import { type BirthBankAsk, type CitedOf, type GetAsk, type GetWorldAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, VoidTrack, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { FirstLifetok, FirstRevtok, T0, revtokOf } from './models-world'
 
 /** The bank the Things stand in. */
@@ -149,6 +149,11 @@ export function listAskAt(labelpath: Labelpath): ListAsk { return listAskOf({ ..
 /** The ask that births {@link ThingBank} with its three roots, each at revision 0 of life 0, with `overrides` laid over it. */
 export function birthBankAskOf(overrides: Partial<BirthBankAsk> = {}): BirthBankAsk {
   return { ...ThingBank, op: 'birth', bank: bankThingOf(), gate: gateThingOf(), root: rootBoxOf(), ...SenderKnows, ...overrides }
+}
+
+/** The ask that gets {@link ThingBank}'s three roots, with `overrides` laid over it. */
+export function getWorldAskOf(overrides: Partial<GetWorldAsk> = {}): GetWorldAsk {
+  return { ...ThingBank, op: 'getworld', ...SenderKnows, ...overrides }
 }
 
 /** The track of a sender with the main gate of another life. */

@@ -4,12 +4,12 @@ import { sortBy } from 'es-toolkit'
 import { CX, EX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/internals'
 import { policyRefusalOf } from './policies'
 import { Labelpath } from '../shapes/primitives'
-import type { BirthBankActual, DamagedThing, GotActual, KidEntry, Kids, ListThingsActual, WroteActual } from '../shapes/shapes-answers'
+import type { BirthBankActual, DamagedThing, GetWorldActual, GotActual, KidEntry, Kids, ListThingsActual, WroteActual } from '../shapes/shapes-answers'
 import type { ReadTc } from '../shapes/shapes-vault-event'
 import { type BoxSparse, type StoredCited, type ThingCited, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
 import { BaseThing } from '../models/base-thing'
-import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
+import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type GetWorldAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WorldRoots, type WriteAsk } from '../shapes/shapes-asks'
 import * as Throwers from '../refusals/throwers'
 
 // == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeMismatch
@@ -175,7 +175,7 @@ export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): ThingR
   return writtenThingOf(scopeReport.data, raw)
 }
 
-/** The raw bank, main gate and root box a concrete adapter fetched for a bank's birth, each null for none, its {@link TrackedFetched}, and when it read them (`readTcNow`). */
+/** The raw bank, main gate and root box a concrete adapter fetched for a bank's birth or a get of its world, each null for none, its {@link TrackedFetched}, and when it read them (`readTcNow`). */
 export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: unknown, tracked: TrackedFetched, read_tc: ReadTc }>
 
 // Every step reads its bank's world, so when it read the world is the step's `read_tc`.
@@ -254,10 +254,10 @@ function trackedEntryOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>
 }
 // --
 
-// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, listedOf, isChildLabelpath, kidsOf, classifyBirthBank
+// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, listedOf, isChildLabelpath, kidsOf, classifyBirthBank, classifyGetWorld, rootStoredOf
 // Each is given the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`, with when it read them;
-// a get and a write are given the nearest Thing stored above the ask's scope; a birth is given the bank's three roots, and,
-// where it is born, reports the world its puts wrote.
+// a get and a write are given the nearest Thing stored above the ask's scope; a birth and a get of the world are given the
+// bank's three roots, and a birth, where it is born, reports the world its puts wrote.
 
 /** Classify a get against the raw Thing a concrete adapter fetched at its scope, null for none, and what it fetched above it in the same step.
  * Where none is stored, the report's `record` is the shell there, under the nearest Thing stored above it.
@@ -349,6 +349,23 @@ export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): B
   const things = { bank: bankPut.record, gate: gatePut.record, root: rootPut.record }
   const tracked = trackedOf(bankPut, trackedFetchedOf(bankPut, { bank: things.bank, [Labelpath.MainGate]: things.gate, [Labelpath.RootBox]: things.root }))
   return { ok: true, act: 'born', world: { ...things.bank, maingate: things.gate }, tracked, read_tc: fetched.read_tc, things }
+}
+
+/** Classify a get of the world against the raw roots a concrete adapter fetched: each root checked, or the shell where none is stored. A root that fails its checks refuses the ask. */
+export function classifyGetWorld(ask: GetWorldAsk, fetched: BankRootsFetched): GetWorldActual {
+  const { userid, banklabel } = ask
+  const things: WorldRoots = {
+    bank: rootStoredOf(BankChecks.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank),
+    gate: rootStoredOf(GateChecks.stored, { userid, banklabel, labelpath: Labelpath.MainGate }, fetched.gate),
+    root: rootStoredOf(BoxChecks.stored,  { userid, banklabel, labelpath: Labelpath.RootBox }, fetched.root),
+  }
+  return { ok: true, act: 'got', world: worldOf(ask, { bank: fetched.bank, maingate: fetched.gate }), tracked: trackedOf(ask, fetched.tracked), read_tc: fetched.read_tc, things }
+}
+
+// A root has nothing above it, so where none is stored its shell stands alone.
+/** The root stored at `scope`, checked by `check`, or the shell there for none. */
+function rootStoredOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>, scope: ThingScope, raw: unknown): RecordT | VoidSentinel {
+  return storedOf(check, scope, raw) ?? Shell.under(scope, null)
 }
 // --
 

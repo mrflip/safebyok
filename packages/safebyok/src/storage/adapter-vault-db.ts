@@ -8,11 +8,11 @@ import type { ThingRecord, VoidSentinel } from '../shapes/shapes-thing'
 import type { TombstoneOf } from '../shapes/shapes-sealers'
 import { type ReadTc, type VaultEvent, type VaultItemEvent, VaultDBSourcelabel } from '../shapes/shapes-vault-event'
 import {
-  type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
+  type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
 } from '../shapes/shapes-asks'
 import {
-  type Actual, type ActualBeside, type Answer, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type GetThingAnswer, type GotActual, type ListThingsActual, type ListThingsAnswer, type Received, type WriteThingAnswer,
-  type WroteActual, ActualChecks,
+  type Actual, type ActualBeside, type Answer, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type GetThingAnswer, type GetWorldActual, type GetWorldAnswer, type GotActual, type ListThingsActual, type ListThingsAnswer,
+  type Received, type WriteThingAnswer, type WroteActual, ActualChecks,
 } from '../shapes/shapes-answers'
 import { VacantAgerank, itemSeenOf, readTcNow } from './agerank'
 import type { AboveFetched, BankRootsFetched, ThingsFetched, WorldFetched } from './thing-classifier'
@@ -83,7 +83,7 @@ function itemEventOf(record: ThingRecord, world: WorldRecord | null): VaultItemE
  */
 export abstract class AdapterVaultDB implements VaultDB {
 
-  // == [Classifying]: classifyGetThing, classifyWriteThing, classifyListThings, classifyBirthBank
+  // == [Classifying]: classifyGetThing, classifyWriteThing, classifyListThings, classifyBirthBank, classifyGetWorld
   // A subclass's `do*` calls these. A concrete adapter that reaches some of the verdict itself overrides them to read it. Each
   // is given the raw bank and main gate of the ask's bank, fetched in the same step, as its world; a get and a write, also
   // the nearest Thing stored above the ask's scope ({@link AboveFetched}).
@@ -99,10 +99,13 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** Classify a bank's birth, by its three puts, against its raw bank, main gate and root box, each null for none. */
   protected classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual { return Classifier.classifyBirthBank(puts, fetched) }
+
+  /** Classify a get of the world against its raw bank, main gate and root box, each null for none. */
+  protected classifyGetWorld(ask: GetWorldAsk, fetched: BankRootsFetched): GetWorldActual { return Classifier.classifyGetWorld(ask, fetched) }
   // --
 
 
-  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, watch
+  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetWorld, watch
   // Each verb's body is the plain path. Every throw in it lands in `answerForThrown`.
 
   /** The Thing at `ask`'s scope ({@link VaultDB.tryGetThing}). */
@@ -151,6 +154,16 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { return this.answerForThrown(err, 'birthBank', ask) }
   }
 
+  /** The bank's three roots, read in one step ({@link VaultDB.tryGetWorld}). */
+  async tryGetWorld(ask: GetWorldAsk): Promise<GetWorldAnswer> {
+    try {
+      const worldAsk    = AskChecks.getWorldAsk.parse(ask)
+      const loggableAsk = loggableAskOf(worldAsk)
+      const actual      = await this.doGetWorld(worldAsk)
+      return frozenAnswerOf<GetWorldAnswer>({ ok: true, ask: loggableAsk, act: actual.act, ...besideOf(actual), val: actual.things })
+    } catch (err) { return this.answerForThrown(err, 'getWorld', ask) }
+  }
+
   /** Watch a bank's Things ({@link VaultDB.watch}): each notice is of a Thing the datastore reports changing, read when it arrives.
    * Records a datastore pushes together are notified one at a time.
    * A Thing that fails its checks or belongs to another bank goes to `onBadNews` instead of `onNotice`, as does an error `onNotice` throws.
@@ -193,7 +206,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
   // --
 
-  // == [Protected, for a subclass to write]: doGetThing, doWriteThing, doListThings, doBirthBank, doWatch
+  // == [Protected, for a subclass to write]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doWatch
   // Each is one atomic step: fetch the Thing at the ask's scope, classify it, and when `isWriteAct(act)` is true, write
   // `ask.record` and report the Thing the datastore reports writing, checked by `writtenThingOf`, in place of the one
   // fetched. A datastore that can run code of its own may run the whole step there. The step also compares the ask's `track`
@@ -229,6 +242,8 @@ export abstract class AdapterVaultDB implements VaultDB {
    * write each put's record and report the three as written, checked by `writtenRootsOf`, and the world the bank and main gate make.
    */
   protected abstract doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Helpers.Awaitable<BirthBankActual>
+  /** In one step, the same atomic unit as a get's: fetch the raw bank, main gate and root box, and return `this.classifyGetWorld(ask, fetched)`. */
+  protected abstract doGetWorld(ask: GetWorldAsk): Helpers.Awaitable<GetWorldActual>
   /** Start watching the datastore: call `receive` with each changed Thing, one at a time ({@link Received}), and `onBadNews` with any trouble,
    * whether or not it ends the watch. Return a function that stops it. Left unwritten, for a datastore with no watch, it calls neither.
    */

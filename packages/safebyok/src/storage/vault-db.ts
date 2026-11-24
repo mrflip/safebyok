@@ -1,8 +1,8 @@
 /** The `VaultDB` interface the models call. Its answers, and what a concrete adapter reports to `AdapterVaultDB`, are in shapes-answers. */
 
 import type { Errors } from 'safebyok-big/internals'
-import type { BirthBankAsk, GetAsk, ListAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
-import type { BirthBankAnswer, GetThingAnswer, ListThingsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
+import type { BirthBankAsk, GetAsk, GetWorldAsk, ListAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
+import type { BirthBankAnswer, GetThingAnswer, GetWorldAnswer, ListThingsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import type { VaultEvent } from '../shapes/shapes-vault-event'
 
 // == [The interface]: VaultDB, VaultDBMembernames, isVaultDB
@@ -27,6 +27,8 @@ export interface VaultDB {
   tryListThings(ask: ListAsk): Promise<ListThingsAnswer>
   /** Write a new bank's three roots (bank, main gate, root box), or answer the roots already stored. */
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
+  /** A bank's three roots (bank, main gate, root box), read in one step: each live, a tombstone, or the shell where none is stored. */
+  tryGetWorld(ask: GetWorldAsk): Promise<GetWorldAnswer>
   /** Watch a bank's Things, returning a function that stops the watch.
    * `onBadNews` gets any trouble the watch meets, including a Thing that fails its checks.
    * What a watcher is notified of is the vaultDB's own to say: an `AdapterVaultDB` notifies each change its datastore
@@ -37,7 +39,7 @@ export interface VaultDB {
 
 /** The members of {@link VaultDB} that are functions. */
 const VaultDBMembernames = [
-  'tryGetThing', 'tryWriteThing', 'tryListThings', 'tryBirthBank', 'watch',
+  'tryGetThing', 'tryWriteThing', 'tryListThings', 'tryBirthBank', 'tryGetWorld', 'watch',
 ] as const satisfies readonly (keyof VaultDB)[]
 
 /** True for an object with a function for each member of {@link VaultDB}. */

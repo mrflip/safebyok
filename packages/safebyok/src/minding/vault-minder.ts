@@ -4,7 +4,7 @@ import { once } from 'es-toolkit'
 import { Clock, Errors, SX } from 'safebyok-big/internals'
 import { type Lifetok, Labelpath, Lifeseq } from '../shapes/primitives'
 import {
-  type AnyAsk, type BirthBankAsk, type CitedOf, type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type Tracked, type WorldRecord, type WriteAsk,
+  type AnyAsk, type BirthBankAsk, type CitedOf, type DelAskDraft, type GetAsk, type GetWorldAsk, type ListAsk, type PutAskDraft, type Track, type Tracked, type WorldRecord, type WriteAsk,
   delAskOf, getAskOf, listAskOf, putAskOf,
 } from '../shapes/shapes-asks'
 import type { BankAskDraft } from '../shapes/shapes-bankish'
@@ -16,7 +16,7 @@ import * as Throwers from '../refusals/throwers'
 import { BaseThing } from '../models/base-thing'
 import { VacantAgerank, itemSeenOf } from '../storage/agerank'
 import { refusedAnswerOf } from '../storage/refused-answer'
-import type { BadAnswer, BirthBankAnswer, GetThingAnswer, Kids, ListThingsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
+import type { BadAnswer, BirthBankAnswer, GetThingAnswer, GetWorldAnswer, Kids, ListThingsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import type { VaultDB } from '../storage/vault-db'
 
 // == [VaultMinder]: Dispatch, Listening, Told, VaultMinder
@@ -30,7 +30,7 @@ type Listening = Readonly<{ listener: VaultMinderListener }>
 /** A vaultDB's answer, its records told, and the refusal the record it carries at the ask's labelpath raised, or null. */
 type Told<AnswerT> = Readonly<{ answer: AnswerT, refusal: Errors.VaultError | null }>
 
-/** A vaultDB's four verbs over another vaultDB, for one bank, telling its listeners each record it learns of that is news, in order.
+/** A vaultDB's verbs over another vaultDB, for one bank, telling its listeners each record it learns of that is news, in order.
  * It learns of the records each answer carries, of what the wrapped vaultDB's watch notifies, and of the events a device database rings, handed to its `receive`.
  * It keeps a Thing for each labelpath it learns of a record at, for as long as it lives, and each Thing's `receive` says what is news.
  * Beside each Thing it keeps the refusal the Thing last raised at a record, for a devtool: {@link carAt}.
@@ -73,7 +73,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   }
   // --
 
-  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank
+  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetWorld
   // Each verb refuses an ask of another bank, by its userid and banklabel, and hands any other to the wrapped vaultDB, which
   // checks the rest, its banktok among it, and answers a refusal rather than throwing. Each returns that answer unchanged.
   // The records it carries are told first, out to in, at the answer's read_tc.
@@ -120,15 +120,29 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return answer
   }
 
+  /** {@link VaultDB.tryGetWorld}: the three roots it answers are told in root order, the shell where none is stored. */
+  async tryGetWorld(ask: GetWorldAsk): Promise<GetWorldAnswer> {
+    try { this.#checkOwnAsk(ask) } catch (err) { return refusedAnswerOf(ask, err) }
+    const answer = await this.#vaultDB.tryGetWorld(ask)
+    this.#tellAnswer(answer, rootsOf(answer), worldRootsOf(answer))
+    return answer
+  }
+
   /** Refuse an ask of another bank than this vaultDB's */
   #checkOwnAsk(ask: AnyAsk): void { ThingChecks.bankScope.parseConsistent(ask, this.#scope) }
   // --
 
-  // == [Once verbs]: tryGetOnce, getOnce, tryListOnce, listOnce, tryPutOnce, putOnce, tryDelOnce, delOnce
+  // == [Once verbs]: tryGetWorldOnce, tryGetOnce, getOnce, tryListOnce, listOnce, tryPutOnce, putOnce, tryDelOnce, delOnce
   // Each sends the wrapped vaultDB one ask of this bank's, and answers once the records the answer carries are told. Each
   // `try` form answers the vaultDB's whole answer, a refusal included, unless the record it carries at the ask's labelpath
   // is refused as it is told: then it answers that refusal. The other form throws the refusal, and `getOnce` refuses too
   // where the Thing is known only sparse in its newest life.
+
+  // A get of the world has no labelpath of its own: a root refused as it is told reaches each listener's onBadNews alone.
+  /** Get this bank's three roots once, in one step. */
+  async tryGetWorldOnce(): Promise<GetWorldAnswer> {
+    return await this.tryGetWorld({ ...this.#scope, op: 'getworld', ...this.#bankFields() })
+  }
 
   /** Get the Thing at `scoped`, of this bank, once. */
   async tryGetOnce(scoped: ThingScope): Promise<GetThingAnswer> {
@@ -415,7 +429,7 @@ function ownRefusedAnswerOf(answer: GetThingAnswer | WriteThingAnswer, err: Erro
 }
 // --
 
-// == [Records of an answer]: rootsOf, bankOfWorld, gotRecordsOf, writtenRecordsOf, listedRecordsOf, bornRecordsOf
+// == [Records of an answer]: rootsOf, bankOfWorld, gotRecordsOf, writtenRecordsOf, listedRecordsOf, bornRecordsOf, worldRootsOf
 
 // The world and tracked of one step agree, so a root they both carry is told once: its Thing drops the second.
 // Unspecified for a missing or damaged row: notes/wontfix.md.
@@ -452,6 +466,12 @@ function listedRecordsOf(answer: ListThingsAnswer): SeenThing[] {
 
 /** The records a birth's `answer` carries of its own: the three roots, or a refusal's dbhas, none where the verb threw. */
 function bornRecordsOf(answer: BirthBankAnswer): SeenThing[] {
+  if (answer.ok) { return [answer.val.bank, answer.val.gate, answer.val.root] }
+  return (answer.dbhas === null) ? [] : [answer.dbhas]
+}
+
+/** The records a get of the world's `answer` carries of its own: the three roots, each the shell where none is stored, or a refusal's dbhas, none where the verb threw. */
+function worldRootsOf(answer: GetWorldAnswer): SeenThing[] {
   if (answer.ok) { return [answer.val.bank, answer.val.gate, answer.val.root] }
   return (answer.dbhas === null) ? [] : [answer.dbhas]
 }

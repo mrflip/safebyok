@@ -5,10 +5,10 @@ import { CX, type EX, type Errors, Validator } from 'safebyok-big/internals'
 import type { Labelpath, Lifepath, Lifeseq, Lifetok } from './primitives'
 import type { ThingRecord, ThingScope, VoidSentinel } from './shapes-thing'
 import type { SparseOf, TombstoneOf } from './shapes-sealers'
-import type { BankRoots, LoggableAsk, Tracked, WorldRecord } from './shapes-asks'
+import type { BankRoots, LoggableAsk, Tracked, WorldRecord, WorldRoots } from './shapes-asks'
 import { type ReadTc, SeenChecks } from './shapes-vault-event'
 
-// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer
+// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer, GetWorldAnswer
 // No check reads an answer whole: `AdapterVaultDB` makes each of parts it has checked, and a reader checks each record it
 // keeps where a Thing takes it.
 
@@ -89,9 +89,12 @@ export type ListThingsAnswer<RecordT extends ThingRecord = ThingRecord> =
 
 /** The answer to `tryBirthBank`: the three roots written (`born`), or found already stored (`passed`). Refused, its `dbhas` is the root stored that refused it. */
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
+
+/** The answer to `tryGetWorld`: the bank's three roots ({@link WorldRoots}), under the act `got`. Only a verb that threw refuses it. */
+export type GetWorldAnswer = Answer<WorldRoots, 'got'>
 // --
 
-// == [Pre-image of an answer]: ActualChecks, ActualBeside, Actual, GotActual, WroteActual, ListThingsActual, BirthBankActual, Received
+// == [Pre-image of an answer]: ActualChecks, ActualBeside, Actual, GotActual, WroteActual, ListThingsActual, BirthBankActual, GetWorldActual, Received
 // What a concrete adapter reports, carrying the actual values stored: `AdapterVaultDB` makes the answer from it.
 
 /** True for null or a plain object */
@@ -150,6 +153,9 @@ export type BirthBankActual = ActualBeside & (
   | { ok: true,  act: 'born' | 'passed', things: BankRoots }
   | { ok: false, act: EX.RefusedAct,     record: ThingRecord | VoidSentinel }
 )
+
+/** A concrete adapter's report of a get of the world: the bank's three roots, each the Thing stored or the shell where none is. */
+export type GetWorldActual = ActualBeside & { ok: true, act: 'got', things: WorldRoots }
 
 /** A change a concrete adapter's `doWatch` passes to `receive`: the changed Thing, raw, and its bank's world as the datastore last read it.
  * Watchers are notified of the Thing alone, with the world's lifetok: a bank or main gate that changed is a change of its own.

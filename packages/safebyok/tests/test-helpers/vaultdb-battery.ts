@@ -13,6 +13,7 @@ import { describeVaultDBBirths } from './vaultdb-battery-births'
 import { describeVaultDBWatch } from './vaultdb-battery-watch'
 import { describeVaultDBWorld } from './vaultdb-battery-world'
 import { describeVaultDBTracked } from './vaultdb-battery-tracked'
+import { describeVaultDBGetWorld } from './vaultdb-battery-getworld'
 
 // == [The hooks a vaultDB hands the battery]: VaultDBRowCheats, BatteryVaultDB, VaultDBBatteryOpts
 
@@ -24,7 +25,7 @@ export type VaultDBRowCheats = {
   remove: (scope: ThingScope) => Helpers.Awaitable<void>
 }
 
-/** What the battery runs over: a vaultDB, or a `VaultMinder`, which answers the four verbs and has no watch. */
+/** What the battery runs over: a vaultDB, or a `VaultMinder`, which answers the same verbs and has no watch. */
 export type BatteryVaultDB = Omit<VaultDB, 'watch'>
 
 /** The options of {@link describeVaultDBBattery}: how to make a vaultDB, and the cheat into what it stores. */
@@ -108,6 +109,7 @@ export function describeVaultDBBattery<DBT extends BatteryVaultDB>(label: string
     describeVaultDBWrites(world)
     describeVaultDBLists(world)
     describeVaultDBBirths(world)
+    describeVaultDBGetWorld(world)
     describeVaultDBWorld(world)
     describeVaultDBTracked(world)
     if (world.watches) { describeVaultDBWatch(world) }
