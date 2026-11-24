@@ -236,16 +236,16 @@ function cachePrecisOf(world: TSQWorld<MemoryVaultDB>): CachePrecis {
 }
 
 // An item's staleness depends on its route only through `isInvalidated`, which a fetch clears: an observer's word is the rule's.
-/** Each way `world`'s item breaks the rules an item with data keeps: it is its Thing's own record, and stale just while the Thing is not here. */
+/** Each way `world`'s item breaks the rules an item with data keeps: it deeply equals its Thing's record, and is stale just while the Thing is not here. */
 function endFaultsOf(world: TSQWorld<MemoryVaultDB>): string[] {
   const thing = world.sorted.thingAt(TH.BoxScope)
   const item  = itemQueryAt(world)?.state.data
   if ((item === undefined) || (thing === undefined)) { return [] }
   const isStale  = isObservedStale(world.queryClient, BoxKey)
-  const isHeld   = (item === null) || (item === thing.pickle())
+  const isHeld   = (item === null) || isEqual(item, thing.pickle())
   const isRuled  = isStale === (thing.agekind !== 'here')
   return [
-    ...(isHeld ? [] : ["the item is not its Thing's own record"]),
+    ...(isHeld ? [] : ["the item differs from its Thing's record"]),
     ...(isRuled ? [] : [`the item is ${isStale ? 'stale' : 'fresh'} while its Thing is ${String(thing.agekind)}`]),
   ]
 }

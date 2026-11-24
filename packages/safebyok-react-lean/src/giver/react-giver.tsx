@@ -368,7 +368,7 @@ function makeBankGiver(friend: BankFriend) {
   }
 
   // Left with no queryFn, a query of the box's item fetches by the vault TSQ's default under the bank's key, which gets the
-  // box and answers what its Thing then holds. Its staleness, retries and structural sharing are the vault TSQ's defaults too.
+  // box and answers what its Thing then holds. Its staleness and retries are the vault TSQ's defaults too, and its structural sharing TanStack's.
   /** {@link boxQueryOf}, less its `select`. */
   function boxQueryBaseOf(device: Device | null, labelpath: string, isFetchable: boolean): Pick<UseQueryOptions<BoxShown>, 'queryKey' | 'queryFn' | 'initialData' | 'initialDataUpdatedAt'> {
     const boxLabelpath = boxLabelpathOf(labelpath)

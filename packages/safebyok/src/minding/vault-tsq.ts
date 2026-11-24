@@ -22,9 +22,10 @@ import { bankKeyHeadOf, labelsOf } from './query-keys'
 // The writer, `#hear`, is the only code that changes an item or a listing: the queryFns answer what the Thing holds,
 // and nothing here acts on a query's success.
 /** One bank's vault TSQ: its boxes under the root box, as items, and their listings, in a client it is handed.
- * An item is the box's own frozen record, the same object its Thing holds, or null where none is stored live. Once the box
- * is known only sparse in a newer life than the item holds, the item is null; a box known only sparse from the first has
- * no data. An item is stale while a newer revision is known only sparse.
+ * An item is the box's live record, deep-equal to the one its Thing holds, or null where none is stored live. Across
+ * revisions, a part of the record left unchanged stays the same object. Once the box is known only sparse in a newer life
+ * than the item holds, the item is null; a box known only sparse from the first has no data. An item is stale while a
+ * newer revision is known only sparse.
  * A listing is the kids value a list last answered, kept while nothing observes it, and invalidated once a child's life changes.
  * Its queries never retry, and run whether or not the browser reports itself online.
  */
@@ -56,9 +57,8 @@ export class VaultTSQ {
     queryClient.setQueryDefaults(bankHead, BankDefaults)
     queryClient.setMutationDefaults(bankHead, BankDefaults)
     queryClient.setQueryDefaults([...bankHead, Itemkind], {
-      queryFn:           async ({ queryKey }) => await this.#itemOf(labelpathOfItemKey(queryKey)),
-      staleTime:         ({ queryKey }) => ((this.#vaultMinder.thingAt(this.#scopeOf(labelpathOfItemKey(queryKey)))?.agekind === 'here') ? Infinity : 0),
-      structuralSharing: frozenOrSharedOf,
+      queryFn:   async ({ queryKey }) => await this.#itemOf(labelpathOfItemKey(queryKey)),
+      staleTime: ({ queryKey }) => ((this.#vaultMinder.thingAt(this.#scopeOf(labelpathOfItemKey(queryKey)))?.agekind === 'here') ? Infinity : 0),
     })
     // A listing is kept nowhere but its query, so it stays while no one observes it.
     queryClient.setQueryDefaults([...bankHead, Listkind], {
@@ -170,7 +170,7 @@ export class VaultTSQ {
       return
     }
     if (event.liveness === 'soon') { return }
-    // The record the Thing holds, not the event's: a revision seen again keeps the object it had.
+    // The record the Thing holds, as the item's queryFn answers it.
     const record = (event.liveness === 'full') ? this.#vaultMinder.thingAt(this.#scopeOf(event.labelpath))?.pickle() : null
     this.#queryClient.setQueryData(queryKey, record, setDataOptionsOf(event.read_tc))
   }
@@ -208,7 +208,7 @@ export class VaultTSQ {
 }
 // --
 
-// == [Helpers]: Itemkind, Listkind, LabelsIdx, BankDefaults, frozenOrSharedOf, setDataOptionsOf, isItemLabelpath, itemValOf, labelpathOfItemKey, labelpathOfListKey
+// == [Helpers]: Itemkind, Listkind, LabelsIdx, BankDefaults, setDataOptionsOf, isItemLabelpath, itemValOf, labelpathOfItemKey, labelpathOfListKey
 
 /** The kind segment of an item's query key. */
 const Itemkind = 'item'
@@ -221,15 +221,6 @@ const LabelsIdx = 4
 // its caller. A retry would put a whizbang in the critical path of a primitive operation (CLAUDE.md).
 /** The query and mutation defaults under the bank's key. */
 const BankDefaults = Object.freeze({ networkMode: 'always', retry: false } as const)
-
-// TanStack shares structure through this both between an item's values and between what a host's `select` returns from
-// them. An item's value is its Thing's own frozen record, or null, whose identity already changes only with the record;
-// so does a part of it, or a primitive, which a `select` may return. A new object a `select` makes each run is shared
-// with the last, so that an observer is told, and a host's memos run, only when what it selects changes.
-/** Structural sharing for an item: a frozen value or a primitive as it is, anything else shared with `prior` by TanStack's default, `replaceEqualDeep`. */
-function frozenOrSharedOf(prior: unknown, next: unknown): unknown {
-  return Object.isFrozen(next) ? next : TSQ.replaceEqualDeep(prior, next)
-}
 
 /** The options that date an item set from an event read at `read_tc`, or none where it was not said. */
 function setDataOptionsOf(read_tc: ReadTc | undefined): TSQ.SetDataOptions {

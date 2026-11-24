@@ -199,7 +199,7 @@ describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
     expect(err).to.be.undefined
     expect(box).to.equal(boxAt(vault))
     expect(box).to.include({ labelpath: Openai, revseq: 0, am: 'a' })
-    expect(itemAt(vault)).to.equal(box!.pickle())
+    expect(itemAt(vault)).to.deep.equal(box!.pickle())
   })
 
   it("writes a put ask over the box it was given, cited sparse, in its bank's scope, tracking its roots", async () => {
@@ -237,7 +237,7 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
     const { vault } = await TH.buildBornVault()
     const box = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     expect(box).to.include({ labelpath: Openai, revseq: 0, am: 'a' })
-    expect(itemAt(vault)).to.equal(box.pickle())
+    expect(itemAt(vault)).to.deep.equal(box.pickle())
     expect(await vault.unsealBox(TH.livePickleOf(box))).to.deep.include({ whisper: TH.Whisper, sidecar: TH.Sidecar })
   })
 
@@ -247,7 +247,7 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
     const next = await vault.putBoxOnce(Openai, {}, { whisper: { apiKey: 'sk-test-1111' } })
     expect(next).to.include({ revseq: 1 })
     expect(next.sidecar).to.deep.equal(TH.Sidecar)
-    expect(itemAt(vault)).to.equal(next.pickle())
+    expect(itemAt(vault)).to.deep.equal(next.pickle())
   })
 
   it("given a labelpath this device has seen nothing of, gets the newest revision to write over", async () => {
