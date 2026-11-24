@@ -14,11 +14,11 @@ export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, typ
 export { type Adoptable, Thing } from './models/thing'
 export {
   type AnyAsk, type BankRoots, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAskDraft, type GetAsk, type ListAskDraft,
-  type ListAsk, type LoggableAsk, type PutAskDraft, type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk, type WriteAskFlags, AskChecks, delAskOf, getAskOf,
+  type ListAsk, type LoggableAsk, type PutAskDraft, type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk, type WriteAskFlags, AskChecks, VoidTrack, delAskOf, getAskOf,
   listAskOf, putAskOf,
 } from './shapes/shapes-asks'
 export * as Classifier from './storage/thing-classifier'
-export { readAtOf, readTcNow } from './storage/agerank'
+export { VacantAgerank, readAtOf, readTcNow } from './storage/agerank'
 export { type BankScope, type BankStamp, type BoxStamp, type GateStamp, StampChecks } from './shapes/shapes-stamps'
 export {
   type Actual, type ActualBeside, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer, type GotActual,
@@ -28,12 +28,12 @@ export { type VaultDB, isVaultDB } from './storage/vault-db'
 // The events a vaultDB's watcher is notified with.
 export {
   type Agekind, type Agerank, type ItemSeen, type Lifekind, type Liveness, type ReadTc, type SeenThing, type VaultAgedEvent, type VaultEvent, type VaultEventOf, type VaultEventkind, type VaultItemEvent, type VaultLifeEvent,
-  agekindVals, lifekindVals, livenessVals, vaultEventkindVals,
+  VaultDBSourcelabel, agekindVals, lifekindVals, livenessVals, vaultEventkindVals,
 } from './shapes/shapes-vault-event'
 
 // From safebyok-big: what an adapter's `do*` methods answer and are named with, its throwers, and the checkers it checks its
 // own options and rows with.
-export { storagePolicyVals, type Awaitable, type DelAct, type GoodAct, type GotAct, type PutAct, type StoragePolicy, type WriteAct } from 'safebyok-big/storage'
+export { VoidLifeTok, storagePolicyVals, type Awaitable, type DelAct, type GoodAct, type GotAct, type PutAct, type StoragePolicy, type WriteAct } from 'safebyok-big/storage'
 export type { IfAbsent, IfPresent, PutIfAbsent, RefusedAct } from 'safebyok-big/internals'
 export { VaultError, isVaultError, type Capacity, type RefusalFamily, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'
 export { fetchFailed, identityRevoked, sanitizeForeignError, storageFailed, storageRefusalOf, storageUnavailable, unexpectedError } from 'safebyok-big/storage'

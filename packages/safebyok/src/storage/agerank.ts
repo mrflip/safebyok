@@ -6,7 +6,7 @@ import { type EpochMillis, type Lifepath, Lifeseq, Revseq } from '../shapes/prim
 import type { ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
 import type { Agekind, Agerank, ItemSeen, ReadTc, SeenThing, VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
 
-// == [Agerank]: TcchunkDigits, NoRevseq, AgerankFields, readTcNow, readAtOf, tcchunkOf, nextAgerankOf, lifeAgerankOf, tcchunkAfter, laterOf, itemSeenOf, eventsOf, agekindOf, fieldsOf, isOfLife
+// == [Agerank]: TcchunkDigits, NoRevseq, VacantAgerank, AgerankFields, readTcNow, readAtOf, tcchunkOf, nextAgerankOf, lifeAgerankOf, tcchunkAfter, laterOf, itemSeenOf, eventsOf, agekindOf, seenAgekindOf, fieldsOf, isOfLife
 
 // Eight digits make a span of 65.536 seconds: a record seen again at its revision a minute or two later is news, which
 // sits well with TanStack Query's five minutes before it collects a query.
@@ -15,6 +15,10 @@ const TcchunkDigits = 8
 
 /** The revseq an agerank spells where no revision has been seen, which sorts below every other. */
 const NoRevseq = Revseq.padded(-1)
+
+// `(` sorts as text below `-` and every base-32 digit, so below the first character of every lifepath.
+/** The agerank of a Thing that has received nothing: it sorts below every other, and is of no life. */
+export const VacantAgerank: Agerank = ['(vacant)', NoRevseq, NoRevseq, '00000000'].join('|')
 
 /** An agerank's four fields, as it spells them: its lifepath, the newest revseq seen in that life, the newest whole one, and the tcchunk the newest was last read in. */
 type AgerankFields = readonly [lifepath: Lifepath, highRevseq: string, itemRevseq: string, tcchunk: string]
@@ -32,13 +36,12 @@ export function tcchunkOf(read_tc: ReadTc): string { return read_tc.slice(0, Tcc
 
 // An earlier life, a repeat, an older record and a sighting in no later tcchunk than the last each leave an agerank no greater than the one before.
 /** The agerank once `seen` is read at `read_tc`, or undefined where that is no greater than `agerankWas`: the record is not news.
- * `agerankWas` is undefined where nothing was seen, and any record is then news. Pass `isWhole` false for a sparse live record, which leaves the newest whole revision as it was.
+ * Over the {@link VacantAgerank}, any record is news. Pass `isWhole` false for a sparse live record, which leaves the newest whole revision as it was.
  */
-export function nextAgerankOf(agerankWas: Agerank | undefined, seen: Pick<ThingCited, 'lifepath' | 'revseq'>, read_tc: ReadTc, isWhole: boolean): Agerank | undefined {
+export function nextAgerankOf(agerankWas: Agerank, seen: Pick<ThingCited, 'lifepath' | 'revseq'>, read_tc: ReadTc, isWhole: boolean): Agerank | undefined {
   const revseq  = Revseq.padded(seen.revseq)
   const tcchunk = tcchunkOf(read_tc)
   // A first record, or one of another life, begins its life's agerank afresh.
-  if (agerankWas === undefined) { return lifeAgerankOf(seen.lifepath, revseq, isWhole, tcchunk) }
   if (! isOfLife(agerankWas, seen.lifepath)) { return laterOrNone(agerankWas, lifeAgerankOf(seen.lifepath, revseq, isWhole, tcchunk)) }
   const fieldsWas = fieldsOf(agerankWas)
   const [, highWas, itemWas] = fieldsWas
@@ -78,37 +81,39 @@ export function itemSeenOf(seen: SeenThing): ItemSeen {
   return { liveness: 'gone', val: seen as Tombstone<ThingRecord> }
 }
 
-/** The events of `proposed`, a record that moved its Thing's agerank from `agerankWas`, undefined where nothing was seen, up to `agerank`, each frozen, in a frozen list.
+/** The events of `proposed`, a record that moved its Thing's agerank from `agerankWas` up to `agerank`, each frozen, in a frozen list.
  * `proposed` comes first, with both ageranks. A `life` follows where its lifepath is not `agerankWas`'s, and an `aged` where the newest revision has not been seen whole.
- * Each keeps the `sourcelabel`, `read_tc` and `banktok` of `proposed`. After a first record, each gives `agerankWas`, and an `aged` its `agekindWas`, as undefined.
+ * Each keeps the `sourcelabel`, `read_tc` and `banktok` of `proposed`. After a first record, each gives `agerankWas` as the {@link VacantAgerank}, and an `aged` its `agekindWas` as `vacant`.
  */
-export function eventsOf<RecordT extends ThingRecord>(proposed: VaultItemEvent<RecordT>, agerankWas: Agerank | undefined, agerank: Agerank): readonly VaultEvent<RecordT>[] {
+export function eventsOf<RecordT extends ThingRecord>(proposed: VaultItemEvent<RecordT>, agerankWas: Agerank, agerank: Agerank): readonly VaultEvent<RecordT>[] {
   const { userid, banklabel, labelpath, modelkind, banktok, sourcelabel, read_tc, val: { lifepath } } = proposed
-  // Before a first record no life was seen, nor any agekind.
-  const isNewLife  = (agerankWas === undefined) || (! isOfLife(agerankWas, lifepath))
-  const agekindWas = (agerankWas === undefined) ? undefined : agekindOf(agerankWas)
+  const isNewLife  = ! isOfLife(agerankWas, lifepath)
+  const agekindWas = agekindOf(agerankWas)
   const shared     = { userid, banklabel, labelpath, modelkind, agerank, agerankWas, banktok, sourcelabel, read_tc }
   const events: VaultEvent<RecordT>[] = [Object.freeze({ ...proposed, agerank, agerankWas })]
   if (isNewLife) {
     const lifekind = Lifeseq.isTombstone(Lifeseq.ofLifepath(lifepath)) ? 'died' : 'born'
     events.push(Object.freeze({ eventkind: 'life', ...shared, lifekind }))
   }
-  const agekind = agekindOf(agerank)
+  const agekind = seenAgekindOf(agerank)
   if (agekind !== 'here') {
     events.push(Object.freeze({ eventkind: 'aged', ...shared, agekind, agekindWas }))
   }
   return Object.freeze(events)
 }
 
-/** The agekind of `agerank`: `'here'` where its newest revision has been seen whole, `'cold'` where only an older one of its life has, `'bare'` where none of its life has. */
-export function agekindOf(agerank: Agerank): Agekind {
+/** The agekind of `agerank`: `'here'` where its newest revision has been seen whole, `'cold'` where only an older one of its life has, `'bare'` where none of its life has, and `'vacant'` for the {@link VacantAgerank}. */
+export function agekindOf(agerank: Agerank): Agekind { return (agerank === VacantAgerank) ? 'vacant' : seenAgekindOf(agerank) }
+
+/** The agekind of `agerank`, the agerank of a Thing that has received a record */
+function seenAgekindOf(agerank: Agerank): Exclude<Agekind, 'vacant'> {
   const [, highRevseq, itemRevseq] = fieldsOf(agerank)
   if (highRevseq === itemRevseq) { return 'here' }
   return (itemRevseq === NoRevseq) ? 'bare' : 'cold'
 }
 
-// Every agerank is made by nextAgerankOf, of a checked lifepath, two padded revseqs and the tcchunk of a checked
-// read_tc: none of the four has a `|`.
+// Every agerank but the vacant one is made by nextAgerankOf, of a checked lifepath, two padded revseqs and the tcchunk of
+// a checked read_tc: none of the four has a `|`.
 /** The four fields of `agerank` */
 function fieldsOf(agerank: Agerank): AgerankFields { return agerank.split('|') as unknown as AgerankFields }
 

@@ -8,7 +8,7 @@ import type { MaskedRow } from '../shapes/shapes-masked-view'
 import type { LiveOf, ShellOf } from '../shapes/shapes-sealers'
 import type { BulletproofCallback, Sparse, ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
 import { type Agekind, type Agerank, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
-import { agekindOf, eventsOf, nextAgerankOf, readAtOf } from '../storage/agerank'
+import { VacantAgerank, agekindOf, eventsOf, nextAgerankOf, readAtOf } from '../storage/agerank'
 import * as Throwers from '../refusals/throwers'
 
 // == [Adoptable]: Adoptable
@@ -38,7 +38,7 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   #record: Adoptable<RecordT> | undefined = undefined
   /** The Thing fields of the newest revision seen. */
   #citable: Sparse<ThingRecord>
-  #agerank: Agerank | undefined = undefined
+  #agerank: Agerank = VacantAgerank
   #readAt: EpochMillis | undefined = undefined
 
   /** Wraps each subscriber as it subscribes: what one throws goes where the maker said, or reaches `receive`'s caller where it said nothing. */
@@ -79,12 +79,12 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   /** What a write over this Thing cites: the Thing fields of the newest revision seen, whole or a live box's sparse form. */
   get citable(): Sparse<ThingRecord> { return this.#citable }
 
-  /** How far this Thing has been seen, as {@link Agerank} spells it, or undefined until it first receives a record. */
-  get agerank(): Agerank | undefined { return this.#agerank }
+  /** How far this Thing has been seen, as {@link Agerank} spells it: the vacant agerank until it first receives a record. */
+  get agerank(): Agerank { return this.#agerank }
 
   // A Thing bare in a later life still holds an earlier life's record.
-  /** Whether the newest revision seen has been seen whole ({@link Agekind}), or undefined until this Thing first receives a record. Check it before reading the record. */
-  get agekind(): Agekind | undefined { return (this.#agerank === undefined) ? undefined : agekindOf(this.#agerank) }
+  /** Whether the newest revision seen has been seen whole ({@link Agekind}): `vacant` until this Thing first receives a record. Check it before reading the record. */
+  get agekind(): Agekind { return agekindOf(this.#agerank) }
 
   /** When the newest revision seen was last seen, in epoch milliseconds, or undefined until it first receives a record. */
   get read_at(): EpochMillis | undefined { return this.#readAt }

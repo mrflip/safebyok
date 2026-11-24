@@ -5,7 +5,7 @@ import { noop } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 // fake-indexeddb installs IndexedDB's globals, for the device database browserOpts() opens: no browser.
 import 'fake-indexeddb/auto'
-import { Consts, Errors, Phrases } from 'safebyok-big/internals'
+import { Consts, Errors, Phrases, SX } from 'safebyok-big/internals'
 import { browserOpts } from '../../src/browser'
 import { maskUuid } from '../../src/helpers/mask-uuid'
 import { Bank } from '../../src/models/bank'
@@ -392,12 +392,12 @@ describe("device.signin(userid)", () => {
     expect(device.world.getSnapshot()).to.include({ stage: 'unlocked' })
   })
 
-  it("has its world's VaultMinder build asks that carry no banktok until it has a bank, and the bank's after", async () => {
+  it("has its world's VaultMinder build asks that carry the void lifetok until it has a bank, and the bank's after", async () => {
     const device = TH.makeDevice({ userid: null })
     await device.signin(TH.WorldScope.userid)
     const vaultMinder = device.world.demandVaultMinder()
-    expect(vaultMinder.makeGetAsk({ labelpath: 'bank' })).to.not.have.property('banktok')
-    expect(vaultMinder.makeListAsk({ labelpath: 'box' })).to.not.have.property('banktok')
+    expect(vaultMinder.makeGetAsk({ labelpath: 'bank' })).to.deep.include({ banktok: SX.VoidLifeTok })
+    expect(vaultMinder.makeListAsk({ labelpath: 'box' })).to.deep.include({ banktok: SX.VoidLifeTok })
     const bank = await device.birthGating({ passphraseCleartext: TH.TestPassphrase }).attempt()
     expect(vaultMinder.makeGetAsk({ labelpath: 'bank' })).to.deep.include({ banktok: bank.lifetok })
   })

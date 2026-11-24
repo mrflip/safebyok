@@ -246,7 +246,7 @@ function endFaultsOf(world: TSQWorld<MemoryVaultDB>): string[] {
   const isRuled  = isStale === (thing.agekind !== 'here')
   return [
     ...(isHeld ? [] : ["the item differs from its Thing's record"]),
-    ...(isRuled ? [] : [`the item is ${isStale ? 'stale' : 'fresh'} while its Thing is ${String(thing.agekind)}`]),
+    ...(isRuled ? [] : [`the item is ${isStale ? 'stale' : 'fresh'} while its Thing is ${thing.agekind}`]),
   ]
 }
 

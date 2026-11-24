@@ -65,6 +65,9 @@ export const RevtokShape = "A revtok is a UUID: hex digits in groups of 8, 4, 4,
 /** A lifetok not of a UUID's shape. */
 export const LifetokShape = "A lifetok is a UUID: hex digits in groups of 8, 4, 4, 4 and 12, joined by '-'."
 
+/** An ask other than a get whose banktok is the void lifetok. */
+export const BanktokVoid = "Only a get may carry the void banktok: a list, a write or a birth carries its bank's lifetok."
+
 /** A lifepath that is not lifeseqs, each after a '/'. */
 export const LifepathShape = "A lifepath is one or more lifeseqs, joined by '/'."
 

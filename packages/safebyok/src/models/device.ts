@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
-import { Consts, Deriver, Errors, type GX, Helpers, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
+import { Consts, Deriver, Errors, type GX, Helpers, Logger, Phrases as PhrasesX, ReportError, SX, VX, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
 import type { BirthGating } from './gating'
 import { Proving, guardKeyDeriver } from './proving'
@@ -17,7 +17,7 @@ import type { BankScope } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Lifetok, Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
 import { VaultMinder } from '../minding/vault-minder'
-import { itemSeenOf, readTcNow } from '../storage/agerank'
+import { VacantAgerank, itemSeenOf, readTcNow } from '../storage/agerank'
 import { Labelpath } from '../shapes/primitives'
 import type { ReadTc, SeenThing, VaultEvent } from '../shapes/shapes-vault-event'
 import { type Modelkind, PerKindChecks, ThingChecks } from '../shapes/shapes-thing'
@@ -367,17 +367,17 @@ function checkSecureContext(): void {
 /** The `sourcelabel` of the events of the roots a device read from its root shelf. */
 const ShelvedSourcelabel = 'root_shelf'
 
-/** The lifetok of `root`, where it is a live bank's record, as the events of the roots shelved carry it */
-function banktokOf(root: unknown): Lifetok | undefined {
+/** The lifetok of `root`, where it is a live bank's record, else the void lifetok, as the events of the roots shelved carry it */
+function banktokOf(root: unknown): Lifetok {
   const report = PerKindChecks.bankThing.safeParse(root)
-  return (report.success && (report.data.am === 'a')) ? report.data.lifetok : undefined
+  return (report.success && (report.data.am === 'a')) ? report.data.lifetok : SX.VoidLifeTok
 }
 
-/** The `item` event of `record`, a root read from a root shelf, read at `read_tc` in the bank of `banktok` */
-function shelvedEventOf(record: SeenThing, read_tc: ReadTc, banktok: Lifetok | undefined): VaultEvent {
+/** The `item` event of `record`, a root read from a root shelf, read at `read_tc` in the bank of `banktok`, with the vacant agerank */
+function shelvedEventOf(record: SeenThing, read_tc: ReadTc, banktok: Lifetok): VaultEvent {
   const { userid, banklabel, labelpath } = record
   return {
-    eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: undefined, agerankWas: undefined,
+    eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: VacantAgerank, agerankWas: VacantAgerank,
     sourcelabel: ShelvedSourcelabel, read_tc, banktok, ...itemSeenOf(record),
   }
 }

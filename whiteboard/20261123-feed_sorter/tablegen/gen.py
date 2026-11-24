@@ -71,12 +71,13 @@ def eventsOf(was, agerank, p):
   """The events a record taken returns: the record, then a life change, then an aging."""
   kind, life, rev = p[:3]
   events = [timed(("item", kind, life, rev), chunkOf(p))]
-  lifeWas, highWas = partsOf(was)[:2] if was else (None, None)
+  # Before the first record, the vacant agerank stands: of no life, its highest revision -1.
+  lifeWas, highWas = partsOf(was)[:2] if was else ("vacant", -1)
   # The first record of a scope returns a life too, from nothing: a listing may return only these.
   if life != lifeWas:
     events.append(("life", "died" if (kind == "void" or life % 2 == 1) else "born", lifeWas, highWas, life, rev))
-  # An aging says what it was before, null for nothing: cold to cold may matter where bare to cold does not.
-  if tagOf(agerank) != "here": events.append(("aged", tagOf(was) if was else None, tagOf(agerank), life, partsOf(agerank)[1]))
+  # An aging says what it was before, vacant for nothing: cold to cold may matter where bare to cold does not.
+  if tagOf(agerank) != "here": events.append(("aged", tagOf(was) if was else "vacant", tagOf(agerank), life, partsOf(agerank)[1]))
   return events
 
 def streamOf(agerank, chain):

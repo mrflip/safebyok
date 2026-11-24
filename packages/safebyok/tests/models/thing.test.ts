@@ -1,10 +1,11 @@
 import { omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
+import { SX } from 'safebyok-big/internals'
 import { type Adoptable, Thing } from '../../src/models/thing'
 import { type Lifepath, Lifeseq, Revseq, VoidLifeseq } from '../../src/shapes/primitives'
 import { type ThingRecord, type ThingScope, Shell } from '../../src/shapes/shapes-thing'
-import type { Agekind, Agerank, Lifekind, Liveness, ReadTc, SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
-import { readAtOf, readTcNow } from '../../src/storage/agerank'
+import { type Agekind, type Agerank, type Lifekind, type Liveness, type ReadTc, type SeenThing, type VaultEvent, type VaultItemEvent, VaultDBSourcelabel } from '../../src/shapes/shapes-vault-event'
+import { VacantAgerank, readAtOf, readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
 
 // == [Shorthand]: Life, Seen, Shorthand, FeedCase, the starts
@@ -15,12 +16,12 @@ type Life = number
 type Chunk = number
 /** A record, as `[liveness, life, revseq]`, or with the chunk it was read in after them */
 type Seen = readonly [Liveness, Life, number] | readonly [Liveness, Life, number, Chunk]
-/** An event: an item as its record is, a life or an aging with what stood before (null for none) and after */
+/** An event: an item as its record is, a life or an aging with what stood before (`vacant` and -1 for the vacant agerank) and after */
 type Shorthand =
   | readonly ['item', Liveness, Life, number]
   | readonly ['item', Liveness, Life, number, Chunk]
-  | readonly ['life', Lifekind, Life | null, number | null, Life, number]
-  | readonly ['aged', Agekind | null, Agekind, Life, number]
+  | readonly ['life', Lifekind, Life | 'vacant', number, Life, number]
+  | readonly ['aged', Agekind, Agekind, Life, number]
 type FeedCase = Readonly<{ initial: readonly Seen[], chain: readonly Seen[], streamed: readonly Shorthand[], agerank: string, blurb: string }>
 
 // Each start is the chain its row under "Each start, from nothing" feeds.
@@ -38,37 +39,37 @@ const StartNames = new Map([[Empty, 'nothing'], [Void, 'void'], [BareSoon, 'bare
 // Pasted from whiteboard/20261123-feed_sorter/tablegen/table.ts.txt, written by its gen.py, with every quote but the blurb's made double.
 const FeedCases: readonly FeedCase[] = [
   // Each start, from nothing:
-  { initial: Empty,    chain: [["void", -1, -1]],           streamed: [["item", "void", -1, -1], ["life", "died", null, null, -1, -1]],                      agerank: "-000000001|-000000001|-000000001|00000000", blurb: 'void' },
+  { initial: Empty,    chain: [["void", -1, -1]],           streamed: [["item", "void", -1, -1], ["life", "died", "vacant", -1, -1, -1]],                    agerank: "-000000001|-000000001|-000000001|00000000", blurb: 'void' },
   { initial: Empty,    chain: [["soon", 4, 4]],
-    streamed: [["item", "soon", 4, 4], ["life", "born", null, null, 4, 4], ["aged", null, "bare", 4, 4]],
+    streamed: [["item", "soon", 4, 4], ["life", "born", "vacant", -1, 4, 4], ["aged", "vacant", "bare", 4, 4]],
     agerank: "0000000004|0000000004|-000000001|00000000", blurb: 'bare: a soon at 4, no item' },
   { initial: Empty,    chain: [["full", 4, 2], ["soon", 4, 4]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "soon", 4, 4], ["aged", "here", "cold", 4, 4]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["item", "soon", 4, 4], ["aged", "here", "cold", 4, 4]],
     agerank: "0000000004|0000000004|0000000002|00000000", blurb: 'cold: an item at 2, a soon at 4' },
-  { initial: Empty,    chain: [["full", 4, 4]],             streamed: [["item", "full", 4, 4], ["life", "born", null, null, 4, 4]],                          agerank: "0000000004|0000000004|0000000004|00000000", blurb: 'here: an item at 4' },
-  { initial: Empty,    chain: [["gone", 5, 0]],             streamed: [["item", "gone", 5, 0], ["life", "died", null, null, 5, 0]],                          agerank: "0000000005|0000000000|0000000000|00000000", blurb: 'dead: a tombstone of life 5' },
+  { initial: Empty,    chain: [["full", 4, 4]],             streamed: [["item", "full", 4, 4], ["life", "born", "vacant", -1, 4, 4]],                        agerank: "0000000004|0000000004|0000000004|00000000", blurb: 'here: an item at 4' },
+  { initial: Empty,    chain: [["gone", 5, 0]],             streamed: [["item", "gone", 5, 0], ["life", "died", "vacant", -1, 5, 0]],                        agerank: "0000000005|0000000000|0000000000|00000000", blurb: 'dead: a tombstone of life 5' },
   // On nothing, each record of the alphabet:
-  { initial: Empty,    chain: [["void", -1, -1]],           streamed: [["item", "void", -1, -1], ["life", "died", null, null, -1, -1]],                      agerank: "-000000001|-000000001|-000000001|00000000", blurb: 'a void' },
-  { initial: Empty,    chain: [["void", 9, -1]],            streamed: [["item", "void", 9, -1], ["life", "died", null, null, 9, -1]],                        agerank: "0000000009|-000000001|-000000001|00000000", blurb: 'a void' },
-  { initial: Empty,    chain: [["gone", 3, 0]],             streamed: [["item", "gone", 3, 0], ["life", "died", null, null, 3, 0]],                          agerank: "0000000003|0000000000|0000000000|00000000", blurb: 'a tombstone' },
-  { initial: Empty,    chain: [["gone", 5, 0]],             streamed: [["item", "gone", 5, 0], ["life", "died", null, null, 5, 0]],                          agerank: "0000000005|0000000000|0000000000|00000000", blurb: 'a tombstone' },
-  { initial: Empty,    chain: [["gone", 7, 0]],             streamed: [["item", "gone", 7, 0], ["life", "died", null, null, 7, 0]],                          agerank: "0000000007|0000000000|0000000000|00000000", blurb: 'a tombstone' },
-  { initial: Empty,    chain: [["soon", 2, 9]],             streamed: [["item", "soon", 2, 9], ["life", "born", null, null, 2, 9], ["aged", null, "bare", 2, 9]], agerank: "0000000002|0000000009|-000000001|00000000", blurb: 'a soon' },
-  { initial: Empty,    chain: [["soon", 4, 1]],             streamed: [["item", "soon", 4, 1], ["life", "born", null, null, 4, 1], ["aged", null, "bare", 4, 1]], agerank: "0000000004|0000000001|-000000001|00000000", blurb: 'a soon' },
-  { initial: Empty,    chain: [["soon", 4, 2]],             streamed: [["item", "soon", 4, 2], ["life", "born", null, null, 4, 2], ["aged", null, "bare", 4, 2]], agerank: "0000000004|0000000002|-000000001|00000000", blurb: 'a soon' },
-  { initial: Empty,    chain: [["soon", 4, 3]],             streamed: [["item", "soon", 4, 3], ["life", "born", null, null, 4, 3], ["aged", null, "bare", 4, 3]], agerank: "0000000004|0000000003|-000000001|00000000", blurb: 'a soon' },
-  { initial: Empty,    chain: [["soon", 4, 4]],             streamed: [["item", "soon", 4, 4], ["life", "born", null, null, 4, 4], ["aged", null, "bare", 4, 4]], agerank: "0000000004|0000000004|-000000001|00000000", blurb: 'a soon' },
-  { initial: Empty,    chain: [["soon", 4, 5]],             streamed: [["item", "soon", 4, 5], ["life", "born", null, null, 4, 5], ["aged", null, "bare", 4, 5]], agerank: "0000000004|0000000005|-000000001|00000000", blurb: 'a soon' },
-  { initial: Empty,    chain: [["soon", 6, 0]],             streamed: [["item", "soon", 6, 0], ["life", "born", null, null, 6, 0], ["aged", null, "bare", 6, 0]], agerank: "0000000006|0000000000|-000000001|00000000", blurb: 'a soon' },
-  { initial: Empty,    chain: [["soon", 6, 1]],             streamed: [["item", "soon", 6, 1], ["life", "born", null, null, 6, 1], ["aged", null, "bare", 6, 1]], agerank: "0000000006|0000000001|-000000001|00000000", blurb: 'a soon' },
-  { initial: Empty,    chain: [["full", 2, 9]],             streamed: [["item", "full", 2, 9], ["life", "born", null, null, 2, 9]],                          agerank: "0000000002|0000000009|0000000009|00000000", blurb: 'a full record' },
-  { initial: Empty,    chain: [["full", 4, 1]],             streamed: [["item", "full", 4, 1], ["life", "born", null, null, 4, 1]],                          agerank: "0000000004|0000000001|0000000001|00000000", blurb: 'a full record' },
-  { initial: Empty,    chain: [["full", 4, 2]],             streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2]],                          agerank: "0000000004|0000000002|0000000002|00000000", blurb: 'a full record' },
-  { initial: Empty,    chain: [["full", 4, 3]],             streamed: [["item", "full", 4, 3], ["life", "born", null, null, 4, 3]],                          agerank: "0000000004|0000000003|0000000003|00000000", blurb: 'a full record' },
-  { initial: Empty,    chain: [["full", 4, 4]],             streamed: [["item", "full", 4, 4], ["life", "born", null, null, 4, 4]],                          agerank: "0000000004|0000000004|0000000004|00000000", blurb: 'a full record' },
-  { initial: Empty,    chain: [["full", 4, 5]],             streamed: [["item", "full", 4, 5], ["life", "born", null, null, 4, 5]],                          agerank: "0000000004|0000000005|0000000005|00000000", blurb: 'a full record' },
-  { initial: Empty,    chain: [["full", 6, 0]],             streamed: [["item", "full", 6, 0], ["life", "born", null, null, 6, 0]],                          agerank: "0000000006|0000000000|0000000000|00000000", blurb: 'a full record' },
-  { initial: Empty,    chain: [["full", 6, 1]],             streamed: [["item", "full", 6, 1], ["life", "born", null, null, 6, 1]],                          agerank: "0000000006|0000000001|0000000001|00000000", blurb: 'a full record' },
+  { initial: Empty,    chain: [["void", -1, -1]],           streamed: [["item", "void", -1, -1], ["life", "died", "vacant", -1, -1, -1]],                    agerank: "-000000001|-000000001|-000000001|00000000", blurb: 'a void' },
+  { initial: Empty,    chain: [["void", 9, -1]],            streamed: [["item", "void", 9, -1], ["life", "died", "vacant", -1, 9, -1]],                      agerank: "0000000009|-000000001|-000000001|00000000", blurb: 'a void' },
+  { initial: Empty,    chain: [["gone", 3, 0]],             streamed: [["item", "gone", 3, 0], ["life", "died", "vacant", -1, 3, 0]],                        agerank: "0000000003|0000000000|0000000000|00000000", blurb: 'a tombstone' },
+  { initial: Empty,    chain: [["gone", 5, 0]],             streamed: [["item", "gone", 5, 0], ["life", "died", "vacant", -1, 5, 0]],                        agerank: "0000000005|0000000000|0000000000|00000000", blurb: 'a tombstone' },
+  { initial: Empty,    chain: [["gone", 7, 0]],             streamed: [["item", "gone", 7, 0], ["life", "died", "vacant", -1, 7, 0]],                        agerank: "0000000007|0000000000|0000000000|00000000", blurb: 'a tombstone' },
+  { initial: Empty,    chain: [["soon", 2, 9]],             streamed: [["item", "soon", 2, 9], ["life", "born", "vacant", -1, 2, 9], ["aged", "vacant", "bare", 2, 9]], agerank: "0000000002|0000000009|-000000001|00000000", blurb: 'a soon' },
+  { initial: Empty,    chain: [["soon", 4, 1]],             streamed: [["item", "soon", 4, 1], ["life", "born", "vacant", -1, 4, 1], ["aged", "vacant", "bare", 4, 1]], agerank: "0000000004|0000000001|-000000001|00000000", blurb: 'a soon' },
+  { initial: Empty,    chain: [["soon", 4, 2]],             streamed: [["item", "soon", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["aged", "vacant", "bare", 4, 2]], agerank: "0000000004|0000000002|-000000001|00000000", blurb: 'a soon' },
+  { initial: Empty,    chain: [["soon", 4, 3]],             streamed: [["item", "soon", 4, 3], ["life", "born", "vacant", -1, 4, 3], ["aged", "vacant", "bare", 4, 3]], agerank: "0000000004|0000000003|-000000001|00000000", blurb: 'a soon' },
+  { initial: Empty,    chain: [["soon", 4, 4]],             streamed: [["item", "soon", 4, 4], ["life", "born", "vacant", -1, 4, 4], ["aged", "vacant", "bare", 4, 4]], agerank: "0000000004|0000000004|-000000001|00000000", blurb: 'a soon' },
+  { initial: Empty,    chain: [["soon", 4, 5]],             streamed: [["item", "soon", 4, 5], ["life", "born", "vacant", -1, 4, 5], ["aged", "vacant", "bare", 4, 5]], agerank: "0000000004|0000000005|-000000001|00000000", blurb: 'a soon' },
+  { initial: Empty,    chain: [["soon", 6, 0]],             streamed: [["item", "soon", 6, 0], ["life", "born", "vacant", -1, 6, 0], ["aged", "vacant", "bare", 6, 0]], agerank: "0000000006|0000000000|-000000001|00000000", blurb: 'a soon' },
+  { initial: Empty,    chain: [["soon", 6, 1]],             streamed: [["item", "soon", 6, 1], ["life", "born", "vacant", -1, 6, 1], ["aged", "vacant", "bare", 6, 1]], agerank: "0000000006|0000000001|-000000001|00000000", blurb: 'a soon' },
+  { initial: Empty,    chain: [["full", 2, 9]],             streamed: [["item", "full", 2, 9], ["life", "born", "vacant", -1, 2, 9]],                        agerank: "0000000002|0000000009|0000000009|00000000", blurb: 'a full record' },
+  { initial: Empty,    chain: [["full", 4, 1]],             streamed: [["item", "full", 4, 1], ["life", "born", "vacant", -1, 4, 1]],                        agerank: "0000000004|0000000001|0000000001|00000000", blurb: 'a full record' },
+  { initial: Empty,    chain: [["full", 4, 2]],             streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2]],                        agerank: "0000000004|0000000002|0000000002|00000000", blurb: 'a full record' },
+  { initial: Empty,    chain: [["full", 4, 3]],             streamed: [["item", "full", 4, 3], ["life", "born", "vacant", -1, 4, 3]],                        agerank: "0000000004|0000000003|0000000003|00000000", blurb: 'a full record' },
+  { initial: Empty,    chain: [["full", 4, 4]],             streamed: [["item", "full", 4, 4], ["life", "born", "vacant", -1, 4, 4]],                        agerank: "0000000004|0000000004|0000000004|00000000", blurb: 'a full record' },
+  { initial: Empty,    chain: [["full", 4, 5]],             streamed: [["item", "full", 4, 5], ["life", "born", "vacant", -1, 4, 5]],                        agerank: "0000000004|0000000005|0000000005|00000000", blurb: 'a full record' },
+  { initial: Empty,    chain: [["full", 6, 0]],             streamed: [["item", "full", 6, 0], ["life", "born", "vacant", -1, 6, 0]],                        agerank: "0000000006|0000000000|0000000000|00000000", blurb: 'a full record' },
+  { initial: Empty,    chain: [["full", 6, 1]],             streamed: [["item", "full", 6, 1], ["life", "born", "vacant", -1, 6, 1]],                        agerank: "0000000006|0000000001|0000000001|00000000", blurb: 'a full record' },
   // On void, each record of the alphabet:
   { initial: Void,     chain: [["void", -1, -1]],           streamed: [],                                                                                    agerank: "-000000001|-000000001|-000000001|00000000", blurb: 'its void again' },
   { initial: Void,     chain: [["void", 9, -1]],            streamed: [["item", "void", 9, -1], ["life", "died", -1, -1, 9, -1]],                            agerank: "0000000009|-000000001|-000000001|00000000", blurb: 'a void of a later life' },
@@ -302,160 +303,160 @@ const FeedCases: readonly FeedCase[] = [
     agerank: "0000000005|0000000000|0000000000|00000001", blurb: 'its tombstone again, a chunk later' },
   // Longer chains, from nothing:
   { initial: Empty,    chain: [["void", -1, -1], ["soon", 4, 2], ["full", 4, 2], ["gone", 5, 0]],
-    streamed: [["item", "void", -1, -1], ["life", "died", null, null, -1, -1], ["item", "soon", 4, 2], ["life", "born", -1, -1, 4, 2], ["aged", "here", "bare", 4, 2], ["item", "full", 4, 2], ["item", "gone", 5, 0], ["life", "died", 4, 2, 5, 0]],
+    streamed: [["item", "void", -1, -1], ["life", "died", "vacant", -1, -1, -1], ["item", "soon", 4, 2], ["life", "born", -1, -1, 4, 2], ["aged", "here", "bare", 4, 2], ["item", "full", 4, 2], ["item", "gone", 5, 0], ["life", "died", 4, 2, 5, 0]],
     agerank: "0000000005|0000000000|0000000000|00000000", blurb: 'the first chain proposed: a void, a list, a get, a death' },
   { initial: Empty,    chain: [["full", 4, 2], ["full", 4, 2], ["soon", 4, 2], ["soon", 4, 1], ["full", 4, 1], ["gone", 3, 0], ["void", -1, -1]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2]],
     agerank: "0000000004|0000000002|0000000002|00000000", blurb: 'repeats and olders return no events' },
   { initial: Empty,    chain: [["full", 4, 1], ["full", 4, 2], ["full", 4, 3]],
-    streamed: [["item", "full", 4, 1], ["life", "born", null, null, 4, 1], ["item", "full", 4, 2], ["item", "full", 4, 3]],
+    streamed: [["item", "full", 4, 1], ["life", "born", "vacant", -1, 4, 1], ["item", "full", 4, 2], ["item", "full", 4, 3]],
     agerank: "0000000004|0000000003|0000000003|00000000", blurb: 'three writes in a row' },
   { initial: Empty,    chain: [["full", 4, 3], ["full", 4, 2], ["full", 4, 1]],
-    streamed: [["item", "full", 4, 3], ["life", "born", null, null, 4, 3]],
+    streamed: [["item", "full", 4, 3], ["life", "born", "vacant", -1, 4, 3]],
     agerank: "0000000004|0000000003|0000000003|00000000", blurb: 'three writes arriving newest first' },
   { initial: Empty,    chain: [["soon", 4, 2], ["full", 4, 2], ["full", 4, 3]],
-    streamed: [["item", "soon", 4, 2], ["life", "born", null, null, 4, 2], ["aged", null, "bare", 4, 2], ["item", "full", 4, 2], ["item", "full", 4, 3]],
+    streamed: [["item", "soon", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["aged", "vacant", "bare", 4, 2], ["item", "full", 4, 2], ["item", "full", 4, 3]],
     agerank: "0000000004|0000000003|0000000003|00000000", blurb: 'a list, a get, a write' },
   { initial: Empty,    chain: [["soon", 4, 2], ["soon", 4, 2], ["soon", 4, 3], ["full", 4, 3]],
-    streamed: [["item", "soon", 4, 2], ["life", "born", null, null, 4, 2], ["aged", null, "bare", 4, 2], ["item", "soon", 4, 3], ["aged", "bare", "bare", 4, 3], ["item", "full", 4, 3]],
+    streamed: [["item", "soon", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["aged", "vacant", "bare", 4, 2], ["item", "soon", 4, 3], ["aged", "bare", "bare", 4, 3], ["item", "full", 4, 3]],
     agerank: "0000000004|0000000003|0000000003|00000000", blurb: 'a list twice, a write seen between, then its get' },
   { initial: Empty,    chain: [["full", 4, 2], ["soon", 4, 2]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2]],
     agerank: "0000000004|0000000002|0000000002|00000000", blurb: 'a soon at the revision of the item' },
   { initial: Empty,    chain: [["full", 4, 1], ["soon", 4, 2], ["full", 4, 2], ["soon", 4, 3], ["full", 4, 3]],
-    streamed: [["item", "full", 4, 1], ["life", "born", null, null, 4, 1], ["item", "soon", 4, 2], ["aged", "here", "cold", 4, 2], ["item", "full", 4, 2], ["item", "soon", 4, 3], ["aged", "here", "cold", 4, 3], ["item", "full", 4, 3]],
+    streamed: [["item", "full", 4, 1], ["life", "born", "vacant", -1, 4, 1], ["item", "soon", 4, 2], ["aged", "here", "cold", 4, 2], ["item", "full", 4, 2], ["item", "soon", 4, 3], ["aged", "here", "cold", 4, 3], ["item", "full", 4, 3]],
     agerank: "0000000004|0000000003|0000000003|00000000", blurb: 'each soon caught up before the next' },
   { initial: Empty,    chain: [["full", 4, 3], ["soon", 4, 2], ["soon", 4, 3], ["soon", 4, 4]],
-    streamed: [["item", "full", 4, 3], ["life", "born", null, null, 4, 3], ["item", "soon", 4, 4], ["aged", "here", "cold", 4, 4]],
+    streamed: [["item", "full", 4, 3], ["life", "born", "vacant", -1, 4, 3], ["item", "soon", 4, 4], ["aged", "here", "cold", 4, 4]],
     agerank: "0000000004|0000000004|0000000003|00000000", blurb: 'a full record ahead of its soons, then one soon past it' },
   { initial: Empty,    chain: [["soon", 4, 1], ["soon", 4, 3], ["soon", 4, 2], ["full", 4, 3]],
-    streamed: [["item", "soon", 4, 1], ["life", "born", null, null, 4, 1], ["aged", null, "bare", 4, 1], ["item", "soon", 4, 3], ["aged", "bare", "bare", 4, 3], ["item", "full", 4, 3]],
+    streamed: [["item", "soon", 4, 1], ["life", "born", "vacant", -1, 4, 1], ["aged", "vacant", "bare", 4, 1], ["item", "soon", 4, 3], ["aged", "bare", "bare", 4, 3], ["item", "full", 4, 3]],
     agerank: "0000000004|0000000003|0000000003|00000000", blurb: 'soons out of order over a bare item' },
   { initial: Empty,    chain: [["soon", 4, 5], ["full", 4, 2], ["full", 4, 1], ["full", 4, 5]],
-    streamed: [["item", "soon", 4, 5], ["life", "born", null, null, 4, 5], ["aged", null, "bare", 4, 5], ["item", "full", 4, 2], ["aged", "bare", "cold", 4, 5], ["item", "full", 4, 5]],
+    streamed: [["item", "soon", 4, 5], ["life", "born", "vacant", -1, 4, 5], ["aged", "vacant", "bare", 4, 5], ["item", "full", 4, 2], ["aged", "bare", "cold", 4, 5], ["item", "full", 4, 5]],
     agerank: "0000000004|0000000005|0000000005|00000000", blurb: 'a bare soon, filled from behind, then caught up' },
   { initial: Empty,    chain: [["full", 4, 2], ["soon", 4, 5], ["full", 4, 4], ["soon", 4, 3], ["full", 4, 5]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "soon", 4, 5], ["aged", "here", "cold", 4, 5], ["item", "full", 4, 4], ["aged", "cold", "cold", 4, 5], ["item", "full", 4, 5]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["item", "soon", 4, 5], ["aged", "here", "cold", 4, 5], ["item", "full", 4, 4], ["aged", "cold", "cold", 4, 5], ["item", "full", 4, 5]],
     agerank: "0000000004|0000000005|0000000005|00000000", blurb: 'a second full record between the item and the soon' },
   { initial: Empty,    chain: [["full", 4, 1], ["soon", 4, 6], ["full", 4, 2], ["full", 4, 4], ["full", 4, 3], ["full", 4, 7]],
-    streamed: [["item", "full", 4, 1], ["life", "born", null, null, 4, 1], ["item", "soon", 4, 6], ["aged", "here", "cold", 4, 6], ["item", "full", 4, 2], ["aged", "cold", "cold", 4, 6], ["item", "full", 4, 4], ["aged", "cold", "cold", 4, 6], ["item", "full", 4, 7]],
+    streamed: [["item", "full", 4, 1], ["life", "born", "vacant", -1, 4, 1], ["item", "soon", 4, 6], ["aged", "here", "cold", 4, 6], ["item", "full", 4, 2], ["aged", "cold", "cold", 4, 6], ["item", "full", 4, 4], ["aged", "cold", "cold", 4, 6], ["item", "full", 4, 7]],
     agerank: "0000000004|0000000007|0000000007|00000000", blurb: 'full records climbing under a soon, then past it' },
   { initial: Empty,    chain: [["full", 4, 2], ["soon", 4, 4], ["soon", 4, 6], ["full", 4, 4], ["full", 4, 6]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "soon", 4, 4], ["aged", "here", "cold", 4, 4], ["item", "soon", 4, 6], ["aged", "cold", "cold", 4, 6], ["item", "full", 4, 4], ["aged", "cold", "cold", 4, 6], ["item", "full", 4, 6]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["item", "soon", 4, 4], ["aged", "here", "cold", 4, 4], ["item", "soon", 4, 6], ["aged", "cold", "cold", 4, 6], ["item", "full", 4, 4], ["aged", "cold", "cold", 4, 6], ["item", "full", 4, 6]],
     agerank: "0000000004|0000000006|0000000006|00000000", blurb: 'the soon moves on while the item is cold' },
   { initial: Empty,    chain: [["full", 4, 2], ["soon", 4, 5], ["full", 4, 5], ["soon", 4, 5], ["full", 4, 4]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "soon", 4, 5], ["aged", "here", "cold", 4, 5], ["item", "full", 4, 5]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["item", "soon", 4, 5], ["aged", "here", "cold", 4, 5], ["item", "full", 4, 5]],
     agerank: "0000000004|0000000005|0000000005|00000000", blurb: 'once here, nothing more at or under that revision' },
   { initial: Empty,    chain: [["full", 4, 2], ["gone", 5, 0], ["full", 6, 0], ["gone", 7, 0]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "gone", 5, 0], ["life", "died", 4, 2, 5, 0], ["item", "full", 6, 0], ["life", "born", 5, 0, 6, 0], ["item", "gone", 7, 0], ["life", "died", 6, 0, 7, 0]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["item", "gone", 5, 0], ["life", "died", 4, 2, 5, 0], ["item", "full", 6, 0], ["life", "born", 5, 0, 6, 0], ["item", "gone", 7, 0], ["life", "died", 6, 0, 7, 0]],
     agerank: "0000000007|0000000000|0000000000|00000000", blurb: 'die, be born, die' },
   { initial: Empty,    chain: [["gone", 5, 0], ["soon", 6, 0], ["gone", 5, 0], ["full", 6, 0], ["gone", 7, 0]],
-    streamed: [["item", "gone", 5, 0], ["life", "died", null, null, 5, 0], ["item", "soon", 6, 0], ["life", "born", 5, 0, 6, 0], ["aged", "here", "bare", 6, 0], ["item", "full", 6, 0], ["item", "gone", 7, 0], ["life", "died", 6, 0, 7, 0]],
+    streamed: [["item", "gone", 5, 0], ["life", "died", "vacant", -1, 5, 0], ["item", "soon", 6, 0], ["life", "born", 5, 0, 6, 0], ["aged", "here", "bare", 6, 0], ["item", "full", 6, 0], ["item", "gone", 7, 0], ["life", "died", 6, 0, 7, 0]],
     agerank: "0000000007|0000000000|0000000000|00000000", blurb: 'dead from the start, born by a soon, the old tombstone again' },
   { initial: Empty,    chain: [["gone", 5, 0], ["gone", 7, 0]],
-    streamed: [["item", "gone", 5, 0], ["life", "died", null, null, 5, 0], ["item", "gone", 7, 0], ["life", "died", 5, 0, 7, 0]],
+    streamed: [["item", "gone", 5, 0], ["life", "died", "vacant", -1, 5, 0], ["item", "gone", 7, 0], ["life", "died", 5, 0, 7, 0]],
     agerank: "0000000007|0000000000|0000000000|00000000", blurb: 'dead to dead, the life between unseen' },
   { initial: Empty,    chain: [["full", 4, 2], ["soon", 6, 0], ["full", 6, 1]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "soon", 6, 0], ["life", "born", 4, 2, 6, 0], ["aged", "here", "bare", 6, 0], ["item", "full", 6, 1]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["item", "soon", 6, 0], ["life", "born", 4, 2, 6, 0], ["aged", "here", "bare", 6, 0], ["item", "full", 6, 1]],
     agerank: "0000000006|0000000001|0000000001|00000000", blurb: 'a birth past an unseen death, seen by a soon' },
   { initial: Empty,    chain: [["full", 4, 2], ["full", 6, 0]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "full", 6, 0], ["life", "born", 4, 2, 6, 0]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["item", "full", 6, 0], ["life", "born", 4, 2, 6, 0]],
     agerank: "0000000006|0000000000|0000000000|00000000", blurb: 'a birth past an unseen death, by a full record' },
   { initial: Empty,    chain: [["full", 4, 2], ["full", 8, 0]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "full", 8, 0], ["life", "born", 4, 2, 8, 0]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["item", "full", 8, 0], ["life", "born", 4, 2, 8, 0]],
     agerank: "0000000008|0000000000|0000000000|00000000", blurb: 'two lives on, nothing seen between' },
   { initial: Empty,    chain: [["full", 4, 2], ["gone", 7, 0]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "gone", 7, 0], ["life", "died", 4, 2, 7, 0]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["item", "gone", 7, 0], ["life", "died", 4, 2, 7, 0]],
     agerank: "0000000007|0000000000|0000000000|00000000", blurb: 'on to a later death, a life unseen' },
   { initial: Empty,    chain: [["full", 4, 1], ["soon", 4, 3], ["gone", 5, 0]],
-    streamed: [["item", "full", 4, 1], ["life", "born", null, null, 4, 1], ["item", "soon", 4, 3], ["aged", "here", "cold", 4, 3], ["item", "gone", 5, 0], ["life", "died", 4, 3, 5, 0]],
+    streamed: [["item", "full", 4, 1], ["life", "born", "vacant", -1, 4, 1], ["item", "soon", 4, 3], ["aged", "here", "cold", 4, 3], ["item", "gone", 5, 0], ["life", "died", 4, 3, 5, 0]],
     agerank: "0000000005|0000000000|0000000000|00000000", blurb: 'a death while cold' },
   { initial: Empty,    chain: [["soon", 4, 3], ["gone", 5, 0]],
-    streamed: [["item", "soon", 4, 3], ["life", "born", null, null, 4, 3], ["aged", null, "bare", 4, 3], ["item", "gone", 5, 0], ["life", "died", 4, 3, 5, 0]],
+    streamed: [["item", "soon", 4, 3], ["life", "born", "vacant", -1, 4, 3], ["aged", "vacant", "bare", 4, 3], ["item", "gone", 5, 0], ["life", "died", 4, 3, 5, 0]],
     agerank: "0000000005|0000000000|0000000000|00000000", blurb: 'a death while bare' },
   { initial: Empty,    chain: [["full", 4, 2], ["gone", 5, 0], ["full", 4, 3], ["soon", 4, 9], ["gone", 5, 0]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "gone", 5, 0], ["life", "died", 4, 2, 5, 0]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["item", "gone", 5, 0], ["life", "died", 4, 2, 5, 0]],
     agerank: "0000000005|0000000000|0000000000|00000000", blurb: 'records of the dead life after its tombstone' },
   { initial: Empty,    chain: [["gone", 5, 0], ["soon", 6, 2], ["full", 4, 9], ["full", 6, 1], ["full", 6, 2]],
-    streamed: [["item", "gone", 5, 0], ["life", "died", null, null, 5, 0], ["item", "soon", 6, 2], ["life", "born", 5, 0, 6, 2], ["aged", "here", "bare", 6, 2], ["item", "full", 6, 1], ["aged", "bare", "cold", 6, 2], ["item", "full", 6, 2]],
+    streamed: [["item", "gone", 5, 0], ["life", "died", "vacant", -1, 5, 0], ["item", "soon", 6, 2], ["life", "born", 5, 0, 6, 2], ["aged", "here", "bare", 6, 2], ["item", "full", 6, 1], ["aged", "bare", "cold", 6, 2], ["item", "full", 6, 2]],
     agerank: "0000000006|0000000002|0000000002|00000000", blurb: 'a soon of a rebirth, a record of an old life, then catching up' },
   { initial: Empty,    chain: [["full", 4, 1], ["soon", 4, 2], ["soon", 6, 0], ["full", 4, 2], ["full", 6, 0]],
-    streamed: [["item", "full", 4, 1], ["life", "born", null, null, 4, 1], ["item", "soon", 4, 2], ["aged", "here", "cold", 4, 2], ["item", "soon", 6, 0], ["life", "born", 4, 2, 6, 0], ["aged", "cold", "bare", 6, 0], ["item", "full", 6, 0]],
+    streamed: [["item", "full", 4, 1], ["life", "born", "vacant", -1, 4, 1], ["item", "soon", 4, 2], ["aged", "here", "cold", 4, 2], ["item", "soon", 6, 0], ["life", "born", 4, 2, 6, 0], ["aged", "cold", "bare", 6, 0], ["item", "full", 6, 0]],
     agerank: "0000000006|0000000000|0000000000|00000000", blurb: 'cold across a rebirth: the catch-up of the old life comes too late' },
   { initial: Empty,    chain: [["gone", 5, 0], ["soon", 6, 0], ["soon", 6, 0], ["full", 6, 0], ["full", 6, 0]],
-    streamed: [["item", "gone", 5, 0], ["life", "died", null, null, 5, 0], ["item", "soon", 6, 0], ["life", "born", 5, 0, 6, 0], ["aged", "here", "bare", 6, 0], ["item", "full", 6, 0]],
+    streamed: [["item", "gone", 5, 0], ["life", "died", "vacant", -1, 5, 0], ["item", "soon", 6, 0], ["life", "born", 5, 0, 6, 0], ["aged", "here", "bare", 6, 0], ["item", "full", 6, 0]],
     agerank: "0000000006|0000000000|0000000000|00000000", blurb: 'a rebirth seen twice and fetched twice' },
   { initial: Empty,    chain: [["full", 4, 7], ["gone", 5, 0], ["full", 6, 0], ["soon", 6, 1]],
-    streamed: [["item", "full", 4, 7], ["life", "born", null, null, 4, 7], ["item", "gone", 5, 0], ["life", "died", 4, 7, 5, 0], ["item", "full", 6, 0], ["life", "born", 5, 0, 6, 0], ["item", "soon", 6, 1], ["aged", "here", "cold", 6, 1]],
+    streamed: [["item", "full", 4, 7], ["life", "born", "vacant", -1, 4, 7], ["item", "gone", 5, 0], ["life", "died", 4, 7, 5, 0], ["item", "full", 6, 0], ["life", "born", 5, 0, 6, 0], ["item", "soon", 6, 1], ["aged", "here", "cold", 6, 1]],
     agerank: "0000000006|0000000001|0000000000|00000000", blurb: 'revisions start over in each life' },
-  { initial: Empty,    chain: [["void", -1, -1], ["void", -1, -1]], streamed: [["item", "void", -1, -1], ["life", "died", null, null, -1, -1]],                      agerank: "-000000001|-000000001|-000000001|00000000", blurb: 'a void twice' },
+  { initial: Empty,    chain: [["void", -1, -1], ["void", -1, -1]], streamed: [["item", "void", -1, -1], ["life", "died", "vacant", -1, -1, -1]],                    agerank: "-000000001|-000000001|-000000001|00000000", blurb: 'a void twice' },
   { initial: Empty,    chain: [["void", -1, -1], ["void", 9, -1], ["void", -1, -1], ["void", 9, -1]],
-    streamed: [["item", "void", -1, -1], ["life", "died", null, null, -1, -1], ["item", "void", 9, -1], ["life", "died", -1, -1, 9, -1]],
+    streamed: [["item", "void", -1, -1], ["life", "died", "vacant", -1, -1, -1], ["item", "void", 9, -1], ["life", "died", -1, -1, 9, -1]],
     agerank: "0000000009|-000000001|-000000001|00000000", blurb: 'a void, then a void of a later life, each again' },
   { initial: Empty,    chain: [["full", 4, 2], ["void", 5, -1], ["full", 4, 3], ["soon", 4, 9]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "void", 5, -1], ["life", "died", 4, 2, 5, -1]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["item", "void", 5, -1], ["life", "died", 4, 2, 5, -1]],
     agerank: "0000000005|-000000001|-000000001|00000000", blurb: 'a void of a later life: records of the old life return no events' },
   { initial: Empty,    chain: [["full", 4, 2], ["void", 5, -1], ["soon", 6, 0], ["full", 6, 0], ["gone", 7, 0]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "void", 5, -1], ["life", "died", 4, 2, 5, -1], ["item", "soon", 6, 0], ["life", "born", 5, -1, 6, 0], ["aged", "here", "bare", 6, 0], ["item", "full", 6, 0], ["item", "gone", 7, 0], ["life", "died", 6, 0, 7, 0]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["item", "void", 5, -1], ["life", "died", 4, 2, 5, -1], ["item", "soon", 6, 0], ["life", "born", 5, -1, 6, 0], ["aged", "here", "bare", 6, 0], ["item", "full", 6, 0], ["item", "gone", 7, 0], ["life", "died", 6, 0, 7, 0]],
     agerank: "0000000007|0000000000|0000000000|00000000", blurb: 'a void of a later life, then born, written and dead' },
   { initial: Empty,    chain: [["void", 5, -1], ["full", 4, 2], ["void", 9, -1]],
-    streamed: [["item", "void", 5, -1], ["life", "died", null, null, 5, -1], ["item", "void", 9, -1], ["life", "died", 5, -1, 9, -1]],
+    streamed: [["item", "void", 5, -1], ["life", "died", "vacant", -1, 5, -1], ["item", "void", 9, -1], ["life", "died", 5, -1, 9, -1]],
     agerank: "0000000009|-000000001|-000000001|00000000", blurb: 'a void of each of two later lives, a record of an earlier life between' },
-  { initial: Empty,    chain: [["full", 4, 1], ["void", -1, -1]], streamed: [["item", "full", 4, 1], ["life", "born", null, null, 4, 1]],                          agerank: "0000000004|0000000001|0000000001|00000000", blurb: 'a void after a record' },
+  { initial: Empty,    chain: [["full", 4, 1], ["void", -1, -1]], streamed: [["item", "full", 4, 1], ["life", "born", "vacant", -1, 4, 1]],                        agerank: "0000000004|0000000001|0000000001|00000000", blurb: 'a void after a record' },
   { initial: Empty,    chain: [["void", -1, -1], ["full", 4, 0]],
-    streamed: [["item", "void", -1, -1], ["life", "died", null, null, -1, -1], ["item", "full", 4, 0], ["life", "born", -1, -1, 4, 0]],
+    streamed: [["item", "void", -1, -1], ["life", "died", "vacant", -1, -1, -1], ["item", "full", 4, 0], ["life", "born", -1, -1, 4, 0]],
     agerank: "0000000004|0000000000|0000000000|00000000", blurb: 'a void, then a first write' },
   { initial: Empty,    chain: [["void", -1, -1], ["gone", 5, 0]],
-    streamed: [["item", "void", -1, -1], ["life", "died", null, null, -1, -1], ["item", "gone", 5, 0], ["life", "died", -1, -1, 5, 0]],
+    streamed: [["item", "void", -1, -1], ["life", "died", "vacant", -1, -1, -1], ["item", "gone", 5, 0], ["life", "died", -1, -1, 5, 0]],
     agerank: "0000000005|0000000000|0000000000|00000000", blurb: 'a void, then a tombstone' },
   { initial: Empty,    chain: [["void", -1, -1], ["soon", 4, 0], ["full", 4, 0], ["soon", 4, 2], ["full", 4, 1], ["full", 4, 2], ["gone", 5, 0], ["soon", 6, 0], ["full", 6, 0], ["gone", 7, 0]],
-    streamed: [["item", "void", -1, -1], ["life", "died", null, null, -1, -1], ["item", "soon", 4, 0], ["life", "born", -1, -1, 4, 0], ["aged", "here", "bare", 4, 0], ["item", "full", 4, 0], ["item", "soon", 4, 2], ["aged", "here", "cold", 4, 2], ["item", "full", 4, 1], ["aged", "cold", "cold", 4, 2], ["item", "full", 4, 2], ["item", "gone", 5, 0], ["life", "died", 4, 2, 5, 0], ["item", "soon", 6, 0], ["life", "born", 5, 0, 6, 0], ["aged", "here", "bare", 6, 0], ["item", "full", 6, 0], ["item", "gone", 7, 0], ["life", "died", 6, 0, 7, 0]],
+    streamed: [["item", "void", -1, -1], ["life", "died", "vacant", -1, -1, -1], ["item", "soon", 4, 0], ["life", "born", -1, -1, 4, 0], ["aged", "here", "bare", 4, 0], ["item", "full", 4, 0], ["item", "soon", 4, 2], ["aged", "here", "cold", 4, 2], ["item", "full", 4, 1], ["aged", "cold", "cold", 4, 2], ["item", "full", 4, 2], ["item", "gone", 5, 0], ["life", "died", 4, 2, 5, 0], ["item", "soon", 6, 0], ["life", "born", 5, 0, 6, 0], ["aged", "here", "bare", 6, 0], ["item", "full", 6, 0], ["item", "gone", 7, 0], ["life", "died", 6, 0, 7, 0]],
     agerank: "0000000007|0000000000|0000000000|00000000", blurb: 'a long life: void, born, written, behind, dead, born again, dead' },
   // Longer chains across chunks, from nothing:
   { initial: Empty,    chain: [["full", 4, 4, 1], ["full", 4, 4, 1]],
-    streamed: [["item", "full", 4, 4, 1], ["life", "born", null, null, 4, 4]],
+    streamed: [["item", "full", 4, 4, 1], ["life", "born", "vacant", -1, 4, 4]],
     agerank: "0000000004|0000000004|0000000004|00000001", blurb: 'the same whole record twice in one chunk: the second returns nothing' },
   { initial: Empty,    chain: [["full", 4, 4, 2], ["full", 4, 4, 1]],
-    streamed: [["item", "full", 4, 4, 2], ["life", "born", null, null, 4, 4]],
+    streamed: [["item", "full", 4, 4, 2], ["life", "born", "vacant", -1, 4, 4]],
     agerank: "0000000004|0000000004|0000000004|00000002", blurb: 'the same whole record again from an earlier chunk returns nothing' },
   { initial: Empty,    chain: [["full", 4, 4], ["full", 4, 4, 1], ["full", 4, 4, 2]],
-    streamed: [["item", "full", 4, 4], ["life", "born", null, null, 4, 4], ["item", "full", 4, 4, 1], ["item", "full", 4, 4, 2]],
+    streamed: [["item", "full", 4, 4], ["life", "born", "vacant", -1, 4, 4], ["item", "full", 4, 4, 1], ["item", "full", 4, 4, 2]],
     agerank: "0000000004|0000000004|0000000004|00000002", blurb: 'the same whole record in each of three chunks' },
   { initial: Empty,    chain: [["full", 4, 4], ["soon", 4, 4, 1], ["full", 4, 4, 1]],
-    streamed: [["item", "full", 4, 4], ["life", "born", null, null, 4, 4], ["item", "soon", 4, 4, 1]],
+    streamed: [["item", "full", 4, 4], ["life", "born", "vacant", -1, 4, 4], ["item", "soon", 4, 4, 1]],
     agerank: "0000000004|0000000004|0000000004|00000001", blurb: 'here, then a soon at its revision a chunk later, then the full record in that chunk' },
   { initial: Empty,    chain: [["full", 4, 4, 1], ["full", 4, 3, 2], ["soon", 4, 3, 2]],
-    streamed: [["item", "full", 4, 4, 1], ["life", "born", null, null, 4, 4]],
+    streamed: [["item", "full", 4, 4, 1], ["life", "born", "vacant", -1, 4, 4]],
     agerank: "0000000004|0000000004|0000000004|00000001", blurb: 'a record below the highest, in a later chunk, returns nothing' },
   { initial: Empty,    chain: [["full", 4, 2], ["soon", 4, 4], ["full", 4, 2, 1], ["soon", 4, 4, 1]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "soon", 4, 4], ["aged", "here", "cold", 4, 4], ["item", "soon", 4, 4, 1], ["aged", "cold", "cold", 4, 4]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["item", "soon", 4, 4], ["aged", "here", "cold", 4, 4], ["item", "soon", 4, 4, 1], ["aged", "cold", "cold", 4, 4]],
     agerank: "0000000004|0000000004|0000000002|00000001", blurb: 'while cold: the revision of the item a chunk later returns nothing, the highest returns its item' },
   { initial: Empty,    chain: [["soon", 4, 3], ["soon", 4, 3, 1], ["full", 4, 3, 1]],
-    streamed: [["item", "soon", 4, 3], ["life", "born", null, null, 4, 3], ["aged", null, "bare", 4, 3], ["item", "soon", 4, 3, 1], ["aged", "bare", "bare", 4, 3], ["item", "full", 4, 3, 1]],
+    streamed: [["item", "soon", 4, 3], ["life", "born", "vacant", -1, 4, 3], ["aged", "vacant", "bare", 4, 3], ["item", "soon", 4, 3, 1], ["aged", "bare", "bare", 4, 3], ["item", "full", 4, 3, 1]],
     agerank: "0000000004|0000000003|0000000003|00000001", blurb: 'while bare: the soon a chunk later, then its full record in that chunk' },
   { initial: Empty,    chain: [["full", 4, 4, 2], ["full", 4, 5, 1], ["full", 4, 5, 2]],
-    streamed: [["item", "full", 4, 4, 2], ["life", "born", null, null, 4, 4], ["item", "full", 4, 5, 1], ["item", "full", 4, 5, 2]],
+    streamed: [["item", "full", 4, 4, 2], ["life", "born", "vacant", -1, 4, 4], ["item", "full", 4, 5, 1], ["item", "full", 4, 5, 2]],
     agerank: "0000000004|0000000005|0000000005|00000002", blurb: 'a newer revision read earlier than the last sighting: its tcchunk starts over at its own' },
   { initial: Empty,    chain: [["full", 4, 4, 2], ["full", 4, 5, 1], ["full", 4, 4, 3]],
-    streamed: [["item", "full", 4, 4, 2], ["life", "born", null, null, 4, 4], ["item", "full", 4, 5, 1]],
+    streamed: [["item", "full", 4, 4, 2], ["life", "born", "vacant", -1, 4, 4], ["item", "full", 4, 5, 1]],
     agerank: "0000000004|0000000005|0000000005|00000001", blurb: 'an older revision read later returns nothing' },
   { initial: Empty,    chain: [["full", 4, 4, 2], ["full", 6, 0, 1]],
-    streamed: [["item", "full", 4, 4, 2], ["life", "born", null, null, 4, 4], ["item", "full", 6, 0, 1], ["life", "born", 4, 4, 6, 0]],
+    streamed: [["item", "full", 4, 4, 2], ["life", "born", "vacant", -1, 4, 4], ["item", "full", 6, 0, 1], ["life", "born", 4, 4, 6, 0]],
     agerank: "0000000006|0000000000|0000000000|00000001", blurb: 'a later life read earlier' },
   { initial: Empty,    chain: [["full", 6, 0, 1], ["full", 4, 4, 2]],
-    streamed: [["item", "full", 6, 0, 1], ["life", "born", null, null, 6, 0]],
+    streamed: [["item", "full", 6, 0, 1], ["life", "born", "vacant", -1, 6, 0]],
     agerank: "0000000006|0000000000|0000000000|00000001", blurb: 'an earlier life read later returns nothing' },
   { initial: Empty,    chain: [["full", 4, 4, 3], ["full", 4, 4, 1], ["full", 4, 4, 2], ["full", 4, 4, 4]],
-    streamed: [["item", "full", 4, 4, 3], ["life", "born", null, null, 4, 4], ["item", "full", 4, 4, 4]],
+    streamed: [["item", "full", 4, 4, 3], ["life", "born", "vacant", -1, 4, 4], ["item", "full", 4, 4, 4]],
     agerank: "0000000004|0000000004|0000000004|00000004", blurb: 'sightings out of order: only a chunk past the latest returns its item' },
   { initial: Empty,    chain: [["gone", 5, 0], ["gone", 5, 0, 1], ["gone", 5, 0, 1]],
-    streamed: [["item", "gone", 5, 0], ["life", "died", null, null, 5, 0], ["item", "gone", 5, 0, 1]],
+    streamed: [["item", "gone", 5, 0], ["life", "died", "vacant", -1, 5, 0], ["item", "gone", 5, 0, 1]],
     agerank: "0000000005|0000000000|0000000000|00000001", blurb: 'a tombstone again a chunk later, then again in that chunk' },
   { initial: Empty,    chain: [["full", 4, 2], ["void", 5, -1, 1], ["void", 5, -1, 2]],
-    streamed: [["item", "full", 4, 2], ["life", "born", null, null, 4, 2], ["item", "void", 5, -1, 1], ["life", "died", 4, 2, 5, -1], ["item", "void", 5, -1, 2]],
+    streamed: [["item", "full", 4, 2], ["life", "born", "vacant", -1, 4, 2], ["item", "void", 5, -1, 1], ["life", "died", 4, 2, 5, -1], ["item", "void", 5, -1, 2]],
     agerank: "0000000005|-000000001|-000000001|00000002", blurb: 'a void of a later life, then again a chunk later' },
   { initial: Empty,    chain: [["soon", 4, 1], ["full", 4, 1, 1], ["soon", 4, 2, 1], ["full", 4, 2, 3], ["full", 4, 2, 2], ["soon", 4, 2, 4], ["gone", 5, 0, 4], ["gone", 5, 0, 5]],
-    streamed: [["item", "soon", 4, 1], ["life", "born", null, null, 4, 1], ["aged", null, "bare", 4, 1], ["item", "full", 4, 1, 1], ["item", "soon", 4, 2, 1], ["aged", "here", "cold", 4, 2], ["item", "full", 4, 2, 3], ["item", "soon", 4, 2, 4], ["item", "gone", 5, 0, 4], ["life", "died", 4, 2, 5, 0], ["item", "gone", 5, 0, 5]],
+    streamed: [["item", "soon", 4, 1], ["life", "born", "vacant", -1, 4, 1], ["aged", "vacant", "bare", 4, 1], ["item", "full", 4, 1, 1], ["item", "soon", 4, 2, 1], ["aged", "here", "cold", 4, 2], ["item", "full", 4, 2, 3], ["item", "soon", 4, 2, 4], ["item", "gone", 5, 0, 4], ["life", "died", 4, 2, 5, 0], ["item", "gone", 5, 0, 5]],
     agerank: "0000000005|0000000000|0000000000|00000005", blurb: 'a life across chunks: listed, fetched, listed, fetched late, seen again, dead' },
 ]
 // --
@@ -574,21 +575,19 @@ function shorthandOf(event: VaultEvent, record: SeenThing, chunk: Chunk = 0): Sh
     return (chunk === 0) ? item : [...item, chunk]
   }
   case 'life': {
-    const [lifeWas, highWas] = (event.agerankWas === undefined) ? [null, null] : lifeHighOf(event.agerankWas)
+    const [lifeWas, highWas] = (event.agerankWas === VacantAgerank) ? ['vacant', -1] as const : lifeHighOf(event.agerankWas)
     const [life, high] = lifeHighOf(event.agerank)
     return ['life', event.lifekind, lifeWas, highWas, life, high]
   }
   case 'aged': {
     const [life, high] = lifeHighOf(event.agerank)
-    return ['aged', event.agekindWas ?? null, event.agekind, life, high]
+    return ['aged', event.agekindWas, event.agekind, life, high]
   }
   }
 }
 
 /** True when `event`'s agerank is above the one before it */
-function isNewer(event: VaultEvent): boolean {
-  return (event.agerank !== undefined) && ((event.agerankWas === undefined) || (event.agerank > event.agerankWas))
-}
+function isNewer(event: VaultEvent): boolean { return event.agerank > event.agerankWas }
 // --
 
 describe("Thing.receive, over the feed table", () => {
@@ -599,7 +598,7 @@ describe("Thing.receive, over the feed table", () => {
       const shorthands: Shorthand[] = []
       for (const seen of chain) {
         const record        = recordOf(seen)
-        const agerankBefore = thing?.agerank
+        const agerankBefore = thing?.agerank ?? VacantAgerank
         const [receiver, events] = received(thing, record, readTcOf(chunkOf(seen)))
         thing = receiver
         shorthands.push(...events.map((event) => shorthandOf(event, record, chunkOf(seen))))
@@ -623,7 +622,7 @@ describe("Thing.receive", () => {
     expect(events.map(({ eventkind }) => eventkind)).to.deep.equal(['item', 'life', 'aged'])
     expect(events[0]).to.include({ liveness: 'soon', val: record })
     for (const event of events) {
-      expect(event).to.deep.include({ userid: 'u1', banklabel: 'acme', labelpath: 'box/openai', modelkind: 'box', agerankWas: undefined, banktok: undefined, sourcelabel: undefined, read_tc: ReadTcChunk0 })
+      expect(event).to.deep.include({ userid: 'u1', banklabel: 'acme', labelpath: 'box/openai', modelkind: 'box', agerankWas: VacantAgerank, banktok: SX.VoidLifeTok, sourcelabel: VaultDBSourcelabel, read_tc: ReadTcChunk0 })
     }
   })
 
@@ -707,7 +706,7 @@ describe("Thing.receive", () => {
 describe("Thing.agekind", () => {
   const whole2 = TH.boxThingOf('openai', { revseq: 2 })
   const AgekindCases = [
-    [[],                                                                        undefined, 'is undefined before any record'],
+    [[],                                                                        "vacant",  'is vacant before any record'],
     [[whole2],                                                                  "here",    'is here once the newest revision is seen whole'],
     [[TH.boxSparseOf(whole2)],                                                  "bare",    'is bare while no revision of the life is seen whole'],
     [[whole2, TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 4 }))],          "cold",    'is cold while an older revision of the life is seen whole'],
@@ -885,9 +884,9 @@ describe("Thing's props, record and citable", () => {
     }
   })
 
-  it("has no agerank and no read_at until it first receives a record", () => {
+  it("has the vacant agerank and no read_at until it first receives a record", () => {
     const thing = TH.PlainThing.make(TH.boxThingOf())
-    expect([thing.agerank, thing.read_at]).to.deep.equal([undefined, undefined])
+    expect([thing.agerank, thing.read_at]).to.deep.equal([VacantAgerank, undefined])
   })
 
   it("shows only its Thing fields in a spread, its keys and JSON", () => {

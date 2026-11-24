@@ -47,13 +47,13 @@ export type DelOnceArgs<RecordT extends ThingRecord = ThingRecord> = Readonly<Om
 export const VaultMinderChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn }) => ({
   makeArgs:  obj({ scope: ThingChecks.bankScope, opts: obj({ vaultDB: ThingChecks.vaultDBShape, makeThing: fn<ThingMaker>() }) }),
   listener:  obj({ hear: fn(), onBadNews: fn() }),
-  /** An event rung: its kind and scope, who dispatched it, when it was read, and its bank's lifetok if any. Its `val` is checked apart, and the rest is not read. */
+  /** An event rung: its kind and scope, who dispatched it, when it was read, and its bank's lifetok, the void one where its source knew none. Its `val` is checked apart, and the rest is not read. */
   rungEvent: obj({
     ...ThingChecks.thingScope.shape,
     eventkind:   oneof(vaultEventkindVals),
     sourcelabel: ThingChecks.label,
     read_tc:     SeenChecks.readTc,
-    banktok:     AskChecks.loggableAsk.shape.banktok,
+    banktok:     AskChecks.anyBanktok,
   }),
   /** The liveness of an `item` event rung, which says which check its `val` gets. */
   rungItem:  obj({ liveness: oneof(livenessVals) }),

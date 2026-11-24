@@ -159,7 +159,8 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
   try {
     const root   = await lease.seal(BaseBox, rootShell, { sidecar: {} }, { whisper: {} })
     // The roots it answers, written or found stored, are then the Things of the device's world, which shows them locked.
-    const answer = await device.world.demandVaultMinder().tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gateRecord, root, banktok: bankRecord.lifetok })
+    const vaultMinder = device.world.demandVaultMinder()
+    const answer = await vaultMinder.tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gateRecord, root, track: vaultMinder.knownRoots, banktok: bankRecord.lifetok })
     if (! answer.ok) { throw answer.err }
     // The user must hear that their passphrase was not set: the bank stored is another's.
     if (answer.val.bank.revtok !== bankRecord.revtok) { throw Throwers.gateMadeElsewhere() }
@@ -259,7 +260,7 @@ function provingOf(device: Device, gate: StampedGate, proof: ProvedCleartexts): 
 // The ask cites the revision the gating proved against, never the gate as it stands at the write: a gate change landed
 // meanwhile is refused as stale, and the proof unlocks nothing.
 /** The draft put ask that writes the revision after `ante`, with `wayins`, over `ante`, under the storage `policy`. */
-function nextGateAsk(ante: Ante, wayins: GateDna['wayins'], policy: EX.StoragePolicy): PutAskDraft<GateRecord> {
+function nextGateAsk(ante: Ante, wayins: GateDna['wayins'], policy: EX.StoragePolicy): Omit<PutAskDraft<GateRecord>, 'track' | 'banktok'> {
   return { cited: ante.record, record: Gate.makeNextRecord(ante.record, wayins), options: { policies: [policy] } }
 }
 // --

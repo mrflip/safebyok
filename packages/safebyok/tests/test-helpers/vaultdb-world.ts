@@ -7,11 +7,12 @@ import {
 } from '../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
 import { BaseThing } from '../../src/models/base-thing'
-import type { SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
-import { itemSeenOf, readTcNow } from '../../src/storage/agerank'
+import { type SeenThing, type VaultEvent, type VaultItemEvent, VaultDBSourcelabel } from '../../src/shapes/shapes-vault-event'
+import { SX } from 'safebyok-big/internals'
+import { VacantAgerank, itemSeenOf, readTcNow } from '../../src/storage/agerank'
 import { PlainThing } from './plain-thing'
 import { WayinChecks } from '../../src/shapes/shapes-wayin'
-import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
+import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, VoidTrack, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { FirstLifetok, FirstRevtok, T0, revtokOf } from './models-world'
 
 /** The bank the Things stand in. */
@@ -120,31 +121,34 @@ export function boxRebornOf(prior: BoxRecord, overrides: Partial<BoxRecord> = {}
   return { ...next, am: 'a', lifepath, lifeseq: Lifeseq.ofLifepath(lifepath), born_at: next.written_at, sidecar: {}, ...overrides }
 }
 
+/** What a test's ask has of its bank by default: no root known stored, and the bank's first lifetok. */
+export const SenderKnows = Object.freeze({ track: VoidTrack, banktok: FirstLifetok })
+
 /** The ask that births `record` (the main gate by default) over the shell it `cited` (a root's by default). */
 export function birthAskOf(record: ThingRecord = gateThingOf(), cited: ThingCited = Shell.Cited): WriteAsk {
-  return putAskOf({ cited, record, ifPresent: 'fail' })
+  return putAskOf({ cited, record, ifPresent: 'fail', ...SenderKnows })
 }
 
 /** The ask that puts `record` over the live Thing it `cited`, under the storage policies of `options`. */
 export function replaceAskOf<RecordT extends ThingRecord>(cited: CitedOf<RecordT>, record: RecordT, options?: PutAskDraft['options']): WriteAsk<RecordT> {
-  return putAskOf({ cited, record, ifAbsent: 'fail', ...(options && { options }) })
+  return putAskOf({ cited, record, ifAbsent: 'fail', ...(options && { options }), ...SenderKnows })
 }
 
 /** The ask that deletes the Thing it `cited` with the tombstone `record`. */
-export function delAskFor(cited: ThingCited, record: ThingRecord): WriteAsk { return delAskOf({ cited, record }) }
+export function delAskFor(cited: ThingCited, record: ThingRecord): WriteAsk { return delAskOf({ cited, record, ...SenderKnows }) }
 
 /** The ask that gets the main gate, answering null for none under `'nil'`. */
 export function getGateAskOf(ifAbsent: GetAsk['ifAbsent'] = 'nil'): GetAsk { return getAskAt('gate', ifAbsent) }
 
 /** The ask that gets the Thing at `labelpath` in {@link ThingBank}. */
-export function getAskAt(labelpath: Labelpath, ifAbsent: GetAsk['ifAbsent'] = 'nil'): GetAsk { return getAskOf({ ...ThingBank, labelpath, ifAbsent }) }
+export function getAskAt(labelpath: Labelpath, ifAbsent: GetAsk['ifAbsent'] = 'nil'): GetAsk { return getAskOf({ ...ThingBank, labelpath, ifAbsent, ...SenderKnows }) }
 
 /** The ask that lists the children of the Thing at `labelpath` in {@link ThingBank}. */
-export function listAskAt(labelpath: Labelpath): ListAsk { return listAskOf({ ...ThingBank, labelpath }) }
+export function listAskAt(labelpath: Labelpath): ListAsk { return listAskOf({ ...ThingBank, labelpath, ...SenderKnows }) }
 
 /** The ask that births {@link ThingBank} with its three roots, each at revision 0 of life 0, with `overrides` laid over it. */
 export function birthBankAskOf(overrides: Partial<BirthBankAsk> = {}): BirthBankAsk {
-  return { ...ThingBank, op: 'birth', bank: bankThingOf(), gate: gateThingOf(), root: rootBoxOf(), ...overrides }
+  return { ...ThingBank, op: 'birth', bank: bankThingOf(), gate: gateThingOf(), root: rootBoxOf(), ...SenderKnows, ...overrides }
 }
 
 /** The track of a sender with the main gate of another life. */
@@ -162,16 +166,16 @@ export const AnyReadTc = '(any read_tc)'
 
 /** `events`, each with its `read_tc` read as {@link AnyReadTc} where it is a UUID version 7, to compare with expected notices. */
 export function maskedReadTcsOf(events: readonly VaultEvent[]): VaultEvent[] {
-  return events.map((event) => (ReadTcPattern.test(event.read_tc ?? '') ? { ...event, read_tc: AnyReadTc } : event))
+  return events.map((event) => (ReadTcPattern.test(event.read_tc) ? { ...event, read_tc: AnyReadTc } : event))
 }
 
 /** The Thing a test's VaultMinder keeps at each labelpath: a plain one, as a device's is. */
 export function makePlainThing(seen: SeenThing): PlainThing { return PlainThing.make(seen) }
 
-/** The `item` notice a vaultDB's raw watch gets for `record`, at the liveness its record has, with no agerank and no source, at {@link AnyReadTc}, and with no bank lifetok unless given one. */
-export function itemEventOf(record: SeenThing, banktok?: Lifetok): VaultItemEvent {
+/** The `item` notice a vaultDB's raw watch gets for `record`, at the liveness its record has, with the vacant agerank, at {@link AnyReadTc}, and with the void lifetok unless given another. */
+export function itemEventOf(record: SeenThing, banktok: Lifetok = SX.VoidLifeTok): VaultItemEvent {
   const { userid, banklabel, labelpath } = record
-  const unsorted = { agerank: undefined, agerankWas: undefined, banktok, sourcelabel: undefined, read_tc: AnyReadTc }
+  const unsorted = { agerank: VacantAgerank, agerankWas: VacantAgerank, banktok, sourcelabel: VaultDBSourcelabel, read_tc: AnyReadTc }
   return { eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), ...unsorted, ...itemSeenOf(record) }
 }
 

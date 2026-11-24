@@ -8,6 +8,7 @@ import {
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 import { OtherRevtok } from './models-world'
 import { Lifeseq } from '../../src/shapes/primitives'
+import { VoidTrack } from '../../src/shapes/shapes-asks'
 
 /** Register the battery's cases of `tracked`. */
 export function describeVaultDBTracked({ fresh, bornBank }: VaultDBBatteryWorld): void {
@@ -47,10 +48,13 @@ export function describeVaultDBTracked({ fresh, bornBank }: VaultDBBatteryWorld)
       expect(await vaultDB.tryBirthBank(other)).to.deep.include({ ok: true, act: 'passed', tracked: { bank: 'same', gate: 'same', box: 'same' } })
     })
 
-    it("is not in the answer to an ask that tracks nothing", async () => {
+    it("is 'same' for each root an ask tracks at the void revision, whether or not one is stored", async () => {
+      const same    = { bank: 'same', gate: 'same', box: 'same' }
       const vaultDB = await bornBank()
-      expect(await vaultDB.tryGetThing(getAskAt('box'))).not.to.have.property('tracked')
-      expect(await vaultDB.tryListThings(listAskAt('box'))).not.to.have.property('tracked')
+      expect(await vaultDB.tryGetThing({ ...getAskAt('box'), track: VoidTrack })).to.deep.include({ ok: true, tracked: same })
+      expect(await vaultDB.tryListThings({ ...listAskAt('box'), track: VoidTrack })).to.deep.include({ ok: true, tracked: same })
+      const empty   = await fresh()
+      expect(await empty.tryGetThing({ ...getAskAt('box'), track: VoidTrack })).to.deep.include({ ok: true, act: 'gotvoid', tracked: same })
     })
 
     it("refuses a track that is not the revseq and lifepath of the bank, the main gate and the root box", async () => {

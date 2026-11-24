@@ -218,15 +218,14 @@ function ancestorOf({ userid, banklabel, labelpath }: ThingScope, raw: unknown):
 // The concrete adapter compares what an ask tracks with the bank, main gate and root box it fetched, in the step that fetched them.
 // `AdapterVaultDB` checks each row the concrete adapter reports in place of 'same'.
 
-/** A concrete adapter's report on the bank, main gate and root box an ask tracks: for each, `'same'` or the raw Thing. Null for an ask that tracks nothing. */
-export type TrackedFetched = Readonly<{ bank: unknown, [Labelpath.MainGate]: unknown, [Labelpath.RootBox]: unknown }> | null
+/** A concrete adapter's report on the bank, main gate and root box an ask tracks: for each, `'same'` or the raw Thing, null for none. */
+export type TrackedFetched = Readonly<{ bank: unknown, [Labelpath.MainGate]: unknown, [Labelpath.RootBox]: unknown }>
 
 /** The raw bank, main gate and root box a concrete adapter fetched, each null for none, under its key in a `track`. */
 export type TrackedRows = Readonly<{ bank: unknown, [Labelpath.MainGate]: unknown, [Labelpath.RootBox]: unknown }>
 
 /** The {@link TrackedFetched} report of what `ask` tracks against the raw rows a concrete adapter fetched, for one that compares in TypeScript. */
 export function trackedFetchedOf({ track }: AnyAsk, rows: TrackedRows): TrackedFetched {
-  if (track === undefined) { return null }
   return {
     bank:                 trackedRawOf(track.bank, rows.bank),
     [Labelpath.MainGate]: trackedRawOf(track[Labelpath.MainGate], rows[Labelpath.MainGate]),
@@ -239,19 +238,19 @@ function trackedRawOf(pair: Track['bank'], raw: unknown): unknown {
   return (CX.isPlainBag(raw) && (raw['revseq'] === pair.revseq) && (raw['lifepath'] === pair.lifepath)) ? 'same' : raw
 }
 
-/** The report's `tracked`, checked, from the concrete adapter's report for the bank at `bankScope`: null for an ask that tracks nothing. */
-export function trackedOf({ userid, banklabel }: ThingWatchScope, fetched: TrackedFetched): Tracked | null {
-  if (fetched === null) { return null }
+/** The report's `tracked`, checked, from the concrete adapter's report for what `ask` tracks. */
+export function trackedOf({ userid, banklabel, track }: AnyAsk, fetched: TrackedFetched): Tracked {
   return {
-    bank:                  trackedEntryOf(BankChecks.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank),
-    [Labelpath.MainGate]:  trackedEntryOf(GateChecks.stored, { userid, banklabel, labelpath: Labelpath.MainGate }, fetched[Labelpath.MainGate]),
-    [Labelpath.RootBox]:   trackedEntryOf(BoxChecks.stored, { userid, banklabel, labelpath: Labelpath.RootBox }, fetched[Labelpath.RootBox]),
+    bank:                  trackedEntryOf(BankChecks.stored, { userid, banklabel, labelpath: 'bank' }, track.bank, fetched.bank),
+    [Labelpath.MainGate]:  trackedEntryOf(GateChecks.stored, { userid, banklabel, labelpath: Labelpath.MainGate }, track[Labelpath.MainGate], fetched[Labelpath.MainGate]),
+    [Labelpath.RootBox]:   trackedEntryOf(BoxChecks.stored, { userid, banklabel, labelpath: Labelpath.RootBox }, track[Labelpath.RootBox], fetched[Labelpath.RootBox]),
   }
 }
 
-/** `'same'`, or the Thing at `scope` checked by `check`. */
-function trackedEntryOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>, scope: ThingScope, raw: unknown): RecordT | 'same' {
-  return (raw === 'same') ? 'same' : writtenOf(check, scope, raw)
+// A pair at the void revision is how an ask says it tracks nothing of that root, as an ask without a track once did.
+/** `'same'`, or the Thing at `scope` checked by `check`: a root `pair` tracks at the void revision is always `'same'`. */
+function trackedEntryOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>, scope: ThingScope, pair: Track['bank'], raw: unknown): RecordT | 'same' {
+  return ((raw === 'same') || (pair.revseq === SX.VoidRevisionSeq)) ? 'same' : writtenOf(check, scope, raw)
 }
 // --
 
@@ -340,7 +339,7 @@ function kidsOf(ask: ListAsk, parent: ThingRecord, deltas: readonly (ThingRecord
 }
 
 /** Classify a bank's birth, by its three `puts`, against the raw roots a concrete adapter fetched.
- * Under `born`, `things` and `world` are made of the puts' records, for the concrete adapter to write in one step, and `tracked` is null.
+ * Under `born`, `things`, `world` and `tracked` are made of the puts' records, for the concrete adapter to write in one step.
  * It then reports them as written, with the world, `tracked` and `read_tc` read after the write. Otherwise the answer is {@link unwrittenBirthOf}'s.
  */
 export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual {
@@ -348,8 +347,8 @@ export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): B
   if (unwritten !== null) { return unwritten }
   const [bankPut, gatePut, rootPut] = puts
   const things = { bank: bankPut.record, gate: gatePut.record, root: rootPut.record }
-  // Nothing is stored yet for an ask to track: what it tracks is read after the write.
-  return { ok: true, act: 'born', world: { ...things.bank, maingate: things.gate }, tracked: null, read_tc: fetched.read_tc, things }
+  const tracked = trackedOf(bankPut, trackedFetchedOf(bankPut, { bank: things.bank, [Labelpath.MainGate]: things.gate, [Labelpath.RootBox]: things.root }))
+  return { ok: true, act: 'born', world: { ...things.bank, maingate: things.gate }, tracked, read_tc: fetched.read_tc, things }
 }
 // --
 
