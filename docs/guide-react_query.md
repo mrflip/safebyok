@@ -26,16 +26,16 @@ package is from it. The other guides ([Suspense](guide-suspense.md), [Next.js](g
 </QueryClientProvider>
 //   A userid starts that user's device; null or undefined shows 'signed_out'. The config is read when the device starts.
 
-const bank = useBank()                       // synchronous, never suspends, never null
-switch (bank.stage) {                        // one field drives the screen
+const world = useWorld()                     // synchronous, never suspends, never null
+switch (world.stage) {                       // one field drives the screen
   case 'signed_out': return <Signin />
   case 'starting':   return <Spinner />
   case 'unborn':     return <CreateVault />  // nothing stored for this user yet
   case 'locked':                             // records show, sealed; a whisper needs the user
   case 'unlocked':   return <App />          // one component for both, so unlocking unmounts nothing
-  case 'failed':     return <ErrorPanel err={bank.lastErr} />
+  case 'failed':     return <ErrorPanel err={world.lastErr} />
 }
-const isLocked = useBank((b) => b.isLocked)  // with a selector: re-renders only when the pick changes
+const isLocked = useWorld((snap) => snap.isLocked) // with a selector: re-renders only when the pick changes
 
 const vault = useVault()   // the calls and the query factories, for whoever is signed in. The same object until that changes.
 ```
@@ -48,7 +48,7 @@ const keyMask = useBox('openai', { select: (thing) => liveOf(thing)?.sidecar.mas
 
 // Using the key: it stays inside mutationFn. The prompt is the variable.
 const ask = useMutation({ mutationFn: (prompt: string) => vault.withWhisper('openai', ({ apiKey }) => callOpenAI(apiKey, prompt)) })
-//   On a locked bank, withWhisper waits for the unlock form: show it while useBank((b) => b.isUnlockWanted).
+//   On a locked bank, withWhisper waits for the unlock form: show it while useWorld((snap) => snap.isUnlockWanted).
 
 // Saving the key: putBoxMutationOptions pops it from the form before anything is awaited, and runs offline, so nothing TanStack retains contains it.
 const save = useMutation(vault.putBoxMutationOptions('openai', {

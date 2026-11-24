@@ -12,7 +12,7 @@ export const SOK = reactGiver({
   strengthChecker: zxcvbnStrengthChecker,
 })
 
-// PascalCase, so the rules-of-hooks lint checks Knock.useBank() as a hook.
+// PascalCase, so the rules-of-hooks lint checks Knock.useWorld() as a hook.
 /** The hooks and calls of the app's one bank. */
 export const Knock = SOK.bank('knock')
 

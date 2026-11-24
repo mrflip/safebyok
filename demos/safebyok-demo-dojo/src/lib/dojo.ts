@@ -35,7 +35,7 @@ export const SOK = reactGiver({
   rootShelf:       localStorage,
 })
 
-// PascalCase, so the rules-of-hooks lint checks Dojo.useBank() as a hook.
+// PascalCase, so the rules-of-hooks lint checks Dojo.useWorld() as a hook.
 /** The hooks and calls of the app's one bank. */
 export const Dojo = SOK.bank(Banklabel)
 

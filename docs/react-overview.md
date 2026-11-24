@@ -18,7 +18,7 @@ the hooks alone for full control, the kit for a working screen in an afternoon.
 
 * **`hooks`** (`safebyok-react-lean`, in `src/giver/`): the low-level hooks, over the host's own
   React Query. `reactGiver(config)` is made once at module scope; its `Provider` says who is signed
-  in. Beneath it: `useBank` for the stage a screen switches on, `useBox`, `useBoxList` and `useGate`
+  in. Beneath it: `useWorld` for the stage a screen switches on, `useBox`, `useBoxList` and `useGate`
   for stored records, `withWhisper` for the one place a secret is read, `putBoxOnce`, `delBoxOnce`
   and `putBoxAction` for writes, `useDraft` for an editor, and a mutation for each form verb
   (`useUnlock`, `useBirth`, `useReplacePassphrase`, `useAddPasskey`, `useRevokePasskey`).
