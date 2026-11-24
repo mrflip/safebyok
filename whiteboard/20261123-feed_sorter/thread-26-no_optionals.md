@@ -1,6 +1,6 @@
 # Thread 26: no_optionals (2026-11-24)
 
-Branch `20261124-no_optionals`, PR #NNN, stacked on [#891](https://github.com/mrflip/safebyok/pull/891). Proved: see the
+Branch `20261124-no_optionals`, PR [#892](https://github.com/mrflip/safebyok/pull/892), stacked on [#891](https://github.com/mrflip/safebyok/pull/891). Proved: see the
 PR's **Tests:** line (`pnpm justify` in full; idb-lean, postgres, react-lean and the three lean demos by hand).
 
 Built by hand (no /sprint), from section A of [thread-24-whole_records-inventory.md](thread-24-whole_records-inventory.md).
