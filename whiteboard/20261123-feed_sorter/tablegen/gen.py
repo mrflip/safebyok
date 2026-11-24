@@ -3,28 +3,37 @@
 A duplicate of whiteboard/20261123-minder_matrix/tablegen/gen.py (#866), with `streamed` in place of `wanted`, and no
 `today`: there is no earlier sorter to baseline against.
 
-A record is (kind, life, rev), all flat: 'soon' a sparse record, 'full' a whole live one, 'gone' a whole tombstone, 'void'
+A record is (kind, life, rev) or (kind, life, rev, chunk), all flat: 'soon' a sparse record, 'full' a whole live one, 'gone' a whole tombstone, 'void'
 nothing stored, its rev -1. A life is one number that orders the lives at this scope, as a lifepath does: even lives are
 live, odd ones dead. A dead life has one revision, written 0, and no soon. A void's life is -1 where nothing was ever
 stored, or a number of its own where its parent was born again: a void of life 9 is above every record of an earlier
 life. A void counts as dead, and is treated as any whole record is. No chain gives a void and another record one life.
+A record's chunk is a small whole number naming the span of time it was read in, 0 where it is left out: the harness
+reads it at a read_tc whose first eight hexadecimal digits spell it.
 
-A scope's agerank is the joined string `life|high|item`, each spelled as a lifeseq is, in ten base-32 digits with -1 as
-`-000000001`: `high` the highest revision known of in that life, `item` the highest of a whole record seen in it, -1 for
-none. Two ageranks compare as text. A record is taken by preparing the agerank it would leave and comparing the two
-strings. It reads as here where high and item are equal, bare where item is -1, and cold otherwise. A row's `agerank` is
-the one its chain leaves the scope at: at a root's scope it is the sorter's own string, and at a deeper one the
-lifepath stands where the life does.
+A scope's agerank is the joined string `life|high|item|time`: `life`, `high` and `item` each spelled as a lifeseq is, in
+ten base-32 digits with -1 as `-000000001`, `high` the highest revision known of in that life, `item` the highest of a
+whole record seen in it, -1 for none; `time` the chunk the highest revision was last seen in, in eight hexadecimal
+digits. Two ageranks compare as text. A record is taken by preparing the agerank it would leave and comparing the two
+strings. The time belongs to the newest revision: a record of another life, or above `high`, brings its own; one at
+`high` brings the later of its own and the one before; any other keeps the one before. So a record seen again at the
+newest revision in a later chunk is taken, and returns its item. It reads as here where high and item are equal, bare
+where item is -1, and cold otherwise. A row's `agerank` is the one its chain leaves the scope at: at a root's scope it
+is the sorter's own string, and at a deeper one the lifepath stands where the life does.
 
 Run: python3 gen.py > table.ts.txt
 """
 import itertools, sys
 
+def timed(p, t):
+  """`p` read in chunk `t`: chunk 0 is left out, so a row at chunk 0 reads as it did before times."""
+  return p if t == 0 else p + (t,)
 VOID = ("void", -1, -1)
-def S(l, r): return ("soon", l, r)
-def F(l, r): return ("full", l, r)
-def G(l): return ("gone", l, 0)
-def V(l): return ("void", l, -1)
+def S(l, r, t=0): return timed(("soon", l, r), t)
+def F(l, r, t=0): return timed(("full", l, r), t)
+def G(l, t=0): return timed(("gone", l, 0), t)
+def V(l, t=0): return timed(("void", l, -1), t)
+def chunkOf(p): return p[3] if len(p) > 3 else 0
 
 # == the agerank
 DIGITS = "0123456789abcdefghijklmnopqrstuv"
@@ -34,28 +43,34 @@ def padded(n):
   out = ""
   while n: out = DIGITS[n % 32] + out; n //= 32
   return out.rjust(10, "0")
-def agerankOf(life, high, item): return "|".join(padded(n) for n in (life, high, item))
-def partsOf(agerank): return tuple(int(x, 32) for x in agerank.split("|"))
+def agerankOf(life, high, item, time): return "|".join([padded(life), padded(high), padded(item), format(time, "08x")])
+def partsOf(agerank):
+  life, high, item, time = agerank.split("|")
+  return (int(life, 32), int(high, 32), int(item, 32), int(time, 16))
 
 # == the principles
 def isWhole(p): return p[0] != "soon"
 
 def raisedOf(was, p):
   """The agerank `p` raises `was` to, or None where it raises nothing: prepare the agerank `p` would leave, then compare."""
-  kind, life, rev = p
-  lifeWas, high, item = partsOf(was) if was else (None, -1, -1)
-  if life != lifeWas: high, item = -1, -1
-  agerank = agerankOf(life, max(high, rev), max(item, rev) if isWhole(p) else item)
+  kind, life, rev = p[:3]
+  t = chunkOf(p)
+  lifeWas, high, item, time = partsOf(was) if was else (None, -1, -1, None)
+  if life != lifeWas: high, item, time = -1, -1, None
+  # The time belongs to the newest revision: when it was last seen.
+  if time is None or rev > high: time = t
+  elif rev == high: time = max(time, t)
+  agerank = agerankOf(life, max(high, rev), max(item, rev) if isWhole(p) else item, time)
   return agerank if (was is None or agerank > was) else None
 
 def tagOf(agerank):
-  _, high, item = partsOf(agerank)
+  _, high, item, _ = partsOf(agerank)
   return "here" if item == high else ("bare" if item == -1 else "cold")
 
 def eventsOf(was, agerank, p):
   """The events a record taken returns: the record, then a life change, then an aging."""
-  kind, life, rev = p
-  events = [("item", kind, life, rev)]
+  kind, life, rev = p[:3]
+  events = [timed(("item", kind, life, rev), chunkOf(p))]
   lifeWas, highWas = partsOf(was)[:2] if was else (None, None)
   # The first record of a scope returns a life too, from nothing: a listing may return only these.
   if life != lifeWas:
@@ -77,6 +92,8 @@ def streamOf(agerank, chain):
 
 # == what the principles promise, checked here over every short chain of the alphabet
 ALPHABET = [VOID, V(9), G(3), G(5), G(7)] + [k(l, r) for k in (S, F) for (l, r) in [(2, 9), (4, 1), (4, 2), (4, 3), (4, 4), (4, 5), (6, 0), (6, 1)]]
+# The alphabet read in each of three chunks, for the checks alone.
+TIMED_ALPHABET = [timed(p, t) for p in ALPHABET for t in (0, 1, 2)]
 
 def isFlat(chain):
   """True where no life is both a void's and another record's."""
@@ -85,7 +102,7 @@ def isFlat(chain):
 def checkPrinciples():
   count = 0
   for n in (1, 2, 3):
-    for chain in itertools.product(ALPHABET, repeat=n):
+    for chain in itertools.product(TIMED_ALPHABET, repeat=n):
       events, end, taken = streamOf(None, chain)
       ranks = [a for a, _ in taken]
       # Each agerank taken is above the last, as text.
@@ -99,6 +116,14 @@ def checkPrinciples():
       assert len(items) == len(set(items)), chain
       # A dead life, a void's among them, is always here.
       assert all(tagOf(a) == "here" for a, p in taken if p[0] == "void" or p[1] % 2 == 1), chain
+      # A record taken that raises only the time leaves the high and item as they were, and returns its item alone or with an aging.
+      for (a, p), was in zip(taken, [None] + ranks):
+        if was and a[:a.rindex("|")] == was[:was.rindex("|")]:
+          assert [e[0] for e in eventsOf(was, a, p)] in (["item"], ["item", "aged"]), chain
+      # The time an agerank ends at is the latest chunk of the records at its life and highest revision.
+      if taken:
+        life, high, _, time = partsOf(end)
+        assert time == max(chunkOf(p) for p in chain if p[1] == life and p[2] == high), chain
       count += 1
   return count
 
@@ -113,11 +138,15 @@ STARTS = [  # const, the chain that seeds it, its name in a comment
 ]
 
 def relOf(was, p):
-  """How `p` stands to the agerank `was`, in words."""
-  kind, life, rev = p
+  """How `p` stands to the agerank `was`, in words, with the chunk it was read in where that is not 0."""
+  return f"{relOfRecord(was, p)}, a chunk later" if chunkOf(p) else relOfRecord(was, p)
+
+def relOfRecord(was, p):
+  """How `p`, as a record, stands to the agerank `was`, in words."""
+  kind, life, rev = p[:3]
   noun = {"soon": "a soon", "full": "a full record", "gone": "a tombstone", "void": "a void"}[kind]
   if was is None: return noun
-  lifeWas, high, item = partsOf(was)
+  lifeWas, high, item, _ = partsOf(was)
   if life < lifeWas: return f"{noun} of an earlier life"
   if life > lifeWas: return f"{noun} of a later life"
   if kind in ("gone", "void"): return "its tombstone again" if kind == "gone" else "its void again"
@@ -168,6 +197,24 @@ CHAINS = [  # hand-written chains from nothing, each with what it is for
   ([VOID, S(4, 0), F(4, 0), S(4, 2), F(4, 1), F(4, 2), G(5), S(6, 0), F(6, 0), G(7)], "a long life: void, born, written, behind, dead, born again, dead"),
 ]
 
+TIMED_CHAINS = [  # hand-written chains from nothing, read across chunks, each with what it is for
+  ([F(4, 4, 1), F(4, 4, 1)],                                                  "the same whole record twice in one chunk: the second returns nothing"),
+  ([F(4, 4, 2), F(4, 4, 1)],                                                  "the same whole record again from an earlier chunk returns nothing"),
+  ([F(4, 4), F(4, 4, 1), F(4, 4, 2)],                                         "the same whole record in each of three chunks"),
+  ([F(4, 4), S(4, 4, 1), F(4, 4, 1)],                                         "here, then a soon at its revision a chunk later, then the full record in that chunk"),
+  ([F(4, 4, 1), F(4, 3, 2), S(4, 3, 2)],                                      "a record below the highest, in a later chunk, returns nothing"),
+  ([F(4, 2), S(4, 4), F(4, 2, 1), S(4, 4, 1)],                                "while cold: the revision of the item a chunk later returns nothing, the highest returns its item"),
+  ([S(4, 3), S(4, 3, 1), F(4, 3, 1)],                                         "while bare: the soon a chunk later, then its full record in that chunk"),
+  ([F(4, 4, 2), F(4, 5, 1), F(4, 5, 2)],                                      "a newer revision read earlier than the last sighting: its time starts over at its own"),
+  ([F(4, 4, 2), F(4, 5, 1), F(4, 4, 3)],                                      "an older revision read later returns nothing"),
+  ([F(4, 4, 2), F(6, 0, 1)],                                                  "a later life read earlier"),
+  ([F(6, 0, 1), F(4, 4, 2)],                                                  "an earlier life read later returns nothing"),
+  ([F(4, 4, 3), F(4, 4, 1), F(4, 4, 2), F(4, 4, 4)],                          "sightings out of order: only a chunk past the latest returns its item"),
+  ([G(5), G(5, 1), G(5, 1)],                                                  "a tombstone again a chunk later, then again in that chunk"),
+  ([F(4, 2), V(5, 1), V(5, 2)],                                               "a void of a later life, then again a chunk later"),
+  ([S(4, 1), F(4, 1, 1), S(4, 2, 1), F(4, 2, 3), F(4, 2, 2), S(4, 2, 4), G(5, 4), G(5, 5)], "a life across chunks: listed, fetched, listed, fetched late, seen again, dead"),
+]
+
 def fmtX(x): return "null" if x is None else (f"'{x}'" if isinstance(x, str) else (f"[{x[0]}, {x[1]}]" if isinstance(x, tuple) else str(x)))
 def fmtP(p): return "[" + ", ".join(fmtX(x) for x in p) + "]"
 def fmtPs(ps): return "[" + ", ".join(fmtP(p) for p in ps) + "]"
@@ -184,8 +231,23 @@ for const, seed, name in STARTS:
   for p in ALPHABET:
     events, end, _ = streamOf(start, [p])
     lines.append(("row", const, [p], events, end, relOf(start, p)))
+def itemsUntimed(events): return [e[:4] if e[0] == "item" else e for e in events]
+for const, seed, name in STARTS:
+  start = streamOf(None, seed)[1]
+  # Only the records a chunk later makes news of: any other returns what it returns in chunk 0.
+  later = [timed(p, 1) for p in ALPHABET if itemsUntimed(streamOf(start, [timed(p, 1)])[0]) != streamOf(start, [p])[0]]
+  if not later: continue
+  lines.append(("comment", f"On {name}, each record of the alphabet that a chunk later makes news:"))
+  for p in later:
+    events, end, _ = streamOf(start, [p])
+    lines.append(("row", const, [p], events, end, relOf(start, p)))
 lines.append(("comment", "Longer chains, from nothing:"))
 for chain, blurb in CHAINS:
+  assert isFlat(chain), chain
+  events, end, _ = streamOf(None, chain)
+  lines.append(("row", "Empty", chain, events, end, blurb))
+lines.append(("comment", "Longer chains across chunks, from nothing:"))
+for chain, blurb in TIMED_CHAINS:
   assert isFlat(chain), chain
   events, end, _ = streamOf(None, chain)
   lines.append(("row", "Empty", chain, events, end, blurb))
@@ -193,7 +255,7 @@ for chain, blurb in CHAINS:
 rows = [l for l in lines if l[0] == "row"]
 cells = [(f"initial: {c},", f"chain: {fmtPs(ch)},", f"streamed: {fmtPs(ev)},", f"agerank: {fmtAge(end)},", f"blurb: '{b}'") for (_, c, ch, ev, end, b) in rows]
 # Past its cap, a cell runs into the next on its own row only.
-widths = [min(max(len(c[i]) for c in cells), cap) for i, cap in enumerate([18, 36, 96, 46])]
+widths = [min(max(len(c[i]) for c in cells), cap) for i, cap in enumerate([18, 36, 96, 56])]
 out, it = [], iter(cells)
 for l in lines:
   if l[0] == "comment": out.append(f"  // {l[1]}")
@@ -204,4 +266,4 @@ for l in lines:
     if len(row) > 250: row = "  { " + c[0].ljust(widths[0]) + " " + c[1] + "\n    " + c[2] + "\n    " + c[3] + " " + c[4] + " },"
     out.append(row)
 print("\n".join(out))
-print(f"// rows: {len(rows)} ({len(CHAINS)} longer chains); principles held over {checkPrinciples()} chains of up to 3 records", file=sys.stderr)
+print(f"// rows: {len(rows)} ({len(CHAINS)} longer chains, {len(TIMED_CHAINS)} across chunks); principles held over {checkPrinciples()} chains of up to 3 records, each in up to three chunks", file=sys.stderr)
