@@ -64,3 +64,14 @@ Built by hand (no /sprint) from a handoff of two reviews' findings, A to H. Each
 * **For the Coach**:
   * H adds a core export, `vacateHandedCleartexts`, for the giver: confirm a core export is the right home, rather
     than giving the Gate makers a way to vacate without a gate.
+
+## After the report: finding H is taken out
+
+The Coach withdrew his go-ahead for H (the giver's gate form verbs vacating the host's cleartexts when they refuse for
+want of a bank): "it sounds pretty intrusive... Reaching in to a caller's methods is usually a sin", and asked how a
+host comes to show a form when the system is broken or unready. A host reaches that case only by rendering a gate form
+at a stage with no bank; the kit's own form renders only when an unlock is wanted, which needs a bank. The verb refuses
+before any mutation runs, so nothing of ours holds the cleartext. The commit and its `notes/security.md` amendment are
+dropped from this branch; the earlier entry there, which records the case as not fixed, stands. The old tip is tagged
+`20261124-review_fixes-with-cleartext-commit`. If the guarantee is wanted at every stage later, the plain way is for the
+world to make the gate gatings, as it makes the birth's.
