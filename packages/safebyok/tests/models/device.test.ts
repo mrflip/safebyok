@@ -93,7 +93,7 @@ describe("Device.make(record, opts)", () => {
     const queryClient = new QueryClient()
     queryClient.setQueryData(['host', 'notes'], { note: 'mine' })
     const { device, vault } = await TH.buildBornVault({ device: TH.makeDevice({}, { queryClient }) })
-    expect(device.tsqClient).to.equal(queryClient)
+    expect(device.vaultTsqClient).to.equal(queryClient)
     await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const keys = queryClient.getQueryCache().getAll().map(({ queryKey }) => queryKey)
     expect(keys).to.deep.include(['host', 'notes'])
@@ -107,11 +107,11 @@ describe("Device.make(record, opts)", () => {
 
   it("makes a QueryClient of its own where the host gives none, empty, the same before and after signin", async () => {
     const device = TH.makeDevice({ userid: null })
-    const { tsqClient } = device
-    expect(tsqClient.getQueryCache().getAll()).to.have.lengthOf(0)
+    const { vaultTsqClient } = device
+    expect(vaultTsqClient.getQueryCache().getAll()).to.have.lengthOf(0)
     await device.signin(TH.WorldScope.userid)
-    expect(device.tsqClient).to.equal(tsqClient)
-    expect(device.tsqClient).to.not.equal(TH.makeDevice({ userid: null }).tsqClient)
+    expect(device.vaultTsqClient).to.equal(vaultTsqClient)
+    expect(device.vaultTsqClient).to.not.equal(TH.makeDevice({ userid: null }).vaultTsqClient)
   })
 
   it("makes the vault TSQ at signin, refusing it before then", async () => {
@@ -120,14 +120,6 @@ describe("Device.make(record, opts)", () => {
     await device.signin(TH.WorldScope.userid)
     expect(device.vaultTSQ).to.be.instanceOf(VaultTSQ)
     expect(device.vaultTSQ).to.equal(device.vaultTSQ)
-  })
-
-  it("makes its QueryClient with it, empty, its VaultMinder's, the same before and after signin", () => {
-    const device = TH.makeDevice({ userid: null })
-    const { vaultTsqClient } = device
-    expect(vaultTsqClient.getQueryCache().getAll()).to.have.lengthOf(0)
-    void device.signin(TH.WorldScope.userid)
-    expect([device.vaultTsqClient, device.minder.tsqClient]).to.deep.equal([vaultTsqClient, vaultTsqClient])
   })
 
   it("serializes as its user, banklabel and token alone, and is frozen", () => {
@@ -268,7 +260,7 @@ describe("a device's persisters", () => {
     expect(Object.keys(device.minder.listingAt({ ...TH.WorldScope, labelpath: 'box' })?.items ?? {})).to.deep.equal(['openai'])
     expect(device.minder.at({ ...TH.WorldScope, labelpath: 'box/openai' })).to.have.property('labelpath', 'box/openai')
     expect(device.world.demandSortedVaultDB().thingAt({ ...TH.WorldScope, labelpath: 'box/openai' })?.pickle()).to.deep.equal(box.pickle())
-    expect(device.tsqClient.getQueryCache().getAll()).to.have.lengthOf(0)
+    expect(device.vaultTsqClient.getQueryCache().getAll()).to.have.lengthOf(0)
   })
 
   it("restore the signed-in bank's roots and boxes at signin, from the persisters its scope gives, and the stage stays starting until they have", async () => {

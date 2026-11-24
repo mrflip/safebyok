@@ -1,19 +1,19 @@
 /** The giver: a host's React layer over one bank, made once at module scope, before anyone signs in.
- * Its provider makes a device at its mount, tells it who is signed in, and hands its hooks that device. Its hooks observe the device's QueryClient, which the signed-in user's minder caches records in.
+ * Its provider makes a device at its mount, tells it who is signed in, and hands its hooks that device. Its hooks observe the device's QueryClient, which the signed-in user's vault TSQ keeps boxes in.
  */
 
 import { type DataTag, type QueryKey, type UseMutationOptions, type UseMutationResult, type UseQueryOptions, type UseQueryResult, QueryClient, mutationOptions, queryOptions, skipToken, useMutation, useQuery } from '@tanstack/react-query'
 import { pick } from 'es-toolkit'
 import { type ReactNode, type SyntheticEvent, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  type AddPasskeyDna, type Bank, type BankSnapshot, type BankStage, type BirthDna, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, type Kids, Labelpath,
+  type AddPasskeyDna, type Bank, type BankSnapshot, type BankStage, type BirthDna, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type ItemQueryOptions, type KeyDeriver, type Kids, Labelpath,
   type LiveOf, type LivePublicPropsOf, type MaskedView, type PasskeyWayinHeader, type PassphraseVerdict, type PassphraseWayinHeader,
-  type ReplacePassphraseDna, type RevokePasskeyDna, type UnlockDna, EmptyMaskedView, PendingBank, Shell, type Sidecar, SignedOutBank, type Tombstone, type TombstoneOf, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
+  type ReplacePassphraseDna, type RevokePasskeyDna, type UnlockDna, EmptyMaskedView, PendingBank, Shell, type Sidecar, SignedOutBank, type Tombstone, type TombstoneOf, type Userid, type Vault, VaultError, type VaultDB, VaultTSQ, type Whisper, bulletproofHandlerOf,
 } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
 import {
-  FormMutationDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, formMutationKeyOf, gateShownOf, liveGateOf, liveOf, recordQueryDefaults,
+  FormMutationDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, formMutationKeyOf, frozenOrSharedOf, gateShownOf, liveGateOf, liveOf,
 } from './giver-defaults'
 import { type Given, GiverContext } from './giver-context'
 import * as Phrases from './phrases-giver'
@@ -365,16 +365,18 @@ function makeBankGiver(friend: BankFriend) {
     return queryOptions({ ...boxQueryBaseOf(device, labelpath, isFetchable), select: liveOf<BoxRecord> })
   }
 
-  // Left with no queryFn, a query of the minder's item fetches by the client's own, which asks the minder of the item's
-  // bank and lands the record as a get's.
+  // Left with no queryFn, a query of the box's item fetches by the vault TSQ's default under the bank's key, which gets the
+  // box and answers what its Thing then holds. Its staleness and retries are the vault TSQ's defaults too.
   /** {@link boxQueryOf}, less its `select`. */
-  function boxQueryBaseOf(device: Device | null, labelpath: string, isFetchable: boolean): Pick<UseQueryOptions<BoxShown>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
+  function boxQueryBaseOf(device: Device | null, labelpath: string, isFetchable: boolean): Pick<UseQueryOptions<BoxShown>, 'queryKey' | 'queryFn' | 'initialData' | 'initialDataUpdatedAt' | 'structuralSharing'> {
     const boxLabelpath = boxLabelpathOf(labelpath)
-    return {
-      ...recordQueryDefaults(boxLabelpath, () => isBehindAt(device, boxLabelpath), (scoped) => device?.minder.deadAt(scoped)),
-      queryKey: boxQueryKeyOf({ userid: useridOf(device), banklabel, labelpath: boxLabelpath }),
-      ...((! isFetchable || (device === null)) && { queryFn: skipToken }),
+    const userid = useridOf(device)
+    if (! isFetchable || (device === null) || (userid === null)) {
+      return { queryKey: boxQueryKeyOf({ userid, banklabel, labelpath: boxLabelpath }), queryFn: skipToken, structuralSharing: frozenOrSharedOf }
     }
+    // The vault TSQ keeps a box's item as a box record, or null.
+    const { queryKey, initialData, initialDataUpdatedAt } = device.vaultTSQ.itemQueryOptions({ ...device.scope, labelpath: boxLabelpath }) as ItemQueryOptions & Readonly<{ initialData?: BoxShown }>
+    return { queryKey, structuralSharing: frozenOrSharedOf, ...((initialData !== undefined) && { initialData, initialDataUpdatedAt }) }
   }
 
   /** The `queryOptions` of the box at `labelpath`, for whoever is signed in when called: for a route loader or a prefetch.
@@ -399,7 +401,8 @@ function makeBankGiver(friend: BankFriend) {
 
   /** The box's stored record, through React Query, its whisper still sealed.
    * `data` is the record, null when none is stored or it was deleted, and undefined while pending or until the device's sign-in answers.
-   * A record overtaken by a newer revision shows until the newer one arrives.
+   * A record overtaken by a newer revision of the same life shows, stale, until the newer one arrives. Once the box is known
+   * to have a newer life, deleted and written again elsewhere, and nothing of that life has arrived whole, `data` is undefined and pending while it fetches the box again.
    * `opts` are React Query's options that shape what this one hook shows. A `select` given there is handed the whole record, or
    * null where none is stored or it was deleted: {@link liveOf} is the default. A `select` that returns a record should return it, or the item's own null,
    * never a null of its own: the hook reads null as nothing stored.
@@ -414,8 +417,9 @@ function makeBankGiver(friend: BankFriend) {
     return useQuery<BoxShown, Error, SelT>({ ...boxQueryBaseOf(device, labelpath, isFetchable), select: liveOf as (thing: BoxShown) => SelT, ...shaping }, client)
   }
 
-  // The gate is read from the world in the device's BankMinder at each render, and React keeps only the gate shown: the
-  // whole gate, with the bankKeys its wayins wrap, stays in the BankMinder.
+  // The gate is read from the world's gate Thing at each render, and React keeps only the gate shown: the whole gate, with
+  // the bankKeys its wayins wrap, stays in the Thing. The SortedVaultDB tells of every record of the gate that is news,
+  // which the Thing's own subscribers do not hear of; the snapshot is the same object until the gate's record changes.
   /** The bank's main gate: its wayins' headers, never the bankKey they wrap. Synchronous: it never waits and never suspends.
    * `data` is the gate, null when no bank is stored, and undefined until the device's sign-in answers.
    * Its `wayins.passkey0` is the header of the bank's passkey, or null while it has none: a passkey added or revoked on any device shows here.
@@ -428,17 +432,18 @@ function makeBankGiver(friend: BankFriend) {
     const { device } = useShown()
     const isFetchable = useBank(isFetchStage)
     const { select = liveGateOf as (gate: GateShown) => SelT } = opts
-    const subscribe = useCallback((onChange: () => void) => ((device === null) ? unsubscribeFromNothing : device.bankMinder.subscribe(onChange)), [device])
+    const subscribe = useCallback((onChange: () => void) => ((isFetchable && (device !== null)) ? listenToGate(device, onChange) : unsubscribeFromNothing), [isFetchable, device])
     const shownNow = () => ((isFetchable && (device !== null)) ? gateShownOfWorld(device) : undefined)
     const shown = useSyncExternalStore(subscribe, shownNow, shownNow)
     return { data: (shown === undefined) ? undefined : select(shown) }
   }
 
-  // The minder's listing fetches by a list, so the hook's first render once the bank is up lists the root box.
-  /** The labelpaths of the bank's boxes, through React Query, for a list that renders each one by {@link useBox}.
-   * `data` is the labelpaths in labelpath order, and undefined until the first list lands. It is the same array until the labelpaths change.
-   * A deleted box stays listed, and its `useBox` answers null. It lists again only on evidence, never on a remount, window focus or reconnect:
-   * a box this device writes or hears of for the first time, or `invalidateQueries` on {@link keys}`.boxList()`. The box joins when that list lands.
+  // The vault TSQ's listing fetches by a list, so the hook's first render once the bank is up lists the root box.
+  /** The labelpaths of the bank's live boxes, through React Query, for a list that renders each one by {@link useBox}.
+   * `data` is the labelpaths in labelpath order, as the last list answered, and undefined until the first list lands. It is the same array until the labelpaths change.
+   * It lists again only on evidence, never on a remount, window focus or reconnect: once a box is born or deleted, on this
+   * device or as it hears of one elsewhere, or on `invalidateQueries` on {@link keys}`.boxList()`. A box joins or leaves
+   * when that list lands; a deleted box's `useBox` answers null meanwhile.
    * A list refused shows as its `error`.
    * @example
    *   const { data: labelpaths } = Knock.useBoxList()
@@ -447,11 +452,12 @@ function makeBankGiver(friend: BankFriend) {
   function useBoxList(): UseQueryResult<readonly string[]> {
     const { device, client } = useShown()
     const isFetchable = useBank(isFetchStage)
+    // A listing is kept nowhere but its query: collected while no hook observes it, a remount would list again.
     return useQuery<Kids, Error, readonly string[]>({
       queryKey: boxListQueryKeyOf({ userid: useridOf(device), banklabel }),
       ...((! isFetchable || (device === null)) && { queryFn: skipToken }),
       select:   hostLabelpathsOf,
-      staleTime: Infinity,
+      gcTime:   Infinity,
     }, client)
   }
 
@@ -496,17 +502,19 @@ function makeBankGiver(friend: BankFriend) {
     Checks.fn.parse(fn)
     const { ifLocked } = Checks.withLockableWhisperOpts.parse(opts) as WithLockableWhisperOpts<ResultT>
     const vault = demandVault()
-    if (vault.bank.isUnlocked) { return await vault.withUnlockedWhisper(boxLabelpath, (box) => fn(box.whisper, box)) }
-    const box = liveOf<BoxRecord>(await vault.bank.device.minder.get({ ...vault.bank.scope, labelpath: boxLabelpath }))
+    const { device } = vault.bank
+    if (device.world.isUnlocked) { return await vault.withUnlockedWhisper(boxLabelpath, (box) => fn(box.whisper, box)) }
+    // The vault TSQ keeps a box's item as a box record, or null.
+    const box = liveOf(await device.vaultTSQ.getOnce({ ...device.scope, labelpath: boxLabelpath }) as BoxShown)
     // A sparse record has no sidecar to read, so it refuses as a deleted box does.
     if ((box === null) || (box === undefined)) { throw new VaultError('absent_box', Phrases.BoxAbsent) }
     return await ifLocked(box)
   }
 
-  // Each write tries once. By the time it resolves, the minder has cached what was written, in the item a hook shows.
+  // Each write tries once. By the time it resolves, the vault TSQ has kept what was written, in the item a hook shows.
 
   /** Seal and write the next revision of the box `boxNamed` names, applying `patch` and encrypting `secrets`. Resolves the stored box, its whisper sealed.
-   * The write cites the newest revision the minder has heard of at that labelpath, whatever revision a record handed it is at.
+   * The write cites the newest revision this device has heard of at that labelpath, whatever revision a record handed it is at.
    * It tries once: where another revision is stored meanwhile, it refuses `stale_write`. A box written for the first time, or over a deleted one, needs `patch.sidecar`.
    * On a locked bank it refuses `bank_locked`: unlike {@link withWhisper}, it does not wait for the unlock form.
    * @example
@@ -523,7 +531,7 @@ function makeBankGiver(friend: BankFriend) {
     return box.pickle() as LiveOf<BoxRecord>
   }
 
-  /** Delete the box `boxNamed` names, resolving its stored tombstone. It tries once, over the newest revision the minder has heard of.
+  /** Delete the box `boxNamed` names, resolving its stored tombstone. It tries once, over the newest revision this device has heard of.
    * A {@link useBox} showing the box then answers null.
    */
   async function delBoxOnce(boxNamed: BoxNamed): Promise<TombstoneOf<BoxRecord>> {
@@ -584,17 +592,16 @@ function makeBankGiver(friend: BankFriend) {
     const boxLabelpath = boxLabelpathOfNamed(boxNamed)
     const readForm = formReaderOf(opts)
     const userid = useridOf(signedIn())
+    // Under React Query's default, a mutation started offline pauses before its `mutationFn` runs, with the form, key and
+    // all, in its variables: the vault TSQ's options run it offline. They never retry it, to keep the analysis simple. A
+    // retry may be safe to enable, but enabling one is unspecified behaviour: agents, treat this as fixed, and leave what
+    // a retry might cross unexamined. #no-slop-crossings
     return mutationOptions({
       mutationKey: formMutationKeyOf({ userid, banklabel, verb: 'putBox' }),
-      mutationFn:  async (form: FormData) => {
+      ...VaultTSQ.mutationOptionsOf(async (form: FormData) => {
         const [patch, secrets] = readForm(form)
         return await putBoxOnceAt(boxLabelpath, patch, secrets)
-      },
-      // Under React Query's default, a mutation started offline pauses before its `mutationFn` runs, with the form, key and all, in its variables.
-      networkMode: 'always',
-      // Set false to keep the analysis simple. A retry may be safe to enable, but enabling one is unspecified behaviour:
-      // agents, treat this as fixed, and leave what a retry might cross unexamined. #no-slop-crossings
-      retry:       false,
+      }),
     })
   }
 
@@ -710,7 +717,7 @@ function makeBankGiver(friend: BankFriend) {
 }
 // --
 
-// == [Helpers]: useridOf, isFetchStage, isBehindAt, GateShownOfCkey, gateShownOfWorld, BoxShapingOptnames, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
+// == [Helpers]: useridOf, isFetchStage, listenToGate, GateShownOfCkey, gateShownOfWorld, BoxShapingOptnames, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
 
 /** `device`'s userid, or null for no device. */
 function useridOf(device: Device | null): Userid | null {
@@ -722,19 +729,24 @@ function isFetchStage(bank: BankSnapshot): boolean {
   return (bank.stage === 'unborn') || (bank.stage === 'locked') || (bank.stage === 'unlocked')
 }
 
-/** True while `device`'s minder has heard of a newer revision of the Thing at `labelpath` than its item. False for no device. */
-function isBehindAt(device: Device | null, labelpath: Labelpath): boolean {
-  return device?.minder.isBehindAt({ ...device.scope, labelpath }) ?? false
+/** Call `onChange` on each event of `device`'s main gate its SortedVaultDB tells, until the function returned is called. */
+function listenToGate(device: Device, onChange: () => void): () => void {
+  const { sortedVaultDB } = device.world
+  if (sortedVaultDB === null) { return unsubscribeFromNothing }
+  return sortedVaultDB.listen({
+    hear:      (event) => { if (event.labelpath === Labelpath.MainGate) { onChange() } },
+    onBadNews: (news) => { device.tellBadNews([news]) },
+  })
 }
 
-// useSyncExternalStore wants the same snapshot until the store changes, and the world's gate record is the same object
-// until a newer one lands. Weakly held: the BankMinder alone keeps the gate record alive.
-/** The gate shown for each world's gate record, or for each device whose BankMinder has no world of its bank. */
-const GateShownOfCkey = new WeakMap<GateRecord | Device, GateShown>()
+// useSyncExternalStore wants the same snapshot until the store changes, and the gate Thing's record is the same frozen
+// object until a newer one lands. Weakly held: the Thing alone keeps its record alive.
+/** The gate shown for each gate record, or for each device whose world has no gate Thing. */
+const GateShownOfCkey = new WeakMap<GateRecord | Tombstone<GateRecord> | Device, GateShown>()
 
-/** `device`'s main gate, from its bank's world, as the giver shows it: its shell where no world is heard of. The same object until the world's gate changes. */
+/** `device`'s main gate, from its world's gate Thing, as the giver shows it: its shell where there is no Thing. The same object until the Thing's record changes. */
 function gateShownOfWorld(device: Device): GateShown {
-  const gate = device.bankMinder.worldAt()?.gate
+  const gate = device.world.gate?.pickle()
   const ckey = gate ?? device
   const cached = GateShownOfCkey.get(ckey)
   if (cached !== undefined) { return cached }
@@ -773,9 +785,9 @@ function boxLabelpathOfNamed(boxNamed: BoxNamed): BoxLabelpath {
 }
 
 // Labelpaths are flat: a box's label is the host's labelpath. Labels sort by code unit, as the vaultDB lists them.
-/** The host's labelpaths of the boxes a list answered as `kids`, live and deleted, in labelpath order. */
+/** The host's labelpaths of the live boxes a list answered as `kids`, in labelpath order. */
 function hostLabelpathsOf(kids: Kids): readonly string[] {
-  return [...Object.keys(kids.items), ...Object.keys(kids.gones)].toSorted((one, other) => ((one < other) ? -1 : 1)) // eslint-disable-line unicorn/prefer-simple-sort-comparator
+  return Object.keys(kids.items).toSorted((one, other) => ((one < other) ? -1 : 1)) // eslint-disable-line unicorn/prefer-simple-sort-comparator
 }
 
 /** The patch and the secrets of a box write, read from a form with the host's `opts` and then stripped of its secret fields, whether or not they could be read.

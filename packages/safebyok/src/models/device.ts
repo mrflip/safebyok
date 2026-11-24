@@ -42,7 +42,7 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
  * reloading the page.
  */
 export class Device implements MinderFriend {
-  // == [Props]: banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #persisters, #bankMinder, #minder, #tsqClient, #world, #userid, #vaultTSQ, #vault, #signinAnswer, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
+  // == [Props]: banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #persisters, #bankMinder, #minder, #vaultTsqClient, #world, #userid, #vaultTSQ, #vault, #signinAnswer, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
 
   /** The label of the bank this device serves each user. */
   readonly banklabel:          Banklabel
@@ -66,7 +66,7 @@ export class Device implements MinderFriend {
   /** The minder of the signed-in user's boxes, made with the device, which is its friend. */
   readonly #minder: VaultMinder
   /** The QueryClient the vault TSQ keeps the boxes in: the host's, or one made with the device. */
-  readonly #tsqClient: QueryClient
+  readonly #vaultTsqClient: QueryClient
   /** The world of the signed-in user's bank, made with the device. */
   readonly #world: World
   /** The user signed in on this device, from `signin`. Null until then. */
@@ -97,7 +97,7 @@ export class Device implements MinderFriend {
   }
   // --
 
-  // == [Getters]: userid, scope, autolockMinutes, bankMinder, vaultTsqClient, tsqClient, vaultTSQ, minder, world, bank, vault, getSnapshot, subscribe
+  // == [Getters]: userid, scope, autolockMinutes, bankMinder, vaultTsqClient, vaultTSQ, minder, world, bank, vault, getSnapshot, subscribe
 
   /** The user signed in on this device, or null until `signin`. */
   get userid(): Userid | null { return this.#userid }
@@ -117,14 +117,11 @@ export class Device implements MinderFriend {
     if (this.#userid === null) { throw Throwers.nobodySignedIn() }
     return this.#bankMinder
   }
-  // Scaffolding until safebyok-react-lean's hooks read the vault TSQ: the old minder's own client, which they observe.
-  /** The QueryClient of the minder of the signed-in user's boxes: the same one from `Device.make` on, empty until `signin`, for hooks to observe. */
-  get vaultTsqClient(): QueryClient { return this.#minder.tsqClient }
 
   /** The QueryClient the vault TSQ keeps the signed-in user's boxes in: `opts.queryClient`, the host's own, or one the device made. The same one from `Device.make` on. */
-  get tsqClient(): QueryClient { return this.#tsqClient }
+  get vaultTsqClient(): QueryClient { return this.#vaultTsqClient }
 
-  /** The vault TSQ of the signed-in user's boxes, in {@link tsqClient}. Refuses `absent_vault` until `signin`, and `disabled` until the sign-in has restored the bank's caches. */
+  /** The vault TSQ of the signed-in user's boxes, in {@link vaultTsqClient}. Refuses `absent_vault` until `signin`, and `disabled` until the sign-in has restored the bank's caches. */
   get vaultTSQ(): VaultTSQ {
     if (this.#userid === null) { throw Throwers.nobodySignedIn() }
     if (this.#vaultTSQ === null) { throw Throwers.signinUnanswered() }
@@ -162,7 +159,7 @@ export class Device implements MinderFriend {
 
   /** Make a device of the banklabel and token in `record`, guarding the host's functions in `opts`, with nobody signed in.
    * The signed-in user's boxes are kept in `opts.queryClient`, the host's own, under the bank's key, or in a QueryClient the
-   * device makes: {@link tsqClient}. The signed-in bank's caches are restored from `opts.persisters` at {@link signin}, and
+   * device makes: {@link vaultTsqClient}. The signed-in bank's caches are restored from `opts.persisters` at {@link signin}, and
    * nothing is fetched from the vaultDB, or watched, until then.
    */
   static make(record: DeviceRecord, opts: DeviceOpts): Device { return new Device(record, opts) }
@@ -177,9 +174,9 @@ export class Device implements MinderFriend {
     this.#persisters = persisters
     // The roots cache in a minder of their own: the main gate's wrapped bankKeys stay out of the client a host observes.
     this.#bankMinder = BankMinder.make({}, this)
-    // Scaffolding until safebyok-react-lean's hooks read the vault TSQ: the minders keep the caches they read and persist.
+    // Scaffolding until the LocalBridge restores the Things: the old minder keeps the boxes' cache the persister restores and saves.
     this.#minder = VaultMinder.make({}, this)
-    this.#tsqClient = queryClient
+    this.#vaultTsqClient = queryClient
     this.#world = World.make({ device: this })
     this.#snapshot = this.#makeSnapshot()
     this.#world.subscribe(this.#align)
@@ -282,7 +279,7 @@ export class Device implements MinderFriend {
       await this.#restore(minder, this.#persisters?.boxes)
       const sortedVaultDB = SortedVaultDB.make(this.scope, { vaultDB: this.vaultDB, makeThing: (seen) => this.#world.makeThing(seen) })
       this.#receiveRestored(sortedVaultDB, bankMinder, minder)
-      this.#vaultTSQ = VaultTSQ.make({ vaultMinder: sortedVaultDB, queryClient: this.#tsqClient, scope: this.scope, onBadNews: (news) => { this.tellBadNews([news]) } })
+      this.#vaultTSQ = VaultTSQ.make({ vaultMinder: sortedVaultDB, queryClient: this.#vaultTsqClient, scope: this.scope, onBadNews: (news) => { this.tellBadNews([news]) } })
       this.#world.signin(sortedVaultDB)
       bankMinder.hello(sortedVaultDB)
       minder.hello(sortedVaultDB)
@@ -338,7 +335,7 @@ export class Device implements MinderFriend {
     const { bank } = this
     if ((bank !== null) && (this.#vault === null)) {
       this.#vault = Vault.make(bank, this.vaultTSQ)
-      // Scaffolding until the old minders go: the bank's sweep empties the minder safebyok-react-lean's hooks read.
+      // Scaffolding until the old minders go: the bank's sweep stops the old minder.
       bank.hostVault({ sweep: () => { this.#sayGoodbye(this.#minder) } })
     }
     const next = this.#makeSnapshot()
@@ -375,7 +372,7 @@ export class Device implements MinderFriend {
    */
   maskedView(): MaskedView {
     if (this.#userid === null) { return EmptyMaskedView }
-    return { bankTSQ: this.#bankMinder.maskedRows(), vaultTSQ: this.#minder.maskedRows(), lease: maskedViewLeaseOf(this.bank === null ? undefined : this.#world) }
+    return { bankTSQ: this.#bankMinder.maskedRows(), vaultTSQ: this.#vaultTSQ?.maskedRows() ?? [], lease: maskedViewLeaseOf(this.bank === null ? undefined : this.#world) }
   }
   // --
 

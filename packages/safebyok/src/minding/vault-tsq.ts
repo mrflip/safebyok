@@ -3,7 +3,7 @@
 import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
 import { Labelpath } from '../shapes/primitives'
-import { type MinderGetOpts, MinderChecks } from '../shapes/shapes-minder'
+import { type MaskedRow, type MinderGetOpts, MinderChecks } from '../shapes/shapes-minder'
 import { type ThingRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type ItemQueryOptions, type VaultMutationOptions, type VaultTSQOpts, VaultTSQChecks } from '../shapes/shapes-vault-tsq'
@@ -14,6 +14,7 @@ import type { SortedVaultDB } from '../storage/sorted-vault-db'
 import { readAtOf } from '../storage/thing-classifier'
 import type { Kids } from '../storage/vault-db'
 import * as Throwers from '../refusals/throwers'
+import { maskedRowsOf } from './masked-rows'
 import { bankKeyHeadOf, labelsOf } from './minder-keys'
 
 // == [VaultTSQ]: VaultTSQ
@@ -125,6 +126,15 @@ export class VaultTSQ {
     VaultTSQChecks.mutationFn.parse(mutationFn)
     return { mutationFn, ...BankDefaults }
   }
+  // --
+
+  // == [A devtool's view]: maskedRows
+
+  /** The items and listings of the bank, masked for a devtool.
+   * Each has its key, its state, and a copy of its record or listing with each ciphertext masked. What a host keeps beside them in the same client is left out.
+   * For experimenting, never for an app's own logic: what it answers may change without notice.
+   */
+  maskedRows(): MaskedRow[] { return maskedRowsOf(this.#queryClient, VaultTSQ.bankQueryKeyOf(this.#scope)) }
   // --
 
   // == [Ending]: sweep

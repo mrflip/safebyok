@@ -9,8 +9,9 @@ as there. A pencil sketch; *Not built yet* is at the foot.
 
 * **The stage never suspends.** `useBank()` is synchronous at every stage. The screen's first
   branch (signed out, starting, create, the app) is a `switch`, never a fallback.
-* **A record suspends on its first fetch only**, never on a lock and never on a newer revision: a
-  record overtaken shows until the newer one arrives.
+* **A record suspends on its first fetch**, and again where the box is deleted and written anew
+  elsewhere before this device has the new box whole; never on a lock, and never on a newer revision
+  of the same box: a record overtaken shows until the newer one arrives.
 * **Render suspending hooks under the stage switch**, at `'locked'` or `'unlocked'`. Above it there
   is no bank to read, and the hook throws `absent_vault` to the nearest error boundary.
 * **A refusal the user can mend is state, not an exception.** A wrong passphrase is the unlock

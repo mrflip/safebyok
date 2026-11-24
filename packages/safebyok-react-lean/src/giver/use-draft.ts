@@ -238,13 +238,14 @@ function isMovedPast(pinned: BoxShown, stored: BoxShown): boolean {
   return (Thing.cmp(pinned, stored) > 0)
 }
 
-// A base that is null cites the box's tombstone, or its shell, so a box written since refuses the put.
-/** What a draft's put cites: its base, the box's tombstone or shell where the base is null, or with no base the box unsealed. */
+// The put unseals the box first, so a base that is null meets a box stored live only where one was written since: the
+// shell cites nothing stored, and the put refuses.
+/** What a draft's put cites: its base, the box's shell where the base is null, or with no base the box unsealed. */
 function citedOf(vault: Vault, pinned: BoxShown | undefined, unsealed: BoxUnsealed): Sealable<LiveOf<BoxRecord>> {
   if (pinned === undefined) { return Thing.sparseOf(unsealed) }
   if (pinned !== null) { return pinned }
   const scope = { userid: unsealed.userid, banklabel: unsealed.banklabel, labelpath: unsealed.labelpath }
-  return vault.bank.device.minder.deadAt(scope) ?? Shell.of(scope, vault.bank.rootBox)
+  return Shell.of(scope, vault.bank.rootBox)
 }
 
 // React hands a ref callback null only where it returned no cleanup, which this one always does.

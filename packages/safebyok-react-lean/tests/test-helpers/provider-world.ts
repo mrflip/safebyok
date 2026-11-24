@@ -101,13 +101,13 @@ export interface ProviderWorld {
   client:  QueryClient
   /** The host's QueryClient, and the one each device the giver made caches in: every client a secret could reach. */
   clients(): readonly QueryClient[]
-  /** How many watches have been opened on {@link vaultDB} since the world was built, one for each device started over it, which its BankMinder and VaultMinder share, and how many gets it has been asked. */
+  /** How many watches have been opened on {@link vaultDB} since the world was built, one for each device started over it, which its SortedVaultDB opens, and how many gets it has been asked. */
   counts:  { watches: number, gets: number }
   /** Pause every get {@link vaultDB} is asked from now on before it reads, until the function returned is called. */
   pauseGets(): () => void
   /** Pause every get {@link vaultDB} is asked from now on after it reads, until the function returned is called: it answers what it read. */
   pauseAnswers(): () => void
-  /** The device the giver made first, at a provider's mount: for a test to read its minder once a userid is signed in on it. */
+  /** The device the giver made first, at a provider's mount: for a test to read its vault TSQ or world once a userid is signed in on it. */
   _cheat_device(): Device
   /** Every device the giver has made, in the order made. */
   _cheat_devices(): readonly Device[]

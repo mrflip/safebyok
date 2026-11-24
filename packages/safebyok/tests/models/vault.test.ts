@@ -41,7 +41,7 @@ function boxAt(vault: Vault): Box | undefined {
 
 /** What `vault`'s device's QueryClient keeps in the item of {@link Openai}. */
 function itemAt(vault: Vault): unknown {
-  return vault.bank.device.tsqClient.getQueryData(VaultTSQ.itemQueryKeyOf(openaiScopeOf(vault.bank)))
+  return vault.bank.device.vaultTsqClient.getQueryData(VaultTSQ.itemQueryKeyOf(openaiScopeOf(vault.bank)))
 }
 
 /** Unseal the whole record `vault`'s box at {@link Openai} holds once its vault TSQ gets it: the live box or its tombstone. */
@@ -576,7 +576,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const using = vault.withWhisper(Openai, () => 'done')
     await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await using).to.equal('done')
-    const kept   = device.tsqClient.getQueryCache().getAll().map(({ state }) => state.data)
+    const kept   = device.vaultTsqClient.getQueryCache().getAll().map(({ state }) => state.data)
     const traces = JSON.stringify([boxAt(vault)!.pickle(), kept, bank.getSnapshot(), device.getSnapshot()])
     expect(traces).to.include(Openai).and.not.include('sk-test-0000')
   })
