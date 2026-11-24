@@ -3,7 +3,7 @@
 // Each query returns a Thing as one JSON object shaped like the record it was stored from, so that a bigint column arrives
 // as a number (a driver returns a bare bigint as text). The `thing_record` function drops the null columns: the record had no
 // such field. Each read fetches what it asks for and the bank's world in one statement, so both come from the same snapshot.
-// Each statement also returns `tracked`, how the world and root box compare with the track the ask passes as JSON, or null.
+// Each statement also returns `tracked`, how the world and root box compare with the `known_roots` the ask passes as JSON, or null.
 // A get's and a write's also return `ancestor`, the nearest Thing stored above the scope (ancestorSqlOf).
 
 import type { Thingkind } from 'safebyok/storage'
@@ -30,14 +30,14 @@ function ancestorSqlOf(table: string, { userid, banklabel, labelpath }: Readonly
   )`
 }
 
-/** The Thing of each kind at a scope ($1 userid, $2 banklabel, $3 labelpath), its bank's world, the nearest Thing stored above it, and how the world and root box compare with the track ($4). */
+/** The Thing of each kind at a scope ($1 userid, $2 banklabel, $3 labelpath), its bank's world, the nearest Thing stored above it, and how the world and root box compare with the ask's `known_roots` ($4). */
 export const GetThingSql: Readonly<Record<Thingkind, string>> = {
   bank: getThingSqlOf(ThingTables.bank),
   gate: getThingSqlOf(ThingTables.gate),
   box:  getThingSqlOf(ThingTables.box),
 }
 
-/** The Thing of each kind at a scope, each Thing one label under it in labelpath order, its bank's world, and how it compares with the track ($4). */
+/** The Thing of each kind at a scope, each Thing one label under it in labelpath order, its bank's world, and how it compares with the ask's `known_roots` ($4). */
 export const ListThingsSql: Readonly<Record<Thingkind, string>> = {
   bank: listThingsSqlOf(ThingTables.bank),
   gate: listThingsSqlOf(ThingTables.gate),
@@ -80,14 +80,14 @@ function recordAncestorSqlOf(table: string): string {
   return ancestorSqlOf(table, { userid: `($1::text::jsonb ->> 'userid')`, banklabel: `($1::text::jsonb ->> 'banklabel')`, labelpath: `($1::text::jsonb ->> 'labelpath')` })
 }
 
-/** Each kind's write function, over the record ($1) and what it cites ($2), the nearest Thing stored above the record's scope, and how the world and root box after compare with the track ($3); the gate's also takes the storage policies ($4). */
+/** Each kind's write function, over the record ($1) and what it cites ($2), the nearest Thing stored above the record's scope, and how the world and root box after compare with the ask's `known_roots` ($3); the gate's also takes the storage policies ($4). */
 export const WriteThingSql: Readonly<Record<Thingkind, string>> = {
   bank: `SELECT ok, thing, world, born_at_ok, lifetok_ok, ${recordAncestorSqlOf(ThingTables.bank)} AS ancestor, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM ${VaultFunctionNames.write_bank}($1::text::jsonb, $2::text::jsonb)`,
   gate: `SELECT ok, thing, world, born_at_ok, policies_ok, ${recordAncestorSqlOf(ThingTables.gate)} AS ancestor, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM ${VaultFunctionNames.write_gate}($1::text::jsonb, $2::text::jsonb, $4::text[])`,
   box:  `SELECT ok, thing, world, born_at_ok, ${recordAncestorSqlOf(ThingTables.box)} AS ancestor, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM ${VaultFunctionNames.write_box}($1::text::jsonb, $2::text::jsonb)`,
 }
 
-/** A bank's birth: its bank ($1), main gate ($2) and root box ($3), and how the roots after compare with the track ($4). */
+/** A bank's birth: its bank ($1), main gate ($2) and root box ($3), and how the roots after compare with the ask's `known_roots` ($4). */
 export const BirthRootsSql = `
   SELECT ok, bank, gate, root, ${VaultFunctionNames.tracked}(jsonb_build_object('bank', bank, 'maingate', gate), root, $4::text::jsonb) AS tracked
   FROM   ${VaultFunctionNames.birth_roots}($1::text::jsonb, $2::text::jsonb, $3::text::jsonb)

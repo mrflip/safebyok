@@ -4,7 +4,7 @@ import { once } from 'es-toolkit'
 import { Errors, Validator } from 'safebyok-big/internals'
 import { type Lifetok, Labelpath } from '../shapes/primitives'
 import {
-  type BirthBankAsk, type CitedOf, type DelAskDraft, type GetAsk, type ListAsk, type LoggableAsk, type PutAskDraft, type Track, type Tracked, type WorldRecord, type WriteAsk,
+  type BirthBankAsk, type CitedOf, type DelAskDraft, type GetAsk, type ListAsk, type LoggableAsk, type PutAskDraft, type KnownRoots, type Tracked, type WorldRecord, type WriteAsk,
   AskChecks, delAskOf, getAskOf, listAskOf, putAskOf,
 } from '../shapes/shapes-asks'
 import type { BankAskDraft } from '../shapes/shapes-bankish'
@@ -45,10 +45,10 @@ export type SortedVaultDBListener = Readonly<{
 }>
 
 /** What {@link SortedVaultDB.putOnce} writes: a put ask's draft, whose `cited` defaults to the citable of the Thing at the record's labelpath. */
-export type PutOnceArgs<RecordT extends ThingRecord = ThingRecord> = Readonly<Omit<PutAskDraft<RecordT>, 'cited' | 'track' | 'banktok'> & { cited?: CitedOf<RecordT> }>
+export type PutOnceArgs<RecordT extends ThingRecord = ThingRecord> = Readonly<Omit<PutAskDraft<RecordT>, 'cited' | 'known_roots' | 'banktok'> & { cited?: CitedOf<RecordT> }>
 
 /** What {@link SortedVaultDB.delOnce} writes: the tombstone, and the revision it cites, by default the citable of the Thing at its labelpath. */
-export type DelOnceArgs<RecordT extends ThingRecord = ThingRecord> = Readonly<Omit<DelAskDraft<RecordT>, 'cited' | 'track' | 'banktok'> & { cited?: CitedOf<RecordT> }>
+export type DelOnceArgs<RecordT extends ThingRecord = ThingRecord> = Readonly<Omit<DelAskDraft<RecordT>, 'cited' | 'known_roots' | 'banktok'> & { cited?: CitedOf<RecordT> }>
 
 /** Who dispatched a record, when it was read, and its bank's lifetok where known: every event of it carries all three. */
 type Stamp = Readonly<{ sourcelabel: string, read_tc: ReadTc, banktok: Lifetok | undefined }>
@@ -214,7 +214,7 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
 
   // == [Asks]: makeGetAsk, makeListAsk, makePutAsk, makeDelAsk, #bankFields
   // Each fills in the modelkind and default flags `getAskOf` and the rest give it, and the verb checks the rest. A bank
-  // not yet heard of live, as at sign-in or before a birth, has asks with no banktok, and with no track until its roots are.
+  // not yet heard of live, as at sign-in or before a birth, has asks with no `banktok`, and with no `known_roots` until its roots are.
 
   /** The get ask for the Thing at `draft.labelpath` in this bank. */
   makeGetAsk(draft: BankAskDraft): GetAsk { return getAskOf({ ...draft, ...this.#scope, ...this.#bankFields() }) }
@@ -223,26 +223,26 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
   makeListAsk(draft: BankAskDraft): ListAsk { return listAskOf({ ...draft, ...this.#scope, ...this.#bankFields() }) }
 
   /** The put ask writing `draft.record` over `draft.cited`, in this bank. */
-  makePutAsk<RecordT extends ThingRecord>(draft: Omit<PutAskDraft<RecordT>, 'track' | 'banktok'>): WriteAsk<RecordT> {
+  makePutAsk<RecordT extends ThingRecord>(draft: Omit<PutAskDraft<RecordT>, 'known_roots' | 'banktok'>): WriteAsk<RecordT> {
     return { ...putAskOf<RecordT>({ ...draft, ...this.#bankFields() }), ...this.#scope }
   }
 
   /** The del ask writing the tombstone `draft.record` over `draft.cited`, in this bank. */
-  makeDelAsk<RecordT extends ThingRecord>(draft: Omit<DelAskDraft<RecordT>, 'track' | 'banktok'>): WriteAsk<RecordT> {
+  makeDelAsk<RecordT extends ThingRecord>(draft: Omit<DelAskDraft<RecordT>, 'known_roots' | 'banktok'>): WriteAsk<RecordT> {
     return { ...delAskOf<RecordT>({ ...draft, ...this.#bankFields() }), ...this.#scope }
   }
 
-  // The track reads each root's held record, never its citable: a root known newer only sparse is tracked at its older
-  // whole record, so that the answer sends it whole. The shell is no revision stored, and a track cannot name it.
-  /** The `banktok` and `track` of this bank's asks: the lifetok of the bank's Thing while it holds a live record, and the revision each root's Thing holds while all three hold one stored, each left out where unknown */
-  #bankFields(): { banktok?: Lifetok, track?: Track } {
+  // The known roots are each root's held record, never its citable: a root known newer only sparse is named at its older
+  // whole record, so that the answer sends it whole. The shell is no revision stored, and `known_roots` cannot name it.
+  /** The `banktok` and `known_roots` of this bank's asks: the lifetok of the bank's Thing while it holds a live record, and the revision each root's Thing holds while all three hold one stored, each left out where unknown */
+  #bankFields(): { banktok?: Lifetok, known_roots?: KnownRoots } {
     const [bank, gate, root] = RootLabelpaths.map((labelpath) => this.#things.get(labelpath)?.pickle())
     // The record held at the bank's labelpath is a bank's: the vaultDB checked it as one.
     const banktok = (bank?.am === 'a') ? (bank as BankRecord).lifetok : undefined
-    const track   = (isStored(bank) && isStored(gate) && isStored(root))
-      ? { bank: trackPairOf(bank), [Labelpath.MainGate]: trackPairOf(gate), [Labelpath.RootBox]: trackPairOf(root) }
+    const known_roots   = (isStored(bank) && isStored(gate) && isStored(root))
+      ? { bank: knownRootOf(bank), [Labelpath.MainGate]: knownRootOf(gate), [Labelpath.RootBox]: knownRootOf(root) }
       : undefined
-    return { ...((banktok !== undefined) && { banktok }), ...((track !== undefined) && { track }) }
+    return { ...((banktok !== undefined) && { banktok }), ...((known_roots !== undefined) && { known_roots }) }
   }
   // --
 
@@ -360,7 +360,7 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
 }
 // --
 
-// == [Roots]: RootLabelpaths, isStored, trackPairOf
+// == [Roots]: RootLabelpaths, isStored, knownRootOf
 
 /** The labelpaths of a bank's roots, the bank first and the root box last. */
 const RootLabelpaths = ['bank', Labelpath.MainGate, Labelpath.RootBox] as const
@@ -368,8 +368,8 @@ const RootLabelpaths = ['bank', Labelpath.MainGate, Labelpath.RootBox] as const
 /** True of a record held that was stored: neither none nor the void sentinel */
 function isStored(record: Adoptable<ThingRecord> | undefined): record is ThingRecord { return (record !== undefined) && ! BaseThing.isVoidSentinel(record) }
 
-/** The revseq and lifepath of `record`: the pair a `track` has. */
-function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
+/** The revseq and lifepath of `record`: what `known_roots` has of each root. */
+function knownRootOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepath'>): KnownRoots['bank'] { return { revseq, lifepath } }
 // --
 
 // == [Recognizing]: SortedVaultDBMembernames, isSortedVaultDB

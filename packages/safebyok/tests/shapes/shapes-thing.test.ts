@@ -89,7 +89,7 @@ describe("Shell.of(scoped, parent?)", () => {
   })
 
   it("reads only the scope, labelpath, label and lifepath of an ask or a record", () => {
-    const ask = getAskOf({ ...TH.BoxScope, track: TH.trackOf() })
+    const ask = getAskOf({ ...TH.BoxScope, known_roots: TH.knownRootsOf() })
     expect(Shell.of(ask, TH.rootBoxOf())).to.deep.equal(boxShell)
   })
 

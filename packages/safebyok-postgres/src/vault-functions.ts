@@ -169,20 +169,20 @@ LANGUAGE sql STABLE AS $$
   WHERE  (root.userid, root.banklabel, root.labelpath) = (of_userid, of_banklabel, 'box')
 $$;
 
--- How the bank and main gate in world, and the root box row root, compare with track, the revseq and lifepath an ask
+-- How the bank and main gate in world, and the root box row root, compare with known_roots, the revseq and lifepath an ask
 -- tracks of each: under bank, gate and box, the JSON string 'same' where the row has both, else the row. Null where
--- track is null: the ask tracks nothing.
-CREATE OR REPLACE FUNCTION ${VaultFunctionNames.tracked}(world jsonb, root jsonb, track jsonb) RETURNS jsonb
+-- known_roots is null: the ask names no roots.
+CREATE OR REPLACE FUNCTION ${VaultFunctionNames.tracked}(world jsonb, root jsonb, known_roots jsonb) RETURNS jsonb
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT jsonb_build_object(
-    'bank', CASE WHEN ((world->'bank'->'revseq', world->'bank'->'lifepath') = (track->'bank'->'revseq', track->'bank'->'lifepath'))
+    'bank', CASE WHEN ((world->'bank'->'revseq', world->'bank'->'lifepath') = (known_roots->'bank'->'revseq', known_roots->'bank'->'lifepath'))
                  THEN '"same"'::jsonb ELSE world->'bank' END,
-    'gate', CASE WHEN ((world->'maingate'->'revseq', world->'maingate'->'lifepath') = (track->'gate'->'revseq', track->'gate'->'lifepath'))
+    'gate', CASE WHEN ((world->'maingate'->'revseq', world->'maingate'->'lifepath') = (known_roots->'gate'->'revseq', known_roots->'gate'->'lifepath'))
                  THEN '"same"'::jsonb ELSE world->'maingate' END,
-    'box',  CASE WHEN ((root->'revseq', root->'lifepath') = (track->'box'->'revseq', track->'box'->'lifepath'))
+    'box',  CASE WHEN ((root->'revseq', root->'lifepath') = (known_roots->'box'->'revseq', known_roots->'box'->'lifepath'))
                  THEN '"same"'::jsonb ELSE root END
   )
-  WHERE track IS NOT NULL
+  WHERE known_roots IS NOT NULL
 $$;
 
 -- Notify the user's channel, safebyok_things_<userid>, of a Thing just stored, with its bank's world.

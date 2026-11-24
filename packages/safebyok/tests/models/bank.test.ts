@@ -796,7 +796,7 @@ describe("bank.put(args)", () => {
     const record = nextBankThingOf(bank)
     await bank.put({ cited: bank.pickle(), record })
     const sortedVaultDB = device.world.demandSortedVaultDB()
-    expect(sortedVaultDB.makeGetAsk({ labelpath: 'bank' }).track?.bank).to.deep.equal({ revseq: 1, lifepath: record.lifepath })
+    expect(sortedVaultDB.makeGetAsk({ labelpath: 'bank' }).known_roots?.bank).to.deep.equal({ revseq: 1, lifepath: record.lifepath })
     const answer = await device.vaultDB.tryGetThing(sortedVaultDB.makeGetAsk({ labelpath: 'bank' }))
     expect(answer).to.deep.include({ ok: true, tracked: { bank: 'same', gate: 'same', box: 'same' } })
   })

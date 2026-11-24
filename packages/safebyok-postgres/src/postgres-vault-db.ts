@@ -55,13 +55,13 @@ function toldOf({ userid, banklabel }: ThingWatchScope, text: string): Told | nu
 }
 // --
 
-// == [What the database returns]: FetchedThing, trackParam, mayWrite, writtenActOf
+// == [What the database returns]: FetchedThing, knownRootsParam, mayWrite, writtenActOf
 
-/** A get's row, unchecked: the Thing, null for none, the raw world, the nearest Thing stored above it, and how the world and root box compare with the ask's track. */
+/** A get's row, unchecked: the Thing, null for none, the raw world, the nearest Thing stored above it, and how the world and root box compare with the ask's `known_roots`. */
 type FetchedThing = { thing: unknown, world: Classifier.WorldFetched, ancestor: unknown, tracked: Classifier.TrackedFetched }
 
 /** The parameter that carries what `ask` tracks: its JSON, or null for none. */
-function trackParam({ track }: AnyAsk): string | null { return (track === undefined) ? null : JSON.stringify(track) }
+function knownRootsParam({ known_roots }: AnyAsk): string | null { return (known_roots === undefined) ? null : JSON.stringify(known_roots) }
 
 // The classifier finds a write only where the Thing stored is the one cited, so only the flag for the cited Thing can let the ask write.
 /** True when the ask's flags let it write over the Thing it cites: a del over a live Thing; a put by `ifPresent` over a live one, by `ifAbsent` over a tombstone or the shell. */
@@ -112,7 +112,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
   /** The raw Thing at `ask`'s scope, null for none, its bank's raw world, the nearest Thing stored above it, and how the world and root box compare with what `ask` tracks. */
   async #fetchThing(ask: GetAsk | WriteAsk): Promise<FetchedThing> {
     const { userid, banklabel, labelpath, modelkind } = ask
-    return await this.#firstRow<FetchedThing>(GetThingSql[modelkind], [userid, banklabel, labelpath, trackParam(ask)])
+    return await this.#firstRow<FetchedThing>(GetThingSql[modelkind], [userid, banklabel, labelpath, knownRootsParam(ask)])
   }
   // --
 
@@ -129,8 +129,8 @@ export class PostgresVaultDB extends AdapterVaultDB {
       return this.classifyWriteThing(ask, thing, { ...world, ancestor, tracked })
     }
     const policies = (ask.modelkind === 'gate') ? [ask.options?.policies ?? []] : []
-    const params   = [JSON.stringify(ask.record), JSON.stringify(ask.cited), trackParam(ask), ...policies]
-    // Whether it stored the record, the Thing as it now stands, the raw world, the nearest Thing stored above it, how the world compares with the track, and the verdicts
+    const params   = [JSON.stringify(ask.record), JSON.stringify(ask.cited), knownRootsParam(ask), ...policies]
+    // Whether it stored the record, the Thing as it now stands, the raw world, the nearest Thing stored above it, how the world compares with the ask's `known_roots`, and the verdicts
     // of the checks the act tables cannot name: the stored born_at kept, the stored lifetok kept (the bank's alone), and the
     // storage policies met (the gate's alone). Each verdict is true where its check does not apply.
     const written  = await this.#firstRow<FetchedThing & { ok: boolean, born_at_ok: boolean, lifetok_ok?: boolean, policies_ok?: boolean }>(WriteThingSql[ask.modelkind], params)
@@ -150,7 +150,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
 
   protected async doListThings(ask: ListAsk): Promise<ListThingsActual> {
     const { userid, banklabel, labelpath, modelkind } = ask
-    const params = [userid, banklabel, labelpath, trackParam(ask)]
+    const params = [userid, banklabel, labelpath, knownRootsParam(ask)]
     // Made before the statement, whose snapshot is no earlier: Postgres before 18 has no UUID version 7 of its own.
     const read_tc = Classifier.readTcNow()
     const { parent, children, world, tracked } = await this.#firstRow<Omit<Classifier.ThingsFetched, 'read_tc'> & { world: Classifier.WorldFetched, tracked: Classifier.TrackedFetched }>(ListThingsSql[modelkind], params)
@@ -158,8 +158,8 @@ export class PostgresVaultDB extends AdapterVaultDB {
   }
 
   protected async doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthBankActual> {
-    // Whether it stored the three roots, each as it now stands, and how they compare with the track.
-    const params  = [...puts.map(({ record }) => JSON.stringify(record)), trackParam(ask)]
+    // Whether it stored the three roots, each as it now stands, and how they compare with the ask's `known_roots`.
+    const params  = [...puts.map(({ record }) => JSON.stringify(record)), knownRootsParam(ask)]
     const written = await this.#firstRow<Classifier.BankRootsFetched & { ok: boolean, tracked: Classifier.TrackedFetched }>(BirthRootsSql, params)
     if (written.ok) {
       const things = Classifier.writtenRootsOf(puts, written)

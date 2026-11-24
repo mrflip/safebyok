@@ -201,7 +201,7 @@ describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
     const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
     const box     = await TH.expectGood(vault.tryPutBoxOnce(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }))
     expect(written).toHaveBeenCalledTimes(1)
-    expect(written.mock.calls[0]![0]).to.deep.include({ ...bank.scope, op: 'put', labelpath: Openai, modelkind: 'box', cited: Thing.sparseOf(shell), record: box, track: TH.trackOf(bank.pickle(), bank.gate.pickle(), bank.rootBox) })
+    expect(written.mock.calls[0]![0]).to.deep.include({ ...bank.scope, op: 'put', labelpath: Openai, modelkind: 'box', cited: Thing.sparseOf(shell), record: box, known_roots: TH.knownRootsOf(bank.pickle(), bank.gate.pickle(), bank.rootBox) })
   })
 
   it("answers stale_write over an older revision, with the revision stored", async () => {
@@ -339,7 +339,7 @@ describe("vault.tryDelBoxOnce(labelpath)", () => {
     const written   = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
     const tombstone = await TH.expectGood(vault.tryDelBoxOnce(Openai))
     expect(written).toHaveBeenCalledTimes(1)
-    expect(written.mock.calls[0]![0]).to.deep.include({ ...bank.scope, op: 'del', labelpath: Openai, modelkind: 'box', cited: Thing.sparseOf(box), record: tombstone, track: TH.trackOf(bank.pickle(), bank.gate.pickle(), bank.rootBox) })
+    expect(written.mock.calls[0]![0]).to.deep.include({ ...bank.scope, op: 'del', labelpath: Openai, modelkind: 'box', cited: Thing.sparseOf(box), record: tombstone, known_roots: TH.knownRootsOf(bank.pickle(), bank.gate.pickle(), bank.rootBox) })
   })
 
   it("answers a refusal for a box never stored, and writes nothing", async () => {

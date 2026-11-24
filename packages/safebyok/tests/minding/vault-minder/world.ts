@@ -17,7 +17,7 @@ import type { VaultItemEvent } from '../../../src/shapes/shapes-vault-event'
 import * as TH from '../../test-helpers'
 
 /** The get ask a minder sends the vaultDB for the box at `TH.BoxScope` once its SortedVaultDB knows the roots at revision 0 ({@link knowRoots}). */
-export const BoxGetAsk: GetAsk = getAskOf({ ...TH.BoxScope, ifAbsent: 'nil', track: TH.trackOf(), banktok: TH.bankThingOf().lifetok })
+export const BoxGetAsk: GetAsk = getAskOf({ ...TH.BoxScope, ifAbsent: 'nil', known_roots: TH.knownRootsOf(), banktok: TH.bankThingOf().lifetok })
 
 /** A bank as a minder reads it, {@link TH.ThingBank} unless `scope` names another: its scope, and a spy for its bad news. */
 export function fakeBankOf(scope: BankScope = TH.ThingBank) {
@@ -90,7 +90,7 @@ export function sortedOf(vaultDB: VaultDB): SortedVaultDB {
   return sorted
 }
 
-/** Have `sorted` know the bank's roots at revision 0, as a device does once its bank is up, so that the asks it builds track them. Nothing is stored. */
+/** Have `sorted` know the bank's roots at revision 0, as a device does once its bank is up, so that the asks it builds name them in `known_roots`. Nothing is stored. */
 export function knowRoots(sorted: SortedVaultDB): void {
   for (const root of [TH.bankThingOf(), TH.gateThingOf(), TH.rootBoxOf()]) { sorted.receive({ ...TH.itemEventOf(root), sourcelabel: 'persister', read_tc: readTcNow() }) }
 }
@@ -136,7 +136,7 @@ export async function minderWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: Vau
   return { vaultDB, bank, bankMinder, minder, receive }
 }
 
-/** `vaultDB` with a born bank, its roots at revision 0, which the asks above track. */
+/** `vaultDB` with a born bank, its roots at revision 0, which the asks above name in `known_roots`. */
 export async function bornOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT): Promise<VaultDBT> {
   await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
   return vaultDB

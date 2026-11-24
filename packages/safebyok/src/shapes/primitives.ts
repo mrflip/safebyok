@@ -20,9 +20,9 @@ const MaxLabelsUnder = { bank: 0, gate: 1, box: 1 } as const satisfies Record<Th
 
 /** The helpers for a {@link Labelpath}, and where the main gate and the root box are stored. */
 export const Labelpath = Object.freeze({
-  /** Where the main gate is stored in its bank, and its key in a `track`. */
+  /** Where the main gate is stored in its bank, and its key in an ask's `known_roots`. */
   MainGate: 'gate',
-  /** Where the root box is stored in its bank, and its key in a `track`. */
+  /** Where the root box is stored in its bank, and its key in an ask's `known_roots`. */
   RootBox:  'box',
   /** The modelkind a sound labelpath starts with. */
   modelkindOf(labelpath: Labelpath): Thingkind { return labelpath.split('/', 1)[0] as Thingkind },

@@ -181,7 +181,7 @@ async function refusedGetWorldOf() {
 async function renotifiedWorldOf() {
   const vaultDB = await bornOf(new MemoryVaultDB())
   const { minder } = await minderWorldOf(vaultDB)
-  const staleGet = { ...TH.getAskAt('box'), track: TH.GateStaleTrack }
+  const staleGet = { ...TH.getAskAt('box'), known_roots: TH.GateStaleKnownRoots }
   await TH.expectGood<unknown>(vaultDB.tryGetThing(staleGet))
   const listener = listenerOf()
   minder.listen(listener, MinderEventFormat)

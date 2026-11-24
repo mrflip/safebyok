@@ -81,7 +81,7 @@ The return value in `tracked` of a missing or damaged record is unspecified beha
     where it was read; a missing one is not this field's to report.
 * workaround: reload the page, or restart the system.
 
-Steps to reproduce: a device's ask carries `track` for the bank and its main gate, whose revisions it was sent, after
+Steps to reproduce: a device's ask carries `known_roots` for the bank and its main gate, whose revisions it was sent, after
 the datastore has lost or damaged either row.
 
 Reasoning for wontfix: the device was sent revisions of both rows, so either case means storage has gone wrong
