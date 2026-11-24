@@ -527,19 +527,14 @@ function makeBankGiver(friend: BankFriend) {
 
   /** {@link putBoxOnce} of the box at `boxLabelpath`. */
   async function putBoxOnceAt(boxLabelpath: BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<LiveOf<BoxRecord>> {
-    const box = await demandVault().putBoxOnce(boxLabelpath, patch, secrets)
-    // The box a put answers holds a live box.
-    return box.pickle() as LiveOf<BoxRecord>
+    return await demandVault().putBoxOnce(boxLabelpath, patch, secrets)
   }
 
   /** Delete the box `boxNamed` names, resolving its stored tombstone. It tries once, over the newest revision this device has heard of.
    * A {@link useBox} showing the box then answers null.
    */
   async function delBoxOnce(boxNamed: BoxNamed): Promise<TombstoneOf<BoxRecord>> {
-    const boxLabelpath = boxLabelpathOfNamed(boxNamed)
-    const box = await demandVault().delBoxOnce(boxLabelpath)
-    // The box a delete answers holds a tombstone.
-    return box.pickle() as TombstoneOf<BoxRecord>
+    return await demandVault().delBoxOnce(boxLabelpathOfNamed(boxNamed))
   }
 
   // React shows the form's FormData to the components inside it, through `useFormStatus().data`, until the action settles.

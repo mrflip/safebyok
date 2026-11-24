@@ -261,8 +261,8 @@ describe("a device's persisters", () => {
     void device.signin(TH.WorldScope.userid)
     await TH.eventually(() => device.bank !== null)
     const scope = { ...TH.WorldScope, labelpath: 'box/openai' }
-    expect(device.world.demandVaultMinder().thingAt(scope)?.pickle()).to.deep.equal(box.pickle())
-    expect(device.vaultTsqClient.getQueryData(VaultTSQ.itemQueryKeyOf(scope))).to.deep.equal(box.pickle())
+    expect(device.world.demandVaultMinder().thingAt(scope)?.pickle()).to.deep.equal(box)
+    expect(device.vaultTsqClient.getQueryData(VaultTSQ.itemQueryKeyOf(scope))).to.deep.equal(box)
   })
 
   it("read a snapshot saved under another format as empty, and the bank comes up from the vaultDB", async () => {
@@ -709,8 +709,7 @@ describe("device.maskedView()", () => {
 
   it("cuts each wrapped bankKey and each sealed whisper's ciphertext to its last 2 characters and its length", async () => {
     const { device, vault, gateRecord } = await TH.buildBornVault()
-    const box = await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const { whisper_sealed } = TH.livePickleOf(box)
+    const { whisper_sealed } = await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const named = [gateRecord.wayins.main.bank_key_wayin_wrapped, whisper_sealed.key_wrapped, whisper_sealed.ciphered].map(({ ciphertext_b64 }) => ciphertext_b64)
     // Every ciphertext the vault TSQ and the roots' Things hold, the root box's among them, not only those named above.
     const roots     = ['bank', 'gate', 'box'].map((labelpath) => device.world.demandVaultMinder().thingAt({ ...TH.WorldScope, labelpath })?.pickle())

@@ -2,10 +2,11 @@ import { deepFreeze, isEqual, pick } from 'es-toolkit'
 import { Helpers, VX } from 'safebyok-big/internals'
 import { BaseThing } from './base-thing'
 import type { EpochMillis } from '../shapes/primitives'
-import type { ShellOf } from '../shapes/shapes-sealers'
+import type { LiveOf, ShellOf } from '../shapes/shapes-sealers'
 import type { Sparse, ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
 import { type Agekind, type Agerank, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { agekindOf, eventsOf, nextAgerankOf, readAtOf } from '../storage/agerank'
+import * as Throwers from '../refusals/throwers'
 
 // == [Adoptable]: Adoptable
 
@@ -124,6 +125,17 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
 
   /** The record this Thing models, frozen: the last it adopted. */
   pickle(): PickleT { return this.#record as PickleT }
+  // --
+
+  // == [Guards]: demandLive
+
+  // TypeScript cannot narrow a record of the type parameter by its `am`.
+  /** The live record this Thing models, refusing the shell or a tombstone. */
+  protected demandLive(): LiveOf<RecordT> {
+    const record = this.#record
+    if (record?.am !== 'a') { throw Throwers.thingNotLive(this.labelpath) }
+    return record as LiveOf<RecordT>
+  }
   // --
 
   // == [Subscribers]: subscribe, tellSubscribers, dropSubscribers

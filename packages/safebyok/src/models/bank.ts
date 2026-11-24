@@ -50,7 +50,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   get scope(): BankScope { return StampChecks.bankScope.parse(this) }
 
   /** This bank's {@link BankStamp}, which every ctx under it binds first. */
-  get stamp(): BankStamp { return BankChecks.stamp.parse(this.#demandLive()) }
+  get stamp(): BankStamp { return BankChecks.stamp.parse(this.demandLive()) }
 
   /** The bank's main gate: the wayins a user unlocks with, and the form verbs that change them. The same object across a gate change.
    * Refuses `absent_thing` until the device's world has heard of it.
@@ -64,7 +64,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   // A bank of a life replaced since reads the root box of the life that replaced it: its boxes refuse as of another root box.
   /** The root box, as last heard of. Every box of this bank is under it. */
   get rootBox(): BoxRecord {
-    this.#demandLive()
+    this.demandLive()
     const root = this.#world.rootBox?.pickle()
     if (root?.am !== 'a') { throw Throwers.worldNotHeard() }
     return root
@@ -125,7 +125,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   /** Write `ask.record`, this bank's next revision, over `ask.cited`. Resolves the bank's Thing the store reports writing, which the bank in the device's world then models. */
   async put(ask: PutAskDraft<BankRecord>): Promise<BankRecord> {
     this.demandEnabled()
-    this.#demandLive()
+    this.demandLive()
     return await this.#world.demandVaultMinder().putOnce(ask)
   }
   // --
@@ -175,7 +175,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   hostVault(vault: HostedVault): void { this.#world.hostVault(vault) }
   // --
 
-  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, demandEnabled, demandLive
+  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, demandEnabled
 
   /** True until this bank's world is swept or its device ends. */
   get isEnabled(): boolean { return this.#world.isEnabled }
@@ -193,13 +193,6 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   demandEnabled(): this {
     this.#world.demandEnabled()
     return this
-  }
-
-  /** The live record this bank models, refusing the shell or a tombstone */
-  #demandLive(): BankRecord {
-    const record = this.pickle()
-    if (record.am !== 'a') { throw Throwers.thingNotLive(this.labelpath) }
-    return record
   }
   // --
 
