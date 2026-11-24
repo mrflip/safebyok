@@ -23,7 +23,7 @@ const Openai: BoxLabelpath = 'box/openai'
 function scopeAt<LabelpathT extends string>(bank: Bank, labelpath: LabelpathT) { return { ...bank.scope, labelpath } }
 
 /** The rows of `bank`'s MemoryVaultDB, by labelpath, to plant a record as another device would, telling no watch. */
-function rowsOf(bank: Bank): Map<string, unknown> { return (bank.vaultDB as MemoryVaultDB)._cheat_things(bank.scope) }
+function rowsOf(bank: Bank): Map<string, unknown> { return (bank.device.vaultDB as MemoryVaultDB)._cheat_things(bank.scope) }
 
 /** Unseal the whole record `vault`'s minder gets of {@link Openai}, a box, or where it gets null, its tombstone. */
 async function unsealedAt(vault: Vault): Promise<BoxUnsealed> {
@@ -44,12 +44,12 @@ async function bumpApicalls(vault: Vault): Promise<BoxRecord> {
 }
 
 /** A vault of `bank` beside the one its device made, with a minder of its own, befriending the bank, that has not said `hello`. */
-function vaultBesideOf(bank: Bank): Vault { return Vault.make(bank, VaultMinder.make({ vaultDB: bank.vaultDB }, bank)) }
+function vaultBesideOf(bank: Bank): Vault { return Vault.make(bank, VaultMinder.make({ vaultDB: bank.device.vaultDB }, bank)) }
 
 describe("Vault.make(bank, minder)", () => {
   it("makes the vault of the bank's boxes, over the minder given, which waits for its hello", async () => {
     const { bank } = await TH.buildBornBank()
-    const minder = VaultMinder.make({ vaultDB: bank.vaultDB }, bank)
+    const minder = VaultMinder.make({ vaultDB: bank.device.vaultDB }, bank)
     const vault = Vault.make(bank, minder)
     expect(vault.bank).to.equal(bank)
     expect(vault.minder).to.equal(minder)
@@ -146,7 +146,7 @@ describe("the box flows, through a vault and its bank's MemoryVaultDB", () => {
   it("gets null for a box not stored, and its first put by labelpath cites the shell under the root box's life", async () => {
     const { bank, vault, minder } = await TH.buildBornVault()
     expect(await minder.get(scopeAt(bank, Openai))).to.be.null
-    const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     expect(written.mock.calls[0]![0].cited).to.include({ revseq: -1, am: 'x', lifeseq: Shell.VoidLifeseq, lifepath: `${bank.rootBox.lifeseq}/${Shell.VoidLifeseq}` })
   })
@@ -192,7 +192,7 @@ describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
   it("writes a put ask over the box it was given, cited sparse, in its bank's scope and track", async () => {
     const { bank, vault } = await TH.buildBornVault()
     const shell   = Shell.of(scopeAt(bank, Openai), bank.rootBox)
-    const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
     const box     = await TH.expectGood(vault.tryPutBoxOnce(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }))
     expect(written).toHaveBeenCalledTimes(1)
     expect(written.mock.calls[0]![0]).to.deep.include({ ...bank.scope, op: 'put', labelpath: Openai, modelkind: 'box', cited: Thing.sparseOf(shell), record: box, track: bank.track })
@@ -210,7 +210,7 @@ describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
 
   it("answers a refusal met before the write, and writes nothing", async () => {
     const { bank, vault } = await TH.buildBornVault()
-    const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
     bank.lock()
     await TH.expectBad(vault.tryPutBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bank_locked')
     await TH.expectBad(vault.tryPutBoxOnce('gate' as never, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bad_record')
@@ -272,7 +272,7 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
   it("refuses a sparse cited box when the patch gives no sidecar, and writes nothing", async () => {
     const { bank, vault } = await TH.buildBornVault()
     const first = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
     await TH.expectRefusal(vault.putBoxOnce(Thing.sparseOf(first), {}, { whisper: TH.Whisper }), 'bad_record')
     expect(written).not.toHaveBeenCalled()
   })
@@ -280,7 +280,7 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
   it("writes nothing of an unsealed box's whisper, cited or sealed", async () => {
     const { bank, vault } = await TH.buildBornVault()
     const first = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
     await vault.putBoxOnce(await bank.unsealBox(first), {}, { whisper: { apiKey: 'sk-test-1111' } })
     expect(written).toHaveBeenCalledTimes(1)
     expect(written.mock.calls[0]![0].cited).to.deep.equal(Thing.sparseOf(first))
@@ -289,7 +289,7 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
 
   it("refuses without secrets, and writes nothing", async () => {
     const { bank, vault } = await TH.buildBornVault()
-    const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
     await TH.expectRefusal(vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, undefined as never), 'bad_record')
     expect(written).not.toHaveBeenCalled()
   })
@@ -301,8 +301,8 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
 
   it("refuses the root box's labelpath, fetching and writing nothing", async () => {
     const { bank, vault } = await TH.buildBornVault()
-    const fetched = vi.spyOn(bank.vaultDB, 'tryGetThing')
-    const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    const fetched = vi.spyOn(bank.device.vaultDB, 'tryGetThing')
+    const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
     const err = await TH.expectRefusal(vault.putBoxOnce('box', { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bad_record')
     expect(err.message).to.include(Phrases.VaultBoxIsRoot)
     expect(fetched).not.toHaveBeenCalled()
@@ -311,7 +311,7 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
 
   it("refuses while the bank is locked, or once its bank is swept, and writes nothing", async () => {
     const { bank, vault } = await TH.buildBornVault()
-    const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
     bank.lock()
     await TH.expectRefusal(vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bank_locked')
     bank.sweep()
@@ -330,7 +330,7 @@ describe("vault.tryDelBoxOnce(labelpath)", () => {
   it("writes a del ask over the newest revision, cited sparse, in its bank's scope and track", async () => {
     const { bank, vault } = await TH.buildBornVault()
     const box       = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const written   = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    const written   = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
     const tombstone = await TH.expectGood(vault.tryDelBoxOnce(Openai))
     expect(written).toHaveBeenCalledTimes(1)
     expect(written.mock.calls[0]![0]).to.deep.include({ ...bank.scope, op: 'del', labelpath: Openai, modelkind: 'box', cited: Thing.sparseOf(box), record: tombstone, track: bank.track })
@@ -338,7 +338,7 @@ describe("vault.tryDelBoxOnce(labelpath)", () => {
 
   it("answers a refusal for a box never stored, and writes nothing", async () => {
     const { bank, vault } = await TH.buildBornVault()
-    const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
     await TH.expectBad(vault.tryDelBoxOnce(Openai), 'bad_record')
     expect(written).not.toHaveBeenCalled()
   })
@@ -477,7 +477,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     bank.lock()
     const other = vaultBesideOf(bank)
     other.minder.hello()
-    const asked = vi.spyOn(bank.vaultDB, 'tryGetThing')
+    const asked = vi.spyOn(bank.device.vaultDB, 'tryGetThing')
     const using = other.withWhisper(Openai, ({ revseq }) => revseq)
     await vi.advanceTimersByTimeAsync(0)
     expect(boxGetsOf(asked)).to.equal(0)
@@ -569,7 +569,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
 
   it("refuses the root box's labelpath, wanting no unlock and fetching nothing", async () => {
     const { bank, vault } = await TH.buildBornVault()
-    const fetched = vi.spyOn(bank.vaultDB, 'tryGetThing')
+    const fetched = vi.spyOn(bank.device.vaultDB, 'tryGetThing')
     bank.lock()
     const err = await TH.expectRefusal(vault.withWhisper('box', () => undefined), 'bad_record')
     expect(err.message).to.include(Phrases.VaultBoxIsRoot)
@@ -591,7 +591,7 @@ describe("vault.withUnlockedWhisper(labelpath, fn)", () => {
     const { bank, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     bank.lock()
-    const asked = vi.spyOn(bank.vaultDB, 'tryGetThing')
+    const asked = vi.spyOn(bank.device.vaultDB, 'tryGetThing')
     const fn = vi.fn()
     await TH.expectRefusal(vault.withUnlockedWhisper(Openai, fn), 'bank_locked')
     expect(bank.getSnapshot().isUnlockWanted).to.be.false
@@ -626,7 +626,7 @@ describe("vault.forceTimelyUnlocked(labelpath, opts)", () => {
   it("asks the vaultDB for a timely box under a staleTime of 0", async () => {
     const { bank, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const asked = vi.spyOn(bank.vaultDB, 'tryGetThing')
+    const asked = vi.spyOn(bank.device.vaultDB, 'tryGetThing')
     await vault.forceTimelyUnlocked(Openai, { staleTime: 0 })
     expect(boxGetsOf(asked)).to.equal(1)
   })
@@ -634,7 +634,7 @@ describe("vault.forceTimelyUnlocked(labelpath, opts)", () => {
   it("leaves a timely box unfetched under no staleTime of its own", async () => {
     const { bank, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const asked = vi.spyOn(bank.vaultDB, 'tryGetThing')
+    const asked = vi.spyOn(bank.device.vaultDB, 'tryGetThing')
     await vault.forceTimelyUnlocked(Openai)
     expect(boxGetsOf(asked)).to.equal(0)
   })
@@ -682,6 +682,6 @@ function boxGetsOf(asked: { mock: { calls: [GetAsk][] } }): number {
 /** Make `bank`'s vaultDB refuse every get from now on, `storage_unavailable`, and return the spy that saw them. */
 function refuseGets(bank: Bank) {
   const refusal = Throwers.storageUnavailable(new Error('connection refused'))
-  return vi.spyOn(bank.vaultDB, 'tryGetThing').mockImplementation((ask) => Promise.resolve(refusedAnswerOf(ask, refusal)))
+  return vi.spyOn(bank.device.vaultDB, 'tryGetThing').mockImplementation((ask) => Promise.resolve(refusedAnswerOf(ask, refusal)))
 }
 

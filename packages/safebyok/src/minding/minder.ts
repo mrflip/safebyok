@@ -16,7 +16,8 @@ import { type Sparse, type ThingCited, type ThingRecord, type ThingScope, type T
 import { Thing } from '../models/thing'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetAsk, type ThingWatchScope, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
-import type { GetThingAnswer, Kids, ThingNotice, VaultDB, WriteThingAnswer } from '../storage/vault-db'
+import type { GetThingAnswer, Kids, VaultDB, WriteThingAnswer } from '../storage/vault-db'
+import type { VaultEvent } from '../shapes/shapes-vault-event'
 import { refusedAnswerOf } from '../storage/refused-answer'
 import {
   type DeliverableThing, type GotAnswer, type MinderEvent, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts,
@@ -144,8 +145,8 @@ export abstract class Minder {
     this.#unwatch = this.vaultDB.watch(
       this.scope,
       // Synchronous on purpose: the vaultDB notifies of a refusal's dbhas, each changed tracked Thing and a list's parentage and deltas before its verb returns. An await here would cache them after the operation resumes.
-      (notice: ThingNotice) => { this.sendToTSQ(notice.val) },
-      (news)                => { this.#bank.tellBadNews([news]) },
+      (event: VaultEvent) => { if ((event.eventkind === 'item') && (event.record !== null)) { this.sendToTSQ(event.record) } },
+      (news)               => { this.#bank.tellBadNews([news]) },
     )
   }
 

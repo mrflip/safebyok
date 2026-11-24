@@ -5,7 +5,7 @@ import { Thing } from '../../../src/models/thing'
 import { MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
-import { QuietVaultDB, LateWriteVaultDB, minderWorldOf, bornOf, storedBoxOf, noticeOf, cheatBox, listenerOf, boxBirthAskOf, isListingStaleAt, labelpathsOf } from './world'
+import { QuietVaultDB, LateWriteVaultDB, minderWorldOf, bornOf, storedBoxOf, watchEventOf, cheatBox, listenerOf, boxBirthAskOf, isListingStaleAt, labelpathsOf } from './world'
 
 describe("VaultMinder.tryWrite", () => {
   it("answers as the vaultDB did, once the record written is in its item", async () => {
@@ -98,7 +98,7 @@ describe("VaultMinder.tryWrite", () => {
     await minder.list('box')
     await minder.tryWrite(boxBirthAskOf())
     const [record, listing] = [minder.at(TH.BoxScope), minder.listingAt(TH.RootScope)]
-    receive(noticeOf(TH.boxThingOf()))
+    receive(watchEventOf(TH.boxThingOf()))
     expect(minder.at(TH.BoxScope)).to.eq(record)
     expect(minder.listingAt(TH.RootScope)).to.eq(listing)
     expect(record).to.deep.equal(TH.boxThingOf())
@@ -112,7 +112,7 @@ describe("VaultMinder.tryWrite", () => {
     vaultDB.hold()
     const writing = minder.tryWrite(boxBirthAskOf())
     await TH.eventually(() => vaultDB.isHolding)
-    receive(noticeOf(TH.boxThingOf()))
+    receive(watchEventOf(TH.boxThingOf()))
     const [record, listing] = [minder.at(TH.BoxScope), minder.listingAt(TH.RootScope)]
     vaultDB.release()
     await writing

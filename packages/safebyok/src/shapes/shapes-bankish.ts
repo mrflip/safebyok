@@ -34,8 +34,6 @@ export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbse
 export interface BankOpts {
   /** The device the bank is on. Its scope must be the bank's. */
   device:  Device
-  /** Where the bank's boxes are stored. */
-  vaultDB: VaultDB
   /** The bank's main gate, made for this bank's stamp. */
   gate:    Gate
 }

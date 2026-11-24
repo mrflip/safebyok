@@ -80,11 +80,11 @@ describe("IdbVaultDB's watch", () => {
   it("hears a write made by another instance on the same database, as another tab's", async () => {
     const idbVaultDB = TH.makeIdbVaultDB()
     const twin = TH.makeTwin(idbVaultDB)
-    const notices: unknown[] = []
-    const unwatch = twin.watch(TH.ThingBank, (notice) => { notices.push(notice) }, noop)
+    const events: unknown[] = []
+    const unwatch = twin.watch(TH.ThingBank, (event) => { events.push(event) }, noop)
     await TH.expectGood(idbVaultDB.tryWriteThing(TH.birthAskOf()))
-    await TH.eventually(() => notices.length > 0)
-    expect(notices).to.deep.equal([{ ok: true, act: 'gotlive', val: TH.gateThingOf() }])
+    await TH.eventually(() => events.length > 0)
+    expect(events).to.deep.equal([TH.itemEventOf(TH.gateThingOf())])
     unwatch()
   })
 })

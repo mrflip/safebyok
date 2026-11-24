@@ -10,21 +10,19 @@ import type { BankAskDraft, BankOpts, BankSnapshot, BankStage, BoxUnsealed, Host
 import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import { type DeviceTok, type Lifetok, Labelpath, Lifeseq } from '../shapes/primitives'
-import { type BankRecord, type BoxRecord, type Modelkind, type ThingRecord, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type Modelkind, type ThingRecord, ThingFormat } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type BankRoots, type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../shapes/shapes-asks'
-import type { VaultDB } from '../storage/vault-db'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
 /** The signed-in user's bank on this device: its main gate, which holds the lease while unlocked, and its root box.
- * Boxes are sealed and unsealed under its gate's lease, and stored in its vaultDB. Its roots, as last heard of, are its world in the device's BankMinder.
+ * Boxes are sealed and unsealed under its gate's lease. Its roots, as last heard of, are its world in the device's BankMinder.
  */
 export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements BankStamp {
-  // == [Props]: #device, #vaultDB, #gate, #vaults, #endCause, #snapshot, #getSnapshot
+  // == [Props]: #device, #gate, #vaults, #endCause, #snapshot, #getSnapshot
 
   readonly #device:   Device
-  readonly #vaultDB:  VaultDB
 
   /** The main gate. */
   readonly #gate: Gate
@@ -40,7 +38,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   readonly #getSnapshot = (): BankSnapshot => this.#snapshot
   // --
 
-  // == [Getters]: lifetok, device, device_tok, vaultDB, scope, stamp, gate, rootBox, track, getSnapshot, subscribe
+  // == [Getters]: lifetok, device, device_tok, scope, stamp, gate, rootBox, track, getSnapshot, subscribe
 
   // we are under-using the lifetok at the moment
   /** The token minted when this bank was born, which tells this life of the bank from any other under its banklabel. */
@@ -51,9 +49,6 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   /** This device's token, recorded in each wayin the bank builds. */
   get device_tok(): DeviceTok { return this.#device.device_tok }
-
-  /** Where this bank's Things are stored. */
-  get vaultDB(): VaultDB { return this.#vaultDB }
 
   /** This bank's scope: its user and its `banklabel`. */
   get scope(): BankScope { return StampChecks.bankScope.parse(this) }
@@ -92,14 +87,14 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Construction]: make, constructor, mintStamps, makeRecord
 
-  /** Make the bank of `record`, with `opts.gate` as its main gate, on `opts.device`, with its boxes in `opts.vaultDB`. Nothing is fetched or stored.
+  /** Make the bank of `record`, with `opts.gate` as its main gate, on `opts.device`. Nothing is fetched or stored.
    * The device's BankMinder must hold the world of `record`'s life, its root box live: fetch the world, or birth the bank, first.
    * It is locked or unlocked as its gate is. The device is not told of it: a device makes its own bank in its `signIn`, and is handed the bank its birth makes.
    */
   static make(record: BankRecord, opts: BankOpts): Bank { return new Bank(record, opts) }
 
   private constructor(record: BankRecord, opts: BankOpts) {
-    const { record: bankRecord, opts: { device, vaultDB, gate } } = Checks.bankMakeArgs.parse({ record, opts })
+    const { record: bankRecord, opts: { device, gate } } = Checks.bankMakeArgs.parse({ record, opts })
     Validator.checkedConsistent(StampChecks.bankScope.parse(bankRecord), device.scope, { kind: 'record_conflict' })
     Validator.checkedConsistent(gate.bankStamp, BankChecks.stamp.parse(bankRecord), { kind: 'record_conflict' })
     const world = device.bankMinder.worldAt()
@@ -108,7 +103,6 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     BoxChecks.live.parse(world.root)
     super(bankRecord)
     this.#device = device
-    this.#vaultDB = vaultDB
     this.#gate = gate
     this.#snapshot = this.#makeSnapshot()
     // The bank's sweep sweeps its gate, which then lets go of this listener.
@@ -367,7 +361,6 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
     record: BankChecks.record,
     opts:   obj({
       device:  custom<Device>(),
-      vaultDB: ThingChecks.vaultDBShape,
       gate:    custom<Gate>(),
     }),
   }),

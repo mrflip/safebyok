@@ -16,7 +16,6 @@ import { BankChecks, GateChecks } from './shapes-thingkinds'
 import { type GateRecord, ThingChecks } from './shapes-thing'
 import type { PutAskDraft } from './shapes-asks'
 import type { WayinHeader } from './shapes-wayin'
-import type { VaultDB } from '../storage/vault-db'
 
 // == [The form verbs' cleartexts]: CleartextChecks, BirthCleartexts, UnlockCleartexts, PassphraseReplaceCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, ProvedCleartexts, GatingCleartexts
 
@@ -138,8 +137,6 @@ export type GateDna = GateStamp & { wayins: { main: Wayin, passkey0: Wayin | nul
 export interface GateOpts {
   /** The device the gate's bank is on. */
   device:    Device
-  /** Where the gate is stored. */
-  vaultDB:   VaultDB
   /** The stamp of the gate's bank, which its scope must match. */
   bankStamp: BankStamp
 }

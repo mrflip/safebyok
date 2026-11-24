@@ -228,7 +228,7 @@ describe("a device's persisters", () => {
     await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     await first.minder.list('box')
     await nextTick()
-    const device = TH.makeDevice({}, { vaultDB: vault.bank.vaultDB, persisters })
+    const device = TH.makeDevice({}, { vaultDB: vault.bank.device.vaultDB, persisters })
     await device.signIn(TH.WorldScope.userid)
     expect(Object.keys(device.minder.listingAt({ ...TH.WorldScope, labelpath: 'box' })?.items ?? {})).to.deep.equal(['openai'])
     expect(device.minder.at({ ...TH.WorldScope, labelpath: 'box/openai' })).to.have.property('labelpath', 'box/openai')
@@ -263,7 +263,7 @@ describe("a device's persisters", () => {
     await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     await nextTick()
     const otherScope = { ...TH.WorldScope, userid: 'u_other' }
-    const device     = TH.makeDevice({ userid: null }, { vaultDB: vault.bank.vaultDB, persisters })
+    const device     = TH.makeDevice({ userid: null }, { vaultDB: vault.bank.device.vaultDB, persisters })
     await device.signIn(otherScope.userid)
     await nextTick()
     expect(device.minder.at({ ...otherScope, labelpath: 'box/openai' })).to.be.undefined

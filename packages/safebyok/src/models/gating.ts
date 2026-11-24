@@ -151,10 +151,9 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
   const passkey0 = await passkeyProving?.buildWayin(passphraseProving) ?? null
   const bankRecord = Bank.makeRecord(bankStamp)
   const rootShell  = BoxChecks.liveOrShell.parse(Shell.of({ ...device.scope, labelpath: Labelpath.RootBox }))
-  const { vaultDB } = device
   // The root box is sealed under the lease of the gate the birth makes, and the bank stored is made with that gate,
   // unlocked. Where the birth refuses, or the vaultDB's answer is broken, the gate is swept, and no bank holds it.
-  const gate = Gate.make(Gate.makeRecord({ ...gateStamp, wayins: { main, passkey0 } }), { device, vaultDB, bankStamp })
+  const gate = Gate.make(Gate.makeRecord({ ...gateStamp, wayins: { main, passkey0 } }), { device, bankStamp })
   try {
     await friend.unlockByProving(gate, passphraseProving)
     const root   = await gate.seal(BaseBox, rootShell, { sidecar: {} }, { whisper: {} })
@@ -163,7 +162,7 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
     if (! answer.ok) { throw answer.err }
     // The user must hear that their passphrase was not set: the bank stored is another's.
     if (answer.val.bank.revtok !== bankRecord.revtok) { throw Throwers.gateMadeElsewhere() }
-    const bank = Bank.make(answer.val.bank, { device, vaultDB, gate })
+    const bank = Bank.make(answer.val.bank, { device, gate })
     friend.attachBank(bank)
     return bank
   } catch (err) {

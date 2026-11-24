@@ -66,7 +66,7 @@ export type VaultEventOf<EventkindT extends VaultEventkind> = Readonly<{
   agerankWas: Agerank | undefined
 }>
 
-/** A record seen, taken because it raised the Thing's agerank. */
+/** A record seen: from a feed that keeps ageranks, one that raised the Thing's agerank. */
 export type VaultItemEvent = VaultEventOf<'item'> & Readonly<{
   recordkind: Recordkind
   /** The caller's own record object, not a copy, or null for `void`. */

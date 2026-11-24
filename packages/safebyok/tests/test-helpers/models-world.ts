@@ -159,9 +159,8 @@ export async function buildBornBank({ passkeyCleartext, device = makeDevice() }:
 
 /** Another Bank over the records a {@link buildBornBank} birth stored, locked, as a device's `signIn` makes one. Its device is not told of it. */
 export function makeStoredBank({ device, record, gateRecord }: Pick<BornBank, 'device' | 'record' | 'gateRecord'>): Bank {
-  const { vaultDB } = device
-  const gate = Gate.make(gateRecord, { device, vaultDB, bankStamp: record })
-  return Bank.make(record, { device, vaultDB, gate })
+  const gate = Gate.make(gateRecord, { device, bankStamp: record })
+  return Bank.make(record, { device, gate })
 }
 
 /** A {@link buildBornBank} bank, beside the vault of its boxes and that vault's minder. */

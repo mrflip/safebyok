@@ -5,7 +5,7 @@ import { Thing } from '../models/thing'
 import * as Phrases from '../phrases'
 import { type Banklabel, type Lifepath, type Userid, Labelpath, Lifeseq, Revseq } from '../shapes/primitives'
 import type { BankScope } from '../shapes/shapes-stamps'
-import { type ThingCited, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
+import { type ThingCited, type ThingScope, ThingChecks, isLifepathDeep, isParityRight } from '../shapes/shapes-thing'
 import type { Agekind, Agerank, Recordkind, SeenThing, VaultEvent } from '../shapes/shapes-vault-event'
 
 // == [FeedSorter]: FeedSorter
@@ -110,15 +110,10 @@ function agekindOf(agerank: Agerank): Agekind {
 }
 // --
 
-// == [Checks]: SeenChecks, isLifepathDeep, isParityRight
+// == [Checks]: SeenChecks
 
-// The two rules are shapes-thing's own, which keeps them private. A lifepath as deep as its labelpath is what lets two
-// ageranks of one Thing compare as strings: each lifeseq and revseq is ten characters, so each `/` and `|` falls at one place.
-/** True when the lifepath has one lifeseq for each segment of the labelpath */
-function isLifepathDeep({ lifepath, labelpath }: Pick<ThingCited & ThingScope, 'lifepath' | 'labelpath'>): boolean { return lifepath.split('/').length === labelpath.split('/').length }
-/** True when the own lifeseq is odd exactly when the Thing is a tombstone */
-function isParityRight({ am, lifepath }: Pick<ThingCited, 'am' | 'lifepath'>): boolean { return (am === 'x') === Lifeseq.isTombstone(Lifeseq.ofLifepath(lifepath)) }
-
+// A lifepath as deep as its labelpath is what lets two ageranks of one Thing compare as strings: each lifeseq and revseq
+// is ten characters, so each `/` and `|` falls at one place.
 /** The checks of what a feed is given. */
 const SeenChecks = Validator.Checkers('bad_record', () => ({
   /** The scope and citation of a record or a void sentinel. */

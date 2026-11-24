@@ -4,7 +4,7 @@ import type { Kids } from '../../../src/storage/vault-db'
 import { MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { QuietVaultDB, minderWorldOf, storedBoxOf, noticeOf, boxScopeOf, cheatBox, boxBirthAskOf, listenerOf, isListingEvent, isListingStaleAt, labelpathsOf } from './world'
+import { QuietVaultDB, minderWorldOf, storedBoxOf, watchEventOf, boxScopeOf, cheatBox, boxBirthAskOf, listenerOf, isListingEvent, isListingStaleAt, labelpathsOf } from './world'
 
 // == [Listings in any order]: ListingStep, OrdersWithoutWrite, ListingOrders, listingAfter
 
@@ -36,7 +36,7 @@ async function listingAfter(steps: readonly ListingStep[]) {
     list:   async () => { await minder.list('box') },
     get:    async () => { await minder.get(boxScopeOf('anthropic')) },
     write:  async () => { await TH.expectGood(minder.tryWrite(boxBirthAskOf('cohere'))) },
-    notice: () => { receive(noticeOf(mistral)) },
+    notice: () => { receive(watchEventOf(mistral)) },
   }
   for (const step of steps) { await stepRunners[step]() }
   if (isListingStaleAt(minder, TH.RootScope)) { await minder.list('box') }
@@ -81,7 +81,7 @@ async function eventsAfter(steps: readonly ListingStep[]) {
       try { await minder.get(TH.BoxScope, { staleTime: 0 }) } catch (err) { refusalkinds.push((err as { refusalkind?: unknown }).refusalkind) }
     },
     write:  async () => { await TH.expectGood(minder.tryWrite(replaceAsk)) },
-    notice: () => { receive(noticeOf(Reborn)) },
+    notice: () => { receive(watchEventOf(Reborn)) },
   }
   for (const step of steps) { await stepRunners[step]() }
   return { events: heard.mock.calls.map(([event]) => event), refusalkinds }

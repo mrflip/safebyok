@@ -15,10 +15,10 @@ TH.useFakeClock()
 const ThingFields = ['userid', 'banklabel', 'labelpath', 'label', 'fmt', 'lifepath', 'lifeseq', 'revtok', 'revseq', 'born_at', 'written_at', 'am']
 const GateFields = [...ThingFields, 'wayins', 'auth', 'sigs', 'meta']
 
-/** What a gate of {@link TH.WorldBankStamp}'s bank is made with: a new device of its scope, that device's vaultDB, and the bank's stamp. */
+/** What a gate of {@link TH.WorldBankStamp}'s bank is made with: a new device of its scope, and the bank's stamp. */
 function worldOpts(): GateOpts {
   const device = TH.makeDevice()
-  return { device, vaultDB: device.vaultDB, bankStamp: TH.WorldBankStamp }
+  return { device, bankStamp: TH.WorldBankStamp }
 }
 
 interface DnaWayins { main: Wayin, passkey0: Wayin | null }
@@ -78,7 +78,7 @@ describe("Gate.makeRecord(dna)", () => {
   }
 })
 
-describe("Gate.make(record, { device, vaultDB, bankStamp })", () => {
+describe("Gate.make(record, { device, bankStamp })", () => {
   it("makes the same gate again from a gate's pickle", async () => {
     const gate = Gate.make(await gateRecordOf(true), worldOpts())
     const again = Gate.make(gate.pickle(), worldOpts())
@@ -121,7 +121,7 @@ describe("Gate.make(record, { device, vaultDB, bankStamp })", () => {
     it(`refuses a device of ${blurb} than its bank's`, async () => {
       const record = await gateRecordOf()
       const device = TH.makeDevice(moved)
-      TH.expectSyncRefusal(() => Gate.make(record, { device, vaultDB: device.vaultDB, bankStamp: TH.WorldBankStamp }), 'record_conflict')
+      TH.expectSyncRefusal(() => Gate.make(record, { device, bankStamp: TH.WorldBankStamp }), 'record_conflict')
     })
   }
 
@@ -186,12 +186,11 @@ describe("what a gate shows", () => {
     expect(() => { (gate as { banklabel: unknown }).banklabel = 'other' }).to.throw(TypeError)
   })
 
-  it("has the bank's stamp, the device and the vaultDB it was given, and its own stamp", async () => {
+  it("has the bank's stamp, the device it was given, and its own stamp", async () => {
     const record = await gateRecordOf()
     const opts = worldOpts()
     const gate = Gate.make(record, opts)
     expect(gate.device).to.eq(opts.device)
-    expect(gate.vaultDB).to.eq(opts.vaultDB)
     expect(gate.bankStamp).to.deep.equal(TH.WorldBankStamp)
     expect(gate.stamp).to.deep.equal(TH.WorldGateStamp)
     expect(gate.scope).to.deep.equal({ userid: TH.WorldScope.userid, banklabel: TH.WorldScope.banklabel, labelpath: 'gate' })

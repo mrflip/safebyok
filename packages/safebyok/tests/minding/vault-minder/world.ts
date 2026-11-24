@@ -10,7 +10,8 @@ import { type BoxRecord, type ThingRecord, type ThingScope, Shell } from '../../
 import { Thing } from '../../../src/models/thing'
 import { type GetAsk, type WriteAsk, getAskOf, listAskOf } from '../../../src/shapes/shapes-asks'
 import type { BankScope } from '../../../src/shapes/shapes-stamps'
-import type { GetThingAnswer, Kids, ThingNotice, WriteThingAnswer } from '../../../src/storage/vault-db'
+import type { GetThingAnswer, Kids, WriteThingAnswer } from '../../../src/storage/vault-db'
+import type { VaultItemEvent } from '../../../src/shapes/shapes-vault-event'
 import * as TH from '../../test-helpers'
 
 /** The get ask a minder sends the vaultDB for the box at `TH.BoxScope`: the bank's, tracking the roots at revision 0. */
@@ -48,7 +49,7 @@ export class LateVaultDB extends MemoryVaultDB {
   release(): void { for (const resolve of this.#releases.splice(0)) { resolve() } }
 }
 
-/** A vaultDB whose watch tells nothing: a test hands the minder each notice itself. */
+/** A vaultDB whose watch tells nothing: a test hands the minder each event itself. */
 export class QuietVaultDB extends MemoryVaultDB {
   override watch(): () => void { return noop }
 }
@@ -95,13 +96,13 @@ export function minderOf(vaultDB: MemoryVaultDB, queryCacheOpts: Partial<QueryCa
   return VaultMinder.make({ vaultDB, queryCacheOpts }, bank)
 }
 
-/** A bank's minder, what it stands on, and a way to hand its watch a notice. */
+/** A bank's minder, what it stands on, and a way to hand its watch an event. */
 export interface MinderWorld<VaultDBT extends MemoryVaultDB> {
   vaultDB:    VaultDBT
   bank:       ReturnType<typeof fakeBankOf>
   bankMinder: BankMinder
   minder:     VaultMinder
-  receive:    (notice: ThingNotice) => void
+  receive:    (event: VaultItemEvent) => void
 }
 
 /** The minder of a bank over `vaultDB`, made, and started unless `isStarted` is false. Its BankMinder has the bank's world, roots at revision 0, unless `isWorldHeard` is false. */
@@ -111,8 +112,8 @@ export async function minderWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: Vau
   const watching   = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
   const minder     = minderOf(vaultDB, {}, bank)
   if (isStarted) { minder.hello() }
-  function receive(notice: ThingNotice): void {
-    for (const watched of watching.mock.calls) { watched[1](notice) }
+  function receive(event: VaultItemEvent): void {
+    for (const watched of watching.mock.calls) { watched[1](event) }
   }
   return { vaultDB, bank, bankMinder, minder, receive }
 }
@@ -137,14 +138,14 @@ export async function storedBoxOf(vaultDB: MemoryVaultDB, revseq = 0): Promise<B
   return box
 }
 
-/** A watch notice of `record` sparse, as the vaultDB sends one for a large record. */
-export function sparseNoticeOf(record: ThingRecord): ThingNotice {
-  return noticeOf(Thing.sparseOf(record))
+/** The event a watch tells of `record` sparse, as the vaultDB tells a Thing a list answers. */
+export function sparseWatchEventOf(record: ThingRecord): VaultItemEvent {
+  return TH.itemEventOf(Thing.sparseOf(record), 'soon')
 }
 
-/** A watch notice of `thing`, as the vaultDB sends one. */
-export function noticeOf(thing: ThingNotice['val']): ThingNotice {
-  return { ok: true, act: Thing.isLive(thing) ? 'gotlive' : 'gotgone', val: thing }
+/** The event a watch tells of `record`, live or a tombstone, as the vaultDB tells one. */
+export function watchEventOf(record: ThingRecord): VaultItemEvent {
+  return TH.itemEventOf(record, Thing.isLive(record) ? 'full' : 'gone')
 }
 
 /** The revtok of the item of the box at `TH.BoxScope`, or undefined for nothing or null. */
