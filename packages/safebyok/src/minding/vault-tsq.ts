@@ -2,47 +2,20 @@
 
 import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
-import { Validator } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
 import { type MinderGetOpts, MinderChecks } from '../shapes/shapes-minder'
 import { type ThingRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
 import type { BankScope } from '../shapes/shapes-stamps'
+import { type ItemQueryOptions, type VaultMutationOptions, type VaultTSQOpts, VaultTSQChecks } from '../shapes/shapes-vault-tsq'
 import type { VaultEvent } from '../shapes/shapes-vault-event'
 import { BaseThing } from '../models/base-thing'
-import { type ReceivingThing, type SortedVaultDB, isSortedVaultDB } from '../storage/sorted-vault-db'
+import type { ReceivingThing, SortedVaultDB } from '../storage/sorted-vault-db'
 import { readAtOf } from '../storage/thing-classifier'
 import type { Kids } from '../storage/vault-db'
-import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 import { bankKeyHeadOf, labelsOf } from './minder-keys'
 
-// == [VaultTSQ]: VaultTSQOpts, ItemQueryOptions, VaultMutationOptions, VaultTSQ
-
-/** Options for {@link VaultTSQ.make}. */
-export type VaultTSQOpts = Readonly<{
-  /** The SortedVaultDB of the bank, whose Things the items are read from. */
-  vaultMinder: SortedVaultDB
-  /** The client the items and listings are kept in: a host's own, or one made for the bank. */
-  queryClient: TSQ.QueryClient
-  /** The bank. */
-  scope:       BankScope
-}>
-
-/** The query key and seed of a box's item, for a host's query of it ({@link VaultTSQ.itemQueryOptions}). */
-export type ItemQueryOptions = Readonly<{
-  queryKey:              TSQ.QueryKey
-  /** The box's record, or null where none is stored live. Left out where no whole record of its newest life is known. */
-  initialData?:          ThingRecord | null
-  /** When the newest revision of the box was last read, in epoch milliseconds. Left out with `initialData`. */
-  initialDataUpdatedAt?: number
-}>
-
-/** The options of a host's mutation ({@link VaultTSQ.mutationOptionsOf}). */
-export type VaultMutationOptions<TData, TVariables> = Readonly<{
-  mutationFn:  TSQ.MutationFunction<TData, TVariables>
-  networkMode: 'always'
-  retry:       false
-}>
+// == [VaultTSQ]: VaultTSQ
 
 // The writer, `#hear`, is the only code that changes an item or a listing: the queryFns answer what the Thing holds,
 // and nothing here shares structure or acts on a query's success.
@@ -70,7 +43,7 @@ export class VaultTSQ {
   /** Keep the bank's boxes in `opts.queryClient` from what `opts.vaultMinder` tells, from now on.
    * Its query and mutation defaults go under the bank's key, where a host's own options override them.
    */
-  static make(opts: VaultTSQOpts): VaultTSQ { return new VaultTSQ(Checks.makeArgs.parse(opts)) }
+  static make(opts: VaultTSQOpts): VaultTSQ { return new VaultTSQ(VaultTSQChecks.makeArgs.parse(opts)) }
 
   private constructor({ vaultMinder, queryClient, scope }: VaultTSQOpts) {
     this.#vaultMinder = vaultMinder
@@ -140,7 +113,7 @@ export class VaultTSQ {
 
   /** List the children of the box at `labelpath` once, whatever its listing holds. */
   async listOnce(labelpath: Labelpath): Promise<Kids> {
-    const scope = Checks.listScope.parseConsistent({ ...this.#scope, labelpath }, this.#scope)
+    const scope = VaultTSQChecks.listScope.parseConsistent({ ...this.#scope, labelpath }, this.#scope)
     return await this.#queryClient.query<Kids>({ queryKey: VaultTSQ.listQueryKeyOf(scope), staleTime: 0 })
   }
   // --
@@ -149,7 +122,7 @@ export class VaultTSQ {
 
   /** The options of a host's mutation that runs `mutationFn` once, whether or not the browser reports itself online. */
   static mutationOptionsOf<TData, TVariables>(mutationFn: TSQ.MutationFunction<TData, TVariables>): VaultMutationOptions<TData, TVariables> {
-    Checks.mutationFn.parse(mutationFn)
+    VaultTSQChecks.mutationFn.parse(mutationFn)
     return { mutationFn, ...BankDefaults }
   }
   // --
@@ -243,28 +216,4 @@ function labelpathOfItemKey(queryKey: TSQ.QueryKey): Labelpath { return queryKey
 
 /** The labelpath of a listing's query key */
 function labelpathOfListKey(queryKey: TSQ.QueryKey): Labelpath { return queryKey.slice(LabelsIdx, -2).join('') }
-// --
-
-// == [Checks]: Checks
-
-/** The checks of {@link VaultTSQ.make}'s arguments, of a listing's scope, and of a mutationFn. */
-const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn }) => ({
-  makeArgs:   obj({
-    vaultMinder: custom<SortedVaultDB>(isSortedVaultDB, Phrases.SortedVaultDBExpected),
-    queryClient: custom<TSQ.QueryClient>(isQueryClient, Phrases.QueryClientExpected),
-    scope:       ThingChecks.bankScope,
-  }),
-  listScope:  ThingChecks.thingScope.refine(({ labelpath }) => Labelpath.isBox(labelpath), Phrases.ListOfBoxes),
-  mutationFn: fn<TSQ.MutationFunction>(),
-}))
-
-/** The members of a QueryClient a VaultTSQ calls. */
-const QueryClientMembernames = ['setQueryDefaults', 'setMutationDefaults', 'setQueryData', 'query', 'invalidateQueries', 'resetQueries'] as const
-
-/** True for an object with a function for each member of a QueryClient a VaultTSQ calls. */
-function isQueryClient(val: unknown): val is TSQ.QueryClient {
-  if (typeof val !== 'object' || val === null) { return false }
-  const members: Partial<Record<string, unknown>> = val
-  return QueryClientMembernames.every((membername) => typeof members[membername] === 'function')
-}
 // --
