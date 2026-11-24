@@ -4,9 +4,8 @@ import { VaultTSQ } from '../../../src/minding/vault-tsq'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { SortedVaultDB } from '../../../src/storage/sorted-vault-db'
 import { readTcNow } from '../../../src/storage/thing-classifier'
-import type { ReadTc } from '../../../src/shapes/shapes-answers'
+import type { ReadTc, SeenThing, VaultItemEvent } from '../../../src/shapes/shapes-vault-event'
 import type { ThingScope } from '../../../src/shapes/shapes-thing'
-import type { SeenThing, VaultItemEvent } from '../../../src/shapes/shapes-vault-event'
 import * as TH from '../../test-helpers'
 
 /** A bank's VaultTSQ on a fresh QueryClient, the SortedVaultDB it hears, and a way to hand the vaultDB's watcher a notice. */

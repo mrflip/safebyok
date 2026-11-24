@@ -3,8 +3,7 @@
 import { BaseThing } from '../models/base-thing'
 import { type Lifepath, Lifeseq, Revseq } from '../shapes/primitives'
 import type { ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
-import type { Agekind, Agerank, ItemSeen, SeenThing, VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
-import type { ReadTc } from '../shapes/shapes-answers'
+import type { Agekind, Agerank, ItemSeen, ReadTc, SeenThing, VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
 
 // == [Agerank]: TcchunkDigits, NoRevseq, AgerankFields, tcchunkOf, nextAgerankOf, lifeAgerankOf, tcchunkAfter, laterOf, itemSeenOf, eventsOf, agekindOf, fieldsOf, isOfLife
 

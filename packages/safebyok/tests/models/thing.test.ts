@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { type Adoptable, Thing } from '../../src/models/thing'
 import { type Lifepath, Lifeseq, Revseq, VoidLifeseq } from '../../src/shapes/primitives'
 import { type ThingRecord, type ThingScope, Shell } from '../../src/shapes/shapes-thing'
-import type { Agekind, Agerank, Lifekind, Liveness, SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
+import type { Agekind, Agerank, Lifekind, Liveness, ReadTc, SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
 import { readAtOf, readTcNow } from '../../src/storage/thing-classifier'
-import type { ReadTc } from '../../src/shapes/shapes-answers'
 import * as TH from '../test-helpers'
 
 // == [Shorthand]: Life, Seen, Shorthand, FeedCase, the starts

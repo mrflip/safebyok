@@ -7,7 +7,6 @@ import type { LiveOf, ShellOf } from './shapes-sealers'
 import { type Sparse, type ThingRecord, type Thingkind, type Tombstone, ThingChecks, isLifepathDeep, isParityRight } from './shapes-thing'
 import { BaseThing } from '../models/base-thing'
 import { itemSeenOf } from '../storage/agerank'
-import type { ReadTc } from './shapes-answers'
 
 // == [Kinds]: livenessVals, Liveness, lifekindVals, Lifekind, agekindVals, Agekind, vaultEventkindVals, VaultEventkind
 
@@ -119,7 +118,12 @@ export type VaultAgedEvent = VaultEventOf<'aged'> & Readonly<{
 }>
 // --
 
-// == [Checks]: ReadTcPattern, SeenChecks
+// == [Checks]: ReadTc, ReadTcPattern, SeenChecks
+
+/** When the datastore was read, as a UUID version 7: lowercase hex of a fixed width, so that two compare as text in the order of their reads.
+ * Compare two of them as strings, never with the device's clock.
+ */
+export type ReadTc = string
 
 /** A UUID version 7, as text: the shape of every {@link ReadTc}. */
 export const ReadTcPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/

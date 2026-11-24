@@ -6,9 +6,9 @@ import type { Labelpath, Lifepath, Lifeseq, Lifetok } from './primitives'
 import type { Sparse, ThingRecord, ThingScope, VoidSentinel } from './shapes-thing'
 import type { TombstoneOf } from './shapes-sealers'
 import type { BankRoots, LoggableAsk, Tracked, WorldRecord } from './shapes-asks'
-import { SeenChecks } from './shapes-vault-event'
+import { type ReadTc, SeenChecks } from './shapes-vault-event'
 
-// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ReadTc, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer
+// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer
 // No check reads an answer whole: `AdapterVaultDB` makes each of parts it has checked, and a reader checks each record it
 // keeps where a Thing takes it.
 
@@ -51,11 +51,6 @@ export type WriteThingAnswer = Answer<ThingRecord, EX.PutAct | EX.DelAct>
 /** A child Thing that fails its kind's checks: its scope, and `am: 'd'`. */
 export type DamagedThing = Readonly<ThingScope & { am: 'd' }>
 
-/** When the datastore was read, as a UUID version 7: lowercase hex of a fixed width, so that two compare as text in the order of their reads.
- * Compare two of them as strings, never with the device's clock.
- */
-export type ReadTc = string
-
 /** One child in a {@link Kids} value: the lifeseq of its life stored. */
 export type KidEntry = Readonly<{ lifeseq: Lifeseq }>
 
@@ -97,7 +92,7 @@ export type ListThingsAnswer<RecordT extends ThingRecord = ThingRecord> =
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
 // --
 
-// == [Pre-image of an answer]: ActualChecks, ActualBeside, Actual, GotActual, WroteActual, ListThingsActual, BirthBankActual
+// == [Pre-image of an answer]: ActualChecks, ActualBeside, Actual, GotActual, WroteActual, ListThingsActual, BirthBankActual, Received
 // What a concrete adapter reports, carrying the actual values stored: `AdapterVaultDB` makes the answer from it.
 
 /** True for null or a plain object */
@@ -156,4 +151,9 @@ export type BirthBankActual = ActualBeside & (
   | { ok: true,  act: 'born' | 'passed', things: BankRoots }
   | { ok: false, act: EX.RefusedAct,     record: ThingRecord | VoidSentinel }
 )
+
+/** A change a concrete adapter's `doWatch` passes to `receive`: the changed Thing, raw, and its bank's world as the datastore last read it.
+ * Watchers are notified of the Thing alone, with the world's lifetok: a bank or main gate that changed is a change of its own.
+ */
+export type Received = Pick<ActualBeside, 'world'> & { record: unknown }
 // --

@@ -25,11 +25,11 @@ export { type PasskeyWayinHeader, type PasskeyWayinRecord, type PassphraseWayinH
 export type { AddPasskeyGating, BirthGating, Gating, ReplacePassphraseGating, RevokePasskeyGating, UnlockGating } from './models/gating'
 export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
-  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside, type ReadTc,
+  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside,
   type WriteThingAnswer,
 } from './shapes/shapes-answers'
 export { type VaultDB, isVaultDB } from './storage/vault-db'
-export type { Agerank, ItemSeen, Liveness, VaultAgedEvent, VaultEvent, VaultEventOf, VaultEventkind, VaultItemEvent, VaultLifeEvent } from './shapes/shapes-vault-event'
+export type { Agerank, ItemSeen, Liveness, ReadTc, VaultAgedEvent, VaultEvent, VaultEventOf, VaultEventkind, VaultItemEvent, VaultLifeEvent } from './shapes/shapes-vault-event'
 export { type DevicePersisters, type PersistedClient, type Persister, type PersisterOfBank, MemoryPersister, isPersister } from './storage/persister'
 export {
   type BadNews, type BadNewsHandler, type BankAskDraft, type BankOpts, type BankSnapshot, type BankStage, type BoxUnsealed, type DeviceJSON, type DeviceOpts, type DeviceRecord,

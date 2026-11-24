@@ -6,12 +6,12 @@ import { bulletproofHandlerOf } from '../helpers/bulletproof'
 import { Labelpath, type Lifetok } from '../shapes/primitives'
 import type { ThingRecord, VoidSentinel } from '../shapes/shapes-thing'
 import type { TombstoneOf } from '../shapes/shapes-sealers'
-import type { VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
+import type { ReadTc, VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
 import {
   type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
 } from '../shapes/shapes-asks'
 import {
-  type Actual, type ActualBeside, type Answer, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type GetThingAnswer, type GotActual, type ListThingsActual, type ListThingsAnswer, type ReadTc, type WriteThingAnswer,
+  type Actual, type ActualBeside, type Answer, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type GetThingAnswer, type GotActual, type ListThingsActual, type ListThingsAnswer, type Received, type WriteThingAnswer,
   type WroteActual, ActualChecks,
 } from '../shapes/shapes-answers'
 import { itemSeenOf } from './agerank'
@@ -20,12 +20,7 @@ import * as Classifier from './thing-classifier'
 import type { VaultDB } from './vault-db'
 import * as Throwers from '../refusals/throwers'
 
-// == [Answers]: Received, AnswerBeside, besideOf, answerOf, frozenAnswerOf, banktokOf, itemEventOf
-
-/** A change a concrete adapter's `doWatch` passes to `receive`: the changed Thing, raw, and its bank's world as the datastore last read it.
- * Watchers are notified of the Thing alone, with the world's lifetok: a bank or main gate that changed is a change of its own.
- */
-export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
+// == [Answers]: AnswerBeside, besideOf, answerOf, frozenAnswerOf, banktokOf, itemEventOf
 
 /** What every answer carries beside its `val` or `dbhas`. */
 type AnswerBeside = { world: WorldRecord | null, banktok: Lifetok | null, tracked?: Tracked, read_tc: ReadTc }

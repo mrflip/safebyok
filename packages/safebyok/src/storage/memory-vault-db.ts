@@ -1,11 +1,11 @@
 /** The vaultDB in memory. */
 
 import { type Errors, Helpers, Outcome } from 'safebyok-big/internals'
-import { AdapterVaultDB, type Received } from './adapter-vault-db'
+import { AdapterVaultDB } from './adapter-vault-db'
+import type { ActualBeside, BirthBankActual, GotActual, ListThingsActual, Received, WroteActual } from '../shapes/shapes-answers'
 import { Labelpath } from '../shapes/primitives'
 import { type ThingRecord } from '../shapes/shapes-thing'
 import { type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
-import type { ActualBeside, BirthBankActual, GotActual, ListThingsActual, WroteActual } from '../shapes/shapes-answers'
 import type { AboveFetched, BankRootsFetched, WorldFetched } from './thing-classifier'
 import * as Classifier from './thing-classifier'
 
