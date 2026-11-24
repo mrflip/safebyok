@@ -2,9 +2,9 @@
 
 import type { QueryKey } from '@tanstack/react-query'
 import {
-  type GateRecord, type Gating, type LiveOf, type PasskeyWayinHeader, type Sparse, Thing, type ThingRecord, type Tombstone, type Userid, VaultTSQ, type WayinHeader, type WayinRecord,
+  type GateRecord, type LiveOf, type PasskeyWayinHeader, type Sparse, Thing, type ThingRecord, type Tombstone, type Userid, VaultTSQ, type WayinHeader, type WayinRecord,
 } from 'safebyok'
-import type { GateShown, HeaderedGate } from './react-giver'
+import type { GateShown, GatingOrRefusal, HeaderedGate } from './react-giver'
 
 // == [Query defaults]: liveOf
 
@@ -56,7 +56,7 @@ function wayinHeaderOf(wayin: WayinRecord): WayinHeader {
 
 // A form verb proves the user's cleartexts on this device, and asks the vaultDB only to write a gate: paused while offline,
 // the mutation would leave its gating full, and an `unlock` gating that needs no network would wait for one.
-/** The giver's defaults for a form verb's mutation: it attempts the gating it is handed, runs offline, never retries, and vacates the gating once it settles. */
+/** The giver's defaults for a form verb's mutation: it attempts the gating it is handed, or rejects with the refusal handed in its place, runs offline, never retries, and vacates the gating once it settles. */
 export const FormMutationDefaults = {
   mutationFn:  attemptGating,
   networkMode: 'always',
@@ -66,11 +66,16 @@ export const FormMutationDefaults = {
   onSettled:   vacateGating,
 } as const
 
-/** Attempt the gating a form mutation was handed. */
-async function attemptGating(gating: Gating): Promise<void> { await gating.attempt() }
+/** Attempt the gating a form mutation was handed, or reject with the refusal it was handed in place of one. */
+async function attemptGating(handed: GatingOrRefusal): Promise<void> {
+  if (handed instanceof Error) { throw handed }
+  await handed.attempt()
+}
 
-/** Vacate the gating a form mutation was handed. */
-function vacateGating(_data: unknown, _err: Error | null, gating: Gating): void { gating.vacate() }
+/** Vacate the gating a form mutation was handed, where it was handed one. */
+function vacateGating(_data: unknown, _err: Error | null, handed: GatingOrRefusal): void {
+  if (! (handed instanceof Error)) { handed.vacate() }
+}
 // --
 
 // == [Keys]: formMutationKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, boxListQueryKeyOf

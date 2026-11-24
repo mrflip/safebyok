@@ -93,13 +93,15 @@ export type PutBoxActionResult = Readonly<{ box: LiveOf<BoxRecord>, err: null, t
 /** React Query's options for a box write's mutation, for the host's own `useMutation`: its `mutate` is handed the form. */
 export type PutBoxMutationOptions = UseMutationOptions<LiveOf<BoxRecord>, Error, FormData>
 
+/** What a form verb's mutation is handed: the verb's gating, or the refusal its maker threw in place of one, which carries no cleartext. */
+export type GatingOrRefusal = Gating | Error
+
 /** A form verb's mutation, through `useMutation`, with `attempt` to run it from a form or a dna. */
-export type FormMutationResult<ParamsT> = UseMutationResult<void, Error, Gating> & Readonly<{
+export type FormMutationResult<ParamsT> = UseMutationResult<void, Error, GatingOrRefusal> & Readonly<{
   /** Run the form verb on `params`, a form's `FormData` or a dna: hand it to a form's `action`, or call it from a submit handler.
    * The secret fields leave the `FormData` at once, and the mutation is handed the verb's gating, never the form. It
    * resolves once the mutation settles, so a `SubmitButton` stays disabled until then, and a refusal shows as `error`,
-   * never as a rejection. A gating refused at the wrong stage is refused the same way, but the mutation never runs, so
-   * `error` stays null: only `wasRefused` says so.
+   * never as a rejection. `error` is the latest attempt's refusal, whichever step refused: a verb refused at the wrong stage too.
    */
   attempt:           (params: ParamsT) => Promise<void>
   /** True where the last `attempt` was refused, read as it settled: for code that runs right after it, where `error` may not have rendered yet. */
@@ -645,16 +647,25 @@ function makeBankGiver(friend: BankFriend) {
     // Cancel button's, empties the form.
     const isTextKeptRef = useRef(false)
     // TanStack tells every mutation cache subscriber a mutation's variables as it goes pending: they are the gating, which
-    // shows none of its cleartexts, and the gating's maker has already taken the secret fields out of the form.
-    /** Run the verb on `params`: make its gating, then run the mutation with it. */
+    // shows none of its cleartexts, or the maker's refusal, which carries none; the maker has already taken the secret
+    // fields out of the form, refusing or not.
+    /** Run the verb on `params`: make its gating, then run the mutation with it, or with the maker's refusal. */
     async function attempt(params: ParamsT): Promise<void> {
       try {
-        await mutation.mutateAsync(gatingOf(params))
+        await mutation.mutateAsync(gatingOrRefusalOf(params))
         isRefusedRef.current = false
       } catch {
         isRefusedRef.current = true
       }
       isTextKeptRef.current = isRefusedRef.current
+    }
+    /** The gating `gatingOf` makes of `params`, or the refusal it throws instead. */
+    function gatingOrRefusalOf(params: ParamsT): GatingOrRefusal {
+      try {
+        return gatingOf(params)
+      } catch (err) {
+        return sanitizeForeignError(err)
+      }
     }
     /** True where the last attempt was refused. */
     function wasRefused(): boolean { return isRefusedRef.current }

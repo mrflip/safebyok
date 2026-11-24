@@ -314,7 +314,7 @@ describe("useStageChange", () => {
 })
 
 /** What a test calls of any form verb's hook. */
-type AnyForm = Readonly<{ attempt: (params: never) => Promise<void>, wasRefused: () => boolean }>
+type AnyForm = Readonly<{ attempt: (params: never) => Promise<void>, wasRefused: () => boolean, error: Error | null }>
 
 /** Each form verb, the stage it runs at, its hook, and the dna a form hands it, obvious fakes, new at each call. */
 const FormCases = [
@@ -332,7 +332,7 @@ async function renderForm<FormT extends AnyForm>(useForm: (world: TH.ProviderWor
   return rendered
 }
 
-/** The gating each of `world`'s form mutations was handed, oldest first. */
+/** The gating, or the maker's refusal, each of `world`'s form mutations was handed, oldest first. */
 function gatingsHanded(world: TH.ProviderWorld): unknown[] {
   return world.client.getMutationCache().getAll().map((mutation) => mutation.state.variables)
 }
@@ -392,11 +392,13 @@ describe("the form mutations", () => {
     expect(world.client.getMutationCache().getAll().map((mutation) => mutation.options.mutationKey)).to.deep.equal([['sok', TH.ProviderUser, 'acme', 'unlock']])
   })
 
-  it("resolves a birth refused while nobody is signed in, and the mutation never runs", async () => {
+  it("resolves a birth refused while nobody is signed in, the refusal its error, and the mutation handed the refusal alone", async () => {
     const { world, result } = await renderUnder((world) => world.Bank.useBirth(), {}, { userid: null })
     await act(() => result.current.attempt({ passphrase: NewPassphrase }))
-    expect([result.current.wasRefused(), result.current.error]).to.deep.equal([true, null])
-    expect(world.client.getMutationCache().getAll()).to.deep.equal([])
+    expect(result.current.wasRefused()).to.be.true
+    await waitFor(() => { expect(result.current.error).to.include({ refusalkind: 'absent_vault' }) })
+    expect(gatingsHanded(world)).to.deep.equal([result.current.error])
+    expect(JSON.stringify(gatingsHanded(world))).to.not.include(NewPassphrase)
   })
 })
 
@@ -455,11 +457,23 @@ describe("a form verb's attempt", () => {
     expect([result.current.form.wasRefused(), result.current.bank.stage]).to.deep.equal([false, 'unlocked'])
   })
 
-  it("resolves refused where the gating cannot be made at the stage shown, never rejecting, and the mutation never runs", async () => {
+  it("resolves refused where the gating cannot be made at the stage shown, never rejecting, the maker's refusal its error", async () => {
     const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'unborn')
     await act(() => result.current.form.attempt({ passphrase: Passphrase }))
-    expect([result.current.form.wasRefused(), result.current.form.error]).to.deep.equal([true, null])
-    expect(world.client.getMutationCache().getAll()).to.deep.equal([])
+    expect(result.current.form.wasRefused()).to.be.true
+    await waitFor(() => { expect(result.current.form.error).to.include({ refusalkind: 'absent_vault', message: Phrases.BankAbsent }) })
+    expect(gatingsHanded(world)).to.deep.equal([result.current.form.error])
+  })
+
+  it("shows the latest attempt's refusal as its error, whichever step refused, and hands the mutation no cleartext", async () => {
+    const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    const wrongPassphrase = 'correct horse battery stable'
+    await act(() => result.current.form.attempt(formOf({ passphrase: wrongPassphrase })))
+    await waitFor(() => { expect(result.current.form.error).to.include({ refusalkind: 'wrong_passphrase' }) })
+    await act(() => result.current.form.attempt({ passphrase: [wrongPassphrase] } as never))
+    await waitFor(() => { expect(result.current.form.error).to.include({ refusalkind: 'bad_record' }) })
+    expect([result.current.form.wasRefused(), result.current.form.isError]).to.deep.equal([true, true])
+    expect(JSON.stringify(gatingsHanded(world))).to.not.include(wrongPassphrase)
   })
 
   // FormMutationResult.keepTextIfRefused @example, both
@@ -578,7 +592,9 @@ describe("a form verb at the main gate, refused for want of a bank", () => {
         expect(result.current.stage).to.eq(stage)
         const [hooked, plain] = [paramsOfCase(), paramsOfCase()]
         for (const params of hooked) { await act(() => result.current.hooked.attempt(params as never)) }
-        expect([result.current.hooked.wasRefused(), world.client.getMutationCache().getAll()]).to.deep.equal([true, []])
+        expect(result.current.hooked.wasRefused()).to.be.true
+        await waitFor(() => { expect(result.current.hooked.error).to.include({ refusalkind: 'absent_vault', message }) })
+        expect(gatingsHanded(world).every((handed) => isVaultError(handed))).to.be.true
         for (const params of plain) {
           const refusal = await TH.expectRefusal(plainCallOf(world)(params as never), 'absent_vault')
           expect(refusal.message).to.eq(message)
