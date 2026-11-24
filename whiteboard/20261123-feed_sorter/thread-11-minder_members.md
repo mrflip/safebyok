@@ -4,9 +4,13 @@ Branch `20261124-minder_members`, PR #877, stacked on #876 (base `main`). Design
 [redistribution-design.md](redistribution-design.md), sections 0, 1, 3, 10, 11. Red on purpose: the same 18
 `vault-minder` tests as #876 (listen 4, writes 2, staleness 1, 11 rows of `vault-minder-chains.test.ts`), diffed by name.
 
-Proved: TBD after the catch-up.
+Proved: `pnpm justify` after the catch-up (as cut, onto #876's eb9a092fc): lint, typecheck, build clean in every
+package; `safebyok` 18 failed (the same 18 as at eb9a092fc, diffed by name), 2110 passed, `ctx-bytes.test.ts` among
+them. By hand at the same tree: `safebyok-idb-lean` 115, `safebyok-postgres` 356, `safebyok-react-lean` 320,
+`safebyok-graphql` 448, `demo-dojo` 111, `demo-envman` 24, `demo-knockknock` 26, all passed.
 
-Commits: `storage:` (the members), `storage:` (the ask's `track` is `known_roots`), `plan:` (this file and the design).
+Commits: `storage:` (the members), `storage:` (the ask's `track` is `known_roots`), `plan:` (this file and the design),
+`storage:` (the entry points export `PutOnceArgs` and `DelOnceArgs`, which `forgotten-exports` asked for).
 
 * **Built**
   * **Ask builders on the `SortedVaultDB`** (`src/storage/sorted-vault-db.ts`, `[Asks]`): `makeGetAsk(draft)`,
