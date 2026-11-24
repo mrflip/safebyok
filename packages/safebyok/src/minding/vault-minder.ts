@@ -310,17 +310,23 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     }
   }
 
-  // A Thing is kept only once it has received its first record, so a refused record leaves no Thing behind.
+  // A Thing is kept before it receives its first record, so that a subscriber it tells finds it here, and is let go
+  // where that record is refused, so a refused record leaves no Thing behind.
   /** The events the Thing at `seen`'s labelpath returns for `seen` at `dispatch`, the Thing made first where there is none */
   #receiveAtThing(seen: SeenThing, dispatch: Dispatch): readonly VaultEvent[] {
     const { labelpath } = SeenChecks.seenCited.parseConsistent(seen, this.#scope)
     const proposed = Object.freeze({
       eventkind: 'item', ...this.#scope, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: undefined, agerankWas: undefined, ...dispatch, ...itemSeenOf(seen),
     } as const)
-    const thing  = this.#things.get(labelpath) ?? this.#makeThing(seen)
-    const events = thing.receive(proposed)
+    const kept  = this.#things.get(labelpath)
+    const thing = kept ?? this.#makeThing(seen)
     this.#things.set(labelpath, thing)
-    return events
+    try {
+      return thing.receive(proposed)
+    } catch (err) {
+      if (kept === undefined) { this.#things.delete(labelpath) }
+      throw err
+    }
   }
 
   /** Tell `news` to every listener's `onBadNews`. */

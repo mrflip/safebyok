@@ -13,7 +13,7 @@ import type { Proving, guardKeyDeriver } from '../models/proving'
 import type { Wayin } from '../models/wayin'
 import type { BankScope, BankStamp, GateStamp, LeaseStamp } from './shapes-stamps'
 import { BankChecks, GateChecks } from './shapes-thingkinds'
-import { type GateRecord, ThingChecks } from './shapes-thing'
+import { type GateRecord, type ThingMakeOpts, ThingChecks } from './shapes-thing'
 import type { PutAskDraft } from './shapes-asks'
 import type { WayinHeader } from './shapes-wayin'
 
@@ -149,7 +149,7 @@ export interface WorldGateFriend {
 export type GateDna = GateStamp & { wayins: { main: Wayin, passkey0: Wayin | null } }
 
 /** The options of {@link Gate.make}, beside its record. */
-export interface GateOpts {
+export interface GateOpts extends ThingMakeOpts {
   /** The device the gate's bank is on. */
   device: Device
 }

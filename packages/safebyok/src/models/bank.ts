@@ -5,11 +5,11 @@ import type { Gate } from './gate'
 import type { BirthGating } from './gating'
 import type { World } from './world'
 import type { BirthCleartexts, BirthDna } from '../shapes/shapes-gateish'
-import type { BankOpts, BankSnapshot, HostedVault } from '../shapes/shapes-bankish'
+import type { BankOpts, HostedVault } from '../shapes/shapes-bankish'
 import type { ShellOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import { type DeviceTok, type Lifetok, Labelpath, Lifeseq } from '../shapes/primitives'
-import { type BankRecord, type BoxRecord, type Modelkind, ThingFormat } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type Modelkind, ThingFormat, ThingMakeChecks } from '../shapes/shapes-thing'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import type { PutAskDraft } from '../shapes/shapes-asks'
 import * as Throwers from '../refusals/throwers'
@@ -38,7 +38,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   }
   // --
 
-  // == [Getters]: device, device_tok, scope, stamp, gate, rootBox, getSnapshot, subscribe
+  // == [Getters]: device, device_tok, scope, stamp, gate, rootBox
 
   /** The device this bank is on. */
   get device(): Device { return this.#device }
@@ -69,26 +69,21 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
     if (root?.am !== 'a') { throw Throwers.worldNotHeard() }
     return root
   }
-
-  /** The snapshot getter of the device's world ({@link World.getSnapshot}), already bound, as `useSyncExternalStore` wants it. */
-  get getSnapshot(): () => BankSnapshot { return this.#world.getSnapshot }
-
-  /** Subscribe a listener to the snapshot of the device's world ({@link World.subscribe}), returning its unsubscribe. Already bound, as `useSyncExternalStore` wants it. */
-  override get subscribe(): (listener: () => void) => (() => void) { return this.#world.subscribe }
   // --
 
   // == [Construction]: make, constructor, mintStamps, makeRecord
 
   /** Make the bank of `record`, a whole bank record, live or a tombstone, or the bank's shell, on `opts.device`. Nothing is fetched or stored.
-   * It is locked or unlocked as its device's world is, and finds its main gate there. Internal: the device's world makes the bank its VaultMinder keeps.
+   * It is locked or unlocked as its device's world is, and finds its main gate there. Each subscriber is wrapped by `opts.bulletproofCallback`, where given.
+   * Internal: the device's world makes the bank its VaultMinder keeps.
    */
   static make(record: BankRecord | ShellOf<BankRecord>, opts: BankOpts): Bank { return new Bank(record, opts) }
 
   // A bank models the very record it is handed, never the check's copy.
   private constructor(record: BankRecord | ShellOf<BankRecord>, opts: BankOpts) {
-    const { opts: { device } } = Checks.bankMakeArgs.parse({ record, opts })
+    const { opts: { device, bulletproofCallback } } = Checks.bankMakeArgs.parse({ record, opts })
     Validator.checkedConsistent(StampChecks.bankScope.parse(record), device.scope, { kind: 'record_conflict' })
-    super(record)
+    super(record, bulletproofCallback)
     this.#device = device
     this.#world  = device.world
   }
@@ -211,7 +206,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
   device:      custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
   bankMakeArgs: obj({
     record: BankChecks.recordOrShell,
-    opts:   obj({
+    opts:   ThingMakeChecks.thingMakeOpts.extend({
       device:  custom<Device>(),
     }),
   }),

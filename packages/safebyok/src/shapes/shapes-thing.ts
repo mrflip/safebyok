@@ -424,3 +424,20 @@ export const Shell = Object.freeze({
 /** A tombstone of a RecordT, sparse or whole. */
 export type Tombstone<RecordT extends Sparse<ThingRecord>> = TombstoneOf<RecordT> | (Sparse<RecordT> & Readonly<{ am: 'x' }>)
 // --
+
+// == [Making a Thing]: BulletproofCallback, ThingMakeOpts, ThingMakeChecks
+
+/** `callback`, wrapped so that what it throws is dealt with in one stated way, never reaching whoever calls it. */
+export type BulletproofCallback = <ArgsT extends unknown[]>(callback: (...args: ArgsT) => void) => ((...args: ArgsT) => void)
+
+/** The options every kind of Thing is made with. */
+export type ThingMakeOpts = Readonly<{
+  /** Wraps each subscriber the Thing is handed: a world's `bulletproofCallback`. Left out, what a subscriber throws reaches whoever had the Thing receive. */
+  bulletproofCallback?: BulletproofCallback | undefined
+}>
+
+/** The check of {@link ThingMakeOpts}, for a kind's make to extend. */
+export const ThingMakeChecks = Validator.Checkers('bad_record', ({ obj, fn }) => ({
+  thingMakeOpts: obj({ bulletproofCallback: fn<BulletproofCallback>().optional() }),
+}))
+// --

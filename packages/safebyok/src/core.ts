@@ -32,9 +32,9 @@ export {
 export { type VaultDB, isVaultDB } from './storage/vault-db'
 export type { Agerank, ItemSeen, Liveness, ReadTc, VaultAgedEvent, VaultEvent, VaultEventOf, VaultEventkind, VaultItemEvent, VaultLifeEvent } from './shapes/shapes-vault-event'
 export {
-  type BadNews, type BadNewsHandler, type BankAskDraft, type BankOpts, type BankSnapshot, type BankStage, type BoxUnsealed, type DeviceJSON, type DeviceOpts, type DeviceRecord,
-  type DeviceSnapshot, type HostedVault, type RefusalSnapshot, type RootShelf, type WorldOpts,
-  BankishChecks, DefaultBanklabel, PendingBank, SignedOutBank, bankStageVals, isRootShelf,
+  type BadNews, type BadNewsHandler, type BankAskDraft, type BankOpts, type BankStage, type BoxUnsealed, type DeviceJSON, type DeviceOpts, type DeviceRecord,
+  type HostedVault, type RefusalSnapshot, type RootShelf, type WorldOpts, type WorldSnapshot,
+  BankishChecks, DefaultBanklabel, PendingWorld, SignedOutWorld, bankStageVals, isRootShelf,
 } from './shapes/shapes-bankish'
 export {
   type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateGatingFriend, type GateOpts, type GateRevisionedStamp, type GatingCleartexts, type GuardedKeyDeriver,
@@ -48,7 +48,7 @@ export {
 } from './shapes/shapes-asks'
 export {
   type AnyThingRecord, type BankRecord, type BoxRecord, type GateRecord, type Modelkind, type Sparse, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind, type Tombstone,
-  type VoidSentinel, type Wayins, Shell, ThingChecks, thingkindVals,
+  type BulletproofCallback, type ThingMakeOpts, type VoidSentinel, type Wayins, Shell, ThingChecks, ThingMakeChecks, thingkindVals,
 } from './shapes/shapes-thing'
 export { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from './shapes/shapes-thingkinds'
 // A device shows a devtool a masked view of the roots it keeps, its vault TSQ and its lease; the VaultTSQ itself is on the front door.

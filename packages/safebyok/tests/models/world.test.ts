@@ -1,11 +1,12 @@
-/** The world's Things: what `world.makeThing` makes of each record, and the bank, main gate and bank stamp it finds in its VaultMinder. */
+/** The world: the Things `world.makeThing` makes of each record, the bank, main gate and bank stamp it finds in its VaultMinder, and its snapshot. */
 
-import { describe, expect, expectTypeOf, it } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { Bank } from '../../src/models/bank'
 import { BaseThing } from '../../src/models/base-thing'
 import { Box } from '../../src/models/box'
 import type { Device } from '../../src/models/device'
 import { Gate } from '../../src/models/gate'
+import { type BadNews, type WorldSnapshot, PendingWorld, bankStageVals } from '../../src/shapes/shapes-bankish'
 import { Shell } from '../../src/shapes/shapes-thing'
 import type { SeenThing } from '../../src/shapes/shapes-vault-event'
 import { readTcNow } from '../../src/storage/agerank'
@@ -115,6 +116,141 @@ const RootOrderCases = [
   [["bank", "box", "gate"], 'the main gate last'],
 ] as const
 
+describe("world.getSnapshot() and world.subscribe(listener)", () => {
+  it("shows the pending world from signin until a bank is found", () => {
+    const { world } = TH.makeDevice()
+    expect(world.getSnapshot()).to.equal(PendingWorld)
+    expect(Object.isFrozen(world.getSnapshot())).to.be.true
+  })
+
+  it("shows a born bank unlocked, its lease ending the device's lease length after it was proved", async () => {
+    const { device } = await TH.buildBornBank()
+    const { world } = device
+    expect(world.getSnapshot()).to.deep.equal({ stage: 'unlocked', isLocked: false, isEnded: false, endCause: null, leaseEndsAt: TH.T0 + device.leaseMillis, lastErr: null, isUnlockWanted: false })
+    expect(Object.isFrozen(world.getSnapshot())).to.be.true
+  })
+
+  it("tells its subscribers once each for a lock, an `unlock` gating and a sweep, the snapshot the same object between them", async () => {
+    const { bank } = await TH.buildBornBank()
+    const { world } = bank.device
+    const counter = TH.countCalls(world.subscribe)
+    const unlocked = world.getSnapshot()
+    expect(world.getSnapshot()).to.equal(unlocked)
+
+    bank.lock()
+    const locked = world.getSnapshot()
+    expect(counter.calls).to.eq(1)
+    expect(locked).to.deep.equal({ stage: 'locked', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false })
+    expect(world.getSnapshot()).to.equal(locked)
+
+    await bank.gate.gatingUnlockAttempt({ passphrase: TH.TestPassphrase })
+    expect(counter.calls).to.eq(2)
+    expect(world.getSnapshot()).to.deep.equal(unlocked)
+
+    bank.sweep()
+    expect(counter.calls).to.eq(3)
+    expect(world.getSnapshot()).to.deep.equal({ stage: 'swept', isLocked: true, isEnded: true, endCause: bank.endCause, leaseEndsAt: null, lastErr: null, isUnlockWanted: false })
+    expect(world.getSnapshot().endCause).to.equal(bank.endCause).and.include({ refusalkind: 'disabled' })
+  })
+
+  it("tells no subscriber of a call that changes nothing in the snapshot: a second lock or sweep, a wrong passphrase, or a box landing", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    const { world } = bank.device
+    const counter = TH.countCalls(world.subscribe)
+    const unlocked = world.getSnapshot()
+    await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    expect(world.getSnapshot()).to.equal(unlocked)
+    bank.lock()
+    bank.lock()
+    await TH.expectRefusal(bank.gate.gatingUnlockAttempt({ passphrase: 'not the passphrase' }), 'wrong_passphrase')
+    expect(counter.calls).to.eq(1)
+    bank.sweep()
+    bank.sweep()
+    expect(counter.calls).to.eq(2)
+  })
+
+  it("shows an `unlock` gating wanted while a call waits for one, and carries no cleartext", async () => {
+    const { bank, device: { world } } = await TH.buildBornBank()
+    bank.lock()
+    const snapshots: WorldSnapshot[] = []
+    world.subscribe(() => { snapshots.push(world.getSnapshot()) })
+    const ensuring = bank.ensureUnlocked()
+    const passphraseCleartext = 'not the passphrase, though long enough'
+    await TH.expectRefusal(bank.gate.unlock({ passphraseCleartext }), 'wrong_passphrase')
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await ensuring
+    expect(snapshots.map(({ stage, isUnlockWanted }) => ({ stage, isUnlockWanted }))).to.deep.equal([
+      { stage: 'locked', isUnlockWanted: true },
+      { stage: 'unlocked', isUnlockWanted: false },
+    ])
+    expect(JSON.stringify(snapshots)).not.to.include(passphraseCleartext)
+  })
+
+  it("shows the bank swept once its device is swept", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const { world } = device
+    const counter = TH.countCalls(world.subscribe)
+    device.sweep()
+    expect(counter.calls).to.eq(1)
+    expect(world.getSnapshot()).to.include({ stage: 'swept', isEnded: true, endCause: bank.endCause })
+  })
+
+  it("leaves its snapshot unchanged once swept, telling no subscriber of a lock or of its device's sweep", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const { world } = device
+    bank.sweep()
+    const swept = world.getSnapshot()
+    const counter = TH.countCalls(world.subscribe)
+    bank.lock()
+    device.sweep()
+    expect(counter.calls).to.eq(0)
+    expect(world.getSnapshot()).to.equal(swept)
+    expect(swept.endCause).to.equal(bank.endCause)
+  })
+
+  it("shows only stages that bankStageVals lists", async () => {
+    const { bank } = await TH.buildBornBank()
+    const { world } = bank.device
+    const snapshots = [world.getSnapshot()]
+    bank.lock()
+    snapshots.push(world.getSnapshot())
+    bank.sweep()
+    snapshots.push(world.getSnapshot())
+    expect(snapshots.map(({ stage }) => stage)).to.deep.equal(['unlocked', 'locked', 'swept'])
+    expect(bankStageVals).to.include.members(snapshots.map(({ stage }) => stage))
+  })
+
+  it("stops telling a listener once it unsubscribes", async () => {
+    const { bank } = await TH.buildBornBank()
+    const { world } = bank.device
+    const listener = vi.fn()
+    const unsubscribe = world.subscribe(listener)
+    bank.lock()
+    unsubscribe()
+    bank.sweep()
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
+  it("tells every subscriber when one throws, and passes the throw to the device's onBadNews", async () => {
+    const onBadNews = vi.fn()
+    const { bank } = await TH.buildBornBank({ device: TH.makeDevice({}, { onBadNews }) })
+    const { world } = bank.device
+    world.subscribe(() => { throw new Error('a bug in the host') })
+    const listener = vi.fn()
+    world.subscribe(listener)
+    bank.lock()
+    expect(listener).toHaveBeenCalledOnce()
+    await TH.eventually(() => onBadNews.mock.calls.length === 1)
+    expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'unexpected_error' })
+  })
+
+  it("refuses a listener that is not a function", async () => {
+    const { bank } = await TH.buildBornBank()
+    const { world } = bank.device
+    TH.expectSyncRefusal(() => world.subscribe('call me' as never), 'bad_record')
+  })
+})
+
 describe("a world's stage as its roots arrive one at a time", () => {
   for (const [order, blurb] of RootOrderCases) {
     it(`shows unborn until the last root lands, then locked, in ${blurb}`, async () => {
@@ -122,9 +258,9 @@ describe("a world's stage as its roots arrive one at a time", () => {
       const minder = born.device.world.demandVaultMinder()
       const device = TH.makeDevice()
       await device.signin(TH.WorldScope.userid)
-      expect(device.getSnapshot().bank.stage).to.eq('unborn')
+      expect(device.world.getSnapshot().stage).to.eq('unborn')
       const stages: string[] = []
-      device.subscribe(() => { stages.push(device.getSnapshot().bank.stage) })
+      device.world.subscribe(() => { stages.push(device.world.getSnapshot().stage) })
       for (const labelpath of order) {
         const record = minder.thingAt({ ...TH.WorldScope, labelpath })!.pickle() as SeenThing
         device.world.demandVaultMinder().receive({ ...TH.itemEventOf(record), sourcelabel: 'other_device', read_tc: readTcNow() })

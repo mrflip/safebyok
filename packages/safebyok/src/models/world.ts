@@ -1,4 +1,4 @@
-import { isEqual, noop } from 'es-toolkit'
+import { isEqual } from 'es-toolkit'
 import { type Errors, Validator, VX } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { BaseThing } from './base-thing'
@@ -9,13 +9,14 @@ import { BirthGating } from './gating'
 import type { Lease } from './lease'
 import type { Proving } from './proving'
 import type { Adoptable } from './thing'
-import type { BankSnapshot, BankStage, HostedVault, RefusalSnapshot, WorldOpts } from '../shapes/shapes-bankish'
-import { PendingBank, SignedOutBank, WorldChecks } from '../shapes/shapes-bankish'
+import { bulletproofHandlerOf } from '../helpers/bulletproof'
+import type { BankStage, HostedVault, RefusalSnapshot, WorldOpts, WorldSnapshot } from '../shapes/shapes-bankish'
+import { PendingWorld, SignedOutWorld, WorldChecks } from '../shapes/shapes-bankish'
 import type { BirthCleartexts, BirthDna, BirthGatingFriend, GateRevisionedStamp, LeaseGate, WorldGateFriend } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type BankStamp, type LeaseLoggable, StampChecks } from '../shapes/shapes-stamps'
-import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type Thingkind, Shell } from '../shapes/shapes-thing'
-import { type SeenThing, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
+import { type BankRecord, type BoxRecord, type BulletproofCallback, type GateRecord, type Sparse, type ThingMakeOpts, type ThingRecord, type Thingkind, Shell } from '../shapes/shapes-thing'
+import { type SeenThing, SeenChecks } from '../shapes/shapes-vault-event'
 import { type EpochMillis, Labelpath } from '../shapes/primitives'
 import type { VaultMinder } from '../minding/vault-minder'
 import { isVaultMinder } from '../shapes/shapes-vault-minder'
@@ -25,12 +26,12 @@ import * as Throwers from '../refusals/throwers'
 /** A Thing of the signed-in user's bank, as its world makes one: the bank, a gate or a box. */
 export type SomeThing = Bank | Gate | Box
 
-/** The signed-in user's bank as this device locks, unlocks and ends it: its lease, the wait for an unlock, its end, and its snapshot.
+/** The signed-in user's bank as this device locks, unlocks and ends it: its lease, the wait for an unlock, its end, and its snapshot, which a host renders.
  * Made with its device, it lives as long. Its gates build leases and hand them to it, and boxes are sealed and unsealed under the lease it holds, which no member hands out.
- * Its snapshot's stage is read from the bank, the main gate and the root box its VaultMinder keeps, and from the lease.
+ * Its snapshot's stage is read from the bank, the main gate and the root box its VaultMinder keeps, each of which it subscribes to, and from the lease.
  */
 export class World {
-  // == [Props]: #device, #vaultMinder, #lease, #unlockWait, #endCause, #lastErr, #vaults, #snapshot, #subscribers, #getSnapshot, #subscribe
+  // == [Props]: #device, #vaultMinder, #lease, #unlockWait, #endCause, #lastErr, #vaults, #snapshot, #subscribers, #getSnapshot, #subscribe, #bulletproofCallback
 
   readonly #device: Device
 
@@ -53,16 +54,20 @@ export class World {
   readonly #vaults = new Set<HostedVault>()
 
   /** The current snapshot, which {@link getSnapshot} returns. */
-  #snapshot: BankSnapshot
-  readonly #subscribers = new Set<() => void>()
-  readonly #getSnapshot = (): BankSnapshot => this.#snapshot
+  #snapshot: WorldSnapshot
+  /** Each subscriber, beside its bulletproofed form, which is what is called. */
+  readonly #subscribers = new Map<() => void, () => void>()
+  readonly #getSnapshot = (): WorldSnapshot => this.#snapshot
   readonly #subscribe = (listener: () => void): (() => void) => {
-    this.#subscribers.add(VX.listener.parse(listener))
+    this.#subscribers.set(VX.listener.parse(listener), this.#bulletproofCallback(listener))
     return () => { this.#subscribers.delete(listener) }
   }
+  readonly #bulletproofCallback: BulletproofCallback = (callback) => bulletproofHandlerOf(callback, {
+    ifError: 'tell', transformer: Throwers.refusalOfThrown, onBadNews: (news) => { this.#device.tellBadNews([news]) },
+  })
   // --
 
-  // == [Getters]: vaultMinder, bank, gate, rootBox, bankStamp, leaseEndsAt, leaseLoggable, getSnapshot, subscribe
+  // == [Getters]: vaultMinder, bank, gate, rootBox, bankStamp, leaseEndsAt, leaseLoggable, getSnapshot, subscribe, bulletproofCallback
 
   /** The signed-in user's bank's records, sorted, as handed to {@link signin}, or null until then. */
   get vaultMinder(): VaultMinder | null { return this.#vaultMinder }
@@ -98,15 +103,18 @@ export class World {
   /** What a log wants of the attached lease, or null while locked. */
   get leaseLoggable(): LeaseLoggable | null { return this.#lease?.loggable ?? null }
 
-  /** The snapshot getter of the device's bank, already bound, as `useSyncExternalStore` wants it: the same frozen object until the snapshot changes.
+  /** This world's snapshot getter, already bound, as `useSyncExternalStore` wants it: the same frozen object until the snapshot changes.
    * Until the bank, its main gate and its root box are live, its stage is `'signed_out'`, `'starting'`, `'unborn'` or `'failed'`.
    */
-  get getSnapshot(): () => BankSnapshot { return this.#getSnapshot }
+  get getSnapshot(): () => WorldSnapshot { return this.#getSnapshot }
 
   /** Subscribe a listener to the snapshot, returning its unsubscribe. Already bound, as `useSyncExternalStore` wants it.
    * The listener is called with no argument after each change: read the snapshot again. What it throws goes to the device's `tellBadNews`.
    */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
+
+  /** Wrap `callback`, one the core keeps for someone else, so that what it throws goes to the device's `onBadNews`, never to whoever calls it. Already bound. */
+  get bulletproofCallback(): BulletproofCallback { return this.#bulletproofCallback }
   // --
 
   // == [Construction]: make, constructor, makeThing
@@ -125,6 +133,7 @@ export class World {
 
   /** Make the Thing of `seen`, a record of the device's bank: a {@link Bank}, a {@link Gate} or a {@link Box}, by its modelkind. Nothing is fetched or stored.
    * Begun from a record that is not whole, the Thing holds its kind's shell, under the lives the record names above it: have it receive the record after.
+   * What its subscribers throw goes to the device's `onBadNews`.
    */
   makeThing(seen: BankRecord): Bank
   makeThing(seen: GateRecord): Gate
@@ -135,19 +144,19 @@ export class World {
     Validator.checkedConsistent(StampChecks.bankScope.parse(seen), this.#device.scope, { kind: 'record_conflict' })
     const begun = BaseThing.isWhole(seen) ? seen : Shell.inParentLivesOf(seen)
     const thingClass: ThingClass = thingClassOf(Labelpath.modelkindOf(labelpath))
-    return thingClass.make(begun, { device: this.#device }, this.#gateFriend())
+    const thing = thingClass.make(begun, { device: this.#device, bulletproofCallback: this.#bulletproofCallback }, this.#gateFriend())
+    if (RootLabelpaths.has(labelpath)) { thing.subscribe(() => { this.#hearRoot() }) }
+    return thing
   }
   // --
 
   // == [Signing in]: signin, showSigninRefusal, birthGating, birthFriend
 
-  /** Take `vaultMinder`, the signed-in user's bank's records, sorted, and listen to it for as long as the world lives. A second call does nothing. */
+  /** Take `vaultMinder`, the signed-in user's bank's records, sorted, whose Things this world makes. A second call does nothing. */
   signin(vaultMinder: VaultMinder): void {
     Checks.vaultMinder.parse(vaultMinder)
     if (this.#vaultMinder !== null) { return }
     this.#vaultMinder = vaultMinder
-    // The vault TSQ, listening beside it, tells the device of a record refused.
-    vaultMinder.listen({ hear: (event) => { this.#hear(event) }, onBadNews: noop })
     this.align()
   }
 
@@ -353,13 +362,12 @@ export class World {
   #thingAt(labelpath: Labelpath): unknown { return this.#vaultMinder?.thingAt({ ...this.#device.scope, labelpath }) }
   // --
 
-  // == [Snapshot]: hear, align, stageOf, makeSnapshot
+  // == [Snapshot]: hearRoot, align, stageOf, makeSnapshot
 
   // The three roots may arrive in any order, one at a time: a set of them partly live is never shown as a stage of its
   // own. The last of them to land live brings `'locked'`, so a birth shows no stage between `'unborn'` and `'locked'`.
-  /** Realign on hearing a root, once all three are live or the bank holds no live record. */
-  #hear(event: VaultEvent): void {
-    if ((event.eventkind !== 'item') || ! RootLabelpaths.has(event.labelpath)) { return }
+  /** Realign on news of a root, once all three are live or the bank holds no live record. */
+  #hearRoot(): void {
     if (this.areRootsLive || ! isLive(this.bank)) { this.align() }
   }
 
@@ -368,13 +376,7 @@ export class World {
     const next = this.#makeSnapshot()
     if (isEqual(next, this.#snapshot)) { return }
     this.#snapshot = next
-    for (const listener of this.#subscribers) {
-      try {
-        listener()
-      } catch (err) {
-        this.#device.tellBadNews([err])
-      }
-    }
+    for (const told of this.#subscribers.values()) { told() }
   }
 
   // A sweep is the one way a bank ends, so an ended bank's stage is 'swept'.
@@ -388,13 +390,13 @@ export class World {
     return ((bank === null) || isLive(bank)) ? 'starting' : 'unborn'
   }
 
-  /** A new snapshot of the device's bank. */
-  #makeSnapshot(): BankSnapshot {
+  /** A new snapshot of this world. */
+  #makeSnapshot(): WorldSnapshot {
     const stage = this.#stageOf()
-    if (stage === 'signed_out') { return SignedOutBank }
-    if (stage === 'starting')   { return PendingBank }
-    if (stage === 'unborn')     { return Object.freeze({ ...PendingBank, stage }) }
-    if (stage === 'failed')     { return Object.freeze({ ...PendingBank, stage, lastErr: this.#lastErr }) }
+    if (stage === 'signed_out') { return SignedOutWorld }
+    if (stage === 'starting')   { return PendingWorld }
+    if (stage === 'unborn')     { return Object.freeze({ ...PendingWorld, stage }) }
+    if (stage === 'failed')     { return Object.freeze({ ...PendingWorld, stage, lastErr: this.#lastErr }) }
     const { endCause } = this
     const isEnded = endCause !== null
     return Object.freeze({
@@ -417,7 +419,7 @@ const RootLabelpaths: ReadonlySet<Labelpath> = new Set(['bank', Labelpath.MainGa
 
 /** The class a world makes a Thing of one kind from, as {@link World.makeThing} calls it. */
 interface ThingClass {
-  make(record: Adoptable<ThingRecord>, opts: { device: Device }, friend: WorldGateFriend): SomeThing
+  make(record: Adoptable<ThingRecord>, opts: ThingMakeOpts & { device: Device }, friend: WorldGateFriend): SomeThing
 }
 
 // Read as a world makes a Thing, not as this module loads: the model modules import one another, and a class may not be

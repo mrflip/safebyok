@@ -9,7 +9,7 @@ import type { World } from '../models/world'
 import type { VaultDB } from '../storage/vault-db'
 import type { StrengthChecker } from './shapes-gateish'
 import type { BoxCleartexts, UnsealedOf } from './shapes-sealers'
-import type { BoxRecord } from './shapes-thing'
+import type { BoxRecord, ThingMakeOpts } from './shapes-thing'
 import type { GetAsk, ListAsk } from './shapes-asks'
 import type { Banklabel, DeviceTok, EpochMillis, Labelpath, Userid } from './primitives'
 import * as Phrases from '../phrases'
@@ -31,7 +31,7 @@ export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbse
 // == [The bank's making]: BankOpts, WorldOpts, HostedVault, WorldChecks
 
 /** The options of {@link Bank.make}, beside its record. */
-export interface BankOpts {
+export interface BankOpts extends ThingMakeOpts {
   /** The device the bank is on. Its scope must be the bank's. */
   device:  Device
 }
@@ -122,7 +122,7 @@ export interface DeviceOpts {
 }
 // --
 
-// == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, BankSnapshot, PendingBank, SignedOutBank, DeviceSnapshot
+// == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, WorldSnapshot, PendingWorld, SignedOutWorld
 
 /** The stages of a bank, each described at {@link BankStage}. */
 export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'swept', 'failed'] as const
@@ -144,8 +144,8 @@ export interface RefusalSnapshot {
   readonly message:     string
 }
 
-/** A bank's state, for a host to render. */
-export interface BankSnapshot {
+/** Where the user stands with their bank, as the device's world shows it, for a host to render. */
+export interface WorldSnapshot {
   readonly stage:       BankStage
   /** True at every stage but `'unlocked'`. */
   readonly isLocked:    boolean
@@ -164,17 +164,11 @@ export interface BankSnapshot {
 }
 
 // isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
-/** The bank snapshot a device shows from `signin` until it finds its user's bank stored or not. */
-export const PendingBank: BankSnapshot = Object.freeze({
+/** The world snapshot a device shows from `signin` until it finds its user's bank stored or not. */
+export const PendingWorld: WorldSnapshot = Object.freeze({
   stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false,
 })
 
-/** The bank snapshot a device shows until `signin`, while nobody is signed in on it. */
-export const SignedOutBank: BankSnapshot = Object.freeze({ ...PendingBank, stage: 'signed_out' })
-
-/** A device's state, for a host to render. */
-export interface DeviceSnapshot {
-  /** The snapshot of the signed-in user's bank. With none yet, a stand-in at stage `'signed_out'` ({@link SignedOutBank}), `'starting'` ({@link PendingBank}), `'unborn'` or `'failed'`. */
-  readonly bank: BankSnapshot
-}
+/** The world snapshot a device shows until `signin`, while nobody is signed in on it. */
+export const SignedOutWorld: WorldSnapshot = Object.freeze({ ...PendingWorld, stage: 'signed_out' })
 // --

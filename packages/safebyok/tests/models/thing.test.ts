@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { type Adoptable, Thing } from '../../src/models/thing'
 import { type Lifepath, Lifeseq, Revseq, VoidLifeseq } from '../../src/shapes/primitives'
 import { type ThingRecord, type ThingScope, Shell } from '../../src/shapes/shapes-thing'
@@ -736,6 +736,51 @@ describe("Thing's held record, the same object", () => {
     const [thing] = received(undefined, Thing.sparseOf(tomb))
     thing.receive(eventOf(tomb, readTcOf(1)))
     expect(thing.pickle()).to.equal(tomb)
+  })
+})
+
+describe("thing.subscribe(listener)", () => {
+  it("tells each subscriber once for each record that is news, a newer sparse revision among them, and for none that is not", () => {
+    const whole2   = TH.boxThingOf('openai', { revseq: 2 })
+    const thing    = TH.PlainThing.make(whole2)
+    const listener = vi.fn()
+    thing.subscribe(listener)
+    thing.receive(eventOf(whole2))
+    thing.receive(eventOf(whole2))
+    thing.receive(eventOf(TH.boxThingOf('openai', { revseq: 1 })))
+    expect(listener).toHaveBeenCalledOnce()
+    const soon4 = Thing.sparseOf(TH.boxThingOf('openai', { revseq: 4 }))
+    thing.receive(eventOf(soon4))
+    expect(listener).toHaveBeenCalledTimes(2)
+  })
+
+  it("tells a subscriber once the news is taken in, the Thing reading as the record it adopted", () => {
+    const whole2 = TH.boxThingOf('openai', { revseq: 2 })
+    const thing  = TH.PlainThing.make(whole2)
+    const read: unknown[] = []
+    thing.subscribe(() => { read.push([thing.pickle(), thing.agerank]) })
+    thing.receive(eventOf(whole2))
+    expect(read).to.deep.equal([[whole2, thing.agerank]])
+  })
+
+  it("stops telling a listener once it unsubscribes", () => {
+    const thing       = TH.PlainThing.make(TH.boxThingOf())
+    const listener    = vi.fn()
+    const unsubscribe = thing.subscribe(listener)
+    unsubscribe()
+    thing.receive(eventOf(TH.boxThingOf()))
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it("lets what a subscriber throws reach receive's caller, where its maker gave no bulletproofCallback", () => {
+    const thing = TH.PlainThing.make(TH.boxThingOf())
+    thing.subscribe(() => { throw new Error("a bug in the host") })
+    expect(() => thing.receive(eventOf(TH.boxThingOf()))).to.throw("a bug in the host")
+  })
+
+  it("refuses a listener that is not a function", () => {
+    const thing = TH.PlainThing.make(TH.boxThingOf())
+    TH.expectSyncRefusal(() => thing.subscribe('call me' as never), 'bad_record')
   })
 })
 

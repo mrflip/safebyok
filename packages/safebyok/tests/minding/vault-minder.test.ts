@@ -464,6 +464,21 @@ describe("VaultMinder.thingAt(scoped)", () => {
     expect(vaultDB.thingAt(TH.BoxScope)).to.eq(undefined)
   })
 
+  it("answers a Thing to its own subscriber as it is told of its first record", () => {
+    const found: unknown[] = []
+    const vaultDB: VaultMinder<TH.PlainThing> = VaultMinder.make(TH.ThingBank, {
+      vaultDB:   new MemoryVaultDB(),
+      makeThing: (seen) => {
+        const thing = TH.makePlainThing(seen)
+        thing.subscribe(() => { found.push(vaultDB.thingAt(seen)) })
+        return thing
+      },
+    })
+    vaultDB.receive(rungOf(TH.boxThingOf()))
+    expect(found).to.have.lengthOf(1)
+    expect(found[0]).to.equal(vaultDB.thingAt(TH.BoxScope))
+  })
+
   it("makes each Thing once, with the first record it learns of at that labelpath", () => {
     const makeThing = vi.fn(TH.makePlainThing)
     const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: new MemoryVaultDB(), makeThing })

@@ -3,7 +3,7 @@ import { Helpers, VX } from 'safebyok-big/internals'
 import { BaseThing } from './base-thing'
 import type { EpochMillis } from '../shapes/primitives'
 import type { LiveOf, ShellOf } from '../shapes/shapes-sealers'
-import type { Sparse, ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
+import type { BulletproofCallback, Sparse, ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
 import { type Agekind, type Agerank, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { agekindOf, eventsOf, nextAgerankOf, readAtOf } from '../storage/agerank'
 import * as Throwers from '../refusals/throwers'
@@ -26,10 +26,10 @@ export type Adoptable<RecordT extends ThingRecord> = RecordT | Tombstone<RecordT
  * What Thing itself holds is records as the vaultDB stores them, and what is derived from them: never a cleartext, a key or a lease.
  * It always models a record, at worst the shell, and its {@link receive} says which item events of the Thing are news.
  * A subclass checks what it begins from before calling `super`, and has no member under a record field's name but its body's getters. One that never receives may freeze itself last.
- * A listener can {@link subscribe} to the changes a subclass tells of.
+ * A listener can {@link subscribe} to it, and is told each time {@link receive} returns news.
  */
 export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT extends Adoptable<RecordT> = RecordT> extends BaseThing {
-  // == [Props]: #record, #citable, #agerank, #readAt, #subscribers, #subscribe
+  // == [Props]: #record, #citable, #agerank, #readAt, #bulletproofCallback, #subscribers, #subscribe
 
   // Set by the constructor's adopt.
   #record: Adoptable<RecordT> | undefined = undefined
@@ -38,18 +38,22 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   #agerank: Agerank | undefined = undefined
   #readAt: EpochMillis | undefined = undefined
 
-  readonly #subscribers = new Set<() => void>()
+  /** Wraps each subscriber as it subscribes: what one throws goes where the maker said, or reaches `receive`'s caller where it said nothing. */
+  readonly #bulletproofCallback: BulletproofCallback
+  /** Each subscriber, beside its wrapped form, which is what is called. */
+  readonly #subscribers = new Map<() => void, () => void>()
   readonly #subscribe = (listener: () => void): (() => void) => {
-    this.#subscribers.add(VX.listener.parse(listener))
+    this.#subscribers.set(VX.listener.parse(listener), this.#bulletproofCallback(listener))
     return () => { this.#subscribers.delete(listener) }
   }
   // --
 
   // == [Construction]: constructor, adopt
 
-  /** A Thing that adopts `begun`: a whole record, a tombstone or the void sentinel. */
-  protected constructor(begun: Adoptable<RecordT>) {
+  /** A Thing that adopts `begun`: a whole record, a tombstone or the void sentinel, each subscriber wrapped by `bulletproofCallback` where given. */
+  protected constructor(begun: Adoptable<RecordT>, bulletproofCallback: BulletproofCallback = callAsIs) {
     super()
+    this.#bulletproofCallback = bulletproofCallback
     const { userid, banklabel, labelpath } = begun
     Helpers.tattoo(this, { userid, banklabel, labelpath }, { configurable: false })
     this.#citable = citedOf(begun)
@@ -87,7 +91,7 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
    * whole one seen, or the newest revision seen again in a later tcchunk, a span of 65.536 seconds, than it was last seen in.
    * The events are `proposed` with its ageranks, then any `life`, then any `aged`, each frozen. A whole record, a tombstone
    * or the void sentinel is adopted, unless it equals the record held, which stays the same object; a sparse live record moves only `citable`, `agerank` and `read_at`.
-   * A `life` or `aged` event returns none. Refuses an event of another Thing.
+   * Each subscriber is told once the news is taken in. A `life` or `aged` event returns none. Refuses an event of another Thing.
    */
   receive(proposed: VaultEvent<RecordT>): readonly VaultEvent<RecordT>[] {
     SeenChecks.event.parseConsistent(proposed, pick(this, ['userid', 'banklabel', 'labelpath']))
@@ -103,6 +107,7 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
     this.#agerank = agerank
     this.#readAt  = readAt
     if (BaseThing.cmp(this.#citable, val) > 0) { this.#citable = citedOf(val) }
+    this.#tellSubscribers()
     return eventsOf(proposed, agerankWas, agerank)
   }
 
@@ -138,22 +143,16 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   }
   // --
 
-  // == [Subscribers]: subscribe, tellSubscribers, dropSubscribers
+  // == [Subscribers]: subscribe, #tellSubscribers, dropSubscribers
 
-  /** Subscribe a listener to this Thing's changes, returning its unsubscribe. Already bound, as `useSyncExternalStore` wants it.
-   * The listener is called with no argument after each change the subclass tells of: read the Thing again.
+  /** Subscribe a listener to this Thing's news, returning its unsubscribe. Already bound, as `useSyncExternalStore` wants it.
+   * The listener is called with no argument each time {@link receive} returns news: read the Thing again. Its record, {@link pickle}, is the same object until a newer one is adopted.
    */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
 
-  /** Call each subscriber, handing what one throws to `onThrow`. */
-  protected tellSubscribers(onThrow: (err: unknown) => void): void {
-    for (const listener of this.#subscribers) {
-      try {
-        listener()
-      } catch (err) {
-        onThrow(err)
-      }
-    }
+  /** Call each subscriber. */
+  #tellSubscribers(): void {
+    for (const told of this.#subscribers.values()) { told() }
   }
 
   /** Let go of every subscriber: none is told of anything after. */
@@ -161,10 +160,13 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   // --
 }
 
-// == [Helpers]: NoEvents, citedOf
+// == [Helpers]: NoEvents, callAsIs, citedOf
 
 /** What `receive` returns for an event that is not news. */
 const NoEvents: readonly never[] = Object.freeze([])
+
+/** The {@link BulletproofCallback} of a Thing whose maker gave none: `callback` as it is. */
+function callAsIs<ArgsT extends unknown[]>(callback: (...args: ArgsT) => void): (...args: ArgsT) => void { return callback }
 
 /** The Thing fields of `seen`, frozen */
 function citedOf(seen: Sparse<ThingRecord>): Sparse<ThingRecord> { return Object.freeze(BaseThing.sparseOf(seen)) }

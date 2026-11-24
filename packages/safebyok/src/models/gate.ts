@@ -12,7 +12,7 @@ import type {
 } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type BankStamp, type GateStamp, type LeaseLoggable, type LeaseStamp, StampChecks } from '../shapes/shapes-stamps'
-import { type GateRecord, type Modelkind, type Sparse, type ThingRecord, type ThingScope, type Wayins, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
+import { type GateRecord, type Modelkind, type Sparse, type ThingRecord, type ThingScope, type Wayins, ThingChecks, ThingFormat, ThingMakeChecks } from '../shapes/shapes-thing'
 import { GateChecks } from '../shapes/shapes-thingkinds'
 import type { PutAskDraft } from '../shapes/shapes-asks'
 import type { EpochMillis } from '../shapes/primitives'
@@ -79,24 +79,22 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   // == [Construction]: make, constructor, adopt, makeRecord, makeNextRecord
 
   /** Make the gate of `record`, on `opts.device`, handing its leases to the world through `friend`. Locked, and nothing is fetched or stored.
-   * `record` is a whole gate record or the gate's shell.
+   * `record` is a whole gate record or the gate's shell. Each subscriber is wrapped by `opts.bulletproofCallback`, where given.
    * Internal: the device's world makes the gate its VaultMinder keeps.
    */
   static make(record: GateRecord | Sealers.ShellOf<GateRecord>, opts: GateOpts, friend: WorldGateFriend): Gate {
-    const { opts: { device }, friend: worldFriend } = Checks.gateMakeArgs.parse({ record, opts, friend })
+    const { opts: gateOpts, friend: worldFriend } = Checks.gateMakeArgs.parse({ record, opts, friend })
     // A gate's life is its own, so only the bank's scope is checked: a gate of another life of the bank passes.
-    Validator.checkedConsistent(StampChecks.bankScope.parse(record), device.scope, { kind: 'record_conflict' })
+    Validator.checkedConsistent(StampChecks.bankScope.parse(record), gateOpts.device.scope, { kind: 'record_conflict' })
     // A gate models the very record it is handed, never the check's copy.
-    return new Gate(record, { device }, worldFriend)
+    return new Gate(record, gateOpts, worldFriend)
   }
 
   private constructor(begun: GateRecord | Sealers.ShellOf<GateRecord>, opts: GateOpts, friend: WorldGateFriend) {
-    super(begun)
+    super(begun, opts.bulletproofCallback)
     this.#device    = opts.device
     this.#world     = opts.device.world
     this.#friend    = friend
-    // The world's sweep lets go of this listener.
-    this.#world.subscribe(() => { this.#tell() })
   }
 
   // Thing's constructor calls this before this gate's own fields exist, so it reads and sets none of them.
@@ -236,16 +234,15 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
     return await proved.buildLease(this.#friend.leaseGateOf(this.bankStamp), this, renewed)
   }
 
-  /** Write `ask.record`, this gate's next revision, over `ask.cited`, and tell this gate's subscribers. Resolves this gate, which then models the revision written. */
+  /** Write `ask.record`, this gate's next revision, over `ask.cited`. Resolves this gate, which then models the revision written. */
   async #putGate(ask: PutAskDraft<GateRecord>): Promise<this> {
     this.demandEnabled()
     await this.#world.demandVaultMinder().putOnce(ask)
-    this.#tell()
     return this
   }
   // --
 
-  // == [Locking and sweeping]: lock, sweep, tell
+  // == [Locking and sweeping]: lock, sweep
 
   /** Lock this gate's world: drop its lease and the keys in it ({@link World.lock}). */
   lock(): this {
@@ -258,12 +255,6 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
     this.#world.sweep(endCause)
     return this
   }
-
-  // A subscriber is told after each gate change this device writes, and after each change to the world's snapshot: an
-  // unlock, a lock, a wait in ensureUnlocked opened or settled, and the world's end. A gate change another device writes,
-  // heard by `receive`, is not one of these.
-  /** Tell each subscriber of a change, handing what one throws to the device's `onBadNews`. */
-  #tell(): void { this.tellSubscribers((err) => { this.#device.tellBadNews([err]) }) }
   // --
 
   // == [Sealing under the lease]: seal, unseal
@@ -349,7 +340,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn }) => {
   return {
     gateMakeArgs:   obj({
       record: GateChecks.recordOrShell,
-      opts:   obj({ device: custom<Device>() }),
+      opts:   ThingMakeChecks.thingMakeOpts.extend({ device: custom<Device>() }),
       friend: obj({ leaseGateOf: fn<WorldGateFriend['leaseGateOf']>(), renewal: fn<WorldGateFriend['renewal']>(), attachLease: fn<WorldGateFriend['attachLease']>() }),
     }),
     makeRecordArgs: GateChecks.stamp.extend({ wayins }),
