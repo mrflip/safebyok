@@ -93,6 +93,9 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
   // A Thing's scope and citation: what every record and tombstone has, sparse or whole. Its revseq is the shell's -1
   // only beside the void revtok and lifeseq, and they only beside it.
   const scopedCited  = obj({ ...thingScope.shape, ...thingCited.shape }).refine(isShellCitable, Phrases.CitedHalfShell)
+  // The fields every live Thing, and every tombstone, has, sparse or whole: what the record guards read.
+  const scopedLive      = scopedCited.safeExtend({ am: lit('a') })
+  const scopedTombstone = scopedCited.safeExtend({ am: lit('x') })
   // A checked record shows its fields in this order, for a reader's eye alone: nothing stored, compared or bound into a
   // ctx takes its order from an object's keys (STYLE.md, *Order comes from an explicit list*).
   const sparse       = obj({ ...thingScope.shape, label, ...revisioned, fmt: lit(ThingFormat) })
@@ -111,7 +114,7 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
   }).strict()
   return {
     modelkind, labelpath, anyLifeseq, voidLifeseq, anyLifepath, voidLifepath, ...revisioned, bankScope, label,
-    thingScope, thingCited, scopedCited, sparse, storedCited, sealed,
+    thingScope, thingCited, scopedCited, scopedLive, scopedTombstone, sparse, storedCited, sealed,
   }
 })
 

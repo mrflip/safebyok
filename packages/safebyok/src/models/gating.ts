@@ -240,7 +240,7 @@ interface Ante extends StampedGate {
 /** The revision `gate` models now, as a gating proves against it and a gate change carries it forward. Refuses a gate that is not live. */
 function anteOf(gate: Gate): Ante {
   const { stamp, main, passkey0, bankStamp } = gate
-  const record = GateChecks.record.parse(gate.pickle())
+  const record = GateChecks.record.parse(gate)
   return { record, bankStamp, stamp, wayins: record.wayins, main, passkey0 }
 }
 
