@@ -140,7 +140,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
     // of the checks the act tables cannot name: the stored born_at kept, the stored lifetok kept (the bank's alone), and the
     // storage policies met (the gate's alone). Each verdict is true where its check does not apply.
     const read_tc  = Classifier.readTcNow()
-    const written  = await this.#firstRow<FetchedThing & { ok: boolean, born_at_ok: boolean, lifetok_ok?: boolean, policies_ok?: boolean }>(WriteThingSql[ask.modelkind], params)
+    const written  = await this.#firstRow<FetchedThing & { ok: boolean, born_at_ok: boolean, lifetok_ok: boolean, policies_ok: boolean }>(WriteThingSql[ask.modelkind], params)
     if (written.ok) {
       return { ok: true, act: writtenActOf(ask), world: Classifier.worldOf(ask, written.world), tracked: Classifier.trackedOf(ask, written.tracked), read_tc, record: Classifier.writtenThingOf(ask, written.thing) }
     }
@@ -149,8 +149,8 @@ export class PostgresVaultDB extends AdapterVaultDB {
     const act    = Classifier.writeActOf(ask, stored)
     if (! Classifier.isWriteAct(act))  { return Classifier.unwrittenWriteOf(written.thing, { ask, act, above: { ...written.world, ancestor: written.ancestor, tracked: written.tracked, read_tc } }) }
     if (! written.born_at_ok)          { Classifier.demandBornAtKept(ask, written.thing) }
-    if (written.lifetok_ok === false)  { Classifier.demandLifetokKept(ask, written.thing) }
-    if (written.policies_ok === false) { Classifier.demandPolicies(ask, written.thing) }
+    if (! written.lifetok_ok)          { Classifier.demandLifetokKept(ask, written.thing) }
+    if (! written.policies_ok)         { Classifier.demandPolicies(ask, written.thing) }
     // No verdict explains the refusal: a check a validated ask cannot fail, or a verdict the classifier does not share.
     throw storedNothing()
   }

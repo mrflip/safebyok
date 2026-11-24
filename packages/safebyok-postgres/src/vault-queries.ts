@@ -80,11 +80,12 @@ function recordAncestorSqlOf(table: string): string {
   return ancestorSqlOf(table, { userid: `($1::text::jsonb ->> 'userid')`, banklabel: `($1::text::jsonb ->> 'banklabel')`, labelpath: `($1::text::jsonb ->> 'labelpath')` })
 }
 
+// Every statement returns all three verdicts: one whose check its kind does not make is true.
 /** Each kind's write function, over the record ($1) and what it cites ($2), the nearest Thing stored above the record's scope, and how the world and root box after compare with the track ($3); the gate's also takes the storage policies ($4). */
 export const WriteThingSql: Readonly<Record<Thingkind, string>> = {
-  bank: `SELECT ok, thing, world, born_at_ok, lifetok_ok, ${recordAncestorSqlOf(ThingTables.bank)} AS ancestor, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM ${VaultFunctionNames.write_bank}($1::text::jsonb, $2::text::jsonb)`,
-  gate: `SELECT ok, thing, world, born_at_ok, policies_ok, ${recordAncestorSqlOf(ThingTables.gate)} AS ancestor, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM ${VaultFunctionNames.write_gate}($1::text::jsonb, $2::text::jsonb, $4::text[])`,
-  box:  `SELECT ok, thing, world, born_at_ok, ${recordAncestorSqlOf(ThingTables.box)} AS ancestor, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM ${VaultFunctionNames.write_box}($1::text::jsonb, $2::text::jsonb)`,
+  bank: `SELECT ok, thing, world, born_at_ok, lifetok_ok, true AS policies_ok, ${recordAncestorSqlOf(ThingTables.bank)} AS ancestor, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM ${VaultFunctionNames.write_bank}($1::text::jsonb, $2::text::jsonb)`,
+  gate: `SELECT ok, thing, world, born_at_ok, true AS lifetok_ok, policies_ok, ${recordAncestorSqlOf(ThingTables.gate)} AS ancestor, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM ${VaultFunctionNames.write_gate}($1::text::jsonb, $2::text::jsonb, $4::text[])`,
+  box:  `SELECT ok, thing, world, born_at_ok, true AS lifetok_ok, true AS policies_ok, ${recordAncestorSqlOf(ThingTables.box)} AS ancestor, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM ${VaultFunctionNames.write_box}($1::text::jsonb, $2::text::jsonb)`,
 }
 
 /** A bank's birth: its bank ($1), main gate ($2) and root box ($3), and how the roots after compare with the track ($4). */
