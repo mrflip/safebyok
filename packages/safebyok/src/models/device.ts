@@ -16,6 +16,7 @@ import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthCheck
 import type { BankScope } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
+import { SortedVaultDB } from '../storage/sorted-vault-db'
 import type { DevicePersisters, PersisterOfBank } from '../storage/persister'
 import { type Modelkind, ThingChecks } from '../shapes/shapes-thing'
 import * as Throwers from '../refusals/throwers'
@@ -153,8 +154,9 @@ export class Device implements MinderFriend {
     this.#onBadNews = onBadNews
     this.#persisters = persisters
     // The roots cache in a minder of their own: the main gate's wrapped bankKeys stay out of the client a host observes.
-    this.#bankMinder = BankMinder.make({ vaultDB }, this)
-    this.#minder = VaultMinder.make({ vaultDB, queryCacheOpts }, this)
+    const sortedVaultDB = SortedVaultDB.make({ vaultDB })
+    this.#bankMinder = BankMinder.make({ vaultDB: sortedVaultDB }, this)
+    this.#minder = VaultMinder.make({ vaultDB: sortedVaultDB, queryCacheOpts }, this)
     this.#snapshot = this.#makeSnapshot()
     if (Deriver.isTestDeriver(keyDeriver)) { this.logger.warn(PhrasesX.TestDeriverNotice, { oplabel: 'Device.make' }) }
     Object.freeze(this)
@@ -259,9 +261,8 @@ export class Device implements MinderFriend {
   // Gate.make checks the gate and Bank.make the root box: a tombstone of either refuses.
   /** Make the bank of `world`, and its main gate, this device's bank. */
   #attachWorld(world: BankRoots): void {
-    const { vaultDB } = this
-    const gate = Gate.make(world.gate, { device: this, vaultDB, bankStamp: world.bank })
-    this.#attachBank(Bank.make(world.bank, { device: this, vaultDB, gate }))
+    const gate = Gate.make(world.gate, { device: this, bankStamp: world.bank })
+    this.#attachBank(Bank.make(world.bank, { device: this, gate }))
   }
 
   // The bank's own sweep clears its subscribers, so nothing here unsubscribes.

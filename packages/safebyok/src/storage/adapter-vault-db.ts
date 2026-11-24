@@ -5,6 +5,7 @@ import { EX, Errors, Outcome, type Helpers } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
 import type { Sparse, ThingRecord } from '../shapes/shapes-thing'
 import type { TombstoneOf } from '../shapes/shapes-sealers'
+import type { Recordkind, VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
 import { Thing } from '../models/thing'
 import {
   type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
@@ -12,19 +13,19 @@ import {
 import type { BankRootsFetched, ThingsFetched, WorldFetched } from './thing-classifier'
 import * as Classifier from './thing-classifier'
 import type {
-  Actual, Answer, BadAnswer, BirthBankActual, BirthBankAnswer, GetThingAnswer, ListThingsActual, ListThingsAnswer, ThingNotice, VaultDB, WriteThingAnswer,
+  Actual, Answer, BadAnswer, BirthBankActual, BirthBankAnswer, GetThingAnswer, ListThingsActual, ListThingsAnswer, VaultDB, WriteThingAnswer,
 } from './vault-db'
 import * as Throwers from '../refusals/throwers'
 
-// == [Answers]: Received, answerOf
+// == [Answers]: Received, answerOf, itemEventOf, recordkindOf
 
 /** A change a concrete adapter's watch passes to `receive`: the changed Thing, raw, and its bank's world as the datastore last read it.
  * The watch tells of the Thing and ignores the world: a bank or main gate that changed is notified as a Thing of its own.
  */
 export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
 
-/** One of the adapter's watches: its bank, the function that tells it of one raw Thing, and the one that notifies it of a Thing already checked. */
-type Feed = { scope: ThingWatchScope, tell: (raw: unknown) => void, notify: (val: ThingRecord | Sparse<ThingRecord>) => void }
+/** One caller's watch of a bank: its bank, the function that notifies it of a Thing already checked, and its handler of bad news. */
+type ThingWatcher = { scope: ThingWatchScope, notify: (val: ThingRecord | Sparse<ThingRecord>) => void, onBadNews: (news: Errors.VaultError) => void }
 
 /** The answer a verb gives for its concrete adapter's report: `record` becomes `val` when good, `dbhas` when refused.
  * A get that finds no live Thing answers a `val` of null, with a tombstone or null as its `dbhas`.
@@ -49,6 +50,18 @@ function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: Logg
 
 /** The `tracked` a concrete adapter reports, as a field to spread into an answer: none where it reports none. */
 function trackedFieldOf({ tracked }: { tracked?: Tracked }): { tracked?: Tracked } { return (tracked === undefined) ? {} : { tracked } }
+
+/** The `item` event a watch tells of `record`, with no agerank */
+function itemEventOf(record: ThingRecord | Sparse<ThingRecord>): VaultItemEvent {
+  const { userid, banklabel, labelpath } = record
+  return Object.freeze({ eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: undefined, agerankWas: undefined, recordkind: recordkindOf(record), record })
+}
+
+/** The recordkind of `record`: `gone` for a tombstone, sparse or whole, else `soon` for one sparse and `full` for one whole */
+function recordkindOf(record: ThingRecord | Sparse<ThingRecord>): Exclude<Recordkind, 'void'> {
+  if (Thing.isGone(record)) { return 'gone' }
+  return Thing.isSparse(record) ? 'soon' : 'full'
+}
 // --
 
 /** The base class of a vaultDB whose Things are in a datastore. A subclass writes the `do*` calls, each one atomic step.
@@ -57,9 +70,9 @@ function trackedFieldOf({ tracked }: { tracked?: Tracked }): { tracked?: Tracked
  * and of a list's parentage and deltas.
  */
 export abstract class AdapterVaultDB implements VaultDB {
-  // == [Props]: #feeds
+  // == [Props]: #watchers
 
-  readonly #feeds = new Set<Feed>()
+  readonly #watchers = new Set<ThingWatcher>()
   // --
 
   // == [Classifying]: classifyGetThing, classifyWriteThing, classifyListThings, classifyBirthBank
@@ -155,27 +168,26 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
 
   /** Watch a bank's Things ({@link VaultDB.watch}).
-   * A VaultDB notification carries one Thing per notice. If a datastore pushes several records to its adapter in a notification, they will be split and sent individually.
+   * Each event carries one Thing: several records a datastore pushes to its adapter at once are told one event each.
    * A Thing that fails its checks, or belongs to another bank, goes to `onBadNews` instead of `onNotice`, and so does an error `onNotice` throws.
    */
-  watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
+  watch(scope: ThingWatchScope, onNotice: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
     const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews })
-    const notify = (val: ThingRecord | Sparse<ThingRecord>): void => {
-      // A notice handler that throws is a bug in the host's code, not trouble in storage.
-      try { onNotice({ ok: true, act: Thing.isGone(val) ? 'gotgone' : 'gotlive', val }) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
-    }
-    const feed: Feed = { scope: bankScope, notify, tell: (raw) => {
-      let val: ThingRecord
-      try { val = Classifier.watchedThingOf(bankScope, raw) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
-      notify(val)
+    const watcher: ThingWatcher = { scope: bankScope, onBadNews, notify: (val) => {
+      // An event handler that throws is a bug in the host's code, not trouble in storage.
+      try { onNotice(itemEventOf(val)) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
     } }
-    this.#feeds.add(feed)
-    const stop = this.doWatch(bankScope, ({ record }) => { feed.tell(record) }, onBadNews)
-    return () => { this.#feeds.delete(feed); stop() }
+    this.#watchers.add(watcher)
+    const stop = this.doWatch(bankScope, ({ record }) => {
+      let val: ThingRecord
+      try { val = Classifier.watchedThingOf(bankScope, record) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
+      watcher.notify(val)
+    }, onBadNews)
+    return () => { this.#watchers.delete(watcher); stop() }
   }
   // --
 
-  // == [Notifying]: notifyTrackedRecords, notifyDbhas, notifyListed, #queueNotices, #queueListedNotices
+  // == [Notifying]: notifyTrackedRecords, notifyDbhas, notifyListed, #queueNotices, #queueListedNotices, #watchersOfBank
 
   // Queued before the verb returns. That means each watcher's synchronous work is done before the verb's caller resumes -- no handler runs inside the operation verb.
   /** Notify each watch of `ask`'s bank of the bank, the main gate and the root box, in that order, each where `tracked` reports it other than `'same'`. */
@@ -200,23 +212,33 @@ export abstract class AdapterVaultDB implements VaultDB {
     for (const record of [...answer.parentage, ...answer.deltas]) { this.#queueListedNotices(answer.ask, record) }
   }
 
-  /** Queue one notice of `record` to each watch of `scoped`'s bank. */
+  // Every watcher of one bank checks a Thing alike, so the first one's scope checks it for all.
+  /** Queue one notice of `record` to each watch of `scoped`'s bank, or bad news to each where it fails its checks. */
   #queueNotices(scoped: Pick<LoggableAsk, 'userid' | 'banklabel'>, record: ThingRecord): void {
-    for (const { scope, tell } of this.#feeds) {
-      if ((scope.userid === scoped.userid) && (scope.banklabel === scoped.banklabel)) {
-        queueMicrotask(() => { tell(structuredClone(record)) })
+    const watchers = this.#watchersOfBank(scoped)
+    const [first] = watchers
+    if (first === undefined) { return }
+    queueMicrotask(() => {
+      let val: ThingRecord
+      try { val = Classifier.watchedThingOf(first.scope, record) } catch (err) {
+        for (const { onBadNews } of watchers) { onBadNews(Outcome.storageRefusalOf(err)) }
+        return
       }
-    }
+      for (const { notify } of watchers) { notify(structuredClone(val)) }
+    })
   }
 
   // A listed Thing is sparse, which the watch's check of a whole Thing refuses: the classifier checked it before making it sparse.
   /** Queue one notice of the listed `record` to each watch of `scoped`'s bank, unchecked. */
   #queueListedNotices(scoped: Pick<LoggableAsk, 'userid' | 'banklabel'>, record: Sparse<ThingRecord>): void {
-    for (const { scope, notify } of this.#feeds) {
-      if ((scope.userid === scoped.userid) && (scope.banklabel === scoped.banklabel)) {
-        queueMicrotask(() => { notify(structuredClone(record)) })
-      }
+    for (const { notify } of this.#watchersOfBank(scoped)) {
+      queueMicrotask(() => { notify(structuredClone(record)) })
     }
+  }
+
+  /** The watchers of `scoped`'s bank, as of now. */
+  #watchersOfBank(scoped: Pick<LoggableAsk, 'userid' | 'banklabel'>): ThingWatcher[] {
+    return [...this.#watchers].filter(({ scope }) => (scope.userid === scoped.userid) && (scope.banklabel === scoped.banklabel))
   }
   // --
 

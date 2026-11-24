@@ -5,8 +5,9 @@ import type { Labelpath, Lifepath, Lifeseq } from '../shapes/primitives'
 import type { Sparse, ThingRecord, ThingScope } from '../shapes/shapes-thing'
 import type { TombstoneOf } from '../shapes/shapes-sealers'
 import type { BankRoots, BirthBankAsk, GetAsk, ListAsk, LoggableAsk, ThingWatchScope, Tracked, WorldRecord, WriteAsk } from '../shapes/shapes-asks'
+import type { VaultEvent } from '../shapes/shapes-vault-event'
 
-// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ReadTc, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer, ThingNotice
+// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ReadTc, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer
 
 /** A vaultDB verb's good answer: its `val`, the `act` that says what the datastore did, its bank's `world`, and the loggable part of its `ask`.
  * `world` is the bank and its main gate as the step left them, read in that step. It is null if either is missing or fails its checks.
@@ -80,9 +81,6 @@ export type ListThingsAnswer<RecordT extends ThingRecord = ThingRecord> =
 
 /** The answer to `tryBirthBank`: the three roots written (`born`), or found already stored (`passed`). */
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
-
-/** A Thing that a watch reports, live or a tombstone, as its `val`, with the act a get of it would answer. A Thing a list answers is reported sparse, as listed. */
-export type ThingNotice = Pick<GoodAnswer<ThingRecord | Sparse<ThingRecord>, 'gotlive' | 'gotgone'>, 'ok' | 'act' | 'val'>
 // --
 
 // == [What a concrete adapter reports]: Actual, ListThingsActual, BirthBankActual
@@ -131,18 +129,19 @@ export interface VaultDB {
   /** Write a new bank's three roots (bank, main gate, root box), or answer the roots already stored. */
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
   /** Watch a bank's Things, returning a function that stops the watch.
+   * `onNotice` is told each Thing as an `item` event with no agerank: live or a tombstone, never the void. A Thing a list answers is told sparse, as listed.
    * `onBadNews` gets any trouble the watch meets, including a Thing that fails its checks.
-   * - A Thing notified for two reasons in one verb (a write refused on a Thing it also tracks) is notified twice, and nothing
+   * - A Thing told for two reasons in one verb (a write refused on a Thing it also tracks) is told twice, and nothing
    *   looks for or avoids the repeat.
-   * - Every notice a verb causes reaches each watch before the verb's answer reaches its caller, so a handler's synchronous
+   * - Every event a verb causes reaches each watch before the verb's answer reaches its caller, so a handler's synchronous
    *   work is complete by then. Rely on nothing stronger.
-   * - A verb's notices come "out to in": the bank, the main gate, the root box, then the `dbhas`; or for a list, its
+   * - A verb's events come "out to in": the bank, the main gate, the root box, then the `dbhas`; or for a list, its
    *   `parentage` and then its `deltas`, in labelpath order.
-   * - A notice goes to every watch of the bank, whoever sent the ask.
-   * - A watch may be notified of a Thing again at a revision it has notified, or at an older one.
+   * - An event goes to every watch of the bank, whoever sent the ask.
+   * - A watch may be told of a Thing again at a revision it has told, or at an older one.
    * - A change the datastore itself reports arrives when the datastore delivers it, in no promised order against a verb's answer.
    */
-  watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void
+  watch(scope: ThingWatchScope, onNotice: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void): () => void
 }
 
 /** The members of {@link VaultDB} that are functions. */

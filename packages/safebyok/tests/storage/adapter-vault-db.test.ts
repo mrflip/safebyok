@@ -4,7 +4,8 @@ import { AnswerNotMade } from '../../src/phrases'
 import { AdapterVaultDB, type Received } from '../../src/storage/adapter-vault-db'
 import type { BirthBankAsk, GetAsk, ListAsk, ThingWatchScope, WriteAsk } from '../../src/shapes/shapes-asks'
 import { Thing } from '../../src/models/thing'
-import type { Actual, BirthBankActual, ListThingsActual, ThingNotice } from '../../src/storage/vault-db'
+import type { Actual, BirthBankActual, ListThingsActual } from '../../src/storage/vault-db'
+import type { VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
 import * as Throwers from '../../src/refusals/throwers'
 import * as TH from '../test-helpers'
 
@@ -29,21 +30,21 @@ class ScriptedVaultDB extends AdapterVaultDB {
 }
 
 /** The Things a watch of the test bank hears over `vaultDB`. */
-function heardOver(vaultDB: ScriptedVaultDB): ThingNotice['val'][] {
-  const heard: ThingNotice['val'][] = []
-  vaultDB.watch(TH.ThingBank, ({ val }) => { heard.push(val) }, () => undefined)
+function heardOver(vaultDB: ScriptedVaultDB): VaultItemEvent['record'][] {
+  const heard: VaultItemEvent['record'][] = []
+  vaultDB.watch(TH.ThingBank, (event) => { if (event.eventkind === 'item') { heard.push(event.record) } }, () => undefined)
   return heard
 }
 
 /** A value that throws on any look at it: what a broken backend might throw, or a broken host might ask. */
 const Booby = new Proxy({}, { get() { throw new Error('boom') }, getPrototypeOf() { throw new Error('boom') }, has() { throw new Error('boom') } })
 
-/** A watch whose handler throws on its first notice, after two notices were received; what the handler heard and what onBadNews was told. */
+/** A watch whose handler throws on its first event, after two Things were received; what the handler heard and what onBadNews was told. */
 function watchWithThrowingHandler() {
   const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
-  const heard: ThingNotice[] = []
+  const heard: VaultEvent[] = []
   const badNews: Errors.VaultError[] = []
-  vaultDB.watch(TH.ThingBank, (notice) => { heard.push(notice); if (heard.length === 1) { throw new Error('host bug') } }, (news) => { badNews.push(news) })
+  vaultDB.watch(TH.ThingBank, (event) => { heard.push(event); if (heard.length === 1) { throw new Error('host bug') } }, (news) => { badNews.push(news) })
   vaultDB.receive?.({ record: TH.boxThingOf(), world: null })
   vaultDB.receive?.({ record: TH.gateThingOf(), world: null })
   return { heard, badNews }
@@ -114,45 +115,45 @@ describe("AdapterVaultDB.tryWriteThing(ask), a store that reports oddly", () => 
 describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
   it("hears a sound Thing, and tells onBadNews of one that fails its checks", () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
-    const notices: ThingNotice[] = []
+    const events: VaultEvent[] = []
     const badNews: Errors.VaultError[] = []
-    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, (news) => { badNews.push(news) })
+    vaultDB.watch(TH.ThingBank, (event) => { events.push(event) }, (news) => { badNews.push(news) })
     vaultDB.receive?.({ record: { ...TH.gateThingOf(), wayins: {} }, world: null })
     vaultDB.receive?.({ record: 'not a Thing', world: null })
     vaultDB.receive?.({ record: TH.gateThingOf(), world: null })
-    expect(notices).to.deep.equal([{ ok: true, act: 'gotlive', val: TH.gateThingOf() }])
+    expect(events).to.deep.equal([TH.itemEventOf(TH.gateThingOf())])
     expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['damaged_row', 'storage_issue'])
   })
 
-  it("tells a change as one notice of its Thing, and nothing of the world beside it, sound or not", () => {
+  it("tells a change as one event of its Thing, and nothing of the world beside it, sound or not", () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
-    const notices: ThingNotice[] = []
+    const events: VaultEvent[] = []
     const badNews: Errors.VaultError[] = []
-    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, (news) => { badNews.push(news) })
+    vaultDB.watch(TH.ThingBank, (event) => { events.push(event) }, (news) => { badNews.push(news) })
     vaultDB.receive?.({ record: TH.boxThingOf(), world: { ...TH.bankThingOf(), maingate: TH.gateThingOf() } })
     vaultDB.receive?.({ record: TH.boxThingOf('anthropic'), world: { ...TH.bankThingOf(), maingate: TH.gateThingOf({ wayins: {} as never }) } })
-    expect(notices).to.deep.equal([TH.boxThingOf(), TH.boxThingOf('anthropic')].map((val) => ({ ok: true, act: 'gotlive', val })))
+    expect(events).to.deep.equal([TH.boxThingOf(), TH.boxThingOf('anthropic')].map((box) => TH.itemEventOf(box)))
     expect(badNews).to.deep.equal([])
   })
 
   it("tells onBadNews of a Thing of another bank, and does not hear it", () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
-    const notices: ThingNotice[] = []
+    const events: VaultEvent[] = []
     const badNews: Errors.VaultError[] = []
-    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, (news) => { badNews.push(news) })
+    vaultDB.watch(TH.ThingBank, (event) => { events.push(event) }, (news) => { badNews.push(news) })
     vaultDB.receive?.({ record: TH.gateThingOf({ banklabel: 'other' }), world: null })
-    expect(notices).to.deep.equal([])
+    expect(events).to.deep.equal([])
     expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['storage_issue'])
   })
 
-  it("tells onBadNews of a notice handler that throws", () => {
+  it("tells onBadNews of an event handler that throws", () => {
     const { badNews } = watchWithThrowingHandler()
     expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['unexpected_error'])
   })
 
-  it("keeps telling the handler of later notices after it throws", () => {
+  it("keeps telling the handler of later events after it throws", () => {
     const { heard } = watchWithThrowingHandler()
-    expect(heard.map(({ val }) => val.labelpath)).to.deep.equal(['box/openai', 'gate'])
+    expect(heard.map(({ labelpath }) => labelpath)).to.deep.equal(['box/openai', 'gate'])
   })
 
   it("refuses a watch with no onBadNews", () => {
@@ -171,6 +172,26 @@ describe("AdapterVaultDB, what a watch hears of a verb's answer", () => {
     expect(heard).to.have.lengthOf(2)
     await vaultDB.tryBirthBank(TH.birthBankAskOf())
     expect(heard).to.deep.equal([TH.gateThingOf(), TH.gateThingOf(), TH.gateThingOf()])
+  })
+
+  it("notifies every watch of the bank of a dbhas, each with a copy of its own, or sends each one's onBadNews a dbhas that fails its checks", async () => {
+    const dbhases: unknown[] = [TH.gateThingOf(), { ...TH.gateThingOf(), revseq: 'nine' }]
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: false, act: 'stale', world: null, record: dbhases.shift() }) as never)
+    const watches = [1, 2].map(() => {
+      const watch = { events: [] as VaultEvent[], badNews: [] as Errors.VaultError[] }
+      vaultDB.watch(TH.ThingBank, (event) => { watch.events.push(event) }, (news) => { watch.badNews.push(news) })
+      return watch
+    })
+    const elsewhere: unknown[] = []
+    vaultDB.watch({ ...TH.ThingBank, banklabel: 'other' }, (event) => { elsewhere.push(event) }, (news) => { elsewhere.push(news) })
+    await vaultDB.tryGetThing(TH.getGateAskOf())
+    await vaultDB.tryGetThing(TH.getGateAskOf())
+    for (const { events, badNews } of watches) {
+      expect(events).to.deep.equal([TH.itemEventOf(TH.gateThingOf())])
+      expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['damaged_row'])
+    }
+    expect((watches[0]!.events[0] as VaultItemEvent).record).not.to.equal((watches[1]!.events[0] as VaultItemEvent).record)
+    expect(elsewhere).to.deep.equal([])
   })
 
   it("tells the dbhas a thrown refusal carries once, from a get, a write or a birth", async () => {

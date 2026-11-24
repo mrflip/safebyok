@@ -54,7 +54,7 @@ async function gateWithPassphrase(): Promise<Gate> {
 /** The gate of `record`, of {@link TH.WorldBankStamp}'s bank. */
 function gateOf(record: unknown): Gate {
   const device = TH.makeDevice()
-  return Gate.make(record as never, { device, vaultDB: device.vaultDB, bankStamp: TH.WorldBankStamp })
+  return Gate.make(record as never, { device, bankStamp: TH.WorldBankStamp })
 }
 
 /** The arguments of a proving of `gate`, under a bank's stamp and a gate's stamp each moved by `moves`: the stamps a Gate would refuse to be made under. */

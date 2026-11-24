@@ -15,7 +15,6 @@ import { type BankStamp, type GateStamp, type LeaseLoggable, StampChecks } from 
 import { type GateRecord, type Modelkind, type Sparse, type ThingRecord, type ThingScope, type Wayins, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type PutAskDraft, putAskOf } from '../shapes/shapes-asks'
-import type { VaultDB } from '../storage/vault-db'
 import type { EpochMillis } from '../shapes/primitives'
 import * as Throwers from '../refusals/throwers'
 
@@ -24,10 +23,9 @@ import * as Throwers from '../refusals/throwers'
  * Boxes are sealed and unsealed under its private lease, which no method hands out.
  */
 export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements GateStamp {
-  // == [Props]: #device, #vaultDB, #bankStamp, #main, #passkey0, #lease, #unlockWait, #endCause
+  // == [Props]: #device, #bankStamp, #main, #passkey0, #lease, #unlockWait, #endCause
 
   readonly #device:    Device
-  readonly #vaultDB:   VaultDB
   readonly #bankStamp: BankStamp
 
   // Set again where a gate change lands, from the record written.
@@ -46,13 +44,10 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
   #endCause: Errors.VaultError | null = null
   // --
 
-  // == [Getters]: device, vaultDB, wayins, main, passkey0, scope, stamp, bankStamp, leaseEndsAt, leaseLoggable
+  // == [Getters]: device, wayins, main, passkey0, scope, stamp, bankStamp, leaseEndsAt, leaseLoggable
 
   /** The device this gate's bank is on. */
   get device(): Device { return this.#device }
-
-  /** Where this gate is stored. */
-  get vaultDB(): VaultDB { return this.#vaultDB }
 
   /** The wayin records, frozen. */
   get wayins(): Wayins { return this.pickle().wayins }
@@ -81,13 +76,13 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
 
   // == [Construction]: make, constructor, makeRecord, makeNextRecord
 
-  /** Make the gate of `record`, of the bank stamped `opts.bankStamp`, on `opts.device`, stored in `opts.vaultDB`. Locked, and nothing is fetched or stored. */
+  /** Make the gate of `record`, of the bank stamped `opts.bankStamp`, on `opts.device`. Locked, and nothing is fetched or stored. */
   static make(record: GateRecord, opts: GateOpts): Gate {
-    const { record: gateRecord, opts: { device, vaultDB, bankStamp } } = Checks.gateMakeArgs.parse({ record, opts })
+    const { record: gateRecord, opts: { device, bankStamp } } = Checks.gateMakeArgs.parse({ record, opts })
     // A gate's life is its own, so only the bank's scope is checked: a gate of another life of the bank passes.
     Validator.checkedConsistent(StampChecks.bankScope.parse(bankStamp), device.scope, { kind: 'record_conflict' })
     Validator.checkedConsistent(gateRecord, StampChecks.bankScope.parse(bankStamp), { kind: 'record_conflict' })
-    return new Gate(gateRecord, { device, vaultDB, bankStamp })
+    return new Gate(gateRecord, { device, bankStamp })
   }
 
   private constructor(gateRecord: GateRecord, opts: GateOpts) {
@@ -95,7 +90,6 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
     const passkey0 = (gateRecord.wayins.passkey0 === null) ? null : Wayin.make(gateRecord.wayins.passkey0)
     super({ ...gateRecord, wayins: wayinsOf({ main, passkey0 }) })
     this.#device    = opts.device
-    this.#vaultDB   = opts.vaultDB
     this.#bankStamp = Object.freeze(opts.bankStamp)
     this.#main      = main
     this.#passkey0  = passkey0
@@ -433,7 +427,6 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn }) => {
       record: GateChecks.record,
       opts:   obj({
         device:    custom<Device>(),
-        vaultDB:   ThingChecks.vaultDBShape,
         bankStamp: BankChecks.stamp,
       }),
     }),

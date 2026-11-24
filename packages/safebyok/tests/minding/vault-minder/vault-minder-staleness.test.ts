@@ -5,7 +5,7 @@ import type { VaultMinder } from '../../../src/minding/vault-minder'
 import { MaxTimerMillis, MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
-import { badnewsOf, cheatBox, listenerOf, minderWorldOf, bornOf, storedBoxOf, noticeOf, sparseNoticeOf, revtokAt, toldOf } from './world'
+import { badnewsOf, cheatBox, listenerOf, minderWorldOf, bornOf, storedBoxOf, watchEventOf, sparseWatchEventOf, revtokAt, toldOf } from './world'
 
 describe("VaultMinder.isStaleAt", () => {
   it("is true before any get, false after, and true past staleTime", async () => {
@@ -96,7 +96,7 @@ describe("VaultMinder's item behind a newer sparse record", () => {
       const asked = vi.spyOn(vaultDB, 'tryGetThing')
       const box1  = TH.nextOf(box)
       cheatBox(vaultDB, box1)
-      receive(sparseNoticeOf(box1))
+      receive(sparseWatchEventOf(box1))
       await TH.eventually(() => minder.at(TH.BoxScope)?.revseq === 1)
       await TH.eventually(() => ! minder.tsqClient.isFetching())
       expect([minder.isBehindAt(TH.BoxScope), asked.mock.calls.length]).to.deep.equal([false, 1])
@@ -111,7 +111,7 @@ describe("VaultMinder's item behind a newer sparse record", () => {
       const asked = vi.spyOn(vaultDB, 'tryGetThing')
       const box2  = TH.nextOf(box)
       cheatBox(vaultDB, box2)
-      receive(sparseNoticeOf(box2))
+      receive(sparseWatchEventOf(box2))
       await TH.eventually(() => minder.at(TH.BoxScope)?.revseq === 2)
       await TH.eventually(() => ! minder.tsqClient.isFetching())
       expect([minder.isBehindAt(TH.BoxScope), asked.mock.calls.length]).to.deep.equal([false, 1])
@@ -122,13 +122,13 @@ describe("VaultMinder's item behind a newer sparse record", () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { minder, receive } = await minderWorldOf(vaultDB)
-    receive(sparseNoticeOf(TH.nextOf(box)))
+    receive(sparseWatchEventOf(TH.nextOf(box)))
     await TH.expectRefusal(minder.get(TH.BoxScope), 'stale_read')
     await observeItem(minder, async () => {
       await TH.eventually(() => ! minder.tsqClient.isFetching())
       const box2 = TH.nextOf(TH.nextOf(box))
       cheatBox(vaultDB, box2)
-      receive(sparseNoticeOf(box2))
+      receive(sparseWatchEventOf(box2))
       await TH.eventually(() => minder.at(TH.BoxScope)?.revseq === 2)
     })
   })
@@ -138,7 +138,7 @@ describe("VaultMinder's item behind a newer sparse record", () => {
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
     const box1  = TH.nextOf(box)
     cheatBox(vaultDB, box1)
-    receive(sparseNoticeOf(box1))
+    receive(sparseWatchEventOf(box1))
     await TH.eventually(() => ! minder.tsqClient.isFetching())
     expect([minder.isBehindAt(TH.BoxScope), asked.mock.calls.length]).to.deep.equal([true, 0])
     expect(await minder.get(TH.BoxScope)).to.deep.equal(box1)
@@ -201,9 +201,9 @@ describe("VaultMinder's watch", () => {
   it("caches the box a notice carries, and drops the main gate one carries", async () => {
     const { minder, bankMinder, receive } = await minderWorldOf(new MemoryVaultDB())
     const [gate, box] = [TH.nextGateOf(TH.gateThingOf()), TH.boxThingOf()]
-    receive(noticeOf(box))
+    receive(watchEventOf(box))
     expect(minder.at(TH.BoxScope)).to.deep.equal(box)
-    receive(noticeOf(gate))
+    receive(watchEventOf(gate))
     expect(bankMinder.worldAt()?.gate).to.deep.equal(TH.gateThingOf())
     expect(minder.at(TH.GateScope)).to.be.undefined
   })
@@ -216,7 +216,7 @@ describe("VaultMinder's watch", () => {
   it("skips a Thing while the minder is not minding", async () => {
     const { minder, receive } = await minderWorldOf(new MemoryVaultDB())
     minder.goodbye()
-    receive(noticeOf(TH.boxThingOf()))
+    receive(watchEventOf(TH.boxThingOf()))
     expect(minder.at(TH.BoxScope)).to.be.undefined
   })
 
@@ -232,10 +232,10 @@ describe("VaultMinder's watch", () => {
     const { minder, receive } = await minderWorldOf(new MemoryVaultDB())
     const oldLife = TH.boxThingOf('openai', { lifeseq: '0000000000', lifepath: '0000000000/0000000000', revtok: TH.revtokOf('old'), revseq: 3 })
     const newLife = TH.boxThingOf('openai', { lifeseq: '0000000002', lifepath: '0000000000/0000000002', revtok: TH.revtokOf('new'), revseq: 0 })
-    receive(noticeOf(oldLife))
-    receive(noticeOf(newLife))
+    receive(watchEventOf(oldLife))
+    receive(watchEventOf(newLife))
     expect(revtokAt(minder)).to.eq(TH.revtokOf('new'))
-    receive(noticeOf(oldLife))
+    receive(watchEventOf(oldLife))
     expect(revtokAt(minder)).to.eq(TH.revtokOf('new'))
   })
 
@@ -243,7 +243,7 @@ describe("VaultMinder's watch", () => {
     const { minder, receive } = await minderWorldOf(await bornOf(new MemoryVaultDB()))
     await minder.get(TH.BoxScope)
     const box = TH.boxThingOf()
-    receive(noticeOf(box))
+    receive(watchEventOf(box))
     expect(minder.at(TH.BoxScope)).to.deep.equal(box)
   })
 
@@ -253,11 +253,11 @@ describe("VaultMinder's watch", () => {
       const { minder, receive } = await minderWorldOf(new MemoryVaultDB())
       const box0 = TH.boxThingOf()
       const box1 = TH.nextOf(box0)
-      receive(noticeOf(box1))
+      receive(watchEventOf(box1))
       const listener = listenerOf()
       minder.listen(listener, MinderEventFormat)
       vi.advanceTimersByTime(5000)
-      receive(noticeOf(box0))
+      receive(watchEventOf(box0))
       expect(minder.at(TH.BoxScope)).to.eq(box1)
       expect(minder.tryAt(TH.BoxScope)).to.deep.include({ refreshedAt: 1000 })
       expect(listener.mock.calls).to.deep.equal([])
@@ -271,11 +271,11 @@ describe("VaultMinder's watch", () => {
     try {
       const { minder, receive } = await minderWorldOf(new MemoryVaultDB())
       const box  = TH.boxThingOf()
-      receive(noticeOf(box))
+      receive(watchEventOf(box))
       const listener = listenerOf()
       minder.listen(listener, MinderEventFormat)
       vi.advanceTimersByTime(5000)
-      receive(noticeOf(structuredClone(box)))
+      receive(watchEventOf(structuredClone(box)))
       expect(minder.at(TH.BoxScope)).to.eq(box)
       expect(minder.tryAt(TH.BoxScope)).to.deep.include({ refreshedAt: 6000 })
       expect(listener.mock.calls.map(([event]) => event.action?.type)).to.deep.equal(['success'])
@@ -287,9 +287,9 @@ describe("VaultMinder's watch", () => {
   it("caches a newer record as it arrived", async () => {
     const { minder, receive } = await minderWorldOf(new MemoryVaultDB())
     const box0 = TH.boxThingOf()
-    receive(noticeOf(box0))
+    receive(watchEventOf(box0))
     const box1 = structuredClone(TH.nextOf(box0))
-    receive(noticeOf(box1))
+    receive(watchEventOf(box1))
     expect(minder.at(TH.BoxScope)).to.eq(box1)
   })
 })
