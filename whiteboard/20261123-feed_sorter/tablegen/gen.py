@@ -1,7 +1,7 @@
-"""Generate the feed table: each row a chain of records fed to a FeedSorter, and `streamed`, the events it returns.
+"""Generate the feed table: each row a chain of records, each the val of an event one Thing receives, and `streamed`, the events its `receive` returns.
 
 A duplicate of whiteboard/20261123-minder_matrix/tablegen/gen.py (#866), with `streamed` in place of `wanted`, and no
-`today`: there is no earlier sorter to baseline against.
+`today`: there is no earlier feed to baseline against.
 
 A record is (kind, life, rev) or (kind, life, rev, chunk), all flat: 'soon' a sparse record, 'full' a whole live one, 'gone' a whole tombstone, 'void'
 nothing stored, its rev -1. A life is one number that orders the lives at this scope, as a lifepath does: even lives are
@@ -19,7 +19,7 @@ strings. The time belongs to the newest revision: a record of another life, or a
 `high` brings the later of its own and the one before; any other keeps the one before. So a record seen again at the
 newest revision in a later chunk is taken, and returns its item. It reads as here where high and item are equal, bare
 where item is -1, and cold otherwise. A row's `agerank` is the one its chain leaves the scope at: at a root's scope it
-is the sorter's own string, and at a deeper one the lifepath stands where the life does.
+is the Thing's own string, and at a deeper one the lifepath stands where the life does.
 
 Run: python3 gen.py > table.ts.txt
 """
