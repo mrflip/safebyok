@@ -232,7 +232,8 @@ Where nothing is stored at the ask's scope, the new core's (`packages/safebyok`)
 `dbhas`, never null: the null and dbnil of GV1, GV2, PV2, PV3 and DV2 read, there, as the shell. Its lifepath is
 the lifepath of the nearest Thing stored above the scope, live or a tombstone, then the shell's lifeseq `-000000001` for
 each level below that Thing: `box/zz` under a root box stored at life 0 has `0000000000/-000000001`, and under no root
-box stored, `-000000001/-000000001`. There, a `dbhas` of null means only that the verb threw.
+box stored, `-000000001/-000000001`. There, a `dbhas` of null means only that the verb threw. The records an answer
+carries, and a watch's notice, become the caller's to keep, deeply frozen: a vaultDB never changes one after handing it over.
 
 ## Vault ops table
 
