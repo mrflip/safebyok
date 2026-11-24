@@ -578,6 +578,18 @@ describe("a form verb at the main gate, refused for want of a bank", () => {
     expectVacated(form)
     expectVacated(dna)
   })
+
+  it("clears what each plain call is handed while no provider is mounted, refusing as signed out", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    for (const verbCase of GateVerbCases) {
+      const [plainCallOf, paramsOfCase] = [verbCase[2], verbCase[3]]
+      for (const params of paramsOfCase()) {
+        const refusal = await TH.expectRefusal(plainCallOf(world)(params as never), 'absent_vault')
+        expect(refusal.message).to.eq(Phrases.NobodySignedIn)
+        expectVacated(params)
+      }
+    }
+  })
 })
 
 /** The gate's passkey header, by `useGate`, beside the add and revoke mutations, over a world with the jokes bank stored, once it shows `locked`. */

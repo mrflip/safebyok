@@ -7,7 +7,7 @@ import { Errors, GX, SX } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
 import type { Device } from '../../src/models/device'
 import { Gate } from '../../src/models/gate'
-import { BirthGating, Gating, UnlockGating } from '../../src/models/gating'
+import { BirthGating, Gating, UnlockGating, vacateHanded } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
 import type { GatingCleartexts } from '../../src/shapes/shapes-gateish'
 import type { BirthBankAnswer } from '../../src/shapes/shapes-answers'
@@ -250,6 +250,24 @@ describe("a gating's vacating of the passkey answers it is handed", () => {
     // Whether the check accepts a bare buffer is not this test's subject: the bytes are vacated either way.
     await device.birthGating({ passphrase: TH.TestPassphrase, passkeyAnswer: { ...TH.passkeyAnswerOf(), prfBytes: prfBuffer as never } }).tryAttempt()
     expect(TH.isZeroed(new Uint8Array(prfBuffer))).to.be.true
+  })
+})
+
+/** A form holding a username and every secret field, obvious fakes. */
+function secretForm(): FormData {
+  const form = new FormData()
+  for (const [fieldname, text] of [['username', 'hue'], ['passphrase', 'a fake passphrase'], ['nextPassphrase', 'a fake next one'], ['confirmation', 'a fake next one']] as const) { form.append(fieldname, text) }
+  return form
+}
+
+describe("vacateHanded(handed)", () => {
+  it("empties a form's secret fields and zeroes each passkey answer, whichever verb's names it is in, and never throws", () => {
+    const [form, dna] = [secretForm(), { passphrase: 'a fake passphrase', passkeyAnswer: TH.passkeyAnswerOf(), nextPasskeyAnswer: TH.passkeyAnswerOf() }]
+    vacateHanded(form)
+    vacateHanded(dna)
+    expect([...form.keys()]).to.deep.equal(['username'])
+    expect([TH.isZeroed(dna.passkeyAnswer.prfBytes), TH.isZeroed(dna.nextPasskeyAnswer.prfBytes)]).to.deep.equal([true, true])
+    for (const handed of ['a fake passphrase', 42, null, undefined, { passphrase: 42 }]) { vacateHanded(handed) }
   })
 })
 

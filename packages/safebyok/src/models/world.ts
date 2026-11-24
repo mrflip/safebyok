@@ -5,7 +5,7 @@ import { BaseThing } from './base-thing'
 import { Box } from './box'
 import type { Device } from './device'
 import { Gate } from './gate'
-import { BirthGating, vacateHanded } from './gating'
+import { BirthGating } from './gating'
 import type { Lease } from './lease'
 import type { Proving } from './proving'
 import type { Adoptable } from './thing'
@@ -300,7 +300,7 @@ export class World {
   }
   // --
 
-  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, areRootsLive, vacateUnlessAttemptable, demandEnabled, demandRootsLive, demandVaultMinder, demandLease, thingAt
+  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, areRootsLive, demandEnabled, demandRootsLive, demandVaultMinder, demandLease, thingAt
 
   /** True until this world is swept or its device ends. */
   get isEnabled(): boolean { return this.endCause === null }
@@ -319,15 +319,6 @@ export class World {
 
   /** True while the bank's, the main gate's and the root box's Things each hold a live record. */
   get areRootsLive(): boolean { return isLive(this.bank) && isLive(this.gate) && isLive(this.rootBox) }
-
-  // The refusal is left to the verb, so a host sees the one it saw before.
-  /** Clear `handed`, what a host gave a gate's form verb, unless the verb can be attempted here: the world enabled, and its roots live.
-   * A `FormData` loses its secret fields, and each passkey answer's PRF bytes are zeroed. It never throws.
-   */
-  vacateUnlessAttemptable(handed: unknown): void {
-    if (this.isEnabled && this.areRootsLive) { return }
-    vacateHanded(handed)
-  }
 
   /** Throw unless {@link isEnabled}. */
   demandEnabled(): this {

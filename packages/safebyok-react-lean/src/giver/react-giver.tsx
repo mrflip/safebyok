@@ -8,7 +8,7 @@ import { type ReactNode, type SyntheticEvent, createContext, useCallback, useCon
 import {
   type AddPasskeyDna, type Bank, type BankSnapshot, type BankStage, type BirthDna, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type ItemQueryOptions, type KeyDeriver, type Kids, Labelpath,
   type LiveOf, type LivePublicPropsOf, type MaskedView, type PasskeyWayinHeader, type PassphraseVerdict, type PassphraseWayinHeader,
-  type ReplacePassphraseDna, type RevokePasskeyDna, type UnlockDna, EmptyMaskedView, PendingBank, Shell, type Sidecar, SignedOutBank, type Tombstone, type TombstoneOf, type Userid, type Vault, VaultError, type VaultDB, VaultTSQ, type Whisper, bulletproofHandlerOf,
+  type ReplacePassphraseDna, type RevokePasskeyDna, type UnlockDna, EmptyMaskedView, PendingBank, Shell, type Sidecar, SignedOutBank, type Tombstone, type TombstoneOf, type Userid, type Vault, VaultError, type VaultDB, VaultTSQ, type Whisper, bulletproofHandlerOf, vacateHanded,
 } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
@@ -145,17 +145,15 @@ type Shown = Readonly<{ client: QueryClient } & ({ device: Device, bank: null } 
 
 /** What a bank's hooks and calls read of their giver. */
 type BankFriend = Readonly<{
-  banklabel:    string
+  banklabel:          string
   /** The device of the provider mounted, or null while there is none or nobody is signed in: for the calls a host may make outside the provider. */
-  signedIn:     () => Device | null
-  /** The device of the provider mounted, signed in or not, or null while there is none. */
-  deviceNow:    () => Device | null
+  signedIn:           () => Device | null
   /** The QueryClient of the provider mounted, or the giver's own while none is: for the calls a host may make outside the provider. */
-  clientNow:    () => QueryClient
-  demandDevice: () => Device
-  demandBank:   () => Bank
-  demandVault:  () => Vault
-  useShown:     () => Shown
+  clientNow:          () => QueryClient
+  demandDevice:       () => Device
+  demandBankOrVacate: (params: unknown) => Bank
+  demandVault:        () => Vault
+  useShown:           () => Shown
 }>
 // --
 
@@ -197,6 +195,16 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     const signedIn = demandDevice()
     if (signedIn.bank === null) { throw bankAbsentOf(signedIn) }
     return signedIn.bank
+  }
+
+  /** The signed-in user's bank, for a gate form verb handed `params`: where it refuses, as {@link demandBank} does, what the verb was handed is cleared first. */
+  function demandBankOrVacate(params: unknown): Bank {
+    try {
+      return demandBank()
+    } catch (err) {
+      vacateHanded(params)
+      throw err
+    }
   }
 
   /** The vault of the signed-in user's bank. Refuses as {@link demandBank} does. */
@@ -270,7 +278,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
   }
 
   const { bankGiver, boxQueryOf } = makeBankGiver({
-    banklabel, signedIn: signedInDevice, deviceNow: () => mounted, clientNow: () => mounted?.vaultTsqClient ?? outsideClient, demandDevice, demandBank, demandVault, useShown,
+    banklabel, signedIn: signedInDevice, clientNow: () => mounted?.vaultTsqClient ?? outsideClient, demandDevice, demandBankOrVacate, demandVault, useShown,
   })
 
   /** The query factories of the signed-in user's bank, by banklabel, for the host's own `useQuery` and its kin, with the QueryClient they run in.
@@ -326,7 +334,7 @@ function shownOf(device: Device | null, userid: string | null | undefined, clien
 
 /** The hooks and calls of the bank `friend` serves. */
 function makeBankGiver(friend: BankFriend) {
-  const { banklabel, signedIn, deviceNow, clientNow, demandDevice, demandBank, demandVault, useShown } = friend
+  const { banklabel, signedIn, clientNow, demandDevice, demandBankOrVacate, demandVault, useShown } = friend
 
   /** The bank's snapshot. Synchronous: it never waits and never suspends.
    * Switch a screen on its `stage`.
@@ -678,8 +686,7 @@ function makeBankGiver(friend: BankFriend) {
 
   /** The gating of an unlock over `params`, at the main gate. */
   function unlockGatingOf(params: FormData | UnlockDna): Gating {
-    deviceNow()?.world.vacateUnlessAttemptable(params)
-    return demandBank().gate.unlockGating(params)
+    return demandBankOrVacate(params).gate.unlockGating(params)
   }
 
   /** Replace the passphrase by the `nextPassphrase` in `params`, a form or a dna, proved by its `passphrase` or passkey answer, with no hook: for a submit handler or a `mutationFn` of your own.
@@ -696,8 +703,7 @@ function makeBankGiver(friend: BankFriend) {
 
   /** The gating of a passphrase's replacement over `params`, at the main gate. */
   function replacePassphraseGatingOf(params: FormData | ReplacePassphraseDna): Gating {
-    deviceNow()?.world.vacateUnlessAttemptable(params)
-    return demandBank().gate.replacePassphraseGating(params)
+    return demandBankOrVacate(params).gate.replacePassphraseGating(params)
   }
 
   /** Add the passkey whose answer is the `nextPasskeyAnswer` in `params`, proved by its `passphrase`, with no hook: for a submit handler or a `mutationFn` of your own.
@@ -713,8 +719,7 @@ function makeBankGiver(friend: BankFriend) {
 
   /** The gating of a passkey's addition over `params`, at the main gate. */
   function addPasskeyGatingOf(params: AddPasskeyDna): Gating {
-    deviceNow()?.world.vacateUnlessAttemptable(params)
-    return demandBank().gate.addPasskeyGating(params)
+    return demandBankOrVacate(params).gate.addPasskeyGating(params)
   }
 
   /** Revoke the passkey, proved by the `passphrase` or the passkey's answer in `params`, a form or a dna, with no hook: for a submit handler or a `mutationFn` of your own.
@@ -730,8 +735,7 @@ function makeBankGiver(friend: BankFriend) {
 
   /** The gating of the passkey's revocation over `params`, at the main gate. */
   function revokePasskeyGatingOf(params: FormData | RevokePasskeyDna): Gating {
-    deviceNow()?.world.vacateUnlessAttemptable(params)
-    return demandBank().gate.revokePasskeyGating(params)
+    return demandBankOrVacate(params).gate.revokePasskeyGating(params)
   }
 
   const useDraft = makeUseDraft({ useBank, useBox, withWhisper, demandVault })
