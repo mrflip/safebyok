@@ -592,6 +592,35 @@ describe("a form verb at the main gate, refused for want of a bank", () => {
   })
 })
 
+/** What a page hands the birth form verb, obvious fakes, new at each call: a form, and a dna with a passkey answer. */
+function birthParamsOf(): [FormData, { passphrase: string, passkeyAnswer: { prfBytes: Uint8Array } }] {
+  return [formOf({ username: 'hue', passphrase: NewPassphrase, confirmation: NewPassphrase }), { passphrase: NewPassphrase, passkeyAnswer: LeanTH.passkeyAnswerOf() }]
+}
+
+describe("the birth form verb, refused for want of a signed-in device", () => {
+  it("clears a form's secret fields and a passkey answer, by its hook and its plain call, while nobody is signed in, refusing as signed out", async () => {
+    const { world, result } = await renderSignedOut((world) => world.Bank.useBirth())
+    expect(result.current.stage).to.eq('signed_out')
+    const [hooked, plain] = [birthParamsOf(), birthParamsOf()]
+    for (const params of hooked) { await act(() => result.current.hooked.attempt(params as never)) }
+    expect(result.current.hooked.wasRefused()).to.be.true
+    for (const params of plain) {
+      const refusal = await TH.expectRefusal(world.Bank.gatingBirthAttempt(params as never), 'absent_vault')
+      expect(refusal.message).to.eq(Phrases.NobodySignedIn)
+    }
+    for (const params of [...hooked, ...plain]) { expectVacated(params) }
+  })
+
+  it("clears what its plain call is handed while no provider is mounted, refusing as signed out", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    for (const params of birthParamsOf()) {
+      const refusal = await TH.expectRefusal(world.Bank.gatingBirthAttempt(params as never), 'absent_vault')
+      expect(refusal.message).to.eq(Phrases.NobodySignedIn)
+      expectVacated(params)
+    }
+  })
+})
+
 /** The gate's passkey header, by `useGate`, beside the add and revoke mutations, over a world with the jokes bank stored, once it shows `locked`. */
 async function renderGate() {
   const rendered = await renderUnder((world) => ({

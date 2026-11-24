@@ -145,15 +145,15 @@ type Shown = Readonly<{ client: QueryClient } & ({ device: Device, bank: null } 
 
 /** What a bank's hooks and calls read of their giver. */
 type BankFriend = Readonly<{
-  banklabel:          string
+  banklabel:            string
   /** The device of the provider mounted, or null while there is none or nobody is signed in: for the calls a host may make outside the provider. */
-  signedIn:           () => Device | null
+  signedIn:             () => Device | null
   /** The QueryClient of the provider mounted, or the giver's own while none is: for the calls a host may make outside the provider. */
-  clientNow:          () => QueryClient
-  demandDevice:       () => Device
-  demandBankOrVacate: (params: unknown) => Bank
-  demandVault:        () => Vault
-  useShown:           () => Shown
+  clientNow:            () => QueryClient
+  demandDeviceOrVacate: (params: unknown) => Device
+  demandBankOrVacate:   (params: unknown) => Bank
+  demandVault:          () => Vault
+  useShown:             () => Shown
 }>
 // --
 
@@ -188,6 +188,16 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     const device = signedInDevice()
     if (device === null) { throw new VaultError('absent_vault', Phrases.NobodySignedIn) }
     return device
+  }
+
+  /** The signed-in user's device, for the birth form verb handed `params`: where it refuses, as {@link demandDevice} does, what the verb was handed is cleared first. */
+  function demandDeviceOrVacate(params: unknown): Device {
+    try {
+      return demandDevice()
+    } catch (err) {
+      vacateHanded(params)
+      throw err
+    }
   }
 
   /** The signed-in user's bank. Refuses `absent_vault` while nobody is signed in, while the bank is unborn, until the device's sign-in answers, or where it failed to come up. */
@@ -278,7 +288,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
   }
 
   const { bankGiver, boxQueryOf } = makeBankGiver({
-    banklabel, signedIn: signedInDevice, clientNow: () => mounted?.vaultTsqClient ?? outsideClient, demandDevice, demandBankOrVacate, demandVault, useShown,
+    banklabel, signedIn: signedInDevice, clientNow: () => mounted?.vaultTsqClient ?? outsideClient, demandDeviceOrVacate, demandBankOrVacate, demandVault, useShown,
   })
 
   /** The query factories of the signed-in user's bank, by banklabel, for the host's own `useQuery` and its kin, with the QueryClient they run in.
@@ -334,7 +344,7 @@ function shownOf(device: Device | null, userid: string | null | undefined, clien
 
 /** The hooks and calls of the bank `friend` serves. */
 function makeBankGiver(friend: BankFriend) {
-  const { banklabel, signedIn, clientNow, demandDevice, demandBankOrVacate, demandVault, useShown } = friend
+  const { banklabel, signedIn, clientNow, demandDeviceOrVacate, demandBankOrVacate, demandVault, useShown } = friend
 
   /** The bank's snapshot. Synchronous: it never waits and never suspends.
    * Switch a screen on its `stage`.
@@ -659,7 +669,7 @@ function makeBankGiver(friend: BankFriend) {
   /** Birth the bank under the new passphrase in `params`, a form or a dna, with no hook: for a submit handler or a `mutationFn` of your own.
    * A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once. Hand a mutation of your own nothing of the form.
    */
-  async function gatingBirthAttempt(params: FormData | BirthDna): Promise<void> { await demandDevice().gatingBirthAttempt(params) }
+  async function gatingBirthAttempt(params: FormData | BirthDna): Promise<void> { await demandDeviceOrVacate(params).gatingBirthAttempt(params) }
 
   /** The mutation that births the bank, at stage `unborn`, leaving it unlocked: hand its `attempt` the form, whose new passphrase is the field `passphrase`.
    * Disable the submit until the giver's `useStrengthVerdict` judges the passphrase strong.
@@ -667,7 +677,7 @@ function makeBankGiver(friend: BankFriend) {
    *   const birth = Knock.useBirth()
    *   <form action={birth.attempt} onReset={birth.keepTextIfRefused}>
    */
-  function useBirth(): FormMutationResult<FormData | BirthDna> { return useFormMutation('birth', (params: FormData | BirthDna) => demandDevice().birthGating(params)) }
+  function useBirth(): FormMutationResult<FormData | BirthDna> { return useFormMutation('birth', (params: FormData | BirthDna) => demandDeviceOrVacate(params).birthGating(params)) }
 
   /** Unlock the bank by the passphrase or the passkey's answer in `params`, a form or a dna, with no hook: for a submit handler or a `mutationFn` of your own.
    * Whether it runs or refuses, what it is handed is the package's to clear: a `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once, and a passkey answer's PRF bytes are zeroed.
