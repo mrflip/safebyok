@@ -5,7 +5,9 @@ Branch `20261124-world_stages`, PR #875, stacked on #874 (`20261124-things_made`
 seven `vault-minder` tests (listen 4, writes 2, staleness 1) and 142 rows of `vault-minder-chains.test.ts`, the same 142
 rows before and after this thread (diffed by name). `safebyok-idb-lean` 113, `safebyok-postgres` 354,
 `safebyok-react-lean` 320, each typecheck, lint and tests clean. `lease.ts`, `proving.ts` and `ctx-bytes.test.ts` are
-unchanged.
+unchanged. After the catch-up onto #874 at a8786d3dc (whose chain-table fix leaves 11 rows red there): `pnpm justify`
+lint, typecheck and build clean, every other package's tests green; `safebyok` 18 failed (the seven and 11 chain rows,
+all `bare+soon <- ...`), the same 18 by name as at a8786d3dc itself.
 
 * **Built** (in `packages/safebyok/src/models/`):
   - **`World` derives the stage** (`#stageOf`, first that holds): an end cause, `swept`; nobody signed in,
