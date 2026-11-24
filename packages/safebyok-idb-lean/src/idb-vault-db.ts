@@ -129,9 +129,9 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   }
   // --
 
-  // == [Telling]: #ring
+  // == [Ringing]: #ring
 
-  /** Tell every watch on this database, in every tab, of the Things in `rungs`. */
+  /** Ring the bell for the Things in `rungs`, so that every tab's watch of this database is notified of them. */
   #ring(rungs: Rung[]): void {
     const channel = new BroadcastChannel(this.#bellname)
     for (const { scope: { userid, banklabel }, received } of rungs) { channel.postMessage({ scope: { userid, banklabel }, received }) }

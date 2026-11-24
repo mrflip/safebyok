@@ -30,7 +30,7 @@ export type VaultDBBatteryOpts<DBT extends VaultDB = VaultDB> = {
   makeVaultDB:   () => Helpers.Awaitable<DBT>
   /** The cheat into a vaultDB's stored Things. */
   _cheat_rowsOf: (vaultDB: DBT) => VaultDBRowCheats
-  /** False for a vaultDB whose watch hears nothing; the battery then has no cases of a watch. */
+  /** False for a vaultDB whose watch is notified of nothing; the battery then has no cases of a watch. */
   watches?:      boolean
 }
 // --
