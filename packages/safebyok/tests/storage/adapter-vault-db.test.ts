@@ -151,6 +151,31 @@ describe("AdapterVaultDB, the read_tc of an answer", () => {
   })
 })
 
+describe("AdapterVaultDB, the banktok of an answer", () => {
+  it("answers the lifetok of the bank in the world a concrete adapter reports, good or refused, from a get, a write, a list or a birth", async () => {
+    const world   = { ...TH.bankThingOf(), lifetok: TH.OtherLifetok, maingate: TH.gateThingOf() }
+    const refused = { ok: false, act: 'stale', world, record: TH.gateThingOf() } as const
+    const vaultDB = new ScriptedVaultDB(() => refused)
+    const listing = new ScriptedVaultDB(() => ({ ...refused, read_tc: readTcNow(), parentage: [], deltas: [], damaged_rows: [] }) as never)
+    const good    = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world, record: Shell.of(TH.GateScope) }))
+    const answers = [
+      await vaultDB.tryGetThing(TH.getGateAskOf()), await vaultDB.tryWriteThing(TH.birthAskOf()), await listing.tryListThings(TH.listAskAt('box')),
+      await vaultDB.tryBirthBank(TH.birthBankAskOf()), await good.tryGetThing(TH.getGateAskOf()),
+    ]
+    expect(answers.map((answer) => answer.banktok)).to.deep.equal(Array.from({ length: 5 }, () => TH.OtherLifetok))
+  })
+
+  it("answers a null banktok where a concrete adapter reports no world, and where the verb throws", async () => {
+    const worldless = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: Shell.of(TH.GateScope) }))
+    const throwing  = new ScriptedVaultDB(() => { throw new Error('connection reset') })
+    const answers   = [
+      await worldless.tryGetThing(TH.getGateAskOf()), await throwing.tryGetThing(TH.getGateAskOf()), await throwing.tryListThings(TH.listAskAt('box')),
+      await throwing.tryBirthBank(TH.birthBankAskOf()),
+    ]
+    expect(answers.map((answer) => answer.banktok)).to.deep.equal([null, null, null, null])
+  })
+})
+
 describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
   it("notifies of a sound Thing, and sends one that fails its checks to onBadNews", () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
@@ -185,7 +210,7 @@ describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
     vaultDB.receive?.({ record: TH.bankThingOf({ lifetok: otherLifetok }), world: null })
     vaultDB.receive?.({ record: TH.boxThingOf(), world: { ...TH.bankThingOf(), maingate: TH.gateThingOf() } })
     vaultDB.receive?.({ record: TH.boxThingOf(), world: null })
-    expect(events.map((event) => event.bank_lifetok)).to.deep.equal([otherLifetok, TH.bankThingOf().lifetok, undefined])
+    expect(events.map((event) => event.banktok)).to.deep.equal([otherLifetok, TH.bankThingOf().lifetok, undefined])
   })
 
   it("sends a Thing of another bank to onBadNews, not to onNotice", () => {

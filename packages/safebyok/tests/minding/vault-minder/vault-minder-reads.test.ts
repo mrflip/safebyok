@@ -168,7 +168,7 @@ describe("VaultMinder.get", () => {
     await storedBoxOf(vaultDB)
     const { minder } = await minderWorldOf(vaultDB)
     const theirs = TH.boxThingOf('anthropic')
-    vi.spyOn(vaultDB, 'tryGetThing').mockImplementation((ask) => Promise.resolve({ ok: true, act: 'gotlive', ask, world: null, read_tc: readTcNow(), val: theirs }))
+    vi.spyOn(vaultDB, 'tryGetThing').mockImplementation((ask) => Promise.resolve({ ok: true, act: 'gotlive', ask, world: null, banktok: null, read_tc: readTcNow(), val: theirs }))
     await TH.expectRefusal(minder.get(TH.BoxScope), 'unexpected_error')
     expect(minder.at(TH.BoxScope)).to.be.undefined
   })

@@ -58,11 +58,11 @@ export function itemSeenOf(seen: SeenThing): ItemSeen {
 
 /** The events `proposed` returns once it has raised its Thing's agerank from `agerankWas` to `agerank`, each frozen, in a frozen list.
  * `proposed` comes first, with both ageranks. A `life` follows where its lifepath is not `agerankWas`'s, or there was none,
- * and an `aged` where the newest revision has not been seen whole. Each keeps the `sourcelabel`, `read_tc` and `bank_lifetok` of `proposed`.
+ * and an `aged` where the newest revision has not been seen whole. Each keeps the `sourcelabel`, `read_tc` and `banktok` of `proposed`.
  */
 export function eventsOf<RecordT extends ThingRecord>(proposed: VaultItemEvent<RecordT>, agerankWas: Agerank | undefined, agerank: Agerank): readonly VaultEvent<RecordT>[] {
-  const { userid, banklabel, labelpath, modelkind, bank_lifetok, sourcelabel, read_tc, val: { lifepath } } = proposed
-  const shared = { userid, banklabel, labelpath, modelkind, agerank, agerankWas, bank_lifetok, sourcelabel, read_tc }
+  const { userid, banklabel, labelpath, modelkind, banktok, sourcelabel, read_tc, val: { lifepath } } = proposed
+  const shared = { userid, banklabel, labelpath, modelkind, agerank, agerankWas, banktok, sourcelabel, read_tc }
   const events: VaultEvent<RecordT>[] = [Object.freeze({ ...proposed, agerank, agerankWas })]
   if ((agerankWas === undefined) || (partsOf(agerankWas).lifepath !== lifepath)) {
     const lifekind = Lifeseq.isTombstone(Lifeseq.ofLifepath(lifepath)) ? 'died' : 'born'

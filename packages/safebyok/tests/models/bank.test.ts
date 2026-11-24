@@ -748,21 +748,21 @@ describe("bank.track, and the asks the bank builds", () => {
 
   it("fill in the bank's scope, the modelkind, the default flags, the track and the bank's lifetok", async () => {
     const { bank } = await TH.buildBornBank()
-    const { scope, track, lifetok: bank_lifetok } = bank
-    expect(bank.makeGetAsk({ labelpath: 'box/openai' })).to.deep.equal({ ...scope, labelpath: 'box/openai', op: 'get', modelkind: 'box', ifAbsent: 'nil', track, bank_lifetok })
-    expect(bank.makeListAsk({ labelpath: 'box' })).to.deep.equal({ ...scope, labelpath: 'box', op: 'list', modelkind: 'box', ifAbsent: 'fail', track, bank_lifetok })
+    const { scope, track, lifetok: banktok } = bank
+    expect(bank.makeGetAsk({ labelpath: 'box/openai' })).to.deep.equal({ ...scope, labelpath: 'box/openai', op: 'get', modelkind: 'box', ifAbsent: 'nil', track, banktok })
+    expect(bank.makeListAsk({ labelpath: 'box' })).to.deep.equal({ ...scope, labelpath: 'box', op: 'list', modelkind: 'box', ifAbsent: 'fail', track, banktok })
     const record = nextBankThingOf(bank)
-    expect(bank.makePutAsk({ cited: bank.pickle(), record })).to.deep.include({ ...scope, labelpath: 'bank', op: 'put', modelkind: 'bank', ifAbsent: 'add', ifPresent: 'repl', track, bank_lifetok })
+    expect(bank.makePutAsk({ cited: bank.pickle(), record })).to.deep.include({ ...scope, labelpath: 'bank', op: 'put', modelkind: 'bank', ifAbsent: 'add', ifPresent: 'repl', track, banktok })
     const box = TH.boxThingOf()
-    expect(bank.makeDelAsk({ cited: box, record: TH.boxTombOf(box) })).to.deep.include({ ...scope, op: 'del', modelkind: 'box', ifAbsent: 'fail', track, bank_lifetok })
+    expect(bank.makeDelAsk({ cited: box, record: TH.boxTombOf(box) })).to.deep.include({ ...scope, op: 'del', modelkind: 'box', ifAbsent: 'fail', track, banktok })
   })
 
   it("carry the bank's lifetok to the answer's ask, which a vaultDB neither compares with the bank stored nor refuses on", async () => {
     const { bank, device } = await TH.buildBornBank()
     const answer = await device.vaultDB.tryGetThing(bank.makeGetAsk({ labelpath: 'bank' }))
     expect(answer).to.deep.include({ ok: true, act: 'gotlive' })
-    expect(answer.ask).to.deep.include({ bank_lifetok: bank.lifetok })
-    const elsewise = await device.vaultDB.tryGetThing({ ...bank.makeGetAsk({ labelpath: 'bank' }), bank_lifetok: TH.OtherLifetok })
+    expect(answer.ask).to.deep.include({ banktok: bank.lifetok })
+    const elsewise = await device.vaultDB.tryGetThing({ ...bank.makeGetAsk({ labelpath: 'bank' }), banktok: TH.OtherLifetok })
     expect(elsewise).to.deep.include({ ok: true, act: 'gotlive' })
   })
 

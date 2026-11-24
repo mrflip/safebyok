@@ -160,7 +160,7 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
     const root   = await lease.seal(BaseBox, rootShell, { sidecar: {} }, { whisper: {} })
     // The roots it answers, written or found stored, are then the bank's world in the device's BankMinder, and the
     // Things of the device's world, which shows them locked.
-    const answer = await device.bankMinder.tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gateRecord, root, bank_lifetok: bankRecord.lifetok })
+    const answer = await device.bankMinder.tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gateRecord, root, banktok: bankRecord.lifetok })
     if (! answer.ok) { throw answer.err }
     // The user must hear that their passphrase was not set: the bank stored is another's.
     if (answer.val.bank.revtok !== bankRecord.revtok) { throw Throwers.gateMadeElsewhere() }

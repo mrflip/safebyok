@@ -421,7 +421,7 @@ function receiveRestored(sortedVaultDB: SortedVaultDB, roots: BankRoots): void {
     const { userid, banklabel, labelpath } = root
     sortedVaultDB.receive({
       eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: undefined, agerankWas: undefined,
-      sourcelabel: RestoredSourcelabel, read_tc, bank_lifetok: roots.bank.lifetok, ...itemSeenOf(root),
+      sourcelabel: RestoredSourcelabel, read_tc, banktok: roots.bank.lifetok, ...itemSeenOf(root),
     })
   }
 }

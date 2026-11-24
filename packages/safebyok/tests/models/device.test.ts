@@ -409,13 +409,13 @@ describe("device.signin(userid)", () => {
     expect(device.getSnapshot().bank).to.equal(bank.getSnapshot())
   })
 
-  it("builds asks that carry no bank_lifetok until it has a bank, and the bank's after", async () => {
+  it("builds asks that carry no banktok until it has a bank, and the bank's after", async () => {
     const device = TH.makeDevice({ userid: null })
     await device.signin(TH.WorldScope.userid)
-    expect(device.makeGetAsk({ labelpath: 'bank' })).to.not.have.property('bank_lifetok')
-    expect(device.makeListAsk({ labelpath: 'box' })).to.not.have.property('bank_lifetok')
+    expect(device.makeGetAsk({ labelpath: 'bank' })).to.not.have.property('banktok')
+    expect(device.makeListAsk({ labelpath: 'box' })).to.not.have.property('banktok')
     const bank = await device.birthGating({ passphraseCleartext: TH.TestPassphrase }).attempt()
-    expect(device.makeGetAsk({ labelpath: 'bank' })).to.deep.include({ bank_lifetok: bank.lifetok })
+    expect(device.makeGetAsk({ labelpath: 'bank' })).to.deep.include({ banktok: bank.lifetok })
   })
 
   it("shows the refusal as failed where its bank cannot be read, and never rejects", async () => {

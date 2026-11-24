@@ -623,13 +623,13 @@ describe("Thing.receive", () => {
     expect(events.map(({ eventkind }) => eventkind)).to.deep.equal(['item', 'life', 'aged'])
     expect(events[0]).to.include({ liveness: 'soon', val: record })
     for (const event of events) {
-      expect(event).to.deep.include({ userid: 'u1', banklabel: 'acme', labelpath: 'box/openai', modelkind: 'box', agerankWas: undefined, bank_lifetok: undefined, sourcelabel: undefined, read_tc: ReadTcChunk0 })
+      expect(event).to.deep.include({ userid: 'u1', banklabel: 'acme', labelpath: 'box/openai', modelkind: 'box', agerankWas: undefined, banktok: undefined, sourcelabel: undefined, read_tc: ReadTcChunk0 })
     }
   })
 
-  it("keeps the sourcelabel, read_tc and bank_lifetok of the event it receives on every event", () => {
+  it("keeps the sourcelabel, read_tc and banktok of the event it receives on every event", () => {
     const record = Thing.sparseOf(TH.boxThingOf('openai', { revseq: 3 }))
-    const stamp  = { sourcelabel: 'other_tab', read_tc: readTcNow(), bank_lifetok: TH.FirstLifetok }
+    const stamp  = { sourcelabel: 'other_tab', read_tc: readTcNow(), banktok: TH.FirstLifetok }
     const events = TH.PlainThing.make(record).receive({ ...eventOf(record), ...stamp })
     expect(events).to.have.lengthOf(3)
     for (const event of events) { expect(event).to.include(stamp) }

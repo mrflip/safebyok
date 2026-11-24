@@ -2,7 +2,7 @@
 
 import { noop } from 'es-toolkit'
 import { type EX, Errors, Outcome, type Helpers } from 'safebyok-big/internals'
-import { Labelpath } from '../shapes/primitives'
+import { Labelpath, type Lifetok } from '../shapes/primitives'
 import type { ThingRecord, VoidSentinel } from '../shapes/shapes-thing'
 import type { TombstoneOf } from '../shapes/shapes-sealers'
 import type { VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
@@ -17,7 +17,7 @@ import type {
 } from './vault-db'
 import * as Throwers from '../refusals/throwers'
 
-// == [Answers]: Received, answerOf, trackedFieldOf, itemEventOf
+// == [Answers]: Received, answerOf, trackedFieldOf, banktokOf, itemEventOf
 
 /** A change a concrete adapter's `doWatch` passes to `receive`: the changed Thing, raw, and its bank's world as the datastore last read it.
  * Watchers are notified of the Thing alone, with the world's lifetok: a bank or main gate that changed is a change of its own.
@@ -33,7 +33,7 @@ function answerOf(actual: WroteActual, oplabel: string, loggableAsk: LoggableAsk
 // A concrete adapter's report is the module's entry, so the null its types exclude is still checked for.
 function answerOf(actual: Actual<EX.GoodAct, ThingRecord | VoidSentinel | null>, oplabel: string, loggableAsk: LoggableAsk): Answer<ThingRecord | null, EX.GoodAct> | GetThingAnswer {
   const { world, record } = actual
-  const beside = { ...trackedFieldOf(actual), read_tc: Classifier.readTcOfStep(actual.read_tc) }
+  const beside = { banktok: banktokOf(world), ...trackedFieldOf(actual), read_tc: Classifier.readTcOfStep(actual.read_tc) }
   if (! actual.ok) {
     const err = Throwers.actRefused('vault', actual.act, { oplabel, ask: loggableAsk })
     return { ok: false, ask: loggableAsk, act: actual.act, world, ...beside, dbhas: record, err }
@@ -49,11 +49,14 @@ function answerOf(actual: Actual<EX.GoodAct, ThingRecord | VoidSentinel | null>,
 /** The `tracked` a concrete adapter reports, as a field to spread into an answer: none where it reports none. */
 function trackedFieldOf({ tracked }: { tracked?: Tracked }): { tracked?: Tracked } { return (tracked === undefined) ? {} : { tracked } }
 
+/** The lifetok of the bank in `world`, or null for no world: an answer's `banktok`. */
+function banktokOf(world: WorldRecord | null): Lifetok | null { return world?.lifetok ?? null }
+
 /** The `item` notice for `record`, read now, with no agerank and no source, and its bank's lifetok where `record` or `world` is the bank */
 function itemEventOf(record: ThingRecord, world: WorldRecord | null): VaultItemEvent {
   const { userid, banklabel, labelpath } = record
-  const bank_lifetok = ('lifetok' in record) ? record.lifetok : world?.lifetok
-  const unsorted = { agerank: undefined, agerankWas: undefined, bank_lifetok, sourcelabel: undefined, read_tc: Classifier.readTcNow() }
+  const banktok = ('lifetok' in record) ? record.lifetok : world?.lifetok
+  const unsorted = { agerank: undefined, agerankWas: undefined, banktok, sourcelabel: undefined, read_tc: Classifier.readTcNow() }
   return Object.freeze({ eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), ...unsorted, ...itemSeenOf(record) })
 }
 // --
@@ -112,7 +115,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const listAsk     = AskChecks.listAsk.parse(ask)
       const loggableAsk = loggableAskOf(listAsk)
       const actual      = await this.doListThings(listAsk)
-      const beside      = { world: actual.world, ...trackedFieldOf(actual), parentage: actual.parentage, deltas: actual.deltas, damaged_rows: actual.damaged_rows }
+      const beside      = { world: actual.world, banktok: banktokOf(actual.world), ...trackedFieldOf(actual), parentage: actual.parentage, deltas: actual.deltas, damaged_rows: actual.damaged_rows }
       return actual.ok
         ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, read_tc: actual.kids.read_tc, val: actual.kids }
         : { ok: false, ask: loggableAsk, act: actual.act, ...beside, read_tc: actual.read_tc, dbhas: [], err: Throwers.actRefused('vault', actual.act, { oplabel: 'listThings', ask: loggableAsk }) }
@@ -125,7 +128,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const birthBankAsk = checkedBirthBankAsk(ask)
       const loggableAsk  = loggableAskOf(birthBankAsk)
       const actual       = await this.doBirthBank(birthBankAsk, birthPutsOf(birthBankAsk))
-      const beside       = { world: actual.world, ...trackedFieldOf(actual), read_tc: Classifier.readTcOfStep(actual.read_tc) }
+      const beside       = { world: actual.world, banktok: banktokOf(actual.world), ...trackedFieldOf(actual), read_tc: Classifier.readTcOfStep(actual.read_tc) }
       return actual.ok
         ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, val: actual.things }
         : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: actual.record, err: Throwers.actRefused('vault', actual.act, { oplabel: 'birthBank', ask: loggableAsk }) }
@@ -161,9 +164,9 @@ export abstract class AdapterVaultDB implements VaultDB {
       Object.assign(err, { meta: { ...err.meta, oplabel, ask: loggableAsk } })
       // Only the classifier sets rows.dbhas, to a Thing it has checked.
       const dbhas = (Errors.rowsOfRefusal(err).dbhas ?? null) as ThingRecord | null
-      return { ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', world: null, read_tc: Classifier.readTcNow(), dbhas, err }
+      return { ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', world: null, banktok: null, read_tc: Classifier.readTcNow(), dbhas, err }
     } catch {
-      return { ok: false, ask: {}, act: 'unclassified_storing', world: null, read_tc: Classifier.readTcNow(), dbhas: null, err: Throwers.answerNotMade() }
+      return { ok: false, ask: {}, act: 'unclassified_storing', world: null, banktok: null, read_tc: Classifier.readTcNow(), dbhas: null, err: Throwers.answerNotMade() }
     }
   }
   // --

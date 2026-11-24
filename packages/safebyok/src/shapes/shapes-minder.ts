@@ -140,11 +140,11 @@ export type DeliverableThing = ThingRecord | Sparse<ThingRecord>
  * - `vacant`   -- nothing is cached
  * - `untimely` -- the item is behind a newer revision heard of, or missing beside one, or TanStack Query counts it stale under `staleTime`: older than it, or its last get refused
  */
-// A cached answer reads no datastore, so it has no read_tc.
+// A cached answer reads no datastore, so it has no read_tc and no banktok.
 export type GotAnswer<RecordT extends ThingRecord = ThingRecord> = (
-  | Omit<GoodAnswer<RecordT, 'gotlive'>, 'read_tc'>
-  | (Omit<GoodAnswer<null, 'gotgone'>, 'read_tc'> & { dbhas: Tombstone<RecordT> })
-  | (Omit<GoodAnswer<null, 'gotvoid'>, 'read_tc'> & { dbhas: null })
+  | Omit<GoodAnswer<RecordT, 'gotlive'>, 'read_tc' | 'banktok'>
+  | (Omit<GoodAnswer<null, 'gotgone'>, 'read_tc' | 'banktok'> & { dbhas: Tombstone<RecordT> })
+  | (Omit<GoodAnswer<null, 'gotvoid'>, 'read_tc' | 'banktok'> & { dbhas: null })
   | { ok: true, ask: LoggableAsk, act: 'vacant' | 'untimely', world: null, val: undefined }
 ) & { ask: GetAsk }
 

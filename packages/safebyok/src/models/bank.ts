@@ -119,24 +119,24 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   // --
 
   // == [Ask builders]: makeGetAsk, makeListAsk, makePutAsk, makeDelAsk, tellBadNews
-  // Each fills in this bank's scope, its `track` and its `bank_lifetok`, and the modelkind and default flags of `getAskOf`
+  // Each fills in this bank's scope, its `track` and its `banktok`, and the modelkind and default flags of `getAskOf`
   // and the rest. The track and lifetok are this object's, which may be stale: the answer's `tracked` and `world` say so.
   // Only that the bank is live is checked here, as its lifetok needs it: the verb checks the rest.
 
   /** The get ask for the Thing at `ask.labelpath` in this bank. */
-  makeGetAsk(ask: BankAskDraft): GetAsk { return getAskOf({ ...ask, ...this.scope, bank_lifetok: this.#demandLive().lifetok, track: this.track }) }
+  makeGetAsk(ask: BankAskDraft): GetAsk { return getAskOf({ ...ask, ...this.scope, banktok: this.#demandLive().lifetok, track: this.track }) }
 
   /** The list ask for the children of the Thing at `ask.labelpath` in this bank. */
-  makeListAsk(ask: BankAskDraft): ListAsk { return listAskOf({ ...ask, ...this.scope, bank_lifetok: this.#demandLive().lifetok, track: this.track }) }
+  makeListAsk(ask: BankAskDraft): ListAsk { return listAskOf({ ...ask, ...this.scope, banktok: this.#demandLive().lifetok, track: this.track }) }
 
   /** The put ask writing `ask.record` over `ask.cited`, in this bank. */
-  makePutAsk<RecordT extends ThingRecord>(ask: Omit<PutAskDraft<RecordT>, 'track' | 'bank_lifetok'>): WriteAsk<RecordT> {
-    return { ...putAskOf<RecordT>({ ...ask, bank_lifetok: this.#demandLive().lifetok, track: this.track }), ...this.scope }
+  makePutAsk<RecordT extends ThingRecord>(ask: Omit<PutAskDraft<RecordT>, 'track' | 'banktok'>): WriteAsk<RecordT> {
+    return { ...putAskOf<RecordT>({ ...ask, banktok: this.#demandLive().lifetok, track: this.track }), ...this.scope }
   }
 
   /** The del ask writing the tombstone `ask.record` over `ask.cited`, in this bank. */
-  makeDelAsk<RecordT extends ThingRecord>(ask: Omit<DelAskDraft<RecordT>, 'track' | 'bank_lifetok'>): WriteAsk<RecordT> {
-    return { ...delAskOf<RecordT>({ ...ask, bank_lifetok: this.#demandLive().lifetok, track: this.track }), ...this.scope }
+  makeDelAsk<RecordT extends ThingRecord>(ask: Omit<DelAskDraft<RecordT>, 'track' | 'banktok'>): WriteAsk<RecordT> {
+    return { ...delAskOf<RecordT>({ ...ask, banktok: this.#demandLive().lifetok, track: this.track }), ...this.scope }
   }
 
   /** Tell the device's `onBadNews` of failures no caller is waiting on ({@link Device.tellBadNews}). Never throws. */

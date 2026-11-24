@@ -165,9 +165,9 @@ export function maskedReadTcsOf(events: readonly VaultEvent[]): VaultEvent[] {
 export function makePlainThing(seen: SeenThing): PlainThing { return PlainThing.make(seen) }
 
 /** The `item` notice a vaultDB's raw watch gets for `record`, at the liveness its record has, with no agerank and no source, at {@link AnyReadTc}, and with no bank lifetok unless given one. */
-export function itemEventOf(record: SeenThing, bank_lifetok?: Lifetok): VaultItemEvent {
+export function itemEventOf(record: SeenThing, banktok?: Lifetok): VaultItemEvent {
   const { userid, banklabel, labelpath } = record
-  const unsorted = { agerank: undefined, agerankWas: undefined, bank_lifetok, sourcelabel: undefined, read_tc: AnyReadTc }
+  const unsorted = { agerank: undefined, agerankWas: undefined, banktok, sourcelabel: undefined, read_tc: AnyReadTc }
   return { eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), ...unsorted, ...itemSeenOf(record) }
 }
 

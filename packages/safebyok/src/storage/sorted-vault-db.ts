@@ -40,7 +40,7 @@ export type SortedVaultDBListener = Readonly<{
 }>
 
 /** Who dispatched a record, when it was read, and its bank's lifetok where known: every event of it carries all three. */
-type Stamp = Readonly<{ sourcelabel: string, read_tc: ReadTc, bank_lifetok: Lifetok | undefined }>
+type Stamp = Readonly<{ sourcelabel: string, read_tc: ReadTc, banktok: Lifetok | undefined }>
 
 /** One call of `listen`, holding its listener: a listener that listens twice is told twice, and each end stops one. */
 type Listening = Readonly<{ listener: SortedVaultDBListener }>
@@ -52,7 +52,7 @@ type Listening = Readonly<{ listener: SortedVaultDBListener }>
  * taken all the same, and reaches no one, then or later: listen before asking it anything.
  */
 export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> implements Omit<VaultDB, 'watch'> {
-  // == [Props]: VaultDBSourcelabel, #vaultDB, #scope, #makeThing, #things, #listenings, #bankLifetok, #unwatchWrapped
+  // == [Props]: VaultDBSourcelabel, #vaultDB, #scope, #makeThing, #things, #listenings, #newestBanktok, #unwatchWrapped
 
   /** The `sourcelabel` of each event of a record from the wrapped vaultDB, from an answer or its watch. */
   static get VaultDBSourcelabel(): 'vault_db' { return 'vault_db' }
@@ -65,8 +65,8 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
   /** The Thing at each labelpath a record was learned of at. */
   readonly #things = new Map<Labelpath, ThingT>()
   readonly #listenings = new Set<Listening>()
-  /** The lifetok of the newest answer's world, for an event whose dispatch carries none. */
-  #bankLifetok: Lifetok | undefined = undefined
+  /** The `banktok` of the newest answer that read the bank, for a notice or an event rung that carries none. */
+  #newestBanktok: Lifetok | undefined = undefined
   /** The stop of the wrapped vaultDB's watch, which runs once. */
   readonly #unwatchWrapped: () => void
   // --
@@ -127,8 +127,9 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
   // == [Listening]: listen
 
   /** Tell `listener` each event of this bank's records that is news, and of trouble, until the function it returns is called.
-   * - Each event is a {@link VaultEvent} with its `sourcelabel`, `read_tc` and `bank_lifetok`. Its `bank_lifetok` is the one
-   *   its dispatch carries: an answer's ask's, else its world's. Else it is that of the newest answer's world.
+   * - Each event is a {@link VaultEvent} with its `sourcelabel`, `read_tc` and `banktok`. An answer's events carry the
+   *   answer's `banktok`, or undefined where it is null; a notice's or an event rung's carry its own, else that of the
+   *   newest answer that read the bank.
    * - The events of a verb's answer reach every listener, in order, before the verb resolves.
    * - Of the records an answer carries, the bank comes first, then the main gate, the root box, a list's parent and the
    *   Things it lists, and last the answer's own record.
@@ -146,7 +147,7 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
 
   // == [Receiving]: receive
 
-  /** Take an event a device database rang, and tell every listener, before returning, the events of its `val` that are news, at its `sourcelabel`, `read_tc` and `bank_lifetok`.
+  /** Take an event a device database rang, and tell every listener, before returning, the events of its `val` that are news, at its `sourcelabel`, `read_tc` and `banktok`.
    * An `item` event's `val` is taken as an answer's record is, a void sentinel at the lifepath it carries.
    * A `life` or `aged` event tells nothing, and its agerank is never read: the Thing at its labelpath keeps its own.
    * Refuses an event of another bank.
@@ -157,7 +158,7 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
     if (event.eventkind !== 'item') { return }
     const { liveness } = Checks.rungItem.parse(event)
     if (liveness === 'void') { Checks.rungVoid.parseConsistent(event.val, rung) } else { Checks.rungThing.parseConsistent(event.val, rung) }
-    this.#tell([event.val], { sourcelabel: rung.sourcelabel, read_tc: rung.read_tc, bank_lifetok: rung.bank_lifetok ?? this.#bankLifetok })
+    this.#tell([event.val], { sourcelabel: rung.sourcelabel, read_tc: rung.read_tc, banktok: rung.banktok ?? this.#newestBanktok })
   }
   // --
 
@@ -188,17 +189,18 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
     return (scoped.userid === this.#scope.userid) && (scoped.banklabel === this.#scope.banklabel)
   }
 
-  /** Tell every listener the events of `seens`, the records `answer` carries, from the wrapped vaultDB at the answer's `read_tc`, with the lifetok its ask carries, else its world's. */
-  #tellAnswer(answer: { ask: LoggableAsk, world: WorldRecord | null, read_tc: ReadTc }, seens: readonly SeenThing[]): void {
-    if (answer.world !== null) { this.#bankLifetok = answer.world.lifetok }
-    this.#tell(seens, { sourcelabel: SortedVaultDB.VaultDBSourcelabel, read_tc: answer.read_tc, bank_lifetok: answer.ask.bank_lifetok ?? this.#bankLifetok })
+  /** Tell every listener the events of `seens`, the records `answer` carries, from the wrapped vaultDB at the answer's `read_tc` and `banktok`. */
+  #tellAnswer(answer: { banktok: Lifetok | null, read_tc: ReadTc }, seens: readonly SeenThing[]): void {
+    const banktok = answer.banktok ?? undefined
+    if (banktok !== undefined) { this.#newestBanktok = banktok }
+    this.#tell(seens, { sourcelabel: SortedVaultDB.VaultDBSourcelabel, read_tc: answer.read_tc, banktok })
   }
 
   /** Tell every listener the events of the record in `notice`, a notice of the wrapped vaultDB's watch. */
   #tellNotice(notice: VaultEvent): void {
     if (notice.eventkind !== 'item') { return }
     // The wrapped vaultDB stamps its notices when it classifies their records; one that does not is read now.
-    this.#tell([notice.val], { sourcelabel: SortedVaultDB.VaultDBSourcelabel, read_tc: notice.read_tc ?? readTcNow(), bank_lifetok: notice.bank_lifetok ?? this.#bankLifetok })
+    this.#tell([notice.val], { sourcelabel: SortedVaultDB.VaultDBSourcelabel, read_tc: notice.read_tc ?? readTcNow(), banktok: notice.banktok ?? this.#newestBanktok })
   }
 
   /** Tell every listener each event the Things return for `seens`, in order, each carrying `stamp`. A record refused goes to every listener's `onBadNews`. */
@@ -299,7 +301,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, oneof, str, custom, fn }
     eventkind:    oneof(vaultEventkindVals),
     sourcelabel:  ThingChecks.label,
     read_tc:      str.regex(ReadTcPattern, Phrases.ReadTcShape),
-    bank_lifetok: AskChecks.loggableAsk.shape.bank_lifetok,
+    banktok:      AskChecks.loggableAsk.shape.banktok,
   }),
   /** The liveness of an `item` event rung, which says which check its `val` gets. */
   rungItem:          obj({ liveness: oneof(livenessVals) }),

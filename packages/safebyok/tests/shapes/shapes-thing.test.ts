@@ -286,10 +286,10 @@ describe("AskChecks.getAsk and AskChecks.listAsk", () => {
     TH.expectSyncRefusal(() => AskChecks.listAsk.parse(TH.getAskAt('box')), 'bad_record')
   })
 
-  it("accepts a bank_lifetok that is a UUID, and refuses one that is not", () => {
-    expect(AskChecks.getAsk.parse({ ...TH.getGateAskOf(), bank_lifetok: TH.FirstLifetok })).to.deep.include({ bank_lifetok: TH.FirstLifetok })
-    expect(AskChecks.listAsk.parse({ ...TH.listAskAt('box'), bank_lifetok: TH.FirstLifetok })).to.deep.include({ bank_lifetok: TH.FirstLifetok })
-    TH.expectSyncRefusal(() => AskChecks.getAsk.parse({ ...TH.getGateAskOf(), bank_lifetok: 'life' }), 'bad_record')
+  it("accepts a banktok that is a UUID, and refuses one that is not", () => {
+    expect(AskChecks.getAsk.parse({ ...TH.getGateAskOf(), banktok: TH.FirstLifetok })).to.deep.include({ banktok: TH.FirstLifetok })
+    expect(AskChecks.listAsk.parse({ ...TH.listAskAt('box'), banktok: TH.FirstLifetok })).to.deep.include({ banktok: TH.FirstLifetok })
+    TH.expectSyncRefusal(() => AskChecks.getAsk.parse({ ...TH.getGateAskOf(), banktok: 'life' }), 'bad_record')
   })
 })
 
@@ -442,17 +442,17 @@ describe("the ask builders", () => {
     expect(putAskOf({ cited: Shell.childCited(Life0), record: box, ifPresent: 'fail' })).to.deep.include({ ...TH.BoxScope, modelkind: 'box', ifAbsent: 'add', ifPresent: 'fail' })
   })
 
-  it("carry a bank_lifetok given, and none when none is given", () => {
+  it("carry a banktok given, and none when none is given", () => {
     const tomb = TH.boxTombOf(box)
-    const bank_lifetok = TH.FirstLifetok
-    expect(getAskOf({ ...TH.BoxScope, bank_lifetok })).to.deep.equal({ ...TH.getAskAt('box/openai', 'nil'), bank_lifetok })
-    expect(listAskOf({ ...TH.RootScope, bank_lifetok })).to.deep.equal({ ...TH.listAskAt('box', 'fail'), bank_lifetok })
-    expect(putAskOf({ cited: Shell.childCited(Life0), record: box, bank_lifetok })).to.deep.include({ bank_lifetok })
-    expect(delAskOf({ cited: box, record: tomb, bank_lifetok })).to.deep.equal({ ...TH.delAskFor(box, tomb), bank_lifetok })
-    expect(getAskOf(TH.BoxScope)).to.not.have.property('bank_lifetok')
-    expect(listAskOf(TH.RootScope)).to.not.have.property('bank_lifetok')
-    expect(putAskOf({ cited: Shell.childCited(Life0), record: box })).to.not.have.property('bank_lifetok')
-    expect(delAskOf({ cited: box, record: tomb })).to.not.have.property('bank_lifetok')
+    const banktok = TH.FirstLifetok
+    expect(getAskOf({ ...TH.BoxScope, banktok })).to.deep.equal({ ...TH.getAskAt('box/openai', 'nil'), banktok })
+    expect(listAskOf({ ...TH.RootScope, banktok })).to.deep.equal({ ...TH.listAskAt('box', 'fail'), banktok })
+    expect(putAskOf({ cited: Shell.childCited(Life0), record: box, banktok })).to.deep.include({ banktok })
+    expect(delAskOf({ cited: box, record: tomb, banktok })).to.deep.equal({ ...TH.delAskFor(box, tomb), banktok })
+    expect(getAskOf(TH.BoxScope)).to.not.have.property('banktok')
+    expect(listAskOf(TH.RootScope)).to.not.have.property('banktok')
+    expect(putAskOf({ cited: Shell.childCited(Life0), record: box })).to.not.have.property('banktok')
+    expect(delAskOf({ cited: box, record: tomb })).to.not.have.property('banktok')
   })
 
   it("fix a del's flags", () => {
@@ -532,9 +532,9 @@ describe("loggableAskOf(ask)", () => {
     expect(JSON.stringify(loggable)).to.not.include(TH.FakeSealed.codectag)
   })
 
-  it("carries over the bank_lifetok an ask carries", () => {
-    expect(loggableAskOf({ ...TH.getGateAskOf(), bank_lifetok: TH.FirstLifetok })).to.deep.include({ bank_lifetok: TH.FirstLifetok })
-    expect(loggableAskOf({ ...TH.birthBankAskOf(), bank_lifetok: TH.FirstLifetok })).to.deep.include({ op: 'birth', bank_lifetok: TH.FirstLifetok })
+  it("carries over the banktok an ask carries", () => {
+    expect(loggableAskOf({ ...TH.getGateAskOf(), banktok: TH.FirstLifetok })).to.deep.include({ banktok: TH.FirstLifetok })
+    expect(loggableAskOf({ ...TH.birthBankAskOf(), banktok: TH.FirstLifetok })).to.deep.include({ op: 'birth', banktok: TH.FirstLifetok })
   })
 
   it("gives nothing for an ask that will not parse", () => {

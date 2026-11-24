@@ -334,11 +334,11 @@ describe("SortedVaultDB's listeners, where each event came from and when it was 
     const track = { bank: TH.BankStaleTrack.bank, gate: TH.GateStaleTrack.gate, box: TH.RootStaleTrack.box }
     const answer = await vaultDB.tryGetThing({ ...TH.getGateAskOf(), track })
     expect(events).to.have.lengthOf(6)
-    for (const event of events) { expect(event).to.deep.include({ sourcelabel: SortedVaultDB.VaultDBSourcelabel, read_tc: answer.read_tc, bank_lifetok: TH.bankThingOf().lifetok }) }
+    for (const event of events) { expect(event).to.deep.include({ sourcelabel: SortedVaultDB.VaultDBSourcelabel, read_tc: answer.read_tc, banktok: TH.bankThingOf().lifetok }) }
     expect(SortedVaultDB.VaultDBSourcelabel).to.eq('vault_db')
   })
 
-  it("stamps an answer's events with its ask's bank_lifetok, else its world's, and a received event's with its own, else the newest world's", async () => {
+  it("stamps an answer's events with its own banktok, never its ask's, and a received event's with its own, else the newest world's", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     const { events } = heardOf(vaultDB)
     const { lifetok } = TH.bankThingOf()
@@ -346,12 +346,12 @@ describe("SortedVaultDB's listeners, where each event came from and when it was 
     vaultDB.receive(rungOf(TH.boxThingOf('mistral')))
     await vaultDB.tryBirthBank(TH.birthBankAskOf())
     await inner.tryWriteThing(TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)))
-    await vaultDB.tryGetThing({ ...TH.getAskAt('box/openai'), bank_lifetok: askLifetok })
+    await vaultDB.tryGetThing({ ...TH.getAskAt('box/openai'), banktok: askLifetok })
     vaultDB.receive(rungOf(TH.boxThingOf('anthropic')))
-    vaultDB.receive({ ...rungOf(TH.boxThingOf('cohere')), bank_lifetok: rungLifetok })
+    vaultDB.receive({ ...rungOf(TH.boxThingOf('cohere')), banktok: rungLifetok })
     // Each box first seen gives two events, an item and a life; the birth, six.
-    expect(events.map((event) => event.bank_lifetok)).to.deep.equal([
-      undefined, undefined, ...Array.from({ length: 6 }, () => lifetok), askLifetok, askLifetok, lifetok, lifetok, rungLifetok, rungLifetok,
+    expect(events.map((event) => event.banktok)).to.deep.equal([
+      undefined, undefined, ...Array.from({ length: 6 }, () => lifetok), lifetok, lifetok, lifetok, lifetok, rungLifetok, rungLifetok,
     ])
   })
 
@@ -394,7 +394,7 @@ describe("SortedVaultDB.receive(event)", () => {
     const sorted = [...events]
     for (const event of sorted) { vaultDB.receive(event) }
     const box = TH.boxThingOf()
-    const scope = { userid: box.userid, banklabel: box.banklabel, labelpath: box.labelpath, modelkind: 'box' as const, bank_lifetok: undefined, sourcelabel: 'other_tab', read_tc: readTcNow() }
+    const scope = { userid: box.userid, banklabel: box.banklabel, labelpath: box.labelpath, modelkind: 'box' as const, banktok: undefined, sourcelabel: 'other_tab', read_tc: readTcNow() }
     vaultDB.receive({ ...scope, eventkind: 'life', lifekind: 'born', agerank: 'zzz', agerankWas: undefined })
     vaultDB.receive({ ...scope, eventkind: 'aged', agekind: 'bare', agekindWas: undefined, agerank: 'zzz', agerankWas: undefined })
     expect(events).to.deep.equal(sorted)

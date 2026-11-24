@@ -178,7 +178,7 @@ describe("VaultMinder.tryWrite", () => {
     const vaultDB = await bornOf(new QuietVaultDB())
     const { minder } = await minderWorldOf(vaultDB)
     const theirs  = { ...TH.boxThingOf(), userid: 'u2' }
-    vi.spyOn(vaultDB, 'tryWriteThing').mockImplementation((ask) => Promise.resolve({ ok: true, act: 'born', ask, world: null, read_tc: readTcNow(), val: theirs }))
+    vi.spyOn(vaultDB, 'tryWriteThing').mockImplementation((ask) => Promise.resolve({ ok: true, act: 'born', ask, world: null, banktok: null, read_tc: readTcNow(), val: theirs }))
     await TH.expectRefusal(minder.tryWrite(boxBirthAskOf()), 'unexpected_error')
     expect(minder.at(TH.BoxScope)).to.be.undefined
   })

@@ -1,7 +1,7 @@
 /** The `VaultDB` interface the models call, the answers its verbs resolve, and what a concrete adapter reports to `AdapterVaultDB`. */
 
 import type { EX, Errors } from 'safebyok-big/internals'
-import type { Labelpath, Lifepath, Lifeseq } from '../shapes/primitives'
+import type { Labelpath, Lifepath, Lifeseq, Lifetok } from '../shapes/primitives'
 import type { Sparse, ThingRecord, ThingScope, VoidSentinel } from '../shapes/shapes-thing'
 import type { TombstoneOf } from '../shapes/shapes-sealers'
 import type { BankRoots, BirthBankAsk, GetAsk, ListAsk, LoggableAsk, ThingWatchScope, Tracked, WorldRecord, WriteAsk } from '../shapes/shapes-asks'
@@ -11,18 +11,20 @@ import type { VaultEvent } from '../shapes/shapes-vault-event'
 
 /** A vaultDB verb's good answer: its `val`, the `act` that says what the datastore did, its bank's `world`, the loggable part of its `ask`, and when its step read the datastore (`read_tc`).
  * `world` is the bank and its main gate as the step left them, read in that step. It is null if either is missing or fails its checks.
+ * `banktok` is the lifetok of the bank in `world`, or null where `world` is null.
  * `tracked`, only for an ask that tracks, says for each of the bank, its main gate and its root box whether it is still at the revision the ask tracks ({@link Tracked}).
  */
-export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, world: WorldRecord | null, tracked?: Tracked, read_tc: ReadTc, val: ValT }
+export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, world: WorldRecord | null, banktok: Lifetok | null, tracked?: Tracked, read_tc: ReadTc, val: ValT }
 
 /** A refused answer's act: big's, or `policied` for a replacement that a storage policy or a changed born_at refuses. */
 export type BadAct = EX.BadAct | 'policied'
 
 /** A vaultDB verb's refused answer: its `err` and `act`, the Thing found stored (`dbhas`), its bank's `world`, the loggable part of its `ask`, and when its step read the datastore (`read_tc`).
  * Where nothing is stored at the ask's scope, `dbhas` is the shell there, under the nearest Thing stored above it (see {@link GetThingAnswer}).
- * If the verb threw, `world` is null, `read_tc` is when it was refused, and `dbhas` is the Thing the refusal names, or null where it names none.
+ * `banktok` is the lifetok of the bank in `world`, or null where `world` is null.
+ * If the verb threw, `world` and `banktok` are null, `read_tc` is when it was refused, and `dbhas` is the Thing the refusal names, or null where it names none.
  */
-export type BadAnswer<DbhasT = ThingRecord | VoidSentinel | null> = { ok: false, ask: LoggableAsk, act: BadAct, world: WorldRecord | null, tracked?: Tracked, read_tc: ReadTc, dbhas: DbhasT, err: Errors.VaultError }
+export type BadAnswer<DbhasT = ThingRecord | VoidSentinel | null> = { ok: false, ask: LoggableAsk, act: BadAct, world: WorldRecord | null, banktok: Lifetok | null, tracked?: Tracked, read_tc: ReadTc, dbhas: DbhasT, err: Errors.VaultError }
 
 /** A vaultDB verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. Never thrown. */
 export type Answer<ValT, ActT extends EX.GoodAct> = GoodAnswer<ValT, ActT> | BadAnswer
