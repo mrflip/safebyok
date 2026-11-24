@@ -6,9 +6,9 @@ import { type DataTag, type QueryKey, type UseMutationOptions, type UseMutationR
 import { pick } from 'es-toolkit'
 import { type ReactNode, type SyntheticEvent, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  type AddPasskeyDna, type Bank, type BankStage, type BirthDna, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type ItemQueryOptions, type KeyDeriver, type Kids, Labelpath,
+  type AddPasskeyDna, type Adoptable, type Bank, type BankStage, type BirthDna, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type ItemQueryOptions, type KeyDeriver, type Kids, Labelpath,
   type LiveOf, type LivePublicPropsOf, type MaskedView, type PasskeyWayinHeader, type PassphraseVerdict, type PassphraseWayinHeader,
-  type ReplacePassphraseDna, type RevokePasskeyDna, type UnlockDna, EmptyMaskedView, PendingWorld, Shell, type Sidecar, SignedOutWorld, type Tombstone, type TombstoneOf, type Userid, type Vault, VaultError, type VaultDB, VaultTSQ, type Whisper, type WorldSnapshot, bulletproofHandlerOf, vacateHanded,
+  type ReplacePassphraseDna, type RevokePasskeyDna, type UnlockDna, EmptyMaskedView, PendingWorld, Shell, type ShellOf, type Sidecar, SignedOutWorld, type TombstoneOf, type Userid, type Vault, VaultError, type VaultDB, VaultTSQ, type Whisper, type WorldSnapshot, bulletproofHandlerOf, vacateHanded,
 } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
@@ -47,7 +47,7 @@ export type BoxSelected = LiveOf<BoxRecord> | null | undefined
 export type HeaderedGate = Omit<GateRecord, 'wayins'> & Readonly<{ wayins: Readonly<{ main: PassphraseWayinHeader, passkey0: PasskeyWayinHeader | null }> }>
 
 /** The main gate as the giver shows it: its record by its wayins' headers, or its shell where none is stored. */
-export type GateShown = HeaderedGate | Tombstone<HeaderedGate>
+export type GateShown = HeaderedGate | ShellOf<HeaderedGate>
 
 /** What `useGate` answers by default: the live gate, null where no bank is stored, or undefined. */
 export type GateSelected = HeaderedGate | null | undefined
@@ -467,18 +467,18 @@ function makeBankGiver(friend: BankFriend) {
    * It lists again only on evidence, never on a remount, window focus or reconnect: once a box is born or deleted, on this
    * device or as it hears of one elsewhere, or on `invalidateQueries` on {@link keys}`.boxList()`. A box joins or leaves
    * when that list lands; a deleted box's `useBox` answers null meanwhile.
-   * A list refused shows as its `error`.
+   * A list refused shows as its `error`. While the bank is unborn it lists nothing: `data` stays undefined.
    * @example
    *   const { data: labelpaths } = Knock.useBoxList()
    *   labelpaths?.map((labelpath) => <JokeRow key={labelpath} labelpath={labelpath} />)
    */
   function useBoxList(): UseQueryResult<readonly string[]> {
     const { device, client } = useShown()
-    const isFetchable = useWorld(isFetchStage)
+    const isListable = useWorld(isListStage)
     // Its cache time is the vault TSQ's default: a listing collected while no hook observes it would list again at a remount.
     return useQuery<Kids, Error, readonly string[]>({
       queryKey: boxListQueryKeyOf({ userid: useridOf(device), banklabel }),
-      ...((! isFetchable || (device === null)) && { queryFn: skipToken }),
+      ...((! isListable || (device === null)) && { queryFn: skipToken }),
       select:   hostLabelpathsOf,
     }, client)
   }
@@ -779,7 +779,7 @@ function makeBankGiver(friend: BankFriend) {
 }
 // --
 
-// == [Helpers]: useridOf, isFetchStage, GateShownOfCkey, gateShownOfWorld, BoxShapingOptnames, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
+// == [Helpers]: useridOf, isFetchStage, isListStage, GateShownOfCkey, gateShownOfWorld, BoxShapingOptnames, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
 
 /** `device`'s userid, or null for no device. */
 function useridOf(device: Device | null): Userid | null {
@@ -791,10 +791,16 @@ function isFetchStage(snap: WorldSnapshot): boolean {
   return (snap.stage === 'unborn') || (snap.stage === 'locked') || (snap.stage === 'unlocked')
 }
 
+// An unborn bank has no root box, and a list of a parent not stored refuses.
+/** True while `snap` shows the bank locked or unlocked: the stages its boxes are listed at. */
+function isListStage(snap: WorldSnapshot): boolean {
+  return (snap.stage === 'locked') || (snap.stage === 'unlocked')
+}
+
 // useSyncExternalStore wants the same snapshot until the store changes, and the gate Thing's record is the same frozen
 // object until a newer one lands. Weakly held: the Thing alone keeps its record alive.
 /** The gate shown for each gate record, or for each device whose world has no gate Thing. */
-const GateShownOfCkey = new WeakMap<GateRecord | Tombstone<GateRecord> | Device, GateShown>()
+const GateShownOfCkey = new WeakMap<Adoptable<GateRecord> | Device, GateShown>()
 
 /** `device`'s main gate, from its world's gate Thing, as the giver shows it: its shell where there is no Thing. The same object until the Thing's record changes. */
 function gateShownOfWorld(device: Device): GateShown {

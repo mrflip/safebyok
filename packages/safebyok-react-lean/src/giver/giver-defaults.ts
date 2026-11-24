@@ -2,7 +2,7 @@
 
 import type { QueryKey } from '@tanstack/react-query'
 import {
-  type GateRecord, type LiveOf, type PasskeyWayinHeader, type Sparse, Thing, type ThingRecord, type Tombstone, type Userid, VaultTSQ, type WayinHeader, type WayinRecord,
+  type Adoptable, type GateRecord, type LiveOf, type PasskeyWayinHeader, type Sparse, Thing, type ShellOf, type ThingRecord, type Tombstone, type Userid, VaultTSQ, type WayinHeader, type WayinRecord,
 } from 'safebyok'
 import type { GateShown, GatingOrRefusal, HeaderedGate } from './react-giver'
 
@@ -27,8 +27,8 @@ export function liveOf<RecordT extends Sparse<ThingRecord>>(thing: RecordT | Tom
 // The gate's hook selects through this, so no hook shows a wrapped bankKey; the gate's Thing has the whole gate.
 // A gate is never deleted, so the only tombstone is the shell, which has no wayins.
 /** The main gate as a hook shows it: each wayin by its header, without the bankKey it wraps. */
-export function gateShownOf(thing: GateRecord | Tombstone<GateRecord>): GateShown {
-  if (Thing.isTombstone(thing)) { return Thing.sparseOf(thing) as Tombstone<HeaderedGate> }
+export function gateShownOf(thing: Adoptable<GateRecord>): GateShown {
+  if (Thing.isTombstone(thing)) { return Thing.sparseOf(thing) as ShellOf<HeaderedGate> }
   const { main, passkey0 } = thing.wayins
   return { ...thing, wayins: { main: wayinHeaderOf(main), passkey0: (passkey0 === null) ? null : wayinHeaderOf(passkey0) } } as HeaderedGate
 }

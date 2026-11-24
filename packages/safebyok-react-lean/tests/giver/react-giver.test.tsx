@@ -1018,10 +1018,17 @@ describe("useBoxList", () => {
     await waitFor(() => { expect(result.current.data).to.deep.equal([TH.JokesPath]) })
   })
 
-  it("answers an empty listing for a user with no bank stored", async () => {
-    const { result } = await renderUnder((world) => world.Bank.useBoxList(), { stored: 'none' })
-    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
-    expect(result.current.data).to.deep.equal([])
+  it("lists nothing for a user with no bank stored, its query idle while the bank is unborn", async () => {
+    const { result } = await renderUnder((world) => ({ stage: world.Bank.useWorld((snap) => snap.stage), list: world.Bank.useBoxList() }), { stored: 'none' })
+    await waitFor(() => { expect(result.current.stage).to.eq('unborn') })
+    expect([result.current.list.data, result.current.list.status, result.current.list.fetchStatus]).to.deep.equal([undefined, 'pending', 'idle'])
+  })
+
+  it("lists once the bank is born, from an empty listing", async () => {
+    const { world, result } = await renderUnder((world) => ({ stage: world.Bank.useWorld((snap) => snap.stage), list: world.Bank.useBoxList() }), { stored: 'none' })
+    await waitFor(() => { expect(result.current.stage).to.eq('unborn') })
+    await act(() => world.Bank.gatingBirthAttempt({ passphrase: NewPassphrase }))
+    await waitFor(() => { expect(result.current.list.data).to.deep.equal([]) })
   })
 
   // useBoxList @example
