@@ -3,10 +3,10 @@
 import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
 import { Labelpath } from '../shapes/primitives'
-import { type MaskedRow, type MinderGetOpts, MinderChecks } from '../shapes/shapes-minder'
+import type { MaskedRow } from '../shapes/shapes-masked-view'
 import { type ThingRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
 import type { BankScope } from '../shapes/shapes-stamps'
-import { type ItemQueryOptions, type VaultMutationOptions, type VaultTSQOpts, VaultTSQChecks } from '../shapes/shapes-vault-tsq'
+import { type GetOnceOpts, type ItemQueryOptions, type VaultMutationOptions, type VaultTSQOpts, VaultTSQChecks } from '../shapes/shapes-vault-tsq'
 import type { VaultEvent } from '../shapes/shapes-vault-event'
 import { BaseThing } from '../models/base-thing'
 import type { ReceivingThing } from '../shapes/shapes-sorted-vault-db'
@@ -15,7 +15,7 @@ import { readAtOf } from '../storage/thing-classifier'
 import type { Kids } from '../shapes/shapes-answers'
 import * as Throwers from '../refusals/throwers'
 import { maskedRowsOf } from './masked-rows'
-import { bankKeyHeadOf, labelsOf } from './minder-keys'
+import { bankKeyHeadOf, labelsOf } from './query-keys'
 
 // == [VaultTSQ]: VaultTSQ
 
@@ -73,7 +73,7 @@ export class VaultTSQ {
 
   // A key is the bank's three segments, the kind of query ('item' or 'list'), the labelpath's labels with '/' between
   // them, then a mark: '!' for the item, '#' and 'kids' for the listing. Without a mark the root box's item key would
-  // start every box's. A Minder's keys have the same shapes.
+  // start every box's.
   /** The query key of `scope`'s item. */
   static itemQueryKeyOf(scope: ThingScope): TSQ.QueryKey {
     const { userid, banklabel, labelpath } = ThingChecks.thingScope.parse(scope)
@@ -106,8 +106,8 @@ export class VaultTSQ {
    * Refuses `stale_read` where storage answers an earlier life than the box's newest known only sparse. Rejects with the
    * library's `CancelledError` where the item is reset while the get runs.
    */
-  async getOnce(scope: ThingScope, opts: MinderGetOpts = {}): Promise<ThingRecord | null> {
-    const { staleTime } = MinderChecks.minderGetOpts.parse(opts)
+  async getOnce(scope: ThingScope, opts: GetOnceOpts = {}): Promise<ThingRecord | null> {
+    const { staleTime } = VaultTSQChecks.getOnceOpts.parse(opts)
     const queryKey      = VaultTSQ.itemQueryKeyOf(this.#parseItemScope(scope))
     return await this.#queryClient.query<ThingRecord | null>({ queryKey, ...((staleTime !== undefined) && { staleTime }) })
   }

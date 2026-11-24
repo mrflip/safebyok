@@ -9,9 +9,9 @@ import * as Throwers from '../refusals/throwers'
 import type { BoxUnsealed } from '../shapes/shapes-bankish'
 import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
 import type { BoxLabelpath } from '../shapes/primitives'
-import { type MinderGetOpts, type ScopeAt, MinderChecks } from '../shapes/shapes-minder'
+import { type GetOnceOpts, VaultTSQChecks } from '../shapes/shapes-vault-tsq'
 import type { PutOnceArgs } from '../shapes/shapes-sorted-vault-db'
-import type { BoxRecord, ThingScope } from '../shapes/shapes-thing'
+import type { BoxRecord, ScopeAt, ThingScope } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 import { VaultChecks } from '../shapes/shapes-vault'
 import type { SortedVaultDB } from '../storage/sorted-vault-db'
@@ -154,9 +154,9 @@ export class Vault {
    * It rejects with the `unlock` gating's refusal where that wait is dismissed or the bank ends ({@link Bank.ensureUnlocked}),
    * else with the get's refusal unchanged, else as {@link withWhisper} would refuse the box: `stale_read` or `absent_box`.
    */
-  async forceTimelyUnlocked(labelpath: BoxLabelpath, opts: MinderGetOpts = {}): Promise<void> {
+  async forceTimelyUnlocked(labelpath: BoxLabelpath, opts: GetOnceOpts = {}): Promise<void> {
     const scope = this.#scopeAt(labelpath)
-    MinderChecks.minderGetOpts.parse(opts)
+    VaultTSQChecks.getOnceOpts.parse(opts)
     // Both settle before either refusal is thrown, so which one rejects never depends on which came first.
     const [unlocked, got] = await Promise.allSettled([this.#bank.ensureUnlocked(), this.#vaultTSQ.getOnce(scope, opts)])
     if (unlocked.status === 'rejected') { throw unlocked.reason }

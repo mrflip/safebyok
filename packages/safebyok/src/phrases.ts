@@ -5,7 +5,7 @@
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
 
-/** What a minder's hello is handed that lacks one of a SortedVaultDB's members. */
+/** What a vault TSQ is made with that lacks one of a SortedVaultDB's members. */
 export const SortedVaultDBExpected = 'Expected a SortedVaultDB: an object with a function for each of its verbs, listen, receive, thingAt and sweep.'
 
 /** A sealer that lacks one of its methods, its tags or its purposes. */
@@ -162,10 +162,7 @@ export const BankRootsMissing = "A bank is stored without its main gate or its r
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: MinderFriendExpected, QueryClientExpected, ListOfBoxes, NotMinded, WorldNotHeard, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, DeliveredOfOtherScope, ChildrenStoredDamaged
-
-/** A minder made without a friend: a device or a bank. */
-export const MinderFriendExpected = 'A minder is made with its friend: the device or bank whose Things it minds.'
+// == [Minding]: QueryClientExpected, ListOfBoxes, NotMinded, WorldNotHeard, StaleTimeShape, ChildrenStoredDamaged
 
 /** A VaultTSQ made without a TanStack Query client. */
 export const QueryClientExpected = 'Expected a TanStack Query QueryClient: an object with setQueryDefaults, setMutationDefaults, setQueryData, query, invalidateQueries and resetQueries.'
@@ -173,26 +170,14 @@ export const QueryClientExpected = 'Expected a TanStack Query QueryClient: an ob
 /** A listing asked of a VaultTSQ for a Thing other than a box. */
 export const ListOfBoxes = "A VaultTSQ lists only a box's children: the root box's, or a box's under it."
 
-/** A write through a minder of a Thing it does not mind. */
-export const NotMinded = "A minder writes only the Things it minds: a VaultMinder the boxes under the root box, a BankMinder the bank, its main gate and its root box."
+/** A box's item asked of a vault TSQ for a Thing other than a box under the root box. */
+export const NotMinded = "A vault TSQ keeps an item only for a box under the root box: not for the bank, its main gate or its root box."
 
-/** A Bank made of a bank whose world its device's BankMinder does not hold. */
-export const WorldNotHeard = "A Bank is made of the bank whose world its device's BankMinder holds: bring the device up, or birth the bank, first."
-
-/** A minder read or written through before `hello`, or after `goodbye`. */
-export const MinderNotStarted = 'This minder is not minding: call hello before reading from it or writing through it.'
-
-/** A get that storage answered older than the record the minder had cached when it began. */
-export const StaleRead = 'Storage answered with a revision older than one this device already had. The newer record stays cached, and a later get asks again.'
+/** A bank's root box read while its world holds none live. */
+export const WorldNotHeard = "This bank's root box is not known live on this device: bring the device up, or birth the bank, first."
 
 /** A staleTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
 export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
-
-/** A minder's `listen` given a feed version other than `MinderEventFormat`. */
-export const FeedVersionOther = "A minder's listen is given the version of the feed its listener reads, MinderEventFormat, and this listener was written for another: its events are not shaped as it expects."
-
-/** A record the vaultDB delivered to a minder of another bank, or of another Thing than the minder asked for. */
-export const DeliveredOfOtherScope = "The vaultDB delivered a minder a record of another bank than the minder's, or of another Thing than it asked for: this is a bug in the vaultDB."
 
 /** Children a list found stored damaged, and left out of its answer. */
 export const ChildrenStoredDamaged = "Some of the Things this list found are stored damaged, so it left them out: the refusal's meta.labelpaths names each one. They were left as they are in storage."

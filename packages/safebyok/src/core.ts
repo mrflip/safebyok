@@ -1,5 +1,5 @@
 // safebyok/core: the device, its world, bank, gate, wayin and lease, the gate's form verbs and the methods that put its Things,
-// and every type their signatures name; no caching, so neither the VaultMinder nor TanStack Query. Private
+// and every type their signatures name; no caching, so neither the VaultTSQ nor TanStack Query. Private
 // while it is built. The proving classes are exported as types alone: a proving's `buildLease` is public, and a proving is
 // built only in a form verb's gating, which hands it to the gate's private verbs.
 export { Bank } from './models/bank'
@@ -51,9 +51,8 @@ export {
   type VoidSentinel, type Wayins, Shell, ThingChecks, thingkindVals,
 } from './shapes/shapes-thing'
 export { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from './shapes/shapes-thingkinds'
-// A bank is made with the defaults its minders set on their cached items and lists, and a device shows a devtool a masked view of
-// its bank TSQ, vault TSQ and lease; the minder itself is on the front door.
-export { type MaskedRow, type MaskedView, type MaskedViewLease, type QueryCacheOpts, EmptyMaskedView } from './shapes/shapes-minder'
+// A device shows a devtool a masked view of the roots it keeps, its vault TSQ and its lease; the VaultTSQ itself is on the front door.
+export { type MaskedRow, type MaskedView, type MaskedViewLease, EmptyMaskedView } from './shapes/shapes-masked-view'
 
 // From safebyok-big, re-exported so that each stays one binding across both packages: its refusals and logger, what a
 // device is handed, what a form verb, a wayin and a box carry, and the acts a vaultDB's answer reports.

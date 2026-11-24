@@ -1,8 +1,8 @@
 /** The Things and asks a vaultDB's tests share: a bank's three roots and a box under its root, and the asks that get, list and write them. */
 
-import { type Lifepath, type Lifetok, type Revtok, Labelpath, Lifeseq } from '../../src/shapes/primitives'
+import { type Lifepath, type Lifetok, Labelpath, Lifeseq } from '../../src/shapes/primitives'
 import {
-  type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord,
+  type BankRecord, type BoxRecord, type GateRecord, type ThingCited, type ThingRecord,
   Shell, ThingFormat,
 } from '../../src/shapes/shapes-thing'
 import type { SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
@@ -175,9 +175,4 @@ export function itemEventOf(record: SeenThing, banktok?: Lifetok): VaultItemEven
 /** The `item` event a SortedVaultDB hands the Thing of `record` to receive, read now, typed as of `record`'s kind. */
 export function thingEventOf<RecordT extends ThingRecord>(record: SeenThing<RecordT>): VaultItemEvent<RecordT> {
   return { ...itemEventOf(record), read_tc: readTcNow() } as VaultItemEvent<RecordT>
-}
-
-/** The revtok of `val`, what a minder's item or soon has, or undefined for none or null. */
-export function itemRevtokOf(val: Sparse<ThingRecord> | null | undefined): Revtok | undefined {
-  return val?.revtok
 }

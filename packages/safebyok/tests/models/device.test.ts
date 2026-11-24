@@ -12,7 +12,7 @@ import { Bank } from '../../src/models/bank'
 import { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from '../../src/models/device'
 import { BirthGating } from '../../src/models/gating'
 import { VaultTSQ } from '../../src/minding/vault-tsq'
-import { EmptyMaskedView } from '../../src/shapes/shapes-minder'
+import { EmptyMaskedView } from '../../src/shapes/shapes-masked-view'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { type DevicePersisters, MemoryPersister } from '../../src/storage/persister'
 import { refusedAnswerOf } from '../../src/storage/refused-answer'
@@ -62,8 +62,8 @@ describe("Device.make(record, opts)", () => {
     await device.hello()
     expect([tryGetThing.mock.calls.length, watch.mock.calls.length]).to.deep.equal([0, 0])
     await device.signin(TH.WorldScope.userid)
-    // A get of the root box, then, none being stored, one of the bank, and one watch, which the user's two minders and
-    // its world share through the device's SortedVaultDB.
+    // A get of the root box, then, none being stored, one of the bank, and one watch, which everything listening shares
+    // through the device's SortedVaultDB.
     expect([tryGetThing.mock.calls.length, watch.mock.calls.length]).to.deep.equal([2, 1])
   })
 
@@ -248,19 +248,31 @@ describe("a device's persisters", () => {
     expect(stages).to.deep.equal(['signed_out', 'starting', 'locked'])
   })
 
-  it("restore the boxes and listings its vault cached, each box's record reaching its Thing, and none the host's QueryClient", async () => {
+  it("restore the boxes its vault kept, each box's record reaching its Thing and the vault TSQ's item before the vaultDB answers", async () => {
     const persisters = memoryPersisters()
     const first      = TH.makeDevice({}, { persisters })
     const { vault }  = await TH.buildBornVault({ device: first })
     const box        = await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    await first.minder.list('box')
     await nextTick()
-    const device = TH.makeDevice({}, { vaultDB: vault.bank.device.vaultDB, persisters })
+    const vaultDB = vault.bank.device.vaultDB as MemoryVaultDB
+    const device  = TH.makeDevice({ userid: null }, { vaultDB, persisters })
+    vi.spyOn(vaultDB, 'tryGetThing').mockReturnValue(new Promise(noop))
+    void device.signin(TH.WorldScope.userid)
+    await TH.eventually(() => device.bank !== null)
+    const scope = { ...TH.WorldScope, labelpath: 'box/openai' }
+    expect(device.world.demandSortedVaultDB().thingAt(scope)?.pickle()).to.deep.equal(box.pickle())
+    expect(device.vaultTsqClient.getQueryData(VaultTSQ.itemQueryKeyOf(scope))).to.deep.equal(box.pickle())
+  })
+
+  it("read a snapshot saved under another format as empty, and the bank comes up from the vaultDB", async () => {
+    const { born, device, persisters } = await bornAndReloaded()
+    const rootsPersister = persisters.roots(TH.WorldScope)
+    rootsPersister.persistClient({ ...(await rootsPersister.restoreClient())!, buster: 'a010501' })
+    const tryGetThing = vi.spyOn(born.device.vaultDB, 'tryGetThing')
+    const stages      = stagesOf(device)
     await device.signin(TH.WorldScope.userid)
-    expect(Object.keys(device.minder.listingAt({ ...TH.WorldScope, labelpath: 'box' })?.items ?? {})).to.deep.equal(['openai'])
-    expect(device.minder.at({ ...TH.WorldScope, labelpath: 'box/openai' })).to.have.property('labelpath', 'box/openai')
-    expect(device.world.demandSortedVaultDB().thingAt({ ...TH.WorldScope, labelpath: 'box/openai' })?.pickle()).to.deep.equal(box.pickle())
-    expect(device.vaultTsqClient.getQueryCache().getAll()).to.have.lengthOf(0)
+    expect(stages).to.deep.equal(['signed_out', 'starting', 'locked'])
+    expect(tryGetThing).toHaveBeenCalled()
   })
 
   it("restore the signed-in bank's roots and boxes at signin, from the persisters its scope gives, and the stage stays starting until they have", async () => {
@@ -295,10 +307,8 @@ describe("a device's persisters", () => {
     const device     = TH.makeDevice({ userid: null }, { vaultDB: vault.bank.device.vaultDB, persisters })
     await device.signin(otherScope.userid)
     await nextTick()
-    expect(device.minder.at({ ...otherScope, labelpath: 'box/openai' })).to.be.undefined
-    for (const { tsqClient } of [device.bankMinder, device.minder]) {
-      expect(tsqClient.getQueryCache().getAll().map((tsqQuery) => tsqQuery.queryKey[1])).to.not.include(TH.WorldScope.userid)
-    }
+    expect(device.world.demandSortedVaultDB().thingAt({ ...otherScope, labelpath: 'box/openai' })).to.be.undefined
+    expect(device.vaultTsqClient.getQueryCache().getAll().map((tsqQuery) => tsqQuery.queryKey[1])).to.not.include(TH.WorldScope.userid)
     for (const persisterOf of [persisters.roots, persisters.boxes]) {
       const savedUserids = (await persisterOf(TH.WorldScope).restoreClient())!.clientState.queries.map((saved) => saved.queryKey[1])
       expect(new Set(savedUserids)).to.deep.equal(new Set([TH.WorldScope.userid]))
@@ -341,8 +351,7 @@ describe("a device nobody is signed in to", () => {
   it("refuses what needs a user, absent_vault", async () => {
     const device = TH.makeDevice({ userid: null })
     TH.expectSyncRefusal(() => device.scope, 'absent_vault')
-    TH.expectSyncRefusal(() => device.bankMinder, 'absent_vault')
-    TH.expectSyncRefusal(() => device.minder, 'absent_vault')
+    TH.expectSyncRefusal(() => device.vaultTSQ, 'absent_vault')
     await TH.expectRefusal(device.judgeStrength(TH.TestPassphrase), 'absent_vault')
   })
 
@@ -686,11 +695,12 @@ describe("device.maskedView()", () => {
 
   it("cuts each wrapped bankKey and each sealed whisper's ciphertext to its last 2 characters and its length", async () => {
     const { device, vault, gateRecord } = await TH.buildBornVault()
-    await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const { whisper_sealed } = device.minder.at({ ...TH.WorldScope, labelpath: 'box/openai' })!
+    const box = await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const { whisper_sealed } = TH.livePickleOf(box)
     const named = [gateRecord.wayins.main.bank_key_wayin_wrapped, whisper_sealed.key_wrapped, whisper_sealed.ciphered].map(({ ciphertext_b64 }) => ciphertext_b64)
-    // Every ciphertext either minder keeps, the root box's among them, not only those named above.
-    const keptJsons = [device.bankMinder.tsqClient, device.vaultTsqClient].flatMap((tsq) => tsq.getQueryCache().getAll().map(({ state }) => JSON.stringify(state.data ?? null)))
+    // Every ciphertext the vault TSQ and the roots' Things hold, the root box's among them, not only those named above.
+    const roots     = ['bank', 'gate', 'box'].map((labelpath) => device.world.demandSortedVaultDB().thingAt({ ...TH.WorldScope, labelpath })?.pickle())
+    const keptJsons = [...device.vaultTsqClient.getQueryCache().getAll().map(({ state }) => state.data), ...roots].map((val) => JSON.stringify(val ?? null))
     const ciphertexts = new Set(keptJsons.flatMap((json) => [...json.matchAll(/"ciphertext_b64":"([^"]+)"/g)].map(([, ciphertext]) => ciphertext!)))
     expect([...ciphertexts]).to.include.members(named)
     expect(ciphertexts.size).to.be.at.least(5)
@@ -736,6 +746,19 @@ describe("device.tellBadNews(badnews)", () => {
     device.tellBadNews([new Errors.VaultError('storage_unavailable', "Down.")])
     await TH.eventually(() => onBadNews.mock.calls.length === 1)
     expect(onBadNews).toHaveBeenCalledOnce()
+  })
+})
+
+describe("a device's onBadNews, told of trouble in storage", () => {
+  it("hears each trouble once", async () => {
+    const onBadNews = vi.fn()
+    const { vault } = await TH.buildBornVault({ device: TH.makeDevice({}, { onBadNews }) })
+    const vaultDB   = vault.bank.device.vaultDB as MemoryVaultDB
+    vaultDB._cheat_things(TH.WorldScope).set('box/bad', { ...TH.boxThingOf('bad'), revseq: -2 })
+    await vault.bank.device.vaultTSQ.listOnce('box')
+    await TH.eventually(() => onBadNews.mock.calls.length > 0)
+    await TH.aWhile()
+    expect(onBadNews.mock.calls.map(([heard]) => (heard as BadNews).news.refusalkind)).to.deep.equal(['damaged_row'])
   })
 })
 

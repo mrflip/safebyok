@@ -3,7 +3,7 @@
 import type * as TSQ from '@tanstack/query-core'
 import { cloneDeepWith } from 'es-toolkit'
 import { Outcome } from 'safebyok-big/internals'
-import type { MaskedRow } from '../shapes/shapes-minder'
+import type { MaskedRow } from '../shapes/shapes-masked-view'
 
 // == [Masked rows]: maskedRowsOf
 

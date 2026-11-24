@@ -6,7 +6,7 @@ import { Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
 import { unexpectedError } from 'safebyok-big/refusals/throwers'
 import * as Phrases from '../phrases'
 import { type ThingRecord } from '../shapes/shapes-thing'
-import { type GetAsk, type ListAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
+import { type ListAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
 import type { DamagedThing } from '../shapes/shapes-answers'
 
 // == [Big's Throwers]: every thrower of safebyok-big, re-exported
@@ -124,23 +124,13 @@ export function bankRootsMissing(): Errors.VaultError { return new Errors.VaultE
 export function answerNotMade(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerNotMade) }
 // --
 
-// == [Minding Throwers]: notMinded, worldNotHeard, minderNotStarted, staleRead, childrenStoredDamaged
+// == [Minding Throwers]: notMinded, worldNotHeard, childrenStoredDamaged
 
-/** The refusal of a write through a minder of a Thing it does not mind. */
+/** The refusal of a box's item asked of a vault TSQ for a Thing other than a box under the root box. */
 export function notMinded(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.NotMinded) }
 
-/** The refusal of a Bank made or read while its device's BankMinder holds no world of its bank. */
+/** The refusal of a bank's root box read while its world holds none live. */
 export function worldNotHeard(): Errors.VaultError { return new Errors.VaultError('record_conflict', Phrases.WorldNotHeard) }
-
-/** The refusal of a read or a write on a minder that is not minding. */
-export function minderNotStarted(): Errors.VaultError {
-  return new Errors.VaultError('disabled', Phrases.MinderNotStarted)
-}
-
-/** The refusal of a get answered with a revision older than one cached when it began. */
-export function staleRead(ask: GetAsk): Errors.VaultError {
-  return new Errors.VaultError('stale_read', Phrases.StaleRead, { meta: { ask: loggableAskOf(ask) } })
-}
 
 /** The bad news of `damaged_rows`, the children a list for `ask` found stored damaged and left out, each named by its labelpath. */
 export function childrenStoredDamaged(ask: ListAsk, damaged_rows: readonly DamagedThing[]): Errors.VaultError {

@@ -412,17 +412,17 @@ function nextBankThingOf(bank: TH.LiveBank) {
   return { ...bank.pickle(), revtok: Crypto.randomId(), revseq: bank.revseq + 1, written_at: bank.written_at + 1 }
 }
 
-describe("the bank's world, beside the bank's own writes", () => {
-  it("has the bank's Thing that bank.put wrote once it resolves", async () => {
+describe("the world's Things, beside the bank's own writes", () => {
+  it("have the bank's Thing that bank.put wrote once it resolves", async () => {
     const { bank, device } = await TH.buildBornBank()
     const written = await bank.put({ cited: bank.pickle(), record: nextBankThingOf(bank) })
-    expect(device.bankMinder.worldAt()?.bank).to.deep.equal(written)
+    expect(device.world.demandSortedVaultDB().thingAt({ ...bank.scope, labelpath: 'bank' })?.pickle()).to.deep.equal(written)
   })
 
-  it("has the main gate a gate verb wrote once the verb resolves", async () => {
+  it("have the main gate a gate verb wrote once the verb resolves", async () => {
     const { bank, device } = await TH.buildBornBank()
     const after = await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'another horse battery staple' })
-    expect(device.bankMinder.worldAt()?.gate).to.deep.equal(after.pickle())
+    expect(device.world.demandSortedVaultDB().thingAt({ ...bank.scope, labelpath: 'gate' })?.pickle()).to.deep.equal(after.pickle())
   })
 })
 

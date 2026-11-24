@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/query-core'
-import { isEqual } from 'es-toolkit'
+import { isEqual, noop } from 'es-toolkit'
 import { Consts, Deriver, Errors, type GX, Helpers, Logger, Outcome, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
 import type { BirthGating } from './gating'
@@ -7,11 +7,10 @@ import { Proving, guardKeyDeriver } from './proving'
 import { Vault } from './vault'
 import { World } from './world'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
-import { BankMinder } from '../minding/bank-minder'
-import { VaultMinder } from '../minding/vault-minder'
+import { PersistScaffold, type RootsOrBoxes } from '../minding/persist-scaffold'
 import { VaultTSQ } from '../minding/vault-tsq'
 import { type BadNewsHandler, type DeviceJSON, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, BankishChecks } from '../shapes/shapes-bankish'
-import { type MaskedView, type MaskedViewLease, type MinderFriend, EmptyMaskedView } from '../shapes/shapes-minder'
+import { type MaskedView, type MaskedViewLease, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import { isQueryClient } from '../shapes/shapes-vault-tsq'
 import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
 import type { BankScope } from '../shapes/shapes-stamps'
@@ -23,7 +22,8 @@ import { readTcNow } from '../storage/thing-classifier'
 import { Labelpath } from '../shapes/primitives'
 import type { ReadTc, VaultEvent } from '../shapes/shapes-vault-event'
 import type { DevicePersisters, PersisterOfBank } from '../storage/persister'
-import { type Modelkind, type ThingRecord, ThingChecks } from '../shapes/shapes-thing'
+import { type BankRecord, type Modelkind, type ThingRecord, ThingChecks } from '../shapes/shapes-thing'
+import { BaseThing } from './base-thing'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
@@ -32,7 +32,7 @@ import * as Throwers from '../refusals/throwers'
 /** How long a lease lasts when the host gives no `autolockMinutes`: fourteen days. */
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
-/** This browser, before and after anyone signs in: the host's functions, guarded, the minders, its world, and the signed-in user's bank and vault.
+/** This browser, before and after anyone signs in: the host's functions, guarded, its world, and the signed-in user's bank and vault.
  * Make it with `Device.make(record, opts)`, which does no I/O, touches no browser global and subscribes to nothing; call
  * `hello()` to start it, and `signin(userid)` once the host knows who is signed in, which restores that user's caches
  * from the host's persisters. Its snapshot's stage is `'signed_out'` until then, `'starting'` while it restores the
@@ -41,8 +41,8 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
  * It serves the first user it is told of for its life: another user signing in is a sign-out, which the host answers by
  * reloading the page.
  */
-export class Device implements MinderFriend {
-  // == [Props]: banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #persisters, #bankMinder, #minder, #vaultTsqClient, #world, #userid, #vaultTSQ, #vault, #signinAnswer, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
+export class Device {
+  // == [Props]: banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #persisters, #vaultTsqClient, #world, #userid, #persistScaffold, #unlistenScaffold, #vaultTSQ, #vault, #signinAnswer, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
 
   /** The label of the bank this device serves each user. */
   readonly banklabel:          Banklabel
@@ -59,18 +59,18 @@ export class Device implements MinderFriend {
 
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
-  /** The host's persisters, which the signed-in bank's caches are restored from and saved to, or undefined for none. */
+  /** The host's persisters, which the signed-in bank's records are restored from and saved to, or undefined for none. */
   readonly #persisters: DevicePersisters | undefined
-  /** The minder of the signed-in user's bank's roots: the bank, its main gate and its root box, made with the device, which is its friend. */
-  readonly #bankMinder: BankMinder
-  /** The minder of the signed-in user's boxes, made with the device, which is its friend. */
-  readonly #minder: VaultMinder
   /** The QueryClient the vault TSQ keeps the boxes in: the host's, or one made with the device. */
   readonly #vaultTsqClient: QueryClient
   /** The world of the signed-in user's bank, made with the device. */
   readonly #world: World
   /** The user signed in on this device, from `signin`. Null until then. */
   #userid: Userid | null = null
+  /** Scaffolding until the LocalBridge: the records the persisters restore and save, made as `signin` starts. */
+  #persistScaffold: PersistScaffold | null = null
+  /** Scaffolding until the LocalBridge: ends the scaffold's listen to the SortedVaultDB. */
+  #unlistenScaffold: () => void = noop
   /** The vault TSQ of the signed-in user's boxes, made as `signin` starts the bank. */
   #vaultTSQ: VaultTSQ | null = null
   /** The vault of the bank's boxes, made once the bank is. */
@@ -97,7 +97,7 @@ export class Device implements MinderFriend {
   }
   // --
 
-  // == [Getters]: userid, scope, autolockMinutes, bankMinder, vaultTsqClient, vaultTSQ, minder, world, bank, vault, getSnapshot, subscribe
+  // == [Getters]: userid, scope, autolockMinutes, vaultTsqClient, vaultTSQ, world, bank, vault, getSnapshot, subscribe
 
   /** The user signed in on this device, or null until `signin`. */
   get userid(): Userid | null { return this.#userid }
@@ -111,13 +111,6 @@ export class Device implements MinderFriend {
   /** The autolock duration in minutes, past which a lease no longer unlocks the bank. */
   get autolockMinutes(): number { return this.leaseMillis / Consts.MinuteMillis }
 
-  // Refusing rather than null, as `minder` does: a bank, its gate and their gatings exist only once someone is signed in, and read it unchecked.
-  /** The minder of the signed-in user's bank's roots: its bank, main gate and root box, as last heard of. Refuses `absent_vault` until `signin`. */
-  get bankMinder(): BankMinder {
-    if (this.#userid === null) { throw Throwers.nobodySignedIn() }
-    return this.#bankMinder
-  }
-
   /** The QueryClient the vault TSQ keeps the signed-in user's boxes in: `opts.queryClient`, the host's own, or one the device made. The same one from `Device.make` on. */
   get vaultTsqClient(): QueryClient { return this.#vaultTsqClient }
 
@@ -126,12 +119,6 @@ export class Device implements MinderFriend {
     if (this.#userid === null) { throw Throwers.nobodySignedIn() }
     if (this.#vaultTSQ === null) { throw Throwers.signinUnanswered() }
     return this.#vaultTSQ
-  }
-
-  /** The minder of the signed-in user's boxes. Refuses `absent_vault` until `signin`. */
-  get minder(): VaultMinder {
-    if (this.#userid === null) { throw Throwers.nobodySignedIn() }
-    return this.#minder
   }
 
   /** The world of the signed-in user's bank: what locks, unlocks and ends it, and holds its lease. The same one from `Device.make` on. */
@@ -159,7 +146,7 @@ export class Device implements MinderFriend {
 
   /** Make a device of the banklabel and token in `record`, guarding the host's functions in `opts`, with nobody signed in.
    * The signed-in user's boxes are kept in `opts.queryClient`, the host's own, under the bank's key, or in a QueryClient the
-   * device makes: {@link vaultTsqClient}. The signed-in bank's caches are restored from `opts.persisters` at {@link signin}, and
+   * device makes: {@link vaultTsqClient}. The signed-in bank's records are restored from `opts.persisters` at {@link signin}, and
    * nothing is fetched from the vaultDB, or watched, until then.
    */
   static make(record: DeviceRecord, opts: DeviceOpts): Device { return new Device(record, opts) }
@@ -172,10 +159,6 @@ export class Device implements MinderFriend {
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.#onBadNews = onBadNews
     this.#persisters = persisters
-    // The roots cache in a minder of their own: the main gate's wrapped bankKeys stay out of the client a host observes.
-    this.#bankMinder = BankMinder.make({}, this)
-    // Scaffolding until the LocalBridge restores the Things: the old minder keeps the boxes' cache the persister restores and saves.
-    this.#minder = VaultMinder.make({}, this)
     this.#vaultTsqClient = queryClient
     this.#world = World.make({ device: this })
     this.#snapshot = this.#makeSnapshot()
@@ -203,35 +186,31 @@ export class Device implements MinderFriend {
     return Promise.resolve()
   }
 
-  // Before the minder says hello, so what it caches lands over what was restored.
-  /** Restore `minder`'s cache from the persister `persisterOf` gives the signed-in bank, and save it there from then on, telling `onBadNews` if it fails to restore. */
-  async #restore(minder: BankMinder | VaultMinder, persisterOf: PersisterOfBank | undefined): Promise<void> {
+  /** Restore the roots' or the boxes' records into `scaffold` from the persister `persisterOf` gives the signed-in bank, and save them there from then on, telling `onBadNews` if it fails to restore. */
+  async #restore(scaffold: PersistScaffold, rootsOrBoxes: RootsOrBoxes, persisterOf: PersisterOfBank | undefined): Promise<void> {
     if (persisterOf === undefined) { return }
     try {
-      await minder.persist(persisterOf(this.scope))
+      await scaffold.persist(rootsOrBoxes, persisterOf(this.scope))
     } catch (err) {
       this.tellBadNews([Outcome.storageRefusalOf(err)])
     }
   }
 
-  // Scaffolding until the LocalBridge restores the Things: the persisters restore into the minders, whose records reach the
-  // Things here. Each box record is told apart, so a damaged one is news, and the rest still reach their Things.
-  /** Hand `sortedVaultDB` what `bankMinder` and `minder` restored: the bank's roots, where all three were cached, and each record of a box. */
-  #receiveRestored(sortedVaultDB: SortedVaultDB, bankMinder: BankMinder, minder: VaultMinder): void {
+  // Scaffolding until the LocalBridge restores the Things. Each record is told apart, so a damaged one is news, and the
+  // rest still reach their Things.
+  /** Hand `sortedVaultDB` each record `scaffold` restored, the roots first. */
+  #receiveRestored(sortedVaultDB: SortedVaultDB, scaffold: PersistScaffold): void {
     const read_tc = readTcNow()
-    const roots   = bankMinder.worldAt()
-    const banktok = roots?.bank.lifetok
-    if (roots !== undefined) {
-      for (const root of [roots.bank, roots.gate, roots.root]) { sortedVaultDB.receive(restoredEventOf(root, read_tc, banktok)) }
-    }
-    for (const { state } of minder.tsqClient.getQueryCache().getAll()) {
-      if (! isRestoredBox(state.data)) { continue }
-      try { sortedVaultDB.receive(restoredEventOf(state.data, read_tc, banktok)) } catch (err) { this.tellBadNews([err]) }
+    const records = scaffold.records()
+    const bank    = records.find((record): record is BankRecord => record.labelpath === 'bank')
+    const banktok = ((bank !== undefined) && BaseThing.isLive(bank)) ? bank.lifetok : undefined
+    for (const record of records) {
+      try { sortedVaultDB.receive(restoredEventOf(record, read_tc, banktok)) } catch (err) { this.tellBadNews([err]) }
     }
   }
 
   /** Tell the device who is signed in, and start that user's bank: resolves once the snapshot shows `'locked'`, `'unborn'` or `'failed'` (with `lastErr`). Never rejects.
-   * It restores the bank's roots and boxes first. Where the device has cached the bank's world, the bank comes up
+   * It restores the bank's roots and boxes first. Where the device has kept the bank's roots, the bank comes up
    * `'locked'` from it at once, and unlocks on its cached gate, before the vaultDB answers.
    * Each later call resolves as the first, whatever userid it is handed: the device serves its first user for its life.
    */
@@ -241,7 +220,7 @@ export class Device implements MinderFriend {
     if (this.#signinAnswer !== null) { return this.#signinAnswer }
     this.#userid = signedIn
     this.#world.align()
-    this.#signinAnswer = this.#doSignin(this.#bankMinder, this.#minder)
+    this.#signinAnswer = this.#doSignin()
     return this.#signinAnswer
   }
 
@@ -267,22 +246,23 @@ export class Device implements MinderFriend {
   async gatingBirthAttempt(params: FormData | BirthDna): Promise<Bank> { return await this.birthGating(params).attempt() }
 
   // The world fetched lands in the world's Things, which the stage is read from; a failure to fetch it, once a bank is up
-  // from the cache, is no caller's to hear.
-  // The SortedVaultDB is made right before the vault TSQ and the world listen to it and the minders hello it, with nothing
-  // awaited between: its Things remember what they take, so a record it took with no one listening would reach them later
-  // only as a repeat, which it drops. The records restored are the exception: the minders have them already, the world
-  // reads its Things at its signin, and the vault TSQ reads a Thing for a host's query.
-  /** Start the signed-in user's bank, with `bankMinder` minding its roots and `minder` its boxes over a SortedVaultDB of the bank they share: from what was cached, where there is a world, and from the world the vaultDB answers. */
-  async #doSignin(bankMinder: BankMinder, minder: VaultMinder): Promise<void> {
+  // from what was restored, is no caller's to hear.
+  // The SortedVaultDB is made right before the vault TSQ, the scaffold and the world listen to it, with nothing awaited
+  // between: its Things remember what they take, so a record it took with no one listening would reach them later only as
+  // a repeat, which it drops. The vault TSQ listens before the records restored are received, so each box's is in the
+  // tree before the vaultDB answers; the scaffold has them already, and the world reads its Things at its signin.
+  /** Start the signed-in user's bank over a SortedVaultDB of it: from the records restored, where there are any, and from the world the vaultDB answers. */
+  async #doSignin(): Promise<void> {
     try {
-      await this.#restore(bankMinder, this.#persisters?.roots)
-      await this.#restore(minder, this.#persisters?.boxes)
+      const scaffold = PersistScaffold.make(this.scope)
+      this.#persistScaffold = scaffold
+      await this.#restore(scaffold, 'roots', this.#persisters?.roots)
+      await this.#restore(scaffold, 'boxes', this.#persisters?.boxes)
       const sortedVaultDB = SortedVaultDB.make(this.scope, { vaultDB: this.vaultDB, makeThing: (seen) => this.#world.makeThing(seen) })
-      this.#receiveRestored(sortedVaultDB, bankMinder, minder)
       this.#vaultTSQ = VaultTSQ.make({ vaultMinder: sortedVaultDB, queryClient: this.#vaultTsqClient, scope: this.scope, onBadNews: (news) => { this.tellBadNews([news]) } })
+      this.#receiveRestored(sortedVaultDB, scaffold)
+      this.#unlistenScaffold = scaffold.listen(sortedVaultDB)
       this.#world.signin(sortedVaultDB)
-      bankMinder.hello(sortedVaultDB)
-      minder.hello(sortedVaultDB)
       // Scaffolding until sign-in is one get of the roots: a get of the root box, whose answer's world brings the bank and
       // main gate. Where none is stored, the bank is asked for, and its shell shows the stage `'unborn'`.
       const rootAnswer = await sortedVaultDB.tryGetOnce({ ...this.scope, labelpath: Labelpath.RootBox })
@@ -326,7 +306,7 @@ export class Device implements MinderFriend {
   }
   // --
 
-  // == [Snapshot]: align, sayGoodbye, makeSnapshot
+  // == [Snapshot]: align, makeSnapshot
 
   // An arrow, so it stays bound: the world calls it as a subscriber. The bank is live once the world's stage reads
   // `'locked'`, which the world tells of, so the vault is made here, before a subscriber reads it.
@@ -335,8 +315,8 @@ export class Device implements MinderFriend {
     const { bank } = this
     if ((bank !== null) && (this.#vault === null)) {
       this.#vault = Vault.make(bank, this.vaultTSQ)
-      // Scaffolding until the old minders go: the bank's sweep stops the old minder.
-      bank.hostVault({ sweep: () => { this.#sayGoodbye(this.#minder) } })
+      // Scaffolding until the LocalBridge: the bank's sweep ends the scaffold's listen.
+      bank.hostVault({ sweep: () => { this.#unlistenScaffold() } })
     }
     const next = this.#makeSnapshot()
     if (isEqual(next, this.#snapshot)) { return }
@@ -350,11 +330,6 @@ export class Device implements MinderFriend {
     }
   }
 
-  /** Stop `minder` minding, telling `onBadNews` what that throws. */
-  #sayGoodbye(minder: VaultMinder): void {
-    try { minder.goodbye() } catch (err) { this.tellBadNews([err]) }
-  }
-
   /** A new snapshot of this device: its world's snapshot. */
   #makeSnapshot(): DeviceSnapshot {
     return Object.freeze({ bank: this.#world.getSnapshot() })
@@ -363,16 +338,16 @@ export class Device implements MinderFriend {
 
   // == [A devtool's view]: maskedView
 
-  // The bank TSQ is no devtool's to read whole: the gate's record has each wayin's wrapped bankKey, which an offline
+  // The roots are no devtool's to read whole: the gate's record has each wayin's wrapped bankKey, which an offline
   // guess at a passphrase is checked against. What leaves here is a copy, with every ciphertext masked, and of
   // the lease only its loggable: the world hands out no lease.
-  /** The bank TSQ, the vault TSQ and the lease, masked for a devtool.
+  /** The bank's roots as the device keeps them (`bankTSQ`), the vault TSQ and the lease, masked for a devtool.
    * Each row has its key, its state, and a copy of its record or listing with each ciphertext masked. The lease shows its loggable and when it ends, never its key material.
    * For experimenting, never for an app's own logic: what it answers may change without notice. Before `signin`, it answers {@link EmptyMaskedView}.
    */
   maskedView(): MaskedView {
     if (this.#userid === null) { return EmptyMaskedView }
-    return { bankTSQ: this.#bankMinder.maskedRows(), vaultTSQ: this.#vaultTSQ?.maskedRows() ?? [], lease: maskedViewLeaseOf(this.bank === null ? undefined : this.#world) }
+    return { bankTSQ: this.#persistScaffold?.maskedRootRows() ?? [], vaultTSQ: this.#vaultTSQ?.maskedRows() ?? [], lease: maskedViewLeaseOf(this.bank === null ? undefined : this.#world) }
   }
   // --
 
@@ -433,7 +408,7 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 }
 // --
 
-// == [Helpers]: millisOf, checkSecureContext, RestoredSourcelabel, restoredEventOf, isRestoredBox, maskedViewLeaseOf
+// == [Helpers]: millisOf, checkSecureContext, RestoredSourcelabel, restoredEventOf, maskedViewLeaseOf
 
 // A host's Infinity minutes, for never, becomes ForeverMillis: past the entrypoint, nothing is infinite.
 /** `minutes` in milliseconds, capped at `ForeverMillis`, or `fallback` for none. */
@@ -454,12 +429,6 @@ function restoredEventOf(record: ThingRecord, read_tc: ReadTc, banktok: Lifetok 
     eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: undefined, agerankWas: undefined,
     sourcelabel: RestoredSourcelabel, read_tc, banktok, ...itemSeenOf(record),
   }
-}
-
-/** True for what a minder's query restored that is a box's record, live, sparse or a tombstone: not a listing, nor null */
-function isRestoredBox(val: unknown): val is ThingRecord {
-  const checked = ThingChecks.sparse.safeParse(val)
-  return checked.success && Labelpath.isBox(checked.data.labelpath)
 }
 
 /** The lease `world` holds, as a devtool is shown it: its loggable and when it ends, or `active: false` for no world, or one locked. */

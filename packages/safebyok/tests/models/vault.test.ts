@@ -105,9 +105,9 @@ const SweepCases: readonly (readonly [(born: TH.BornVault) => unknown, string, n
 
 describe("bank.sweep() and device.sweep(), over the vaults made on the bank", () => {
   for (const [sweepOf, blurb, unwatchCount] of SweepCases) {
-    it(`sweep each vault when ${blurb} is swept: the vault TSQ hears no more, and the device's minder is emptied`, async () => {
+    it(`sweep each vault when ${blurb} is swept: the vault TSQ hears no more`, async () => {
       const born = await buildWatchedVault()
-      const { bank, minder, vault, unwatched } = born
+      const { bank, vault, unwatched } = born
       const box    = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
       const first  = box.pickle()
       const stored = await vault.sealBox(TH.livePickleOf(box), {}, { whisper: TH.Whisper })
@@ -116,7 +116,6 @@ describe("bank.sweep() and device.sweep(), over the vaults made on the bank", ()
       await bank.device.world.demandSortedVaultDB().tryGetOnce(openaiScopeOf(bank))
       expect(boxAt(vault)).to.include({ revtok: stored.revtok })
       expect(itemAt(vault)).to.equal(first)
-      expect(minder.at(openaiScopeOf(bank))).to.be.undefined
       // The device's SortedVaultDB has the one watch, which only the device's sweep stops.
       expect(unwatched.calls).to.have.lengthOf(unwatchCount)
     })

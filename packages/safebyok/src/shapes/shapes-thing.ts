@@ -28,7 +28,7 @@ export const ThingFormat = 'a010501'
 function isLabelpath(labelpath: Labelpath): boolean { return thingkindVals.some((modelkind) => Labelpath.isOfModelkind(labelpath, modelkind)) }
 // --
 
-// == [Thing]: isLifepathDeep, isParityRight, GenericChecks, vaultDBShape, PerKindChecks, policiesByModelkind, ThingChecks, ThingScope, ThingCited, StoredCited, Sealed, Wayins, Sparse, AnyThingRecord
+// == [Thing]: isLifepathDeep, isParityRight, GenericChecks, vaultDBShape, PerKindChecks, policiesByModelkind, ThingChecks, ThingScope, ScopeAt, ThingCited, StoredCited, Sealed, Wayins, Sparse, AnyThingRecord
 
 // A stored lifeseq is 10 base-32 digits; the void lifeseq, -000000001, is never stored. A lifepath joins lifeseqs with '/',
 // and every one after a void one is void: a void lifepath is the void lifeseq under its parent's lifepath (void itself
@@ -263,6 +263,8 @@ export const ThingChecks = Object.freeze({ ...GenericChecks, vaultDBShape, Thing
 
 /** Where a Thing is stored: its user, its bank, and its labelpath under the bank. */
 export type ThingScope   = Readonly<Z.infer<typeof ThingChecks.thingScope>>
+/** A scope whose labelpath is `LabelpathT`. */
+export type ScopeAt<LabelpathT extends Labelpath> = ThingScope & Readonly<{ labelpath: LabelpathT }>
 /** A write's citation of the Thing it expects to find: its revision, life and liveness, the only fields AdapterVaultDB compares. The shell may be cited. */
 export type ThingCited   = Readonly<Z.infer<typeof ThingChecks.thingCited>>
 /** The fields a write reads of the Thing stored at its scope: its scope, the fields the act tables compare, and the born_at a replace leaves unchanged. */

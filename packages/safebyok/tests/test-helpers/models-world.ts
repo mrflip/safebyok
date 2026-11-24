@@ -18,7 +18,6 @@ import { Device } from '../../src/models/device'
 import { Gating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
 import type { Vault } from '../../src/models/vault'
-import type { VaultMinder } from '../../src/minding/vault-minder'
 import type { VaultTSQ } from '../../src/minding/vault-tsq'
 import { PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
 import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
@@ -190,17 +189,16 @@ export async function buildBornBank({ passkeyCleartext, device = makeDevice() }:
   }
 }
 
-/** A {@link buildBornBank} bank, beside the vault of its boxes, its device's vault TSQ, and its device's minder of the boxes. */
+/** A {@link buildBornBank} bank, beside the vault of its boxes and its device's vault TSQ. */
 export interface BornVault extends BornBank {
   vault:    Vault
   vaultTSQ: VaultTSQ
-  minder:   VaultMinder
 }
 
 /** A {@link buildBornBank} bank, unlocked, and the vault of its boxes its device made at the birth. */
 export async function buildBornVault(given: BornBankGiven = {}): Promise<BornVault> {
   const born = await buildBornBank(given)
-  return { ...born, vault: born.device.vault!, vaultTSQ: born.device.vaultTSQ, minder: born.device.minder }
+  return { ...born, vault: born.device.vault!, vaultTSQ: born.device.vaultTSQ }
 }
 // --
 

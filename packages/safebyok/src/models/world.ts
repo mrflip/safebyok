@@ -146,7 +146,7 @@ export class World {
     Checks.sortedVaultDB.parse(sortedVaultDB)
     if (this.#sortedVaultDB !== null) { return }
     this.#sortedVaultDB = sortedVaultDB
-    // The minders, listening beside it, tell the device of a record refused.
+    // The vault TSQ, listening beside it, tells the device of a record refused.
     sortedVaultDB.listen({ hear: (event) => { this.#hear(event) }, onBadNews: noop })
     this.align()
   }

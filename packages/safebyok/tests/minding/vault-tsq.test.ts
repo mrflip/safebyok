@@ -2,7 +2,6 @@ import { QueryObserver } from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
 import { Errors } from 'safebyok-big/internals'
 import { describe, expect, it, vi } from 'vitest'
-import { Minder } from '../../src/minding/minder'
 import { VaultTSQ } from '../../src/minding/vault-tsq'
 import { Thing } from '../../src/models/thing'
 import { Shell } from '../../src/shapes/shapes-thing'
@@ -65,10 +64,10 @@ describe("VaultTSQ.make", () => {
 })
 
 describe("VaultTSQ's keys", () => {
-  it("have the shapes a Minder's keys have", () => {
-    expect(VaultTSQ.itemQueryKeyOf(TH.BoxScope)).to.deep.equal(Minder.itemQueryKeyOf(TH.BoxScope))
-    expect(VaultTSQ.listQueryKeyOf(TH.RootScope)).to.deep.equal(Minder.listQueryKeyOf(TH.RootScope))
-    expect(VaultTSQ.bankQueryKeyOf(TH.ThingBank)).to.deep.equal(Minder.bankQueryKeyOf(TH.ThingBank))
+  it("start with the bank, then the kind of query, the labels and a mark", () => {
+    expect(VaultTSQ.bankQueryKeyOf(TH.ThingBank)).to.deep.equal(['sok', 'u1', 'acme'])
+    expect(VaultTSQ.itemQueryKeyOf(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'item', 'box', '/', 'openai', '!'])
+    expect(VaultTSQ.listQueryKeyOf(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'list', 'box', '#', 'kids'])
   })
 })
 
@@ -269,7 +268,7 @@ describe("VaultTSQ.getOnce and listOnce", () => {
     await TH.expectRefusal(vaultTSQ.getOnce(TH.RootScope))
     await TH.expectRefusal(vaultTSQ.getOnce(TH.BoxScope, { staleTime: -1 }))
     await TH.expectRefusal(vaultTSQ.listOnce('gate'))
-    expect(() => vaultTSQ.itemQueryOptions({ ...TH.ThingBank, labelpath: 'gate' })).to.throw('A minder writes only the Things it minds')
+    expect(() => vaultTSQ.itemQueryOptions({ ...TH.ThingBank, labelpath: 'gate' })).to.throw('A vault TSQ keeps an item only for a box under the root box')
   })
 
   it("list each time asked, the listing replaced by each answer", async () => {
