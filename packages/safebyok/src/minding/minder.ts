@@ -372,7 +372,7 @@ export abstract class Minder {
   // lands before the listing itself does.
   /** Fetch the {@link Kids} value of `scoped`'s children, deeply frozen, telling the bank's `tellBadNews` of any Thing stored damaged. */
   async #fetchListing(scoped: ThingScope): Promise<Kids> {
-    const ask    = this.#bank.makeListAsk({ labelpath: scoped.labelpath, ifAbsent: 'nil' })
+    const ask    = this.vaultDB.makeListAsk({ labelpath: scoped.labelpath, ifAbsent: 'nil' })
     const answer = await this.vaultDB.tryListThings(ask)
     this.#landWorld(answer.world)
     if (! answer.ok) { throw answer.err }
@@ -552,7 +552,7 @@ export abstract class Minder {
 
   /** The get ask the minder sends the vaultDB for `labelpathed`, in this minder's bank. */
   #askAt(labelpathed: Labelpathed): GetAsk {
-    return this.#bank.makeGetAsk({ labelpath: labelpathed.labelpath, ifAbsent: 'nil' })
+    return this.vaultDB.makeGetAsk({ labelpath: labelpathed.labelpath, ifAbsent: 'nil' })
   }
   // --
 

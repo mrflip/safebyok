@@ -704,6 +704,42 @@ describe("Thing.receive", () => {
   })
 })
 
+describe("Thing.agekind", () => {
+  const whole2 = TH.boxThingOf('openai', { revseq: 2 })
+  const AgekindCases = [
+    [[],                                                                        undefined, 'is undefined before any record'],
+    [[whole2],                                                                  "here",    'is here once the newest revision is seen whole'],
+    [[Thing.sparseOf(whole2)],                                                  "bare",    'is bare while no revision of the life is seen whole'],
+    [[whole2, Thing.sparseOf(TH.boxThingOf('openai', { revseq: 4 }))],          "cold",    'is cold while an older revision of the life is seen whole'],
+    [[whole2, Thing.sparseOf(TH.boxThingOf('openai', { lifepath: lifepathOf(2, false), lifeseq: Lifeseq.ofLifenum(2), revseq: 0 }))], "bare", 'is bare for a later life seen only sparse, whatever was seen whole before'],
+  ] as const
+  for (const [seens, expected, blurb] of AgekindCases) {
+    it(blurb, () => {
+      const thing = TH.PlainThing.make(seens[0] ?? whole2)
+      for (const seen of seens) { thing.receive(eventOf(seen)) }
+      expect(thing.agekind).to.eq(expected)
+    })
+  }
+})
+
+describe("Thing's held record, the same object", () => {
+  it("stays the record held for an equal one seen again a chunk later, while read_at and the agerank move", () => {
+    const record  = TH.boxThingOf('openai', { sidecar: { account: 'work' } })
+    const [thing] = received(undefined, record)
+    const events  = thing.receive(eventOf(structuredClone(record), readTcOf(1)))
+    expect(events.map(({ eventkind }) => eventkind)).to.deep.equal(['item'])
+    expect(thing.pickle()).to.equal(record)
+    expect([thing.agerank, thing.read_at]).to.deep.equal([agerankOf(0, 0, 0, 1), readAtOf(readTcOf(1))])
+  })
+
+  it("is the whole tombstone that follows a sparse one of the same revision", () => {
+    const tomb    = TH.boxThingOf('openai', { am: 'x', lifepath: lifepathOf(1, false), lifeseq: Lifeseq.ofLifenum(1), revseq: 1 })
+    const [thing] = received(undefined, Thing.sparseOf(tomb))
+    thing.receive(eventOf(tomb, readTcOf(1)))
+    expect(thing.pickle()).to.equal(tomb)
+  })
+})
+
 describe("Thing's props, record and citable", () => {
   it("adopts a record of each later life, every prop set again from it", () => {
     const live0 = TH.boxThingOf('openai', { revseq: 3 })
@@ -714,7 +750,7 @@ describe("Thing's props, record and citable", () => {
       ;[thing] = received(thing, record)
       expect(thing).to.deep.include(Thing.sparseOf(record))
       expect(thing.pickle()).to.eq(record)
-      expect(thing.citable).to.deep.equal({ revtok: record.revtok, revseq: record.revseq, lifepath: record.lifepath, am: record.am })
+      expect(thing.citable).to.deep.equal(Thing.sparseOf(record))
     }
   })
 
@@ -723,13 +759,24 @@ describe("Thing's props, record and citable", () => {
     const whole4 = TH.boxThingOf('openai', { revseq: 4, revtok: TH.revtokOf('four') })
     const [thing] = received(undefined, whole2)
     received(thing, Thing.sparseOf(whole4))
-    expect(thing.citable).to.deep.equal({ revtok: whole4.revtok, revseq: 4, lifepath: whole4.lifepath, am: 'a' })
+    expect(thing.citable).to.deep.equal(Thing.sparseOf(whole4))
     expect(thing.pickle()).to.eq(whole2)
     expect(thing).to.include({ revseq: 2, revtok: whole2.revtok })
     received(thing, whole4)
     expect(thing.pickle()).to.eq(whole4)
     expect(thing).to.include({ revseq: 4, revtok: whole4.revtok })
-    expect(thing.citable).to.deep.equal({ revtok: whole4.revtok, revseq: 4, lifepath: whole4.lifepath, am: 'a' })
+    expect(thing.citable).to.deep.equal(Thing.sparseOf(whole4))
+  })
+
+  it("cites the Thing fields of a newer soon over a cold record: no body, nothing secret", () => {
+    const whole2 = TH.boxThingOf('openai', { revseq: 2, sidecar: { account: 'work' } })
+    const soon4  = Thing.sparseOf(TH.boxThingOf('openai', { revseq: 4, revtok: TH.revtokOf('four'), written_at: TH.T0 + 4 }))
+    const [thing] = received(undefined, whole2)
+    received(thing, soon4)
+    expect(thing.agekind).to.eq('cold')
+    expect(thing.citable).to.deep.equal(soon4)
+    expect(thing.citable).to.not.have.any.keys('sidecar', 'whisper_sealed')
+    expect(Object.isFrozen(thing.citable)).to.be.true
   })
 
   it("keeps citable at the newest revision when an older whole record is adopted", () => {
@@ -770,7 +817,7 @@ describe("Thing's props, record and citable", () => {
 
     it("cites the soon, and moves only its citable, agerank and read_at on a newer soon", () => {
       const [thing] = received(undefined, soon4)
-      expect(thing.citable).to.deep.equal({ revtok: soon4.revtok, revseq: 4, lifepath: soon4.lifepath, am: 'a' })
+      expect(thing.citable).to.deep.equal(soon4)
       expect([thing.agerank, thing.read_at]).to.deep.equal([agerankOf(0, 4, -1), 0])
       const soon5 = Thing.sparseOf(TH.boxThingOf('openai', { revseq: 5, revtok: TH.revtokOf('five') }))
       received(thing, soon5, readTcOf(3))

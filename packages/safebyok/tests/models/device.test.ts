@@ -409,13 +409,14 @@ describe("device.signin(userid)", () => {
     expect(device.getSnapshot().bank).to.equal(bank.getSnapshot())
   })
 
-  it("builds asks that carry no banktok until it has a bank, and the bank's after", async () => {
+  it("has its world's SortedVaultDB build asks that carry no banktok until it has a bank, and the bank's after", async () => {
     const device = TH.makeDevice({ userid: null })
     await device.signin(TH.WorldScope.userid)
-    expect(device.makeGetAsk({ labelpath: 'bank' })).to.not.have.property('banktok')
-    expect(device.makeListAsk({ labelpath: 'box' })).to.not.have.property('banktok')
+    const sortedVaultDB = device.world.demandSortedVaultDB()
+    expect(sortedVaultDB.makeGetAsk({ labelpath: 'bank' })).to.not.have.property('banktok')
+    expect(sortedVaultDB.makeListAsk({ labelpath: 'box' })).to.not.have.property('banktok')
     const bank = await device.birthGating({ passphraseCleartext: TH.TestPassphrase }).attempt()
-    expect(device.makeGetAsk({ labelpath: 'bank' })).to.deep.include({ banktok: bank.lifetok })
+    expect(sortedVaultDB.makeGetAsk({ labelpath: 'bank' })).to.deep.include({ banktok: bank.lifetok })
   })
 
   it("shows the refusal as failed where its bank cannot be read, and never rejects", async () => {

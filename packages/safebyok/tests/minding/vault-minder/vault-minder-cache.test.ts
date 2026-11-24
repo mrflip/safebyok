@@ -2,6 +2,7 @@ import * as TSQ from '@tanstack/query-core'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { MaxTimerMillis } from '../../../src/shapes/shapes-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
+import { SortedVaultDB } from '../../../src/storage/sorted-vault-db'
 import { type BoxRecord, type Sparse, type ThingRecord, type Tombstone } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
@@ -451,10 +452,11 @@ describe("VaultMinder.tryAt", () => {
   })
 
   it("answers unexpected_error, not a storage refusal, for anything else its own code throws", () => {
-    const bank = { ...fakeBankOf(), makeGetAsk: () => { throw new Error('ask broke') } }
-    const minder = minderOf({}, bank)
+    const minder = minderOf({}, fakeBankOf())
     minder.hello(sortedOf(new MemoryVaultDB()))
+    const asking = vi.spyOn(SortedVaultDB.prototype, 'makeGetAsk').mockImplementationOnce(() => { throw new Error('ask broke') })
     const answer = minder.tryAt(TH.BoxScope)
+    asking.mockRestore()
     expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing' })
     expect(answer).to.have.nested.property('err.refusalkind', 'unexpected_error')
   })

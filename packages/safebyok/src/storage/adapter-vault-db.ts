@@ -1,6 +1,6 @@
 /** The `AdapterVaultDB` base class: a concrete adapter extends it by writing the `do*` calls. */
 
-import { noop } from 'es-toolkit'
+import { deepFreeze, noop } from 'es-toolkit'
 import { type EX, Errors, Outcome, type Helpers } from 'safebyok-big/internals'
 import { Labelpath, type Lifetok } from '../shapes/primitives'
 import type { ThingRecord, VoidSentinel } from '../shapes/shapes-thing'
@@ -17,7 +17,7 @@ import type {
 } from './vault-db'
 import * as Throwers from '../refusals/throwers'
 
-// == [Answers]: Received, answerOf, trackedFieldOf, banktokOf, itemEventOf
+// == [Answers]: Received, answerOf, frozenAnswerOf, trackedFieldOf, banktokOf, itemEventOf
 
 /** A change a concrete adapter's `doWatch` passes to `receive`: the changed Thing, raw, and its bank's world as the datastore last read it.
  * Watchers are notified of the Thing alone, with the world's lifetok: a bank or main gate that changed is a change of its own.
@@ -46,6 +46,14 @@ function answerOf(actual: Actual<EX.GoodAct, ThingRecord | VoidSentinel | null>,
   return { ...good, act: actual.act, val: record as ThingRecord }
 }
 
+// Frozen once, here, so that a Thing or a cache may hold the very records an answer carries.
+/** `answer`, with every record it carries deeply frozen, and neither its ask nor its refusal. */
+function frozenAnswerOf<AnswerT extends { ask: unknown, err?: unknown }>(answer: AnswerT): AnswerT {
+  const { ask: _ask, err: _err, ...carried } = answer
+  for (const val of Object.values(carried)) { deepFreeze(val) }
+  return answer
+}
+
 /** The `tracked` a concrete adapter reports, as a field to spread into an answer: none where it reports none. */
 function trackedFieldOf({ tracked }: { tracked?: Tracked }): { tracked?: Tracked } { return (tracked === undefined) ? {} : { tracked } }
 
@@ -64,6 +72,7 @@ function itemEventOf(record: ThingRecord, world: WorldRecord | null): VaultItemE
 /** The base class of a vaultDB over a datastore: a subclass writes the `do*` calls, each one atomic step.
  * It checks each ask, and classifies what a `do*` call fetches per the act tables in `notes/answer-contract.md`.
  * Its watch notifies only what the datastore reports changing: nothing an answer carries.
+ * Every record an answer or a notice carries is deeply frozen; an ask, and a record a caller hands it, never are.
  */
 export abstract class AdapterVaultDB implements VaultDB {
 
@@ -95,7 +104,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const thingGetAsk = AskChecks.getAsk.parse(ask)
       const loggableAsk = loggableAskOf(thingGetAsk)
       const actual      = await this.doGetThing(thingGetAsk) // has act and ok, but no err yet
-      return answerOf(actual, 'getThing', loggableAsk)
+      return frozenAnswerOf(answerOf(actual, 'getThing', loggableAsk))
     } catch (err) { return this.answerForThrown(err, 'getThing', ask) }
   }
 
@@ -105,7 +114,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const writeAsk    = checkedWriteAsk(ask)
       const loggableAsk = loggableAskOf(writeAsk)
       const actual      = await this.doWriteThing(writeAsk) // has act and ok, but no err yet
-      return answerOf(actual, 'writeThing', loggableAsk)
+      return frozenAnswerOf(answerOf(actual, 'writeThing', loggableAsk))
     } catch (err) { return this.answerForThrown(err, 'writeThing', ask) }
   }
 
@@ -116,9 +125,9 @@ export abstract class AdapterVaultDB implements VaultDB {
       const loggableAsk = loggableAskOf(listAsk)
       const actual      = await this.doListThings(listAsk)
       const beside      = { world: actual.world, banktok: banktokOf(actual.world), ...trackedFieldOf(actual), parentage: actual.parentage, deltas: actual.deltas, damaged_rows: actual.damaged_rows }
-      return actual.ok
+      return frozenAnswerOf<ListThingsAnswer>(actual.ok
         ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, read_tc: actual.kids.read_tc, val: actual.kids }
-        : { ok: false, ask: loggableAsk, act: actual.act, ...beside, read_tc: actual.read_tc, dbhas: [], err: Throwers.actRefused('vault', actual.act, { oplabel: 'listThings', ask: loggableAsk }) }
+        : { ok: false, ask: loggableAsk, act: actual.act, ...beside, read_tc: actual.read_tc, dbhas: [], err: Throwers.actRefused('vault', actual.act, { oplabel: 'listThings', ask: loggableAsk }) })
     } catch (err) { return { ...this.answerForThrown(err, 'listThings', ask), dbhas: null, parentage: [], deltas: [], damaged_rows: [] } }
   }
 
@@ -129,9 +138,9 @@ export abstract class AdapterVaultDB implements VaultDB {
       const loggableAsk  = loggableAskOf(birthBankAsk)
       const actual       = await this.doBirthBank(birthBankAsk, birthPutsOf(birthBankAsk))
       const beside       = { world: actual.world, banktok: banktokOf(actual.world), ...trackedFieldOf(actual), read_tc: Classifier.readTcOfStep(actual.read_tc) }
-      return actual.ok
+      return frozenAnswerOf<BirthBankAnswer>(actual.ok
         ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, val: actual.things }
-        : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: actual.record, err: Throwers.actRefused('vault', actual.act, { oplabel: 'birthBank', ask: loggableAsk }) }
+        : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: actual.record, err: Throwers.actRefused('vault', actual.act, { oplabel: 'birthBank', ask: loggableAsk }) })
     } catch (err) { return this.answerForThrown(err, 'birthBank', ask) }
   }
 
@@ -143,7 +152,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews })
     return this.doWatch(bankScope, ({ record, world }) => {
       let event: VaultItemEvent
-      try { event = itemEventOf(Classifier.watchedThingOf(bankScope, record), world) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
+      try { event = itemEventOf(deepFreeze(Classifier.watchedThingOf(bankScope, record)), world) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
       // A notice handler that throws is a bug in the host's code, not trouble in storage.
       try { onNotice(event) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
     }, onBadNews)
@@ -164,7 +173,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       Object.assign(err, { meta: { ...err.meta, oplabel, ask: loggableAsk } })
       // Only the classifier sets rows.dbhas, to a Thing it has checked.
       const dbhas = (Errors.rowsOfRefusal(err).dbhas ?? null) as ThingRecord | null
-      return { ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', world: null, banktok: null, read_tc: Classifier.readTcNow(), dbhas, err }
+      return frozenAnswerOf({ ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', world: null, banktok: null, read_tc: Classifier.readTcNow(), dbhas, err })
     } catch {
       return { ok: false, ask: {}, act: 'unclassified_storing', world: null, banktok: null, read_tc: Classifier.readTcNow(), dbhas: null, err: Throwers.answerNotMade() }
     }

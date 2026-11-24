@@ -178,7 +178,8 @@ export class Vault {
   async #sealedAsk(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxWriteAsk> {
     const record = await this.#bank.sealBox(donorProps, publicProps, secretProps)
     const cited  = Thing.sparseOf(donorProps)
-    return BaseBox.isTombstone(record) ? this.#bank.makeDelAsk<BoxRecord>({ cited, record }) : this.#bank.makePutAsk<BoxRecord>({ cited, record })
+    const sortedVaultDB = this.#bank.device.world.demandSortedVaultDB()
+    return BaseBox.isTombstone(record) ? sortedVaultDB.makeDelAsk<BoxRecord>({ cited, record }) : sortedVaultDB.makePutAsk<BoxRecord>({ cited, record })
   }
 
   /** The scope of the box at `labelpath`, in this vault's bank. Refuses the root box's labelpath. */

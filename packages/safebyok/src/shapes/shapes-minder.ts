@@ -3,15 +3,13 @@
 import * as TSQ from '@tanstack/query-core'
 import type * as Z from 'zod'
 import { type Errors, Validator } from 'safebyok-big/internals'
-import type { Bank } from '../models/bank'
 import type { RecordOfKind } from '../models/base-thing'
 import * as Phrases from '../phrases'
 import type { BadAnswer, GoodAnswer, Kids } from '../storage/vault-db'
 import type { Banklabel, BoxLabelpath, EpochMillis, Labelpath, Lifepath, Lifeseq, Revtok, Userid } from './primitives'
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, ThingChecks, ThingFormat } from './shapes-thing'
-import { type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope } from './shapes-asks'
+import { type GetAsk, type LoggableAsk, type ThingWatchScope } from './shapes-asks'
 import type { LeaseLoggable } from './shapes-stamps'
-import type { BankAskDraft } from './shapes-bankish'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis
 
@@ -71,7 +69,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
   const queryCacheOptsOrDefault = orDefault(queryCacheOpts, DefaultQueryCacheOpts)
   // A live object passes whole where these checks pass: parsing it would hand back a copy, its getters read once. Its
   // scope is not read: a device's refuses until `signin`, and a minder reads it at each use.
-  const friendFields     = obj({ makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
+  const friendFields     = obj({ tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.MinderFriendExpected)
   const minderListener   = fn<(event: MinderEvent) => void>()
   const feedVersion      = lit(MinderEventFormat, Phrases.FeedVersionOther)
@@ -105,16 +103,10 @@ export type MinderGetOpts    = Z.input<typeof MinderChecks.minderGetOpts>
 export type MinderTryAtOpts  = Z.input<typeof MinderChecks.minderTryAtOpts>
 /** `invalidate`'s options, which it requires: `list: 'all'` marks every listing under the labelpath stale. */
 export type MinderInvalidateOpts = Z.input<typeof MinderChecks.minderInvalidateOpts>
-/** What a minder is made with: its bank's scope, the builders of the asks it sends, and where trouble no caller waits on goes.
- * A Device is one, and so is a {@link Bank}.
- */
+/** What a minder is made with: its bank's scope, and where trouble no caller waits on goes. A Device is one, and so is a Bank. */
 export interface MinderFriend {
   /** The bank's scope, which the minder reads at each use, never at its making: it may refuse until the bank is known. */
   readonly scope:   ThingWatchScope
-  /** The get ask for the Thing at `ask.labelpath` in the bank. */
-  makeGetAsk(ask: BankAskDraft): GetAsk
-  /** The list ask for the children of the Thing at `ask.labelpath` in the bank. */
-  makeListAsk(ask: BankAskDraft): ListAsk
   /** Hear failures no caller is waiting on. Never throws. */
   tellBadNews(badnews: readonly unknown[]): void
 }

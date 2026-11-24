@@ -8,7 +8,8 @@ import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/provi
 import { Wayin } from '../../src/models/wayin'
 import type { WorldGateFriend } from '../../src/shapes/shapes-gateish'
 import type { ShellOf } from '../../src/shapes/shapes-sealers'
-import { type GateRecord, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
+import { type GateRecord, ThingFormat } from '../../src/shapes/shapes-thing'
+import { Thing } from '../../src/models/thing'
 import { Lifeseq } from '../../src/shapes/primitives'
 import * as TH from '../test-helpers'
 
@@ -232,7 +233,7 @@ describe("a gate over the shell or a tombstone", () => {
     expect(Object.hasOwn(gate, 'wayins')).to.be.false
     expect(gate.wayins).to.be.undefined
     expect(gate.scope).to.deep.equal(TH.GateScope)
-    expect(gate.citable).to.deep.equal(Shell.Cited)
+    expect(gate.citable).to.deep.equal(Thing.sparseOf(TH.gateShellOf()))
     expect(gate.modelkind).to.eq('gate')
   })
 

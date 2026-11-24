@@ -6,15 +6,11 @@ import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { SortedVaultDB } from '../../../src/storage/sorted-vault-db'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { Hours24, fakeBankOf, minderOf, minderWorldOf, sortedOf, storedBoxOf, boxScopeOf, cheatBox, labelpathsOf } from './world'
+import { Hours24, fakeBankOf, knowRoots, minderOf, minderWorldOf, sortedOf, storedBoxOf, boxScopeOf, cheatBox, labelpathsOf } from './world'
 
 describe("VaultMinder.make", () => {
-  const { makeGetAsk: _makeGetAsk, ...noAsks } = fakeBankOf()
-  const { makeListAsk: _makeListAsk, ...noListAsks } = fakeBankOf()
   const MakeCases = [
     [{},                                                    { ...TH.ThingBank }, 'refuses a bank without its scope'],
-    [{},                                                    noAsks,              'refuses a bank that builds no get asks'],
-    [{},                                                    noListAsks,          'refuses a bank that builds no list asks'],
     [{ queryCacheOpts: { networkMode: 'online' } },         null,                'refuses a networkMode, which no host sets'],
     [{ queryCacheOpts: { retry: 3 } },                      null,                'refuses a retry, which no host sets'],
     [{ queryCacheOpts: { staleTime: -1 } },                 null,                'refuses a negative staleTime'],
@@ -118,6 +114,7 @@ describe("VaultMinder.hello", () => {
     const bankMinder = BankMinder.make({}, fakeBankOf())
     bankMinder.hello(sortedOf(vaultDB))
     const minder     = minderOf({}, fakeBankOf())
+    knowRoots(sortedOf(vaultDB))
     minder.hello(sortedOf(vaultDB))
     await TH.expectRefusal(minder.get(TH.BoxScope), 'storage_issue')
     await TH.expectGood(bankMinder.tryBirthBank(TH.birthBankAskOf()))

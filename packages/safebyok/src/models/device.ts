@@ -9,8 +9,8 @@ import { World } from './world'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import { BankMinder } from '../minding/bank-minder'
 import { VaultMinder } from '../minding/vault-minder'
-import { type BadNewsHandler, type BankAskDraft, type DeviceJSON, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, BankishChecks } from '../shapes/shapes-bankish'
-import { type BankRoots, type GetAsk, type ListAsk, getAskOf, listAskOf } from '../shapes/shapes-asks'
+import { type BadNewsHandler, type DeviceJSON, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, BankishChecks } from '../shapes/shapes-bankish'
+import type { BankRoots } from '../shapes/shapes-asks'
 import { type MaskedView, type MaskedViewLease, type MinderFriend, EmptyMaskedView, MinderChecks } from '../shapes/shapes-minder'
 import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
 import type { BankScope } from '../shapes/shapes-stamps'
@@ -289,16 +289,6 @@ export class Device implements MinderFriend {
     try { this.#world.sortedVaultDB?.sweep() } catch (err) { this.tellBadNews([err]) }
     return this
   }
-  // --
-
-  // == [The minder's friend]: makeGetAsk, makeListAsk
-  // The bank's builders where the device has one, so that each ask tracks the bank, its main gate and its root box and carries its lifetok; until then, asks that track nothing and carry no lifetok.
-
-  /** The get ask for the Thing at `ask.labelpath` in the signed-in user's bank scope. */
-  makeGetAsk(ask: BankAskDraft): GetAsk { return this.bank?.makeGetAsk(ask) ?? getAskOf({ ...ask, ...this.scope }) }
-
-  /** The list ask for the children of the Thing at `ask.labelpath` in the signed-in user's bank scope. */
-  makeListAsk(ask: BankAskDraft): ListAsk { return this.bank?.makeListAsk(ask) ?? listAskOf({ ...ask, ...this.scope }) }
   // --
 
   // == [Snapshot]: align, makeSnapshot

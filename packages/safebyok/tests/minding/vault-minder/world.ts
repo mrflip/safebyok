@@ -10,21 +10,19 @@ import { readTcNow } from '../../../src/storage/thing-classifier'
 import type { Labelpath, Revtok } from '../../../src/shapes/primitives'
 import { type BoxRecord, type ThingRecord, type ThingScope, Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
-import { type GetAsk, type WriteAsk, getAskOf, listAskOf } from '../../../src/shapes/shapes-asks'
+import { type GetAsk, type WriteAsk, getAskOf } from '../../../src/shapes/shapes-asks'
 import type { BankScope } from '../../../src/shapes/shapes-stamps'
 import type { GetThingAnswer, Kids, VaultDB, WriteThingAnswer } from '../../../src/storage/vault-db'
 import type { VaultItemEvent } from '../../../src/shapes/shapes-vault-event'
 import * as TH from '../../test-helpers'
 
-/** The get ask a minder sends the vaultDB for the box at `TH.BoxScope`: the bank's, tracking the roots at revision 0. */
-export const BoxGetAsk: GetAsk = getAskOf({ ...TH.BoxScope, ifAbsent: 'nil', track: TH.trackOf() })
+/** The get ask a minder sends the vaultDB for the box at `TH.BoxScope` once its SortedVaultDB knows the roots at revision 0 ({@link knowRoots}). */
+export const BoxGetAsk: GetAsk = getAskOf({ ...TH.BoxScope, ifAbsent: 'nil', track: TH.trackOf(), banktok: TH.bankThingOf().lifetok })
 
-/** A bank as a minder reads it, {@link TH.ThingBank} unless `scope` names another: its scope, its get and list asks tracking the roots at revision 0, and a spy for its bad news. */
+/** A bank as a minder reads it, {@link TH.ThingBank} unless `scope` names another: its scope, and a spy for its bad news. */
 export function fakeBankOf(scope: BankScope = TH.ThingBank) {
   return {
     scope:       { ...scope },
-    makeGetAsk:  (args: { labelpath: Labelpath, ifAbsent?: 'nil' | 'fail' }) => getAskOf({ ...args, ...scope, track: TH.trackOf() }),
-    makeListAsk: (args: { labelpath: Labelpath, ifAbsent?: 'nil' | 'fail' }) => listAskOf({ ...args, ...scope, track: TH.trackOf() }),
     tellBadNews: vi.fn<(badnews: readonly unknown[]) => void>(),
   } satisfies MinderFriend
 }
@@ -92,6 +90,11 @@ export function sortedOf(vaultDB: VaultDB): SortedVaultDB {
   return sorted
 }
 
+/** Have `sorted` know the bank's roots at revision 0, as a device does once its bank is up, so that the asks it builds track them. Nothing is stored. */
+export function knowRoots(sorted: SortedVaultDB): void {
+  for (const root of [TH.bankThingOf(), TH.gateThingOf(), TH.rootBoxOf()]) { sorted.receive({ ...TH.itemEventOf(root), sourcelabel: 'persister', read_tc: readTcNow() }) }
+}
+
 /** A day, in milliseconds: far past the five minutes after which TanStack Query collects a query by default. */
 export const Hours24 = 24 * 60 * 60 * 1000
 
@@ -117,12 +120,15 @@ export interface MinderWorld<VaultDBT extends MemoryVaultDB> {
   receive:    (event: VaultItemEvent) => void
 }
 
-/** The minder of a bank over `vaultDB`, made, and started unless `isStarted` is false. Its BankMinder has the bank's world, roots at revision 0, unless `isWorldHeard` is false. */
+/** The minder of a bank over `vaultDB`, made, and started unless `isStarted` is false. Its SortedVaultDB knows the roots at revision 0 ({@link knowRoots}).
+ * Its BankMinder has the bank's world, roots at revision 0, unless `isWorldHeard` is false.
+ */
 export async function minderWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT, { isStarted = true, isWorldHeard = true } = {}): Promise<MinderWorld<VaultDBT>> {
   const bank       = fakeBankOf()
   const bankMinder = await bankMinderOf({ isWorldHeard })
   const watching   = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
   const minder     = minderOf({}, bank)
+  knowRoots(sortedOf(vaultDB))
   if (isStarted) { minder.hello(sortedOf(vaultDB)) }
   function receive(event: VaultItemEvent): void {
     for (const watched of watching.mock.calls) { watched[1](event) }

@@ -13,11 +13,14 @@ TH.describeVaultDBBattery('MemoryVaultDB', {
 })
 
 describe("MemoryVaultDB, what only a store in memory can show", () => {
-  it("answers with a copy, which the caller can change without changing the store", async () => {
+  it("answers with a copy of what it stores, deeply frozen, and stores a copy of what it is handed", async () => {
     const vaultDB = new MemoryVaultDB()
-    await TH.expectGood(vaultDB.tryWriteThing(TH.birthAskOf()))
-    const val = await TH.expectGood<unknown>(vaultDB.tryGetThing(TH.getGateAskOf())) as { auth: { planted?: boolean } }
-    val.auth.planted = true
+    const gate = TH.gateThingOf()
+    await TH.expectGood(vaultDB.tryWriteThing(TH.birthAskOf(gate)))
+    const val = await TH.expectGood<unknown>(vaultDB.tryGetThing(TH.getGateAskOf())) as { auth: object }
+    expect(Object.isFrozen(val.auth)).to.be.true
+    expect(val).to.not.equal(vaultDB._cheat_things(TH.ThingBank).get('gate'))
+    ;(gate as { label: string }).label = 'changed'
     const again = await vaultDB.tryGetThing(TH.getGateAskOf())
     expect(again).to.deep.include({ val: TH.gateThingOf() })
   })

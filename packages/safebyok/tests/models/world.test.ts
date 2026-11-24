@@ -59,12 +59,14 @@ describe("world.makeThing(seen)", () => {
   }
 })
 
-describe("world.bank, world.gate and world.bankStamp", () => {
-  it("are the bank and main gate its SortedVaultDB keeps, and the bank's stamp, which a gate of the world's takes for its bank's", async () => {
+describe("world.bank, world.gate, world.rootBox and world.bankStamp", () => {
+  it("are the bank, main gate and root box its SortedVaultDB keeps, and the bank's stamp, which a gate of the world's takes for its bank's", async () => {
     const { device, bank } = await TH.buildBornBank()
     const { world } = device
     expect(world.bank).to.equal(bank)
     expect(world.gate).to.equal(bank.gate)
+    expect(world.rootBox).to.equal(world.sortedVaultDB!.thingAt(TH.RootScope))
+    expect(world.rootBox?.pickle()).to.equal(bank.rootBox)
     expect(world.sortedVaultDB!.thingAt({ ...TH.WorldScope, labelpath: 'gate' })).to.equal(world.gate)
     expect(world.bankStamp).to.deep.equal(bank.stamp)
     expect(world.gate!.bankStamp).to.deep.equal(bank.stamp)
@@ -77,6 +79,17 @@ describe("world.bank, world.gate and world.bankStamp", () => {
     expect(world.gate).to.be.null
     TH.expectSyncRefusal(() => world.bankStamp, 'absent_thing')
     TH.expectSyncRefusal(() => world.makeThing(TH.gateThingOf()).bankStamp, 'absent_thing')
+  })
+})
+
+describe("world.demandSortedVaultDB()", () => {
+  it("answers the SortedVaultDB its signin was handed", async () => {
+    const { world } = await signedInDevice()
+    expect(world.demandSortedVaultDB()).to.equal(world.sortedVaultDB)
+  })
+
+  it("refuses before signin", () => {
+    TH.expectSyncRefusal(() => TH.makeDevice({ userid: null }).world.demandSortedVaultDB(), 'absent_vault')
   })
 })
 

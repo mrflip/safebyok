@@ -79,7 +79,7 @@ export class World {
   }
 
   /** The root box's Thing in the {@link sortedVaultDB}, of whatever life, or null where no record of it has been heard of. */
-  get #rootBox(): Box | null {
+  get rootBox(): Box | null {
     const thing = this.#thingAt(Labelpath.RootBox)
     return (thing instanceof Box) ? thing : null
   }
@@ -299,7 +299,7 @@ export class World {
   }
   // --
 
-  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, areRootsLive, demandEnabled, demandRootsLive, demandLease, thingAt
+  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, areRootsLive, demandEnabled, demandRootsLive, demandSortedVaultDB, demandLease, thingAt
 
   /** True until this world is swept or its device ends. */
   get isEnabled(): boolean { return this.endCause === null }
@@ -317,7 +317,7 @@ export class World {
   get isUnlockWanted(): boolean { return this.#unlockWait !== null }
 
   /** True while the bank's, the main gate's and the root box's Things each hold a live record. */
-  get areRootsLive(): boolean { return isLive(this.bank) && isLive(this.gate) && isLive(this.#rootBox) }
+  get areRootsLive(): boolean { return isLive(this.bank) && isLive(this.gate) && isLive(this.rootBox) }
 
   /** Throw unless {@link isEnabled}. */
   demandEnabled(): this {
@@ -331,8 +331,14 @@ export class World {
     const { bank } = this
     if (! isLive(bank)) { throw Throwers.thingNotLive('bank') }
     if (! isLive(this.gate)) { throw Throwers.thingNotLive(Labelpath.MainGate) }
-    if (! isLive(this.#rootBox)) { throw Throwers.thingNotLive(Labelpath.RootBox) }
+    if (! isLive(this.rootBox)) { throw Throwers.thingNotLive(Labelpath.RootBox) }
     return bank
+  }
+
+  /** The {@link sortedVaultDB}, refusing until {@link signin}. */
+  demandSortedVaultDB(): SortedVaultDB {
+    if (this.#sortedVaultDB === null) { throw Throwers.nobodySignedIn() }
+    return this.#sortedVaultDB
   }
 
   /** The attached lease. Demands that the world is enabled and unlocked. */

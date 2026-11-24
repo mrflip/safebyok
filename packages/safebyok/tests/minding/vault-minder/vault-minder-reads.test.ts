@@ -5,7 +5,7 @@ import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, storedBoxOf, noticeOf, revtokAt, listenerOf, toldOf, labelpathsOf } from './world'
+import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, sortedOf, bornOf, storedBoxOf, noticeOf, revtokAt, listenerOf, toldOf, labelpathsOf } from './world'
 import { readTcNow } from '../../../src/storage/thing-classifier'
 
 describe("VaultMinder.get", () => {
@@ -363,12 +363,13 @@ describe("VaultMinder.list", () => {
     await TH.expectRefusal(minder.list('box'), 'storage_issue')
   })
 
-  it("sends the bank's list ask for the labelpath it is given", async () => {
+  it("sends its SortedVaultDB's list ask for the labelpath it is given", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
-    const { minder, bank } = await minderWorldOf(vaultDB)
+    const { minder } = await minderWorldOf(vaultDB)
     const listed = vi.spyOn(vaultDB, 'tryListThings')
+    const ask    = sortedOf(vaultDB).makeListAsk({ labelpath: 'box/openai', ifAbsent: 'nil' })
     expect(labelpathsOf(await minder.list('box/openai'))).to.deep.equal([])
-    expect(listed.mock.calls).to.deep.equal([[bank.makeListAsk({ labelpath: 'box/openai', ifAbsent: 'nil' })]])
+    expect(listed.mock.calls).to.deep.equal([[ask]])
   })
 
   it("refuses bad_record for a labelpath that is no Thing's", async () => {

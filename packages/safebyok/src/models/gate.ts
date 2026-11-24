@@ -14,7 +14,7 @@ import type * as Sealers from '../shapes/shapes-sealers'
 import { type BankStamp, type GateStamp, type LeaseLoggable, type LeaseStamp, StampChecks } from '../shapes/shapes-stamps'
 import { type GateRecord, type Modelkind, type Sparse, type ThingRecord, type ThingScope, type Wayins, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
 import { GateChecks } from '../shapes/shapes-thingkinds'
-import { type PutAskDraft, putAskOf } from '../shapes/shapes-asks'
+import type { PutAskDraft } from '../shapes/shapes-asks'
 import type { EpochMillis } from '../shapes/primitives'
 import * as Throwers from '../refusals/throwers'
 
@@ -227,8 +227,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   /** Write `ask.record`, this gate's next revision, over `ask.cited`, and tell this gate's subscribers. Resolves this gate, which then models the revision written. */
   async #putGate(ask: PutAskDraft<GateRecord>): Promise<this> {
     this.demandEnabled()
-    const answer = await this.#device.bankMinder.tryWrite({ ...putAskOf<GateRecord>(ask), modelkind: 'gate' })
-    if (! answer.ok) { throw answer.err }
+    await this.#world.demandSortedVaultDB().putOnce(ask)
     this.#tell()
     return this
   }

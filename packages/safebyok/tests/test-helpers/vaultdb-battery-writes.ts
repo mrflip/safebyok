@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { expectBad, expectGood } from 'safebyok-big/testing'
 import * as Phrases from '../../src/phrases'
-import { Shell } from '../../src/shapes/shapes-thing'
+import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import { Thing } from '../../src/models/thing'
 import { type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import {
@@ -422,6 +422,29 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       const next = nextOf(box)
       expect(await vaultDB.tryWriteThing(replaceAskOf(box, next))).to.deep.include({ ok: true, act: 'replaced', val: next })
       expect(await gotAt(vaultDB, box.labelpath)).to.deep.equal(next)
+    })
+  })
+
+  describe("the records its answers carry", () => {
+    it("are deeply frozen, a box's sidecar and the world's main gate among them", async () => {
+      const vaultDB = await bornBank()
+      const [box] = await boxesBorn(vaultDB, boxThingOf('openai', { sidecar: { account: 'work' } }))
+      const answer = await vaultDB.tryGetThing(getAskAt(box!.labelpath))
+      const val = await expectGood(answer) as BoxRecord
+      expect(val.sidecar).to.deep.equal({ account: 'work' })
+      expect([Object.isFrozen(val), Object.isFrozen(val.sidecar), Object.isFrozen(answer.world?.maingate)]).to.deep.equal([true, true, true])
+      const listed = await vaultDB.tryListThings(listAskOf(RootScope))
+      const kids = await expectGood(listed)
+      expect([Object.isFrozen(kids.items), Object.isFrozen(listed.deltas[0])]).to.deep.equal([true, true])
+    })
+
+    it("never freeze the ask or the record a caller hands a write", async () => {
+      const vaultDB = await bornBank()
+      const box = boxThingOf('openai', { sidecar: { account: 'work' } })
+      const ask = birthAskOf(box, Shell.childCited(Life0))
+      const written = await expectGood(vaultDB.tryWriteThing(ask))
+      expect([Object.isFrozen(ask), Object.isFrozen(box), Object.isFrozen(box.sidecar)]).to.deep.equal([false, false, false])
+      expect(Object.isFrozen(written)).to.be.true
     })
   })
 

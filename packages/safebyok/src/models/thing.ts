@@ -1,12 +1,12 @@
-import { pick } from 'es-toolkit'
+import { isEqual, pick } from 'es-toolkit'
 import { Helpers, VX, Validator } from 'safebyok-big/internals'
 import { BaseThing, ThingFieldnames } from './base-thing'
 import * as Phrases from '../phrases'
 import { type EpochMillis, Labelpath } from '../shapes/primitives'
 import type { ShellOf } from '../shapes/shapes-sealers'
 import { type Sparse, type ThingCited, type ThingRecord, type Tombstone, Shell, ThingChecks, isLifepathDeep, isParityRight } from '../shapes/shapes-thing'
-import { type Agerank, type SeenThing, type VaultEvent, livenessVals, vaultEventkindVals } from '../shapes/shapes-vault-event'
-import { eventsOf, itemSeenOf, raisedOf, timeOf } from '../storage/agerank'
+import { type Agekind, type Agerank, type SeenThing, type VaultEvent, livenessVals, vaultEventkindVals } from '../shapes/shapes-vault-event'
+import { agekindOf, eventsOf, itemSeenOf, raisedOf, timeOf } from '../storage/agerank'
 import { ReadTcPattern, readAtOf } from '../storage/thing-classifier'
 import type { ReadTc } from '../storage/vault-db'
 
@@ -35,8 +35,8 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
 
   // Set by the constructor's adopt, which finds it undefined.
   #record: Adoptable<RecordT> | undefined = undefined
-  /** The citation of the newest revision seen. */
-  #citable: ThingCited
+  /** The Thing fields of the newest revision seen. */
+  #citable: Sparse<ThingRecord>
   #agerank: Agerank | undefined = undefined
   #readAt: EpochMillis | undefined = undefined
 
@@ -84,13 +84,17 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   }
   // --
 
-  // == [Feed]: citable, agerank, read_at, receive
+  // == [Feed]: citable, agerank, agekind, read_at, receive
 
-  /** What a write over this Thing cites: the citation of the newest revision seen, sparse or whole. */
-  get citable(): ThingCited { return this.#citable }
+  /** What a write over this Thing cites: the Thing fields of the newest revision seen, sparse or whole. */
+  get citable(): Sparse<ThingRecord> { return this.#citable }
 
   /** How far this Thing has been seen, as {@link Agerank} spells it, or undefined until it first receives a record. */
   get agerank(): Agerank | undefined { return this.#agerank }
+
+  // A Thing bare in a later life still holds an earlier life's record.
+  /** Whether the newest revision seen has been seen whole ({@link Agekind}), or undefined until this Thing first receives a record. Check it before reading the record. */
+  get agekind(): Agekind | undefined { return (this.#agerank === undefined) ? undefined : agekindOf(this.#agerank) }
 
   /** When the newest revision seen was last seen, in epoch milliseconds, or undefined until it first receives a record. */
   get read_at(): EpochMillis | undefined { return this.#readAt }
@@ -99,7 +103,7 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
    * News is a record that raises the agerank: from a later life, newer than any revision seen, a whole record newer than any
    * whole one seen, or the newest revision seen again in a later span of 65.536 seconds than it was last seen in.
    * The events are `proposed` with its ageranks, then any `life`, then any `aged`, each frozen. A whole record, a tombstone
-   * or the void sentinel is adopted; a sparse live record moves only `citable`, `agerank` and `read_at`.
+   * or the void sentinel is adopted, unless it equals the record held, which stays the same object; a sparse live record moves only `citable`, `agerank` and `read_at`.
    * A `life` or `aged` event returns none. Refuses an event of another Thing.
    */
   receive(proposed: VaultEvent<RecordT>): readonly VaultEvent<RecordT>[] {
@@ -112,7 +116,7 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
     if (agerank === undefined) { return NoEvents }
     // Adopted first, so that an adopt that throws leaves this Thing as it was. Read before it, since adopt may move citable.
     const readAt = this.#readAtAfter(val, readAtOf(read_tc))
-    if (liveness !== 'soon') { this.adopt(val) }
+    if ((liveness !== 'soon') && ! isEqual(this.#record, val)) { this.adopt(val) }
     this.#agerank = agerank
     this.#readAt  = readAt
     if (BaseThing.cmp(this.#citable, val) > 0) { this.#citable = citedOf(val) }
@@ -171,8 +175,8 @@ const ScopeFieldnames: ReadonlySet<string> = new Set(['userid', 'banklabel', 'la
 /** What `receive` returns for an event that is not news. */
 const NoEvents: readonly never[] = Object.freeze([])
 
-/** The citation of `seen`, frozen */
-function citedOf(seen: Sparse<ThingRecord>): ThingCited { return Object.freeze(pick(seen, ['revtok', 'revseq', 'lifepath', 'am'])) }
+/** The Thing fields of `seen`, frozen */
+function citedOf(seen: Sparse<ThingRecord>): Sparse<ThingRecord> { return Object.freeze(BaseThing.sparseOf(seen)) }
 // --
 
 // == [Checks]: SeenChecks, Checks

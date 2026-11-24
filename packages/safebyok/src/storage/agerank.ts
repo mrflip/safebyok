@@ -96,8 +96,8 @@ function partsOf(agerank: Agerank): AgerankParts {
 /** The revseq a `Revseq.padded` string stands for */
 function revseqOf(padded: string): number { return Number.parseInt(padded, 32) }
 
-/** The agekind of `agerank` */
-function agekindOf(agerank: Agerank): Agekind {
+/** The agekind of `agerank`: `'here'` where its newest revision has been seen whole, `'cold'` where only an older one of its life has, `'bare'` where none of its life has. */
+export function agekindOf(agerank: Agerank): Agekind {
   const { highRevseq, itemRevseq } = partsOf(agerank)
   if (highRevseq === itemRevseq) { return 'here' }
   return (itemRevseq === -1) ? 'bare' : 'cold'

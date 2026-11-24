@@ -6,18 +6,18 @@ import type { Gate } from './gate'
 import type { BirthGating } from './gating'
 import type { World } from './world'
 import type { BirthCleartexts, BirthDna } from '../shapes/shapes-gateish'
-import type { BankAskDraft, BankOpts, BankSnapshot, BoxUnsealed, HostedVault } from '../shapes/shapes-bankish'
+import type { BankOpts, BankSnapshot, BoxUnsealed, HostedVault } from '../shapes/shapes-bankish'
 import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, ShellOf, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import { type DeviceTok, type Lifetok, Labelpath, Lifeseq } from '../shapes/primitives'
-import { type BankRecord, type BoxRecord, type Modelkind, type ThingRecord, ThingFormat } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type Modelkind, ThingFormat } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
-import { type BankRoots, type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../shapes/shapes-asks'
+import type { PutAskDraft } from '../shapes/shapes-asks'
 import * as Throwers from '../refusals/throwers'
 
 /** The signed-in user's bank on this device: its main gate and its root box.
- * Boxes are sealed and unsealed under the lease its device's world holds. Its roots, as last heard of, are its world in the device's BankMinder.
- * Over the shell or a tombstone, what needs a live record refuses `absent_thing`: its stamp, its root box, an ask, a seal, an unseal and a put.
+ * Boxes are sealed and unsealed under the lease its device's world holds. Its roots, as last heard of, are the Things its device's world keeps.
+ * Over the shell or a tombstone, what needs a live record refuses `absent_thing`: its stamp, its root box, a seal, an unseal and a put.
  */
 export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<BankRecord>> {
   // == [Props]: lifetok, #device, #world
@@ -32,7 +32,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   readonly #world: World
   // --
 
-  // == [Getters]: device, device_tok, scope, stamp, gate, rootBox, track, getSnapshot, subscribe
+  // == [Getters]: device, device_tok, scope, stamp, gate, rootBox, getSnapshot, subscribe
 
   /** The device this bank is on. */
   get device(): Device { return this.#device }
@@ -55,24 +55,13 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
     return gate
   }
 
+  // A bank of a life replaced since reads the root box of the life that replaced it: its boxes refuse as of another root box.
   /** The root box, as last heard of. Every box of this bank is under it. */
   get rootBox(): BoxRecord {
     this.#demandLive()
-    return this.#roots.root
-  }
-
-  /** The revseq and lifepath this device last heard of the bank, its main gate and its root box, which every ask it makes tracks. */
-  get track(): Track {
-    const { bank, gate, root } = this.#roots
-    return { bank: trackPairOf(bank), [Labelpath.MainGate]: trackPairOf(gate), [Labelpath.RootBox]: trackPairOf(root) }
-  }
-
-  // A bank of a life replaced since reads the roots of the life that replaced it: its boxes refuse as of another root box.
-  /** The roots of this bank in the device's BankMinder: its world there. */
-  get #roots(): BankRoots {
-    const world = this.#device.bankMinder.worldAt()
-    if (world === undefined) { throw Throwers.worldNotHeard() }
-    return world
+    const root = this.#world.rootBox?.pickle()
+    if (root?.am !== 'a') { throw Throwers.worldNotHeard() }
+    return root
   }
 
   /** The snapshot getter of the device's world ({@link World.getSnapshot}), already bound, as `useSyncExternalStore` wants it. */
@@ -118,26 +107,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   }
   // --
 
-  // == [Ask builders]: makeGetAsk, makeListAsk, makePutAsk, makeDelAsk, tellBadNews
-  // Each fills in this bank's scope, its `track` and its `banktok`, and the modelkind and default flags of `getAskOf`
-  // and the rest. The track and lifetok are this object's, which may be stale: the answer's `tracked` and `world` say so.
-  // Only that the bank is live is checked here, as its lifetok needs it: the verb checks the rest.
-
-  /** The get ask for the Thing at `ask.labelpath` in this bank. */
-  makeGetAsk(ask: BankAskDraft): GetAsk { return getAskOf({ ...ask, ...this.scope, banktok: this.#demandLive().lifetok, track: this.track }) }
-
-  /** The list ask for the children of the Thing at `ask.labelpath` in this bank. */
-  makeListAsk(ask: BankAskDraft): ListAsk { return listAskOf({ ...ask, ...this.scope, banktok: this.#demandLive().lifetok, track: this.track }) }
-
-  /** The put ask writing `ask.record` over `ask.cited`, in this bank. */
-  makePutAsk<RecordT extends ThingRecord>(ask: Omit<PutAskDraft<RecordT>, 'track' | 'banktok'>): WriteAsk<RecordT> {
-    return { ...putAskOf<RecordT>({ ...ask, banktok: this.#demandLive().lifetok, track: this.track }), ...this.scope }
-  }
-
-  /** The del ask writing the tombstone `ask.record` over `ask.cited`, in this bank. */
-  makeDelAsk<RecordT extends ThingRecord>(ask: Omit<DelAskDraft<RecordT>, 'track' | 'banktok'>): WriteAsk<RecordT> {
-    return { ...delAskOf<RecordT>({ ...ask, banktok: this.#demandLive().lifetok, track: this.track }), ...this.scope }
-  }
+  // == [Telling the host]: tellBadNews
 
   /** Tell the device's `onBadNews` of failures no caller is waiting on ({@link Device.tellBadNews}). Never throws. */
   tellBadNews(badnews: readonly unknown[]): void { this.#device.tellBadNews(badnews) }
@@ -148,10 +118,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   /** Write `ask.record`, this bank's next revision, over `ask.cited`. Resolves the bank's Thing the store reports writing, which the bank in the device's world then models. */
   async put(ask: PutAskDraft<BankRecord>): Promise<BankRecord> {
     this.demandEnabled()
-    const answer = await this.#device.bankMinder.tryWrite({ ...this.makePutAsk(ask), labelpath: 'bank', modelkind: 'bank' })
-    if (! answer.ok) { throw answer.err }
-    // The ask's modelkind is the bank's, which the vaultDB checks what it answers against.
-    return answer.val as BankRecord
+    this.#demandLive()
+    return await this.#world.demandSortedVaultDB().putOnce(ask)
   }
   // --
 
@@ -285,12 +253,6 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   /** A bank's modelkind: the guards this class inherits answer for banks alone. */
   static override readonly modelkind = 'bank'
 }
-
-// == [Helpers]: trackPairOf
-
-/** The revseq and lifepath of a Thing: the pair a `track` has. */
-function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
-// --
 
 // == [Checks]: Checks
 

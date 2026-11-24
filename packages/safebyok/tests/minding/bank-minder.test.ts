@@ -5,9 +5,9 @@ import { getAskOf } from '../../src/shapes/shapes-asks'
 import * as TH from '../test-helpers'
 import { DownVaultDB, badnewsOf, bornOf, fakeBankOf, minderOf, sortedOf, storedBoxOf } from './vault-minder/world'
 
-/** A BankMinder of `TH.ThingBank` over `vaultDB`, minding, and the friend it was made with, whose get asks track nothing, as a device's do before its sign-in answers. */
+/** A BankMinder of `TH.ThingBank` over `vaultDB`, minding, and the friend it was made with. */
 function bankMinderOver(vaultDB: MemoryVaultDB = new MemoryVaultDB()) {
-  const bank       = { ...fakeBankOf(), makeGetAsk: (ask: { labelpath: string }) => getAskOf({ ...ask, ...TH.ThingBank }) }
+  const bank       = fakeBankOf()
   const bankMinder = BankMinder.make({}, bank)
   bankMinder.hello(sortedOf(vaultDB))
   return { vaultDB, bank, bankMinder }
@@ -48,11 +48,11 @@ describe("bankMinder.fetchWorld()", () => {
     expect(Object.isFrozen(world?.gate.wayins)).to.be.true
   })
 
-  it("asks the vaultDB for the root box, through its friend's get ask", async () => {
+  it("asks the vaultDB for the root box, through its SortedVaultDB's get ask, which tracks the roots it fetched", async () => {
     const { vaultDB, bankMinder } = await fetchedWorldOf()
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
     await bankMinder.fetchWorld()
-    expect(asked.mock.calls).to.deep.equal([[getAskOf({ ...TH.RootScope, ifAbsent: 'nil' })]])
+    expect(asked.mock.calls).to.deep.equal([[getAskOf({ ...TH.RootScope, ifAbsent: 'nil', track: TH.trackOf(), banktok: TH.bankThingOf().lifetok })]])
   })
 
   it("answers null, and has no world, where no bank is stored", async () => {
@@ -106,8 +106,7 @@ describe("a BankMinder's watch", () => {
     await TH.expectGood(vaultDB.tryWriteThing(TH.replaceAskOf(BornRoots.gate, Gate1)))
     const { bankMinder } = bankMinderOver(vaultDB)
     expect(bankMinder.at(TH.GateScope)).to.be.undefined
-    const staleBank = { ...fakeBankOf(), makeGetAsk: (ask: { labelpath: string }) => getAskOf({ ...ask, ...TH.ThingBank, track: TH.GateStaleTrack }) }
-    const minder    = minderOf({}, staleBank)
+    const minder    = minderOf({}, fakeBankOf())
     minder.hello(sortedOf(vaultDB))
     await minder.get(TH.BoxScope)
     await TH.eventually(() => TH.itemRevtokOf(bankMinder.at(TH.GateScope)) === Gate1.revtok)
