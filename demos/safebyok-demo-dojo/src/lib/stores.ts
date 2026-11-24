@@ -1,27 +1,33 @@
-/** The dojo's own connections to the two IndexedDB databases behind the app: read every row, and load the fixture by writing rows directly. */
+/** The dojo's own connections to the stores behind the app, the vault's IndexedDB database and the root shelf's localStorage: read every row, and load the fixture by writing rows directly. */
 
 import { clear, createStore, entries, setMany, type UseStore } from 'idb-keyval'
 import { DojoDBName } from './dojo'
-import { Fixture, type StoredRow } from './fixture'
+import { Fixture, type ShelvedRow, type StoredRow } from './fixture'
 
 // safebyok-idb-lean exports none of these names. Its README gives the vault database's name and its object store,
-// `things`; the persist database's store, `clients`, is read from its source (src/persist-shelf.ts).
+// `things`; the root shelf's key, `safebyok:roots:<banklabel>:<userid>`, is read from the core's source
+// (src/minding/root-shelf.ts).
 /** The vault database: what the backend would store. */
 const VaultShelf: UseStore = createStore(`safebyok-${DojoDBName}:vault-v001-001-001`, 'things')
 
-/** The persist database: the device's caches, kept between page loads. */
-const PersistShelf: UseStore = createStore(`safebyok-${DojoDBName}:persist-v001-001-001`, 'clients')
+/** The start of each key the device keeps a bank's roots under in localStorage. */
+const RootShelfCkeyPrefix = 'safebyok:roots:'
 
 /** Every row of the vault database, as stored, in key order. */
 export async function vaultRowsNow(): Promise<StoredRow[]> { return await entries(VaultShelf) }
 
-/** Every row of the persist database, as stored, in key order: one snapshot per recordlabel. */
-export async function cacheRowsNow(): Promise<StoredRow[]> { return await entries(PersistShelf) }
+/** Every item of localStorage the device keeps a bank's roots in. */
+export function cacheRowsNow(): ShelvedRow[] {
+  const ckeys = Array.from({ length: localStorage.length }, (_val, idx) => localStorage.key(idx) ?? '').filter((ckey) => ckey.startsWith(RootShelfCkeyPrefix))
+  return ckeys.map((ckey) => [ckey, localStorage.getItem(ckey) ?? ''])
+}
 
-/** Empty both databases, and write the fixture's rows into them. */
+/** Empty the vault database and the root shelf, and write the fixture's rows into them. */
 export async function loadFixture(): Promise<void> {
-  await Promise.all([clear(VaultShelf), clear(PersistShelf)])
-  await Promise.all([setMany([...Fixture.vault], VaultShelf), setMany([...Fixture.cache], PersistShelf)])
+  for (const [ckey] of cacheRowsNow()) { localStorage.removeItem(ckey) }
+  for (const [ckey, shelved] of Fixture.cache) { localStorage.setItem(ckey, shelved) }
+  await clear(VaultShelf)
+  await setMany([...Fixture.vault], VaultShelf)
 }
 
 /** True while the vault database has no row at all, as on the dojo's first visit to this browser. */
