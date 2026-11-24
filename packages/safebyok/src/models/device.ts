@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/query-core'
 import { isEqual } from 'es-toolkit'
 import { Consts, Deriver, Errors, type GX, Helpers, Logger, Outcome, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
-import { Bank } from './bank'
+import type { Bank } from './bank'
 import type { BirthGating } from './gating'
 import { Proving, guardKeyDeriver } from './proving'
 import { Vault } from './vault'
@@ -9,7 +9,7 @@ import { World } from './world'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import { BankMinder } from '../minding/bank-minder'
 import { VaultMinder } from '../minding/vault-minder'
-import { type BadNewsHandler, type BankAskDraft, type DeviceJSON, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, type RefusalSnapshot, BankishChecks, PendingBank } from '../shapes/shapes-bankish'
+import { type BadNewsHandler, type BankAskDraft, type DeviceJSON, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, BankishChecks } from '../shapes/shapes-bankish'
 import { type BankRoots, type GetAsk, type ListAsk, getAskOf, listAskOf } from '../shapes/shapes-asks'
 import { type MaskedView, type MaskedViewLease, type MinderFriend, EmptyMaskedView, MinderChecks } from '../shapes/shapes-minder'
 import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
@@ -39,7 +39,7 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
  * reloading the page.
  */
 export class Device implements MinderFriend {
-  // == [Props]: banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #persisters, #bankMinder, #minder, #world, #userid, #bank, #vault, #broughtUp, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
+  // == [Props]: banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #persisters, #bankMinder, #minder, #world, #userid, #vault, #broughtUp, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
 
   /** The label of the bank this device serves each user. */
   readonly banklabel:          Banklabel
@@ -66,9 +66,7 @@ export class Device implements MinderFriend {
   readonly #world: World
   /** The user signed in on this device, from `signIn`. Null until then. */
   #userid: Userid | null = null
-  /** The signed-in user's bank, from when the device finds it stored or a birth on this device makes it. Null until then. */
-  #bank:  Bank | null = null
-  /** The vault of the bank's boxes, made with the bank. */
+  /** The vault of the bank's boxes, made once the bank is. */
   #vault: Vault | null = null
   /** What `signIn` resolves, once it has been called. */
   #broughtUp: Promise<void> | null = null
@@ -124,8 +122,8 @@ export class Device implements MinderFriend {
   /** The world of the signed-in user's bank: what locks, unlocks and ends it, and holds its lease. The same one from `Device.make` on. */
   get world(): World { return this.#world }
 
-  /** The signed-in user's bank, or null until the device finds it stored or a birth on this device makes it. */
-  get bank(): Bank | null { return this.#bank }
+  /** The signed-in user's bank, or null until its world has it live, with its main gate and root box: found stored, or born on this device. */
+  get bank(): Bank | null { return this.#world.areRootsLive ? this.#world.bank : null }
 
   /** The vault of this device's bank's boxes, or null while the device has no bank. */
   get vault(): Vault | null { return this.#vault }
@@ -178,7 +176,7 @@ export class Device implements MinderFriend {
   async judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> { return await Proving.judgeStrength(this, this.scope, passphraseCleartext) }
   // --
 
-  // == [Starting]: hello, #restore, signIn, birthGating, gatingBirthAttempt, #bringUp, #attachWorld, #attachBank
+  // == [Starting]: hello, #restore, signIn, birthGating, gatingBirthAttempt, #bringUp
 
   /** Start the device. It resolves at once, and never rejects.
    * Refuses `insecure_context` outside a secure context, where WebCrypto is missing.
@@ -209,7 +207,7 @@ export class Device implements MinderFriend {
     checkSecureContext()
     if (this.#broughtUp !== null) { return this.#broughtUp }
     this.#userid = signedIn
-    this.#world.showStandIn(PendingBank)
+    this.#world.align()
     this.#broughtUp = this.#bringUp(this.#bankMinder, this.#minder)
     return this.#broughtUp
   }
@@ -220,7 +218,7 @@ export class Device implements MinderFriend {
   birthGating(params: FormData | BirthDna | BirthCleartexts): BirthGating {
     // Made before the stage is checked, so a refusal here zeroes the host's passkey answer, and empties a form's secret
     // fields, as every gating does (G2).
-    const gating = Bank.birthGating(this, params, (bank) => { this.#attachBank(bank) })
+    const gating = this.#world.birthGating(params)
     if (['signed_out', 'starting'].includes(this.#snapshot.bank.stage)) {
       gating.vacate()
       throw Throwers.bankNotBroughtUp()
@@ -235,11 +233,11 @@ export class Device implements MinderFriend {
    */
   async gatingBirthAttempt(params: FormData | BirthDna): Promise<Bank> { return await this.birthGating(params).attempt() }
 
-  // The world fetched lands in the BankMinder, and in the world's Things, where a bank brought up from the cache reads it;
-  // a failure to fetch it, once that bank is up, is no caller's to hear.
-  // The SortedVaultDB is made right before the minders hello it, with nothing awaited between: its Things remember what
-  // they take, so a record it took with no minder listening would reach them later only as a repeat, which it drops.
-  // The roots restored are the exception: the minders have them already.
+  // The world fetched lands in the BankMinder, and in the world's Things, which the stage is read from; a failure to fetch
+  // it, once a bank is up from the cache, is no caller's to hear.
+  // The SortedVaultDB is made right before the world and the minders hello it, with nothing awaited between: its Things
+  // remember what they take, so a record it took with no one listening would reach them later only as a repeat, which it
+  // drops. The roots restored are the exception: the minders have them already, and the world reads its Things at hello.
   /** Bring up the signed-in user's bank, with `bankMinder` minding its roots and `minder` its boxes over a SortedVaultDB of the bank they share: from the world cached, where there is one, and from the world the vaultDB answers. */
   async #bringUp(bankMinder: BankMinder, minder: VaultMinder): Promise<void> {
     try {
@@ -251,31 +249,22 @@ export class Device implements MinderFriend {
       this.#world.hello(sortedVaultDB)
       bankMinder.hello(sortedVaultDB)
       minder.hello(sortedVaultDB)
-      if ((cached !== undefined) && Bank.isLive(cached.bank)) { this.#attachWorld() }
       const world = await bankMinder.fetchWorld()
-      if (this.#bank !== null) { return }
-      if ((world === null) || (! Bank.isLive(world.bank))) {
-        this.#world.showStandIn(Object.freeze({ ...PendingBank, stage: 'unborn' }))
+      // Scaffolding until sign-in is one get of the world: where none is stored, the get of the root box brings no bank,
+      // so the bank is asked for, and its shell shows the stage `'unborn'`.
+      if (world === null) {
+        await bankMinder.get({ ...this.scope, labelpath: 'bank' }, { staleTime: 0 })
         return
       }
-      this.#attachWorld()
+      // Roots answered that are not all live in the world are broken: reported as the sign-in's refusal.
+      this.#world.demandRootsLive()
     } catch (err) {
-      if (this.#bank !== null) {
+      if (this.bank !== null) {
         this.tellBadNews([err])
         return
       }
-      this.#world.showStandIn(Object.freeze({ ...PendingBank, stage: 'failed', lastErr: refusalSnapshotOf(err) }))
+      this.#world.showSignInRefusal(err)
     }
-  }
-
-  /** Make the bank of this device's world its bank, refusing unless the bank, its main gate and its root box are live there. */
-  #attachWorld(): void { this.#attachBank(this.#world.demandRootsLive()) }
-
-  /** Make `bank` this device's bank. */
-  #attachBank(bank: Bank): void {
-    this.#bank  = bank
-    this.#vault = Vault.make(bank, this.minder)
-    this.#world.showBank()
   }
   // --
 
@@ -294,7 +283,7 @@ export class Device implements MinderFriend {
    * The device stays usable: it judges passphrases. Its snapshot shows the swept bank.
    */
   sweep(): this {
-    if (this.#bank !== null) { this.#world.sweep() }
+    if (this.bank !== null) { this.#world.sweep() }
     // The watch's stop is the host's vaultDB code: what it throws is news.
     try { this.#world.sortedVaultDB?.sweep() } catch (err) { this.tellBadNews([err]) }
     return this
@@ -305,17 +294,20 @@ export class Device implements MinderFriend {
   // The bank's builders where the device has one, so that each ask tracks the bank, its main gate and its root box and carries its lifetok; until then, asks that track nothing and carry no lifetok.
 
   /** The get ask for the Thing at `ask.labelpath` in the signed-in user's bank scope. */
-  makeGetAsk(ask: BankAskDraft): GetAsk { return this.#bank?.makeGetAsk(ask) ?? getAskOf({ ...ask, ...this.scope }) }
+  makeGetAsk(ask: BankAskDraft): GetAsk { return this.bank?.makeGetAsk(ask) ?? getAskOf({ ...ask, ...this.scope }) }
 
   /** The list ask for the children of the Thing at `ask.labelpath` in the signed-in user's bank scope. */
-  makeListAsk(ask: BankAskDraft): ListAsk { return this.#bank?.makeListAsk(ask) ?? listAskOf({ ...ask, ...this.scope }) }
+  makeListAsk(ask: BankAskDraft): ListAsk { return this.bank?.makeListAsk(ask) ?? listAskOf({ ...ask, ...this.scope }) }
   // --
 
   // == [Snapshot]: align, makeSnapshot
 
-  // An arrow, so it stays bound: the world calls it as a subscriber.
-  /** Remake the snapshot, and tell each subscriber if it changed. */
+  // An arrow, so it stays bound: the world calls it as a subscriber. The bank is live once the world's stage reads
+  // `'locked'`, which the world tells of, so the vault is made here, before a subscriber reads it.
+  /** Make the vault once the bank is live, remake the snapshot, and tell each subscriber if it changed. */
   readonly #align = (): void => {
+    const { bank } = this
+    if ((bank !== null) && (this.#vault === null)) { this.#vault = Vault.make(bank, this.#minder) }
     const next = this.#makeSnapshot()
     if (isEqual(next, this.#snapshot)) { return }
     this.#snapshot = next
@@ -345,7 +337,7 @@ export class Device implements MinderFriend {
    */
   maskedView(): MaskedView {
     if (this.#userid === null) { return EmptyMaskedView }
-    return { bankTSQ: this.#bankMinder.maskedRows(), vaultTSQ: this.#minder.maskedRows(), lease: maskedViewLeaseOf(this.#bank === null ? undefined : this.#world) }
+    return { bankTSQ: this.#bankMinder.maskedRows(), vaultTSQ: this.#minder.maskedRows(), lease: maskedViewLeaseOf(this.bank === null ? undefined : this.#world) }
   }
   // --
 
@@ -406,7 +398,7 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 }
 // --
 
-// == [Helpers]: millisOf, checkSecureContext, RestoredSourcelabel, receiveRestored, refusalSnapshotOf, maskedViewLeaseOf
+// == [Helpers]: millisOf, checkSecureContext, RestoredSourcelabel, receiveRestored, maskedViewLeaseOf
 
 // A host's Infinity minutes, for never, becomes ForeverMillis: past the entrypoint, nothing is infinite.
 /** `minutes` in milliseconds, capped at `ForeverMillis`, or `fallback` for none. */
@@ -431,12 +423,6 @@ function receiveRestored(sortedVaultDB: SortedVaultDB, roots: BankRoots): void {
       sourcelabel: RestoredSourcelabel, read_tc, bank_lifetok: roots.bank.lifetok, ...itemSeenOf(root),
     })
   }
-}
-
-/** What a snapshot shows of `err`: its refusal's kind, family and message, anything but a refusal as an unexpected error. */
-function refusalSnapshotOf(err: unknown): RefusalSnapshot {
-  const { refusalkind, family, message } = Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)
-  return Object.freeze({ refusalkind, family, message })
 }
 
 /** The lease `world` holds, as a devtool is shown it: its loggable and when it ends, or `active: false` for no world, or one locked. */

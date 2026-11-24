@@ -5,6 +5,7 @@ import { BaseBox } from '../../src/models/base-box'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
 import type { ProvingDevice } from '../../src/shapes/shapes-gateish'
 import type { StampedGate } from '../../src/shapes/shapes-stamps'
+import type { GateRecord } from '../../src/shapes/shapes-thing'
 import { Wayin } from '../../src/models/wayin'
 import { Lifeseq } from '../../src/shapes/primitives'
 
@@ -50,10 +51,9 @@ async function gateWithPassphrase(): Promise<TH.LiveGate> {
   return bank.gate
 }
 
-/** The gate of `record`, of {@link TH.WorldBankStamp}'s bank. */
-function gateOf(record: unknown): TH.LiveGate {
-  const device = TH.makeDevice()
-  return TH.liveGateOf(device.world.makeGate(record as never, TH.WorldBankStamp))
+/** The gate of `record`, made by the world of `gate`, a gate of {@link TH.WorldBankStamp}'s bank. */
+function gateOf(gate: TH.LiveGate, record: unknown): TH.LiveGate {
+  return TH.liveGateOf(gate.device.world.makeThing(record as GateRecord))
 }
 
 /** The arguments of a proving of `gate`, under a bank's stamp and a gate's stamp each moved by `moves`: the stamps a Gate would refuse to be made under. */
@@ -561,13 +561,13 @@ describe("the ctx a wayin is wrapped under", () => {
   for (const [altered, blurb] of HeaderCases) {
     it(`a passphrase wayin will not unwrap under ${blurb}`, async () => {
       const gate = await gateWithPassphrase()
-      const moved = gateOf({ ...gate.pickle(), wayins: { ...gate.wayins, main: { ...gate.wayins.main, ...altered } } })
+      const moved = gateOf(gate, { ...gate.pickle(), wayins: { ...gate.wayins, main: { ...gate.wayins.main, ...altered } } })
       await TH.expectRefusal(PassphraseProving.buildStored(TH.provingDeviceOf(), moved, TH.TestPassphrase), 'wrong_passphrase')
     })
 
     it(`a passkey wayin will not unwrap under ${blurb}`, async () => {
       const { gate, answerOf } = await gateWithBoth()
-      const moved = gateOf({ ...gate.pickle(), wayins: { ...gate.wayins, passkey0: { ...gate.wayins.passkey0!, ...altered } } })
+      const moved = gateOf(gate, { ...gate.pickle(), wayins: { ...gate.wayins, passkey0: { ...gate.wayins.passkey0!, ...altered } } })
       await TH.expectRefusal(PasskeyProving.buildStored(moved, answerOf()), 'wrong_passkey')
     })
   }

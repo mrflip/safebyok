@@ -151,22 +151,21 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
   const passkey0 = await passkeyProving?.buildWayin(passphraseProving) ?? null
   const bankRecord = Bank.makeRecord(bankStamp)
   const rootShell  = BoxChecks.liveOrShell.parse(Shell.of({ ...device.scope, labelpath: Labelpath.RootBox }))
-  // The root box is sealed under the lease the birth builds, on a gate made for it alone. The lease reaches the device's
-  // world, unlocking it, only with the bank the world's SortedVaultDB keeps. Where the birth refuses, or the vaultDB's
-  // answer is broken, the lease is evicted, and the world is as it was.
+  // The root box is sealed under the lease the birth builds, against the stamps it minted. The lease reaches the
+  // device's world, unlocking it, only once the bank the world's SortedVaultDB keeps is this one. Where the birth refuses,
+  // or the vaultDB's answer is broken, the lease is evicted, and the world holds no lease of it.
   const gateRecord = Gate.makeRecord({ ...gateStamp, wayins: { main, passkey0 } })
-  const gate  = device.world.makeGate(gateRecord, bankStamp)
-  const lease = await friend.leaseByProving(gate, passphraseProving)
+  const lease = await friend.leaseByProving(passphraseProving, bankStamp, gateRecord)
   try {
     const root   = await lease.seal(BaseBox, rootShell, { sidecar: {} }, { whisper: {} })
     // The roots it answers, written or found stored, are then the bank's world in the device's BankMinder, and the
-    // Things of the device's world.
+    // Things of the device's world, which shows them locked.
     const answer = await device.bankMinder.tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gateRecord, root, bank_lifetok: bankRecord.lifetok })
     if (! answer.ok) { throw answer.err }
     // The user must hear that their passphrase was not set: the bank stored is another's.
     if (answer.val.bank.revtok !== bankRecord.revtok) { throw Throwers.gateMadeElsewhere() }
     const bank = device.world.demandRootsLive()
-    friend.attachBank(bank, lease)
+    friend.attachLease(lease)
     return bank
   } catch (err) {
     lease.evict()

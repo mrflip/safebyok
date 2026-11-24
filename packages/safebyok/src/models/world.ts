@@ -1,19 +1,21 @@
-import { isEqual } from 'es-toolkit'
+import { isEqual, noop } from 'es-toolkit'
 import { Errors, Phrases as BigPhrases, Validator, VX } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { BaseThing } from './base-thing'
 import { Box } from './box'
 import type { Device } from './device'
 import { Gate } from './gate'
+import { BirthGating } from './gating'
 import type { Lease } from './lease'
+import type { Proving } from './proving'
 import { type Adoptable, SeenChecks } from './thing'
-import type { BankSnapshot, BankStage, HostedVault, WorldOpts } from '../shapes/shapes-bankish'
-import { SignedOutBank } from '../shapes/shapes-bankish'
-import type { LeaseGate, WorldGateFriend } from '../shapes/shapes-gateish'
+import type { BankSnapshot, BankStage, HostedVault, RefusalSnapshot, WorldOpts } from '../shapes/shapes-bankish'
+import { PendingBank, SignedOutBank } from '../shapes/shapes-bankish'
+import type { BirthCleartexts, BirthDna, BirthGatingFriend, GateRevisionedStamp, LeaseGate, WorldGateFriend } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type BankStamp, type LeaseLoggable, StampChecks } from '../shapes/shapes-stamps'
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type Thingkind, Shell } from '../shapes/shapes-thing'
-import type { SeenThing } from '../shapes/shapes-vault-event'
+import type { SeenThing, VaultEvent } from '../shapes/shapes-vault-event'
 import { type EpochMillis, Labelpath } from '../shapes/primitives'
 import { type SortedVaultDB, isSortedVaultDB } from '../storage/sorted-vault-db'
 import * as Phrases from '../phrases'
@@ -24,9 +26,10 @@ export type WorldThing = Bank | Gate | Box
 
 /** The signed-in user's bank as this device locks, unlocks and ends it: its lease, the wait for an unlock, its end, and its snapshot.
  * Made with its device, it lives as long. Its gates build leases and hand them to it, and boxes are sealed and unsealed under the lease it holds, which no member hands out.
+ * Its snapshot's stage is read from the bank, the main gate and the root box its SortedVaultDB keeps, and from the lease.
  */
 export class World {
-  // == [Props]: #device, #sortedVaultDB, #lease, #unlockWait, #endCause, #vaults, #standIn, #snapshot, #subscribers, #getSnapshot, #subscribe
+  // == [Props]: #device, #sortedVaultDB, #lease, #unlockWait, #endCause, #lastErr, #vaults, #snapshot, #subscribers, #getSnapshot, #subscribe
 
   readonly #device: Device
 
@@ -42,11 +45,11 @@ export class World {
   /** Why a sweep disabled the world, or null until then. */
   #endCause: Errors.VaultError | null = null
 
+  /** Why sign-in failed, or null while it has not. */
+  #lastErr: RefusalSnapshot | null = null
+
   /** The vaults made on the device's bank, which a sweep sweeps. */
   readonly #vaults = new Set<HostedVault>()
-
-  /** The snapshot shown while the device has no bank, or null once it has one. */
-  #standIn: BankSnapshot | null = SignedOutBank
 
   /** The current snapshot, which {@link getSnapshot} returns. */
   #snapshot: BankSnapshot
@@ -58,7 +61,7 @@ export class World {
   }
   // --
 
-  // == [Getters]: sortedVaultDB, bank, gate, bankStamp, leaseEndsAt, leaseLoggable, getSnapshot, subscribe
+  // == [Getters]: sortedVaultDB, bank, gate, rootBox, bankStamp, leaseEndsAt, leaseLoggable, getSnapshot, subscribe
 
   /** The signed-in user's bank's records, sorted, as handed to {@link hello}, or null until then. */
   get sortedVaultDB(): SortedVaultDB | null { return this.#sortedVaultDB }
@@ -75,6 +78,12 @@ export class World {
     return (thing instanceof Gate) ? thing : null
   }
 
+  /** The root box's Thing in the {@link sortedVaultDB}, of whatever life, or null where no record of it has been heard of. */
+  get #rootBox(): Box | null {
+    const thing = this.#thingAt(Labelpath.RootBox)
+    return (thing instanceof Box) ? thing : null
+  }
+
   /** The stamp of the bank's Thing, which every ctx under the bank binds first. Refuses `absent_thing` until a live bank is heard of. */
   get bankStamp(): BankStamp {
     const { bank } = this
@@ -89,7 +98,7 @@ export class World {
   get leaseLoggable(): LeaseLoggable | null { return this.#lease?.loggable ?? null }
 
   /** The snapshot getter of the device's bank, already bound, as `useSyncExternalStore` wants it: the same frozen object until the snapshot changes.
-   * While the device has no bank, it is a stand-in at stage `'signed_out'`, `'starting'`, `'unborn'` or `'failed'`.
+   * Until the bank, its main gate and its root box are live, its stage is `'signed_out'`, `'starting'`, `'unborn'` or `'failed'`.
    */
   get getSnapshot(): () => BankSnapshot { return this.#getSnapshot }
 
@@ -99,7 +108,7 @@ export class World {
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   // --
 
-  // == [Construction]: make, constructor, makeThing, makeGate, hello
+  // == [Construction]: make, constructor, makeThing, hello
 
   /** Make the world of `opts.device`, locked, showing nobody signed in. Internal: a device makes its own. */
   static make(opts: WorldOpts): World {
@@ -128,31 +137,35 @@ export class World {
     return thingClass.make(begun, { device: this.#device }, this.#gateFriend())
   }
 
-  // Scaffolding until a birth makes no gate before its record: a gate made here holds the bank's stamp it is
-  // handed, where no bank's record may have been heard of yet.
-  /** Make the gate of `record`, a whole gate record or its shell, of the bank stamped `bankStamp`, whose leases this world holds. Locked, and nothing is fetched or stored. */
-  makeGate(record: GateRecord | Sealers.ShellOf<GateRecord>, bankStamp: BankStamp): Gate { return Gate.make(record, { device: this.#device, bankStamp }, this.#gateFriend()) }
-
-  /** Take `sortedVaultDB`, the signed-in user's bank's records, sorted. A second call does nothing. */
+  /** Take `sortedVaultDB`, the signed-in user's bank's records, sorted, and listen to it for as long as the world lives. A second call does nothing. */
   hello(sortedVaultDB: SortedVaultDB): void {
     Checks.sortedVaultDB.parse(sortedVaultDB)
-    this.#sortedVaultDB ??= sortedVaultDB
+    if (this.#sortedVaultDB !== null) { return }
+    this.#sortedVaultDB = sortedVaultDB
+    // The minders, listening beside it, tell the device of a record refused.
+    sortedVaultDB.listen({ hear: (event) => { this.#hear(event) }, onBadNews: noop })
+    this.align()
   }
   // --
 
-  // == [Stand-ins]: showStandIn, showBank
-  // The device says what it has found of its bank; the world shows it.
+  // == [Signing in]: showSignInRefusal, birthGating, birthFriend
 
-  /** Show `standIn` as the snapshot while the device has no bank. Internal. */
-  showStandIn(standIn: BankSnapshot): void {
-    this.#standIn = standIn
-    this.#align()
+  /** Show `err` as the snapshot's `lastErr`, at stage `'failed'`, while the bank's roots are not all live. Internal: the device's sign-in calls it. */
+  showSignInRefusal(err: unknown): void {
+    this.#lastErr = refusalSnapshotOf(err)
+    this.align()
   }
 
-  /** Show the device's bank, now that it has one, in place of a stand-in. Internal. */
-  showBank(): void {
-    this.#standIn = null
-    this.#align()
+  /** The gating of a birth of the device's bank over `params`: once its bank is live here, it unlocks this world. Internal: make one with `device.birthGating`. */
+  birthGating(params: FormData | BirthDna | BirthCleartexts): BirthGating { return new BirthGating(this.#device, params, this.#birthFriend()) }
+
+  /** This world's lease verbs, for a birth's gating to call. */
+  #birthFriend(): BirthGatingFriend {
+    return {
+      // A birth's lease is born when proved.
+      leaseByProving: (proving: Proving, bankStamp: BankStamp, cited: GateRevisionedStamp) => proving.buildLease(this.#leaseGateOf(bankStamp), cited, null),
+      attachLease:    (lease: Lease) => { this.#attachLease(lease) },
+    }
   }
   // --
 
@@ -168,7 +181,7 @@ export class World {
     if (this.isUnlocked) { return this }
     // Read here: a subscriber told of the wait may dismiss it or sweep the world, which clears #unlockWait.
     const wait = (this.#unlockWait ??= makeWait())
-    this.#align()
+    this.align()
     await wait.promise
     return this
   }
@@ -178,7 +191,7 @@ export class World {
    */
   dismissUnlock(): this {
     this.#settleUnlockWait(Throwers.unlockDismissed())
-    this.#align()
+    this.align()
     return this
   }
 
@@ -215,7 +228,7 @@ export class World {
     this.#lease?.evict()
     this.#lease = lease
     this.#settleUnlockWait(null)
-    this.#align()
+    this.align()
   }
   // --
 
@@ -225,7 +238,7 @@ export class World {
   lock(): this {
     this.#lease?.evict()
     this.#lease = null
-    this.#align()
+    this.align()
     return this
   }
 
@@ -241,7 +254,7 @@ export class World {
     this.#lease?.sweep()
     this.#lease = null
     this.#settleUnlockWait(this.#endCause)
-    this.#align()
+    this.align()
     for (const vault of this.#vaults) { vault.sweep() }
     this.#vaults.clear()
     this.#subscribers.clear()
@@ -286,7 +299,7 @@ export class World {
   }
   // --
 
-  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, demandEnabled, demandRootsLive, demandLease, thingAt
+  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, areRootsLive, demandEnabled, demandRootsLive, demandLease, thingAt
 
   /** True until this world is swept or its device ends. */
   get isEnabled(): boolean { return this.endCause === null }
@@ -303,6 +316,9 @@ export class World {
   /** True while a call waits in {@link ensureUnlocked}: render the unlock form while it is. */
   get isUnlockWanted(): boolean { return this.#unlockWait !== null }
 
+  /** True while the bank's, the main gate's and the root box's Things each hold a live record. */
+  get areRootsLive(): boolean { return isLive(this.bank) && isLive(this.gate) && isLive(this.#rootBox) }
+
   /** Throw unless {@link isEnabled}. */
   demandEnabled(): this {
     const { endCause } = this
@@ -312,11 +328,10 @@ export class World {
 
   /** The bank's Thing, demanding that it, the main gate's and the root box's each hold a live record. */
   demandRootsLive(): Bank {
-    const { bank, gate } = this
-    if (bank?.pickle().am !== 'a') { throw Throwers.thingNotLive('bank') }
-    if (gate?.pickle().am !== 'a') { throw Throwers.thingNotLive(Labelpath.MainGate) }
-    const root = this.#thingAt(Labelpath.RootBox)
-    if (! ((root instanceof Box) && (root.pickle().am === 'a'))) { throw Throwers.thingNotLive(Labelpath.RootBox) }
+    const { bank } = this
+    if (! isLive(bank)) { throw Throwers.thingNotLive('bank') }
+    if (! isLive(this.gate)) { throw Throwers.thingNotLive(Labelpath.MainGate) }
+    if (! isLive(this.#rootBox)) { throw Throwers.thingNotLive(Labelpath.RootBox) }
     return bank
   }
 
@@ -331,10 +346,20 @@ export class World {
   #thingAt(labelpath: Labelpath): unknown { return this.#sortedVaultDB?.thingAt({ ...this.#device.scope, labelpath }) }
   // --
 
-  // == [Snapshot]: align, makeSnapshot
+  // == [Snapshot]: hear, align, stageOf, makeSnapshot
 
-  /** Remake the snapshot, and tell each subscriber if it changed. */
-  #align(): void {
+  // An answer tells the bank, the main gate and the root box in that order, so the stage is read at the root box, once all
+  // three have landed: a birth shows no stage between `'unborn'` and `'locked'`. The bank's shell or a tombstone of it
+  // comes alone, as sign-in asks for it.
+  /** Realign on hearing the root box, or the bank holding no live record. */
+  #hear(event: VaultEvent): void {
+    if (event.eventkind !== 'item') { return }
+    const isBankNotLive = (event.labelpath === 'bank') && ((event.liveness === 'void') || (event.liveness === 'gone'))
+    if (isBankNotLive || (event.labelpath === Labelpath.RootBox)) { this.align() }
+  }
+
+  /** Remake the snapshot, and tell each subscriber if it changed. Internal: the device calls it once someone signs in. */
+  align(): void {
     const next = this.#makeSnapshot()
     if (isEqual(next, this.#snapshot)) { return }
     this.#snapshot = next
@@ -347,18 +372,29 @@ export class World {
     }
   }
 
-  /** A new snapshot of the device's bank, or the stand-in while it has none. */
+  // A sweep is the one way a bank ends, so an ended bank's stage is 'swept'.
+  /** The stage the snapshot shows, the first that holds. */
+  #stageOf(): BankStage {
+    if (this.endCause !== null)       { return 'swept' }
+    if (this.#device.userid === null) { return 'signed_out' }
+    if (this.areRootsLive)            { return this.isLocked ? 'locked' : 'unlocked' }
+    if (this.#lastErr !== null)       { return 'failed' }
+    const { bank } = this
+    return ((bank === null) || isLive(bank)) ? 'starting' : 'unborn'
+  }
+
+  /** A new snapshot of the device's bank. */
   #makeSnapshot(): BankSnapshot {
-    if (this.#standIn !== null) { return this.#standIn }
-    // A sweep is the one way a bank ends, so an ended bank's stage is 'swept'.
+    const stage = this.#stageOf()
+    if (stage === 'signed_out') { return SignedOutBank }
+    if (stage === 'starting')   { return PendingBank }
+    if (stage === 'unborn')     { return Object.freeze({ ...PendingBank, stage }) }
+    if (stage === 'failed')     { return Object.freeze({ ...PendingBank, stage, lastErr: this.#lastErr }) }
     const { endCause } = this
-    const isEnded  = endCause !== null
-    const isLocked = isEnded || this.isLocked
-    let stage: BankStage = isLocked ? 'locked' : 'unlocked'
-    if (isEnded) { stage = 'swept' }
+    const isEnded = endCause !== null
     return Object.freeze({
       stage,
-      isLocked,
+      isLocked:       stage !== 'unlocked',
       isEnded,
       endCause,
       leaseEndsAt:    isEnded ? null : this.leaseEndsAt,
@@ -369,7 +405,7 @@ export class World {
   // --
 }
 
-// == [Helpers]: ThingClass, thingClassOf, WorldLeaseGate, Wait, makeWait
+// == [Helpers]: ThingClass, thingClassOf, isLive, refusalSnapshotOf, WorldLeaseGate, Wait, makeWait
 
 /** The class a world makes a Thing of one kind from, as {@link World.makeThing} calls it. */
 interface ThingClass {
@@ -381,6 +417,15 @@ interface ThingClass {
 /** The class of the Things of `modelkind` */
 function thingClassOf(modelkind: Thingkind): ThingClass {
   return ({ bank: Bank, gate: Gate, box: Box } as const satisfies Record<Thingkind, ThingClass>)[modelkind]
+}
+
+/** True of a Thing holding a live record; false of one holding the shell or a tombstone, and of none */
+function isLive<ThingT extends WorldThing>(thing: ThingT | null): thing is ThingT { return thing?.pickle().am === 'a' }
+
+/** What a snapshot shows of `err`: its refusal's kind, family and message, anything but a refusal as an unexpected error */
+function refusalSnapshotOf(err: unknown): RefusalSnapshot {
+  const { refusalkind, family, message } = Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)
+  return Object.freeze({ refusalkind, family, message })
 }
 
 // The stamp is pinned once per lease: every ctx under a lease binds the stamp it was granted under.

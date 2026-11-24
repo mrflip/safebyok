@@ -111,12 +111,12 @@ export type RevokePasskeyDna = { passphrase?: string | undefined, passkeyAnswer?
 
 // == [Given to a gating]: BirthGatingFriend, GateGatingFriend, WorldGateFriend
 
-/** The gate's private lease building, for {@link Bank.birth}'s gating to call on the gate it makes, and the attaching of the bank it births. Internal. */
+/** A world's lease verbs, for {@link Bank.birth}'s gating to call. Internal. */
 export interface BirthGatingFriend {
-  /** A lease `proving` builds for `gate`, citing the revision `gate` models: the birth seals its root box under it. */
-  leaseByProving: (gate: Gate, proving: Proving) => Promise<Lease>
-  /** Hand `lease` to the world of `bank`, just born, and `bank` to whoever made the gating, to attach. */
-  attachBank:     (bank: Bank, lease: Lease) => void
+  /** A lease `proving` builds, granted in the world under `bankStamp` and citing `cited`, the gate revision it proves: the birth seals its root box under it. */
+  leaseByProving: (proving: Proving, bankStamp: BankStamp, cited: GateRevisionedStamp) => Promise<Lease>
+  /** Attach `lease` to the world, unlocking it. */
+  attachLease:    (lease: Lease) => void
 }
 
 /** A gate's private verbs, for its form verbs' gatings to call. Internal. */
@@ -146,9 +146,7 @@ export type GateDna = GateStamp & { wayins: { main: Wayin, passkey0: Wayin | nul
 /** The options of {@link Gate.make}, beside its record. */
 export interface GateOpts {
   /** The device the gate's bank is on. */
-  device:    Device
-  /** The stamp of the gate's bank, which its scope must match, for a gate made before its bank's record is heard of. Its world's bank stamp where left out. */
-  bankStamp?: BankStamp | undefined
+  device: Device
 }
 // --
 

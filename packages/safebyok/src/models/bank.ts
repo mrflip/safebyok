@@ -2,7 +2,7 @@ import { Clock, Crypto, type Errors, Outcome, Phrases as BigPhrases, Validator }
 import { type Adoptable, Thing } from './thing'
 import { BaseBox } from './base-box'
 import { Device } from './device'
-import { Gate } from './gate'
+import type { Gate } from './gate'
 import type { BirthGating } from './gating'
 import type { World } from './world'
 import type { BirthCleartexts, BirthDna } from '../shapes/shapes-gateish'
@@ -159,10 +159,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   // The world's own, for a host's screen or a vault that wants the bank unlocked whichever way the user gets in. Every
   // other form verb is on the gate.
 
-  /** The gating of {@link birth} over `params`, handing `attachBank`, where given, the bank it births. Internal: make a birth's gating with {@link Device.birthGating}.
-   * Without `attachBank`, the bank it births is no device's: `device` does not show it.
-   */
-  static birthGating(device: Device, params: FormData | BirthDna | BirthCleartexts, attachBank?: (bank: Bank) => void): BirthGating { return Gate.birthGating(device, params, attachBank) }
+  /** The gating of {@link birth} over `params` ({@link World.birthGating}). Internal: make a birth's gating with {@link Device.birthGating}. */
+  static birthGating(device: Device, params: FormData | BirthDna | BirthCleartexts): BirthGating { return Checks.device.parse(device).world.birthGating(params) }
 
   /** Birth the bank of `device`'s scope with the user's new passphrase and optional passkey, and resolve it unlocked. The device's bank is then this one.
    * A weak passphrase refuses `weak_passphrase`: show {@link Device.judgeStrength}'s verdict as the user types.
@@ -297,7 +295,7 @@ function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepat
 // == [Checks]: Checks
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Bank.make}'s arguments and {@link Bank.birth}'s device. */
+/** The checks of {@link Bank.make}'s arguments, and of the device {@link Bank.birth} and {@link Bank.birthGating} are handed. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
   device:      custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
   bankMakeArgs: obj({

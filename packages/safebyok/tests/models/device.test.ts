@@ -60,8 +60,9 @@ describe("Device.make(record, opts)", () => {
     await device.hello()
     expect([tryGetThing.mock.calls.length, watch.mock.calls.length]).to.deep.equal([0, 0])
     await device.signIn(TH.WorldScope.userid)
-    // A get of the root box, and one watch, which the user's two minders share through the device's SortedVaultDB.
-    expect([tryGetThing.mock.calls.length, watch.mock.calls.length]).to.deep.equal([1, 1])
+    // A get of the root box, then, none being stored, one of the bank, and one watch, which the user's two minders and
+    // its world share through the device's SortedVaultDB.
+    expect([tryGetThing.mock.calls.length, watch.mock.calls.length]).to.deep.equal([2, 1])
   })
 
   it("accepts the bag of browserOpts() spread in, ignoring its device database", () => {
@@ -390,15 +391,19 @@ describe("device.signIn(userid)", () => {
     expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'storage_unavailable' })
   })
 
-  it("shows its bank unborn where none is stored, and the bank born on it after", async () => {
+  it("shows its bank unborn where none is stored, and the bank born on it after, locked and then unlocked", async () => {
     const device = TH.makeDevice({ userid: null })
     const stages = stagesOf(device)
     await device.signIn(TH.WorldScope.userid)
     expect(device.getSnapshot().bank).to.include({ stage: 'unborn', isLocked: true, lastErr: null })
     expect(device.bank).to.be.null
     expect(device.vault).to.be.null
+    const shownLocked: (Bank | null)[] = []
+    device.subscribe(() => { if (device.getSnapshot().bank.stage === 'locked') { shownLocked.push(device.bank) } })
     const bank = await device.birthGating({ passphraseCleartext: TH.TestPassphrase }).attempt()
-    expect(stages).to.deep.equal(['signed_out', 'starting', 'unborn', 'unlocked'])
+    expect(stages).to.deep.equal(['signed_out', 'starting', 'unborn', 'locked', 'unlocked'])
+    expect(shownLocked).to.have.lengthOf(1)
+    expect(shownLocked[0]).to.equal(bank)
     expect(device.bank).to.equal(bank)
     expect(device.vault!.bank).to.equal(bank)
     expect(device.getSnapshot().bank).to.equal(bank.getSnapshot())

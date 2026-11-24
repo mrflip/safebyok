@@ -70,9 +70,11 @@ describe("world.bank, world.gate and world.bankStamp", () => {
     expect(world.gate!.bankStamp).to.deep.equal(bank.stamp)
   })
 
-  it("are null, and the stamp refuses, until the world hears of a bank", async () => {
+  it("are null until the world hears of each, and the stamp refuses until it hears of a live bank", async () => {
+    expect([TH.makeDevice({ userid: null }).world.bank, TH.makeDevice({ userid: null }).world.gate]).to.deep.equal([null, null])
     const { world } = await signedInDevice()
-    expect([world.bank, world.gate]).to.deep.equal([null, null])
+    expect(world.bank!.pickle()).to.deep.equal(TH.bankShellOf())
+    expect(world.gate).to.be.null
     TH.expectSyncRefusal(() => world.bankStamp, 'absent_thing')
     TH.expectSyncRefusal(() => world.makeThing(TH.gateThingOf()).bankStamp, 'absent_thing')
   })

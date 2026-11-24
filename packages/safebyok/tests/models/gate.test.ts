@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
+import { noop } from 'es-toolkit'
 import { Errors } from 'safebyok-big/internals'
 import { BaseBox } from '../../src/models/base-box'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
-import type { GateOpts } from '../../src/shapes/shapes-gateish'
-import type { BankStamp } from '../../src/shapes/shapes-stamps'
+import type { WorldGateFriend } from '../../src/shapes/shapes-gateish'
 import type { ShellOf } from '../../src/shapes/shapes-sealers'
 import { type GateRecord, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { Lifeseq } from '../../src/shapes/primitives'
@@ -17,17 +17,15 @@ TH.useFakeClock()
 const ThingFields = ['userid', 'banklabel', 'labelpath', 'label', 'fmt', 'lifepath', 'lifeseq', 'revtok', 'revseq', 'born_at', 'written_at', 'am']
 const GateFields = [...ThingFields, 'wayins', 'auth', 'sigs', 'meta']
 
-/** What a gate made alone is made with: a device, and the stamp of its bank. */
-type PinnedGateOpts = GateOpts & { bankStamp: BankStamp }
-
-/** What a gate of {@link TH.WorldBankStamp}'s bank is made with: a new device of its scope, and the bank's stamp. */
-function worldOpts(): PinnedGateOpts {
-  const device = TH.makeDevice()
-  return { device, bankStamp: TH.WorldBankStamp }
+/** The lease verbs of a world, for a gate made alone, on which no test here builds a lease. */
+const AloneFriend: WorldGateFriend = {
+  leaseGateOf: () => { throw new Error("No lease is built on a gate made alone.") },
+  renewal:     () => null,
+  attachLease: noop,
 }
 
-/** The gate of `record` made by the world of `opts.device`, which hands `Gate.make` its friend. */
-function makeGate(record: GateRecord | ShellOf<GateRecord>, opts: PinnedGateOpts = worldOpts()): Gate { return opts.device.world.makeGate(record, opts.bankStamp) }
+/** The gate of `record`, made alone on `device`, by default a new device of {@link TH.WorldScope}. */
+function makeGate(record: GateRecord | ShellOf<GateRecord>, device = TH.makeDevice()): Gate { return Gate.make(record, { device }, AloneFriend) }
 
 interface DnaWayins { main: Wayin, passkey0: Wayin | null }
 
@@ -86,7 +84,7 @@ describe("Gate.makeRecord(dna)", () => {
   }
 })
 
-describe("Gate.make(record, { device, bankStamp }, friend), by world.makeGate(record, bankStamp)", () => {
+describe("Gate.make(record, { device }, friend)", () => {
   it("makes the same gate again from a gate's pickle", async () => {
     const gate = makeGate(await gateRecordOf(true))
     const again = makeGate(TH.livePickleOf(gate))
@@ -129,7 +127,7 @@ describe("Gate.make(record, { device, bankStamp }, friend), by world.makeGate(re
     it(`refuses a device of ${blurb} than its bank's`, async () => {
       const record = await gateRecordOf()
       const device = TH.makeDevice(moved)
-      TH.expectSyncRefusal(() => makeGate(record, { device, bankStamp: TH.WorldBankStamp }), 'record_conflict')
+      TH.expectSyncRefusal(() => makeGate(record, device), 'record_conflict')
     })
   }
 
@@ -139,12 +137,10 @@ describe("Gate.make(record, { device, bankStamp }, friend), by world.makeGate(re
     expect(makeGate(record).lifeseq).to.eq(later)
   })
 
-  it("refuses a bankStamp that is not a stamp, no opts at all, or no friend", async () => {
+  it("refuses no opts at all, or no friend", async () => {
     const record = await gateRecordOf()
-    const opts = worldOpts()
-    TH.expectSyncRefusal(() => makeGate(record, { ...opts, bankStamp: { lifeseq: 'nope' } } as never), 'bad_record')
     TH.expectSyncRefusal(() => Gate.make(record, undefined as never, undefined as never))
-    TH.expectSyncRefusal(() => Gate.make(record, opts, undefined as never), 'bad_record')
+    TH.expectSyncRefusal(() => Gate.make(record, { device: TH.makeDevice() }, undefined as never), 'bad_record')
   })
 
   it("quotes none of a refused record in its refusal: no ciphertext", async () => {
@@ -195,15 +191,20 @@ describe("what a gate shows", () => {
     expect(() => { (gate as { banklabel: unknown }).banklabel = 'other' }).to.throw(TypeError)
   })
 
-  it("has the bank's stamp, the device it was given, and its own stamp", async () => {
+  it("has the device it was given and its own stamp, and refuses its bank's stamp while its world has no bank", async () => {
     const record = await gateRecordOf()
-    const opts = worldOpts()
-    const gate = makeGate(record, opts)
-    expect(gate.device).to.eq(opts.device)
-    expect(gate.bankStamp).to.deep.equal(TH.WorldBankStamp)
+    const device = TH.makeDevice()
+    const gate = makeGate(record, device)
+    expect(gate.device).to.eq(device)
+    TH.expectSyncRefusal(() => gate.bankStamp, 'absent_thing')
     expect(gate.stamp).to.deep.equal(TH.WorldGateStamp)
     expect(gate.scope).to.deep.equal({ userid: TH.WorldScope.userid, banklabel: TH.WorldScope.banklabel, labelpath: 'gate' })
     expect([gate.revtok, gate.revseq, gate.written_at]).to.deep.equal([record.revtok, 0, TH.T0])
+  })
+
+  it("has its bank's stamp from its world, once a bank is there", async () => {
+    const { bank } = await TH.buildBornBank()
+    expect(bank.gate.bankStamp).to.deep.equal(bank.stamp)
   })
 
   it("is a gate by its modelkind", async () => {
@@ -225,13 +226,12 @@ describe("a gate over the shell or a tombstone", () => {
     })
   }
 
-  it("is made from the shell, which it pickles to, with no wayins and the scope, bank stamp and citation of the shell", () => {
+  it("is made from the shell, which it pickles to, with no wayins and the scope and citation of the shell", () => {
     const gate = makeGate(TH.gateShellOf())
     expect(gate.pickle()).to.deep.equal(TH.gateShellOf())
     expect(Object.hasOwn(gate, 'wayins')).to.be.false
     expect(gate.wayins).to.be.undefined
     expect(gate.scope).to.deep.equal(TH.GateScope)
-    expect(gate.bankStamp).to.deep.equal(TH.WorldBankStamp)
     expect(gate.citable).to.deep.equal(Shell.Cited)
     expect(gate.modelkind).to.eq('gate')
   })

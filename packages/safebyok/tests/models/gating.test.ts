@@ -20,6 +20,12 @@ async function birth(device: Device, cleartexts: unknown): Promise<Bank> {
   return await Bank.birth(device, cleartexts as never)
 }
 
+/** Expect `device` to have no bank, the bank Thing its world keeps holding the shell its sign-in found. */
+function expectNoBankBorn(device: Device): void {
+  expect(device.bank).to.be.null
+  expect(device.world.bank?.pickle()).to.deep.equal(TH.bankShellOf())
+}
+
 describe("Bank.birth(device, cleartexts)", () => {
   it("births an unlocked bank of the device's scope, its main gate with the passphrase's wayin", async () => {
     const device = TH.makeDevice()
@@ -77,17 +83,17 @@ describe("Bank.birth(device, cleartexts)", () => {
   it("passes any refusal of the vaultDB on unchanged, making no bank", async () => {
     const refusal = new Errors.VaultError('storage_unavailable', 'the disk is full')
     const device = TH.makeDevice()
-    const births = TH.spyBirths(device, (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, read_tc: readTcNow(), dbhas: null, err: refusal }))
+    TH.spyBirths(device, (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, read_tc: readTcNow(), dbhas: null, err: refusal }))
     const err = await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase }))
     expect(err).to.eq(refusal)
-    expect(births.banks).to.be.empty
+    expectNoBankBorn(device)
   })
 
   it("refuses 'weak_passphrase' before it makes a bank", async () => {
     const device = TH.makeDevice({}, { strengthChecker: () => ({ strong: false, reason: 'too short' }) })
     const births = TH.spyBirths(device)
     await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase }), 'weak_passphrase')
-    expect(births.banks).to.be.empty
+    expectNoBankBorn(device)
     expect(births.tryBirthBank).not.toHaveBeenCalled()
   })
 
@@ -108,10 +114,9 @@ describe("Bank.birth(device, cleartexts)", () => {
   for (const [cleartexts, blurb] of CleartextsCases) {
     it(`refuses ${blurb}, quoting no passphrase, before it makes a bank`, async () => {
       const device = TH.makeDevice()
-      const births = TH.spyBirths(device)
       const err = await TH.expectRefusal(birth(device, cleartexts), 'bad_record')
       expect(TH.thrownText(err)).to.not.include(TH.TestPassphrase)
-      expect(births.banks).to.be.empty
+      expectNoBankBorn(device)
     })
   }
 
@@ -172,13 +177,12 @@ describe("Bank.birth(device, cleartexts)", () => {
     expect([bank.revseq, bank.rootBox.revseq]).to.deep.equal([0, 0])
   })
 
-  it("makes a gate to seal the root box, and the bank's main gate is the one its device's world keeps, unlocked", async () => {
+  it("makes no gate before the bank's main gate, the one its device's world keeps, unlocked", async () => {
     const make = vi.spyOn(Gate, 'make')
     const device = TH.makeDevice()
     const bank = await birth(device, { passphraseCleartext: TH.TestPassphrase })
-    expect(make).toHaveBeenCalledTimes(2)
-    expect(make.mock.results[0]!.value).to.not.equal(bank.gate)
-    expect(make.mock.results[1]!.value).to.equal(bank.gate)
+    expect(make).toHaveBeenCalledOnce()
+    expect(make.mock.results[0]!.value).to.equal(bank.gate)
     expect(bank.gate).to.equal(device.world.gate)
     expect(bank.gate.isUnlocked).to.be.true
   })
@@ -249,25 +253,17 @@ describe("a gating's vacating of the passkey answers it is handed", () => {
   })
 })
 
-describe("Bank.birthGating(device, cleartexts, attachBank)", () => {
-  it("hands `attachBank` the bank it births", async () => {
-    const device = TH.makeDevice()
-    await device.signIn(TH.WorldScope.userid)
-    const attachBank = vi.fn()
-    const bank = await Bank.birthGating(device, { passphraseCleartext: TH.TestPassphrase }, attachBank).attempt()
-    expect(attachBank).toHaveBeenCalledExactlyOnceWith(bank)
-  })
-
-  it("births a bank its device does not show, where no `attachBank` is given", async () => {
+describe("Bank.birthGating(device, cleartexts)", () => {
+  it("births the bank its device then shows, unlocked", async () => {
     const device = TH.makeDevice()
     await device.signIn(TH.WorldScope.userid)
     const bank = await Bank.birthGating(device, { passphraseCleartext: TH.TestPassphrase }).attempt()
     expect(bank.isUnlocked).to.be.true
-    expect(device.bank).to.be.null
+    expect(device.bank).to.equal(bank)
   })
 
-  it("refuses an `attachBank` that is not a function", () => {
-    TH.expectSyncRefusal(() => Bank.birthGating(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase }, 'attachBank' as never), 'bad_record')
+  it("refuses a device that is not one", () => {
+    TH.expectSyncRefusal(() => Bank.birthGating({ scope: TH.WorldScope } as never, { passphraseCleartext: TH.TestPassphrase }), 'bad_record')
   })
 })
 
@@ -277,11 +273,8 @@ const FakePassphrase = 'fake passphrase'
 /** A new passphrase, an obvious fake. */
 const FakeNextPassphrase = 'fake next passphrase'
 
-/** A birth gating's `attachBank` that attaches the bank to nothing: these gatings' banks are no device's. */
-function attachNothing(): void { /* Nothing takes the bank. */ }
-
 /** A birth gating over `cleartexts` as the caller hands them, on a fresh device. */
-function gatingOf(cleartexts: unknown): BirthGating { return Bank.birthGating(TH.makeDevice(), cleartexts as never, attachNothing) }
+function gatingOf(cleartexts: unknown): BirthGating { return Bank.birthGating(TH.makeDevice(), cleartexts as never) }
 
 /** What a gating over `cleartexts` hands its body: a clone, taken in the body, before the attempt vacates what it adopted. */
 async function adoptedFrom(cleartexts: unknown): Promise<unknown> {
