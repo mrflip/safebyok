@@ -12,13 +12,14 @@ import { type ThingRecord, ThingChecks, ThingFormat } from '../shapes/shapes-thi
 import type { VaultEvent } from '../shapes/shapes-vault-event'
 import type { SortedVaultDB } from '../storage/sorted-vault-db'
 import { maskedRowsOf } from './masked-rows'
-import { bankKeyHeadOf } from './query-keys'
+import { bankKeyHeadOf, labelsOf } from './query-keys'
 
 // == [PersistScaffold]: PersistScaffold
 
 // It holds records as the vaultDB stores them, and nothing else: no listing, no lease, and no query of a host's, whose
 // queries and mutations may hold cleartexts. No host is handed its client.
 /** One bank's records between page loads: each root's and each box's newest whole record or tombstone, in a QueryClient of its own, under a key of its own.
+ * A record's key has the shape of a vault TSQ's item key, so a devtool reads the roots' rows as it read them before.
  * It is filled from what the bank's SortedVaultDB tells, and from what a persister restores.
  */
 export class PersistScaffold {
@@ -49,9 +50,8 @@ export class PersistScaffold {
    */
   async persist(rootsOrBoxes: RootsOrBoxes, persister: Persister): Promise<void> {
     const queryClient = this.#queryClient
-    const keyHead     = this.#keyHeadOf(rootsOrBoxes)
     const dehydrateOptions: TSQ.DehydrateOptions = {
-      shouldDehydrateQuery:    (tsqQuery) => (TSQ.partialMatchKey(tsqQuery.queryKey, keyHead) && (tsqQuery.state.data !== undefined)),
+      shouldDehydrateQuery:    (tsqQuery) => (this.#isKeptKey(tsqQuery.queryKey) && isRecord(tsqQuery.state.data) && (rootsOrBoxesOf(tsqQuery.state.data.labelpath) === rootsOrBoxes)),
       shouldDehydrateMutation: () => false,
     }
     try {
@@ -67,12 +67,15 @@ export class PersistScaffold {
   /** Every record kept: the roots' first, then the boxes'. Anything a persister restored that is not a record is left out. */
   records(): ThingRecord[] {
     const roots = RootLabelpaths.map((labelpath) => this.#queryClient.getQueryData(this.#keyOf(labelpath)))
-    const boxes = this.#queryClient.getQueryCache().findAll({ queryKey: this.#keyHeadOf('boxes') }).map(({ state }) => state.data)
-    return [...roots, ...boxes].filter(isRecord)
+    const boxes = this.#queryClient.getQueryCache().findAll({ queryKey: this.#keyHead }).map(({ state }) => state.data)
+    return [...roots.filter(isRecord), ...boxes.filter(isRecord).filter(({ labelpath }) => (rootsOrBoxesOf(labelpath) === 'boxes'))]
   }
 
   /** The roots' rows, masked for a devtool. */
-  maskedRootRows(): MaskedRow[] { return maskedRowsOf(this.#queryClient, this.#keyHeadOf('roots')) }
+  maskedRootRows(): MaskedRow[] {
+    const rootHashes = new Set(RootLabelpaths.map((labelpath) => TSQ.hashKey(this.#keyOf(labelpath))))
+    return maskedRowsOf(this.#queryClient, this.#keyHead).filter(({ queryKey }) => rootHashes.has(TSQ.hashKey(queryKey)))
+  }
   // --
 
   // == [Listening]: listen
@@ -84,7 +87,7 @@ export class PersistScaffold {
   }
   // --
 
-  // == [Helpers]: #hear, #keyOf, #keyHeadOf
+  // == [Helpers]: #hear, #keyOf, #keyHead, #isKeptKey
 
   /** Keep the record of `event`, where it is a whole record or tombstone of a root or a box */
   #hear(event: VaultEvent): void {
@@ -94,21 +97,30 @@ export class PersistScaffold {
   }
 
   /** The key of the record at `labelpath` */
-  #keyOf(labelpath: Labelpath): TSQ.QueryKey { return [...this.#keyHeadOf(rootsOrBoxesOf(labelpath)), labelpath] }
+  #keyOf(labelpath: Labelpath): TSQ.QueryKey { return [...this.#keyHead, ...labelsOf(labelpath), ItemMark] }
 
-  /** The key every record of the roots or the boxes starts with */
-  #keyHeadOf(rootsOrBoxes: RootsOrBoxes): TSQ.QueryKey { return [...bankKeyHeadOf(this.#scope), rootsOrBoxes] }
+  /** The head of every record's key */
+  get #keyHead(): TSQ.QueryKey { return [...bankKeyHeadOf(this.#scope), Itemkind] }
+
+  /** True for a key of this bank's records */
+  #isKeptKey(queryKey: TSQ.QueryKey): boolean { return TSQ.partialMatchKey(queryKey, this.#keyHead) }
   // --
 }
 // --
 
-// == [Helpers]: RootsOrBoxes, RootLabelpaths, PersistBuster, RestoreOpts, rootsOrBoxesOf, isRootOrBox, isRecord
+// == [Helpers]: RootsOrBoxes, RootLabelpaths, Itemkind, ItemMark, PersistBuster, RestoreOpts, rootsOrBoxesOf, isRootOrBox, isRecord
 
 /** Which of a device's two persisters: the bank's roots', or its boxes'. */
 export type RootsOrBoxes = 'roots' | 'boxes'
 
 /** The labelpaths of a bank's roots, in the order a SortedVaultDB tells them: the bank, its main gate and its root box. */
 const RootLabelpaths: readonly Labelpath[] = Object.freeze(['bank', Labelpath.MainGate, Labelpath.RootBox])
+
+/** The kind segment of a record's key, as a vault TSQ's item key has it. */
+const Itemkind = 'item'
+
+/** The mark that ends a record's key, as it ends a vault TSQ's item key. */
+const ItemMark = '!'
 
 // The minders this replaced saved under ThingFormat alone, so a snapshot of theirs is discarded.
 /** The buster a snapshot is saved under: a snapshot saved under another is discarded at restore. */
