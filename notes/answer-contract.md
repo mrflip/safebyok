@@ -228,6 +228,12 @@ the ask is made, before anything is fetched, so its answer has no dbhas, and the
 DL3, DG9, and any other row whose cited record is a tombstone) are not reached. safebyok-big classifies such a del by
 the stored row, by the rows below.
 
+Where nothing is stored at the ask's scope, the new core's (`packages/safebyok`) answer carries the shell there as its
+`dbhas`, never null: the null and dbnil of GV1, GV2, PV2, PV3 and DV2 read, there, as the shell. Its lifepath is
+the lifepath of the nearest Thing stored above the scope, live or a tombstone, then the shell's lifeseq `-000000001` for
+each level below that Thing: `box/zz` under a root box stored at life 0 has `0000000000/-000000001`, and under no root
+box stored, `-000000001/-000000001`. There, a `dbhas` of null means only that the verb threw.
+
 ## Vault ops table
 
 Same ops, flags and conventions as the box table, applied to the vault row. Two things to note:

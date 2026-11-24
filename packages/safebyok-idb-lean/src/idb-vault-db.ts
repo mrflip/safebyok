@@ -3,7 +3,7 @@
 import type { UseStore } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
 import type {
-  Actual, AnyAsk, BirthBankActual, BirthBankAsk, BirthPuts, DelAct, GetAsk, GotAct, ListAsk, ListThingsActual, PutAct, Received, ThingWatchScope, Tracked, VaultError, WorldRecord, WriteAsk,
+  AnyAsk, BirthBankActual, BirthBankAsk, BirthPuts, GetAsk, GotActual, ListAsk, ListThingsActual, Received, ThingWatchScope, Tracked, VaultError, WorldRecord, WriteAsk, WroteActual,
 } from 'safebyok/storage'
 import { bellnameOf, childrenIn, shelfOf, thingScopepathOf } from './vault-shelf'
 
@@ -18,7 +18,7 @@ export type IdbVaultDBOpts = { dbName?: string | undefined }
 const idbVaultDBOpts = DB.objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_record')
 // --
 
-// == [Helpers]: Rung, isHeardBy, rootsFetchedIn, worldFetchedIn, worldAfterIn
+// == [Helpers]: Rung, isHeardBy, rootsFetchedIn, worldFetchedIn, aboveFetchedIn, worldAfterIn
 
 /** The notice of one Thing written, broadcast to every watch on the database. */
 type Rung = { scope: ThingWatchScope, received: Received }
@@ -43,6 +43,16 @@ async function rootsFetchedIn(store: IDBObjectStore, ask: AnyAsk): Promise<DB.Cl
 async function worldFetchedIn(store: IDBObjectStore, ask: AnyAsk): Promise<DB.Classifier.WorldFetched> {
   const { gate: maingate, root: _root, ...fetched } = await rootsFetchedIn(store, ask)
   return { ...fetched, maingate }
+}
+
+/** The world of `ask`'s bank and the nearest Thing stored above its scope, fetched raw in `store`'s transaction. */
+async function aboveFetchedIn(store: IDBObjectStore, ask: GetAsk | WriteAsk): Promise<DB.Classifier.AboveFetched> {
+  const { userid, banklabel } = ask
+  const [world, ...ancestors] = await Promise.all([
+    worldFetchedIn(store, ask),
+    ...DB.Labelpath.ancestorsOf(ask.labelpath).map((labelpath) => DB.rowAt(store, thingScopepathOf({ userid, banklabel, labelpath }))),
+  ])
+  return { ...world, ancestor: ancestors.find((raw) => raw !== null) ?? null }
 }
 
 /** The world of `ask`'s bank as `store`'s transaction now has it, and its {@link Tracked} if `ask` tracks the roots. */
@@ -74,23 +84,23 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
 
   // Each call is one IndexedDB transaction. It fetches the Things the ask depends on, classifies the ask against them, and
   // on a write act writes the ask's records and reads them back, with the world after, before the transaction ends.
-  protected async doGetThing(ask: GetAsk): Promise<Actual<GotAct>> {
+  protected async doGetThing(ask: GetAsk): Promise<GotActual> {
     return await DB.inOneStep(this.#shelf, 'readonly', async (store) => {
-      const [raw, world] = await Promise.all([DB.rowAt(store, thingScopepathOf(ask)), worldFetchedIn(store, ask)])
-      return this.classifyGetThing(ask, raw, world)
+      const [raw, above] = await Promise.all([DB.rowAt(store, thingScopepathOf(ask)), aboveFetchedIn(store, ask)])
+      return this.classifyGetThing(ask, raw, above)
     })
   }
 
-  protected async doWriteThing(ask: WriteAsk): Promise<Actual<PutAct | DelAct>> {
+  protected async doWriteThing(ask: WriteAsk): Promise<WroteActual> {
     const actual = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const [raw, world] = await Promise.all([DB.rowAt(store, thingScopepathOf(ask)), worldFetchedIn(store, ask)])
-      const actual = this.classifyWriteThing(ask, raw, world)
+      const [raw, above] = await Promise.all([DB.rowAt(store, thingScopepathOf(ask)), aboveFetchedIn(store, ask)])
+      const actual = this.classifyWriteThing(ask, raw, above)
       if (! (actual.ok && DB.Classifier.isWriteAct(actual.act))) { return actual }
       store.put(ask.record, thingScopepathOf(ask))
       const [written, after] = await Promise.all([DB.rowAt(store, thingScopepathOf(ask)), worldAfterIn(store, ask)])
       return { ...actual, ...after, record: DB.Classifier.writtenThingOf(ask, written) }
     })
-    if (actual.ok && DB.Classifier.isWriteAct(actual.act) && (actual.record !== null)) {
+    if (actual.ok && DB.Classifier.isWriteAct(actual.act)) {
       this.#ring([{ scope: ask, received: { record: actual.record, world: actual.world } }])
     }
     return actual

@@ -5,8 +5,8 @@ import { v7 as uuidv7 } from 'uuid'
 import { CX, EX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/internals'
 import { policyRefusalOf } from './policies'
 import { Labelpath } from '../shapes/primitives'
-import type { Actual, BirthBankActual, DamagedThing, KidEntry, Kids, ListThingsActual, ReadTc } from './vault-db'
-import { type Sparse, type StoredCited, type ThingCited, type ThingRecord, type ThingScope, Shell, ThingChecks } from '../shapes/shapes-thing'
+import type { BirthBankActual, DamagedThing, GotActual, KidEntry, Kids, ListThingsActual, ReadTc, WroteActual } from './vault-db'
+import { type Sparse, type StoredCited, type ThingCited, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
 import { Thing } from '../models/thing'
 import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
@@ -120,7 +120,7 @@ export function isRefusedAct(act: string): act is EX.RefusedAct { return (EX.ref
 export function isWriteAct(act: string): act is EX.WriteAct { return (EX.writeActVals as readonly string[]).includes(act) }
 // --
 
-// == [Things stored]: RowOfOtherScope, StoredCheck, storedOf, writtenOf, storedCitedOf, storedThingOf, writtenThingOf, writtenRootsOf, listedThingOf, watchedThingOf, BankRootsFetched, WorldFetched, worldOf
+// == [Things stored]: RowOfOtherScope, StoredCheck, storedOf, writtenOf, storedCitedOf, storedThingOf, writtenThingOf, writtenRootsOf, listedThingOf, watchedThingOf, BankRootsFetched, WorldFetched, AboveFetched, worldOf, shellAt, ancestorOf
 // A Thing that fails its kind's checks is damaged, and refuses `damaged_row`. One that is not an object, or a sound one
 // stored at another scope than the one asked for, means the datastore or its concrete adapter is broken, and refuses `storage_issue`.
 
@@ -181,6 +181,12 @@ export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: un
 /** The raw bank and main gate a concrete adapter fetched for an ask's bank, each null for none, and its {@link TrackedFetched}. */
 export type WorldFetched = Readonly<{ bank: unknown, maingate: unknown, tracked?: TrackedFetched }>
 
+/** What a concrete adapter fetched for a get or a write beside the Thing at its scope: the raw world ({@link WorldFetched}), and `ancestor`, the raw nearest Thing stored above that scope.
+ * `ancestor` is, of the Things stored in the ask's bank whose labelpath followed by `/` begins the ask's labelpath, the one with
+ * the longest labelpath, live or a tombstone; null where there is none, as for a root. It gives the shell's lifepath where nothing is stored at the scope.
+ */
+export type AboveFetched = WorldFetched & Readonly<{ ancestor: unknown }>
+
 // A world is news, never the verdict: a bank or main gate that fails its checks leaves it null, and the step's answer stands.
 /** The world of the bank at `bankScope`, from its raw `fetched` bank and main gate; null where either is missing or fails its checks. */
 export function worldOf({ userid, banklabel }: ThingWatchScope, fetched: WorldFetched): WorldRecord | null {
@@ -189,6 +195,21 @@ export function worldOf({ userid, banklabel }: ThingWatchScope, fetched: WorldFe
     const maingate = storedOf(GateChecks.stored, { userid, banklabel, labelpath: Labelpath.MainGate }, fetched.maingate)
     return ((bank === null) || (maingate === null)) ? null : { ...bank, maingate }
   } catch { return null }
+}
+
+/** The shell at `scope`, under the nearest Thing stored above it, from the raw `ancestor` a concrete adapter fetched ({@link AboveFetched}). */
+function shellAt({ userid, banklabel, labelpath }: ThingScope, ancestor: unknown): VoidSentinel {
+  return Shell.under({ userid, banklabel, labelpath }, ancestorOf({ userid, banklabel, labelpath }, ancestor))
+}
+
+// An ancestor that fails its checks refuses the ask as a damaged row; one that is not above the scope, as a broken datastore.
+/** The nearest Thing stored above `scope`, from its raw row, checked: null for none. */
+function ancestorOf({ userid, banklabel, labelpath }: ThingScope, raw: unknown): StoredCited | null {
+  if (raw === null) { return null }
+  if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
+  const abovepath = raw['labelpath']
+  if ((typeof abovepath !== 'string') || (! labelpath.startsWith(`${abovepath}/`))) { throw Throwers.rowOfOtherAddress(['labelpath']) }
+  return storedCitedOf({ userid, banklabel, labelpath: abovepath }, raw)
 }
 // --
 
@@ -233,34 +254,38 @@ function trackedEntryOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>
 }
 // --
 
-// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, isChildLabelpath, kidsOf, readTcNow, readTcOf, classifyBirthBank
+// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, isChildLabelpath, kidsOf, readTcNow, readTcOfStep, readTcOf, classifyBirthBank
 // Each is given the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`;
-// a birth is given the bank's three roots, and where it is born, reports the world its puts wrote.
+// a get and a write are given the nearest Thing stored above the ask's scope; a birth is given the bank's three roots, and,
+// where it is born, reports the world its puts wrote.
 
-/** Classify a get against the raw Thing a concrete adapter fetched at its scope, null for none. */
-export function classifyGetThing(ask: GetAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.GotAct> {
+/** Classify a get against the raw Thing a concrete adapter fetched at its scope, null for none, and what it fetched above it in the same step.
+ * Where none is stored, the report's `record` is the shell there, under the nearest Thing stored above it.
+ */
+export function classifyGetThing(ask: GetAsk, raw: unknown, above: AboveFetched): GotActual {
   const stored = storedThingOf(ask, raw)
   const act    = getActOf(ask, stored)
-  const world  = worldOf(ask, worldFetched)
-  const beside = trackedFieldOf(ask, worldFetched.tracked)
-  return isRefusedAct(act) ? { ok: false, act, world, record: stored, ...beside } : { ok: true, act, world, record: stored, ...beside }
+  const record = stored ?? shellAt(ask, above.ancestor)
+  const world  = worldOf(ask, above)
+  const beside = trackedFieldOf(ask, above.tracked)
+  return isRefusedAct(act) ? { ok: false, act, world, record, ...beside } : { ok: true, act, world, record, ...beside }
 }
 
-/** Classify a write against the raw Thing a concrete adapter fetched at its scope, null for none.
+/** Classify a write against the raw Thing a concrete adapter fetched at its scope, null for none, and what it fetched above it in the same step.
  * Where the write would replace a live Thing, it also checks the born_at and the storage policies, and where it puts or deletes
  * the bank over a live bank, the lifetok. Under a write act, `record` is `ask.record`: the concrete adapter writes it, then reports the
  * Thing it wrote and the world after the write.
  */
-export function classifyWriteThing(ask: WriteAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.PutAct | EX.DelAct> {
+export function classifyWriteThing(ask: WriteAsk, raw: unknown, above: AboveFetched): WroteActual {
   const stored = storedCitedOf(ask, raw)
   const act    = writeActOf(ask, stored)
-  if (! isWriteAct(act))  { return unwrittenWriteOf(raw, { ask, act, world: worldFetched }) }
+  if (! isWriteAct(act))  { return unwrittenWriteOf(raw, { ask, act, above }) }
   if (act === 'replaced') {
     demandBornAtKept(ask, raw)
     demandPolicies(ask, raw)
   }
   demandLifetokKept(ask, raw)
-  return { ok: true, act, world: worldOf(ask, worldFetched), record: ask.record, ...trackedFieldOf(ask, worldFetched.tracked) }
+  return { ok: true, act, world: worldOf(ask, above), record: ask.record, ...trackedFieldOf(ask, above.tracked) }
 }
 
 /** The raw rows a concrete adapter fetched for a listing: the parent (null for none), each child one label under it with its labelpath, and when it read them ({@link readTcNow}). */
@@ -317,12 +342,16 @@ function kidsOf(ask: ListAsk, parent: ThingRecord | null, deltas: readonly Spars
 /** A {@link ReadTc} made now, for a concrete adapter to report as the `read_tc` of a listing it reads in the same step. */
 export function readTcNow(): ReadTc { return uuidv7() }
 
+/** The `read_tc` a concrete adapter reported for a step, or one made now where it reported none. Throws `storage_issue` for anything but a UUID version 7. */
+export function readTcOfStep(raw: unknown): ReadTc { return (raw === undefined) ? readTcNow() : readTcOf(raw) }
+
 /** The `read_tc` a concrete adapter reported, checked as a UUID version 7. Throws `storage_issue` for anything else. */
 function readTcOf(raw: unknown): ReadTc {
   if ((typeof raw !== 'string') || (! ReadTcPattern.test(raw))) { throw Throwers.storageIssue() }
   return raw
 }
-const ReadTcPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+/** A UUID version 7, as text: the shape of every {@link ReadTc}. */
+export const ReadTcPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 /** Classify a bank's birth, by its three `puts`, against the raw roots a concrete adapter fetched.
  * Under `born`, `things` and `world` are made of the puts' records, for the concrete adapter to write in one step. It then reports
@@ -341,17 +370,17 @@ export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): B
 // The steps of the classifiers above, for a concrete adapter that checks some preconditions itself to call in its own order.
 
 /** The answer to a write the act tables leave unwritten, a refusal or `passed`, from the raw Thing a concrete adapter fetched at its scope.
- * `world` is the raw world the concrete adapter fetched beside it.
+ * Its `record` is the Thing stored, or where none is, the shell under the nearest Thing stored above it.
  */
-export function unwrittenWriteOf(raw: unknown, { ask, act, world }: UnwrittenWrite): Actual<EX.PutAct | EX.DelAct> {
-  const record  = storedThingOf(ask, raw)
-  const worldRecord = worldOf(ask, world)
-  const beside  = trackedFieldOf(ask, world.tracked)
-  return isRefusedAct(act) ? { ok: false, act, world: worldRecord, record, ...beside } : { ok: true, act, world: worldRecord, record, ...beside }
+export function unwrittenWriteOf(raw: unknown, { ask, act, above }: UnwrittenWrite): WroteActual {
+  const record  = storedThingOf(ask, raw) ?? shellAt(ask, above.ancestor)
+  const world   = worldOf(ask, above)
+  const beside  = trackedFieldOf(ask, above.tracked)
+  return isRefusedAct(act) ? { ok: false, act, world, record, ...beside } : { ok: true, act, world, record, ...beside }
 }
 
-/** An unwritten write, for {@link unwrittenWriteOf}: the write, the act the act tables found, and the raw world the concrete adapter fetched. */
-export type UnwrittenWrite = Readonly<{ ask: WriteAsk, act: Exclude<EX.PutAct | EX.DelAct | EX.RefusedAct, EX.WriteAct>, world: WorldFetched }>
+/** An unwritten write, for {@link unwrittenWriteOf}: the write, the act the act tables found, and what the concrete adapter fetched beside the Thing at its scope. */
+export type UnwrittenWrite = Readonly<{ ask: WriteAsk, act: Exclude<EX.PutAct | EX.DelAct | EX.RefusedAct, EX.WriteAct>, above: AboveFetched }>
 
 /** Throw `bad_record` unless `ask` leaves unchanged the born_at of the live Thing it replaces, the raw Thing a concrete adapter fetched at its scope. */
 export function demandBornAtKept(ask: WriteAsk, raw: unknown): void {
@@ -393,7 +422,10 @@ export function unwrittenBirthOf(puts: BirthPuts, fetched: BankRootsFetched): Bi
   }
   for (const [put, raw] of [[bankPut, fetched.bank], [gatePut, fetched.gate], [rootPut, fetched.root]] as const) {
     const act = putActOf(put, storedCitedOf(put, raw))
-    if (isRefusedAct(act)) { return { ok: false, act, world: worldOf(bankPut, { bank: fetched.bank, maingate: fetched.gate }), record: storedThingOf(put, raw), ...trackedFieldOf(bankPut, fetched.tracked) } }
+    if (! isRefusedAct(act)) { continue }
+    // A root has nothing above it, so where none is stored its shell stands alone.
+    const record = storedThingOf(put, raw) ?? Shell.under(put, null)
+    return { ok: false, act, world: worldOf(bankPut, { bank: fetched.bank, maingate: fetched.gate }), record, ...trackedFieldOf(bankPut, fetched.tracked) }
   }
   return null
 }

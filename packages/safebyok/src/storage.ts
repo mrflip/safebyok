@@ -21,14 +21,14 @@ export {
 export * as Classifier from './storage/thing-classifier'
 export { type BankScope, type BankStamp, type BoxStamp, type GateStamp, StampChecks } from './shapes/shapes-stamps'
 export {
-  type Actual, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer,
-  type KidEntry, type Kids, type ListThingsActual, type ListThingsAnswer, type ListedBeside, type ReadTc, type VaultDB, type WriteThingAnswer, isVaultDB,
+  type Actual, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer, type GotActual,
+  type KidEntry, type Kids, type ListThingsActual, type ListThingsAnswer, type ListedBeside, type ReadTc, type VaultDB, type WriteThingAnswer, type WroteActual, isVaultDB,
 } from './storage/vault-db'
 // The events a vaultDB's watcher is notified with, and FeedSorter, which sorts a bank's records into events.
 export { FeedSorter } from './storage/feed-sorter'
 export {
-  type Agekind, type Agerank, type Lifekind, type Recordkind, type SeenThing, type VaultAgedEvent, type VaultEvent, type VaultEventOf, type VaultEventkind, type VaultItemEvent, type VaultLifeEvent,
-  agekindVals, lifekindVals, recordkindVals, vaultEventkindVals,
+  type Agekind, type Agerank, type ItemSeen, type Lifekind, type Liveness, type SeenThing, type VaultAgedEvent, type VaultEvent, type VaultEventOf, type VaultEventkind, type VaultItemEvent, type VaultLifeEvent,
+  agekindVals, lifekindVals, livenessVals, vaultEventkindVals,
 } from './shapes/shapes-vault-event'
 // What a host's persister is written against: TanStack Query's own interface, as a device takes it.
 export { type DevicePersisters, type PersistedClient, type Persister, type PersisterOfBank, MemoryPersister, isPersister } from './storage/persister'

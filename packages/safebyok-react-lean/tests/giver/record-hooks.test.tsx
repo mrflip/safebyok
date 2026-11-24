@@ -1,7 +1,7 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { type ReactNode, useEffect, useLayoutEffect } from 'react'
 import { type BoxRecord, type GateRecord, type PasskeyWayinHeader, VaultMinder } from 'safebyok'
-import { storageUnavailable } from 'safebyok/storage'
+import { Classifier, storageUnavailable } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { type BoxSelected, passkeyHeaderOf } from '../../src/index'
@@ -264,7 +264,7 @@ describe("useBoxList over the minder's own listing", () => {
 
   it("shows a list refused as its error", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
-    world.vaultDB.tryListThings = () => Promise.resolve({ ok: false, world: null, err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') } as never)
+    world.vaultDB.tryListThings = (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, read_tc: Classifier.readTcNow(), dbhas: null, parentage: [], deltas: [], damaged_rows: [], err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
     function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
     const { result } = renderHook(() => world.Bank.useBoxList(), { wrapper: Wrapper })
     await waitFor(() => { expect(result.current.isError).to.eq(true) })

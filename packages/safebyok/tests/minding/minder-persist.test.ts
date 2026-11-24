@@ -8,7 +8,7 @@ import { MemoryPersister } from '../../src/storage/persister'
 import { refusedAnswerOf } from '../../src/storage/refused-answer'
 import { ThingFormat } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
-import { DownVaultDB, Hours24, boxScopeOf, cheatBox, fakeBankOf, storedBoxOf } from './vault-minder/world'
+import { DownVaultDB, Hours24, boxScopeOf, cheatBox, fakeBankOf, sortedOf, storedBoxOf } from './vault-minder/world'
 
 afterEach(() => { vi.restoreAllMocks() })
 
@@ -18,9 +18,9 @@ async function nextTick(): Promise<void> { await new Promise((resolve) => { setT
 
 /** A minder over `vaultDB`, restored from `persister` and saving to it, and started unless `isStarted` is false. */
 async function persistedMinderOf(persister: MemoryPersister, vaultDB: MemoryVaultDB, { isStarted = true } = {}): Promise<VaultMinder> {
-  const minder = VaultMinder.make({ vaultDB }, fakeBankOf())
+  const minder = VaultMinder.make({}, fakeBankOf())
   await minder.persist(persister)
-  if (isStarted) { minder.hello() }
+  if (isStarted) { minder.hello(sortedOf(vaultDB)) }
   return minder
 }
 
@@ -150,9 +150,9 @@ describe("minder.persist(persister)", () => {
     vi.spyOn(persister, 'restoreClient').mockRejectedValueOnce(new Error('disk on fire'))
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
-    const minder = VaultMinder.make({ vaultDB }, fakeBankOf())
+    const minder = VaultMinder.make({}, fakeBankOf())
     await expect(minder.persist(persister)).rejects.toThrow('disk on fire')
-    minder.hello()
+    minder.hello(sortedOf(vaultDB))
     await minder.get(TH.BoxScope)
     await nextTick()
     const saved = persister.restoreClient()!

@@ -2,45 +2,51 @@
 
 import type { EX, Errors } from 'safebyok-big/internals'
 import type { Labelpath, Lifepath, Lifeseq } from '../shapes/primitives'
-import type { Sparse, ThingRecord, ThingScope } from '../shapes/shapes-thing'
+import type { Sparse, ThingRecord, ThingScope, VoidSentinel } from '../shapes/shapes-thing'
 import type { TombstoneOf } from '../shapes/shapes-sealers'
 import type { BankRoots, BirthBankAsk, GetAsk, ListAsk, LoggableAsk, ThingWatchScope, Tracked, WorldRecord, WriteAsk } from '../shapes/shapes-asks'
 import type { VaultEvent } from '../shapes/shapes-vault-event'
 
 // == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ReadTc, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer
 
-/** A vaultDB verb's good answer: its `val`, the `act` that says what the datastore did, its bank's `world`, and the loggable part of its `ask`.
+/** A vaultDB verb's good answer: its `val`, the `act` that says what the datastore did, its bank's `world`, the loggable part of its `ask`, and when its step read the datastore (`read_tc`).
  * `world` is the bank and its main gate as the step left them, read in that step. It is null if either is missing or fails its checks.
  * `tracked`, only for an ask that tracks, says for each of the bank, its main gate and its root box whether it is still at the revision the ask tracks ({@link Tracked}).
  */
-export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, world: WorldRecord | null, tracked?: Tracked, val: ValT }
+export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, world: WorldRecord | null, tracked?: Tracked, read_tc: ReadTc, val: ValT }
 
 /** A refused answer's act: big's, or `policied` for a replacement that a storage policy or a changed born_at refuses. */
 export type BadAct = EX.BadAct | 'policied'
 
-/** A vaultDB verb's refused answer: its `err` and `act`, the Thing found stored (`dbhas`), its bank's `world`, and the loggable part of its `ask`.
- * `world` is null if the verb threw.
+/** A vaultDB verb's refused answer: its `err` and `act`, the Thing found stored (`dbhas`), its bank's `world`, the loggable part of its `ask`, and when its step read the datastore (`read_tc`).
+ * Where nothing is stored at the ask's scope, `dbhas` is the shell there, under the nearest Thing stored above it (see {@link GetThingAnswer}).
+ * If the verb threw, `world` is null, `read_tc` is when it was refused, and `dbhas` is the Thing the refusal names, or null where it names none.
  */
-export type BadAnswer<DbhasT = ThingRecord | null> = { ok: false, ask: LoggableAsk, act: BadAct, world: WorldRecord | null, tracked?: Tracked, dbhas: DbhasT, err: Errors.VaultError }
+export type BadAnswer<DbhasT = ThingRecord | VoidSentinel | null> = { ok: false, ask: LoggableAsk, act: BadAct, world: WorldRecord | null, tracked?: Tracked, read_tc: ReadTc, dbhas: DbhasT, err: Errors.VaultError }
 
 /** A vaultDB verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. Never thrown. */
 export type Answer<ValT, ActT extends EX.GoodAct> = GoodAnswer<ValT, ActT> | BadAnswer
 
 /** The answer to `tryGetThing`: the live Thing (`gotlive`), or a `val` of null for a tombstone (`gotgone`) or none (`gotvoid`).
- * Every answer but `gotlive` carries a `dbhas`: the tombstone under `gotgone`, and null under `gotvoid`. Watchers are notified of the tombstone before the answer.
+ * Every answer but `gotlive` carries a `dbhas`: the tombstone under `gotgone`, and the shell under `gotvoid` or a `void` refusal.
+ * The shell's lifepath is that of the nearest Thing stored above it, live or a tombstone, as the step read it, then the
+ * shell's lifeseq for each level below that Thing: `<box's lifepath>/-000000001` for `box/zz` under a stored root box. Where
+ * nothing is stored above it, every level's lifeseq is the shell's (`-000000001/-000000001`); a root's is the shell's lifeseq alone.
  */
 export type GetThingAnswer   =
   | GoodAnswer<ThingRecord, 'gotlive'>
   | (GoodAnswer<null, 'gotgone'> & { dbhas: TombstoneOf<ThingRecord> })
-  | (GoodAnswer<null, 'gotvoid'> & { dbhas: null })
+  | (GoodAnswer<null, 'gotvoid'> & { dbhas: VoidSentinel })
   | BadAnswer
-/** The answer to `tryWriteThing`: the Thing the concrete adapter reports writing, or under `passed` the live Thing it found. */
+/** The answer to `tryWriteThing`: the Thing the concrete adapter reports writing, or under `passed` the live Thing it found.
+ * Refused, its `dbhas` is the Thing stored, or where none is, the shell there, as for {@link GetThingAnswer}.
+ */
 export type WriteThingAnswer = Answer<ThingRecord, EX.PutAct | EX.DelAct>
 
 /** A child Thing that fails its kind's checks: its scope, and `am: 'd'`. */
 export type DamagedThing = Readonly<ThingScope & { am: 'd' }>
 
-/** When the datastore read a list's children, as a UUID version 7: lowercase hex of a fixed width, so that two compare as text in the order of their reads.
+/** When the datastore was read, as a UUID version 7: lowercase hex of a fixed width, so that two compare as text in the order of their reads.
  * Compare two of them as strings, never with the device's clock.
  */
 export type ReadTc = string
@@ -67,7 +73,6 @@ export type Kids = Readonly<{
  * - `parentage`    -- the parent, sparse, if one is stored
  * - `deltas`       -- each child the `val` names, sparse, in labelpath order
  * - `damaged_rows` -- each child that fails its kind's checks
- * Watchers are notified of the parentage and the deltas before the answer.
  */
 export type ListedBeside<RecordT extends ThingRecord = ThingRecord> = {
   parentage:    readonly Sparse<RecordT>[]
@@ -75,26 +80,34 @@ export type ListedBeside<RecordT extends ThingRecord = ThingRecord> = {
   damaged_rows: readonly DamagedThing[]
 }
 
-/** The answer to `tryListThings`: the parent's children as a {@link Kids} value, and when the datastore read them as its `read_tc`. Its act is the parent's get act.
- * Refused under `void` or `gone`, its `dbhas` is `[]`, and its `read_tc` says when the datastore read the parent. Under any other refusal `dbhas` is null and there is no `read_tc`.
+/** The answer to `tryListThings`: the parent's children as a {@link Kids} value, whose `read_tc` is the answer's. Its act is the parent's get act.
+ * Refused under `void` or `gone`, its `dbhas` is `[]`, its `read_tc` says when the datastore read the parent, and its `parentage`
+ * holds the parent's tombstone under `gone`; under `void` it says nothing of the life above the parent. If the verb threw, `dbhas` is null.
  */
 export type ListThingsAnswer<RecordT extends ThingRecord = ThingRecord> =
-  | (GoodAnswer<Kids, EX.GotAct> & ListedBeside<RecordT> & { read_tc: ReadTc })
-  | (BadAnswer<Sparse<RecordT>[] | null> & ListedBeside<RecordT> & { read_tc?: ReadTc })
+  | (GoodAnswer<Kids, EX.GotAct> & ListedBeside<RecordT>)
+  | (BadAnswer<Sparse<RecordT>[] | null> & ListedBeside<RecordT>)
 
-/** The answer to `tryBirthBank`: the three roots written (`born`), or found already stored (`passed`). */
+/** The answer to `tryBirthBank`: the three roots written (`born`), or found already stored (`passed`). Refused, its `dbhas` is the root stored that refused it. */
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
 // --
 
-// == [What a concrete adapter reports]: Actual, ListThingsActual, BirthBankActual
+// == [What a concrete adapter reports]: Actual, GotActual, WroteActual, ListThingsActual, BirthBankActual
 
 /** A concrete adapter's report of one atomic step: its act, the bank's `world` as the step left it with its `tracked`, and a `record`.
  * `record` is the Thing found at the scope or, after a write, the Thing it reports writing. `AdapterVaultDB` turns it into the answer's `val` when good, its `dbhas` when refused.
  * A refused report has no error: `AdapterVaultDB` makes it from the act.
+ * `read_tc` is the datastore's own time for the step, where it has one: `AdapterVaultDB` makes one when the report reaches it otherwise.
  */
-export type Actual<ActT extends EX.GoodAct> =
-  | { ok: true,  act: ActT,           world: WorldRecord | null, tracked?: Tracked, record: ThingRecord | null }
-  | { ok: false, act: EX.RefusedAct,  world: WorldRecord | null, tracked?: Tracked, record: ThingRecord | null }
+export type Actual<ActT extends EX.GoodAct, RecordT = ThingRecord | VoidSentinel> =
+  | { ok: true,  act: ActT,           world: WorldRecord | null, tracked?: Tracked, read_tc?: ReadTc, record: RecordT }
+  | { ok: false, act: EX.RefusedAct,  world: WorldRecord | null, tracked?: Tracked, read_tc?: ReadTc, record: RecordT }
+
+/** A concrete adapter's report of a get: its `record` is the Thing stored at the scope, or the shell there where none is ({@link GetThingAnswer}). */
+export type GotActual = Actual<EX.GotAct>
+
+/** A concrete adapter's report of a write: its `record` is the Thing it reports writing, or unwritten, the Thing stored at the scope, or the shell there where none is. */
+export type WroteActual = Actual<EX.PutAct | EX.DelAct>
 
 /** A concrete adapter's report of a listing: the parent's act, its children as a {@link Kids} value, and what the answer carries beside it.
  * Refused, it has no children, and its `read_tc` says when the datastore read the parent.
@@ -104,10 +117,12 @@ export type ListThingsActual = Readonly<{ world: WorldRecord | null, tracked?: T
   | { ok: false, act: EX.RefusedAct, read_tc: ReadTc }
 )>
 
-/** A concrete adapter's report of a bank's birth: the three roots, written or already stored, or the first refused act with the Thing stored at that root. */
+/** A concrete adapter's report of a bank's birth: the three roots, written or already stored, or the first refused act with the Thing stored at that root, or its shell where none is.
+ * `read_tc` is as for {@link Actual}.
+ */
 export type BirthBankActual =
-  | { ok: true,  act: 'born' | 'passed', world: WorldRecord | null, tracked?: Tracked, things: BankRoots }
-  | { ok: false, act: EX.RefusedAct,     world: WorldRecord | null, tracked?: Tracked, record: ThingRecord | null }
+  | { ok: true,  act: 'born' | 'passed', world: WorldRecord | null, tracked?: Tracked, read_tc?: ReadTc, things: BankRoots }
+  | { ok: false, act: EX.RefusedAct,     world: WorldRecord | null, tracked?: Tracked, read_tc?: ReadTc, record: ThingRecord | VoidSentinel }
 // --
 
 // == [The interface]: VaultDB, VaultDBMembernames, isVaultDB
@@ -132,16 +147,9 @@ export interface VaultDB {
   /** Write a new bank's three roots (bank, main gate, root box), or answer the roots already stored. */
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
   /** Watch a bank's Things, returning a function that stops the watch.
-   * Each notice to `onNotice` is an `item` event with no agerank, for a Thing live or a tombstone, never the void. A Thing a list answers comes sparse, as listed.
    * `onBadNews` gets any trouble the watch meets, including a Thing that fails its checks.
-   * - Every watcher of the bank is notified, whoever sent the ask.
-   * - Every notice a verb causes reaches each watcher before the verb's answer reaches its caller, so a handler's synchronous
-   *   work is done by then. Rely on nothing stronger.
-   * - A verb's notices come "out to in": the bank, the main gate, the root box, then the `dbhas`; for a list, its
-   *   `parentage`, then its `deltas` in labelpath order.
-   * - A watcher may be notified of a Thing twice in one verb (a write refused on a Thing it also tracks), again at a revision
-   *   it was notified of, or at an older one.
-   * - A change the datastore itself reports arrives when the datastore delivers it, in no promised order against a verb's answer.
+   * What a watcher is notified of is the vaultDB's own to say: an `AdapterVaultDB` notifies each change its datastore
+   * reports, when the datastore delivers it, and a `SortedVaultDB` the records it learns of that are news, in order.
    */
   watch(scope: ThingWatchScope, onNotice: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void): () => void
 }

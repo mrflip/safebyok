@@ -102,7 +102,7 @@ describe("the provider", () => {
     expect(seen[0]).to.eq('starting')
     await waitFor(() => { expect(result.current).to.eq('locked') })
     expect(seen).to.not.include('signed_out')
-    expect(world.counts.watches).to.eq(2)
+    expect(world.counts.watches).to.eq(1)
   })
 
   it("shows unborn for a user with no bank stored", async () => {
@@ -118,14 +118,14 @@ describe("the provider", () => {
     expect(result.current).to.eq('locked')
     treeOpts.userid = TH.ProviderUser
     rerender()
-    expect([result.current, world.counts.watches]).to.deep.equal(['locked', 2])
+    expect([result.current, world.counts.watches]).to.deep.equal(['locked', 1])
   })
 
   it("starts one device once under StrictMode, which makes its state twice and runs its effects twice", async () => {
     const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' }, { isStrict: true })
     await waitFor(() => { expect(result.current).to.eq('locked') })
     const signedIn = world._cheat_devices().filter((device) => device.userid !== null)
-    expect([world._cheat_devices().length, signedIn.length, world.counts.watches]).to.deep.equal([2, 1, 2])
+    expect([world._cheat_devices().length, signedIn.length, world.counts.watches]).to.deep.equal([2, 1, 1])
   })
 
   it("shows starting, in the same render, under a userid other than its device's", async () => {
@@ -141,7 +141,7 @@ describe("the provider", () => {
   it("uses the config's vaultDB and key deriver where it is handed none", async () => {
     const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes', isInConfig: true }, { isBare: true })
     await waitFor(() => { expect(result.current).to.eq('locked') })
-    expect(world.counts.watches).to.eq(2)
+    expect(world.counts.watches).to.eq(1)
   })
 
   it("needs no QueryClientProvider for the record hooks under it", async () => {

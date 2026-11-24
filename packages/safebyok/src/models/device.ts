@@ -36,7 +36,7 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
  * reloading the page.
  */
 export class Device implements MinderFriend {
-  // == [Props]: banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #persisters, #bankMinder, #minder, #userid, #bank, #vault, #broughtUp, #banklessSnapshot, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
+  // == [Props]: banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #persisters, #bankMinder, #minder, #userid, #sortedVaultDB, #bank, #vault, #broughtUp, #banklessSnapshot, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
 
   /** The label of the bank this device serves each user. */
   readonly banklabel:          Banklabel
@@ -61,6 +61,8 @@ export class Device implements MinderFriend {
   readonly #minder: VaultMinder
   /** The user signed in on this device, from `signIn`. Null until then. */
   #userid: Userid | null = null
+  /** The signed-in user's bank's records, sorted, over {@link vaultDB}, which the two minders share: made at `signIn`, null until then. */
+  #sortedVaultDB: SortedVaultDB | null = null
   /** The signed-in user's bank, from when the device finds it stored or a birth on this device makes it. Null until then. */
   #bank:  Bank | null = null
   /** The vault of the bank's boxes, made with the bank. */
@@ -141,7 +143,7 @@ export class Device implements MinderFriend {
   /** Make a device of the banklabel and token in `record`, guarding the host's functions in `opts`, with nobody signed in.
    * It makes its two minders, each with its QueryClient, empty: one for the bank's roots, and one for its boxes, whose
    * client is {@link vaultTsqClient}. The signed-in bank's caches are restored from `opts.persisters` at {@link signIn}, and
-   * nothing is fetched from the vaultDB until then.
+   * nothing is fetched from the vaultDB, or watched, until then.
    */
   static make(record: DeviceRecord, opts: DeviceOpts): Device { return new Device(record, opts) }
 
@@ -154,9 +156,8 @@ export class Device implements MinderFriend {
     this.#onBadNews = onBadNews
     this.#persisters = persisters
     // The roots cache in a minder of their own: the main gate's wrapped bankKeys stay out of the client a host observes.
-    const sortedVaultDB = SortedVaultDB.make({ vaultDB })
-    this.#bankMinder = BankMinder.make({ vaultDB: sortedVaultDB }, this)
-    this.#minder = VaultMinder.make({ vaultDB: sortedVaultDB, queryCacheOpts }, this)
+    this.#bankMinder = BankMinder.make({}, this)
+    this.#minder = VaultMinder.make({ queryCacheOpts }, this)
     this.#snapshot = this.#makeSnapshot()
     if (Deriver.isTestDeriver(keyDeriver)) { this.logger.warn(PhrasesX.TestDeriverNotice, { oplabel: 'Device.make' }) }
     Object.freeze(this)
@@ -231,13 +232,17 @@ export class Device implements MinderFriend {
 
   // The world fetched lands in the BankMinder, where a bank brought up from the cache reads it; a failure to fetch it,
   // once that bank is up, is no caller's to hear.
-  /** Bring up the signed-in user's bank, with `bankMinder` minding its roots and `minder` its boxes: from the world cached, where there is one, and from the world the vaultDB answers. */
+  // The SortedVaultDB is made right before the minders hello it, with nothing awaited between: its sorter remembers what
+  // it sorts, so a record it sorted with no minder listening would reach them later only as a repeat, which it drops.
+  /** Bring up the signed-in user's bank, with `bankMinder` minding its roots and `minder` its boxes over a SortedVaultDB of the bank they share: from the world cached, where there is one, and from the world the vaultDB answers. */
   async #bringUp(bankMinder: BankMinder, minder: VaultMinder): Promise<void> {
     try {
       await this.#restore(bankMinder, this.#persisters?.roots)
       await this.#restore(minder, this.#persisters?.boxes)
-      bankMinder.hello()
-      minder.hello()
+      const sortedVaultDB = SortedVaultDB.make(this.scope, { vaultDB: this.vaultDB })
+      this.#sortedVaultDB = sortedVaultDB
+      bankMinder.hello(sortedVaultDB)
+      minder.hello(sortedVaultDB)
       const cached = bankMinder.worldAt()
       if ((cached !== undefined) && Bank.isLive(cached.bank)) { this.#attachWorld(cached) }
       const world = await bankMinder.fetchWorld()
@@ -286,17 +291,19 @@ export class Device implements MinderFriend {
 
   // == [Ending]: sweep
 
-  /** Sweep the signed-in user's bank, if the device has one. Never throws.
+  /** Sweep the signed-in user's bank, if the device has one, and stop watching its vaultDB. Never throws.
    * The device stays usable: it judges passphrases. Its snapshot shows the swept bank.
    */
   sweep(): this {
     this.#bank?.sweep()
+    // The watch's stop is the host's vaultDB code: what it throws is news.
+    try { this.#sortedVaultDB?.sweep() } catch (err) { this.tellBadNews([err]) }
     return this
   }
   // --
 
   // == [The minder's friend]: makeGetAsk, makeListAsk
-  // The bank's builders where the device has one, so that each ask tracks the bank, its main gate and its root box; until then, asks that track nothing.
+  // The bank's builders where the device has one, so that each ask tracks the bank, its main gate and its root box and carries its lifetok; until then, asks that track nothing and carry no lifetok.
 
   /** The get ask for the Thing at `ask.labelpath` in the signed-in user's bank scope. */
   makeGetAsk(ask: BankAskDraft): GetAsk { return this.#bank?.makeGetAsk(ask) ?? getAskOf({ ...ask, ...this.scope }) }

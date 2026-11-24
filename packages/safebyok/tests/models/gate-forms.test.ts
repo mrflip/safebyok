@@ -8,6 +8,7 @@ import { PassphraseProving, Proving } from '../../src/models/proving'
 import type { StrengthChecker } from '../../src/shapes/shapes-gateish'
 import type { GateRecord } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
+import { readTcNow } from '../../src/storage/thing-classifier'
 
 /** A passphrase to replace {@link TH.TestPassphrase} with. */
 const NextPassphrase = 'a different passphrase, just as long'
@@ -233,7 +234,7 @@ describe("bank.gate.replacePassphrase(cleartexts)", () => {
     const { bank, device } = await TH.buildBornBank()
     const ante = bank.gate.pickle()
     const refusal = new Errors.VaultError('storage_unavailable', 'the disk is full')
-    vi.spyOn(device.vaultDB, 'tryWriteThing').mockImplementationOnce((ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, dbhas: null, err: refusal }))
+    vi.spyOn(device.vaultDB, 'tryWriteThing').mockImplementationOnce((ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, read_tc: readTcNow(), dbhas: null, err: refusal }))
     const make = vi.spyOn(Lease, 'make')
     expect(await TH.expectRefusal(bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase }))).to.equal(refusal)
     expect(bank.gate.pickle()).to.equal(ante)

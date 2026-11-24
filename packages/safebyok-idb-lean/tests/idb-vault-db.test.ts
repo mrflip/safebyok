@@ -4,7 +4,7 @@
 import 'fake-indexeddb/auto'
 import { noop } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Shell, VaultError } from 'safebyok/storage'
+import { type VaultEvent, Shell, VaultError } from 'safebyok/storage'
 import { IdbVaultDB } from '../src/idb-vault-db'
 import { VaultDBVersion } from '../src/vault-shelf'
 import * as TH from './test-helpers'
@@ -80,11 +80,11 @@ describe("IdbVaultDB's watch", () => {
   it("notifies of a write made by another instance on the same database, as another tab's", async () => {
     const idbVaultDB = TH.makeIdbVaultDB()
     const twin = TH.makeTwin(idbVaultDB)
-    const events: unknown[] = []
+    const events: VaultEvent[] = []
     const unwatch = twin.watch(TH.ThingBank, (event) => { events.push(event) }, noop)
     await TH.expectGood(idbVaultDB.tryWriteThing(TH.birthAskOf()))
     await TH.eventually(() => events.length > 0)
-    expect(events).to.deep.equal([TH.itemEventOf(TH.gateThingOf())])
+    expect(TH.maskedReadTcsOf(events)).to.deep.equal([TH.itemEventOf(TH.gateThingOf())])
     unwatch()
   })
 })

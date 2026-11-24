@@ -12,6 +12,7 @@ import { Lease } from '../../src/models/lease'
 import type { GatingCleartexts } from '../../src/shapes/shapes-gateish'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
+import { readTcNow } from '../../src/storage/thing-classifier'
 
 /** A bank born on `device` by `Bank.birth`, once the device has signed in, from `cleartexts` as the caller hands them. */
 async function birth(device: Device, cleartexts: unknown): Promise<Bank> {
@@ -33,13 +34,13 @@ describe("Bank.birth(device, cleartexts)", () => {
     expect(births.banks).to.deep.equal([bank])
   })
 
-  it("births the bank, its main gate and its root box in one call to the vaultDB", async () => {
+  it("births the bank, its main gate and its root box in one call to the vaultDB, its ask carrying the new bank's lifetok", async () => {
     const device = TH.makeDevice()
     const births = TH.spyBirths(device)
     const bank = await birth(device, { passphraseCleartext: TH.TestPassphrase })
     expect(births.tryBirthBank).toHaveBeenCalledOnce()
     const [ask] = births.tryBirthBank.mock.calls[0]!
-    expect(ask).to.deep.include({ op: 'birth', bank: bank.pickle(), gate: bank.gate.pickle() })
+    expect(ask).to.deep.include({ op: 'birth', bank: bank.pickle(), gate: bank.gate.pickle(), bank_lifetok: bank.lifetok })
     expect(ask.root).to.include({ labelpath: 'box', revseq: 0, am: 'a' })
   })
 
@@ -76,7 +77,7 @@ describe("Bank.birth(device, cleartexts)", () => {
   it("passes any refusal of the vaultDB on unchanged, making no bank", async () => {
     const refusal = new Errors.VaultError('storage_unavailable', 'the disk is full')
     const device = TH.makeDevice()
-    const births = TH.spyBirths(device, (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, dbhas: null, err: refusal }))
+    const births = TH.spyBirths(device, (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, read_tc: readTcNow(), dbhas: null, err: refusal }))
     const err = await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase }))
     expect(err).to.eq(refusal)
     expect(births.banks).to.be.empty
@@ -160,7 +161,7 @@ describe("Bank.birth(device, cleartexts)", () => {
     await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase }), 'gate_made_elsewhere')
     expect(evict).toHaveBeenCalledTimes(1)
     const refusal = new Errors.VaultError('storage_unavailable', 'the disk is full')
-    TH.spyBirths(device, (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, dbhas: null, err: refusal }))
+    TH.spyBirths(device, (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, read_tc: readTcNow(), dbhas: null, err: refusal }))
     await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase }), 'storage_unavailable')
     expect(evict).toHaveBeenCalledTimes(2)
   })

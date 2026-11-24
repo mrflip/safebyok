@@ -5,12 +5,14 @@ import type { DeliverableThing, ListingEvent, MinderEvent, ThingEvent, MinderFri
 import { VaultMinder } from '../../../src/minding/vault-minder'
 import { BankMinder } from '../../../src/minding/bank-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
+import { SortedVaultDB } from '../../../src/storage/sorted-vault-db'
+import { readTcNow } from '../../../src/storage/thing-classifier'
 import type { Labelpath, Revtok } from '../../../src/shapes/primitives'
 import { type BoxRecord, type ThingRecord, type ThingScope, Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import { type GetAsk, type WriteAsk, getAskOf, listAskOf } from '../../../src/shapes/shapes-asks'
 import type { BankScope } from '../../../src/shapes/shapes-stamps'
-import type { GetThingAnswer, Kids, WriteThingAnswer } from '../../../src/storage/vault-db'
+import type { GetThingAnswer, Kids, VaultDB, WriteThingAnswer } from '../../../src/storage/vault-db'
 import type { VaultItemEvent } from '../../../src/shapes/shapes-vault-event'
 import * as TH from '../../test-helpers'
 
@@ -49,7 +51,7 @@ export class LateVaultDB extends MemoryVaultDB {
   release(): void { for (const resolve of this.#releases.splice(0)) { resolve() } }
 }
 
-/** A vaultDB whose watch notifies no one: a test hands the minder each notice itself. */
+/** A vaultDB whose own watch notifies no one: a test hands it each notice itself. The SortedVaultDB over it still notifies what its answers carry. */
 export class QuietVaultDB extends MemoryVaultDB {
   override watch(): () => void { return noop }
 }
@@ -80,23 +82,33 @@ export class DownVaultDB extends MemoryVaultDB {
   protected override doGetThing(): never { throw new Error('connection refused') }
 }
 
+/** The SortedVaultDB over each vaultDB a test's minders stand on. */
+const SortedOf = new WeakMap<VaultDB, SortedVaultDB>()
+
+/** The one SortedVaultDB of `TH.ThingBank` over `vaultDB`, made and watching it at the first call, shared by every minder over it, as a device's minders share one. */
+export function sortedOf(vaultDB: VaultDB): SortedVaultDB {
+  const sorted = SortedOf.get(vaultDB) ?? SortedVaultDB.make(TH.ThingBank, { vaultDB })
+  SortedOf.set(vaultDB, sorted)
+  return sorted
+}
+
 /** A day, in milliseconds: far past the five minutes after which TanStack Query collects a query by default. */
 export const Hours24 = 24 * 60 * 60 * 1000
 
 /** A BankMinder of `TH.ThingBank`, minding, with its roots at revision 0 unless `isWorldHeard` is false. Its birth is in a vaultDB of its own. */
 export async function bankMinderOf({ isWorldHeard = true } = {}): Promise<BankMinder> {
-  const bankMinder = BankMinder.make({ vaultDB: new MemoryVaultDB() }, fakeBankOf())
-  bankMinder.hello()
+  const bankMinder = BankMinder.make({}, fakeBankOf())
+  bankMinder.hello(sortedOf(new MemoryVaultDB()))
   if (isWorldHeard) { await TH.expectGood(bankMinder.tryBirthBank(TH.birthBankAskOf())) }
   return bankMinder
 }
 
-/** A minder of `bank` over `vaultDB`. */
-export function minderOf(vaultDB: MemoryVaultDB, queryCacheOpts: Partial<QueryCacheOpts> = {}, bank: MinderFriend = fakeBankOf()): VaultMinder {
-  return VaultMinder.make({ vaultDB, queryCacheOpts }, bank)
+/** A minder of `bank`, not started: its `hello` takes the vaultDB, as a device hands its minders their SortedVaultDB ({@link sortedOf}). */
+export function minderOf(queryCacheOpts: Partial<QueryCacheOpts> = {}, bank: MinderFriend = fakeBankOf()): VaultMinder {
+  return VaultMinder.make({ queryCacheOpts }, bank)
 }
 
-/** A bank's minder, what it stands on, and a way to hand its watch a notice. */
+/** A bank's minder, what it stands on, and a way to hand the vaultDB's watch a notice, which reaches the minder through the SortedVaultDB over it. */
 export interface MinderWorld<VaultDBT extends MemoryVaultDB> {
   vaultDB:    VaultDBT
   bank:       ReturnType<typeof fakeBankOf>
@@ -110,8 +122,8 @@ export async function minderWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: Vau
   const bank       = fakeBankOf()
   const bankMinder = await bankMinderOf({ isWorldHeard })
   const watching   = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
-  const minder     = minderOf(vaultDB, {}, bank)
-  if (isStarted) { minder.hello() }
+  const minder     = minderOf({}, bank)
+  if (isStarted) { minder.hello(sortedOf(vaultDB)) }
   function receive(event: VaultItemEvent): void {
     for (const watched of watching.mock.calls) { watched[1](event) }
   }
@@ -138,14 +150,14 @@ export async function storedBoxOf(vaultDB: MemoryVaultDB, revseq = 0): Promise<B
   return box
 }
 
-/** The notice a watcher gets for `record` sparse, as the vaultDB notifies of a Thing a list answers. */
+/** The notice a raw watch gets for `record` sparse, read now. */
 export function sparseNoticeOf(record: ThingRecord): VaultItemEvent {
-  return TH.itemEventOf(Thing.sparseOf(record), 'soon')
+  return { ...TH.itemEventOf(Thing.sparseOf(record)), read_tc: readTcNow() }
 }
 
-/** The notice a watcher gets for `record`, live or a tombstone. */
+/** The notice a raw watch gets for `record`, live or a tombstone, read now. */
 export function noticeOf(record: ThingRecord): VaultItemEvent {
-  return TH.itemEventOf(record, Thing.isLive(record) ? 'full' : 'gone')
+  return { ...TH.itemEventOf(record), read_tc: readTcNow() }
 }
 
 /** The revtok of the item of the box at `TH.BoxScope`, or undefined for nothing or null. */

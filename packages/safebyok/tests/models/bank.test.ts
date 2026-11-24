@@ -729,15 +729,24 @@ describe("bank.track, and the asks the bank builds", () => {
     expect(bank.track).to.deep.equal(TH.trackOf(bank.pickle(), bank.gate.pickle(), bank.rootBox))
   })
 
-  it("fill in the bank's scope, the modelkind, the default flags and the track", async () => {
+  it("fill in the bank's scope, the modelkind, the default flags, the track and the bank's lifetok", async () => {
     const { bank } = await TH.buildBornBank()
-    const { scope, track } = bank
-    expect(bank.makeGetAsk({ labelpath: 'box/openai' })).to.deep.equal({ ...scope, labelpath: 'box/openai', op: 'get', modelkind: 'box', ifAbsent: 'nil', track })
-    expect(bank.makeListAsk({ labelpath: 'box' })).to.deep.equal({ ...scope, labelpath: 'box', op: 'list', modelkind: 'box', ifAbsent: 'fail', track })
+    const { scope, track, lifetok: bank_lifetok } = bank
+    expect(bank.makeGetAsk({ labelpath: 'box/openai' })).to.deep.equal({ ...scope, labelpath: 'box/openai', op: 'get', modelkind: 'box', ifAbsent: 'nil', track, bank_lifetok })
+    expect(bank.makeListAsk({ labelpath: 'box' })).to.deep.equal({ ...scope, labelpath: 'box', op: 'list', modelkind: 'box', ifAbsent: 'fail', track, bank_lifetok })
     const record = nextBankThingOf(bank)
-    expect(bank.makePutAsk({ cited: bank.pickle(), record })).to.deep.include({ ...scope, labelpath: 'bank', op: 'put', modelkind: 'bank', ifAbsent: 'add', ifPresent: 'repl', track })
+    expect(bank.makePutAsk({ cited: bank.pickle(), record })).to.deep.include({ ...scope, labelpath: 'bank', op: 'put', modelkind: 'bank', ifAbsent: 'add', ifPresent: 'repl', track, bank_lifetok })
     const box = TH.boxThingOf()
-    expect(bank.makeDelAsk({ cited: box, record: TH.boxTombOf(box) })).to.deep.include({ ...scope, op: 'del', modelkind: 'box', ifAbsent: 'fail', track })
+    expect(bank.makeDelAsk({ cited: box, record: TH.boxTombOf(box) })).to.deep.include({ ...scope, op: 'del', modelkind: 'box', ifAbsent: 'fail', track, bank_lifetok })
+  })
+
+  it("carry the bank's lifetok to the answer's ask, which a vaultDB neither compares with the bank stored nor refuses on", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const answer = await device.vaultDB.tryGetThing(bank.makeGetAsk({ labelpath: 'bank' }))
+    expect(answer).to.deep.include({ ok: true, act: 'gotlive' })
+    expect(answer.ask).to.deep.include({ bank_lifetok: bank.lifetok })
+    const elsewise = await device.vaultDB.tryGetThing({ ...bank.makeGetAsk({ labelpath: 'bank' }), bank_lifetok: TH.OtherLifetok })
+    expect(elsewise).to.deep.include({ ok: true, act: 'gotlive' })
   })
 
   it("track what the bank's world last heard of, though the bank stored has moved on: the answer's tracked says so", async () => {

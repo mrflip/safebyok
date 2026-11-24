@@ -72,6 +72,7 @@ export class BankMinder extends Minder {
 
   /** Birth the bank through the vaultDB, and return its answer, a refusal included.
    * The three roots it answers, written or found stored, are cached before it answers, while minding.
+   * Rejects `disabled` before the first `hello`, which hands it the vaultDB.
    */
   async tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer> {
     const answer = await this.vaultDB.tryBirthBank(ask)

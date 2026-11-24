@@ -1,11 +1,12 @@
 /** The Things and asks a vaultDB's tests share: a bank's three roots and a box under its root, and the asks that get, list and write them. */
 
-import { type Lifepath, type Revtok, Labelpath, Lifeseq } from '../../src/shapes/primitives'
+import { type Lifepath, type Lifetok, type Revtok, Labelpath, Lifeseq } from '../../src/shapes/primitives'
 import {
   type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord,
   Shell, ThingFormat,
 } from '../../src/shapes/shapes-thing'
-import type { Recordkind, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
+import type { SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
+import { itemSeenOf } from '../../src/storage/feed-sorter'
 import { WayinChecks } from '../../src/shapes/shapes-wayin'
 import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { FirstLifetok, FirstRevtok, T0, revtokOf } from './models-world'
@@ -144,10 +145,22 @@ export const BankStaleTrack = trackOf(bankThingOf({ revseq: 3 }), gateThingOf())
 /** The track of a sender with the root box at another revision. */
 export const RootStaleTrack = trackOf(bankThingOf(), gateThingOf(), rootBoxOf({ revseq: 3 }))
 
-/** The `item` notice a watcher gets for `record`, with no agerank: `full` unless `recordkind` says otherwise. */
-export function itemEventOf(record: Sparse<ThingRecord>, recordkind: Exclude<Recordkind, 'void'> = 'full'): VaultItemEvent {
+/** A UUID version 7, the shape of every `read_tc`. */
+export const ReadTcPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+/** What {@link maskedReadTcsOf} puts in place of each `read_tc`, as an expected notice carries it. */
+export const AnyReadTc = '(any read_tc)'
+
+/** `events`, each with its `read_tc` read as {@link AnyReadTc} where it is a UUID version 7, to compare with expected notices. */
+export function maskedReadTcsOf(events: readonly VaultEvent[]): VaultEvent[] {
+  return events.map((event) => (ReadTcPattern.test(event.read_tc ?? '') ? { ...event, read_tc: AnyReadTc } : event))
+}
+
+/** The `item` notice a vaultDB's raw watch gets for `record`, at the liveness a sorter gives it, with no agerank and no source, at {@link AnyReadTc}, and with no bank lifetok unless given one. */
+export function itemEventOf(record: SeenThing, bank_lifetok?: Lifetok): VaultItemEvent {
   const { userid, banklabel, labelpath } = record
-  return { eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: undefined, agerankWas: undefined, recordkind, record }
+  const unsorted = { agerank: undefined, agerankWas: undefined, bank_lifetok, sourcelabel: undefined, read_tc: AnyReadTc }
+  return { eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), ...unsorted, ...itemSeenOf(record) }
 }
 
 /** The revtok of `val`, what a minder's item or soon has, or undefined for none or null. */

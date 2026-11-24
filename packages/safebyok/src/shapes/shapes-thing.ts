@@ -31,12 +31,13 @@ function isLabelpath(labelpath: Labelpath): boolean { return thingkindVals.some(
 // == [Thing]: isLifepathDeep, isParityRight, GenericChecks, vaultDBShape, PerKindChecks, policiesByModelkind, ThingChecks, ThingScope, ThingCited, StoredCited, Sealed, Wayins, Sparse, AnyThingRecord
 
 // A stored lifeseq is 10 base-32 digits; the void lifeseq, -000000001, is never stored. A lifepath joins lifeseqs with '/',
-// and only its last may be void: a void lifepath is the void lifeseq under its parent's lifepath, or alone at a root.
+// and every one after a void one is void: a void lifepath is the void lifeseq under its parent's lifepath (void itself
+// where nothing is stored there), or alone at a root.
 const LifeseqPattern      = /^[0-9a-v]{10}$/
 const AnyLifeseqPattern   = /^(?:[0-9a-v]{10}|-000000001)$/
 const LifepathPattern     = /^(?:[0-9a-v]{10}\/)*[0-9a-v]{10}$/
-const VoidLifepathPattern = /^(?:[0-9a-v]{10}\/)*-000000001$/
-const AnyLifepathPattern  = /^(?:[0-9a-v]{10}\/)*(?:[0-9a-v]{10}|-000000001)$/
+const VoidLifepathPattern = /^(?:[0-9a-v]{10}\/)*(?:-000000001\/)*-000000001$/
+const AnyLifepathPattern  = /^(?:[0-9a-v]{10}\/)*(?:[0-9a-v]{10}|(?:-000000001\/)*-000000001)$/
 
 type Labelled = { labelpath: Labelpath, label: string }
 type Lived    = { lifepath: Lifepath, am: string }
@@ -311,6 +312,7 @@ const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, label }) => {
 
 const labelpathWithParentageChecker = Validator.Checker(() => ThingChecks.sparse.pick({ labelpath: true, label: true }))
 const lifepathWithParentageChecker = Validator.Checker(({ obj }) => obj({ lifepath: ThingChecks.anyLifepath, lifeseq: ThingChecks.anyLifeseq }))
+const shellAncestorChecker = Validator.Checker(({ obj }) => obj({ labelpath: ThingChecks.labelpath, lifepath: ThingChecks.lifepath }))
 
 function rootShellOf(proposed: Partial<Sparse<ThingRecord>>): VoidSentinel {
   const modelkind = ThingChecks.modelkind.parse(proposed.labelpath)
@@ -351,6 +353,18 @@ export const Shell = Object.freeze({
     const shell    = ShellChecks.shell.parse({ fmt: ThingFormat, ...proposed, ...labels, ...lives })
     demandConsistentParent(shell, parent)
     return Object.freeze(shell)
+  },
+  /** The shell at `scope`, under `ancestor`, the nearest Thing stored above it, or null where none is.
+   * Its lifepath is the ancestor's, then the shell's lifeseq for each level below it down to its own; with no ancestor, the shell's lifeseq at every level.
+   * Refuses an `ancestor` that is not above `scope`.
+   */
+  under({ userid, banklabel, labelpath }: ThingScope, ancestor: Readonly<Pick<StoredCited, 'labelpath' | 'lifepath'>> | null): VoidSentinel {
+    const labels      = ThingChecks.labelpath.parse(labelpath).split('/')
+    const above       = (ancestor === null) ? null : shellAncestorChecker.parse(ancestor)
+    const aboveLabels = above?.labelpath.split('/') ?? []
+    Validator.demandConsistent({ labelpath: labels.slice(0, aboveLabels.length).join('/') }, { labelpath: aboveLabels.join('/') })
+    const lifeseqs    = [...(above ? [above.lifepath] : []), ...labels.slice(aboveLabels.length).map(() => VoidLifeseq)]
+    return Shell.of({ userid, banklabel, labelpath, lifepath: lifeseqs.join('/') })
   },
   /** The labelpath and label of `raw`: its own labelpath, or its label under `parent`'s.
    * It does not check `raw` against `parent`: the caller does.

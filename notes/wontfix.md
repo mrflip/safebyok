@@ -87,7 +87,7 @@ the datastore has lost or damaged either row.
 Reasoning for wontfix: the device was sent revisions of both rows, so either case means storage has gone wrong
 underneath it: work stops until the page reloads, or until a developer catches the error and restarts the system.
 Pinned by a type-level test that each `tracked` entry is exactly its record or `'same'`, and by a `//` comment at the
-`tracked` type and at `notifyTrackedRecords` pointing here. Ruled by the Coach, 2026-11-15, lean_buttonup T1.
+`tracked` type and at `SortedVaultDB`'s `rootsOf` pointing here. Ruled by the Coach, 2026-11-15, lean_buttonup T1.
 
 ### Changing only a box's sidecar needs the bank unlocked and the whisper in hand
 
@@ -346,6 +346,51 @@ Steps to reproduce: call `persistClient`, then `removeClient` in the same turn, 
 Reasoning for wontfix: `removeClient` runs when a bank is deleted or a user signs out, a few times a day, against a
 write in flight for milliseconds (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). The snapshot is a cache of
 what the bankDB holds. Unspecified and unguarded; reviewer, 2026-11-22, awaiting a ruling.
+
+### A `read_tc` from a clock running ahead pins a Thing's agerank time in the future
+
+* current outcome: a `SortedVaultDB` keeps, as the last field of each Thing's agerank, the first eight hexadecimal
+  digits of the `read_tc` its newest revision was last seen at, whatever their time. A source whose clock runs ahead (a
+  datastore's, or another device's records rung to the `bell`) hands a `read_tc` in the future, and the time is pinned
+  there: a true sighting of that revision notifies nothing until real time passes it. A newer revision or a later life
+  still notifies at once, since the time is the agerank's last field: only freshness is affected, never which revision
+  is newer.
+* alternatives:
+  - cap an incoming time at the sorter's own present chunk: a clock read and a branch in the common path of every
+    record sorted, for a broken system; and whether to tolerate a clock that runs ahead or to panic is the customer's
+    call, not the sorter's.
+  - refuse a `read_tc` from the future: the same check, with a refusal where a cap would accept, the same call taken
+    from the customer.
+* workaround: the customer keeps its datastore's and its devices' clocks in step, or refetches what it shows; the bankDB
+  is the ground truth.
+
+Steps to reproduce: watch a `SortedVaultDB`; ring a record to its `bell` at a `read_tc` an hour ahead of now; ring the
+same record again at a `read_tc` of now. The second notifies nothing.
+
+Reasoning for wontfix: a clock running ahead is a broken system, and the fix is a check in the common code against it
+(CLAUDE.md, *The bankDB is the ground truth*: a broken state is reported, never accommodated). Nothing stored changes,
+and no secret moves. Ruled by the Coach, 2026-11-24: "I don't want to complicate the common code for a broken system,
+and it would have to be the customer's call whether to tolerate it or panic."
+
+### A device's sweep while `signIn` restores its caches leaves the vaultDB watched
+
+* current outcome: `signIn` makes the device's `SortedVaultDB`, which watches the host's vaultDB, only once both
+  persisters have restored. A `Device.sweep` that lands while they restore finds no `SortedVaultDB` to stop; the one
+  made after it watches until the page goes, and the minders hear what it notifies.
+* alternatives:
+  - make the `SortedVaultDB` before the restores, as it was: its sorter would sort records no minder hears, and drop them
+    as repeats once the minders listen.
+  - have the sweep mark the device so the bring-up stops: a state and a check in the bring-up for a sweep landing in a
+    window of milliseconds.
+* workaround: none needed; the device sweeps again, or the page reloads.
+
+Steps to reproduce: give a device persisters whose restore is slow; call `signIn`, then `sweep` before the restore
+resolves; ring the vaultDB's watch.
+
+Reasoning for wontfix: a sweep crossing a bring-up is an end-of-life event landing in a millisecond window (CLAUDE.md,
+*Hours separate updates*), and the fix is a state and a check in the common path of every sign-in. Nothing stored
+changes and no secret moves: a watch notifies records the bankDB already holds. Recorded under that rule by thread 4 of
+feed_sorter, 2026-11-24.
 
 ## React
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as Classifier from '../../src/storage/thing-classifier'
+import { Shell } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.describeVaultDBBattery('MemoryVaultDB', {
@@ -63,4 +64,20 @@ describe("Classifier.classifyListThings(ask, fetched, roots)", () => {
       TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), { parent: TH.rootBoxOf(), children: [], read_tc }, { bank: null, maingate: null }), 'storage_issue')
     }
   })
+})
+
+describe("Classifier.classifyGetThing(ask, raw, above) and Classifier.classifyWriteThing(ask, raw, above), over nothing stored", () => {
+  const OverNothing = [
+    ['storage_issue', TH.boxThingOf('open'),              'refuses, as a broken store, an ancestor a store fetched that is not above the scope'],
+    ['storage_issue', 'not a Thing',                      'refuses, as a broken store, an ancestor that is not an object'],
+    ['damaged_row',   { ...TH.rootBoxOf(), revseq: -2 },  'refuses, as a damaged row, an ancestor whose revision fails its checks'],
+  ] as const
+
+  for (const [refusalkind, ancestor, blurb] of OverNothing) {
+    it(blurb, () => {
+      const above = { bank: null, maingate: null, ancestor }
+      TH.expectSyncRefusal(() => Classifier.classifyGetThing(TH.getAskAt('box/openai'), null, above), refusalkind)
+      TH.expectSyncRefusal(() => Classifier.classifyWriteThing({ ...TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)), ifAbsent: 'fail' }, null, above), refusalkind)
+    })
+  }
 })

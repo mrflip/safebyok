@@ -44,12 +44,12 @@ async function bumpApicalls(vault: Vault): Promise<BoxRecord> {
 }
 
 /** A vault of `bank` beside the one its device made, with a minder of its own, befriending the bank, that has not said `hello`. */
-function vaultBesideOf(bank: Bank): Vault { return Vault.make(bank, VaultMinder.make({ vaultDB: bank.device.vaultDB }, bank)) }
+function vaultBesideOf(bank: Bank): Vault { return Vault.make(bank, VaultMinder.make({}, bank)) }
 
 describe("Vault.make(bank, minder)", () => {
   it("makes the vault of the bank's boxes, over the minder given, which waits for its hello", async () => {
     const { bank } = await TH.buildBornBank()
-    const minder = VaultMinder.make({ vaultDB: bank.device.vaultDB }, bank)
+    const minder = VaultMinder.make({}, bank)
     const vault = Vault.make(bank, minder)
     expect(vault.bank).to.equal(bank)
     expect(vault.minder).to.equal(minder)
@@ -77,18 +77,18 @@ async function buildWatchedVault() {
   return { ...born, unwatched: unwatched.mock }
 }
 
-/** Each way to sweep a born vault's bank, by what is swept. */
-const SweepCases: readonly (readonly [(born: TH.BornVault) => unknown, string])[] = [
-  [(born) => born.bank.sweep(),   'its bank'],
-  [(born) => born.device.sweep(), 'its device'],
+/** Each way to sweep a born vault's bank, by what is swept, and how many watches of the host's vaultDB it stops, the vault beside's among them. */
+const SweepCases: readonly (readonly [(born: TH.BornVault) => unknown, string, number])[] = [
+  [(born) => born.bank.sweep(),   'its bank',   1],
+  [(born) => born.device.sweep(), 'its device', 2],
 ]
 
 describe("bank.sweep() and device.sweep(), over the vaults made on the bank", () => {
-  for (const [sweepOf, blurb] of SweepCases) {
+  for (const [sweepOf, blurb, unwatchCount] of SweepCases) {
     it(`sweep each vault when ${blurb} is swept: its cache emptied, telling each listener of the removal, and its watch stopped`, async () => {
       const born = await buildWatchedVault()
       const { bank, minder, vault, unwatched } = born
-      vaultBesideOf(bank).minder.hello()
+      vaultBesideOf(bank).minder.hello(bank.device.vaultDB)
       await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
       const events: MinderEvent[] = []
       minder.listen((event) => { events.push(event) }, ThingFormat)
@@ -96,7 +96,8 @@ describe("bank.sweep() and device.sweep(), over the vaults made on the bank", ()
       expect(minder.at(scopeAt(bank, Openai))).to.be.undefined
       expect(minder.tryAt(scopeAt(bank, Openai))).to.include({ ok: false })
       expect(events.map(({ type }) => type)).to.include('removed')
-      expect(unwatched.calls).to.have.lengthOf(2)
+      // The vault beside stops its own watch. The device's minders share its SortedVaultDB's one watch, which only the device's sweep stops.
+      expect(unwatched.calls).to.have.lengthOf(unwatchCount)
     })
   }
 
@@ -104,7 +105,7 @@ describe("bank.sweep() and device.sweep(), over the vaults made on the bank", ()
     const { bank, minder } = await TH.buildBornVault()
     await minder.get(scopeAt(bank, Openai))
     bank.sweep()
-    minder.hello()
+    minder.hello(bank.device.vaultDB)
     expect(await minder.get(scopeAt(bank, Openai))).to.be.null
   })
 
@@ -117,11 +118,12 @@ describe("bank.sweep() and device.sweep(), over the vaults made on the bank", ()
     })
     const onBadNews = vi.fn()
     const { bank, device } = await TH.buildBornVault({ device: TH.makeDevice({}, { vaultDB, onBadNews }) })
-    vaultBesideOf(bank).minder.hello()
+    vaultBesideOf(bank).minder.hello(bank.device.vaultDB)
     expect(() => device.sweep()).not.to.throw()
     expect(device.getSnapshot().bank).to.include({ stage: 'swept' })
+    // The vault beside stops its own watch of the host's, and the device's sweep its SortedVaultDB's, which its minders share.
     await TH.eventually(() => onBadNews.mock.calls.length === 2)
-    expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'unexpected_error' })
+    expect(onBadNews.mock.calls.map(([badNews]) => (badNews as BadNews).news.refusalkind)).to.deep.equal(['unexpected_error', 'unexpected_error'])
   })
 
   it("tell the bank's subscribers once, and nothing after", async () => {
@@ -241,7 +243,7 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
     const { bank, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const other = vaultBesideOf(bank)
-    other.minder.hello()
+    other.minder.hello(bank.device.vaultDB)
     const next = await other.putBoxOnce(Openai, {}, { whisper: TH.Whisper })
     expect(next).to.include({ revseq: 1 })
     expect(other.minder.at(scopeAt(bank, Openai))).to.deep.equal(next)
@@ -394,7 +396,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const { bank, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const other = vaultBesideOf(bank)
-    other.minder.hello()
+    other.minder.hello(bank.device.vaultDB)
     await other.minder.list('box')
     expect(await other.withWhisper(Openai, ({ whisper }) => whisper)).to.deep.equal(TH.Whisper)
   })
@@ -476,7 +478,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     bank.lock()
     const other = vaultBesideOf(bank)
-    other.minder.hello()
+    other.minder.hello(bank.device.vaultDB)
     const asked = vi.spyOn(bank.device.vaultDB, 'tryGetThing')
     const using = other.withWhisper(Openai, ({ revseq }) => revseq)
     await vi.advanceTimersByTimeAsync(0)

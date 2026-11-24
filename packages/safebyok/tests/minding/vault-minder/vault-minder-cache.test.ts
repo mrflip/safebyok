@@ -5,7 +5,7 @@ import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { type BoxRecord, type Sparse, type ThingRecord, type Tombstone } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { Hours24, BoxGetAsk, DownVaultDB, fakeBankOf, minderOf, minderWorldOf, bornOf, storedBoxOf, noticeOf, sparseNoticeOf, actOf, boxScopeOf, cheatBox, boxBirthAskOf, isListingStaleAt, labelpathsOf } from './world'
+import { Hours24, BoxGetAsk, DownVaultDB, fakeBankOf, minderOf, minderWorldOf, sortedOf, bornOf, storedBoxOf, noticeOf, sparseNoticeOf, actOf, boxScopeOf, cheatBox, boxBirthAskOf, isListingStaleAt, labelpathsOf } from './world'
 
 describe("VaultMinder.at", () => {
   it("has nothing before any get", async () => {
@@ -236,8 +236,8 @@ describe("VaultMinder.listingAt", () => {
     try {
       const vaultDB = new MemoryVaultDB()
       await storedBoxOf(vaultDB)
-      const minder  = minderOf(vaultDB)
-      minder.hello()
+      const minder  = minderOf()
+      minder.hello(sortedOf(vaultDB))
       await minder.list('box')
       await vi.advanceTimersByTimeAsync(Hours24)
       expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/openai'])
@@ -452,8 +452,8 @@ describe("VaultMinder.tryAt", () => {
 
   it("answers unexpected_error, not a storage refusal, for anything else its own code throws", () => {
     const bank = { ...fakeBankOf(), makeGetAsk: () => { throw new Error('ask broke') } }
-    const minder = minderOf(new MemoryVaultDB(), {}, bank)
-    minder.hello()
+    const minder = minderOf({}, bank)
+    minder.hello(sortedOf(new MemoryVaultDB()))
     const answer = minder.tryAt(TH.BoxScope)
     expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing' })
     expect(answer).to.have.nested.property('err.refusalkind', 'unexpected_error')

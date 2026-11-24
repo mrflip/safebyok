@@ -6,6 +6,7 @@ import { MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
 import { QuietVaultDB, LateWriteVaultDB, minderWorldOf, bornOf, storedBoxOf, noticeOf, cheatBox, listenerOf, boxBirthAskOf, isListingStaleAt, labelpathsOf } from './world'
+import { readTcNow } from '../../../src/storage/thing-classifier'
 
 describe("VaultMinder.tryWrite", () => {
   it("answers as the vaultDB did, once the record written is in its item", async () => {
@@ -137,8 +138,8 @@ describe("VaultMinder.tryWrite", () => {
 
   it("writes a box the bank sealed, then the tombstone it sealed, through the put and del asks the bank makes", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const minder = VaultMinder.make({ vaultDB: device.vaultDB }, bank)
-    minder.hello()
+    const minder = VaultMinder.make({}, bank)
+    minder.hello(device.vaultDB)
     const shell  = Shell.of({ ...bank.scope, labelpath: TH.BoxScope.labelpath }, bank.rootBox)
     const box    = await bank.sealBox(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const putAsk = bank.makePutAsk<BoxRecord>({ cited: Thing.sparseOf(shell), record: box })
@@ -177,7 +178,7 @@ describe("VaultMinder.tryWrite", () => {
     const vaultDB = await bornOf(new QuietVaultDB())
     const { minder } = await minderWorldOf(vaultDB)
     const theirs  = { ...TH.boxThingOf(), userid: 'u2' }
-    vi.spyOn(vaultDB, 'tryWriteThing').mockImplementation((ask) => Promise.resolve({ ok: true, act: 'born', ask, world: null, val: theirs }))
+    vi.spyOn(vaultDB, 'tryWriteThing').mockImplementation((ask) => Promise.resolve({ ok: true, act: 'born', ask, world: null, read_tc: readTcNow(), val: theirs }))
     await TH.expectRefusal(minder.tryWrite(boxBirthAskOf()), 'unexpected_error')
     expect(minder.at(TH.BoxScope)).to.be.undefined
   })

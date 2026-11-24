@@ -4,7 +4,7 @@ import { expectBad, expectGood } from 'safebyok-big/testing'
 import { type Labelpath, VoidLifeseq } from '../../src/shapes/primitives'
 import type { BoxRecord } from '../../src/shapes/shapes-thing'
 import type { Kids, VaultDB } from '../../src/storage/vault-db'
-import { Life0, ThingBank, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAskFor, listAskAt, rootBoxOf } from './vaultdb-world'
+import { Life0, ReadTcPattern, ThingBank, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAskFor, listAskAt, rootBoxOf } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 import { Thing } from '../../src/models/thing'
 
@@ -23,9 +23,6 @@ function kidsOf(parent: Pick<BoxRecord, 'labelpath' | 'lifepath'>, boxes: readon
   const entriesOf = (am: string) => Object.fromEntries(boxes.filter((box) => box.am === am).map(({ label, lifeseq }) => [label, { lifeseq }]))
   return { modelkind: 'kids', parentpath: parent.labelpath, parentlife: parent.lifepath, items: entriesOf('a'), gones: entriesOf('x'), read_tc }
 }
-
-/** The pattern of a UUID version 7. */
-const ReadTcPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 /** The root box's tombstone, over {@link rootBoxOf}. */
 const RootGone = Object.freeze(boxTombOf(rootBoxOf()))

@@ -6,7 +6,7 @@ import { type Errors, Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
 import type { RecordOfKind } from '../models/base-thing'
 import * as Phrases from '../phrases'
-import type { BadAnswer, GoodAnswer, Kids, VaultDB } from '../storage/vault-db'
+import type { BadAnswer, GoodAnswer, Kids } from '../storage/vault-db'
 import type { Banklabel, BoxLabelpath, EpochMillis, Labelpath, Lifepath, Lifeseq, Revtok, Userid } from './primitives'
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, ThingChecks, ThingFormat } from './shapes-thing'
 import { type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope } from './shapes-asks'
@@ -140,10 +140,11 @@ export type DeliverableThing = ThingRecord | Sparse<ThingRecord>
  * - `vacant`   -- nothing is cached
  * - `untimely` -- the item is behind a newer revision heard of, or missing beside one, or TanStack Query counts it stale under `staleTime`: older than it, or its last get refused
  */
+// A cached answer reads no datastore, so it has no read_tc.
 export type GotAnswer<RecordT extends ThingRecord = ThingRecord> = (
-  | GoodAnswer<RecordT, 'gotlive'>
-  | (GoodAnswer<null, 'gotgone'> & { dbhas: Tombstone<RecordT> })
-  | (GoodAnswer<null, 'gotvoid'> & { dbhas: null })
+  | Omit<GoodAnswer<RecordT, 'gotlive'>, 'read_tc'>
+  | (Omit<GoodAnswer<null, 'gotgone'>, 'read_tc'> & { dbhas: Tombstone<RecordT> })
+  | (Omit<GoodAnswer<null, 'gotvoid'>, 'read_tc'> & { dbhas: null })
   | { ok: true, ask: LoggableAsk, act: 'vacant' | 'untimely', world: null, val: undefined }
 ) & { ask: GetAsk }
 
@@ -326,8 +327,6 @@ export const EmptyMaskedView: MaskedView = Object.freeze({ bankTSQ: Object.freez
 
 /** The options every minder is made with: `VaultMinder.make`'s and `BankMinder.make`'s. */
 export interface MinderOpts {
-  /** Where the bank's Things are stored. */
-  vaultDB:         VaultDB
   /** The cache's timings ({@link QueryCacheOpts}). A field left out defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?: Partial<QueryCacheOpts>
 }

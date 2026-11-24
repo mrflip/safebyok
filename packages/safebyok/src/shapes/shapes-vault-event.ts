@@ -1,19 +1,21 @@
 /** `VaultEvent`, the notice a vaultDB's watcher gets, and `Agerank`, which orders the records seen of a Thing. */
 
-import type { Banklabel, Labelpath, Userid } from './primitives'
-import type { Sparse, ThingRecord, Thingkind, VoidSentinel } from './shapes-thing'
+import type { Banklabel, Labelpath, Lifetok, Userid } from './primitives'
+import type { LiveOf } from './shapes-sealers'
+import type { Sparse, ThingRecord, Thingkind, Tombstone, VoidSentinel } from './shapes-thing'
+import type { ReadTc } from '../storage/vault-db'
 
-// == [Kinds]: recordkindVals, Recordkind, lifekindVals, Lifekind, agekindVals, Agekind, vaultEventkindVals, VaultEventkind
+// == [Kinds]: livenessVals, Liveness, lifekindVals, Lifekind, agekindVals, Agekind, vaultEventkindVals, VaultEventkind
 
-/** Kinds of record:
+/** Liveness of a record seen:
  * - `soon` -- a sparse live record
  * - `full` -- a whole live record
  * - `gone` -- a tombstone, whole or sparse
  * - `void` -- nothing stored
  */
-export const recordkindVals = ['soon', 'full', 'gone', 'void'] as const
-/** A record's kind: one of {@link recordkindVals}. */
-export type Recordkind = typeof recordkindVals[number]
+export const livenessVals = ['soon', 'full', 'gone', 'void'] as const
+/** A record's liveness: one of {@link livenessVals}. */
+export type Liveness = typeof livenessVals[number]
 
 /** Kinds of life:
  * - `born` -- the Thing is live
@@ -44,8 +46,10 @@ export type VaultEventkind = typeof vaultEventkindVals[number]
 
 // == [Agerank]: Agerank, SeenThing
 
-/** The newest life and revisions seen of a Thing, as a string: of two for one Thing, the greater is the newer.
- * It joins with `|` the lifepath, the newest revision seen in that life, and the newest whole one (-1 for none), each revseq as `Revseq.padded` writes it.
+/** The newest life and revisions seen of a Thing, and when the newest revision was last seen, as a string: of two for one Thing, the greater is the newer.
+ * It joins with `|` the lifepath, the newest revision seen in that life, the newest whole one (-1 for none), each revseq
+ * as `Revseq.padded` writes it, and the time: the first eight hexadecimal digits of the `read_tc` the newest revision was
+ * last seen at, in units of 65.536 seconds.
  */
 export type Agerank = string
 
@@ -53,7 +57,7 @@ export type Agerank = string
 export type SeenThing = ThingRecord | Sparse<ThingRecord> | VoidSentinel
 // --
 
-// == [Events]: VaultEvent, VaultEventOf, VaultItemEvent, VaultLifeEvent, VaultAgedEvent
+// == [Events]: VaultEvent, VaultEventOf, VaultItemEvent, ItemSeen, VaultLifeEvent, VaultAgedEvent
 
 /** An event about one Thing: a record, a new life, or a newer revision not yet seen whole. Narrow it on `eventkind`. */
 export type VaultEvent = VaultItemEvent | VaultLifeEvent | VaultAgedEvent
@@ -71,14 +75,30 @@ export type VaultEventOf<EventkindT extends VaultEventkind> = Readonly<{
   agerank:    Agerank | undefined
   /** The Thing's agerank before this event's record, or undefined for none. */
   agerankWas: Agerank | undefined
+  /** The lifetok of the bank's life, where the event's source knew it: from a `SortedVaultDB`, the one the answer's ask or the notice carried, else the bank's as last read. Undefined from a `FeedSorter`, and in a vaultDB's raw watch where the datastore did not hand over the bank. */
+  bank_lifetok: Lifetok | undefined
+  /** Who dispatched this event's record: a `SortedVaultDB` names the vaultDB it wraps, or the ringer of its `bell`. Undefined in a vaultDB's raw watch, and from a `FeedSorter`. */
+  sourcelabel: string | undefined
+  /** When this event's record was read, shared by every event of one dispatch. Undefined only where a vaultDB's watch does not say. */
+  read_tc:    ReadTc | undefined
 }>
 
-/** A record of the Thing. Where ageranks are kept, the record raised the Thing's agerank. */
-export type VaultItemEvent = VaultEventOf<'item'> & Readonly<{
-  recordkind: Recordkind
-  /** The record, or null for `void`. From a `FeedSorter`, it is the very object it was given. */
-  record:     ThingRecord | Sparse<ThingRecord> | null
-}>
+/** A record of the Thing. Where ageranks are kept, the record raised the Thing's agerank. Narrow it on `liveness` to know what `val` holds.
+ * The newest revision seen again in a later span of time raises only the agerank's time: the event's `agerankWas` and `agerank` then differ only in their last field.
+ */
+export type VaultItemEvent = VaultEventOf<'item'> & ItemSeen
+
+/** The record an `item` event saw, as `val`, beside its `liveness`. From a `FeedSorter`, `val` is the very object it was given.
+ * - `full` -- a whole live record
+ * - `soon` -- a sparse live record
+ * - `gone` -- a tombstone, whole or sparse
+ * - `void` -- the void sentinel, for nothing stored
+ */
+export type ItemSeen =
+  | Readonly<{ liveness: 'full', val: LiveOf<ThingRecord> }>
+  | Readonly<{ liveness: 'soon', val: Sparse<LiveOf<ThingRecord>> }>
+  | Readonly<{ liveness: 'gone', val: Tombstone<ThingRecord> }>
+  | Readonly<{ liveness: 'void', val: VoidSentinel }>
 
 /** The first life seen of the Thing, or a new one, right after the `item` event of the record that showed it. */
 export type VaultLifeEvent = VaultEventOf<'life'> & Readonly<{
