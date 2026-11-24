@@ -12,6 +12,11 @@ function StageScreen({ world }: Readonly<{ world: TH.ProviderWorld }>) {
   return (stage === 'unborn') ? <CreateVaultForm username="hue@example.com" /> : <p>{stage}</p>
 }
 
+/** The bank's stage as a line of text. */
+function StageLine({ world }: Readonly<{ world: TH.ProviderWorld }>) {
+  return <p>{world.Bank.useBank((snap) => snap.stage)}</p>
+}
+
 /** A world with nothing stored, rendered under its provider, once it shows the create-vault form. */
 async function renderCreateVault() {
   const world = await TH.buildProviderWorld({ stored: 'none' })
@@ -76,7 +81,7 @@ describe("CreateVaultForm", () => {
     expect(createButton().disabled).to.eq(true)
   })
 
-  it("shows the refusal and empties both fields when the birth fails", async () => {
+  it("shows the refusal and keeps what was typed in both fields when the birth is refused", async () => {
     const { world, container } = await renderCreateVault()
     typeChosen(NewPassphrase, NewPassphrase)
     await waitFor(() => { expect(createButton().disabled).to.eq(false) })
@@ -84,11 +89,24 @@ describe("CreateVaultForm", () => {
     fireEvent.click(createButton())
     const alert = await screen.findByRole('alert')
     await waitFor(() => { expect(alert.textContent).to.eq('Something went wrong. Please try again later.') })
+    await waitFor(() => { expect(createButton().disabled).to.eq(false) })
+    expect(screen.getByLabelText<HTMLInputElement>('New passphrase').value).to.eq(NewPassphrase)
+    expect(screen.getByLabelText<HTMLInputElement>('Confirm passphrase').value).to.eq(NewPassphrase)
+    expect(document.activeElement).to.eq(screen.getByLabelText('New passphrase'))
+    expect(screen.getByText('Strong enough')).to.exist
+    TH.expectTextUnheld(NewPassphrase, container, world.clients())
+  })
+
+  it("empties both fields once the vault is stored", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'none' })
+    render(TH.providerTreeOf(world, <><StageLine world={world} /><CreateVaultForm username="hue@example.com" /></>, { userid: TH.ProviderUser }))
+    typeChosen(NewPassphrase, NewPassphrase)
+    await waitFor(() => { expect(createButton().disabled).to.eq(false) })
+    fireEvent.click(createButton())
+    await screen.findByText('unlocked')
     await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>('New passphrase').value).to.eq('') })
     expect(screen.getByLabelText<HTMLInputElement>('Confirm passphrase').value).to.eq('')
-    expect(document.activeElement).to.eq(screen.getByLabelText('New passphrase'))
     expect(screen.queryByText('Strong enough')).to.be.null
     expect(createButton().disabled).to.eq(true)
-    TH.expectTextUnheld(NewPassphrase, container, world.clients())
   })
 })

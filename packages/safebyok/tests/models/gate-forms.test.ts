@@ -363,29 +363,6 @@ describe("bank.gate.revokePasskey(cleartexts)", () => {
   })
 })
 
-describe("the try forms: tryUnlock, tryReplacePassphrase, tryAddPasskey, tryRevokePasskey, Bank.tryBirth", () => {
-  it("each resolves a good outcome of the gate on success, and Bank.tryBirth of the bank", async () => {
-    const device = TH.makeDevice()
-    await device.signIn(TH.WorldScope.userid)
-    const bank = await TH.expectGood(Bank.tryBirth(device, { passphraseCleartext: TH.TestPassphrase }))
-    bank.lock()
-    expect(await TH.expectGood(bank.gate.tryUnlock({ passphraseCleartext: TH.TestPassphrase }))).to.equal(bank.gate)
-    const nextPasskeyCleartext = TH.passkeyAnswerOf()
-    expect(await TH.expectGood(bank.gate.tryAddPasskey({ passphraseCleartext: TH.TestPassphrase, nextPasskeyCleartext }))).to.equal(bank.gate)
-    expect(await TH.expectGood(bank.gate.tryRevokePasskey({ passphraseCleartext: TH.TestPassphrase }))).to.equal(bank.gate)
-    expect(await TH.expectGood(bank.gate.tryReplacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase }))).to.equal(bank.gate)
-  })
-
-  it("each resolves the refusal its throwing form throws", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    await TH.expectBad(Bank.tryBirth(device, { passphraseCleartext: 42 } as never), 'bad_record')
-    await TH.expectBad(bank.gate.tryUnlock({ passphraseCleartext: 'not the passphrase' }), 'wrong_passphrase')
-    await TH.expectBad(bank.gate.tryReplacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: TH.TestPassphrase }), 'same_passphrase')
-    await TH.expectBad(bank.gate.tryAddPasskey({ passphraseCleartext: 'not the passphrase', nextPasskeyCleartext: TH.passkeyAnswerOf() }), 'wrong_passphrase')
-    await TH.expectBad(bank.gate.tryRevokePasskey({ passphraseCleartext: 'not the passphrase' }), 'wrong_passphrase')
-  })
-})
-
 describe("bank.ensureUnlocked()", () => {
   it("resolves at once on an unlocked bank, wanting no unlock", async () => {
     const { bank } = await TH.buildBornBank()

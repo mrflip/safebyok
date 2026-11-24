@@ -83,7 +83,8 @@ a menu choice is a `kind` (`scopepathkind`) or a `flavor`.
 
 **A boolean is `isFoo`, an enumeration a plain noun, and `state` is a smell.** A boolean is `isFoo` on an
 instance and in a snapshot alike: `box.isVeiled` and the snapshot's `isVeiled`, never a bare
-adjective (`veiled`). An enumeration is named for what it tells, a plain noun: `box.exposure`,
+adjective (`veiled`). `wasFoo` or `hasFoo` are acceptable where it's more natural or the
+distinction is important: `wasRefused`, of the last attempt. An enumeration is named for what it tells, a plain noun: `box.exposure`,
 typed `BoxExposure`. **A two-valued enumeration is a boolean**: `isLocked`, never a `lockState` of
 `'locked' | 'unlocked'`. **`state` names nothing public**: a React app already means its own
 component state by it, and the word says only that something changes. Name a status for what it is

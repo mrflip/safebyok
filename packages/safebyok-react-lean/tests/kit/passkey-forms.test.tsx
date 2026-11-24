@@ -92,6 +92,8 @@ describe("AddPasskeyForm", () => {
     await renderWorld('add')
     submitPassphrase(WrongPassphrase, 'Add passkey')
     expect(await alertText()).to.eq('That is not the passphrase.')
+    // The alert shows while the first attempt's action is still pending, and the form empties when it settles: type the next one after.
+    await screen.findByRole('button', { name: 'Add passkey' })
     authenticator.refuseNext('NotAllowedError')
     submitPassphrase(Passphrase, 'Add passkey')
     await waitFor(() => { expect(authenticator.calls.create).to.have.lengthOf(2) })

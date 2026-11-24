@@ -315,7 +315,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     expect(locked).to.deep.equal({ stage: 'locked', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false })
     expect(bank.getSnapshot()).to.equal(locked)
 
-    await TH.expectGood(bank.gate.tryUnlock({ passphraseCleartext: TH.TestPassphrase }))
+    await bank.gate.gatingUnlockAttempt({ passphrase: TH.TestPassphrase })
     expect(counter.calls).to.eq(2)
     expect(bank.getSnapshot()).to.deep.equal(unlocked)
 
@@ -333,7 +333,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     expect(bank.getSnapshot()).to.equal(unlocked)
     bank.lock()
     bank.lock()
-    await TH.expectBad(bank.gate.tryUnlock({ passphraseCleartext: 'not the passphrase' }), 'wrong_passphrase')
+    await TH.expectRefusal(bank.gate.gatingUnlockAttempt({ passphrase: 'not the passphrase' }), 'wrong_passphrase')
     expect(counter.calls).to.eq(1)
     bank.sweep()
     bank.sweep()

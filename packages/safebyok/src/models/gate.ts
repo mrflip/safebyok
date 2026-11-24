@@ -1,4 +1,4 @@
-import { Clock, Crypto, Errors, Outcome, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
+import { Clock, Crypto, Errors, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { Thing } from './thing'
 import type { Bank } from './bank'
 import type { Device } from './device'
@@ -7,7 +7,8 @@ import type { Lease } from './lease'
 import type { Proving } from './proving'
 import { Wayin } from './wayin'
 import type {
-  BirthCleartexts, GateDna, GateGatingFriend, GateOpts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, PassphraseReplaceCleartexts, UnlockCleartexts,
+  AddPasskeyDna, BirthCleartexts, BirthDna, GateDna, GateGatingFriend, GateOpts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, PassphraseReplaceCleartexts, ReplacePassphraseDna,
+  RevokePasskeyDna, UnlockCleartexts, UnlockDna,
 } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type BankStamp, type GateStamp, type LeaseLoggable, StampChecks } from '../shapes/shapes-stamps'
@@ -116,22 +117,32 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
   }
   // --
 
-  // == [Form verbs]: birthGating, unlockGating, unlock, tryUnlock, replacePassphraseGating, replacePassphrase, tryReplacePassphrase, addPasskeyGating, addPasskey, tryAddPasskey, revokePasskeyGating, revokePasskey, tryRevokePasskey, gatingFriend
-  // Each maker hands the cleartexts a form collected, unread, to a gating in gating.ts, with a friend of this gate's private
+  // == [Form verbs]: birthGating, unlockGating, gatingUnlockAttempt, unlock, replacePassphraseGating, gatingReplacePassphraseAttempt, replacePassphrase, addPasskeyGating, gatingAddPasskeyAttempt, addPasskey, revokePasskeyGating, gatingRevokePasskeyAttempt, revokePasskey, gatingFriend
+  // Each maker hands what a form collected, unread, to a gating in gating.ts, with a friend of this gate's private
   // verbs: no public method accepts a proving (G9). Each verb attempts the gating its maker makes, which is vacated
   // whatever its outcome, and changes nothing where it refuses.
+  // A maker takes a `FormData`, a dna in a form's fieldnames, or the cleartexts in the names a gating's body takes.
 
-  /** The gating of `Bank.birth` over `cleartexts`, handing `attachBank`, where given, the bank it births. Internal: make a birth's gating with `device.birthGating`. */
-  static birthGating(device: Device, cleartexts: BirthCleartexts, attachBank?: (bank: Bank) => void): BirthGating {
+  /** The gating of `Bank.birth` over `params`, handing `attachBank`, where given, the bank it births. Internal: make a birth's gating with `device.birthGating`. */
+  static birthGating(device: Device, params: FormData | BirthDna | BirthCleartexts, attachBank?: (bank: Bank) => void): BirthGating {
     const attacher = Checks.attachBank.parse(attachBank)
-    return new BirthGating(device, cleartexts, {
+    return new BirthGating(device, params, {
       unlockByProving: (gate: Gate, proving: Proving) => gate.#unlockByProving(proving),
       attachBank:      (bank: Bank) => { attacher?.(bank) },
     })
   }
 
-  /** The gating of {@link unlock} over `cleartexts`, for a form mutation to attempt. */
-  unlockGating(cleartexts: UnlockCleartexts): UnlockGating { return new UnlockGating(this, cleartexts, this.#gatingFriend()) }
+  /** The gating of {@link unlock} over `params`, for a form mutation to attempt. A `FormData` loses its `passphrase` field, and `nextPassphrase` and `confirmation`, at once. */
+  unlockGating(params: FormData | UnlockDna | UnlockCleartexts): UnlockGating { return new UnlockGating(this, params, this.#gatingFriend()) }
+
+  /** Unlock this gate by the passphrase, or the passkey's answer, in a form or a dna, as {@link unlock} does.
+   * A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields before anything is awaited; its other fields stay. A dna's fields are never changed, but a passkey answer's PRF bytes are zeroed.
+   * @example
+   *   await gate.gatingUnlockAttempt(new FormData(formEl))
+   * @example
+   *   await gate.gatingUnlockAttempt({ passkeyAnswer: await askPasskey(header) })
+   */
+  async gatingUnlockAttempt(params: FormData | UnlockDna): Promise<Gate> { return await this.unlockGating(params).attempt() }
 
   /** Unlock this gate by its passphrase or its passkey, resuming every call waiting in {@link ensureUnlocked}.
    * A wrong one refuses `wrong_passphrase` or `wrong_passkey`, and the gate is unchanged.
@@ -141,11 +152,13 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
     return this
   }
 
-  /** {@link unlock}, resolving an `Outcome` instead of throwing. */
-  tryUnlock(cleartexts: UnlockCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.unlock(cleartexts)) }
+  /** The gating of {@link replacePassphrase} over `params`, for a form mutation to attempt. A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once. */
+  replacePassphraseGating(params: FormData | ReplacePassphraseDna | PassphraseReplaceCleartexts): ReplacePassphraseGating { return new ReplacePassphraseGating(this, params, this.#gatingFriend()) }
 
-  /** The gating of {@link replacePassphrase} over `cleartexts`, for a form mutation to attempt. */
-  replacePassphraseGating(cleartexts: PassphraseReplaceCleartexts): ReplacePassphraseGating { return new ReplacePassphraseGating(this, cleartexts, this.#gatingFriend()) }
+  /** Replace the passphrase by `nextPassphrase`, proved by the `passphrase` or the passkey's answer, in a form or a dna, as {@link replacePassphrase} does.
+   * A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields before anything is awaited; its other fields stay. A dna's fields are never changed, but a passkey answer's PRF bytes are zeroed.
+   */
+  async gatingReplacePassphraseAttempt(params: FormData | ReplacePassphraseDna): Promise<Gate> { return await this.replacePassphraseGating(params).attempt() }
 
   /** Replace the passphrase, proved by the current passphrase or the passkey, and leave the gate unlocked.
    * The passkey stays, and the bankKey does not change.
@@ -156,11 +169,12 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
     return this
   }
 
-  /** {@link replacePassphrase}, resolving an `Outcome` instead of throwing. */
-  tryReplacePassphrase(cleartexts: PassphraseReplaceCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.replacePassphrase(cleartexts)) }
+  /** The gating of {@link addPasskey} over `params`, for a form mutation to attempt. */
+  addPasskeyGating(params: FormData | AddPasskeyDna | PasskeyAddCleartexts): AddPasskeyGating { return new AddPasskeyGating(this, params, this.#gatingFriend()) }
 
-  /** The gating of {@link addPasskey} over `cleartexts`, for a form mutation to attempt. */
-  addPasskeyGating(cleartexts: PasskeyAddCleartexts): AddPasskeyGating { return new AddPasskeyGating(this, cleartexts, this.#gatingFriend()) }
+  // A FormData cannot carry a passkey's answer, so only a dna can add one.
+  /** Add the passkey whose answer is `nextPasskeyAnswer`, proved by the `passphrase`, as {@link addPasskey} does. The dna is never changed, but the answer's PRF bytes are zeroed. */
+  async gatingAddPasskeyAttempt(params: AddPasskeyDna): Promise<Gate> { return await this.addPasskeyGating(params).attempt() }
 
   /** Add a passkey, proved by the passphrase, and leave the gate unlocked.
    * A gate has one passkey at most, so this refuses while it has one: revoke that one first.
@@ -170,11 +184,13 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
     return this
   }
 
-  /** {@link addPasskey}, resolving an `Outcome` instead of throwing. */
-  tryAddPasskey(cleartexts: PasskeyAddCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.addPasskey(cleartexts)) }
+  /** The gating of {@link revokePasskey} over `params`, for a form mutation to attempt. A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once. */
+  revokePasskeyGating(params: FormData | RevokePasskeyDna | PasskeyRevokeCleartexts): RevokePasskeyGating { return new RevokePasskeyGating(this, params, this.#gatingFriend()) }
 
-  /** The gating of {@link revokePasskey} over `cleartexts`, for a form mutation to attempt. */
-  revokePasskeyGating(cleartexts: PasskeyRevokeCleartexts): RevokePasskeyGating { return new RevokePasskeyGating(this, cleartexts, this.#gatingFriend()) }
+  /** Revoke the passkey, proved by the `passphrase` or the passkey's answer, in a form or a dna, as {@link revokePasskey} does.
+   * A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields before anything is awaited; its other fields stay. A dna's fields are never changed, but a passkey answer's PRF bytes are zeroed.
+   */
+  async gatingRevokePasskeyAttempt(params: FormData | RevokePasskeyDna): Promise<Gate> { return await this.revokePasskeyGating(params).attempt() }
 
   /** Revoke the passkey, proved by the passphrase or the passkey itself, and leave the gate unlocked.
    * With no passkey, the proof only unlocks the gate. The bankKey does not change.
@@ -183,9 +199,6 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
     await this.revokePasskeyGating(cleartexts).attempt()
     return this
   }
-
-  /** {@link revokePasskey}, resolving an `Outcome` instead of throwing. */
-  tryRevokePasskey(cleartexts: PasskeyRevokeCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.revokePasskey(cleartexts)) }
 
   /** This gate's private verbs, for a gating to call. */
   #gatingFriend(): GateGatingFriend {

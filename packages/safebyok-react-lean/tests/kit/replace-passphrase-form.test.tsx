@@ -58,6 +58,9 @@ describe("ReplacePassphraseForm", () => {
     for (const text of [Passphrase, NextPassphrase]) { TH.expectTextUnheld(text, container, world.clients()) }
     // React resets the form once the action settles, which may be after the stage shows `unlocked`.
     await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>('Current passphrase').value).to.eq('') })
+    expect(screen.getByLabelText<HTMLInputElement>('New passphrase').value).to.eq('')
+    expect(screen.getByLabelText<HTMLInputElement>('Confirm passphrase').value).to.eq('')
+    expect(replaceButton().disabled).to.eq(true)
 
     act(() => { world.Bank.lock() })
     fireEvent.change(await screen.findByLabelText('Passphrase'), { target: { value: Passphrase } })
@@ -69,7 +72,7 @@ describe("ReplacePassphraseForm", () => {
     await screen.findByText('unlocked')
   })
 
-  it("says a wrong current passphrase is wrong, hands its field focus, and replaces nothing", async () => {
+  it("says a wrong current passphrase is wrong, hands its field focus, keeps what was typed, and replaces nothing", async () => {
     const { world, container } = await renderReplace()
     await typeReplacement(WrongPassphrase)
     fireEvent.click(replaceButton())
@@ -78,6 +81,10 @@ describe("ReplacePassphraseForm", () => {
     const alerts = screen.getAllByRole('alert').map((alert) => alert.textContent)
     expect(alerts).to.include('That is not the passphrase.')
     expect(field.getAttribute('aria-invalid')).to.eq('true')
+    await waitFor(() => { expect(replaceButton().disabled).to.eq(false) })
+    expect(field.value).to.eq(WrongPassphrase)
+    expect(screen.getByLabelText<HTMLInputElement>('New passphrase').value).to.eq(NextPassphrase)
+    expect(screen.getByLabelText<HTMLInputElement>('Confirm passphrase').value).to.eq(NextPassphrase)
     for (const text of [WrongPassphrase, NextPassphrase]) { TH.expectTextUnheld(text, container, world.clients()) }
 
     fireEvent.change(screen.getByLabelText('Passphrase'), { target: { value: Passphrase } })

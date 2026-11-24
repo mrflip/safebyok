@@ -9,17 +9,21 @@ assert, under jsdom over fake-indexeddb; nobody has yet looked at it in a real b
 "Cleared" is React's own reset of an uncontrolled form whose `action` is a function: React queues it as the action
 starts, so it comes after every outcome, refused or not. A form that submits from `onSubmit` with `preventDefault` gets
 none. The one exception is Login's Dismiss, where the dojo's own Cancel calls `form.reset()`.
-The library deletes the secret fields from the `FormData` only; it never touches the inputs.
+The library deletes the secret fields from the `FormData` only; it never touches the inputs. Login cancels React's reset
+after a refusal, with the hook's `keepTextIfRefused` as its `onReset` (thread 7), so a refused Login keeps every field.
 
-**Login** (Nolo, bank `unborn`): a hand-built form on `useBirth`, `useNewPassphrase`, `PassphraseInput` and `popField`.
+**Login** (Nolo, bank `unborn`): a hand-built form on `useBirth`'s `attempt` and `keepTextIfRefused`, `useNewPassphrase`
+and `PassphraseInput`. Its submitting buttons are disabled until the meter says Strong enough and the confirmation matches.
 
 | Button | What happens | username | passphrase | confirmation | message shown | stage after |
 | --- | --- | --- | --- | --- | --- | --- |
 | Sign In | the bank is born | cleared | cleared | cleared | Your vault is created. | `unlocked` |
-| Weak | `weak_passphrase` (the birth judges again; the meter still says Strong enough) | cleared | cleared | cleared | That passphrase is too easy to guess. | `unborn` |
-| Exists | `gate_made_elsewhere` | cleared | cleared | cleared | This vault's passphrase was just set on another device, … Enter the passphrase chosen there to unlock it. | `unborn` |
-| Failed | `storage_unavailable` | cleared | cleared | cleared | The dojo told its vaultDB to refuse this write. | `unborn` |
+| Weak | `weak_passphrase` (the birth judges again; the meter still says Strong enough) | kept | kept | kept | That passphrase is too easy to guess. | `unborn` |
+| Exists | `gate_made_elsewhere` | kept | kept | kept | This vault's passphrase was just set on another device, … Enter the passphrase chosen there to unlock it. | `unborn` |
+| Failed | `storage_unavailable` | kept | kept | kept | The dojo told its vaultDB to refuse this write. | `unborn` |
 | Dismiss | the form is reset; nothing reaches the library | cleared | cleared | cleared | (none) | `unborn` |
+| Dismiss, after Failed | the form is reset: the kept text goes | cleared | cleared | cleared | (none) | `unborn` |
+| Sign In, after Failed | the bank is born from the text kept | cleared | cleared | cleared | Your vault is created. | `unlocked` |
 
 **New Box** (Hero, unlocked): `putBoxAction` under `useActionState`, `WhisperInput`, `useStrengthVerdict`, the username
 put back with `defaultValue={put?.texts['username']}` as the giver's doc block says.
@@ -34,8 +38,8 @@ put back with `defaultValue={put?.texts['username']}` as the giver's doc block s
 
 Read with it:
 
-* **The birth has no `texts`**: on every refusal Login loses the username the user typed. `putBoxAction` gives them
-  back; the form verbs (`useBirth`, `useUnlock`, …) do not.
+* **The birth has no `texts`, and Login needs none**: since thread 7 a refused Login keeps what the inputs hold, so the
+  username stays where the user typed it. `putBoxAction` still gives its `texts` back, for a form that lets React reset.
 * **Exists on Login leaves the page unborn**: the message says to unlock with the passphrase chosen elsewhere, but the
   stage stays `unborn`, so a page switched on the stage shows the create form again until a reload.
 * **New Box's Dismiss had no counterpart**: `putBoxAction` refuses `bank_locked` on a locked bank and never asks for
@@ -263,10 +267,20 @@ Each with what it cost the dojo. None is smoothed over with machinery.
 5. **A host's strength check at submit cannot await.** `whisperOf` is synchronous and the secrets must leave the
    `FormData` before the first await, so the check reads the verdict from render: the action is remade under `useMemo`
    keyed on the verdict, and Weak submits from an effect after the verdict lands. About 10 lines in `NewBoxTab.tsx`.
-6. **The kit's `formActionOf` is private**, so a hand-built form verb rewrites it: pop the fields, make the gating,
+   Thread 7 leaves `putBoxAction` as it was. The form verbs need no check at submit: the birth and the passphrase
+   replacement judge strength themselves, after the secrets have left the form, and Login's confirmation is matched by
+   `useNewPassphrase`'s `isReady`, which disables its buttons.
+6. **The kit's `formActionOf` was private**, so a hand-built form verb rewrote it: pop the fields, make the gating,
    `mutateAsync`, and keep a second error for what threw before the mutation ran (the host's check, a gating at the
    wrong stage), since `birth.error` holds only the mutation's. About 20 lines in `LoginTab.tsx`.
+   Thread 7: `formActionOf` is gone, and each form verb's hook has `attempt`, which takes the form, takes the secret
+   fields out of it, and runs the mutation with the gating. Login's action is `await birth.attempt(form)` and the
+   readout's bookkeeping: its verb code went from 28 lines (`action` and `gatingOf`) to 7, and the file from 101 lines to
+   73. The second error went: the mismatch check is the disabled buttons, and a gating refused at the wrong stage resolves
+   `attempt` as refused (`wasRefused()`), never as a rejection, though it shows nothing in the alert (item 28).
 7. **The form verbs give back no `texts`** (above): a host restoring the username would hand-roll it. Not built.
+   Thread 7: still not built, and not needed: `keepTextIfRefused` keeps the inputs' text through React's reset after a
+   refusal, so nothing has to be put back.
 8. **Messages unfit for a user pass through `refusalTextOf`**: `stale_write`'s message is `stale_write`, and
    `bank_locked`'s tells a developer to call `bank.ensureUnlocked`. 0 lines; shown as they come.
 9. **No unlock prompt for a box put** (above): building one means `useDraft` or a hand-made wait. Not built.
@@ -327,6 +341,20 @@ Each with what it cost the dojo. None is smoothed over with machinery.
     spreading the whole sidecar. About 7 lines.
 27. **`useDraft` has no save on blur**: the host wraps the whisper field's `onBlur` around its own, with the draft's
     `isDirty`, and adds one to the username. About 6 lines; a move from one field into the other saves too (E10).
+
+28. **A form verb refused at the wrong stage shows nothing, and keeps its secret in the `FormData`**: the giver's
+    `attempt` resolves refused (`wasRefused()` true), but the mutation never ran, so `error` stays null and the alert is
+    empty; and the giver refuses (`absent_vault`, no bank) before the core's maker can take the form's secret fields, so a
+    `<form action={unlock.attempt}>` shown at the wrong stage leaves the passphrase in `useFormStatus().data`. The kit's
+    forms are shown only at their stage, and the kit's unlock forms submit from a handler. 0 lines; recorded.
+29. **Adding a passkey cannot take a `FormData`**: the passphrase is typed and the answer comes from the ceremony, which
+    is awaited, so the kit's `AddPasskeyForm` still takes the passphrase out of the form with `popField` and hands
+    `attempt` a dna. 0 lines in the dojo.
+30. **`keepTextIfRefused` and `useNewPassphrase`'s `forget` share the form's `onReset`, in that order**: `forget` keeps
+    the verdicts when the reset was cancelled, so Login writes `(event) => { birth.keepTextIfRefused(event);
+    newPassphrase.forget(event) }`. 1 line.
+31. **A refusal of a dna's field names the gating's own field**: a birth handed `{ passphrase: 42 }` refuses
+    `bad_record` at `passphraseCleartext`, not `passphrase`. Never its text. 0 lines; recorded.
 
 React itself, not the library, cost two lines more: an outcome set after an `await` must be wrapped in
 `startTransition` to commit with React's reset of the form, and a query-cache subscriber must go through

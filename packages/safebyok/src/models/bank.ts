@@ -5,7 +5,7 @@ import { BaseBox } from './base-box'
 import { Device } from './device'
 import { Gate } from './gate'
 import type { BirthGating } from './gating'
-import type { BirthCleartexts } from '../shapes/shapes-gateish'
+import type { BirthCleartexts, BirthDna } from '../shapes/shapes-gateish'
 import type { BankAskDraft, BankOpts, BankSnapshot, BankStage, BoxUnsealed, HostedVault } from '../shapes/shapes-bankish'
 import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
@@ -173,14 +173,14 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  // == [Gate verbs]: birthGating, birth, tryBirth, ensureUnlocked, dismissUnlock, lock
+  // == [Gate verbs]: birthGating, birth, ensureUnlocked, dismissUnlock, lock
   // The gate's own, for a host's screen or a vault that wants the bank unlocked whichever way the user gets in. Every other
   // form verb is on the gate.
 
-  /** The gating of {@link birth} over `cleartexts`, handing `attachBank`, where given, the bank it births. Internal: make a birth's gating with {@link Device.birthGating}.
+  /** The gating of {@link birth} over `params`, handing `attachBank`, where given, the bank it births. Internal: make a birth's gating with {@link Device.birthGating}.
    * Without `attachBank`, the bank it births is no device's: `device` does not show it.
    */
-  static birthGating(device: Device, cleartexts: BirthCleartexts, attachBank?: (bank: Bank) => void): BirthGating { return Gate.birthGating(device, cleartexts, attachBank) }
+  static birthGating(device: Device, params: FormData | BirthDna | BirthCleartexts, attachBank?: (bank: Bank) => void): BirthGating { return Gate.birthGating(device, params, attachBank) }
 
   /** Birth the bank of `device`'s scope with the user's new passphrase and optional passkey, and resolve it unlocked. The device's bank is then this one.
    * A weak passphrase refuses `weak_passphrase`: show {@link Device.judgeStrength}'s verdict as the user types.
@@ -188,9 +188,6 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
    * Call it once the device's `signIn` shows the stage `'unborn'`.
    */
   static async birth(device: Device, cleartexts: BirthCleartexts): Promise<Bank> { return await Checks.device.parse(device).birthGating(cleartexts).attempt() }
-
-  /** {@link birth}, resolving an `Outcome` instead of throwing. */
-  static tryBirth(device: Device, cleartexts: BirthCleartexts): Promise<Outcome.Outcome<Bank>> { return Outcome.outcomeOf(() => this.birth(device, cleartexts)) }
 
   /** Resolve this bank once its gate is unlocked ({@link Gate.ensureUnlocked}). While it waits, the snapshot's `isUnlockWanted` is true. */
   async ensureUnlocked(): Promise<this> {

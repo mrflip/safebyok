@@ -18,7 +18,8 @@ pnpm --filter safebyok-demo-dojo fixture     # writes src/fixture/fixture.json a
   * **Thierry** has a bank stored there, and nothing here.
   * **Nolo** has nothing anywhere: its bank is `unborn`.
 * **Login**: one form that creates the signed-in user's vault: a username, a new passphrase and its confirmation, the
-  strength verdict beside them (`useNewPassphrase`), and five buttons. Sign in as Nolo.
+  strength verdict beside them (`useNewPassphrase`), and five buttons, which submit through `useBirth`'s `attempt`. A
+  refusal keeps what was typed (`keepTextIfRefused`). Sign in as Nolo.
 * **New Box**: the same form adding a box at the labelpath `login` (`putBoxAction` under `useActionState`): the username
   in its sidecar, the password in its whisper. Sign in as Hero or Thierry and unlock.
 * **Forms**: one form with a secret in it, built ten ways, a row each (`src/components/forms/`), in two groups. The tab

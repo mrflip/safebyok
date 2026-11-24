@@ -33,9 +33,10 @@ export {
   BankishChecks, DefaultBanklabel, PendingBank, SignedOutBank, bankStageVals,
 } from './shapes/shapes-bankish'
 export {
-  type BirthCleartexts, type BirthGatingFriend, type GateDna, type GateGatingFriend, type GateOpts, type GateRevisionedStamp, type GatingCleartexts, type GuardedKeyDeriver, type GuardedStrengthChecker,
-  type LeaseGate, type LeaseOpts, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type ProvedCleartexts, type ProvingDevice, type ProvingOpts, type ProvingParts,
-  type SecretFieldname, type StrengthChecker, type UnlockCleartexts, CleartextChecks, GateishChecks,
+  type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateGatingFriend, type GateOpts, type GateRevisionedStamp, type GatingCleartexts, type GuardedKeyDeriver,
+  type GuardedStrengthChecker, type HandedCleartexts, type LeaseGate, type LeaseOpts, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type ProvedCleartexts, type ProvingDevice,
+  type ProvingOpts, type ProvingParts, type ReplacePassphraseDna, type RevokePasskeyDna, type SecretFieldname, type StrengthChecker, type UnlockCleartexts, type UnlockDna, CleartextChecks,
+  FormSecretFieldnames, GateishChecks, GatingChecks,
 } from './shapes/shapes-gateish'
 export {
   type BankRoots, type BankWriteAsk, type BirthBankAsk, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAsk, type ListAsk, type LoggableAsk, type PutAskDraft,

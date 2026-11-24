@@ -1,5 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useActionState, useState, useTransition } from 'react'
+import { type Root, hydrateRoot } from 'react-dom/client'
+import { renderToString } from 'react-dom/server'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { UnlockDialog, UnlockForm } from '../../src/kit'
 import * as TH from '../test-helpers'
@@ -13,6 +15,11 @@ const WrongPassphrase = 'correct horse battery stable'
 function StageScreen({ world }: Readonly<{ world: TH.ProviderWorld }>) {
   const stage = world.Bank.useBank((snap) => snap.stage)
   return (stage === 'locked') ? <UnlockForm username="hue@example.com" /> : <p>{stage}</p>
+}
+
+/** The bank's stage as a line of text. */
+function StageLine({ world }: Readonly<{ world: TH.ProviderWorld }>) {
+  return <p>{world.Bank.useBank((snap) => snap.stage)}</p>
 }
 
 /** The bank's stage as a line of text, beside the unlock dialog. */
@@ -103,6 +110,39 @@ describe("UnlockForm", () => {
     expect(username?.value).to.eq('hue@example.com')
     expect(username?.autocomplete).to.eq('username')
     expect(screen.queryByRole('button', { name: 'Cancel' })).to.be.null
+  })
+
+  it("posts, so a form submitted before React attaches keeps the passphrase out of the URL, and has no username field without a username", async () => {
+    const { container } = await renderWorld(() => <UnlockForm />, 'Unlock')
+    expect(container.querySelector('form')?.getAttribute('method')).to.eq('post')
+    expect(container.querySelector('input[name="username"]')).to.be.null
+  })
+
+  it("keeps Unlock disabled in a server render until it is hydrated, so the passphrase is never submitted before React attaches", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const tree = TH.providerTreeOf(world, <><StageLine world={world} /><UnlockForm /></>, { userid: TH.ProviderUser })
+    const container = document.createElement('div')
+    container.innerHTML = renderToString(tree)
+    document.body.append(container)
+    // Whether React had cancelled each submit by the time it reached the document; cancelled here, as jsdom submits nothing.
+    const submits: boolean[] = []
+    function hearSubmit(event: SubmitEvent) { submits.push(event.defaultPrevented); event.preventDefault() }
+    document.addEventListener('submit', hearSubmit)
+    let root: Root | null = null
+    onTestFinished(() => { document.removeEventListener('submit', hearSubmit); act(() => { root?.unmount() }); container.remove() })
+    const unlockButton = () => screen.getByRole<HTMLButtonElement>('button', { name: 'Unlock' })
+    screen.getByLabelText<HTMLInputElement>('Passphrase').value = Passphrase
+    expect(unlockButton().disabled).to.eq(true)
+    unlockButton().click()
+    expect(submits).to.be.empty
+
+    const mismatches: unknown[] = []
+    act(() => { root = hydrateRoot(container, tree, { onRecoverableError: (err) => { mismatches.push(err) } }) })
+    await screen.findByText('locked')
+    expect([unlockButton().disabled, mismatches]).to.deep.equal([false, []])
+    typePassphrase(Passphrase)
+    await screen.findByText('unlocked')
+    expect(submits).to.deep.equal([true])
   })
 
   it("uses the bank handed to it over the provider's", async () => {

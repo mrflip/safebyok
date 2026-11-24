@@ -12,7 +12,7 @@ import { VaultMinder } from '../minding/vault-minder'
 import { type BadNewsHandler, type BankAskDraft, type BankSnapshot, type DeviceJSON, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, type RefusalSnapshot, BankishChecks, PendingBank, SignedOutBank } from '../shapes/shapes-bankish'
 import { type BankRoots, type GetAsk, type ListAsk, getAskOf, listAskOf } from '../shapes/shapes-asks'
 import { type MaskedView, type MaskedViewLease, type MinderFriend, EmptyMaskedView, MinderChecks } from '../shapes/shapes-minder'
-import type { BirthCleartexts, GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
+import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
 import type { BankScope } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
@@ -169,7 +169,7 @@ export class Device implements MinderFriend {
   async judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> { return await Proving.judgeStrength(this, this.scope, passphraseCleartext) }
   // --
 
-  // == [Starting]: hello, #restore, signIn, birthGating, #bringUp, #attachWorld, #attachBank
+  // == [Starting]: hello, #restore, signIn, birthGating, gatingBirthAttempt, #bringUp, #attachWorld, #attachBank
 
   /** Start the device. It resolves at once, and never rejects.
    * Refuses `insecure_context` outside a secure context, where WebCrypto is missing.
@@ -206,18 +206,26 @@ export class Device implements MinderFriend {
     return this.#broughtUp
   }
 
-  /** The gating of a birth of this device's bank, for a form mutation to attempt: the bank it births is then this device's, unlocked.
+  /** The gating of a birth of this device's bank over `params`, for a form mutation to attempt: the bank it births is then this device's, unlocked.
    * Call it once `signIn` shows the stage `'unborn'`. See {@link Bank.birth} for what the birth refuses.
    */
-  birthGating(cleartexts: BirthCleartexts): BirthGating {
-    // Made before the stage is checked, so a refusal here zeroes the host's passkey answer as every gating does (G2).
-    const gating = Bank.birthGating(this, cleartexts, (bank) => { this.#attachBank(bank) })
+  birthGating(params: FormData | BirthDna | BirthCleartexts): BirthGating {
+    // Made before the stage is checked, so a refusal here zeroes the host's passkey answer, and empties a form's secret
+    // fields, as every gating does (G2).
+    const gating = Bank.birthGating(this, params, (bank) => { this.#attachBank(bank) })
     if (['signed_out', 'starting'].includes(this.#snapshot.bank.stage)) {
       gating.vacate()
       throw Throwers.bankNotBroughtUp()
     }
     return gating
   }
+
+  /** Birth this device's bank under the new `passphrase`, and a new passkey's answer if given, in a form or a dna, as {@link Bank.birth} does: the bank is then this device's, unlocked.
+   * A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields before anything is awaited; its other fields stay. A dna's fields are never changed, but a passkey answer's PRF bytes are zeroed.
+   * @example
+   *   await device.gatingBirthAttempt(new FormData(formEl))
+   */
+  async gatingBirthAttempt(params: FormData | BirthDna): Promise<Bank> { return await this.birthGating(params).attempt() }
 
   // The world fetched lands in the BankMinder, where a bank brought up from the cache reads it; a failure to fetch it,
   // once that bank is up, is no caller's to hear.

@@ -9,8 +9,9 @@ import { Gate } from './gate'
 import type { Wayin } from './wayin'
 import { NOVEL, PasskeyProving, PassphraseProving, type Proving } from './proving'
 import {
-  type BirthCleartexts, type BirthGatingFriend, type GateDna, type GateGatingFriend, type GatingCleartexts, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts,
-  type PassphraseReplaceCleartexts, type ProvedCleartexts, type UnlockCleartexts, CleartextChecks,
+  type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateGatingFriend, type GatingCleartexts, type HandedCleartexts, type PasskeyAddCleartexts,
+  type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type ProvedCleartexts, type ReplacePassphraseDna, type RevokePasskeyDna, type UnlockCleartexts, type UnlockDna,
+  CleartextChecks, FormSecretFieldnames, GatingChecks,
 } from '../shapes/shapes-gateish'
 import type { PutAskDraft } from '../shapes/shapes-asks'
 import type { StampedGate } from '../shapes/shapes-stamps'
@@ -38,9 +39,11 @@ export class Gating<ResolvedT = unknown> {
   /** True once attempted or vacated. */
   #isSpent = false
 
-  /** Adopt `cleartexts` for `body`: the PRF bytes of each passkey answer are copied, and those in the answer handed in are zeroed. */
-  protected constructor(cleartexts: unknown, body: (cleartexts: GatingCleartexts) => Promise<ResolvedT>) {
-    this.#cleartexts = adoptedCleartextsOf(cleartexts)
+  /** Adopt the cleartexts in `params`, by `dnaCheck`, for `body`: the PRF bytes of each passkey answer are copied, and those in the answer handed in are zeroed.
+   * A `FormData` loses its secret fields, used or not.
+   */
+  protected constructor(params: unknown, dnaCheck: DnaCheck, body: (cleartexts: GatingCleartexts) => Promise<ResolvedT>) {
+    this.#cleartexts = adoptedCleartextsOf(params, dnaCheck)
     this.#body       = body
     Object.freeze(this)
   }
@@ -86,27 +89,37 @@ export class Gating<ResolvedT = unknown> {
 
 /** A {@link Bank.birth} to attempt: make one with {@link Device.birthGating}. */
 export class BirthGating extends Gating<Bank> {
-  constructor(device: Device, cleartexts: BirthCleartexts, friend: BirthGatingFriend) { super(cleartexts, (given) => birthBank(device, given, friend)) }
+  constructor(device: Device, params: FormData | BirthDna | BirthCleartexts, friend: BirthGatingFriend) {
+    super(params, GatingChecks.birthGating, (given) => birthBank(device, given, friend))
+  }
 }
 
 /** A {@link Gate.unlock} to attempt: make one with {@link Gate.unlockGating}. */
 export class UnlockGating extends Gating<Gate> {
-  constructor(gate: Gate, cleartexts: UnlockCleartexts, friend: Pick<GateGatingFriend, 'unlockByProving'>) { super(cleartexts, (given) => unlockGate(gate, given, friend)) }
+  constructor(gate: Gate, params: FormData | UnlockDna | UnlockCleartexts, friend: Pick<GateGatingFriend, 'unlockByProving'>) {
+    super(params, GatingChecks.unlockGating, (given) => unlockGate(gate, given, friend))
+  }
 }
 
 /** A {@link Gate.replacePassphrase} to attempt: make one with {@link Gate.replacePassphraseGating}. */
 export class ReplacePassphraseGating extends Gating<Gate> {
-  constructor(gate: Gate, cleartexts: PassphraseReplaceCleartexts, friend: GateGatingFriend) { super(cleartexts, (given) => replacePassphrase(gate, given, friend)) }
+  constructor(gate: Gate, params: FormData | ReplacePassphraseDna | PassphraseReplaceCleartexts, friend: GateGatingFriend) {
+    super(params, GatingChecks.replacePassphraseGating, (given) => replacePassphrase(gate, given, friend))
+  }
 }
 
 /** A {@link Gate.addPasskey} to attempt: make one with {@link Gate.addPasskeyGating}. */
 export class AddPasskeyGating extends Gating<Gate> {
-  constructor(gate: Gate, cleartexts: PasskeyAddCleartexts, friend: GateGatingFriend) { super(cleartexts, (given) => addPasskey(gate, given, friend)) }
+  constructor(gate: Gate, params: FormData | AddPasskeyDna | PasskeyAddCleartexts, friend: GateGatingFriend) {
+    super(params, GatingChecks.addPasskeyGating, (given) => addPasskey(gate, given, friend))
+  }
 }
 
 /** A {@link Gate.revokePasskey} to attempt: make one with {@link Gate.revokePasskeyGating}. */
 export class RevokePasskeyGating extends Gating<Gate> {
-  constructor(gate: Gate, cleartexts: PasskeyRevokeCleartexts, friend: GateGatingFriend) { super(cleartexts, (given) => revokePasskey(gate, given, friend)) }
+  constructor(gate: Gate, params: FormData | RevokePasskeyDna | PasskeyRevokeCleartexts, friend: GateGatingFriend) {
+    super(params, GatingChecks.revokePasskeyGating, (given) => revokePasskey(gate, given, friend))
+  }
 }
 // --
 
@@ -250,28 +263,54 @@ function nextGateAsk(ante: Ante, wayins: GateDna['wayins'], policy: EX.StoragePo
 }
 // --
 
-// == [Adopting and vacating]: adoptedCleartextsOf, adoptedAnswerOf, isAnswerish, zeroAnswer, zeroBytes
+// == [Adopting and vacating]: adoptedCleartextsOf, handedCleartextsOf, takeSecretFields, isInCleartextNames, adoptedAnswerOf, isAnswerish, zeroAnswer, zeroBytes
 
-/** A copy of `cleartexts` the gating owns, each passkey answer adopted, checked only for its fields.
+/** A copy of the cleartexts in `params` the gating owns, each passkey answer adopted, checked only for its fields.
  * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that carries nothing of it.
  */
-function adoptedCleartextsOf(cleartexts: unknown): GatingCleartexts {
+function adoptedCleartextsOf(params: unknown, dnaCheck: DnaCheck): GatingCleartexts {
   // Declared outside the try, so a refusal zeroes the gating's copies of the passkey answers too (G2).
   let passkeyCleartext:     unknown
   let nextPasskeyCleartext: unknown
   try {
+    const handed = handedCleartextsOf(params, dnaCheck)
     // The passkey answers are adopted before the fields are checked, so a refusal leaves none of the host's PRF bytes unzeroed.
-    const handed = (cleartexts ?? {}) as GatingCleartexts
     passkeyCleartext     = adoptedAnswerOf(handed.passkeyCleartext)
     nextPasskeyCleartext = adoptedAnswerOf(handed.nextPasskeyCleartext)
     // Typed as the host declared them: each body judges the values it takes.
-    const given = CleartextChecks.gatingArgs.parse(cleartexts)
+    const given = CleartextChecks.gatingArgs.parse(handed)
     return omitBy({ ...given, passkeyCleartext, nextPasskeyCleartext }, (val) => val === undefined) as GatingCleartexts
   } catch (err) {
     zeroAnswer(passkeyCleartext)
     zeroAnswer(nextPasskeyCleartext)
     throw Errors.isVaultError(err) ? err : Throwers.cleartextsThrew()
   }
+}
+
+// Today's `…Cleartext` names are read as given, so the form verbs' own `unlock(cleartexts)` and the like keep their bag.
+/** The cleartexts `params` hands its gating, in the names its body takes: a form's secret fields, taken out of it, or a dna's fields, renamed by `dnaCheck`. */
+function handedCleartextsOf(params: unknown, dnaCheck: DnaCheck): HandedCleartexts {
+  if (params instanceof FormData) { return dnaCheck.parse(takeSecretFields(params)) }
+  if (isInCleartextNames(params)) { return params as HandedCleartexts }
+  return dnaCheck.parse(params)
+}
+
+// React keeps an action's FormData as the form's status (`useFormStatus().data`) and in the action's queued update; a
+// field deleted before the action's first await is in neither.
+/** The text of each of `form`'s {@link FormSecretFieldnames}, by fieldname, each deleted from `form`, used or not. */
+function takeSecretFields(form: FormData): Partial<Record<typeof FormSecretFieldnames[number], unknown>> {
+  const taken: Partial<Record<typeof FormSecretFieldnames[number], unknown>> = {}
+  for (const fieldname of FormSecretFieldnames) {
+    const val = form.get(fieldname)
+    form.delete(fieldname)
+    if (val !== null) { taken[fieldname] = val }
+  }
+  return taken
+}
+
+/** True of an object that names any field `…Cleartext`: cleartexts in the names a gating's body takes. */
+function isInCleartextNames(params: unknown): boolean {
+  return (typeof params === 'object') && (params !== null) && Object.keys(params).some((fieldname) => fieldname.endsWith('Cleartext'))
 }
 
 // Every object kept is the gating's own, its fields read once here, so nothing a vacate reaches can be a host's getter.

@@ -5,7 +5,6 @@ import { useGivenBank, useGivenGiver } from '../giver/giver-context'
 import type { BankGiver, ReactGiver } from '../giver/react-giver'
 import { PassphraseInput } from '../parts/passphrase-input'
 import { SubmitButton } from '../parts/submit-button'
-import { formActionOf } from './form-action'
 import { KitPhrases, refusalTextOf } from './phrases-kit'
 import { UsernameField } from './unlock-form'
 import { useNewPassphrase } from './use-new-passphrase'
@@ -24,6 +23,7 @@ export interface CreateVaultFormProps {
 
 /** The form that creates the vault, for stage `unborn`: a new passphrase with the strength checker's verdict beside it, and the passphrase again to confirm it.
  * Its submit stays disabled until the passphrase is strong and the two match. The bank is left unlocked.
+ * A refused attempt leaves what was typed, for the user to correct; a stored one empties the form.
  * The passphrase never reaches React's state or the mutation's variables.
  * @example
  *   case 'unborn': return <CreateVaultForm username={user.email} />
@@ -34,18 +34,18 @@ export function CreateVaultForm({ giver: giverProp, bank: bankProp, username }: 
   const birth = bank.useBirth()
   const newPassphrase = useNewPassphrase(giver)
   const alertId = useId()
-  const birthAction = formActionOf(birth, ['passphrase', 'confirmation'], ({ passphrase }) => ({ passphraseCleartext: passphrase }))
 
   /** Birth the bank under the form's passphrase, handing focus back to its field on a refusal. */
   async function action(form: FormData) {
-    if (! await birthAction(form)) { newPassphrase.field.ref.current?.focus() }
+    await birth.attempt(form)
+    if (birth.wasRefused()) { newPassphrase.field.ref.current?.focus() }
   }
 
   const isRefused = (birth.error !== null)
   return (
-    <form className="sok-create-vault-form" action={action} onReset={newPassphrase.forget}>
+    <form className="sok-create-vault-form" action={action} onReset={(event) => { birth.keepTextIfRefused(event, newPassphrase.forget) }}>
       <p>{KitPhrases.createBlurb}</p>
-      {(username !== undefined) && <UsernameField username={username} />}
+      <UsernameField username={username} />
       <PassphraseInput
         {...newPassphrase.field}
         name="passphrase"
