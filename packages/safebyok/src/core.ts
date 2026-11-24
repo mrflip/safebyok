@@ -1,4 +1,4 @@
-// safebyok/core: the device, bank, gate, wayin and lease, the gate's form verbs and the methods that seal the bank's boxes and
+// safebyok/core: the device, its world, bank, gate, wayin and lease, the gate's form verbs and the methods that seal the bank's boxes and
 // put its Things, and every type their signatures name; no caching, so neither the VaultMinder nor TanStack Query. Private
 // while it is built. The proving classes are exported as types alone: a proving's `buildLease` is public, and a proving is
 // built only in a form verb's gating, which hands it to the gate's private verbs.
@@ -7,6 +7,7 @@ export { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from './m
 export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
 export { BaseBox } from './models/base-box'
 export { Gate } from './models/gate'
+export { World } from './models/world'
 export { type Adoptable, Thing } from './models/thing'
 export { Lease, withoutSecrets } from './models/lease'
 export type { Novel, PasskeyProving, PassphraseProving, Proving } from './models/proving'
@@ -30,13 +31,13 @@ export type { Agerank, ItemSeen, Liveness, VaultAgedEvent, VaultEvent, VaultEven
 export { type DevicePersisters, type PersistedClient, type Persister, type PersisterOfBank, MemoryPersister, isPersister } from './storage/persister'
 export {
   type BadNews, type BadNewsHandler, type BankAskDraft, type BankOpts, type BankSnapshot, type BankStage, type BoxUnsealed, type DeviceJSON, type DeviceOpts, type DeviceRecord,
-  type DeviceSnapshot, type HostedVault, type RefusalSnapshot,
+  type DeviceSnapshot, type HostedVault, type RefusalSnapshot, type WorldOpts,
   BankishChecks, DefaultBanklabel, PendingBank, SignedOutBank, bankStageVals,
 } from './shapes/shapes-bankish'
 export {
   type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateGatingFriend, type GateOpts, type GateRevisionedStamp, type GatingCleartexts, type GuardedKeyDeriver,
   type GuardedStrengthChecker, type HandedCleartexts, type LeaseGate, type LeaseOpts, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type ProvedCleartexts, type ProvingDevice,
-  type ProvingOpts, type ProvingParts, type ReplacePassphraseDna, type RevokePasskeyDna, type SecretFieldname, type StrengthChecker, type UnlockCleartexts, type UnlockDna, CleartextChecks,
+  type ProvingOpts, type ProvingParts, type ReplacePassphraseDna, type RevokePasskeyDna, type SecretFieldname, type StrengthChecker, type UnlockCleartexts, type UnlockDna, type WorldGateFriend, CleartextChecks,
   FormSecretFieldnames, GateishChecks, GatingChecks,
 } from './shapes/shapes-gateish'
 export {

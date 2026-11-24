@@ -2,7 +2,7 @@ import { describe, expect, it, type Mock, vi } from 'vitest'
 import type { Deriver } from 'safebyok-big/internals'
 import { Consts, Crypto, Errors, GX, Phrases } from 'safebyok-big/internals'
 import { BaseBox } from '../../src/models/base-box'
-import { Gate } from '../../src/models/gate'
+import type { Gate } from '../../src/models/gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
 import type { ProvingDevice } from '../../src/shapes/shapes-gateish'
 import type { StampedGate } from '../../src/shapes/shapes-stamps'
@@ -54,7 +54,7 @@ async function gateWithPassphrase(): Promise<Gate> {
 /** The gate of `record`, of {@link TH.WorldBankStamp}'s bank. */
 function gateOf(record: unknown): Gate {
   const device = TH.makeDevice()
-  return Gate.make(record as never, { device, bankStamp: TH.WorldBankStamp })
+  return device.world.makeGate(record as never, TH.WorldBankStamp)
 }
 
 /** The arguments of a proving of `gate`, under a bank's stamp and a gate's stamp each moved by `moves`: the stamps a Gate would refuse to be made under. */

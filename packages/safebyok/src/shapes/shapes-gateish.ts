@@ -11,7 +11,7 @@ import type { Gating } from '../models/gating'
 import type { Lease } from '../models/lease'
 import type { Proving, guardKeyDeriver } from '../models/proving'
 import type { Wayin } from '../models/wayin'
-import type { BankScope, BankStamp, GateStamp } from './shapes-stamps'
+import type { BankScope, BankStamp, GateStamp, LeaseStamp } from './shapes-stamps'
 import { BankChecks, GateChecks } from './shapes-thingkinds'
 import { type GateRecord, ThingChecks } from './shapes-thing'
 import type { PutAskDraft } from './shapes-asks'
@@ -109,14 +109,14 @@ export type AddPasskeyDna = { passphrase: string, nextPasskeyAnswer: GX.PasskeyA
 export type RevokePasskeyDna = { passphrase?: string | undefined, passkeyAnswer?: GX.PasskeyAnswer | null | undefined }
 // --
 
-// == [Given to a gating]: BirthGatingFriend, GateGatingFriend
+// == [Given to a gating]: BirthGatingFriend, GateGatingFriend, WorldGateFriend
 
-/** The gate's private unlock, for {@link Bank.birth}'s gating to call on the gate it makes, and the attaching of the bank it births to whoever made the gating. Internal. */
+/** The gate's private lease building, for {@link Bank.birth}'s gating to call on the gate it makes, and the attaching of the bank it births. Internal. */
 export interface BirthGatingFriend {
-  /** Unlock `gate` under a lease `proving` builds, citing the revision `gate` models. */
-  unlockByProving: (gate: Gate, proving: Proving) => Promise<Gate>
-  /** Hand `bank`, just born, to whoever made the gating, to attach. */
-  attachBank:      (bank: Bank) => void
+  /** A lease `proving` builds for `gate`, citing the revision `gate` models: the birth seals its root box under it. */
+  leaseByProving: (gate: Gate, proving: Proving) => Promise<Lease>
+  /** Hand `lease` to the world of `bank`, just born, and `bank` to whoever made the gating, to attach. */
+  attachBank:     (bank: Bank, lease: Lease) => void
 }
 
 /** A gate's private verbs, for its form verbs' gatings to call. Internal. */
@@ -125,6 +125,16 @@ export interface GateGatingFriend {
   unlockByProving: (proved: Proving) => Promise<Gate>
   /** Write the gate's next revision, and model the revision written. */
   putGate:         (ask: PutAskDraft<GateRecord>) => Promise<Gate>
+}
+
+/** A world's lease verbs, for each gate it makes to call. Internal. */
+export interface WorldGateFriend {
+  /** The world as a lease granted under `bankStamp` reads it back. */
+  leaseGateOf: (bankStamp: BankStamp) => LeaseGate
+  /** The `born_at` of the world's lease, which a renewal keeps, or null while locked. */
+  renewal:     () => Pick<LeaseStamp, 'born_at'> | null
+  /** Attach `lease` in place of the world's lease, resuming every call waiting for an `unlock` gating. Refuses on a disabled world. */
+  attachLease: (lease: Lease) => void
 }
 // --
 
@@ -179,15 +189,24 @@ export interface ProvingOpts {
 
 // == [What a lease is handed]: LeaseGate, SecretFieldname, LeaseOpts
 
-/** The part of its gate a lease uses: its bank's stamp, its `lock` (called when the bankKey will not unwrap), and whether it is enabled. */
-export type LeaseGate = Pick<Gate, 'bankStamp' | 'lock' | 'isEnabled' | 'demandEnabled'>
+/** What a lease reads back of the world it is granted in: its bank's stamp, the world's `lock` (called when the bankKey will not unwrap), and whether the world is enabled. */
+export interface LeaseGate {
+  /** The stamp of the bank the lease was granted under, fixed for the lease's life. */
+  readonly bankStamp: BankStamp
+  /** True until the world is swept or its device ends. */
+  readonly isEnabled: boolean
+  /** Lock the world, dropping its lease. */
+  lock:          () => void
+  /** Throw unless the world is enabled. */
+  demandEnabled: () => void
+}
 
 /** A field that contains a cleartext or a sealed part: `whisper`, or any name ending `_sealed`. */
 export type SecretFieldname = 'whisper' | `${string}_sealed`
 
 /** The options of {@link Lease.make}, beside its record. */
 export interface LeaseOpts {
-  /** The gate the lease is granted to. */
+  /** The world the lease is granted in, as the lease reads it back. */
   gate: LeaseGate
 }
 // --

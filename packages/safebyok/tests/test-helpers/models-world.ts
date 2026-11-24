@@ -13,7 +13,6 @@ import { Consts, Crypto, GX, SX } from 'safebyok-big/internals'
 import { anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testing'
 import { Bank } from '../../src/models/bank'
 import { Device } from '../../src/models/device'
-import { Gate } from '../../src/models/gate'
 import { Gating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
 import type { Vault } from '../../src/models/vault'
@@ -157,9 +156,9 @@ export async function buildBornBank({ passkeyCleartext, device = makeDevice() }:
   }
 }
 
-/** Another Bank over the records a {@link buildBornBank} birth stored, locked, as a device's `signIn` makes one. Its device is not told of it. */
+/** Another Bank over the records a {@link buildBornBank} birth stored, as a device's `signIn` makes one. Its device is not told of it, and it shares that device's world: it is locked or unlocked as the world is. */
 export function makeStoredBank({ device, record, gateRecord }: Pick<BornBank, 'device' | 'record' | 'gateRecord'>): Bank {
-  const gate = Gate.make(gateRecord, { device, bankStamp: record })
+  const gate = device.world.makeGate(gateRecord, record)
   return Bank.make(record, { device, gate })
 }
 
@@ -239,7 +238,7 @@ export type FakeLeaseGate = LeaseGate & { lock: Mock<() => void> }
 /** A {@link FakeLeaseGate} whose bank's stamp is {@link WorldBankStamp}, as `overrides` moves it. */
 export function fakeLeaseGateOf(overrides: Partial<BankStamp> = {}): FakeLeaseGate {
   const gate = { bankStamp: { ...WorldBankStamp, ...overrides }, lock: vi.fn<() => void>(), isEnabled: true, demandEnabled: () => gate }
-  return gate as unknown as FakeLeaseGate
+  return gate
 }
 
 /** A test cheat: a lease `proving` builds, granted to `gate` and citing `cited`, beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */

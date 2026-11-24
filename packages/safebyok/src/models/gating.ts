@@ -151,22 +151,23 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
   const passkey0 = await passkeyProving?.buildWayin(passphraseProving) ?? null
   const bankRecord = Bank.makeRecord(bankStamp)
   const rootShell  = BoxChecks.liveOrShell.parse(Shell.of({ ...device.scope, labelpath: Labelpath.RootBox }))
-  // The root box is sealed under the lease of the gate the birth makes, and the bank stored is made with that gate,
-  // unlocked. Where the birth refuses, or the vaultDB's answer is broken, the gate is swept, and no bank holds it.
-  const gate = Gate.make(Gate.makeRecord({ ...gateStamp, wayins: { main, passkey0 } }), { device, bankStamp })
+  // The root box is sealed under the lease the birth builds, and the bank stored is made with the gate the birth makes.
+  // The lease reaches the device's world, unlocking it, only with the bank. Where the birth refuses, or the vaultDB's
+  // answer is broken, the lease is evicted, and the world is as it was.
+  const gate  = device.world.makeGate(Gate.makeRecord({ ...gateStamp, wayins: { main, passkey0 } }), bankStamp)
+  const lease = await friend.leaseByProving(gate, passphraseProving)
   try {
-    await friend.unlockByProving(gate, passphraseProving)
-    const root   = await gate.seal(BaseBox, rootShell, { sidecar: {} }, { whisper: {} })
+    const root   = await lease.seal(BaseBox, rootShell, { sidecar: {} }, { whisper: {} })
     // The roots it answers, written or found stored, are then the bank's world in the device's BankMinder.
     const answer = await device.bankMinder.tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gate.pickle(), root, bank_lifetok: bankRecord.lifetok })
     if (! answer.ok) { throw answer.err }
     // The user must hear that their passphrase was not set: the bank stored is another's.
     if (answer.val.bank.revtok !== bankRecord.revtok) { throw Throwers.gateMadeElsewhere() }
     const bank = Bank.make(answer.val.bank, { device, gate })
-    friend.attachBank(bank)
+    friend.attachBank(bank, lease)
     return bank
   } catch (err) {
-    gate.sweep()
+    lease.evict()
     throw err
   }
 }

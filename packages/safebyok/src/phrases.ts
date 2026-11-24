@@ -1,6 +1,6 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, SortedVaultDBExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, BankNotBroughtUp, NobodySignedIn, GateSwept, UnlockDismissed, HostedVaultExpected, BoxSoonestBare
+// == [Models]: VaultDBExpected, SortedVaultDBExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, BankNotBroughtUp, NobodySignedIn, UnlockDismissed, HostedVaultExpected, BoxSoonestBare
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
@@ -28,9 +28,6 @@ export const BankNotBroughtUp = "This device's bank is not brought up yet: call 
 
 /** A call that needs a user, on a device nobody is signed in to. */
 export const NobodySignedIn = "Nobody is signed in on this device: call `signIn` with the user's id first."
-
-/** A call on a gate after its sweep. */
-export const GateSwept = "This gate was swept, so it answers nothing more: make its bank again with Bank.make."
 
 /** A call that waited for an `unlock` gating, when the wait was dismissed. */
 export const UnlockDismissed = 'The unlock was dismissed, so the bank stayed locked and the call waiting on it was not made: try again when you want it.'

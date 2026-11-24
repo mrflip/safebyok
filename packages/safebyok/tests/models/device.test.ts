@@ -566,13 +566,14 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     expect(snapshots[0]!.bank).to.include({ stage: 'locked' })
   })
 
-  it("shows its own bank still when another bank is made over the same vaultDB, which it is not told of", async () => {
+  it("shows its own bank still when another bank is made over the same vaultDB, which it is not told of, and which shares its world", async () => {
     const born = await TH.buildBornBank()
     const { bank, device } = born
-    const other = TH.makeStoredBank(born)
     const snapshots = snapshotsOf(device)
-    other.lock()
+    const other = TH.makeStoredBank(born)
     expect(snapshots).to.have.lengthOf(0)
+    other.lock()
+    expect(bank.isLocked).to.be.true
     expect(device.getSnapshot().bank).to.equal(bank.getSnapshot())
     expect(device.bank).to.equal(bank)
   })

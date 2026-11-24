@@ -5,6 +5,7 @@ import { CX, type Deriver, type EX, type Errors, type Logger, Validator } from '
 import type { Bank } from '../models/bank'
 import type { DefaultOnBadNews, Device } from '../models/device'
 import type { Gate } from '../models/gate'
+import type { World } from '../models/world'
 import type { VaultDB } from '../storage/vault-db'
 import type { DevicePersisters } from '../storage/persister'
 import type { StrengthChecker } from './shapes-gateish'
@@ -28,7 +29,7 @@ export type BoxUnsealed = UnsealedOf<BoxRecord, BoxCleartexts>
 export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent }>
 // --
 
-// == [The bank's making]: BankOpts, HostedVault
+// == [The bank's making]: BankOpts, WorldOpts, HostedVault
 
 /** The options of {@link Bank.make}, beside its record. */
 export interface BankOpts {
@@ -38,10 +39,16 @@ export interface BankOpts {
   gate:    Gate
 }
 
+/** The options of {@link World.make}. */
+export interface WorldOpts {
+  /** The device the world is made with. */
+  device: Device
+}
+
 // `safebyok/core` carries no caching, so the bank knows its vaults by this method alone, not by the Vault class.
-/** A vault a bank hosts: the bank's sweep sweeps it. */
+/** A vault a world hosts: the world's sweep sweeps it. */
 export interface HostedVault {
-  /** End the vault, as its bank ends. */
+  /** End the vault, as its world ends. */
   sweep(): unknown
 }
 // --

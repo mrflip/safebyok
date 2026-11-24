@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Crypto, Errors } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
 import { type BadNews, bankStageVals } from '../../src/shapes/shapes-bankish'
-import { Gate } from '../../src/models/gate'
+import type { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import type { LiveOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
 import { Labelpath, Lifeseq } from '../../src/shapes/primitives'
@@ -85,15 +85,16 @@ describe("Bank.makeRecord(stamp)", () => {
   })
 })
 
-/** A locked gate made from the main gate `born` stored, for the bank stamped `bankStamp`, or `born`'s own bank by default. */
+/** A gate made by the world of `born`'s device from the main gate `born` stored, for the bank stamped `bankStamp`, or `born`'s own bank by default. */
 function makeStoredGate(born: TH.BornBank, bankStamp: BankStamp = born.record): Gate {
-  return Gate.make(born.gateRecord, { device: born.device, bankStamp })
+  return born.device.world.makeGate(born.gateRecord, bankStamp)
 }
 
 describe("Bank.make(record, { device, gate })", () => {
-  it("makes a bank of the record with the gate given as its main gate, on the device, locked as its gate is", async () => {
+  it("makes a bank of the record with the gate given as its main gate, on the device, locked as its device's world is", async () => {
     const born = await TH.buildBornBank()
     const { record, device } = born
+    device.lock()
     const gate = makeStoredGate(born)
     const bank = Bank.make(record, { device, gate })
     expect(bank.isLocked).to.be.true
@@ -208,7 +209,7 @@ describe("Bank.make(record, { device, gate })", () => {
   it("refuses a bank whose world its device's BankMinder has not heard of", async () => {
     const born = await TH.buildBornBank()
     const device = TH.makeDevice({}, { vaultDB: born.device.vaultDB })
-    const gate = Gate.make(born.gateRecord, { device, bankStamp: born.record })
+    const gate = device.world.makeGate(born.gateRecord, born.record)
     TH.expectSyncRefusal(() => Bank.make(born.record, { device, gate }), 'record_conflict')
   })
 

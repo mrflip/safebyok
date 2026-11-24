@@ -23,12 +23,13 @@ async function storedGateOf(bank: Bank): Promise<GateRecord> {
   return answer.val as GateRecord
 }
 
-/** A {@link TH.buildBornBank} bank, locked, beside a second Bank object over the same stored bank, which writes as another device would. */
+/** A {@link TH.buildBornBank} bank, locked, beside the bank of a second device over the same vaultDB, which writes as another device does. */
 async function bankAndElsewhere(given: TH.BornBankGiven = {}) {
   const born = await TH.buildBornBank(given)
   born.bank.lock()
-  const elsewhere = TH.makeStoredBank(born)
-  return { ...born, elsewhere }
+  const device = TH.makeDevice({}, { vaultDB: born.device.vaultDB })
+  await device.signIn(TH.WorldScope.userid)
+  return { ...born, elsewhere: device.bank! }
 }
 
 /** A {@link TH.buildBornBank} bank, locked, on a device whose key deriver is watched: `deriveKeyBytes` is called for each derivation from the birth on. */

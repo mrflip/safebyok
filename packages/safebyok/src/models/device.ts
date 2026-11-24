@@ -2,15 +2,15 @@ import type { QueryClient } from '@tanstack/query-core'
 import { isEqual } from 'es-toolkit'
 import { Consts, Deriver, Errors, type GX, Helpers, Logger, Outcome, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
-import { Gate } from './gate'
 import { PlainThing } from './plain-thing'
 import type { BirthGating } from './gating'
 import { Proving, guardKeyDeriver } from './proving'
 import { Vault } from './vault'
+import { World } from './world'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import { BankMinder } from '../minding/bank-minder'
 import { VaultMinder } from '../minding/vault-minder'
-import { type BadNewsHandler, type BankAskDraft, type BankSnapshot, type DeviceJSON, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, type RefusalSnapshot, BankishChecks, PendingBank, SignedOutBank } from '../shapes/shapes-bankish'
+import { type BadNewsHandler, type BankAskDraft, type DeviceJSON, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, type RefusalSnapshot, BankishChecks, PendingBank } from '../shapes/shapes-bankish'
 import { type BankRoots, type GetAsk, type ListAsk, getAskOf, listAskOf } from '../shapes/shapes-asks'
 import { type MaskedView, type MaskedViewLease, type MinderFriend, EmptyMaskedView, MinderChecks } from '../shapes/shapes-minder'
 import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
@@ -27,7 +27,7 @@ import * as Throwers from '../refusals/throwers'
 /** How long a lease lasts when the host gives no `autolockMinutes`: fourteen days. */
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
-/** This browser, before and after anyone signs in: the host's functions, guarded, the minders, and the signed-in user's bank and vault.
+/** This browser, before and after anyone signs in: the host's functions, guarded, the minders, its world, and the signed-in user's bank and vault.
  * Make it with `Device.make(record, opts)`, which does no I/O, touches no browser global and subscribes to nothing; call
  * `hello()` to start it, and `signIn(userid)` once the host knows who is signed in, which restores that user's caches
  * from the host's persisters. Its snapshot's stage is `'signed_out'` until then, `'starting'` while it restores the
@@ -37,7 +37,7 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
  * reloading the page.
  */
 export class Device implements MinderFriend {
-  // == [Props]: banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #persisters, #bankMinder, #minder, #userid, #sortedVaultDB, #bank, #vault, #broughtUp, #banklessSnapshot, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
+  // == [Props]: banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #persisters, #bankMinder, #minder, #world, #userid, #bank, #vault, #broughtUp, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
 
   /** The label of the bank this device serves each user. */
   readonly banklabel:          Banklabel
@@ -60,18 +60,16 @@ export class Device implements MinderFriend {
   readonly #bankMinder: BankMinder
   /** The minder of the signed-in user's boxes, made with the device, which is its friend. */
   readonly #minder: VaultMinder
+  /** The world of the signed-in user's bank, made with the device. */
+  readonly #world: World
   /** The user signed in on this device, from `signIn`. Null until then. */
   #userid: Userid | null = null
-  /** The signed-in user's bank's records, sorted, over {@link vaultDB}, which the two minders share: made at `signIn`, null until then. */
-  #sortedVaultDB: SortedVaultDB<PlainThing> | null = null
   /** The signed-in user's bank, from when the device finds it stored or a birth on this device makes it. Null until then. */
   #bank:  Bank | null = null
   /** The vault of the bank's boxes, made with the bank. */
   #vault: Vault | null = null
   /** What `signIn` resolves, once it has been called. */
   #broughtUp: Promise<void> | null = null
-  /** The bank snapshot shown while the device has no bank: {@link SignedOutBank}, then {@link PendingBank} from `signIn`, then `'unborn'` or `'failed'` as it finds. */
-  #banklessSnapshot: BankSnapshot = SignedOutBank
   // Nothing ends a device yet: its sweep ends only its banks.
   /** Why the device ended, or null while it is enabled. */
   #endCause:   Errors.VaultError | null = null
@@ -92,7 +90,7 @@ export class Device implements MinderFriend {
   }
   // --
 
-  // == [Getters]: userid, scope, autolockMinutes, bankMinder, vaultTsqClient, minder, bank, vault, getSnapshot, subscribe
+  // == [Getters]: userid, scope, autolockMinutes, bankMinder, vaultTsqClient, minder, world, bank, vault, getSnapshot, subscribe
 
   /** The user signed in on this device, or null until `signIn`. */
   get userid(): Userid | null { return this.#userid }
@@ -121,6 +119,9 @@ export class Device implements MinderFriend {
     return this.#minder
   }
 
+  /** The world of the signed-in user's bank: what locks, unlocks and ends it, and holds its lease. The same one from `Device.make` on. */
+  get world(): World { return this.#world }
+
   /** The signed-in user's bank, or null until the device finds it stored or a birth on this device makes it. */
   get bank(): Bank | null { return this.#bank }
 
@@ -128,7 +129,7 @@ export class Device implements MinderFriend {
   get vault(): Vault | null { return this.#vault }
 
   /** This device's snapshot getter, already bound, as `useSyncExternalStore` wants it.
-   * It returns the same frozen object until something in the snapshot changes. The snapshot includes the bank's, so one
+   * It returns the same frozen object until something in the snapshot changes. The snapshot includes the world's, so one
    * subscription here hears every change to either.
    */
   get getSnapshot(): () => DeviceSnapshot { return this.#getSnapshot }
@@ -159,7 +160,9 @@ export class Device implements MinderFriend {
     // The roots cache in a minder of their own: the main gate's wrapped bankKeys stay out of the client a host observes.
     this.#bankMinder = BankMinder.make({}, this)
     this.#minder = VaultMinder.make({ queryCacheOpts }, this)
+    this.#world = World.make({ device: this })
     this.#snapshot = this.#makeSnapshot()
+    this.#world.subscribe(this.#align)
     if (Deriver.isTestDeriver(keyDeriver)) { this.logger.warn(PhrasesX.TestDeriverNotice, { oplabel: 'Device.make' }) }
     Object.freeze(this)
   }
@@ -204,8 +207,7 @@ export class Device implements MinderFriend {
     checkSecureContext()
     if (this.#broughtUp !== null) { return this.#broughtUp }
     this.#userid = signedIn
-    this.#banklessSnapshot = PendingBank
-    this.#align()
+    this.#world.showStandIn(PendingBank)
     this.#broughtUp = this.#bringUp(this.#bankMinder, this.#minder)
     return this.#broughtUp
   }
@@ -241,7 +243,7 @@ export class Device implements MinderFriend {
       await this.#restore(bankMinder, this.#persisters?.roots)
       await this.#restore(minder, this.#persisters?.boxes)
       const sortedVaultDB = SortedVaultDB.make(this.scope, { vaultDB: this.vaultDB, makeThing: (seen) => PlainThing.make(seen) })
-      this.#sortedVaultDB = sortedVaultDB
+      this.#world.hello(sortedVaultDB)
       bankMinder.hello(sortedVaultDB)
       minder.hello(sortedVaultDB)
       const cached = bankMinder.worldAt()
@@ -249,8 +251,7 @@ export class Device implements MinderFriend {
       const world = await bankMinder.fetchWorld()
       if (this.#bank !== null) { return }
       if ((world === null) || (! Bank.isLive(world.bank))) {
-        this.#banklessSnapshot = Object.freeze({ ...PendingBank, stage: 'unborn' })
-        this.#align()
+        this.#world.showStandIn(Object.freeze({ ...PendingBank, stage: 'unborn' }))
         return
       }
       this.#attachWorld(world)
@@ -259,33 +260,30 @@ export class Device implements MinderFriend {
         this.tellBadNews([err])
         return
       }
-      this.#banklessSnapshot = Object.freeze({ ...PendingBank, stage: 'failed', lastErr: refusalSnapshotOf(err) })
-      this.#align()
+      this.#world.showStandIn(Object.freeze({ ...PendingBank, stage: 'failed', lastErr: refusalSnapshotOf(err) }))
     }
   }
 
   // Gate.make checks the gate and Bank.make the root box: a tombstone of either refuses.
   /** Make the bank of `world`, and its main gate, this device's bank. */
   #attachWorld(world: BankRoots): void {
-    const gate = Gate.make(world.gate, { device: this, bankStamp: world.bank })
+    const gate = this.#world.makeGate(world.gate, world.bank)
     this.#attachBank(Bank.make(world.bank, { device: this, gate }))
   }
 
-  // The bank's own sweep clears its subscribers, so nothing here unsubscribes.
   /** Make `bank` this device's bank. */
   #attachBank(bank: Bank): void {
     this.#bank  = bank
     this.#vault = Vault.make(bank, this.minder)
-    bank.subscribe(this.#align)
-    this.#align()
+    this.#world.showBank()
   }
   // --
 
   // == [Locking]: lock
 
-  /** Lock the signed-in user's bank, if the device has one. Never throws. */
+  /** Lock the signed-in user's bank ({@link World.lock}). Never throws. */
   lock(): this {
-    this.#bank?.lock()
+    this.#world.lock()
     return this
   }
   // --
@@ -296,9 +294,9 @@ export class Device implements MinderFriend {
    * The device stays usable: it judges passphrases. Its snapshot shows the swept bank.
    */
   sweep(): this {
-    this.#bank?.sweep()
+    if (this.#bank !== null) { this.#world.sweep() }
     // The watch's stop is the host's vaultDB code: what it throws is news.
-    try { this.#sortedVaultDB?.sweep() } catch (err) { this.tellBadNews([err]) }
+    try { this.#world.sortedVaultDB?.sweep() } catch (err) { this.tellBadNews([err]) }
     return this
   }
   // --
@@ -315,7 +313,7 @@ export class Device implements MinderFriend {
 
   // == [Snapshot]: align, makeSnapshot
 
-  // An arrow, so it stays bound: the bank calls it as a subscriber.
+  // An arrow, so it stays bound: the world calls it as a subscriber.
   /** Remake the snapshot, and tell each subscriber if it changed. */
   readonly #align = (): void => {
     const next = this.#makeSnapshot()
@@ -330,9 +328,9 @@ export class Device implements MinderFriend {
     }
   }
 
-  /** A new snapshot of this device: its bank's snapshot, or the stand-in while it has none. */
+  /** A new snapshot of this device: its world's snapshot. */
   #makeSnapshot(): DeviceSnapshot {
-    return Object.freeze({ bank: this.#bank?.getSnapshot() ?? this.#banklessSnapshot })
+    return Object.freeze({ bank: this.#world.getSnapshot() })
   }
   // --
 
@@ -340,14 +338,14 @@ export class Device implements MinderFriend {
 
   // The bank TSQ is no devtool's to read whole: the gate's record has each wayin's wrapped bankKey, which an offline
   // guess at a passphrase is checked against. What leaves here is a copy, with every ciphertext masked, and of
-  // the lease only its loggable: the gate hands out no lease.
+  // the lease only its loggable: the world hands out no lease.
   /** The bank TSQ, the vault TSQ and the lease, masked for a devtool.
    * Each row has its key, its state, and a copy of its record or listing with each ciphertext masked. The lease shows its loggable and when it ends, never its key material.
    * For experimenting, never for an app's own logic: what it answers may change without notice. Before `signIn`, it answers {@link EmptyMaskedView}.
    */
   maskedView(): MaskedView {
     if (this.#userid === null) { return EmptyMaskedView }
-    return { bankTSQ: this.#bankMinder.maskedRows(), vaultTSQ: this.#minder.maskedRows(), lease: maskedViewLeaseOf(this.#bank?.gate) }
+    return { bankTSQ: this.#bankMinder.maskedRows(), vaultTSQ: this.#minder.maskedRows(), lease: maskedViewLeaseOf(this.#bank === null ? undefined : this.#world) }
   }
   // --
 
@@ -425,10 +423,10 @@ function refusalSnapshotOf(err: unknown): RefusalSnapshot {
   return Object.freeze({ refusalkind, family, message })
 }
 
-/** The lease `gate` holds, as a devtool is shown it: its loggable and when it ends, or `active: false` for no gate, or one locked. */
-function maskedViewLeaseOf(gate: Gate | undefined): MaskedViewLease {
-  const loggable = gate?.leaseLoggable ?? null
-  const endsAt = gate?.leaseEndsAt ?? null
+/** The lease `world` holds, as a devtool is shown it: its loggable and when it ends, or `active: false` for no world, or one locked. */
+function maskedViewLeaseOf(world: World | undefined): MaskedViewLease {
+  const loggable = world?.leaseLoggable ?? null
+  const endsAt = world?.leaseEndsAt ?? null
   return ((loggable === null) || (endsAt === null)) ? EmptyMaskedView.lease : { active: true, ...loggable, ends_at: endsAt }
 }
 // --
