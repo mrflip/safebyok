@@ -23,7 +23,7 @@ import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
 /** A Thing of the signed-in user's bank, as its world makes one: the bank, a gate or a box. */
-export type WorldThing = Bank | Gate | Box
+export type SomeThing = Bank | Gate | Box
 
 /** The signed-in user's bank as this device locks, unlocks and ends it: its lease, the wait for an unlock, its end, and its snapshot.
  * Made with its device, it lives as long. Its gates build leases and hand them to it, and boxes are sealed and unsealed under the lease it holds, which no member hands out.
@@ -129,8 +129,8 @@ export class World {
   makeThing(seen: BankRecord): Bank
   makeThing(seen: GateRecord): Gate
   makeThing(seen: BoxRecord): Box
-  makeThing(seen: SeenThing): WorldThing
-  makeThing(seen: SeenThing): WorldThing {
+  makeThing(seen: SeenThing): SomeThing
+  makeThing(seen: SeenThing): SomeThing {
     const { labelpath } = SeenChecks.seenCited.parse(seen)
     Validator.checkedConsistent(StampChecks.bankScope.parse(seen), this.#device.scope, { kind: 'record_conflict' })
     const begun = BaseThing.isWhole(seen) ? seen : Shell.inParentLivesOf(seen)
@@ -426,7 +426,7 @@ const RootLabelpaths: ReadonlySet<Labelpath> = new Set(['bank', Labelpath.MainGa
 
 /** The class a world makes a Thing of one kind from, as {@link World.makeThing} calls it. */
 interface ThingClass {
-  make(record: Adoptable<ThingRecord>, opts: { device: Device }, friend: WorldGateFriend): WorldThing
+  make(record: Adoptable<ThingRecord>, opts: { device: Device }, friend: WorldGateFriend): SomeThing
 }
 
 // Read as a world makes a Thing, not as this module loads: the model modules import one another, and a class may not be
@@ -437,7 +437,7 @@ function thingClassOf(modelkind: Thingkind): ThingClass {
 }
 
 /** True of a Thing holding a live record; false of one holding the shell or a tombstone, and of none */
-function isLive<ThingT extends WorldThing>(thing: ThingT | null): thing is ThingT { return thing?.pickle().am === 'a' }
+function isLive<ThingT extends SomeThing>(thing: ThingT | null): thing is ThingT { return thing?.pickle().am === 'a' }
 
 /** What a snapshot shows of `err`: its refusal's kind, family and message, anything but a refusal as an unexpected error */
 function refusalSnapshotOf(err: unknown): RefusalSnapshot {

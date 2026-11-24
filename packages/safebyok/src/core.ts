@@ -8,7 +8,7 @@ export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, typ
 export { BaseBox } from './models/base-box'
 export { Box } from './models/box'
 export { Gate } from './models/gate'
-export { type WorldThing, World } from './models/world'
+export { type SomeThing, World } from './models/world'
 export { type Adoptable, Thing } from './models/thing'
 export { Lease, withoutSecrets } from './models/lease'
 export type { Novel, PasskeyProving, PassphraseProving, Proving } from './models/proving'
