@@ -2,6 +2,7 @@
 
 import { deepFreeze, noop } from 'es-toolkit'
 import { type EX, Errors, Outcome, type Helpers } from 'safebyok-big/internals'
+import { bulletproofHandlerOf } from '../helpers/bulletproof'
 import { Labelpath, type Lifetok } from '../shapes/primitives'
 import type { ThingRecord, VoidSentinel } from '../shapes/shapes-thing'
 import type { TombstoneOf } from '../shapes/shapes-sealers'
@@ -162,22 +163,17 @@ export abstract class AdapterVaultDB implements VaultDB {
    */
   watch(scope: ThingWatchScope, onNotice: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
     const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews })
+    // A notice handler that throws is a bug in the host's code, not trouble in storage.
+    const notify = bulletproofHandlerOf(onNotice, { ifError: 'tell', transformer: Throwers.refusalOfThrown, onBadNews })
     return this.doWatch(bankScope, ({ record, world }) => {
       let event: VaultItemEvent
-      // this is classifying and answer-ifying the event for every listener
       try {
         event = itemEventOf(deepFreeze(Classifier.watchedThingOf(bankScope, record)), world)
       } catch (err) {
         onBadNews(Outcome.storageRefusalOf(err))
         return
       }
-      // A notice handler that throws is a bug in the host's code, not trouble in storage.
-      try {
-        onNotice(event)
-      } catch (err) {
-        // is sanitizeForeignError appropriate over the ternary?
-        onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err))
-      }
+      notify(event)
     }, onBadNews)
   }
   // --

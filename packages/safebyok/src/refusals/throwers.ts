@@ -3,6 +3,7 @@
 // The rules for a refusal, its thrower and its phrase are at the top of safebyok-big's refusals/throwers.ts.
 
 import { Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
+import { unexpectedError } from 'safebyok-big/refusals/throwers'
 import * as Phrases from '../phrases'
 import { type ThingRecord } from '../shapes/shapes-thing'
 import { type GetAsk, type ListAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
@@ -12,6 +13,12 @@ import type { DamagedThing } from '../shapes/shapes-answers'
 
 // Re-exported, never redefined: a refusal is one class in both packages (notes/transition.md).
 export * from 'safebyok-big/refusals/throwers'
+// --
+
+// == [Outcome Throwers]: refusalOfThrown
+
+/** The refusal standing for what a function threw: a refusal as it is, anything else as `unexpected_error`, a bug in safebyok or in the host's own function. */
+export function refusalOfThrown(thrown: unknown): Errors.VaultError { return Errors.isVaultError(thrown) ? thrown : unexpectedError(thrown) }
 // --
 
 // == [Model Throwers]: bankSwept, signinUnanswered, nobodySignedIn, thingNotLive, unlockDismissed, gatingSpent, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, boxSoonestBare
