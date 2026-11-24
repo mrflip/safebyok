@@ -1,21 +1,12 @@
-/** What every giver supplies React Query: the sharing of a hook's query in the device's QueryClient, the defaults of a form verb's mutation in the host's, and the keys. */
+/** What every giver supplies React Query: the default `select` of a hook's query in the device's QueryClient, the defaults of a form verb's mutation in the host's, and the keys. */
 
-import { type QueryKey, replaceEqualDeep } from '@tanstack/react-query'
+import type { QueryKey } from '@tanstack/react-query'
 import {
   type GateRecord, type Gating, type LiveOf, type PasskeyWayinHeader, type Sparse, Thing, type ThingRecord, type Tombstone, type Userid, VaultTSQ, type WayinHeader, type WayinRecord,
 } from 'safebyok'
 import type { GateShown, HeaderedGate } from './react-giver'
 
-// == [Query defaults]: frozenOrSharedOf, liveOf
-
-// TanStack shares structure through this both between an item's values and between what a host's `select` returns from
-// them. An item's value is its Thing's own frozen record, or null, whose identity already changes only with the record;
-// so does a part of it, or a primitive, which a `select` may return. A new object a `select` makes each run is shared
-// with the last, so that a hook re-renders, and the host's memos run, only when what it selects changes.
-/** Structural sharing for a hook's query of a box: a frozen value or a primitive as it is, anything else shared with `prior` by TanStack's default, `replaceEqualDeep`. */
-export function frozenOrSharedOf(prior: unknown, next: unknown): unknown {
-  return Object.isFrozen(next) ? next : replaceEqualDeep(prior, next)
-}
+// == [Query defaults]: liveOf
 
 // A vault TSQ's item never has a sparse record. The case is here for a host's own select over a record it found
 // elsewhere.

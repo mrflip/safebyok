@@ -20,11 +20,11 @@ import { bankKeyHeadOf, labelsOf } from './query-keys'
 // == [VaultTSQ]: VaultTSQ
 
 // The writer, `#hear`, is the only code that changes an item or a listing: the queryFns answer what the Thing holds,
-// and nothing here shares structure or acts on a query's success.
+// and nothing here acts on a query's success.
 /** One bank's vault TSQ: its boxes under the root box, as items, and their listings, in a client it is handed.
  * An item is the box's own frozen record, the same object its Thing holds, or null where none is stored live. It has no
  * data while the box is known only sparse in its newest life. An item is stale while a newer revision is known only sparse.
- * A listing is the kids value a list last answered, invalidated once a child's life changes.
+ * A listing is the kids value a list last answered, kept while nothing observes it, and invalidated once a child's life changes.
  * Its queries never retry, and run whether or not the browser reports itself online.
  */
 export class VaultTSQ {
@@ -57,11 +57,13 @@ export class VaultTSQ {
     queryClient.setQueryDefaults([...bankHead, Itemkind], {
       queryFn:           async ({ queryKey }) => await this.#itemOf(labelpathOfItemKey(queryKey)),
       staleTime:         ({ queryKey }) => ((this.#vaultMinder.thingAt(this.#scopeOf(labelpathOfItemKey(queryKey)))?.agekind === 'here') ? Infinity : 0),
-      structuralSharing: false,
+      structuralSharing: frozenOrSharedOf,
     })
+    // A listing is kept nowhere but its query, so it stays while no one observes it.
     queryClient.setQueryDefaults([...bankHead, Listkind], {
       queryFn:   async ({ queryKey }) => await this.#vaultMinder.listOnce(labelpathOfListKey(queryKey)),
       staleTime: Infinity,
+      gcTime:    Infinity,
     })
     // Synchronous on purpose: the SortedVaultDB tells an answer's records before its verb resolves.
     this.#unlisten = vaultMinder.listen({ hear: (event) => { this.#hear(event) }, onBadNews })
@@ -197,7 +199,7 @@ export class VaultTSQ {
 }
 // --
 
-// == [Helpers]: Itemkind, Listkind, LabelsIdx, BankDefaults, isItemLabelpath, itemValOf, labelpathOfItemKey, labelpathOfListKey
+// == [Helpers]: Itemkind, Listkind, LabelsIdx, BankDefaults, frozenOrSharedOf, isItemLabelpath, itemValOf, labelpathOfItemKey, labelpathOfListKey
 
 /** The kind segment of an item's query key. */
 const Itemkind = 'item'
@@ -210,6 +212,15 @@ const LabelsIdx = 4
 // its caller. A retry would put a whizbang in the critical path of a primitive operation (CLAUDE.md).
 /** The query and mutation defaults under the bank's key. */
 const BankDefaults = Object.freeze({ networkMode: 'always', retry: false } as const)
+
+// TanStack shares structure through this both between an item's values and between what a host's `select` returns from
+// them. An item's value is its Thing's own frozen record, or null, whose identity already changes only with the record;
+// so does a part of it, or a primitive, which a `select` may return. A new object a `select` makes each run is shared
+// with the last, so that an observer is told, and a host's memos run, only when what it selects changes.
+/** Structural sharing for an item: a frozen value or a primitive as it is, anything else shared with `prior` by TanStack's default, `replaceEqualDeep`. */
+function frozenOrSharedOf(prior: unknown, next: unknown): unknown {
+  return Object.isFrozen(next) ? next : TSQ.replaceEqualDeep(prior, next)
+}
 
 /** True for the labelpath of a box under the root box: the Things an item is kept for. */
 function isItemLabelpath(labelpath: Labelpath): boolean { return Labelpath.isBox(labelpath) && (labelpath !== Labelpath.RootBox) }

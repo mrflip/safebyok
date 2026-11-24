@@ -43,8 +43,8 @@ function boxHeldIn({ sorted }: TSQWorld<MemoryVaultDB>) {
 describe("VaultTSQ.make", () => {
   it("sets its query and mutation defaults under the bank's key, and nothing outside it", async () => {
     const { queryClient } = await tsqWorldOf(new MemoryVaultDB())
-    expect(queryClient.getQueryDefaults(BoxKey)).to.include({ networkMode: 'always', retry: false, structuralSharing: false })
-    expect(queryClient.getQueryDefaults(VaultTSQ.listQueryKeyOf(TH.RootScope))).to.include({ networkMode: 'always', retry: false, staleTime: Infinity })
+    expect(queryClient.getQueryDefaults(BoxKey)).to.include({ networkMode: 'always', retry: false }).and.have.property('structuralSharing').that.is.a('function')
+    expect(queryClient.getQueryDefaults(VaultTSQ.listQueryKeyOf(TH.RootScope))).to.include({ networkMode: 'always', retry: false, staleTime: Infinity, gcTime: Infinity })
     expect(queryClient.getMutationDefaults(VaultTSQ.bankQueryKeyOf(TH.ThingBank))).to.deep.equal({ networkMode: 'always', retry: false })
     expect(queryClient.getQueryDefaults(VaultTSQ.itemQueryKeyOf({ ...TH.BoxScope, banklabel: 'other' }))).to.deep.equal({})
     expect(queryClient.getQueryDefaults(['todos'])).to.deep.equal({})
@@ -68,6 +68,19 @@ describe("VaultTSQ's keys", () => {
     expect(VaultTSQ.bankQueryKeyOf(TH.ThingBank)).to.deep.equal(['sok', 'u1', 'acme'])
     expect(VaultTSQ.itemQueryKeyOf(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'item', 'box', '/', 'openai', '!'])
     expect(VaultTSQ.listQueryKeyOf(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'list', 'box', '#', 'kids'])
+  })
+})
+
+describe("an item's structural sharing", () => {
+  it("keeps the Thing's own record as the item, and a select's equal result as the same object across revisions", async () => {
+    const world    = await worldWithBox()
+    const observer = new QueryObserver(world.queryClient, { queryKey: BoxKey, select: (record: unknown) => ({ labelpath: (record as { labelpath: string }).labelpath }) })
+    const stop     = observer.subscribe(noop)
+    const selected = observer.getCurrentResult().data
+    world.notify(noticeOf(Box1))
+    expect(world.queryClient.getQueryData(BoxKey)).to.eq(boxHeldIn(world)).and.deep.equal(Box1)
+    expect(observer.getCurrentResult().data).to.eq(selected).and.deep.equal({ labelpath: TH.BoxScope.labelpath })
+    stop()
   })
 })
 

@@ -13,7 +13,7 @@ import {
 import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
 import {
-  FormMutationDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, formMutationKeyOf, frozenOrSharedOf, gateShownOf, liveGateOf, liveOf,
+  FormMutationDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, formMutationKeyOf, gateShownOf, liveGateOf, liveOf,
 } from './giver-defaults'
 import { type Given, GiverContext } from './giver-context'
 import * as Phrases from './phrases-giver'
@@ -366,17 +366,17 @@ function makeBankGiver(friend: BankFriend) {
   }
 
   // Left with no queryFn, a query of the box's item fetches by the vault TSQ's default under the bank's key, which gets the
-  // box and answers what its Thing then holds. Its staleness and retries are the vault TSQ's defaults too.
+  // box and answers what its Thing then holds. Its staleness, retries and structural sharing are the vault TSQ's defaults too.
   /** {@link boxQueryOf}, less its `select`. */
-  function boxQueryBaseOf(device: Device | null, labelpath: string, isFetchable: boolean): Pick<UseQueryOptions<BoxShown>, 'queryKey' | 'queryFn' | 'initialData' | 'initialDataUpdatedAt' | 'structuralSharing'> {
+  function boxQueryBaseOf(device: Device | null, labelpath: string, isFetchable: boolean): Pick<UseQueryOptions<BoxShown>, 'queryKey' | 'queryFn' | 'initialData' | 'initialDataUpdatedAt'> {
     const boxLabelpath = boxLabelpathOf(labelpath)
     const userid = useridOf(device)
     if (! isFetchable || (device === null) || (userid === null)) {
-      return { queryKey: boxQueryKeyOf({ userid, banklabel, labelpath: boxLabelpath }), queryFn: skipToken, structuralSharing: frozenOrSharedOf }
+      return { queryKey: boxQueryKeyOf({ userid, banklabel, labelpath: boxLabelpath }), queryFn: skipToken }
     }
     // The vault TSQ keeps a box's item as a box record, or null.
     const { queryKey, initialData, initialDataUpdatedAt } = device.vaultTSQ.itemQueryOptions({ ...device.scope, labelpath: boxLabelpath }) as ItemQueryOptions & Readonly<{ initialData?: BoxShown }>
-    return { queryKey, structuralSharing: frozenOrSharedOf, ...((initialData !== undefined) && { initialData, initialDataUpdatedAt }) }
+    return { queryKey, ...((initialData !== undefined) && { initialData, initialDataUpdatedAt }) }
   }
 
   /** The `queryOptions` of the box at `labelpath`, for whoever is signed in when called: for a route loader or a prefetch.
@@ -452,12 +452,11 @@ function makeBankGiver(friend: BankFriend) {
   function useBoxList(): UseQueryResult<readonly string[]> {
     const { device, client } = useShown()
     const isFetchable = useBank(isFetchStage)
-    // A listing is kept nowhere but its query: collected while no hook observes it, a remount would list again.
+    // Its cache time is the vault TSQ's default: a listing collected while no hook observes it would list again at a remount.
     return useQuery<Kids, Error, readonly string[]>({
       queryKey: boxListQueryKeyOf({ userid: useridOf(device), banklabel }),
       ...((! isFetchable || (device === null)) && { queryFn: skipToken }),
       select:   hostLabelpathsOf,
-      gcTime:   Infinity,
     }, client)
   }
 
