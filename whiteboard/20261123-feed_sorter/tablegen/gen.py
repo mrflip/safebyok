@@ -11,11 +11,11 @@ life. A void counts as dead, and is treated as any whole record is. No chain giv
 A record's chunk is a small whole number naming the span of time it was read in, 0 where it is left out: the harness
 reads it at a read_tc whose first eight hexadecimal digits spell it.
 
-A scope's agerank is the joined string `life|high|item|time`: `life`, `high` and `item` each spelled as a lifeseq is, in
-ten base-32 digits with -1 as `-000000001`, `high` the highest revision known of in that life, `item` the highest of a
-whole record seen in it, -1 for none; `time` the chunk the highest revision was last seen in, in eight hexadecimal
+A scope's agerank is the joined string `life|high|item|tcchunk`: `life`, `high` and `item` each spelled as a lifeseq is,
+in ten base-32 digits with -1 as `-000000001`, `high` the highest revision known of in that life, `item` the highest of a
+whole record seen in it, -1 for none; `tcchunk` the chunk the highest revision was last seen in, in eight hexadecimal
 digits. Two ageranks compare as text. A record is taken by preparing the agerank it would leave and comparing the two
-strings. The time belongs to the newest revision: a record of another life, or above `high`, brings its own; one at
+strings. The tcchunk belongs to the newest revision: a record of another life, or above `high`, brings its own; one at
 `high` brings the later of its own and the one before; any other keeps the one before. So a record seen again at the
 newest revision in a later chunk is taken, and returns its item. It reads as here where high and item are equal, bare
 where item is -1, and cold otherwise. A row's `agerank` is the one its chain leaves the scope at: at a root's scope it
@@ -26,7 +26,7 @@ Run: python3 gen.py > table.ts.txt
 import itertools, sys
 
 def timed(p, t):
-  """`p` read in chunk `t`: chunk 0 is left out, so a row at chunk 0 reads as it did before times."""
+  """`p` read in chunk `t`: chunk 0 is left out, so a row at chunk 0 reads as it did before tcchunks."""
   return p if t == 0 else p + (t,)
 VOID = ("void", -1, -1)
 def S(l, r, t=0): return timed(("soon", l, r), t)
@@ -43,24 +43,24 @@ def padded(n):
   out = ""
   while n: out = DIGITS[n % 32] + out; n //= 32
   return out.rjust(10, "0")
-def agerankOf(life, high, item, time): return "|".join([padded(life), padded(high), padded(item), format(time, "08x")])
+def agerankOf(life, high, item, tcchunk): return "|".join([padded(life), padded(high), padded(item), format(tcchunk, "08x")])
 def partsOf(agerank):
-  life, high, item, time = agerank.split("|")
-  return (int(life, 32), int(high, 32), int(item, 32), int(time, 16))
+  life, high, item, tcchunk = agerank.split("|")
+  return (int(life, 32), int(high, 32), int(item, 32), int(tcchunk, 16))
 
 # == the principles
 def isWhole(p): return p[0] != "soon"
 
-def raisedOf(was, p):
-  """The agerank `p` raises `was` to, or None where it raises nothing: prepare the agerank `p` would leave, then compare."""
+def nextAgerankOf(was, p):
+  """The agerank `p` moves `was` up to, or None where it is not news: prepare the agerank `p` would leave, then compare."""
   kind, life, rev = p[:3]
   t = chunkOf(p)
-  lifeWas, high, item, time = partsOf(was) if was else (None, -1, -1, None)
-  if life != lifeWas: high, item, time = -1, -1, None
-  # The time belongs to the newest revision: when it was last seen.
-  if time is None or rev > high: time = t
-  elif rev == high: time = max(time, t)
-  agerank = agerankOf(life, max(high, rev), max(item, rev) if isWhole(p) else item, time)
+  lifeWas, high, item, tcchunk = partsOf(was) if was else (None, -1, -1, None)
+  if life != lifeWas: high, item, tcchunk = -1, -1, None
+  # The tcchunk belongs to the newest revision: when it was last seen.
+  if tcchunk is None or rev > high: tcchunk = t
+  elif rev == high: tcchunk = max(tcchunk, t)
+  agerank = agerankOf(life, max(high, rev), max(item, rev) if isWhole(p) else item, tcchunk)
   return agerank if (was is None or agerank > was) else None
 
 def tagOf(agerank):
@@ -83,10 +83,10 @@ def streamOf(agerank, chain):
   """(the events `chain` returns from `agerank`, the agerank it ends at, each agerank taken along the way)."""
   events, taken = [], []
   for p in chain:
-    raised = raisedOf(agerank, p)
-    if raised is None: continue
-    events += eventsOf(agerank, raised, p)
-    agerank = raised
+    nextAgerank = nextAgerankOf(agerank, p)
+    if nextAgerank is None: continue
+    events += eventsOf(agerank, nextAgerank, p)
+    agerank = nextAgerank
     taken.append((agerank, p))
   return events, agerank, taken
 
@@ -116,14 +116,14 @@ def checkPrinciples():
       assert len(items) == len(set(items)), chain
       # A dead life, a void's among them, is always here.
       assert all(tagOf(a) == "here" for a, p in taken if p[0] == "void" or p[1] % 2 == 1), chain
-      # A record taken that raises only the time leaves the high and item as they were, and returns its item alone or with an aging.
+      # A record taken that moves only the tcchunk leaves the high and item as they were, and returns its item alone or with an aging.
       for (a, p), was in zip(taken, [None] + ranks):
         if was and a[:a.rindex("|")] == was[:was.rindex("|")]:
           assert [e[0] for e in eventsOf(was, a, p)] in (["item"], ["item", "aged"]), chain
-      # The time an agerank ends at is the latest chunk of the records at its life and highest revision.
+      # The tcchunk an agerank ends at is the latest chunk of the records at its life and highest revision.
       if taken:
-        life, high, _, time = partsOf(end)
-        assert time == max(chunkOf(p) for p in chain if p[1] == life and p[2] == high), chain
+        life, high, _, tcchunk = partsOf(end)
+        assert tcchunk == max(chunkOf(p) for p in chain if p[1] == life and p[2] == high), chain
       count += 1
   return count
 
@@ -205,7 +205,7 @@ TIMED_CHAINS = [  # hand-written chains from nothing, read across chunks, each w
   ([F(4, 4, 1), F(4, 3, 2), S(4, 3, 2)],                                      "a record below the highest, in a later chunk, returns nothing"),
   ([F(4, 2), S(4, 4), F(4, 2, 1), S(4, 4, 1)],                                "while cold: the revision of the item a chunk later returns nothing, the highest returns its item"),
   ([S(4, 3), S(4, 3, 1), F(4, 3, 1)],                                         "while bare: the soon a chunk later, then its full record in that chunk"),
-  ([F(4, 4, 2), F(4, 5, 1), F(4, 5, 2)],                                      "a newer revision read earlier than the last sighting: its time starts over at its own"),
+  ([F(4, 4, 2), F(4, 5, 1), F(4, 5, 2)],                                      "a newer revision read earlier than the last sighting: its tcchunk starts over at its own"),
   ([F(4, 4, 2), F(4, 5, 1), F(4, 4, 3)],                                      "an older revision read later returns nothing"),
   ([F(4, 4, 2), F(6, 0, 1)],                                                  "a later life read earlier"),
   ([F(6, 0, 1), F(4, 4, 2)],                                                  "an earlier life read later returns nothing"),

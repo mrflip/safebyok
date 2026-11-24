@@ -396,7 +396,7 @@
     agerank: '0000000004|0000000003|0000000003|00000001', blurb: 'while bare: the soon a chunk later, then its full record in that chunk' },
   { initial: Empty,    chain: [['full', 4, 4, 2], ['full', 4, 5, 1], ['full', 4, 5, 2]],
     streamed: [['item', 'full', 4, 4, 2], ['life', 'born', null, null, 4, 4], ['item', 'full', 4, 5, 1], ['item', 'full', 4, 5, 2]],
-    agerank: '0000000004|0000000005|0000000005|00000002', blurb: 'a newer revision read earlier than the last sighting: its time starts over at its own' },
+    agerank: '0000000004|0000000005|0000000005|00000002', blurb: 'a newer revision read earlier than the last sighting: its tcchunk starts over at its own' },
   { initial: Empty,    chain: [['full', 4, 4, 2], ['full', 4, 5, 1], ['full', 4, 4, 3]],
     streamed: [['item', 'full', 4, 4, 2], ['life', 'born', null, null, 4, 4], ['item', 'full', 4, 5, 1]],
     agerank: '0000000004|0000000005|0000000005|00000001', blurb: 'an older revision read later returns nothing' },
