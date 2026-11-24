@@ -548,28 +548,28 @@ describe("device.lock()", () => {
   })
 })
 
-describe("device.maskedView()", () => {
+describe("device.inspectable()", () => {
   it("answers EmptyMaskedView before signin", () => {
-    expect(TH.makeDevice({ userid: null }).maskedView()).to.equal(EmptyMaskedView)
+    expect(TH.makeDevice({ userid: null }).inspectable()).to.equal(EmptyMaskedView)
     expect(EmptyMaskedView).to.deep.equal({ bankTSQ: [], vaultTSQ: [], lease: { active: false } })
   })
 
   it("answers the lease of an unlocked bank by its loggable and when it ends, and none granted once it locks", async () => {
     const { device, bank } = await TH.buildBornVault()
-    const { lease } = device.maskedView()
+    const { lease } = device.inspectable()
     expect(lease).to.have.all.keys(
       'active', 'ends_at', 'fmt', 'userid', 'banklabel', 'labelpath', 'wayinkind', 'born_at', 'proved_at', 'gate_labelpath', 'gate_lifeseq', 'gate_revtok', 'bank_lifeseq', 'bank_born_at', 'bank_lifetok', 'isEvicted',
     )
     const { proved_at } = lease as { proved_at: number }
     expect(lease).to.include({ active: true, ends_at: proved_at + device.leaseMillis, born_at: proved_at, labelpath: 'lease/gate', gate_revtok: maskUuid(bank.gate.revtok), bank_lifetok: maskUuid(bank.lifetok), wayinkind: 'passphrase', isEvicted: false })
     bank.lock()
-    expect(device.maskedView().lease).to.deep.equal({ active: false })
+    expect(device.inspectable().lease).to.deep.equal({ active: false })
   })
 
   it("answers the bank, its main gate and its root box in the bank TSQ, and the boxes put in the vault TSQ, each with its state", async () => {
     const { device, vault } = await TH.buildBornVault()
     await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const { bankTSQ, vaultTSQ } = device.maskedView()
+    const { bankTSQ, vaultTSQ } = device.inspectable()
     expect(bankTSQ.map(({ val }) => (val as { labelpath: string }).labelpath)).to.have.members(['bank', 'box', 'gate'])
     expect(vaultTSQ.map(({ val }) => (val as { labelpath?: string } | null)?.labelpath)).to.include('box/openai')
     for (const row of [...bankTSQ, ...vaultTSQ]) {
@@ -588,7 +588,7 @@ describe("device.maskedView()", () => {
     const ciphertexts = new Set(keptJsons.flatMap((json) => [...json.matchAll(/"ciphertext_b64":"([^"]+)"/g)].map(([, ciphertext]) => ciphertext!)))
     expect([...ciphertexts]).to.include.members(named)
     expect(ciphertexts.size).to.be.at.least(5)
-    const shown = JSON.stringify(device.maskedView())
+    const shown = JSON.stringify(device.inspectable())
     for (const ciphertext of ciphertexts) {
       expect(shown).to.not.include(ciphertext)
       expect(shown).to.include(`"…${ciphertext.slice(-2)}(${String(ciphertext.length)})"`)
@@ -600,7 +600,7 @@ describe("device.maskedView()", () => {
   it("leaves out what a host keeps beside its rows in the vault TSQ", async () => {
     const { device } = await TH.buildBornVault()
     device.vaultTsqClient.setQueryData(['host', 'notes'], { note: 'mine' })
-    expect(JSON.stringify(device.maskedView())).to.not.include('mine')
+    expect(JSON.stringify(device.inspectable())).to.not.include('mine')
   })
 })
 

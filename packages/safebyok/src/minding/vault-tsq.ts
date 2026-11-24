@@ -2,6 +2,7 @@
 
 import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
+import { Outcome } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
 import type { MaskedRow } from '../shapes/shapes-masked-view'
 import { type ThingRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
@@ -14,7 +15,7 @@ import type { VaultMinder } from './vault-minder'
 import { readAtOf } from '../storage/agerank'
 import type { Kids } from '../shapes/shapes-answers'
 import * as Throwers from '../refusals/throwers'
-import { maskedRowsOf } from './masked-rows'
+import { maskedOf } from '../helpers/mask-ciphertexts'
 import { bankKeyHeadOf, labelsOf } from './query-keys'
 
 // == [VaultTSQ]: VaultTSQ
@@ -131,15 +132,6 @@ export class VaultTSQ {
   }
   // --
 
-  // == [A devtool's view]: maskedRows
-
-  /** The items and listings of the bank, masked for a devtool.
-   * Each has its key, its state, and a copy of its record or listing with each ciphertext masked. What a host keeps beside them in the same client is left out.
-   * For experimenting, never for an app's own logic: what it answers may change without notice.
-   */
-  maskedRows(): MaskedRow[] { return maskedRowsOf(this.#queryClient, VaultTSQ.bankQueryKeyOf(this.#scope)) }
-  // --
-
   // == [Ending]: sweep
 
   /** Stop hearing the VaultMinder, for good: the items and listings stay as they are. */
@@ -203,6 +195,28 @@ export class VaultTSQ {
     const parsed = ThingChecks.thingScope.parseConsistent(scope, this.#scope)
     if (! isItemLabelpath(parsed.labelpath)) { throw Throwers.notMinded() }
     return parsed
+  }
+  // --
+
+  // == [A devtool's view]: inspectable
+
+  /** The bank's items and listings, each ciphertext masked, for a devtool.
+   * Each has its key, its state, and a copy of its record or listing. What a host keeps beside them in the same client is left out.
+   * For experimenting, never for an app's own logic: what it answers may change without notice.
+   */
+  inspectable(): MaskedRow[] {
+    return this.#queryClient.getQueryCache().findAll({ queryKey: VaultTSQ.bankQueryKeyOf(this.#scope) }).map((tsqQuery) => {
+      const { status, fetchStatus, dataUpdatedAt, isInvalidated, error: err, data: val } = tsqQuery.state
+      return {
+        queryKey:        [...tsqQuery.queryKey],
+        status,
+        fetchStatus,
+        dataUpdatedAt,
+        isInvalidated,
+        lastRefusalkind: (err === null) ? null : Outcome.storageRefusalOf(err).refusalkind,
+        val:             maskedOf(val),
+      }
+    })
   }
   // --
 }

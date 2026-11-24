@@ -310,11 +310,11 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
   }
 
   // The device stays out of a host's reach: what leaves is the core's copy, each ciphertext masked, and the lease's loggable.
-  /** The mounted provider's bank TSQ, vault TSQ and lease, masked for a devtool, as `device.maskedView()` does.
+  /** The mounted provider's bank TSQ, vault TSQ and lease, masked for a devtool, as `device.inspectable()` does.
    * For experimenting, never for an app's own logic: what it answers may change without notice. While no provider is mounted, or nobody is signed in, it answers `EmptyMaskedView`.
    * It is no hook: call it again to see what changed.
    */
-  function maskedView(): MaskedView { return mounted?.maskedView() ?? EmptyMaskedView }
+  function maskedView(): MaskedView { return mounted?.inspectable() ?? EmptyMaskedView }
 
   const giver = Object.freeze({
     Provider,

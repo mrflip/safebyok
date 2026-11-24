@@ -13,6 +13,7 @@ import { bulletproofHandlerOf } from '../helpers/bulletproof'
 import type { BankStage, HostedVault, RefusalSnapshot, WorldOpts, WorldSnapshot } from '../shapes/shapes-bankish'
 import { PendingWorld, SignedOutWorld, WorldChecks } from '../shapes/shapes-bankish'
 import type { BirthCleartexts, BirthDna, BirthGatingFriend, GateRevisionedStamp, LeaseGate, WorldGateFriend } from '../shapes/shapes-gateish'
+import { type MaskedViewLease, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type BankStamp, type LeaseLoggable, StampChecks } from '../shapes/shapes-stamps'
 import { type BankRecord, type BoxRecord, type BulletproofCallback, type GateRecord, type Sparse, type ThingMakeOpts, type ThingRecord, type Thingkind, Shell } from '../shapes/shapes-thing'
@@ -408,6 +409,19 @@ export class World {
       lastErr:        null,
       isUnlockWanted: this.isUnlockWanted,
     })
+  }
+  // --
+
+  // == [A devtool's view]: inspectable
+
+  // The world hands out no lease: what leaves is its loggable.
+  /** The attached lease's loggable and when it ends, for a devtool, or only `active: false` while locked or while the roots are not all live.
+   * For experimenting, never for an app's own logic: what it answers may change without notice.
+   */
+  inspectable(): MaskedViewLease {
+    const { leaseLoggable, leaseEndsAt } = this
+    if ((leaseLoggable === null) || (leaseEndsAt === null) || ! this.areRootsLive) { return EmptyMaskedView.lease }
+    return { active: true, ...leaseLoggable, ends_at: leaseEndsAt }
   }
   // --
 }

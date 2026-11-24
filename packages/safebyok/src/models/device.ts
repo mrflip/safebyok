@@ -7,11 +7,10 @@ import { Proving, guardKeyDeriver } from './proving'
 import { Vault } from './vault'
 import { World } from './world'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
-import { maskedRecordRowOf } from '../minding/masked-rows'
 import { guardRootShelf, isRootLabelpath, peekRoots, stowRoots } from '../minding/root-shelf'
 import { VaultTSQ } from '../minding/vault-tsq'
 import { type BadNewsHandler, type DeviceJSON, type DeviceOpts, type DeviceRecord, type RootShelf, BankishChecks, isRootShelf } from '../shapes/shapes-bankish'
-import { type MaskedRow, type MaskedView, type MaskedViewLease, EmptyMaskedView } from '../shapes/shapes-masked-view'
+import { type MaskedView, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import { isQueryClient } from '../shapes/shapes-vault-tsq'
 import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
 import type { BankScope } from '../shapes/shapes-stamps'
@@ -280,27 +279,6 @@ export class Device {
   }
   // --
 
-  // == [A devtool's view]: maskedView, #maskedRootRows
-
-  // The roots are no devtool's to read whole: the gate's record has each wayin's wrapped bankKey, which an offline
-  // guess at a passphrase is checked against. What leaves here is a copy, with every ciphertext masked, and of
-  // the lease only its loggable: the world hands out no lease.
-  /** The bank's roots as the world's Things have them (`bankTSQ`), the vault TSQ and the lease, masked for a devtool.
-   * Each row has its key, its state, and a copy of its record or listing with each ciphertext masked. The lease shows its loggable and when it ends, never its key material.
-   * For experimenting, never for an app's own logic: what it answers may change without notice. Before `signin`, it answers {@link EmptyMaskedView}.
-   */
-  maskedView(): MaskedView {
-    if (this.#userid === null) { return EmptyMaskedView }
-    return { bankTSQ: this.#maskedRootRows(), vaultTSQ: this.#vaultTSQ?.maskedRows() ?? [], lease: maskedViewLeaseOf(this.bank === null ? undefined : this.#world) }
-  }
-
-  /** The row of each root the world's Things have heard of, masked, under its item key */
-  #maskedRootRows(): MaskedRow[] {
-    const { bank, gate, rootBox } = this.#world
-    return [bank, gate, rootBox].filter((thing) => thing !== null).map((thing) => maskedRecordRowOf(VaultTSQ.itemQueryKeyOf(thing), thing.pickle(), thing.written_at))
-  }
-  // --
-
   // == [Telling the host]: tellBadNews
 
   /** Tell the host's `onBadNews` of failures no caller is waiting on. Never throws.
@@ -331,6 +309,23 @@ export class Device {
 
   /** Always `'device'`: this model's {@link Modelkind}. */
   get modelkind(): 'device' { return 'device' satisfies Modelkind }
+
+  // == [A devtool's view]: inspectable
+
+  /** Safe view of the device, for logging and debugging.
+   * It has the bank's roots (`bankTSQ`) and the vault TSQ, each ciphertext masked, and the lease's loggable and when it ends, never its key material. Before `signin`, it answers {@link EmptyMaskedView}.
+   * For experimenting, never for an app's own logic: what it answers may change without notice.
+   */
+  inspectable(): MaskedView {
+    if (this.#userid === null) { return EmptyMaskedView }
+    const { bank, gate, rootBox } = this.#world
+    return {
+      bankTSQ:  [bank, gate, rootBox].filter((thing) => thing !== null).map((thing) => thing.inspectable()),
+      vaultTSQ: this.#vaultTSQ?.inspectable() ?? [],
+      lease:    this.#world.inspectable(),
+    }
+  }
+  // --
 }
 
 // == [Host functions]: DefaultOnBadNews, tellBadNewsTo
@@ -358,7 +353,7 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 }
 // --
 
-// == [Helpers]: millisOf, checkSecureContext, ShelvedSourcelabel, banktokOf, shelvedEventOf, maskedViewLeaseOf
+// == [Helpers]: millisOf, checkSecureContext, ShelvedSourcelabel, banktokOf, shelvedEventOf
 
 // A host's Infinity minutes, for never, becomes ForeverMillis: past the entrypoint, nothing is infinite.
 /** `minutes` in milliseconds, capped at `ForeverMillis`, or `fallback` for none. */
@@ -385,13 +380,6 @@ function shelvedEventOf(record: SeenThing, read_tc: ReadTc, banktok: Lifetok | u
     eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: undefined, agerankWas: undefined,
     sourcelabel: ShelvedSourcelabel, read_tc, banktok, ...itemSeenOf(record),
   }
-}
-
-/** The lease `world` holds, as a devtool is shown it: its loggable and when it ends, or `active: false` for no world, or one locked. */
-function maskedViewLeaseOf(world: World | undefined): MaskedViewLease {
-  const loggable = world?.leaseLoggable ?? null
-  const endsAt = world?.leaseEndsAt ?? null
-  return ((loggable === null) || (endsAt === null)) ? EmptyMaskedView.lease : { active: true, ...loggable, ends_at: endsAt }
 }
 // --
 

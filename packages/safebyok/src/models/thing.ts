@@ -1,7 +1,10 @@
 import { deepFreeze, isEqual, pick } from 'es-toolkit'
 import { Helpers, VX } from 'safebyok-big/internals'
 import { BaseThing } from './base-thing'
+import { maskedOf } from '../helpers/mask-ciphertexts'
+import { VaultTSQ } from '../minding/vault-tsq'
 import type { EpochMillis } from '../shapes/primitives'
+import type { MaskedRow } from '../shapes/shapes-masked-view'
 import type { LiveOf, ShellOf } from '../shapes/shapes-sealers'
 import type { BulletproofCallback, Sparse, ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
 import { type Agekind, type Agerank, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
@@ -157,6 +160,26 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
 
   /** Let go of every subscriber: none is told of anything after. */
   protected dropSubscribers(): void { this.#subscribers.clear() }
+  // --
+
+  // == [A devtool's view]: inspectable
+
+  // The record is no devtool's to read whole: a gate's has each wayin's wrapped bankKey, which an offline guess at a
+  // passphrase is checked against.
+  /** The record this Thing models, each ciphertext masked, for a devtool, as a vault TSQ item settled on it would show.
+   * For experimenting, never for an app's own logic: what it answers may change without notice.
+   */
+  inspectable(): MaskedRow {
+    return {
+      queryKey:        [...VaultTSQ.itemQueryKeyOf(this)],
+      status:          'success',
+      fetchStatus:     'idle',
+      dataUpdatedAt:   this.written_at,
+      isInvalidated:   false,
+      lastRefusalkind: null,
+      val:             maskedOf(this.#record),
+    }
+  }
   // --
 }
 

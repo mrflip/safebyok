@@ -207,7 +207,7 @@ describe("the provider", () => {
     const { result, unmount } = renderHook(() => world.Bank.useWorld((snap) => snap.stage), { wrapper: ({ children }: Readonly<{ children: ReactNode }>) => TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) })
     await waitFor(() => { expect(result.current).to.eq('locked') })
     const shown = world.SOK.maskedView()
-    expect(shown).to.deep.equal(world._cheat_device().maskedView())
+    expect(shown).to.deep.equal(world._cheat_device().inspectable())
     expect(shown.bankTSQ.map(({ val }) => (val as { labelpath: string }).labelpath)).to.have.members(['bank', 'box', 'gate'])
     expect(shown.lease).to.deep.equal({ active: false })
     unmount()
