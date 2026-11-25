@@ -1,6 +1,6 @@
 # Thread 12: set_stage (2026-11-25)
 
-Branch `20261125-set_stage`, PR #TBD, stacked on #924 (thread 10). Proved: `pnpm --filter safebyok test` (lint and typecheck clean, 36 files, 2,296 tests). `pnpm justify` after the catch-up: see the PR's **Tests:**.
+Branch `20261125-set_stage`, PR #925, stacked on #924 (thread 10). Proved: `pnpm --filter safebyok test` (lint and typecheck clean, 36 files, 2,296 tests). `pnpm justify` after the catch-up: see the PR's **Tests:**.
 
 * **Built**:
   * **`World#setStage(stage)`** (world.ts, section *Snapshot*): inscribes `#stage`, the stage the world was last at (null before the first), and announces `{ kind: 'stage_crossed', from, to }` through `device.announce` where it differs. `#stageOf()` still computes the stage from its sources and `#makeSnapshot` still builds from it; `#setStage` is called from `align()` with the new snapshot's stage (after the snapshot is set, before the subscribers are told) and once from the constructor, which inscribes the first stage and announces nothing.
