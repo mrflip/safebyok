@@ -1,17 +1,21 @@
 # Thread 5: devicetok (2026-11-25)
 
-Branch `20261125-devicetok`, PR #910, stacked on #909. Proved: safebyok 2170 tests, safebyok-react-lean 339,
+Branch `20261125-devicetok`, PR #910, stacked on #909. Proved: safebyok 2176 tests, safebyok-react-lean 339,
 safebyok-big 2951, dojo 111, each typechecked and linted; `pnpm justify` after the catch-up (see the PR's **Tests:**).
 
 * **Built**:
-  * `DeviceDB.ensureDevicetok()` (`packages/safebyok/src/storage/device-db.ts`): this device's devicetok, one for every
-    bank and tab given the database. It answers the one stored, or stores and answers a fresh `Crypto.randomId()` where
-    none is or the one stored fails `BankishChecks.devicetok`, in one step (`doStowDevicetok(made, isReplaced)`, shaped
-    as `doStowLease`). A subclass's throw refuses `storage_unavailable` (`refusalOf`). Memory keeps it in a field
-    (`#devicetok`, cheat `_cheat_plantDevicetok`); IndexedDB files it in the lease store under the string key
-    `DevicetokCkey = 'devicetok'`, which never meets a lease's array scopepath. `isDeviceDB` asks for the verb too.
+  * `DeviceDB.ensureDevicetok(scope)` (`packages/safebyok/src/storage/device-db.ts`): the devicetok of the bank at
+    `scope` (a `BankScope`, checked by `StampChecks.bankScope`), one per bank scope, the same for every tab given the
+    database. It answers the one stored, or stores and answers a fresh `Crypto.randomId()` where none is or the one
+    stored fails `BankishChecks.devicetok`, in one step (`doStowDevicetok(scope, made, isReplaced)`, shaped as
+    `doStowLease`). A subclass's throw refuses `storage_unavailable` (`refusalOf`). Memory keeps a map by
+    `MemoryDeviceDB.devicetokCkeyOf(scope)` (cheat `_cheat_plantDevicetok(scope, raw)`); IndexedDB files it in the
+    lease store at `devicetokScopepathOf(scope)` = `[userid, banklabel, 'devicetok']` (type `DevicetokScopepath`,
+    exported beside `LeaseScopepath`). That never meets a lease's scopepath `[userid, banklabel, labelpath]`, since a
+    lease's labelpath always matches `lease/<label>` (`LeaseLabelpathPattern`). `isDeviceDB` asks for the verb too.
   * `Device.ensureDevicetok()` (`models/device.ts`): the host's `devicetok` option (new on `DeviceOpts`, checked as a
-    UUID), else `deviceDB.ensureDevicetok()`. Where the deviceDB refuses, it tells `onBadNews` and answers a fresh token
+    UUID), else `deviceDB.ensureDevicetok(this.scope)`; with no host token, it refuses `absent_vault` before signin
+    (the `scope` getter's refusal, outside the try, so not turned into bad news; a wayin is only built signed in). Where the deviceDB refuses, it tells `onBadNews` and answers a fresh token
     for that call alone, as `World.#stowLease` does with a refused lease stow: the wayin is still built.
   * Read at each wayin build, nowhere else: `PassphraseProving.buildNovel` and `PasskeyProving.buildNovel` await
     `device.ensureDevicetok()` and hand it to `mintPassphraseHeader` / `mintPasskeyHeader`. `ProvingDevice` is big's
@@ -30,12 +34,16 @@ safebyok-big 2951, dojo 111, each typechecked and linted; `pnpm justify` after t
     with a passkey reads twice; both answers are the same.
   * **A damaged devicetok stored is replaced**, not refused: nothing else reads it, and big did the same with its row.
   * **The device drops it from `toJSON`, its spread, and the bank's getter** (`bank.device_tok` is gone): it is async now.
-  * **Filed per device, as briefed**, not per bank scope. See *For the Coach*.
+  * **One per bank scope** (rework, the orchestrator's YOLO call on my open matter): first built one per device
+    database, as briefed, which let a storage reader link two users' banks in one browser by their shared devicetok.
+    Big's `device_tok` was per bank scope, and NOTYET.md recorded that as the design. Set aside: a scope-free
+    `ensureDevicetok()` on the device that falls back to a database-wide token before signin (it would bring the
+    linkable token back by a side path).
 * **Deviations**:
   * **The dojo demo is on the new core** (`safebyok` and `safebyok-idb-lean`), though the brief named `demos/*` as on
     big: its three `Device.make` calls drop `device_tok`, and its fixture is written again (`pnpm --filter
     safebyok-demo-dojo fixture`). safebyok-demo-react, still on big, is untouched.
-  * `NOTYET.md`'s device lock-out item now says `devicetok`, one per device database.
+  * `NOTYET.md`'s device lock-out item now says `devicetok`, one per bank per device.
 * **Discoveries**:
   * `device_tok` was bound into the wayin ctx (`wayinCtxOf` binds the whole header through `cipherCtx`); the Coach ruled
     the rename may change the bytes. Recorded in `notes/guarantees-drift.md` and `notes/security.md` (an amendment line
@@ -43,9 +51,5 @@ safebyok-big 2951, dojo 111, each typechecked and linted; `pnpm justify` after t
   * The checker was big's `CX.device_tok`; big now has `CX.devicetok` beside it.
   * The react-lean provider's "Cheat (react_life): a fresh device_tok for each device" is gone.
 * **For the Coach**:
-  * **One devicetok per device, or per bank scope?** As briefed it is one per device database, so two users' banks built
-    in one browser record the same devicetok, which a storage reader could link. Big's `device_tok` was one per bank
-    scope, and `NOTYET.md` recorded that as the design ("a random `device_tok` per bank per device"). Recommend per bank
-    scope: `ensureDevicetok(scope)` filed under `[userid, banklabel, 'devicetok']`, the same size of change.
-  * **The devicetok lives in the lease database** (`safebyok:lease-v…`, store `leases`). Recommend leaving it there
-    until the database is renamed for everything it keeps.
+  * **The devicetok lives in the lease database** (`safebyok:lease-v…`, store `leases`, now at
+    `[userid, banklabel, 'devicetok']`). Recommend leaving it there until the database is renamed for everything it keeps.
