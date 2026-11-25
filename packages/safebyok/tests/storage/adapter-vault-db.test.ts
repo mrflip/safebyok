@@ -253,6 +253,31 @@ describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
     expect(events.map((event) => event.banktok)).to.deep.equal([otherLifetok, TH.bankThingOf().lifetok, SX.VoidLifeTok])
   })
 
+  it("notifies with the read_tc received beside a Thing, else one made when it arrives", () => {
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', record: null }))
+    const events: VaultEvent[] = []
+    vaultDB.watch(TH.ThingBank, (event) => { events.push(event) }, () => undefined)
+    const told  = readTcNow()
+    const early = readTcNow()
+    vaultDB.receive?.({ record: TH.boxThingOf(), banktok: SX.VoidLifeTok, read_tc: told })
+    vaultDB.receive?.({ record: TH.boxThingOf(), banktok: SX.VoidLifeTok })
+    expect(events[0]?.read_tc).to.eq(told)
+    const isMadeOnArrival = events[1]!.read_tc > early
+    expect(isMadeOnArrival).to.be.true
+  })
+
+  it("sends a Thing whose read_tc is no UUID version 7 to onBadNews, as a broken store", () => {
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', record: null }))
+    const events: VaultEvent[] = []
+    const badNews: Errors.VaultError[] = []
+    vaultDB.watch(TH.ThingBank, (event) => { events.push(event) }, (news) => { badNews.push(news) })
+    for (const read_tc of [crypto.randomUUID(), readTcNow().toUpperCase(), 7, null]) {
+      vaultDB.receive?.({ record: TH.boxThingOf(), banktok: SX.VoidLifeTok, read_tc })
+    }
+    expect(events).to.deep.equal([])
+    expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['storage_issue', 'storage_issue', 'storage_issue', 'storage_issue'])
+  })
+
   it("sends a Thing of another bank to onBadNews, not to onNotice", () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', record: null }))
     const events: VaultEvent[] = []

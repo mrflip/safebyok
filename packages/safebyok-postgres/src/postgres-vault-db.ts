@@ -35,23 +35,25 @@ const postgresVaultDBOpts = objCheck(({ custom, fn }) => ({
 export function thingsChannelOf(userid: string): string { return `safebyok_things_${userid}` }
 
 // Each notice comes from the `tell_thing` function in `vault-functions.ts`: a JSON object with the Thing's scope under `at`,
-// the Thing under `thing` and the raw bank row under `bank`, whichever fit.
+// when Postgres read it under `read_tc`, the Thing under `thing` and the raw bank row under `bank`, whichever fit.
 
-/** A parsed notice: the labelpath of the Thing stored, and the Thing and raw bank row, where they fit. */
-type Told = { labelpath: string, thing?: unknown, bank?: unknown }
+// AdapterVaultDB checks the read_tc, as it checks the Thing.
+/** A parsed notice: the labelpath of the Thing stored, when Postgres read it, and the Thing and raw bank row, where they fit. */
+type Told = { labelpath: string, read_tc?: unknown, thing?: unknown, bank?: unknown }
 
 const toldCheck = objCheck(({ obj, str, unk }) => ({
-  at:    obj({ userid: str, banklabel: str, labelpath: str }),
-  thing: unk.optional(),
-  bank:  unk.optional(),
+  at:      obj({ userid: str, banklabel: str, labelpath: str }),
+  read_tc: unk.optional(),
+  thing:   unk.optional(),
+  bank:    unk.optional(),
 }), { refusalkind: 'bad_record', extras: 'strip' })
 
 /** The notice in `text` of a Thing in `scope`'s bank, or null for anything else. */
 function toldOf({ userid, banklabel }: ThingWatchScope, text: string): Told | null {
   const toldReport = toldCheck.safeParse(jsonOrNull(text))
   if ((! toldReport.success) || (toldReport.data.at.userid !== userid) || (toldReport.data.at.banklabel !== banklabel)) { return null }
-  const { at: { labelpath }, thing, bank } = toldReport.data
-  return { labelpath, thing, bank }
+  const { at: { labelpath }, read_tc, thing, bank } = toldReport.data
+  return { labelpath, read_tc, thing, bank }
 }
 // --
 
@@ -216,14 +218,14 @@ export class PostgresVaultDB extends AdapterVaultDB {
 
   // == [Hearing]: #receivedOrNull
 
-  /** The Thing and banktok a notice carried, or fetched now if it carried less. Null if that fetch finds no Thing, or fails.
+  /** The Thing, banktok and read_tc a notice carried, or fetched now if it carried less. Null if that fetch finds no Thing, or fails.
    * A failure a retry would not mend also hands `onFailed` its refusal.
    */
-  async #receivedOrNull(scope: ThingWatchScope, { labelpath, thing, bank }: Told, onFailed: (news: VaultError) => void): Promise<Received | null> {
-    if ((thing !== undefined) && (bank !== undefined)) { return { record: thing, banktok: Classifier.banktokOf(scope, bank) } }
+  async #receivedOrNull(scope: ThingWatchScope, { labelpath, read_tc, thing, bank }: Told, onFailed: (news: VaultError) => void): Promise<Received | null> {
+    if ((thing !== undefined) && (bank !== undefined)) { return { record: thing, banktok: Classifier.banktokOf(scope, bank), read_tc } }
     try {
       const fetched = await this.#fetchThing(getAskOf({ ...scope, labelpath, track: VoidTrack, banktok: VoidLifeTok }))
-      return (fetched.thing === null) ? null : { record: fetched.thing, banktok: Classifier.banktokOf(scope, fetched.bank) }
+      return (fetched.thing === null) ? null : { record: fetched.thing, banktok: Classifier.banktokOf(scope, fetched.bank), read_tc: fetched.read_tc }
     } catch (err) {
       // A notice is only a hint: if its Thing cannot be fetched for now, drop it.
       const refusal = refusalOf(err)

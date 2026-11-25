@@ -6,7 +6,7 @@ import { bulletproofHandlerOf } from '../helpers/bulletproof'
 import type { Lifetok } from '../shapes/primitives'
 import type { ThingRecord, VoidSentinel } from '../shapes/shapes-thing'
 import type { TombstoneOf } from '../shapes/shapes-sealers'
-import { type VaultEvent, type VaultItemEvent, VaultDBSourcelabel } from '../shapes/shapes-vault-event'
+import { type ReadTc, type VaultEvent, type VaultItemEvent, VaultDBSourcelabel } from '../shapes/shapes-vault-event'
 import {
   type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldAsk, type ListAsk, type LoggableAsk, type StatsAsk, type ThingWatchScope, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
 } from '../shapes/shapes-asks'
@@ -62,10 +62,10 @@ function frozenAnswerOf<AnswerT extends { ask: unknown, err?: unknown }>(answer:
   return answer
 }
 
-/** The `item` notice for `record`, read now, from this vaultDB, with the vacant agerank, and the lifetok of `record` where it is the bank, else `received` */
-function noticeOf(record: ThingRecord, received: Lifetok): VaultItemEvent {
+/** The `item` notice for `record`, read at `read_tc`, from this vaultDB, with the vacant agerank, and the lifetok of `record` where it is the bank, else `received` */
+function noticeOf(record: ThingRecord, received: Lifetok, read_tc: ReadTc): VaultItemEvent {
   const banktok = ('lifetok' in record) ? record.lifetok : received
-  return itemEventOf(record, { sourcelabel: VaultDBSourcelabel, read_tc: readTcNow(), banktok })
+  return itemEventOf(record, { sourcelabel: VaultDBSourcelabel, read_tc, banktok })
 }
 // --
 
@@ -170,7 +170,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { return this.answerForThrown(err, 'stats', ask) }
   }
 
-  /** Watch a bank's Things ({@link VaultDB.watch}): each notice is of a Thing the datastore reports changing, read when it arrives.
+  /** Watch a bank's Things ({@link VaultDB.watch}): each notice is of a Thing the datastore reports changing, read when the datastore says, else when it arrives.
    * Records a datastore pushes together are notified one at a time.
    * A Thing that fails its checks or belongs to another bank goes to `onBadNews` instead of `onNotice`, as does an error `onNotice` throws.
    */
@@ -178,10 +178,12 @@ export abstract class AdapterVaultDB implements VaultDB {
     const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews })
     // A notice handler that throws is a bug in the host's code, not trouble in storage.
     const notify = bulletproofHandlerOf(onNotice, { ifError: 'tell', transformer: Throwers.refusalOfThrown, onBadNews })
-    return this.doWatch(bankScope, ({ record, banktok }) => {
+    return this.doWatch(bankScope, (received) => {
+      const { record, banktok } = received
       let event: VaultItemEvent
       try {
-        event = noticeOf(deepFreeze(Classifier.watchedThingOf(bankScope, record)), banktok)
+        const { read_tc = readTcNow() } = ActualChecks.received.parse(received)
+        event = noticeOf(deepFreeze(Classifier.watchedThingOf(bankScope, record)), banktok, read_tc)
       } catch (err) {
         onBadNews(Outcome.storageRefusalOf(err))
         return

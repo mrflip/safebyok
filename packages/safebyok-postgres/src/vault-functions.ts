@@ -184,17 +184,19 @@ LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
 $$;
 
 -- Notify the user's channel, safebyok_things_<userid>, of a Thing just stored, with its bank's row, null for none.
--- The notice is a JSON object with the Thing's scope under at, the Thing under thing, and the bank row under bank.
+-- The notice is a JSON object with the Thing's scope under at, when Postgres read it under read_tc (a UUID version 7),
+-- the Thing under thing, and the bank row under bank.
 -- Postgres refuses a notice of 8000 bytes or more. A notice that is too large drops the bank row first, then the Thing.
 -- A listener that gets only a scope fetches the Thing and the bank row itself.
 CREATE OR REPLACE FUNCTION ${VaultFunctionNames.tell_thing}(thing jsonb, bank jsonb) RETURNS void
 LANGUAGE plpgsql AS $$
 DECLARE
-  at     jsonb := jsonb_build_object('userid', thing->'userid', 'banklabel', thing->'banklabel', 'labelpath', thing->'labelpath');
-  notice text  := jsonb_build_object('at', at, 'thing', thing, 'bank', bank)::text;
+  at      jsonb := jsonb_build_object('userid', thing->'userid', 'banklabel', thing->'banklabel', 'labelpath', thing->'labelpath');
+  read_tc text  := uuidv7()::text;
+  notice  text  := jsonb_build_object('at', at, 'read_tc', read_tc, 'thing', thing, 'bank', bank)::text;
 BEGIN
-  IF octet_length(notice) >= 8000 THEN notice := jsonb_build_object('at', at, 'thing', thing)::text; END IF;
-  IF octet_length(notice) >= 8000 THEN notice := jsonb_build_object('at', at)::text; END IF;
+  IF octet_length(notice) >= 8000 THEN notice := jsonb_build_object('at', at, 'read_tc', read_tc, 'thing', thing)::text; END IF;
+  IF octet_length(notice) >= 8000 THEN notice := jsonb_build_object('at', at, 'read_tc', read_tc)::text; END IF;
   PERFORM pg_notify('safebyok_things_' || (thing->>'userid'), notice);
 END $$;
 
