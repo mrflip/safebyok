@@ -32,8 +32,8 @@ Branch `20261125-postgres_standalone`, PR #930, stacked on #923. Proved: `pnpm j
   - **A failed listen ends the watch.** It is classified like any other failure, so a transient one ends the watch as
     `storage_unavailable`, since there is nothing left to listen with.
   - **The order of an unlisten failure.** After a self-end, an unlisten failure reaches `onBadNews` after the bad news
-    that said why, and so after `onEnded`. I read the #926 phrase "nothing is notified after it" as being about notices.
-    This is an open matter.
+    that said why, and so after `onEnded`. The Coach ruled (2026-11-25) that news may follow `onEnded`, and the
+    `VaultDB.watch` doc, the OneWatchVaultDB doc and the README now say so.
   - **Names.** `Told`/`toldOf` were renamed `ThingNotification`/`thingNotificationOf`, because VOCABULARY keeps
     tell and hear for the VaultMinder.
   - `storedNothing` stays `unexpected_error`, as the handoff said (Closer Look E2).
@@ -47,4 +47,3 @@ Branch `20261125-postgres_standalone`, PR #930, stacked on #923. Proved: `pnpm j
     The README says 18 or later. I did not touch the row.
 * **For the Coach**:
   - Should the package export a ready-made `PostgresListen` for a `pg` Client (the README's recipe)? Thread D will need one.
-  - Is an unlisten failure after `onEnded` a breach of "nothing is notified after it"?

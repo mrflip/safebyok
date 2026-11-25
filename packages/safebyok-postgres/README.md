@@ -132,8 +132,8 @@ returns, or until it ends of itself:
   the watch: it calls `onEnded`, then `onBadNews` with the refusal, and listens no more.
 * **A `listen` that fails** ends the watch the same way, once `watch` has returned: `onEnded`, then `onBadNews`.
 * **An unlisten that fails**, the function your `listen` returned throwing or rejecting, is handed to `onBadNews`. It
-  does not call `onEnded`, since the watch was ending anyway; in a watch that ended of itself, it comes after the bad
-  news that said why.
+  does not call `onEnded`, since the watch was ending anyway; in a watch that ended of itself, it still reaches
+  `onBadNews`, after `onEnded` and the bad news that said why.
 
 A watch calls `onEnded` at most once, and unlistens once, however many of these happen. A watch stopped before its
 `listen` resolves still unlistens, once it does.
