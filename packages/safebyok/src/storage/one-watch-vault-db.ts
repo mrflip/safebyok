@@ -74,7 +74,7 @@ export class OneWatchVaultDB implements VaultDB {
       const heardReport = SeenChecks.itemEvent.safeParse(data)
       if (heardReport.success) { notify(deepFreeze(heardReport.data as VaultEvent)) }
     })
-    const release = this.#holdWatch(locks, bankScope, channel, onNotice, onBadNews)
+    const release = this.#holdWatch(locks, bankScope, channel, notify, onBadNews)
     return () => {
       release()
       channel.close()
@@ -82,7 +82,7 @@ export class OneWatchVaultDB implements VaultDB {
   }
 
   /** Ask for the bank's lock, and while this tab holds it, run the wrapped vaultDB's watch, posting each notice on `channel`; answers the function that lets the lock go */
-  #holdWatch(locks: LockManager, bankScope: ThingWatchScope, channel: BroadcastChannel, onNotice: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
+  #holdWatch(locks: LockManager, bankScope: ThingWatchScope, channel: BroadcastChannel, notify: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
     let isReleased = false
     let release = () => { isReleased = true }
     void this.#whileLocked(locks, bankScope, onBadNews, () => new Promise<void>((resolve) => {
@@ -90,7 +90,7 @@ export class OneWatchVaultDB implements VaultDB {
       if (isReleased) { resolve(); return }
       const unwatch = this.#vaultDB.watch(bankScope, (event) => {
         channel.postMessage(event)
-        onNotice(event)
+        notify(event)
       }, onBadNews)
       release = () => {
         unwatch()
