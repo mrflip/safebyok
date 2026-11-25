@@ -14,7 +14,7 @@ import type { VaultDB } from './vault-db'
 // == [Names]: watchnameOf, lockManagerOf
 
 // A userid and a banklabel never hold a `/`, so the name reads back into its parts.
-/** The name of the Web Lock, and of the BroadcastChannel, of the watch of the bank at `scope`: safebyok's, then the userid, the banklabel and the bank's labelpath. */
+/** The name of the Web Lock and of the BroadcastChannel for the watch of the bank at `scope`: `safebyok/<userid>/<banklabel>/bank`. */
 export function watchnameOf({ userid, banklabel }: ThingWatchScope): string { return `safebyok/${userid}/${banklabel}/bank` }
 
 /** This page's Web Locks manager, or undefined where the platform has none */
@@ -66,7 +66,7 @@ export class OneWatchVaultDB implements VaultDB {
   /** Watch a bank's Things ({@link VaultDB.watch}): notified of what the wrapped vaultDB's watch notifies, in whichever tab of the origin runs it.
    * The wrapped vaultDB's watch starts in a tab once it is handed the bank's lock, so a change while the lock changes hands reaches no tab. Bad news reaches only the holder's `onBadNews`.
    * Of what another tab posts, only an `item` event that passes its checks is notified, deeply frozen, with the `read_tc` the holder heard it at.
-   * Where the wrapped vaultDB's watch throws as it starts, the lock passes to the next tab, and this tab's watch ends: `onEnded` is called, then `onBadNews`, and nothing is notified after.
+   * Where this tab's watch cannot start, as where the wrapped vaultDB's watch throws as it starts, it ends. Its `onEnded` is called, then its `onBadNews` says why, and nothing is notified after.
    */
   watch(scope: ThingWatchScope, onNotice: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void, onEnded: () => void = noop): () => void {
     const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews, onEnded })
@@ -90,9 +90,7 @@ export class OneWatchVaultDB implements VaultDB {
     }
   }
 
-  /** Ask for the bank's lock, and while this tab holds it, run the wrapped vaultDB's watch, posting each notice on `channel`; answers the function that lets the lock go.
-   * What the wrapped vaultDB's watch throws as it starts goes to `onFailed`.
-   */
+  /** Ask for the bank's lock, and while this tab holds it, run the wrapped vaultDB's watch, posting each notice on `channel`; answers the function that lets the lock go */
   #holdWatch(
     locks: LockManager, bankScope: ThingWatchScope, channel: BroadcastChannel,
     notify: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void, onFailed: (err: unknown) => void,
@@ -114,7 +112,7 @@ export class OneWatchVaultDB implements VaultDB {
     return () => { release() }
   }
 
-  /** Call `hold` once this tab is handed the bank's lock, and keep the lock until the promise it answers settles; what `hold` throws goes to `onFailed` */
+  /** Call `hold` once this tab is handed the bank's lock, and keep the lock until the promise it answers settles; what `hold` throws, or the lock request itself, goes to `onFailed` */
   async #whileLocked(locks: LockManager, bankScope: ThingWatchScope, onFailed: (err: unknown) => void, hold: () => Promise<void>): Promise<void> {
     try {
       await locks.request(watchnameOf(bankScope), hold)

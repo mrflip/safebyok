@@ -35,8 +35,8 @@ export interface VaultDB {
   tryStats(ask: StatsAsk): Promise<StatsAnswer>
   /** Watch a bank's Things, returning a function that stops the watch.
    * `onBadNews` gets any trouble the watch meets, including a Thing that fails its checks.
-   * `onEnded` is called where the watch ends before its stop is called, as one that cannot start may: once, never before
-   * `watch` returns, and before the bad news that says why. Nothing is notified after it, and its stop need not be called.
+   * `onEnded` is called once where the watch ends before its stop is called, as one that cannot start may. It comes after
+   * `watch` returns and before the bad news that says why; nothing is notified after it, and the stop need not be called.
    * A vaultDB whose watch ends only at its stop never calls it.
    * What a watcher is notified of is the vaultDB's own to say: an `AdapterVaultDB` notifies each change its datastore
    * reports, when the datastore delivers it.
