@@ -106,7 +106,9 @@ export const stats = query({
 // Convex re-runs this query whenever a Thing in its range is committed, and sends the client its whole result each time,
 // so the client watches again from the cursor each result returns. Every later commit has a higher commit timestamp than
 // any this query read, and than the snapshot it read, so watching from that cursor misses nothing.
-/** Fetch each Thing of a bank committed after `cursor`, each raw beside its labelpath, and the bank, with the cursor to watch from next. Given null, fetch nothing, the cursor being now. */
+/** Fetch the Things of a bank committed after `cursor`, with the bank and the cursor to watch from next.
+ * A null cursor fetches no Thing, and returns the cursor of now.
+ */
 export const watchThings = query({
   args:    CVX.watchArgs,
   returns: CVX.thingsWatched,
@@ -200,7 +202,7 @@ async function bankThingsIn(db: DatabaseReader, { userid, banklabel }: ThingWatc
   return docs.map(({ labelpath, thing }) => ({ labelpath, raw: thing }))
 }
 
-/** Each raw Thing of a bank committed after `cursor`, beside its labelpath, in commit order; the raw bank; and the last commit timestamp among them, else `cursor`. Called from a query only. */
+/** The raw Things of a bank committed after `cursor`, with the raw bank and the next cursor. */
 async function committedAfterIn(db: DatabaseReader, { userid, banklabel }: ThingWatchScope, cursor: bigint) {
   // Only the mutation that writes a document reads its `commit_ts` back as Convex's placeholder; a query reads the timestamp.
   type CommittedThingDoc = ThingDoc & { commit_ts: bigint }

@@ -10,7 +10,7 @@ import { v } from 'convex/values'
 /** The arguments of a vaultDB function whose only argument is an ask. */
 export const askArgs = { ask: v.any() }
 
-/** The arguments of `watchThings`: the bank to watch, and the commit timestamp to report the Things committed after, or null to start now. */
+/** The arguments of `watchThings`: the bank to watch, and the cursor, or null to watch from now. */
 export const watchArgs = { scope: v.any(), cursor: v.union(v.null(), v.int64()) }
 // --
 
@@ -38,7 +38,7 @@ export const rootsFetched = v.object({ bank: v.any(), gate: v.any(), root: v.any
 /** What `stats` returns: the bank's boxes and gates as stored, the bank, and `tracked`. */
 export const statsFetched = v.object({ box: thingkindStats, gate: thingkindStats, bank: v.any(), tracked })
 
-/** What `watchThings` returns: each Thing of the bank committed after the cursor, the bank, and the cursor to watch from next. */
+/** The result of `watchThings`: the Things committed after the cursor, the bank, and the next cursor. */
 export const thingsWatched = v.object({ things: v.array(filed), bank: v.any(), cursor: v.int64() })
 // --
 

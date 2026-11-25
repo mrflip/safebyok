@@ -50,7 +50,7 @@ export type ConvexVaultClient = ConvexWatchingClient | ConvexReactWatchingClient
  */
 export type ConvexVaultDBOpts = Readonly<{ client: ConvexVaultClient, api: SafebyokVaultApi }>
 
-/** What `watchThings` returns: each Thing committed after the cursor it was given, the bank raw, and the cursor to watch from next. */
+/** The result of `watchThings`: the Things committed after the cursor, the bank, and the next cursor. */
 type Watched = FunctionReturnType<SafebyokVaultApi['watchThings']>
 // --
 

@@ -94,8 +94,8 @@ one range fetches what a bank's watch has not yet heard. A deleted Thing stays a
 
 **How big a bank can be.** `stats` reads every Thing of a bank in one query, within a Convex query's limits (32,000
 documents, 16 MiB read), as may a watch that comes back after long enough away, so a bank past that makes its stats
-refuse and such a watch go quiet. The stats report those two limits as the bank's `max`, and weigh each Thing as the UTF-8 length
-of its JSON, a little under what Convex counts for its document.
+refuse and such a watch go quiet. The stats report those two limits as the bank's `max`, and weigh each Thing as the
+UTF-8 length of its JSON, a little under what Convex counts for its document.
 
 **What a sidecar may hold.** Convex refuses an object key, anywhere in a stored Thing, that starts with `$`, holds a
 character outside printable ASCII, or runs past 1024 characters. A put of a box whose sidecar has such a key, at any
