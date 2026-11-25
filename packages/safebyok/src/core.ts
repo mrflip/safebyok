@@ -18,7 +18,7 @@ export type {
 } from './shapes/shapes-sealers'
 export {
   type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseLoggable, type LeaseRecord, type LeaseScope, type LeaseSparse, type LeaseStamp, type LeaseTombstone, type StampedGate,
-  LeaseFormat, LeaseLifeRoot, LeaseLabelpath, StampChecks, leaseLifepathOf,
+  LeaseFormat, LeaseLabelpath, LeaseLifeRoot, StampChecks, leaseLifepathOf,
 } from './shapes/shapes-stamps'
 export { Wayin } from './models/wayin'
 export { type PasskeyWayinHeader, type PasskeyWayinRecord, type PassphraseWayinHeader, type PassphraseWayinRecord, type WayinHeader, type WayinRecord, WayinChecks } from './shapes/shapes-wayin'

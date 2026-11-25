@@ -11,7 +11,7 @@ import { type LeaseGate, type LeaseOpts, type LeaseShellScope, type SecretFieldn
 import type * as Sealers from '../shapes/shapes-sealers'
 import type { LiveOf, ShellOf } from '../shapes/shapes-sealers'
 import {
-  type BankStamp, type LeaseLoggable, type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat, StampChecks, LeaseLabelpath, leaseLifepathOf,
+  type BankStamp, type LeaseLoggable, type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat, LeaseLabelpath, StampChecks, leaseLifepathOf,
 } from '../shapes/shapes-stamps'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { DeviceDBChecks } from '../shapes/shapes-device-db'
