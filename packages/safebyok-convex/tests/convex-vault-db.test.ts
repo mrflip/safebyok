@@ -10,6 +10,7 @@ import * as TH from './test-helpers'
 import { ConvexVaultDB } from '../src/index'
 import { fakeDeployment } from '../src/testing'
 import type { FakeDeployment, FakeHost } from '../src/testing'
+import type { SafebyokVaultApi } from '../src/server'
 
 type ComponentDeployment = FakeDeployment<ReturnType<typeof TH.componentHost>>
 type ComponentBackend = ReturnType<ComponentDeployment['_cheat_backendAs']>
@@ -104,10 +105,10 @@ function alterWritten(convexVaultDB: ConvexVaultDB, alter: (written: unknown) =>
   onTestFinished(() => { spy.mockRestore() })
 }
 
-/** How many Things the deployment stores. */
-async function thingCountOf(convexVaultDB: ConvexVaultDB): Promise<number> {
-  const docs = await madeOf(convexVaultDB).deployment._cheat_backendAs(null).run(async ({ db }) => await db.query('things').collect())
-  return docs.length
+/** The labelpath of each Thing the deployment stores, in order. */
+async function thingLabelpathsOf(convexVaultDB: ConvexVaultDB): Promise<string[]> {
+  const docs = await madeOf(convexVaultDB).deployment._cheat_backendAs(null).run(async ({ db }) => await db.query('things').withIndex('by_scope').collect())
+  return docs.map(({ labelpath }) => labelpath)
 }
 
 describe("ConvexVaultDB's refusals", () => {
@@ -179,15 +180,25 @@ describe("ConvexVaultDB against a component out of step with it", () => {
 })
 
 describe("ConvexVaultDB's component", () => {
-  it("stores one document for each Thing, writing only the Thing a write cites", async () => {
+  it("stores one document for each Thing a bank is born with", async () => {
     const convexVaultDB = makeConvexVaultDB()
     await TH.expectGood(convexVaultDB.tryBirthBank(TH.birthBankAskOf()))
-    expect(await thingCountOf(convexVaultDB)).to.eq(3)
-    const boxBirthAsk = TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0))
+    expect(await thingLabelpathsOf(convexVaultDB)).to.deep.equal(['bank', 'box', 'gate'])
+  })
+
+  it("writes no document but the cited Thing's", async () => {
+    // The backend refuses a transaction that writes a second document, so a write over the cited Thing alone succeeds.
+    const deployment = deploy(TH.componentHostWritingAtMost(1))
+    const backend = deployment._cheat_backendAs(null)
+    for (const thing of [TH.bankThingOf(), TH.gateThingOf(), TH.rootBoxOf()]) {
+      await backend.run(async ({ db }) => { await db.insert('things', { ...TH.ThingBank, labelpath: thing.labelpath, thing }) })
+    }
+    const convexVaultDB = new ConvexVaultDB({ client: deployment.client(null), api: TH.rootVaultApi })
+    const box = TH.boxThingOf()
+    const boxBirthAsk = TH.birthAskOf(box, Shell.childCited(TH.Life0))
     await TH.expectGood(convexVaultDB.tryWriteThing(boxBirthAsk))
-    expect(await thingCountOf(convexVaultDB)).to.eq(4)
-    const gate = await TH.expectGood(convexVaultDB.tryGetThing(TH.getAskAt('gate')))
-    expect(gate).to.deep.equal(TH.gateThingOf())
+    const stored = await backend.run(async ({ db }) => await thingDocAt(db, TH.BoxScope))
+    expect(stored?.thing).to.deep.equal(box)
   })
 
   it("refuses an ask that fails the core's checks, with the core's sentence", async () => {
@@ -195,6 +206,43 @@ describe("ConvexVaultDB's component", () => {
     expect(refusal.kind).to.eq('bad_record')
     expect(refusal).to.have.property('message').that.is.a('string')
   })
+})
+
+// Anyone signed in may call the component's functions with arguments of their own making.
+type SloppyCase = readonly [keyof SafebyokVaultApi, Record<string, unknown>, string]
+
+const SloppyQueryCases: readonly SloppyCase[] = [
+  ["listThings",  { ask: null },                                          'refuses a list with no ask'],
+  ["listThings",  { ask: { ...TH.listAskAt('box'), labelpath: 42 } },     'refuses a list whose labelpath is a number'],
+  ["getWorld",    { ask: "acme" },                                        'refuses a world asked as a bare string'],
+  ["getWorld",    { ask: { ...TH.getWorldAskOf(), userid: undefined } },  'refuses a world asked without its userid'],
+  ["stats",       { ask: {} },                                            'refuses stats asked of an empty object'],
+  ["watchThings", { scope: { userid: 'u1' } },                            'refuses a watch whose scope has no banklabel'],
+  ["watchThings", { scope: [] },                                          'refuses a watch whose scope is an array'],
+]
+
+const GateOfOtherBank = TH.gateThingOf({ banklabel: 'other' })
+const SloppyMutationCases: readonly SloppyCase[] = [
+  ["writeThing",  { ask: { ...TH.birthAskOf(), record: null } },              'refuses a write with no record'],
+  ["writeThing",  { ask: { ...TH.birthAskOf(), record: GateOfOtherBank } },   'refuses a write whose record is at another scope'],
+  ["birthBank",   { ask: { ...TH.birthBankAskOf(), gate: TH.rootBoxOf() } },  'refuses a birth whose gate is a box'],
+  ["birthBank",   { ask: 7 },                                                 'refuses a birth asked as a number'],
+]
+
+describe("ConvexVaultDB's component, given sloppy arguments", () => {
+  for (const [fnname, args, blurb] of SloppyQueryCases) {
+    it(blurb, async () => {
+      const refusal = await TH.convexRefusalOf(TH.componentTest().query(TH.rootVaultApi[fnname] as FunctionReference<'query'>, args))
+      expect(refusal.kind).to.eq('bad_record')
+    })
+  }
+
+  for (const [fnname, args, blurb] of SloppyMutationCases) {
+    it(blurb, async () => {
+      const refusal = await TH.convexRefusalOf(TH.componentTest().mutation(TH.rootVaultApi[fnname] as FunctionReference<'mutation'>, args))
+      expect(refusal.kind).to.eq('bad_record')
+    })
+  }
 })
 
 const SidecarKeyCases: readonly (readonly [BoxRecord['sidecar'], string])[] = [
@@ -275,6 +323,19 @@ describe("ConvexVaultDB's watch over a client with watchQuery, as a ConvexReactC
 describe("ConvexVaultDB's constructor", () => {
   it("refuses a client that is not a Convex client", () => {
     TH.expectSyncRefusal(() => new ConvexVaultDB({ client: {} as never, api: TH.rootVaultApi }), 'bad_record')
+  })
+
+  it("refuses undefined for its options", () => {
+    TH.expectSyncRefusal(() => new ConvexVaultDB(undefined as never), 'bad_record')
+  })
+
+  it("refuses options without a client", () => {
+    TH.expectSyncRefusal(() => new ConvexVaultDB({ api: TH.rootVaultApi } as never), 'bad_record')
+  })
+
+  it("refuses options without an api", () => {
+    const deployment = deploy(TH.componentHost())
+    TH.expectSyncRefusal(() => new ConvexVaultDB({ client: deployment.client(null) } as never), 'bad_record')
   })
 
   it("refuses the whole generated api in place of its safebyokVault module", () => {

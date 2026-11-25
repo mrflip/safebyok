@@ -17,6 +17,11 @@ export function componentTest() { return convexTest({ schema, modules }) }
 /** Make a host with only the component, its functions at the root, for a fake deployment whose clients may write as any user. */
 export function componentHost() { return { api: anyApi, createTest: () => componentTest() } }
 
+/** Make a host like {@link componentHost} whose backend refuses a function that writes more than `documentsWritten` documents. */
+export function componentHostWritingAtMost(documentsWritten: number) {
+  return { api: anyApi, createTest: () => convexTest({ schema, modules, transactionLimits: { documentsWritten } }) }
+}
+
 /** Make a host app with the component installed as `safebyok`, and the SafebyokVaultComponent that wraps it. */
 export function installedVaultComponent() {
   const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register } } })

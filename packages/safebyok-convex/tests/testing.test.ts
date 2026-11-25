@@ -39,15 +39,20 @@ describe("fakeDeployment", () => {
     expect(await client.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.include({ bank })
   })
 
-  it("connects a client of any other kind that its caller constructs, and closes it with the rest", async () => {
+  it("connects a client of any other kind that its caller constructs", async () => {
     const deployment = deploy()
-    const closed = vi.fn()
     const made = deployment.connectWith('u1', (address, opts) => {
       const inner = new ConvexClient(address, opts)
-      return { inner, close: async () => { closed(); await inner.close() } }
+      return { inner, close: () => inner.close() }
     })
     await made.inner.mutation(deployment.api.safebyokVault.birthBank, birthBankArgs)
     expect(await made.inner.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.include({ bank })
+  })
+
+  it("closes a client its caller constructed with the rest", async () => {
+    const deployment = deploy()
+    const closed = vi.fn()
+    deployment.connectWith('u1', () => ({ close: () => { closed(); return Promise.resolve() } }))
     await deployment.close()
     expect(closed).toHaveBeenCalledOnce()
   })
@@ -61,15 +66,20 @@ describe("fakeDeployment", () => {
     expect(closed).toHaveBeenCalledOnce()
   })
 
-  it("by default drops a client's log, and sends its refused mutation to console.error", async () => {
+  it("by default sends a client's refused mutation to console.error", async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
+    const deployment = deploy()
+    await TH.convexRefusalOf(refusedMutation(deployment))
+    expect(consoleError).toHaveBeenCalledOnce()
+    expect(String(consoleError.mock.calls[0]?.[0])).to.match(/\[CONVEX M\(safebyokVault:birthBank\)\]/)
+  })
+
+  it("by default drops a client's other log lines", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => { /* kept out of the test output */ })
     const deployment = deploy()
-    const refusal = await TH.convexRefusalOf(refusedMutation(deployment))
-    expect(refusal.kind).to.eq('identity_revoked')
-    expect(consoleError).toHaveBeenCalledOnce()
-    expect(String(consoleError.mock.calls[0]?.[0])).to.match(/\[CONVEX M\(safebyokVault:birthBank\)\]/)
+    await TH.convexRefusalOf(refusedMutation(deployment))
     expect(consoleWarn).toHaveBeenCalledTimes(0)
     expect(consoleLog).toHaveBeenCalledTimes(0)
   })
@@ -127,20 +137,29 @@ describe("fakeDeployment", () => {
     expect(quoted).to.not.include('fake-secret-value')
   })
 
-  it("runs the backend directly as a subject, or as no one, to arrange or inspect what is stored", async () => {
+  it("runs the backend directly as a subject", async () => {
     const deployment = deploy()
     await deployment._cheat_backendAs('u1').mutation(deployment.api.safebyokVault.birthBank, birthBankArgs)
     expect(await deployment._cheat_backendAs('u1').query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.include({ bank })
+  })
+
+  it("runs the backend directly as no one", async () => {
+    const deployment = deploy()
     const refusal = await TH.convexRefusalOf(deployment._cheat_backendAs(null).query(deployment.api.safebyokVault.getWorld, worldAsked))
     expect(refusal.kind).to.eq('identity_revoked')
   })
 
-  it("lists the functions its sockets watch, and pushes a changed result to a watcher after a mutation through any socket", async () => {
+  it("lists the functions its sockets watch", async () => {
     const deployment = deploy()
-    const client = deployment.client('u1')
-    const heard = vi.fn()
-    client.onUpdate(deployment.api.safebyokVault.watchThings, watchThingsArgs, heard)
+    deployment.client('u1').onUpdate(deployment.api.safebyokVault.watchThings, watchThingsArgs, () => undefined)
     await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
+    expect(deployment.watching()[0]).to.match(/safebyokVault:watchThings/)
+  })
+
+  it("pushes a changed result to a watcher after a mutation through another socket", async () => {
+    const deployment = deploy()
+    const heard = vi.fn()
+    deployment.client('u1').onUpdate(deployment.api.safebyokVault.watchThings, watchThingsArgs, heard)
     await vi.waitFor(() => { expect(heard).toHaveBeenCalledTimes(1) })
     await deployment.client('u1').mutation(deployment.api.safebyokVault.birthBank, birthBankArgs)
     await vi.waitFor(() => { expect(heard.mock.calls.length).to.be.greaterThan(1) })
@@ -154,6 +173,7 @@ describe("fakeDeployment", () => {
     deployment.signOut()
     await vi.waitFor(() => { expect(failed).toHaveBeenCalled() })
   })
+
   it("has pushed a backend change to every watcher and cache by the time _cheat_arrange returns", async () => {
     const deployment = deploy()
     const client = deployment.client('u1')
