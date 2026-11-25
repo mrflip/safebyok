@@ -415,7 +415,8 @@ describe("the proof", () => {
     const page = mountPage(device, bank)
     page.expectRenders({ device: ['ready'], bank: ['unlocked'], vaults: ['main'] })
 
-    dialog.typing = { ...byPassphrase(Passphrase), ...await byPasskey('laptop') }
+    const passkeyTyping = await byPasskey('laptop')
+    dialog.typing = { ...byPassphrase(Passphrase), ...passkeyTyping }
     await bank.maingate.addPasskeyPrompt()
     expect(dialog.shown.splice(0)).to.deep.equal(['add_passkey'])
     page.expectRenders({ device: ['ready (asking add_passkey)', 'ready'] })

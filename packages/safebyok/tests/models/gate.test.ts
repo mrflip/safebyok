@@ -125,7 +125,8 @@ describe("Gate.make(begun, { world }, friend)", () => {
 
   for (const [moved, blurb] of OtherBankCases) {
     it(`refuses a record with ${blurb} than its bank's`, async () => {
-      const record = { ...await gateRecordOf(), ...moved }
+      const ownRecord = await gateRecordOf()
+      const record = { ...ownRecord, ...moved }
       TH.expectSyncRefusal(() => makeGate(record), 'record_conflict')
     })
   }
@@ -140,7 +141,8 @@ describe("Gate.make(begun, { world }, friend)", () => {
 
   it("accepts a record of another life than its bank's: only the bank's scope is checked", async () => {
     const later = Lifeseq.ofLifenum(2)
-    const record = { ...await gateRecordOf(), lifeseq: later, lifepath: later }
+    const ownRecord = await gateRecordOf()
+    const record = { ...ownRecord, lifeseq: later, lifepath: later }
     expect(makeGate(record).lifeseq).to.eq(later)
   })
 
