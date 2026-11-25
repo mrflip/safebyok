@@ -212,7 +212,7 @@ describe("the Knock-Knock Machine", () => {
     await within(region('Ways in')).findByRole('button', { name: 'Remove passkey' })
     expect(authenticator.credentialIds()).to.have.lengthOf(1)
     // The passkey shows once the gate is written, before the add's own unlock lands: a Lock before that leaves the bank
-    // unlocked (notes/wontfix.md, "A lock, a sweep or a second form verb while a form verb runs"). Let the add settle.
+    // unlocked (notes/wontfix.md, "A lock, a disconnect or a second form verb while a form verb runs"). Let the add settle.
     await waitFor(() => { expect(page.client.isMutating()).to.eq(0) })
 
     fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
