@@ -1,8 +1,8 @@
 # Thread 1a: device_db (2026-11-25)
 
-Branch `20261125-device_db`, PR (to come), stacked on #899; rebased onto 0 `connect` at filing. Proved: `pnpm --filter
+Branch `20261125-device_db`, PR #903, stacked on #899; rebased onto 0 `connect` at filing. Proved: `pnpm --filter
 safebyok lint` and `typecheck` clean; `tests/storage/memory-device-db.test.ts` 33, `tests/storage/idb-device-db.test.ts`
-36, `tests/browser.test.ts` 5, all passing. `pnpm justify` to come after the catch-up rebase.
+36, `tests/browser.test.ts` 5; the package's whole suite 2063 in 33 files. `pnpm justify` after the catch-up rebase.
 
 * **Built**:
   - `packages/safebyok/src/storage/device-db.ts`: abstract `DeviceDB` with `peekLease(scope)`, `stowLease(row)` and
