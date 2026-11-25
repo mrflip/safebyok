@@ -263,5 +263,8 @@ export class Vault {
   // --
 }
 
+// == [Helpers]: isBoxCar
+
 /** True of the car of a box */
 function isBoxCar(car: ThingCar | undefined): car is ThingCar<Box> { return car?.thing instanceof Box }
+// --
