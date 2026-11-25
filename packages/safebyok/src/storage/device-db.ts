@@ -63,8 +63,8 @@ export abstract class DeviceDB {
   async ensureDevicetok(userid: Userid): Promise<Devicetok> {
     try {
       const useridChecked = BankishChecks.userid.parse(userid)
-      const made   = Crypto.randomId()
-      const before = await this.doStowDevicetok(useridChecked, made, isDevicetokReplaced)
+      const made          = Crypto.randomId()
+      const before        = await this.doStowDevicetok(useridChecked, made, isDevicetokReplaced)
       return isDevicetokReplaced(before) ? made : BankishChecks.devicetok.parse(before)
     } catch (err) { throw refusalOf(err, 'ensureDevicetok') }
   }
