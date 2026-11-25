@@ -325,12 +325,11 @@ feed_sorter (the redistribution design, section 12); narrowed to an item with no
   no longer among them. The disconnect stops the world's janitor, but a re-read of the roots its last tick began goes
   on, and its roots land in the VaultMinder as a get's answer does. A peek of the deviceDB that a connect, a root's news
   or a ring began goes on too, and where the lease stored is newer it is taken up: the disconnected tab holds it until a
-  lock, a later disconnect or the janitor's autolock past its end. Either way the take-up is announced to the host's
-  `onLifecycle` as it lands, after a disable too: a `lease_taken_up`, or a `lock_taken_up` where the tab still held a
-  lease. The next `device.connect()` invalidates the bank's
+  lock, a later disconnect or the janitor's autolock past its end. The take-up is announced to the host's `onLifecycle`
+  as it lands, as a `lease_taken_up`. The next `device.connect()` invalidates the bank's
   items and listings, so what is shown then is fetched again. A `device.disable()` disconnects, so the same holds of
   it, and no connect follows: what lands is kept by a device whose every verb refuses, and a lease taken up is evicted
-  as it is attached.
+  as it is attached, which refuses before anything is announced.
 * alternatives:
   - have the disconnect wait for, or cancel, what is in flight: abort machinery in a primitive's critical path.
   - drop an answer or a notice that lands once disconnected: a token or a state checked on every answer, for a crossing.
