@@ -369,7 +369,7 @@ function rootStoredOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>, 
   return storedOf(check, scope, raw) ?? Shell.under(scope, null)
 }
 
-/** The report of a bank's storage `stats`, a concrete adapter measured in the step that fetched its raw bank. */
+/** Report the storage stats a concrete adapter measured, beside the raw bank it fetched in the same step. */
 export function classifyStats(ask: StatsAsk, fetched: BankFetched, stats: VaultStats): StatsActual {
   return { ok: true, act: 'got', banktok: banktokOf(ask, fetched.bank), tracked: trackedOf(ask, fetched.tracked), read_tc: fetched.read_tc, stats }
 }
