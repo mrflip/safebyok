@@ -1,6 +1,7 @@
 /** The world: the Things `world.makeThing` makes of each record, the bank, main gate and bank stamp it finds in its VaultMinder, and its snapshot. */
 
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
+import { Consts } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
 import { Box } from '../../src/models/box'
 import type { Device } from '../../src/models/device'
@@ -270,8 +271,6 @@ describe("a world's stage as its roots arrive one at a time", () => {
   }
 })
 
-const MinuteMillis = 60_000
-
 /** Set the clock past every read_tc minted so far, since uuid's v7 never mints one earlier than the last, whatever the clock says. */
 function setClockPastEveryReadTc(): void {
   vi.setSystemTime(readAtOf(readTcNow()) + 1)
@@ -281,11 +280,11 @@ describe("a world's softlock, near its lease's end", () => {
   it("is off on a freshly unlocked world, and on from softlockMillis before the lease ends, on the world, bank and gate alike", async () => {
     const { bank, device } = await TH.buildBornBank({ device: TH.makeDevice({}, { autolockMinutes: 600, softlockMinutes: 10 }) })
     const { world } = device
-    expect(world.leaseEndsAt).to.eq(TH.T0 + (600 * MinuteMillis))
+    expect(world.leaseEndsAt).to.eq(TH.T0 + (600 * Consts.MinuteMillis))
     expect([world.isSoftlocked, bank.isSoftlocked, bank.gate.isSoftlocked]).to.deep.equal([false, false, false])
-    vi.setSystemTime(world.leaseEndsAt! - (10 * MinuteMillis) - 1)
+    vi.setSystemTime(world.leaseEndsAt! - (10 * Consts.MinuteMillis) - 1)
     expect(world.isSoftlocked).to.be.false
-    vi.setSystemTime(world.leaseEndsAt! - (10 * MinuteMillis))
+    vi.setSystemTime(world.leaseEndsAt! - (10 * Consts.MinuteMillis))
     expect([world.isSoftlocked, bank.isSoftlocked, bank.gate.isSoftlocked]).to.deep.equal([true, true, true])
     expect([world.isLocked, world.getSnapshot().stage]).to.deep.equal([false, 'unlocked'])
   })
@@ -298,19 +297,19 @@ describe("a world's softlock, near its lease's end", () => {
 
   it("has ensureUnlocked want an `unlock` gating though the bank shows unlocked, and the unlock renews the lease and settles the wait", async () => {
     const { bank, device: { world } } = await TH.buildBornBank({ device: TH.makeDevice({}, { autolockMinutes: 600 }) })
-    const nearEnd = world.leaseEndsAt! - MinuteMillis
+    const nearEnd = world.leaseEndsAt! - Consts.MinuteMillis
     vi.setSystemTime(nearEnd)
     const ensuring = bank.ensureUnlocked()
     expect(world.getSnapshot()).to.include({ stage: 'unlocked', isUnlockWanted: true })
     await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await ensuring).to.equal(bank)
     expect(world.getSnapshot().isUnlockWanted).to.be.false
-    expect([world.leaseEndsAt, world.isSoftlocked]).to.deep.equal([nearEnd + (600 * MinuteMillis), false])
+    expect([world.leaseEndsAt, world.isSoftlocked]).to.deep.equal([nearEnd + (600 * Consts.MinuteMillis), false])
   })
 
   it("leaves a call that wants the bank unlocked alone before the softlock: ensureUnlocked resolves at once", async () => {
     const { bank, device: { world } } = await TH.buildBornBank({ device: TH.makeDevice({}, { autolockMinutes: 600 }) })
-    vi.setSystemTime(world.leaseEndsAt! - (11 * MinuteMillis))
+    vi.setSystemTime(world.leaseEndsAt! - (11 * Consts.MinuteMillis))
     expect(await bank.ensureUnlocked()).to.equal(bank)
     expect(world.getSnapshot().isUnlockWanted).to.be.false
   })
@@ -319,9 +318,9 @@ describe("a world's softlock, near its lease's end", () => {
 describe("a world's janitor", () => {
   it("locks the world at its first tick once the lease has ended", async () => {
     const { device: { world } } = await TH.buildBornBank({ device: TH.makeDevice({}, { autolockMinutes: 25, janitorMinutes: 10 }) })
-    await vi.advanceTimersByTimeAsync(20 * MinuteMillis)
+    await vi.advanceTimersByTimeAsync(20 * Consts.MinuteMillis)
     expect(world.isLocked).to.be.false
-    await vi.advanceTimersByTimeAsync(10 * MinuteMillis)
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
     expect([world.isLocked, world.getSnapshot().stage]).to.deep.equal([true, 'locked'])
   })
 
@@ -331,13 +330,13 @@ describe("a world's janitor", () => {
     const tryGetWorld = vi.spyOn(vaultDB, 'tryGetWorld')
     await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, gateStaleMinutes: 25, janitorMinutes: 10 }) })
     const asked = tryGetWorld.mock.calls.length
-    await vi.advanceTimersByTimeAsync(20 * MinuteMillis)
+    await vi.advanceTimersByTimeAsync(20 * Consts.MinuteMillis)
     expect(tryGetWorld.mock.calls.length - asked).to.eq(0)
-    await vi.advanceTimersByTimeAsync(10 * MinuteMillis)
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
     expect(tryGetWorld.mock.calls.length - asked).to.eq(1)
-    await vi.advanceTimersByTimeAsync(20 * MinuteMillis)
+    await vi.advanceTimersByTimeAsync(20 * Consts.MinuteMillis)
     expect(tryGetWorld.mock.calls.length - asked).to.eq(1)
-    await vi.advanceTimersByTimeAsync(10 * MinuteMillis)
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
     expect(tryGetWorld.mock.calls.length - asked).to.eq(2)
   })
 
@@ -347,7 +346,7 @@ describe("a world's janitor", () => {
     const onBadNews = vi.fn()
     const { device: { world } } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, onBadNews, gateStaleMinutes: 5, janitorMinutes: 10 }) })
     vi.spyOn(vaultDB, 'tryGetWorld').mockRejectedValue(new Error('the network is down'))
-    await vi.advanceTimersByTimeAsync(10 * MinuteMillis)
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
     await TH.eventually(() => onBadNews.mock.calls.length === 1)
     expect(world.getSnapshot().stage).to.eq('unlocked')
   })
@@ -359,10 +358,10 @@ describe("a world's janitor", () => {
     const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, gateStaleMinutes: 5, janitorMinutes: 10 }) })
     device.disconnect()
     const asked = tryGetWorld.mock.calls.length
-    await vi.advanceTimersByTimeAsync(30 * MinuteMillis)
+    await vi.advanceTimersByTimeAsync(30 * Consts.MinuteMillis)
     expect(tryGetWorld.mock.calls.length - asked).to.eq(0)
     device.connect()
-    await vi.advanceTimersByTimeAsync(10 * MinuteMillis)
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
     expect(tryGetWorld.mock.calls.length - asked).to.be.at.least(1)
   })
 
