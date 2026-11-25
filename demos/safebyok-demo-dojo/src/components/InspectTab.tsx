@@ -136,10 +136,10 @@ function shownOfThing([ckey, val]: StoredRow): Shown {
   return { ckey: JSON.stringify(ckey), modelkind: labelpath.split('/', 1)[0] ?? '', val }
 }
 
-/** Each root the root shelf keeps at `ckey`: the value is its version, then the bank's, the main gate's and the root box's records. */
+/** Each root the root shelf keeps at `ckey`: the value is its version, then the bank's, the main gate's and the root box's records, each beside when it was read. */
 function shownOfShelved([ckey, shelved]: ShelvedRow): Shown[] {
-  const [, ...roots] = JSON.parse(shelved) as [version: string, ...roots: { labelpath: string }[]]
-  return roots.map((root) => ({ ckey: `${ckey} ${root.labelpath}`, modelkind: root.labelpath.split('/', 1)[0] ?? '', val: root }))
+  const [, ...roots] = JSON.parse(shelved) as [version: string, ...roots: { record: { labelpath: string }, read_tc: string }[]]
+  return roots.map((root) => ({ ckey: `${ckey} ${root.record.labelpath}`, modelkind: root.record.labelpath.split('/', 1)[0] ?? '', val: root }))
 }
 
 /** Each row of the device's bank TSQ and vault TSQ, its ckey led by `bankTSQ` or `vaultTSQ`; then its lease. */
