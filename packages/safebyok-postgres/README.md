@@ -42,10 +42,6 @@ await pglite.exec(VaultTablesSql)
 await pglite.exec(VaultFunctionsSql)
 ```
 
-**A database with the tables of an earlier release** (`safebyok_banks`, `safebyok_gates`, `safebyok_vaults`,
-`safebyok_boxes`): this release does not read them, and each user's bank starts empty. Drop them, and their `safebyok_`
-functions, when you no longer need them.
-
 ## Use
 
 ```ts
@@ -65,21 +61,27 @@ const vaultDB = new PostgresVaultDB({ client: pool })
 bank**: check the signed-in user before a request reaches the vaultDB, and build each scope's `userid` from that check,
 never from the request.
 
+## When a statement fails
+
 A failed statement that a retry may mend is refused with `storage_unavailable`: a lost or refused connection, a
 serialization failure or deadlock, a server short of resources or shutting down, a lock not granted in time, a write
 sent to a server that is read-only for now, as during a failover (SQLSTATE classes `08`, `40`, `53`, `57`, and `55P03`
 and `25006`). A lost or refused connection is also told by a Node system error code such as `ECONNRESET`, or by `pg`'s
 own message for one; a wrapper for another driver passes it on with a SQLSTATE or a Node code as the error's `code`.
-Every other failed statement, a missing table or privilege among them, is refused with `unexpected_error`. Either way
-its cause is the driver's message and code.
+
+Every other failed statement, a missing table or privilege among them, is refused with `storage_issue`: a retry would
+fail the same way, and the database needs your attention. Its message names the call that failed (`getThing`,
+`writeThing`, and so on).
+
+Either way the refusal's `cause` is an `Error` with the driver's message and its `code`, and nothing else the driver
+attached: a `pg` error can carry the statement's parameters, and so a row.
 
 ## Hearing other writes
 
 Each write notifies on its user's channel, `thingsChannelOf(userid)`, which is `safebyok_things_` followed by the
 userid, as it commits: a JSON object with the Thing's scope under `at`, the Thing under `thing`, and its bank's row under
 `bank`. Postgres refuses a notification of 8,000 bytes or more; one that is too large drops the bank row first, then the
-Thing, and the listener fetches what it lacks. A fetch that fails in a way a retry may mend drops the notice; any other
-failure ends the watch and is handed to its `onBadNews`. Any role that can connect to the database can `LISTEN` on a
+Thing, and the watch fetches what it lacks. Any role that can connect to the database can `LISTEN` on a
 channel, and so can read the Things a notification carries: the same ciphertext and wrapped keys the tables contain.
 
 `listen(channel, onNotify)` passes the text of each notification on that channel to `onNotify`, unchanged, and returns
@@ -123,8 +125,21 @@ A write made just after a watch's first LISTEN can go unheard, as can any notifi
 reconnecting. A watch is only a hint: a device that misses one learns of the write when it next fetches. A PGlite's own
 `listen` fits as it is, given the channel quoted (`"safebyok_things_..."`).
 
+**How a watch ends.** `vaultDB.watch(scope, onNotice, onBadNews, onEnded)` listens until you call the stop function it
+returns, or until it ends of itself:
+
+* **A notification whose fetch fails** in a way a retry may mend is dropped, and the watch listens on. Any other failure ends
+  the watch: it calls `onEnded`, then `onBadNews` with the refusal, and listens no more.
+* **A `listen` that fails** ends the watch the same way, once `watch` has returned: `onEnded`, then `onBadNews`.
+* **An unlisten that fails**, the function your `listen` returned throwing or rejecting, is handed to `onBadNews`. It
+  does not call `onEnded`, since the watch was ending anyway; in a watch that ended of itself, it still reaches
+  `onBadNews`, after `onEnded` and the bad news that said why.
+
+A watch calls `onEnded` at most once, and unlistens once, however many of these happen. A watch stopped before its
+`listen` resolves still unlistens, once it does.
+
 **A userid whose channel passes 63 bytes cannot write.** A channel is a Postgres identifier, at most 63 bytes, so a
-userid of more than 47 bytes makes every write fail with `unexpected_error`, its cause Postgres's
+userid of more than 47 bytes makes every write fail with `storage_issue`, its cause Postgres's
 `channel name too long`. Keep userids to 47 bytes with this package for now.
 
 ## What is stored

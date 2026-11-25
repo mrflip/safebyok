@@ -15,6 +15,7 @@ import * as TH from '../test-helpers'
 /** A concrete adapter whose every step does what the test hands it: throws, or reports what it is given, with the void banktok, each root `'same'` in `tracked` and a `read_tc` made now unless it gives them. */
 class ScriptedVaultDB extends AdapterVaultDB {
   receive: ((received: Received) => void) | null = null
+  onEnded: (() => void) | null = null
   readonly step: () => object
 
   constructor(step: () => object) {
@@ -31,8 +32,9 @@ class ScriptedVaultDB extends AdapterVaultDB {
   protected doBirthBank(_ask: BirthBankAsk): BirthBankActual { return this.#report() as BirthBankActual }
   protected doGetWorld(_ask: GetWorldAsk): GetWorldActual { return this.#report() as GetWorldActual }
   protected doStats(_ask: StatsAsk): StatsActual { return this.#report() as StatsActual }
-  protected override doWatch(_scope: ThingWatchScope, receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void {
+  protected override doWatch(_scope: ThingWatchScope, receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void, onEnded: () => void): () => void {
     this.receive = receive
+    this.onEnded = onEnded
     return () => { this.receive = null }
   }
 }
@@ -216,7 +218,22 @@ describe("AdapterVaultDB, the banktok of an answer", () => {
   })
 })
 
-describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
+describe("AdapterVaultDB.watch(scope, onNotice, onBadNews, onEnded)", () => {
+  it("hands the watch's onEnded to the concrete adapter", () => {
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', record: null }))
+    let endedCount = 0
+    vaultDB.watch(TH.ThingBank, () => undefined, () => undefined, () => { endedCount += 1 })
+    vaultDB.onEnded?.()
+    expect(endedCount).to.eq(1)
+  })
+
+  it("hands the concrete adapter an onEnded that does nothing where the watch has none", () => {
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', record: null }))
+    vaultDB.watch(TH.ThingBank, () => undefined, () => undefined)
+    expect(() => vaultDB.onEnded?.()).not.to.throw()
+    expect(vaultDB.onEnded).to.be.a('function')
+  })
+
   it("notifies of a sound Thing, and sends one that fails its checks to onBadNews", () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', record: null }))
     const events: VaultEvent[] = []

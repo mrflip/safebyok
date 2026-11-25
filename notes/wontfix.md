@@ -579,9 +579,9 @@ verb for a line in the host's log. Ruled by the Coach, 2026-11-25, written by le
 * current outcome: `ConvexVaultDB`'s and `PostgresVaultDB`'s watches check nothing once stopped. A result Convex
   pushes, or a failure it reports, after the stop function has run still reaches the watch's `onNotice` or
   `onBadNews`. A Postgres notice heard while its UNLISTEN is under way is fetched and notified as any other, and so
-  is one whose fetch was in flight at the stop. A Postgres watch a notice's fetch has ended (one a retry would not
-  mend) tells `onBadNews` of each such failure that lands, so two fetches in flight together that both fail tell it
-  twice.
+  is one whose fetch was in flight at the stop, and one heard after a failed fetch has ended the watch, until its
+  UNLISTEN is done. A Postgres watch ends once: the flag that calls `onEnded` once and unlistens once also drops a
+  second fetch's failure, and one that lands after the stop.
 * alternatives:
   - a flag each handler checks before it delivers: a state checked on every notice, for a crossing.
   - wait for UNLISTEN, or the unsubscribe, before the stop function returns: a stop that waits on the network.
@@ -589,11 +589,10 @@ verb for a line in the host's log. Ruled by the Coach, 2026-11-25, written by le
   again.
 
 Steps to reproduce: watch a bank over `PostgresVaultDB`; have a write's notice arrive, and stop the watch while its
-fetch is in flight: the fetch's Thing is notified after the stop. Or feed two notices whose fetches both fail with a
-missing relation (`42P01`): `onBadNews` is told twice.
+fetch is in flight: the fetch's Thing is notified after the stop.
 
 Reasoning for wontfix: a stop comes when a device disconnects, a few times a day, and a notice or its fetch is in flight
 for milliseconds (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). Nothing is written to the bankDB, and a
 notice carries only sealed records. The guards that covered it were removed at the Coach's word ("E3 remove the
-guards", 2026-11-25), by adapter_port thread B's rework. See also *A get, a put, … or a notice that lands across a
+guards", 2026-11-25), by adapter_port thread B's rework; thread F's watch ends once, for `onEnded`. See also *A get, a put, … or a notice that lands across a
 disconnect or a disable*, for what the VaultMinder does with such a notice.

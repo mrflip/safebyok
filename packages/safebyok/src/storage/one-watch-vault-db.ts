@@ -66,7 +66,7 @@ export class OneWatchVaultDB implements VaultDB {
   /** Watch a bank's Things ({@link VaultDB.watch}): notified of what the wrapped vaultDB's watch notifies, in whichever tab of the origin runs it.
    * The wrapped vaultDB's watch starts in a tab once it is handed the bank's lock, so a change while the lock changes hands reaches no tab. Bad news reaches only the holder's `onBadNews`.
    * Of what another tab posts, only an `item` event that passes its checks is notified, deeply frozen, with the `read_tc` the holder heard it at.
-   * Where this tab's watch cannot start, as where the wrapped vaultDB's watch throws as it starts, it ends. Its `onEnded` is called, then its `onBadNews` says why, and nothing is notified after.
+   * Where this tab's watch cannot start, as where the wrapped vaultDB's watch throws as it starts, it ends. Its `onEnded` is called, then its `onBadNews` says why.
    */
   watch(scope: ThingWatchScope, onNotice: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void, onEnded: () => void = noop): () => void {
     const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews, onEnded })

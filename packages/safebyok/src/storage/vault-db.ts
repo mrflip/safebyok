@@ -36,7 +36,8 @@ export interface VaultDB {
   /** Watch a bank's Things, returning a function that stops the watch.
    * `onBadNews` gets any trouble the watch meets, including a Thing that fails its checks.
    * `onEnded` is called once where the watch ends before its stop is called, as one that cannot start may. It comes after
-   * `watch` returns and before the bad news that says why; nothing is notified after it, and the stop need not be called.
+   * `watch` returns and before the bad news that says why; the stop need not be called. News may still reach the watcher
+   * after it, as when the watch's closing, an unlisten, fails.
    * A vaultDB whose watch ends only at its stop never calls it.
    * What a watcher is notified of is the vaultDB's own to say: an `AdapterVaultDB` notifies each change its datastore
    * reports, when the datastore delivers it.
