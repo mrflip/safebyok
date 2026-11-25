@@ -1,6 +1,6 @@
 # Thread 13: watch_recovery, a OneWatchVaultDB watch that cannot start ends (2026-11-25)
 
-Branch `20261125-watch_recovery`, PR #TBD, stacked on #924 (thread 10, `20261125-car_read_at`).
+Branch `20261125-watch_recovery`, PR #926, stacked on #924 (thread 10, `20261125-car_read_at`).
 Proved: `pnpm --filter safebyok lint` and `typecheck` clean; the one-watch, minder and world tests pass (19, 715 with
 `tests/minding`, 71 in world). `pnpm justify` pending.
 
