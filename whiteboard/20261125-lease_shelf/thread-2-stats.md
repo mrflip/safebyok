@@ -36,9 +36,21 @@ then "for stats: { box: { count: xxx, live_count: xxx, size }, ... don't let sto
     the size, and the cap as the count. The quota is the origin's, not the bank's. It is read before the IDB transaction
     opens (a non-IDB await would commit it). A rejected estimate refuses (`storage_unavailable`, as any IDB failure
     does); no `navigator.storage` reports the cap.
-  * `storeLimits` takes 0 (`uint.max(cap)`), not only positive: a browser may report a quota of 0.
+  * `storeLimits` keeps accepting 0 (`uint.max(cap)`). The floor belongs to IdbVaultDB's open, not to the shape: an
+    adapter may report any limit by the shape's interface, and Memory and Postgres report the cap.
   * **`vault.stats()` needs no unlock** (`#lock-is-intent`): it refuses only while the roots are not live or the device
     is disabled, as every vault read does through `#bank`.
+  * **A quota too small refuses at open** (the Coach's ruling: "continuing to operate with a limit of 0 is surprising
+    behavior"). `StoreLimitFloor = 5_000` (arithmetic from `notes/reference-sizes.md` in the `//` above it, beside
+    `StoreLimitCap`) and `StoreQuotaLeast = 2 * StoreLimitFloor` = 10,000, in shapes-vault-stats.ts. IdbVaultDB wraps its
+    shelf in `shelfRefusingSmallQuota`: the first use of the shelf reads `navigator.storage.estimate()` once and refuses
+    `storage_blocked` (thrower `storeQuotaTooSmall`, phrase `StoreQuotaTooSmall`) under the least; later uses go straight
+    through. The constructor is synchronous, and idb-keyval opens its database lazily at the first transaction, so the
+    shelf's first use is "when it first opens". No `navigator.storage`: nothing is checked. A failed check is not
+    remembered, so the next use reads the estimate again; a rejected estimate refuses `storage_unavailable` as before.
+    `doStats` still reads the quota itself, for the limit it reports. Memory and Postgres are untouched. Set aside: a
+    check in each `do*` verb (a guard on every verb), and one in `doStats` alone (a store that opens would still run
+    with a quota of 0 for every other verb).
   * **No enforcement**: nothing refuses a write over a limit.
 * **Deviations**: none from the handoff.
 * **Discoveries**:
@@ -52,4 +64,4 @@ then "for stats: { box: { count: xxx, live_count: xxx, size }, ... don't let sto
   * **pg_column_size as Postgres's size** -- keep, or `octet_length` of the record's JSON text, closer to the others.
   * **Bank row not counted** -- keep.
   * **IDB quota is origin-wide; a failing estimate refuses** -- keep.
-  * **StoreLimits allows 0** -- keep.
+  * **StoreLimits allows 0** -- keep; IDB can no longer report it.

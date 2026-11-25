@@ -4,7 +4,7 @@
 import 'fake-indexeddb/auto'
 import { noop } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { type StatsAnswer, type StoreLimits, type VaultEvent, Shell, StoreLimitCap, VaultError } from 'safebyok/storage'
+import { type StatsAnswer, type StoreLimits, type VaultEvent, Shell, StoreLimitCap, StoreQuotaLeast, VaultError } from 'safebyok/storage'
 import { IdbVaultDB } from '../src/idb-vault-db'
 import { VaultDBVersion } from '../src/vault-shelf'
 import * as TH from './test-helpers'
@@ -99,6 +99,30 @@ describe("IdbVaultDB's stats", () => {
 
   it("refuses storage_unavailable where the browser's estimate fails", async () => {
     await TH.expectBad(statsWhere({ storage: { estimate: () => Promise.reject(new Error('no estimate')) } }), 'storage_unavailable')
+  })
+})
+
+describe("IdbVaultDB's quota at open", () => {
+  it("refuses storage_blocked on opening its database where the browser's quota is under StoreQuotaLeast", async () => {
+    vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: StoreQuotaLeast - 1 }) } })
+    const idbVaultDB = TH.makeIdbVaultDB()
+    const refusal = await TH.expectBad(idbVaultDB.tryGetThing(TH.getGateAskOf()), 'storage_blocked')
+    expect(refusal.message).to.match(/withholds/)
+  })
+
+  it("refuses a quota of 0, as a stats call would otherwise report it", async () => {
+    vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: 0 }) } })
+    await TH.expectBad(TH.makeIdbVaultDB().tryStats(TH.statsAskOf()), 'storage_blocked')
+  })
+
+  it("opens its database where the browser's quota is StoreQuotaLeast", async () => {
+    vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: StoreQuotaLeast }) } })
+    await TH.expectGood(TH.makeIdbVaultDB().tryGetThing(TH.getGateAskOf()))
+  })
+
+  it("opens its database where the browser gives no estimate", async () => {
+    vi.stubGlobal('navigator', {})
+    await TH.expectGood(TH.makeIdbVaultDB().tryGetThing(TH.getGateAskOf()))
   })
 })
 

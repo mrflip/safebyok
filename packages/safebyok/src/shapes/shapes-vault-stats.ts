@@ -4,11 +4,19 @@ import type * as Z from 'zod'
 import { Validator } from 'safebyok-big/internals'
 import type { Labelpath } from './primitives'
 
-// == [Limits]: StoreLimitCap, storeLimitsOf
+// == [Limits]: StoreLimitCap, StoreLimitFloor, StoreQuotaLeast, storeLimitsOf
 
 // 1-900-MIX-A-LOT: a finite number past any store's limit, and well inside a safe integer.
 /** The most a store's limit is reported as, and the limit reported where a store sets none: never `Infinity`. */
 export const StoreLimitCap = 19_006_492_568
+
+// notes/reference-sizes.md: a medium box 1,087 bytes, a gate with a passphrase and a passkey wayin 1,029, an empty root box 566:
+// 2,682 bytes, plus half again is 4,023, rounded up to the next 1000.
+/** The size in bytes below which a store cannot hold even a bank's first few Things. */
+export const StoreLimitFloor = 5_000
+
+/** The smallest quota a browser may give a page for an IndexedDB store to open: twice {@link StoreLimitFloor}. */
+export const StoreQuotaLeast = 2 * StoreLimitFloor
 
 /** The limits a store reports: each of `limits` given, capped at {@link StoreLimitCap}, and the cap for each left out. */
 export function storeLimitsOf(limits: Partial<StoreLimits> = {}): StoreLimits {

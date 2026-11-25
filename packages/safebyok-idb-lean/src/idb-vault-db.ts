@@ -18,7 +18,7 @@ export type IdbVaultDBOpts = { dbName?: string | undefined }
 const idbVaultDBOpts = DB.objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_record')
 // --
 
-// == [Helpers]: Rung, isHeardBy, rootsFetchedIn, bankFetchedIn, aboveFetchedIn, besideAfterIn, quotaNow
+// == [Helpers]: Rung, isHeardBy, rootsFetchedIn, bankFetchedIn, aboveFetchedIn, besideAfterIn, quotaNow, shelfRefusingSmallQuota
 
 /** The notice of one Thing written, broadcast to every watch on the database. */
 type Rung = { scope: ThingWatchScope, received: Received }
@@ -69,6 +69,19 @@ async function quotaNow(): Promise<number | undefined> {
   const { quota } = await storage.estimate()
   return quota
 }
+
+/** `shelf`, but its first use refuses `storage_blocked` where the browser's quota is under {@link DB.StoreQuotaLeast}. Where the browser gives no estimate, nothing is refused. */
+function shelfRefusingSmallQuota(shelf: UseStore): UseStore {
+  let quotaIsEnough = false
+  return async (txMode, callback) => {
+    if (! quotaIsEnough) {
+      const quota = await quotaNow()
+      if ((quota !== undefined) && (quota < DB.StoreQuotaLeast)) { throw DB.storeQuotaTooSmall(quota) }
+      quotaIsEnough = true
+    }
+    return await shelf(txMode, callback)
+  }
+}
 // --
 
 /** A vaultDB stored in this browser's IndexedDB. Its watches receive the writes made in every tab. */
@@ -84,7 +97,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   constructor(opts: IdbVaultDBOpts = {}) {
     const { dbName } = idbVaultDBOpts.parse(opts, { where: "In IdbVaultDB's options" })
     super()
-    this.#shelf    = shelfOf(dbName)
+    this.#shelf    = shelfRefusingSmallQuota(shelfOf(dbName))
     this.#bellname = bellnameOf(dbName)
   }
   // --

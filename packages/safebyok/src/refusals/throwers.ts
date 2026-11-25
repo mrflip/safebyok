@@ -6,6 +6,7 @@ import { Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
 import { unexpectedError } from 'safebyok-big/refusals/throwers'
 import * as Phrases from '../phrases'
 import { type ThingRecord } from '../shapes/shapes-thing'
+import { StoreQuotaLeast } from '../shapes/shapes-vault-stats'
 import { type ListAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
 import type { DamagedThing } from '../shapes/shapes-answers'
 import type { ProbeStepkind } from '../shapes/shapes-vault-probe'
@@ -91,7 +92,7 @@ export function bornAtNotNow(ask: WriteAsk): Errors.VaultError { return new Erro
 export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
 // --
 
-// == [Storing Throwers]: PoliciedMeta, gateIssue, bornAtNotStored, lifetokNotStored, rowOfOtherAddress, bankRootsMissing, listParentNotLive, answerNotMade
+// == [Storing Throwers]: PoliciedMeta, gateIssue, storeQuotaTooSmall, bornAtNotStored, lifetokNotStored, rowOfOtherAddress, bankRootsMissing, listParentNotLive, answerNotMade
 
 // Big types a refusal's meta.act as its own BadAct, which has no `policied`.
 /** Refusal meta with act `policied`, for a write the act tables allow but a storage policy, the born_at check or the lifetok check refuses. */
@@ -100,6 +101,11 @@ export const PoliciedMeta = { act: 'policied' } as unknown as Errors.RefusalMeta
 /** A `gate_issue` refusal of a write over `stored`, saying `why`. */
 export function gateIssue(stored: ThingRecord | null, why: string): Errors.VaultError {
   return new Errors.VaultError('gate_issue', BigPhrases.gateIssue(why), { rows: { dbhas: stored }, meta: PoliciedMeta })
+}
+
+/** A `storage_blocked` refusal: the browser's `quota` of bytes for the page is under {@link StoreQuotaLeast}, too little for a vault. */
+export function storeQuotaTooSmall(quota: number): Errors.VaultError {
+  return new Errors.VaultError('storage_blocked', Phrases.StoreQuotaTooSmall(quota, StoreQuotaLeast))
 }
 
 /** A `bad_record` refusal of a write over `stored`, the live Thing whose born_at it changes. */
