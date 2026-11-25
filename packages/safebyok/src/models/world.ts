@@ -428,9 +428,9 @@ export class World {
   }
 
   /** True of a live lease record not past its end, granted under the main gate's life */
-  #canUnlock(stored: LeaseRecord): boolean {
+  #canUnlock(stored: Sealers.LiveOf<LeaseRecord>): boolean {
     const { gate } = this
-    return (stored.am === 'a') && (Clock.nowMillis() < stored.ends_at) && (stored.gate_labelpath === gate?.labelpath) && (stored.gate_lifeseq === gate.lifeseq)
+    return (Clock.nowMillis() < stored.ends_at) && (stored.gate_labelpath === gate?.labelpath) && (stored.gate_lifeseq === gate.lifeseq)
   }
 
   // A softlock only ever brings the end nearer, so every tab that hears the same gate change writes the same revision,
