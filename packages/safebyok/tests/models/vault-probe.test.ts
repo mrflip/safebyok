@@ -38,7 +38,7 @@ function getAfterPut(bank: Bank, before: () => unknown): void {
 }
 
 describe("vault.probe(asked)", () => {
-  it("puts a box, gets it back from storage though this device holds it, unseals it and deletes it, reporting that its whisper matched", async () => {
+  it("probes storage and keys end to end", async () => {
     // probe @example
     const { bank, vault } = await TH.buildBornVault()
     const asks = spyAsksAt(bank, ProbeLabelpath)
@@ -119,7 +119,7 @@ describe("vault.probe(asked)", () => {
     expect(asks.writes()).to.deep.equal([])
   })
 
-  it("refuses at the step that failed, with the step's refusal kind and cause, leaving the steps after it untaken", async () => {
+  it("refuses at the step that failed", async () => {
     const { bank, vault } = await TH.buildBornVault()
     const refusal = Throwers.storageUnavailable(new Error('connection refused'))
     getAfterPut(bank, () => { throw refusal })
