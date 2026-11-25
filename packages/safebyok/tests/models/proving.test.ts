@@ -355,8 +355,8 @@ describe("PasskeyProving.buildStored(gate, passkeyCleartext)", () => {
 /** What a proving's make is handed, loosely typed, so that a test can hand it anything. */
 type MakeHanded = { parts: Readonly<Record<'bankStamp' | 'gateStamp' | 'header' | 'stored', unknown> & Record<string, unknown>>, opts: Readonly<Record<string, unknown>> }
 
-/** What a refusal case hands a make in place of a part: the other kind's header, a wayin's record, and things that are not a wayinKey. */
-type MakeSpares = { otherHeader: WayinHeader, record: WayinRecord, keyBytes: Uint8Array, extractableKey: CryptoKey, boxKey: CryptoKey, shortKey: CryptoKey }
+/** What a refusal case hands a make in place of a part: the other kind's header, a wayin's record, wayins of other headers, and things that are not a wayinKey. */
+type MakeSpares = { otherHeader: WayinHeader, record: WayinRecord, otherWayin: Wayin, kinWayin: Wayin, keyBytes: Uint8Array, extractableKey: CryptoKey, boxKey: CryptoKey, shortKey: CryptoKey }
 
 /** A fresh wayinKey, as a passphrase proving derives one. */
 function wayinKeyOf(): Promise<CryptoKey> { return Crypto.importWrappingKeyBytes(Crypto.randomBytes(Consts.PassphraseKeySize)) }
@@ -366,12 +366,14 @@ async function makeHandedOf(novel: Proving): Promise<MakeHanded> {
   return { parts: { bankStamp: novel.bankStamp, gateStamp: novel.gateStamp, header: novel.header, stored: null }, opts: { wayinKey: await wayinKeyOf() } }
 }
 
-/** The spares a refusal case draws on: `other`'s header, the record of a new wayin of `novel`, and keys of every wrong kind. */
-async function makeSparesOf(novel: Proving, other: Proving): Promise<MakeSpares> {
+/** The spares a refusal case draws on: `other`'s header and a new wayin of it, the record of a new wayin of `novel`, a new wayin of `kin`, and keys of every wrong kind. */
+async function makeSparesOf(novel: Proving, other: Proving, kin: Proving): Promise<MakeSpares> {
   const wayin = await novel.buildWayin(NOVEL)
   return {
     otherHeader:    other.header,
     record:         wayin.pickle(),
+    otherWayin:     await other.buildWayin(NOVEL),
+    kinWayin:       await kin.buildWayin(NOVEL),
     keyBytes:       Crypto.randomBytes(Consts.PassphraseKeySize),
     extractableKey: await Crypto.makeBankKey(),
     boxKey:         await Crypto.makeBoxKey(),
@@ -396,6 +398,8 @@ const MakeRefusalCases: readonly (readonly [(handed: MakeHanded, spares: MakeSpa
   [({ parts, opts }, { otherHeader }) => ({ parts: { ...parts, header: otherHeader }, opts }),  "the other kind of wayin's header"],
   [({ parts, opts }, { record }) => ({ parts: { ...parts, header: record }, opts }),            "a whole wayin record, wrapped bankKey and all, as the header"],
   [({ parts, opts }, { record }) => ({ parts: { ...parts, stored: record }, opts }),            "a wayin's record in place of a Wayin"],
+  [({ parts, opts }, { otherWayin }) => ({ parts: { ...parts, stored: otherWayin }, opts }),    "a stored wayin of the other kind"],
+  [({ parts, opts }, { kinWayin }) => ({ parts: { ...parts, stored: kinWayin }, opts }),        "a stored wayin of its kind with another header"],
   [({ parts }, { keyBytes }) => ({ parts, opts: { wayinKey: keyBytes } }),                      'key bytes in place of a CryptoKey'],
   [({ parts }, { extractableKey }) => ({ parts, opts: { wayinKey: extractableKey } }),          'an extractable key'],
   [({ parts }, { boxKey }) => ({ parts, opts: { wayinKey: boxKey } }),                          'a key for encrypt and decrypt'],
@@ -422,7 +426,7 @@ for (const [ProvingClass, novelOf, otherOf] of MakeKinds) {
       it(`refuses ${blurb} as 'bad_record', quoting nothing it was handed and with no cause`, async () => {
         const novel = await novelOf()
         const handed = await makeHandedOf(novel)
-        const spares = await makeSparesOf(novel, await otherOf())
+        const spares = await makeSparesOf(novel, await otherOf(), await novelOf())
         const { parts, opts } = handedOf(handed, spares)
         const err = TH.expectSyncRefusal(() => ProvingClass.make(parts as never, opts as never), 'bad_record')
         expect(err.cause).to.be.undefined
