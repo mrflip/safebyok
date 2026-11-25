@@ -164,6 +164,13 @@ VaultMinder). World.connect's doc block says a call after a failed watch retries
 its own section (the Closer Look's E4 is open). Levels: review `medium` on opus. Branch `20261125-janitor`, cut from
 1a's tip. Depends on 1c; beside 1d; 1b builds on both at the restack. Size: medium. PR #908, ready; in review. No car `readAt` (the Thing's `read_at` serves).
 
+### 9. `pg_read_tc`: Postgres mints read_tc
+> "Postgres does not take it from the database -- would you fix that? Pg should be able to make the uuid v7 directly"
+
+Gloss: PostgresVaultDB takes `read_tc` from Postgres 18's built-in `uuidv7()`, in the statement that reads the rows,
+not from the client's `readTcNow()`; its watch too. README: Postgres 18 or later. Memory and IndexedDB keep minting
+locally. Levels: worker opus medium; review `medium`. Branch `20261125-pg_read_tc`, cut from 2 (#905). Building.
+
 ## For the Coach
 - **safebyok-convex is still on safebyok-big.** Thread 7's wrapper works for any new-core vaultDB. *Coach:* "convex and
   other adapters will be soon".

@@ -74,3 +74,19 @@ Curated by the orchestrator. Newer than the plan where they disagree.
   disconnect drops this tab's copy, YOLO in 1b, a row); E3 (read_tc stays storage's: "what matters is when the ground
   truth was consulted"); E9 (`MaxTimerMillis`: "Maxmillis of 24.5 days is correct one", imported in thread 8). The
   rest (E2 lazy expiry, E4 janitor object, E5 VaultTSQ reach, E6 softlock and the kit, E7, E8, E10–E12) is dropped.
+
+## Thread 1b `lease_shared` (#909, reviewed, filing)
+- Every tab follows the stored lease: a grant, renewal or softlock stows it; `lock()` and the janitor's autolock stow its
+  tombstone; a disconnect and `disable()` drop this tab's copy only (the Coach: "Vacate delete and lock cause lock").
+- A connected World peeks the device database on `connect`, on each root's news, and at each ring; a newer record
+  replaces this tab's lease (`#followStored` → `#takeUp`). A gate change softlocks (`#softlockPastGate`).
+- Leases are filed under the lease's own scope, `LeaseScope` = `{ userid, banklabel, labelpath: 'lease/<gate label>' }`
+  (`leaseScopeOf(gateScope)`); lifepath `0000000000/<lifeseq>` (`LeaseLifeRoot`, `leaseLifepathOf`).
+- Keys are read only in `Lease.make`, `Lease#nextEndingAt`, `Lease#stow` (G4/G9 drift recorded).
+- **For thread 6:** hook a line each in `#takeUp` (an unlock or lock taken up from another tab), `#softlockPastGate`,
+  and the janitor's `#lockPastLeaseEnd`. **For thread 5:** `device.deviceDB` is always set.
+- **Owed to 1b, in thread 6's first commit:** an expired stored lease is followed as its tombstone
+  (`#leaseFollowed` follows `Lease.tombstoneOf(stored)` where the stored record cannot unlock), so the unlock starts a
+  new life; `Lease.stow`'s local `checked` gets a plain name.
+- **Planning lesson:** the forked `/code-review` checked the reviewer's own worktree branch back out under it; a reviewer
+  re-checks HEAD after `/code-review` returns. (Brief reviewers with it.)
