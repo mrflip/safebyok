@@ -53,7 +53,7 @@ const LeaseLabelpathPattern = /^lease\/[^/]+$/
 
 /** The helpers of a {@link LeaseLabelpath}. */
 export const LeaseLabelpath = Object.freeze({
-  /** The labelpath of the lease for the gate at `gateLabelpath`: `lease/gate` for the main gate, `lease/passkeys` for `gate/passkeys`. Refuses `bad_record` for any other labelpath. */
+  /** The labelpath of the lease for the gate at `gateLabelpath`: `lease/gate` for the main gate, `lease/passkeys` for `gate/passkeys`. */
   of(gateLabelpath: Labelpath): LeaseLabelpath { return `lease/${Labelpath.labelOf(PerKindChecks.gateLabelpath.parse(gateLabelpath))}` },
 })
 
