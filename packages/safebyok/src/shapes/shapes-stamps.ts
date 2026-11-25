@@ -3,7 +3,7 @@
 import type * as Z from 'zod'
 import { CX, GX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { Labelpath } from './primitives'
+import { type Lifepath, type Lifeseq, Labelpath, VoidLifeseq, Lifeseq as Lifeseqs } from './primitives'
 import type { TombstoneOf } from './shapes-sealers'
 import { PerKindChecks, ThingChecks, ThingFormat, isLabelLast, isParityRight } from './shapes-thing'
 
@@ -40,7 +40,7 @@ export type StampedGate = Z.infer<typeof StampChecks.stampedGate>
 export type BoxStamp    = Z.infer<typeof StampChecks.boxStamp>
 // --
 
-// == [The lease's forms]: LeaseFormat, LeaseLabelpath, leaseLabelpathOf, isLifepathOwn, isOfItsGate, LeaseChecks, StampChecks, LeaseStamp, LeaseSparse, LeaseRecord, LeaseTombstone, LeaseLoggable
+// == [The lease's forms]: LeaseFormat, LeaseLabelpath, leaseLabelpathOf, LeaseLifeRoot, leaseLifepathOf, isLifepathOwn, isOfItsGate, LeaseChecks, StampChecks, LeaseStamp, LeaseSparse, LeaseRecord, LeaseTombstone, LeaseLoggable
 
 /** The `fmt` a lease carries, the same as every Thing's. It is bound into the wrap of the lease's bankKey. */
 export const LeaseFormat = ThingFormat
@@ -54,8 +54,16 @@ const LeaseLabelpathPattern = /^lease\/[^/]+$/
 /** The labelpath of a lease granted under the gate at `gateLabelpath`: `lease/gate` for the main gate, `lease/passkeys` for `gate/passkeys`. */
 export function leaseLabelpathOf(gateLabelpath: Labelpath): LeaseLabelpath { return `lease/${Labelpath.labelOf(gateLabelpath)}` }
 
-/** True when a lease's lifepath is its lifeseq alone: a lease has no lives above its own. */
-function isLifepathOwn({ lifeseq, lifepath }: { lifeseq: string, lifepath: string }): boolean { return lifepath === lifeseq }
+// A lease has no life above its own, but its lifepath keeps one lifeseq for each segment of its labelpath, as a
+// Thing's does: the first is this placeholder, so a lease's life never resets with its gate's or its bank's.
+/** The placeholder lifeseq at the head of every lease's lifepath, life 0's: `0000000000`. */
+export const LeaseLifeRoot: Lifeseq = Lifeseqs.ofLifenum(0)
+
+/** The lifepath of a lease of life `lifeseq`: {@link LeaseLifeRoot}, then `lifeseq`. */
+export function leaseLifepathOf(lifeseq: Lifeseq): Lifepath { return `${LeaseLifeRoot}/${lifeseq}` }
+
+/** True when a lease's lifepath is {@link LeaseLifeRoot} and then its own lifeseq. */
+function isLifepathOwn({ lifeseq, lifepath }: { lifeseq: string, lifepath: string }): boolean { return lifepath === leaseLifepathOf(lifeseq) }
 
 /** True when a live lease's labelpath is the one its gate's labelpath gives it. */
 function isOfItsGate({ labelpath, gate_labelpath }: { labelpath: string, gate_labelpath: Labelpath }): boolean { return labelpath === leaseLabelpathOf(gate_labelpath) }
@@ -100,7 +108,7 @@ const LeaseChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, discrim,
     revseq:     lit(SX.VoidRevisionSeq),
     am:         lit('x'),
     lifeseq:    ThingChecks.voidLifeseq,
-    lifepath:   ThingChecks.voidLifeseq,
+    lifepath:   lit(leaseLifepathOf(VoidLifeseq)),
     born_at:    lit(SX.VoidTime),
     written_at: lit(SX.VoidTime),
   })
@@ -120,7 +128,7 @@ const LeaseChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, discrim,
  * Anything carrying a stamp's fields passes, such as a Bank, a Gate or its Thing, and its other fields are dropped.
  * The lease's stamp has its bank's stamp under `bank_` names, cites the gate the lease was granted under, and is bound into the wrap of its bankKey.
  * Its `born_at` is that of the lease it renews, or its `proved_at` where it renews none.
- * A lease record is what a deviceDB stores for a bank, Thing-shaped at `lease/<gate label>`, its lifepath its lifeseq alone.
+ * A lease record is what a deviceDB stores for a gate, Thing-shaped at `lease/<gate label>`, its lifepath `0000000000/` and its lifeseq.
  * Live, it adds the stamp, the leaseKey, the bankKey wrapped under it, when the lease ends and the gate revision it cites; a tombstone has its Thing fields alone.
  * Also `LeaseFormat`, the `fmt` a lease carries.
  */

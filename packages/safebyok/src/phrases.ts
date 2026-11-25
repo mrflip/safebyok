@@ -102,7 +102,7 @@ export const LifepathDepth = "A Thing's lifepath has one lifeseq for each segmen
 export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tombstone (am: 'x')."
 
 /** A lease record whose lifepath is more than its lifeseq. */
-export const LeaseLifepathOwn = "A lease record's lifepath is its lifeseq alone: no life is above a lease's own."
+export const LeaseLifepathOwn = "A lease record's lifepath is `0000000000/` and its own lifeseq: no life is above a lease's own."
 
 /** A lease record whose labelpath is not `lease/` and one label. */
 export const LeaseLabelpathShape = "A lease's labelpath is `lease/` and the label of its gate, such as `lease/gate`."

@@ -11,7 +11,7 @@ import { type LeaseGate, type LeaseOpts, type LeaseShellScope, type SecretFieldn
 import type * as Sealers from '../shapes/shapes-sealers'
 import type { LiveOf, ShellOf } from '../shapes/shapes-sealers'
 import {
-  type BankStamp, type LeaseLabelpath, type LeaseLoggable, type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat, StampChecks, leaseLabelpathOf,
+  type BankStamp, type LeaseLabelpath, type LeaseLoggable, type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat, StampChecks, leaseLabelpathOf, leaseLifepathOf,
 } from '../shapes/shapes-stamps'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { DeviceDBChecks } from '../shapes/shapes-device-db'
@@ -45,7 +45,7 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
   declare readonly am:             'a'
   /** Its life, as a lifeseq: a lease granted after a lock has the next. */
   declare readonly lifeseq:        Lifeseq
-  /** Its lifeseq alone: no life is above a lease's own. */
+  /** `0000000000/` and its lifeseq: one lifeseq for each segment of its labelpath, though no life is above a lease's own. */
   declare readonly lifepath:       Lifepath
   /** Its revision in its life: a renewal or a softlock writes the next. */
   declare readonly revseq:         number
@@ -123,7 +123,7 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
     const { userid, banklabel, labelpath: gate_labelpath } = Checks.gateScope.parse(gateScope)
     const labelpath = leaseLabelpathOf(gate_labelpath)
     return StampChecks.leaseShell.parse({
-      fmt: LeaseFormat, userid, banklabel, labelpath, label: Labelpath.labelOf(labelpath), lifeseq: VoidLifeseq, lifepath: VoidLifeseq,
+      fmt: LeaseFormat, userid, banklabel, labelpath, label: Labelpath.labelOf(labelpath), lifeseq: VoidLifeseq, lifepath: leaseLifepathOf(VoidLifeseq),
       revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', born_at: SX.VoidTime, written_at: SX.VoidTime,
     })
   }

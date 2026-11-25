@@ -4,7 +4,7 @@ import { fakeCiphered } from 'safebyok-big/testing'
 import { type Lifenum, Lifeseq } from '../../src/shapes/primitives'
 import type { LiveOf } from '../../src/shapes/shapes-sealers'
 import type { Sparse } from '../../src/shapes/shapes-thing'
-import { type LeaseRecord, type LeaseTombstone, LeaseFormat } from '../../src/shapes/shapes-stamps'
+import { type LeaseRecord, type LeaseTombstone, LeaseFormat, leaseLifepathOf } from '../../src/shapes/shapes-stamps'
 import { T0, WorldBankStamp, WorldGate, WorldScope, revtokOf } from './models-world'
 
 // == [Lease records]: LeaseGiven, leaseThingOf, liveLeaseRecordOf, leaseTombstoneOf
@@ -17,7 +17,7 @@ function leaseThingOf(lifenum: Lifenum, revseq: number): Omit<Sparse<LeaseRecord
   const lifeseq = Lifeseq.ofLifenum(lifenum)
   return {
     fmt: LeaseFormat, ...WorldScope, labelpath: 'lease/gate', label: 'gate',
-    lifeseq, lifepath: lifeseq, revseq, revtok: revtokOf(`${String(lifenum)}.${String(revseq)}`), born_at: T0, written_at: T0,
+    lifeseq, lifepath: leaseLifepathOf(lifeseq), revseq, revtok: revtokOf(`${String(lifenum)}.${String(revseq)}`), born_at: T0, written_at: T0,
   }
 }
 

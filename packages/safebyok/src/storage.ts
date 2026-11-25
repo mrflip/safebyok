@@ -21,7 +21,7 @@ export {
 export * as Classifier from './storage/thing-classifier'
 export { VacantAgerank, readAtOf, readTcNow } from './storage/agerank'
 export {
-  type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseLabelpath, type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat, StampChecks, leaseLabelpathOf,
+  type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseLabelpath, type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat, LeaseLifeRoot, StampChecks, leaseLabelpathOf, leaseLifepathOf,
 } from './shapes/shapes-stamps'
 // The deviceDB, which has each bank's lease record on this device, and its memory store. The IndexedDB store is on `safebyok/browser`.
 export { DeviceDB } from './storage/device-db'
