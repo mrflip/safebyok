@@ -3,7 +3,7 @@
 Mode: **YOLO**. Issued by the Coach, 2026-11-25. Cap: 3 threads at once.
 Default levels: review `medium`; worker `opus` (thread-worker), reviewer `opus` for threads touching what
 `notes/guarantees-big.md` covers (lease, keys), else its `sonnet` pin; style pass on `style-reviewer`'s pin.
-Status: 0 filed (#900, out of draft); 1c reviewed (fixed), filing hit a conflict, a worker resolves it; 1a in review (#903); 2 stats building; Open Matters bookmark rev 8.
+Status: 0 filed (#900); 1c filing (conflict being resolved); 1a reviewed (fixed), files onto 1c once it lands; 2 stats building. Line: 0 -> 1c -> 1a -> 1b.
 
 Sprint doc: https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh (Open Matters bookmark rev 3).
 
@@ -48,8 +48,12 @@ throws big's refusal phrased "a sweep or a vacate"; device verbs after disable; 
 
 Gloss: design 1, and the stored row of 2. It ports big's device database (lease verbs: peek, stow, listen) into
 `safebyok/src/storage/`. The row is Thing-shaped; a stow keeps the newest; the bell carries the scope only.
-Levels: review `high` on `opus`. Branch `20261125-device_db`, cut from #899's tip; rebased onto 0 at filing.
-Depends on nothing; stays out of `models/`. Building.
+Levels: review `high` on `opus`. Branch `20261125-device_db`, PR #903, cut from #899's tip; files onto 1c.
+Depends on nothing; stays out of `models/`. Reviewed.
+*Review:* `high` on opus, fixed: banner and local names, shapes moved to `shapes/shapes-device-db.ts`, `listen` maps a
+throw to `storage_unavailable` as its siblings do, vocabulary words, and a missing G4 drift (rows peeked by bank
+scope alone). Left: a documentarian pass on `device-db.ts` and `StampChecks` after 1b; `scopepathOf` and
+`LeaseScopepath` to export from `safebyok/browser` in 1b.
 
 ### 1c. `softlock`: options, softlock, the janitor
 > "Add a startup (device/provider) option janitorMinutes (default 10) and gateStaleMinutes default 720, World has a
