@@ -1,8 +1,8 @@
 # Thread 0: connect() and disconnect() replace sweep (2026-11-25)
 
-Branch `20261125-connect`, PR #900, a draft on `main` (stacked on #899, now merged). Proved: `safebyok` 1978 tests,
-`safebyok-react-lean` 339, the knockknock (26) and envman (24) demos, typecheck and lint clean in each; `pnpm justify`
-after the catch-up, per the PR's **Tests:** line.
+Branch `20261125-connect`, PR #900, a draft on `main` (stacked on #899, now merged). Proved after the rework:
+`safebyok` 2000 tests, `safebyok-react-lean` 339, the knockknock (26) and envman (24) demos, typecheck and lint clean
+in each. The first build was proved with `pnpm justify` after the catch-up.
 
 * **Built**:
   - `VaultMinder.connect()`/`disconnect()`/`isWatching` (`src/minding/vault-minder.ts`): the constructor no longer
@@ -19,6 +19,20 @@ after the catch-up, per the PR's **Tests:** line.
   - `Device.connect()`/`disconnect()` forward to the World and return the device. `Vault.connect`/`disconnect` forward
     to its vault TSQ. `HostedVault` is `{ connect, disconnect }`.
   - The giver's provider (`safebyok-react-lean/src/giver/react-giver.tsx`) adds the effect the Coach gave.
+  - **Rework, the review's finding**: a `World.connect` after sign-in, where the world was not connected, gets the three
+    roots again (`#refreshRoots`, through `vaultMinder.tryGetWorldOnce()`), what it throws or refuses going to
+    `tellBadNews`. Test: device test "gets its bank's roots again as it connects after a disconnect, following a gate
+    changed meanwhile on another device, with no notice heard" (the watch muted, a second device replaces the
+    passphrase). A second `connect()` gets nothing: the refresh runs only on the move from disconnected.
+  - **Rework, the Coach's directive**: `Device.disable()` ends the device for good: it sets `#endCause` to big's
+    `deviceDisabled()`, then `World.disable()` (internal) rejects the `ensureUnlocked` wait with it and disconnects
+    (which locks). Idempotent, never throws. `World.connect` does nothing once disabled, so no watch or refresh restarts.
+    The stage is `'disabled'`, renamed from `'swept'` (core, both demos, VOCABULARY's stage row). The disabled-path tests
+    return on `disable()`: World (snapshot, subscribers), Bank (end cause, put refused before the vaultDB, hostVault
+    refused), Gate (end cause, unseal refused), the `ensureUnlocked` waiter rejections, Vault (make refused, put,
+    withWhisper, withUnlockedWhisper, seal, tombstone, unseal refused, watch stopped), and G2 zeroing on a disabled
+    unlock (gate-forms "refuses once its device is disabled, deriving no key, and zeroes a passkey answer"). The lease's
+    disabled tests stay on their fake gate.
   - Removed: `sweep` on Device, World, Bank, Gate, Lease, Vault, VaultMinder, VaultTSQ; `Phrases.BankSwept`,
     `Throwers.bankSwept`, `WorldChecks.endCause`.
   - Docs: VOCABULARY rows for bank, device, lease, land and world, and a new **connect**, **disconnect** row. In
@@ -32,9 +46,11 @@ after the catch-up, per the PR's **Tests:** line.
     starts before the vaults hear, so the connect's invalidation refetches under a watching minder.
   - `Device.make` starts nothing, verified: nothing is watched until the device is both connected and signed in (device
     test "watches nothing until connected, even once signed in").
-  - Nothing can disable a world once sweep is gone (handoff item 6): `World.endCause` is `this.#device.endCause`, and
-    Device's `#endCause` is never set. `isEnabled`/`demandEnabled` stay as guards; I invented no caller. The `'swept'`
-    stage stays exported in `bankStageVals`, unreachable, and the demos keep their `case 'swept':`.
+  - `World.endCause` is `this.#device.endCause`; only `device.disable()` sets it (rework).
+  - `disable()` uses safebyok-big's `deviceDisabled()` thrower (already re-exported through `export *`), whose phrase,
+    `DeviceLetGo`, reads "This device was let go, by a sweep or a vacate, ...". A thrower of the same name here fails
+    lint (`import-x/export`), and CLAUDE.md says re-export rather than redefine. Set aside: a new-core phrase and a
+    differently named thrower.
   - `VaultTSQ.connect` invalidates the bank's items and listings, so what was cached while unminded is fetched again on
     reconnect. A second connect does nothing. This is an addition the handoff did not name.
 
@@ -49,9 +65,7 @@ after the catch-up, per the PR's **Tests:** line.
     `onBadNews`, and the bank comes up (`'unborn'` in the test). The watch is no longer part of sign-in, so it cannot
     fail it. Only a broken vaultDB sees this. The react-lean test that failed sign-in through a throwing watch now fails
     it through `tryGetWorld` rejecting.
-  - **Tests deleted**, with no way left into a disabled world: the swept refusals of World, Bank, Gate and Vault, and
-    "refuses a swept bank, deriving no key, and zeroes a passkey answer" (G2 zeroing on a disabled unlock). The lease's
-    disabled tests are kept, against a local fake gate whose end can be set (`endableGateOf`, `tests/models/lease.test.ts`).
+  - The disabled-path tests deleted in the first build return on `disable()` (rework, above).
 
 * **Discoveries**:
   - For thread 1: the plan says the janitor is "started at `signin` and cleared by the world's disconnect". With this
@@ -60,8 +74,10 @@ after the catch-up, per the PR's **Tests:** line.
   - StrictMode mounts, unmounts and mounts again: the giver test sees one watch at the end, the minder watching.
 
 * **For the Coach**:
-  - The `'swept'` stage: rename or drop it when vacate and delete arrive.
-  - The deleted disabled-path tests, G2 zeroing on a disabled unlock among them: they return with the ends.
+  - The refusal a disabled device throws names "a sweep or a vacate" (big's `DeviceLetGo`); a new-core phrase would say
+    "disabled".
+  - After `disable()`, the device's own `signin`, `judgeStrength` and `birthGating` do not check the end cause
+    themselves; a sign-in after it reaches the world, which refuses as it hosts the vault, and shows `'disabled'`.
   - Freshness through staleTime rather than agekind (above).
   - The invalidation on connect (above).
   - The watch-throw change from `'failed'` to bad news (above).
