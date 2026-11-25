@@ -231,7 +231,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
    * Under it, a hook never shows a device whose userid is not the prop's: it shows `starting` instead. Until its effects run,
    * as in a server render, a hook shows `starting` for a userid and `signed_out` for none.
    * The calls that are not hooks act on the device of the provider mounted, and refuse once it unmounts.
-   * While mounted, its device watches the vaultDB; unmounting locks the bank and stops the watch, and ends nothing.
+   * While mounted, its device watches the vaultDB and follows the lease its deviceDB stores; unmounting stops both and locks the bank in this tab alone, and ends nothing.
    * Mount one at a time: under two mounted at once, those calls act on the one mounted last, until it unmounts.
    * The parts and the kit beneath it use its giver and bank, unless handed their own as props.
    */
