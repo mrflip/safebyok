@@ -14,7 +14,7 @@ import { type CarWorld, type DelOnceArgs, type PutOnceArgs, type ReceivingThing,
 import { type ReadTc, type SeenThing, type VaultEvent, SeenChecks, VaultDBSourcelabel } from '../shapes/shapes-vault-event'
 import * as Throwers from '../refusals/throwers'
 import { BaseThing } from '../models/base-thing'
-import { VacantAgerank, itemSeenOf } from '../storage/agerank'
+import { itemEventOf } from '../storage/agerank'
 import { refusedAnswerOf } from '../storage/refused-answer'
 import { ThingCar } from './thing-car'
 import type { BadAnswer, BirthBankAnswer, GetThingAnswer, GetWorldAnswer, Kids, ListThingsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
@@ -382,10 +382,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
 
   /** The events the Thing at `labelpath`, `seen`'s, returns for `seen` at `dispatch`, its car kept first where there is none */
   #receiveAtThing(labelpath: Labelpath, seen: SeenThing, dispatch: Dispatch): readonly VaultEvent[] {
-    const proposed = Object.freeze({
-      eventkind: 'item', ...this.#scope, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: VacantAgerank, agerankWas: VacantAgerank, ...dispatch, ...itemSeenOf(seen),
-    } as const)
-    return this.#ensureCar(labelpath, seen).receive(proposed)
+    return this.#ensureCar(labelpath, seen).receive(itemEventOf(seen, dispatch))
   }
 
   // The car is kept before its Thing receives a record, so that a subscriber the Thing tells finds it here, and stays

@@ -9,7 +9,7 @@ import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
 import { BaseThing } from '../../src/models/base-thing'
 import { type SeenThing, type VaultEvent, type VaultItemEvent, VaultDBSourcelabel } from '../../src/shapes/shapes-vault-event'
 import { SX } from 'safebyok-big/internals'
-import { VacantAgerank, itemSeenOf, readTcNow } from '../../src/storage/agerank'
+import { itemEventOf as dispatchedItemEventOf, readTcNow } from '../../src/storage/agerank'
 import { PlainThing } from './plain-thing'
 import type { ShellOf } from '../../src/shapes/shapes-sealers'
 import type { CarWorld } from '../../src/shapes/shapes-vault-minder'
@@ -184,9 +184,7 @@ export const PlainWorld: CarWorld<PlainThing> = Object.freeze({ makeThing: makeP
 
 /** The `item` notice a vaultDB's raw watch gets for `record`, at the liveness its record has, with the vacant agerank, at {@link AnyReadTc}, and with the void lifetok unless given another. */
 export function itemEventOf(record: SeenThing, banktok: Lifetok = SX.VoidLifeTok): VaultItemEvent {
-  const { userid, banklabel, labelpath } = record
-  const unsorted = { agerank: VacantAgerank, agerankWas: VacantAgerank, banktok, sourcelabel: VaultDBSourcelabel, read_tc: AnyReadTc }
-  return { eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), ...unsorted, ...itemSeenOf(record) }
+  return dispatchedItemEventOf(record, { sourcelabel: VaultDBSourcelabel, read_tc: AnyReadTc, banktok })
 }
 
 /** What a Thing is made from at `seen`: `seen` itself where it is the shell, else its item event, read now. */

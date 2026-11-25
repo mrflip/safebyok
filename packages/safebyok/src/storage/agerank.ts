@@ -2,11 +2,11 @@
 
 import { v7 as uuidv7 } from 'uuid'
 import { BaseThing } from '../models/base-thing'
-import { type EpochMillis, type Lifepath, Lifeseq, Revseq } from '../shapes/primitives'
+import { type EpochMillis, type Lifepath, Labelpath, Lifeseq, Revseq } from '../shapes/primitives'
 import type { ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
 import type { Agekind, Agerank, ItemSeen, ReadTc, SeenThing, VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
 
-// == [Agerank]: TcchunkDigits, NoRevseq, VacantAgerank, VacantReadTc, AgerankFields, readTcNow, readAtOf, tcchunkOf, nextAgerankOf, lifeAgerankOf, tcchunkAfter, laterOf, itemSeenOf, eventsOf, agekindOf, seenAgekindOf, fieldsOf, isOfLife
+// == [Agerank]: TcchunkDigits, NoRevseq, VacantAgerank, VacantReadTc, AgerankFields, readTcNow, readAtOf, tcchunkOf, nextAgerankOf, lifeAgerankOf, tcchunkAfter, laterOf, itemSeenOf, itemEventOf, eventsOf, agekindOf, seenAgekindOf, fieldsOf, isOfLife
 
 // Eight digits make a span of 65.536 seconds: a record seen again at its revision a minute or two later is news, which
 // sits well with TanStack Query's five minutes before it collects a query.
@@ -82,6 +82,16 @@ export function itemSeenOf(seen: SeenThing): ItemSeen {
   if (BaseThing.isVoidSentinel(seen)) { return { liveness: 'void', val: seen } }
   if (BaseThing.isLive(seen)) { return BaseThing.isWhole(seen) ? { liveness: 'full', val: seen } : { liveness: 'soon', val: seen } }
   return { liveness: 'gone', val: seen as Tombstone<ThingRecord> }
+}
+
+/** The `item` event of `seen`, at its scope, as `dispatch` says who dispatched it, when it was read and its bank's lifetok, with the vacant ageranks, frozen. */
+export function itemEventOf(seen: SeenThing, dispatch: Pick<VaultItemEvent, 'sourcelabel' | 'read_tc' | 'banktok'>): VaultItemEvent {
+  const { userid, banklabel, labelpath } = seen
+  const { sourcelabel, read_tc, banktok } = dispatch
+  return Object.freeze({
+    eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: VacantAgerank, agerankWas: VacantAgerank,
+    sourcelabel, read_tc, banktok, ...itemSeenOf(seen),
+  })
 }
 
 /** The events of `proposed`, a record that moved its Thing's agerank from `agerankWas` up to `agerank`, each frozen, in a frozen list.
