@@ -63,7 +63,7 @@ export class Device {
   readonly leaseMillis:        number
   /** How near its end, in milliseconds, a lease asks the user again: `softlockMinutes`, at most a twentieth of {@link leaseMillis}, or 0 where that is under a minute. */
   readonly softlockMillis:     number
-  /** How often, in milliseconds, the world's janitor locks a lease past its end and checks whether the gate is stale. */
+  /** How often, in milliseconds, the world's janitor locks a lease past its end, and, while connected, starts the watch where it is not running and checks whether the gate is stale. */
   readonly janitorMillis:      number
   /** How long after this device last read the gate, in milliseconds, the world reads it again. */
   readonly gateStaleMillis:    number

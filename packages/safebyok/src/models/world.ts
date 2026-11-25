@@ -18,6 +18,7 @@ import { type BankStamp, type LeaseLoggable, StampChecks } from '../shapes/shape
 import { type BankRecord, type BoxRecord, type BulletproofCallback, type GateRecord, type Sparse, type ThingRecord, type Thingkind, type VoidSentinel, PerKindChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type ReadTc, type SeenThing, type VaultEvent, type VaultItemEvent, SeenChecks } from '../shapes/shapes-vault-event'
+import { MaxTimerMillis } from '../shapes/shapes-vault-tsq'
 import { type EpochMillis, type Lifetok, Labelpath } from '../shapes/primitives'
 import { peekRoots, stowRoots } from '../minding/root-shelf'
 import { itemEventOf, readAtOf } from '../storage/agerank'
@@ -50,7 +51,7 @@ export class World {
   /** True from {@link connect} until {@link disconnect}. */
   #isConnected = false
 
-  /** The janitor's timer, running while this world is connected and someone has signed in; null otherwise. */
+  /** The janitor's timer, running from {@link signin} until the device is disabled; null otherwise. */
   #janitor: ReturnType<typeof setInterval> | null = null
 
   /** Why sign-in failed, or null while it has not. */
@@ -166,7 +167,7 @@ export class World {
 
   // Its Things are seeded before it listens to keep them on the shelf, which would only put back what it read.
   /** Take `vaultMinder`, the signed-in user's bank's records, sorted, whose Things this world makes; seed them from the roots `shelf` keeps, and keep the roots there from then on. A second call does nothing.
-   * With no shelf, the roots are kept nowhere between page loads. Where this world is connected, the VaultMinder starts watching the vaultDB, and the janitor starts.
+   * With no shelf, the roots are kept nowhere between page loads. The janitor starts, and where this world is connected, the VaultMinder starts watching the vaultDB.
    */
   signin(vaultMinder: VaultMinder, shelf: RootShelf | null): void {
     Checks.signinArgs.parse({ vaultMinder, shelf })
@@ -177,6 +178,7 @@ export class World {
       this.#keepOnShelf(vaultMinder, shelf)
     }
     if (this.#isConnected) { this.#connectSignedIn() }
+    this.#startJanitor()
     this.align()
   }
 
@@ -296,8 +298,8 @@ export class World {
   }
 
   // The watch starts before the vaults hear it, so that what a vault refetches as it connects is fetched under the watch.
-  /** Start what this world keeps running: its VaultMinder's watch of the vaultDB and its janitor, once someone signs in, and each vault it hosts hearing the VaultMinder. Never throws; a second call, or a call once the device is disabled, does nothing.
-   * What the host's vaultDB throws as the watch starts goes to the device's `onBadNews`.
+  /** Start what this world keeps running: its VaultMinder's watch of the vaultDB, once someone signs in, and each vault it hosts hearing the VaultMinder. Never throws; a call once the device is disabled does nothing.
+   * What the host's vaultDB throws as the watch starts goes to the device's `onBadNews`, and a later call, or the janitor's next tick, starts the watch again. A call while the watch runs leaves it running.
    */
   connect(): this {
     if (! this.isEnabled) { return this }
@@ -307,22 +309,22 @@ export class World {
     return this
   }
 
-  /** Lock this world, and stop what it keeps running: its janitor stops, each vault it hosts stops hearing the VaultMinder, and the VaultMinder stops watching the vaultDB. Never throws; calling it twice in a row is the same as once, and each call locks.
-   * The world stays enabled: its verbs still work, a call waiting in {@link ensureUnlocked} still waits, and {@link connect} resumes it.
+  /** Lock this world, and stop what it keeps running: each vault it hosts stops hearing the VaultMinder, and the VaultMinder stops watching the vaultDB. Never throws; calling it twice in a row is the same as once, and each call locks.
+   * The world stays enabled: its verbs still work, a call waiting in {@link ensureUnlocked} still waits, its janitor still locks it past its lease's end, and {@link connect} resumes it.
    * What the host's vaultDB throws as the watch stops goes to the device's `onBadNews`.
    */
   disconnect(): this {
     this.#isConnected = false
     this.lock()
-    this.#stopJanitor()
     for (const vault of this.#vaults) { vault.disconnect() }
     try { this.#vaultMinder?.disconnect() } catch (err) { this.#device.tellBadNews([err]) }
     return this
   }
 
-  /** Reject every call waiting in {@link ensureUnlocked} with the device's end cause, and {@link disconnect}. Internal: call `device.disable`, which ends the device first. */
+  /** Reject every call waiting in {@link ensureUnlocked} with the device's end cause, stop the janitor, and {@link disconnect}. Internal: call `device.disable`, which ends the device first. */
   disable(): this {
     this.#settleUnlockWait(this.endCause)
+    this.#stopJanitor()
     return this.disconnect()
   }
 
@@ -336,21 +338,24 @@ export class World {
     if (this.#isConnected) { vault.connect() }
   }
 
-  /** Start the VaultMinder's watch and the janitor, where someone has signed in, telling the device's `onBadNews` what the host's vaultDB throws */
+  /** Start the VaultMinder's watch, where someone has signed in, telling the device's `onBadNews` what the host's vaultDB throws */
   #connectSignedIn(): void {
     if (this.#vaultMinder === null) { return }
     try { this.#vaultMinder.connect() } catch (err) { this.#device.tellBadNews([err]) }
-    this.#startJanitor()
   }
   // --
 
-  // == [The janitor]: #startJanitor, #stopJanitor, #tidy, #isGateStale, #refreshRoots
-  // #lock-is-intent: autolock is a best-effort time, not a deadline. A lease past its end still seals and unseals until
-  // the next tick, which may come a janitor period late, or later while the page sleeps. Meanwhile isSoftlocked holds,
-  // so a call to ensureUnlocked asks the user first.
+  // == [The janitor]: #startJanitor, #stopJanitor, #tidy, #lockPastLeaseEnd, #tidyConnected, #isGateStale, #refreshRoots
+  // It runs from sign-in until the device is disabled, connected or not: a lease unlocked while disconnected still ends.
 
-  /** Tidy every `janitorMillis` of the device, from now on; a second call does nothing */
-  #startJanitor(): void { this.#janitor ??= setInterval(() => { this.#tidy() }, Math.min(this.#device.janitorMillis, MaxTimerMillis)) }
+  /** Tidy every `janitorMillis` of the device, from now on, unless the device is disabled; a second call does nothing */
+  #startJanitor(): void {
+    if ((this.#janitor !== null) || ! this.isEnabled) { return }
+    this.#janitor = setInterval(() => { this.#tidy() }, Math.min(this.#device.janitorMillis, MaxTimerMillis))
+    // Under Node, as in a test, a timer keeps the process running. Node's types are in scope, but a browser's timer is a
+    // number, with no unref.
+    this.#janitor.unref?.() // eslint-disable-line @typescript-eslint/no-unnecessary-condition
+  }
 
   /** Stop the janitor, where it runs */
   #stopJanitor(): void {
@@ -358,23 +363,36 @@ export class World {
     this.#janitor = null
   }
 
-  /** Lock this world once its lease has passed its end, and read its roots again once the gate was last read longer ago than the device's `gateStaleMillis`. Never throws: a refusal goes to the device's `onBadNews`. */
+  /** Lock this world once its lease has passed its end, and, while connected, start a watch that is not running and read the roots again once the gate is stale. Never throws: a refusal goes to the device's `onBadNews`. */
   #tidy(): void {
     try {
-      const now = Clock.nowMillis()
-      const { leaseEndsAt } = this
-      if ((leaseEndsAt !== null) && (now >= leaseEndsAt)) { this.lock() }
-      if (this.#isGateStale(now)) { void this.#refreshRoots() }
+      this.#lockPastLeaseEnd()
+      if (this.#isConnected) { this.#tidyConnected(this.demandVaultMinder()) }
     } catch (err) {
       this.#device.tellBadNews([err])
     }
   }
 
-  // Each tab judges for itself, by when it last read the gate as news: a gate never heard of is not stale.
-  /** True where the main gate was last read more than the device's `gateStaleMillis` before `now` */
-  #isGateStale(now: EpochMillis): boolean {
+  // #lock-is-intent: autolock is a best-effort time, not a deadline. A lease past its end still seals and unseals until
+  // the next tick, which may come a janitor period late, or later while the page sleeps. Meanwhile isSoftlocked holds,
+  // so a call to ensureUnlocked asks the user first.
+  /** Lock this world where its lease has passed its end */
+  #lockPastLeaseEnd(): void {
+    const { leaseEndsAt } = this
+    if ((leaseEndsAt !== null) && (Clock.nowMillis() >= leaseEndsAt)) { this.lock() }
+  }
+
+  /** Start `vaultMinder`'s watch where it is not running, and read the roots again where the gate is stale */
+  #tidyConnected(vaultMinder: VaultMinder): void {
+    if (! vaultMinder.isWatching) { this.#connectSignedIn() }
+    if (this.#isGateStale()) { void this.#refreshRoots() }
+  }
+
+  // Each tab judges for itself, by when it last read the gate: a gate never read is not stale.
+  /** True where the main gate was last read more than the device's `gateStaleMillis` ago */
+  #isGateStale(): boolean {
     const car = this.#vaultMinder?.carAt({ ...this.#device.scope, labelpath: Labelpath.MainGate })
-    return (car !== undefined) && (now - readAtOf(car.read_tc) > this.#device.gateStaleMillis)
+    return (car !== undefined) && (Clock.nowMillis() - readAtOf(car.read_tc) > this.#device.gateStaleMillis)
   }
 
   /** Get the bank, the main gate and the root box from the vaultDB, past anything kept here, telling the device's `onBadNews` of a refusal */
@@ -539,11 +557,7 @@ export class World {
   // --
 }
 
-// == [Helpers]: MaxTimerMillis, RootLabelpaths, ShelvedSourcelabel, banktokOf, shelvedEventOf, ThingClass, receiveFirst, thingClassOf, isLive, refusalSnapshotOf, WorldLeaseGate, Wait, makeWait
-
-// A browser's timer runs at once for a longer delay.
-/** The longest delay a timer waits, in milliseconds: about 24.8 days. */
-const MaxTimerMillis = (2 ** 31) - 1
+// == [Helpers]: RootLabelpaths, ShelvedSourcelabel, banktokOf, shelvedEventOf, ThingClass, receiveFirst, thingClassOf, isLive, refusalSnapshotOf, WorldLeaseGate, Wait, makeWait
 
 /** The labelpaths of the bank's roots, which the stage is read from. */
 const RootLabelpaths: ReadonlySet<Labelpath> = new Set(['bank', Labelpath.MainGate, Labelpath.RootBox])

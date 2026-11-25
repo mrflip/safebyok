@@ -135,7 +135,7 @@ export interface DeviceOpts {
   autolockMinutes?:  number | undefined
   /** How near its end a lease asks the user again, in minutes: from then on, a call that wants the bank unlocked waits for an `unlock` gating, which renews the lease. At most a twentieth of the lease, and none under a minute. Default: 10. */
   softlockMinutes?:  number | undefined
-  /** How often the device locks a lease past its end, and checks whether its gate is stale, in minutes. Autolock is a best-effort time, not a deadline. Default: 10. */
+  /** How often the device locks a lease past its end, and, while connected, starts the watch where it is not running and checks whether its gate is stale, in minutes. Autolock is a best-effort time, not a deadline. Default: 10. */
   janitorMinutes?:   number | undefined
   /** How long after this device last read the bank's gate it reads the gate again, with the bank and root box, in minutes. Default: 720, twelve hours. */
   gateStaleMinutes?: number | undefined

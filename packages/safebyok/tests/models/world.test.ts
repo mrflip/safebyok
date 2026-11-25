@@ -325,6 +325,16 @@ describe("a world's janitor", () => {
     expect([world.isLocked, world.getSnapshot().stage]).to.deep.equal([true, 'locked'])
   })
 
+  it("locks a world unlocked while disconnected once the lease has ended", async () => {
+    const { bank, device } = await TH.buildBornBank({ device: TH.makeDevice({}, { autolockMinutes: 25, janitorMinutes: 10 }) })
+    device.disconnect()
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await vi.advanceTimersByTimeAsync(20 * Consts.MinuteMillis)
+    expect(device.world.isLocked).to.be.false
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
+    expect(device.world.isLocked).to.be.true
+  })
+
   it("re-reads the roots at the first tick after the gate goes stale", async () => {
     setClockPastEveryReadTc()
     const vaultDB = new MemoryVaultDB()
@@ -352,7 +362,7 @@ describe("a world's janitor", () => {
     expect(world.getSnapshot().stage).to.eq('unlocked')
   })
 
-  it("stops on disconnect, and starts again on connect", async () => {
+  it("re-reads no stale gate while disconnected, and does again once connected", async () => {
     setClockPastEveryReadTc()
     const vaultDB = new MemoryVaultDB()
     const tryGetWorld = vi.spyOn(vaultDB, 'tryGetWorld')
@@ -366,13 +376,30 @@ describe("a world's janitor", () => {
     expect(tryGetWorld.mock.calls.length - asked).to.be.at.least(1)
   })
 
-  it("does not start until the device signs in", async () => {
+  it("starts the watch at its next tick while connected, where the watch threw as it started, telling the device's onBadNews", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const onBadNews = vi.fn()
+    vi.spyOn(vaultDB, 'watch').mockImplementationOnce(() => { throw new Error('the socket is down') })
+    const { device: { world } } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, onBadNews, janitorMinutes: 10 }) })
+    expect([world.demandVaultMinder().isWatching, onBadNews.mock.calls.length]).to.deep.equal([false, 1])
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
+    expect([world.demandVaultMinder().isWatching, onBadNews.mock.calls.length]).to.deep.equal([true, 1])
+  })
+
+  it("starts no watch while disconnected", async () => {
+    const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { janitorMinutes: 10 }) })
+    device.disconnect()
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
+    expect(device.world.demandVaultMinder().isWatching).to.be.false
+  })
+
+  it("runs from sign-in, and through a disconnect", async () => {
     const device = TH.makeDevice({ userid: null })
     const before = vi.getTimerCount()
     await device.signin(TH.WorldScope.userid)
     expect(vi.getTimerCount() - before).to.eq(1)
     device.disconnect()
-    expect(vi.getTimerCount() - before).to.eq(0)
+    expect(vi.getTimerCount() - before).to.eq(1)
   })
 
   it("stops for good once the device is disabled", async () => {
@@ -381,6 +408,14 @@ describe("a world's janitor", () => {
     await device.signin(TH.WorldScope.userid)
     device.disable()
     device.connect()
+    expect(vi.getTimerCount() - before).to.eq(0)
+  })
+
+  it("does not start on a device disabled before it signs in", async () => {
+    const device = TH.makeDevice({ userid: null })
+    const before = vi.getTimerCount()
+    device.disable()
+    await device.signin(TH.WorldScope.userid)
     expect(vi.getTimerCount() - before).to.eq(0)
   })
 })
