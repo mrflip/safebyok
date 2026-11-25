@@ -196,10 +196,11 @@ export class Device {
   // The roots fetched land in the world's Things, which the stage is read from. A root its Thing refuses reaches the host
   // once, as bad news told by the VaultMinder; sign-in then reports only what the roots amount to: all three live, the
   // bank unborn, or broken. A failure to fetch them, once a bank is up from what was restored, is no caller's to hear.
-  // The VaultMinder is made right before the vault TSQ and the world listen to it, with nothing awaited between: its
-  // cars remember what they take, so a record it took with no one listening would reach them later only as a repeat,
-  // which it drops. The world takes the roots shelved before the vaultDB is asked. The vault is made last, on everything
-  // made before it.
+  // The VaultMinder, the vault TSQ, the world's hold on them and the vault are made with nothing awaited between: the
+  // VaultMinder's cars remember what they take, so a record it took with no one listening would reach them later only
+  // as a repeat, which it drops. The vault TSQ listens from the vault's making where the device is connected, and else
+  // from its next connect, which refetches what the vault TSQ caches. The world takes the roots shelved before the
+  // vaultDB is asked. The vault is made last, on everything made before it.
   /** Start the signed-in user's bank over a VaultMinder of it: from the roots shelved, where there are any, and from the three roots the vaultDB answers. */
   async #doSignin(): Promise<void> {
     try {
@@ -231,7 +232,7 @@ export class Device {
   }
 
   // Call it as a QueryClient's `mount` is called, from an effect whose cleanup calls `disconnect`.
-  /** Keep the device in step with the vaultDB: watch the signed-in user's bank there, from now or from `signin` ({@link World.connect}). Never throws, and a second call does nothing.
+  /** Keep the device in step with the vaultDB: watch the signed-in user's bank there, from now or from `signin`, getting its bank, main gate and root box again where it is signed in ({@link World.connect}). Never throws, and a second call does nothing.
    * @example
    *   useEffect(() => { device.connect(); return () => { device.disconnect() } }, [device])
    */
@@ -240,7 +241,7 @@ export class Device {
     return this
   }
 
-  /** Lock the signed-in user's bank, and stop watching the vaultDB, until the next {@link connect} ({@link World.disconnect}). Never throws, and a second call does nothing.
+  /** Lock the signed-in user's bank, and stop watching the vaultDB, until the next {@link connect} ({@link World.disconnect}). Never throws; calling it twice in a row is the same as once, and each call locks.
    * The device stays enabled: its verbs still work, and a call waiting for an `unlock` gating still waits.
    */
   disconnect(): this {

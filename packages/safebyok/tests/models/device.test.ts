@@ -605,6 +605,34 @@ describe("device.connect() and device.disconnect()", () => {
     expect(await ensuring).to.equal(bank)
   })
 
+  it("gets its bank's roots again as it connects after a disconnect, following a gate changed meanwhile on another device, with no notice heard", async () => {
+    const vaultDB = new MemoryVaultDB()
+    vi.spyOn(vaultDB, 'watch').mockReturnValue(noop)
+    const { bank, device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB }) })
+    device.disconnect()
+    const elsewhere = TH.makeDevice({}, { vaultDB })
+    await elsewhere.signin(TH.WorldScope.userid)
+    const after = await elsewhere.bank!.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'a different passphrase, just as long' })
+    await TH.aWhile()
+    expect(bank.gate.revtok).not.to.eq(after.revtok)
+    device.connect()
+    await TH.eventually(() => bank.gate.revtok === after.revtok)
+    await TH.expectRefusal(bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase }), 'wrong_passphrase')
+    await bank.gate.unlock({ passphraseCleartext: 'a different passphrase, just as long' })
+    expect(device.world.getSnapshot()).to.include({ stage: 'unlocked' })
+  })
+
+  it("tells onBadNews what the vaultDB throws as it gets the bank's roots again", async () => {
+    const onBadNews = vi.fn()
+    const vaultDB = new MemoryVaultDB()
+    const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, onBadNews }) })
+    device.disconnect()
+    vi.spyOn(vaultDB, 'tryGetWorld').mockRejectedValue(new Error('no getting here'))
+    device.connect()
+    await TH.eventually(() => onBadNews.mock.calls.length === 1)
+    expect((onBadNews.mock.calls[0]![0] as BadNews).news.refusalkind).to.eq('unexpected_error')
+  })
+
   it("never throws, telling onBadNews what the vaultDB's watch throws as it starts or stops", async () => {
     const onBadNews = vi.fn()
     const vaultDB = new MemoryVaultDB()

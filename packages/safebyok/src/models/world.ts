@@ -278,7 +278,7 @@ export class World {
   }
   // --
 
-  // == [Locking and connecting]: lock, connect, disconnect, hostVault, #connectMinder
+  // == [Locking and connecting]: lock, connect, disconnect, hostVault, #connectMinder, #refreshRoots
 
   /** Lock the world: drop its lease and the keys in it. */
   lock(): this {
@@ -288,18 +288,23 @@ export class World {
     return this
   }
 
-  // The watch starts before the vaults hear it, so that what a vault refetches as it connects is fetched under the watch.
+  // The watch starts before the vaults hear it, so that what a vault refetches as it connects is fetched under the watch,
+  // and so is the bank's three roots, got again where someone has signed in: what was written while no watch ran told
+  // this world nothing.
   /** Start what this world keeps running: its VaultMinder's watch of the vaultDB, once someone signs in, and each vault it hosts hearing the VaultMinder. Never throws, and a second call does nothing.
-   * What the host's vaultDB throws as the watch starts goes to the device's `onBadNews`.
+   * Where someone has signed in, the bank, its main gate and its root box are got again, so they match the vaultDB after a disconnect of any length.
+   * What the host's vaultDB throws or refuses goes to the device's `onBadNews`.
    */
   connect(): this {
+    const wasConnected = this.#isConnected
     this.#isConnected = true
     this.#connectMinder()
+    if ((! wasConnected) && (this.#vaultMinder !== null)) { void this.#refreshRoots(this.#vaultMinder) }
     for (const vault of this.#vaults) { vault.connect() }
     return this
   }
 
-  /** Lock this world, and stop what it keeps running: each vault it hosts stops hearing the VaultMinder, and the VaultMinder stops watching the vaultDB. Never throws, and a second call does nothing.
+  /** Lock this world, and stop what it keeps running: each vault it hosts stops hearing the VaultMinder, and the VaultMinder stops watching the vaultDB. Never throws; calling it twice in a row is the same as once, and each call locks.
    * The world stays enabled: its verbs still work, a call waiting in {@link ensureUnlocked} still waits, and {@link connect} resumes it.
    * What the host's vaultDB throws as the watch stops goes to the device's `onBadNews`.
    */
@@ -324,6 +329,16 @@ export class World {
   /** Start the VaultMinder's watch, where someone has signed in, telling the device's `onBadNews` what the host's vaultDB throws. */
   #connectMinder(): void {
     try { this.#vaultMinder?.connect() } catch (err) { this.#device.tellBadNews([err]) }
+  }
+
+  /** Get the bank's three roots from the vaultDB through `vaultMinder`, telling the device's `onBadNews` what it throws or refuses. */
+  async #refreshRoots(vaultMinder: VaultMinder): Promise<void> {
+    try {
+      const answer = await vaultMinder.tryGetWorldOnce()
+      if (! answer.ok) { this.#device.tellBadNews([answer.err]) }
+    } catch (err) {
+      this.#device.tellBadNews([err])
+    }
   }
   // --
 
