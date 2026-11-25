@@ -1,7 +1,7 @@
 # Thread 14: watch_ended, a watch that ends of itself is announced (2026-11-25)
 
-Branch `20261125-watch_ended`, PR #929, stacked on #925 (thread 12, `20261125-set_stage`).
-Proved: `pnpm --filter safebyok test` (lint, typecheck, 36 files, 2,316 tests). `pnpm justify` after the catch-up: see the PR's **Tests:**.
+Branch `20261125-watch_ended`, PR #929, cut from #925 (thread 12), which merged to main through #928 before the catch-up; now on main.
+Proved: `pnpm justify` green after the catch-up onto `4cac0deaa` (8,595 tests across 16 suites; safebyok 2,316).
 
 * **Built**:
   - **A new lifecycle kind, `watch_ended`** (`src/shapes/shapes-bankish.ts`): `lifecyclekindVals` gains it,
