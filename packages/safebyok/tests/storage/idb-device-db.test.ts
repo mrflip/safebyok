@@ -9,18 +9,18 @@ import { IdbDeviceDB, idbDeviceDB, leaseBellnameOf, leaseDatabasenameOf, scopepa
 import * as TH from '../test-helpers'
 
 /** The `dbName` each IdbDeviceDB under test was made with. */
-const dbNameOf = new WeakMap<IdbDeviceDB, string>()
+const DbNameForDeviceDB = new WeakMap<IdbDeviceDB, string>()
 
 /** An IdbDeviceDB on a fresh database that no other test has touched. */
 function makeIdbDeviceDB(dbName = `test-${crypto.randomUUID()}`): IdbDeviceDB {
   const deviceDB = new IdbDeviceDB({ dbName })
-  dbNameOf.set(deviceDB, dbName)
+  DbNameForDeviceDB.set(deviceDB, dbName)
   return deviceDB
 }
 
 /** A second IdbDeviceDB on `deviceDB`'s database, on a connection of its own, as another tab would have. */
 function makeTwin(deviceDB: IdbDeviceDB): IdbDeviceDB {
-  const dbName = dbNameOf.get(deviceDB)!
+  const dbName = DbNameForDeviceDB.get(deviceDB)!
   TH._cheat_forgetShelf(leaseDatabasenameOf(dbName))
   return makeIdbDeviceDB(dbName)
 }
@@ -29,7 +29,7 @@ TH.describeDeviceDBLeaseBattery('IdbDeviceDB', {
   makeDeviceDB: () => makeIdbDeviceDB(),
   makeTwin,
   plant:        async (deviceDB, scope, raw) => {
-    const shelf = createStore(leaseDatabasenameOf(dbNameOf.get(deviceDB)), 'leases')
+    const shelf = createStore(leaseDatabasenameOf(DbNameForDeviceDB.get(deviceDB)), 'leases')
     await inOneStep(shelf, 'readwrite', (store) => { store.put(raw, scopepathOf(scope)) })
   },
 })
@@ -75,7 +75,7 @@ describe("IdbDeviceDB's database and bell", () => {
     const deviceDB = makeIdbDeviceDB()
     const heard: unknown[] = []
     deviceDB.listen((scope) => { heard.push(scope) })
-    const channel  = new BroadcastChannel(leaseBellnameOf(dbNameOf.get(deviceDB)))
+    const channel  = new BroadcastChannel(leaseBellnameOf(DbNameForDeviceDB.get(deviceDB)))
     channel.postMessage({ userid: 'u1' })
     channel.postMessage({ ...TH.WorldScope, extra: 'dropped' })
     channel.close()

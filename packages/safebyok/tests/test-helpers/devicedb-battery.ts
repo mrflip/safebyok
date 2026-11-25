@@ -82,11 +82,11 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
     for (const [stored, stowed, blurb] of NotNewerCases) {
       it(blurb, async () => {
         const deviceDB = makeDeviceDB()
-        const kept     = await rowOf(stored)
-        await deviceDB.stowLease(kept)
+        const prior    = await rowOf(stored)
+        await deviceDB.stowLease(prior)
         const row      = await rowOf(stowed)
-        expect(sansKey(await deviceDB.stowLease(row))).to.deep.equal(sansKey(kept))
-        expect(sansKey(await deviceDB.peekLease(WorldScope))).to.deep.equal(sansKey(kept))
+        expect(sansKey(await deviceDB.stowLease(row))).to.deep.equal(sansKey(prior))
+        expect(sansKey(await deviceDB.peekLease(WorldScope))).to.deep.equal(sansKey(prior))
       })
     }
 

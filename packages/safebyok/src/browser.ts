@@ -36,8 +36,8 @@ const bagsByDbName = new Map<string | undefined, BrowserOpts>()
  */
 export function browserOpts(opts: IdbDeviceDBOpts = {}): BrowserOpts {
   const { dbName } = idbDeviceDBOpts.parse(opts, { where: "In browserOpts's options" })
-  const kept = bagsByDbName.get(dbName)
-  if (kept !== undefined) { return kept }
+  const prior = bagsByDbName.get(dbName)
+  if (prior !== undefined) { return prior }
   const bag: BrowserOpts = Object.freeze({ keyDeriver: argon2idWebV1Deriver, deviceDB: idbDeviceDB({ dbName }), strengthChecker: zxcvbnStrengthChecker })
   bagsByDbName.set(dbName, bag)
   return bag
