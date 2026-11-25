@@ -270,7 +270,7 @@ export function describeDeviceDBDevicetokBattery<DBT extends DeviceDB>(dbname: s
       expect(await deviceDB.ensureDevicetok(WorldScope)).to.eq('00000000-0000-4000-8000-0000000000d2')
     })
 
-    it("refuses a scope that is no bank's as bad_record", async () => {
+    it("refuses a scope that is no bank's", async () => {
       await expectRefusal(makeDeviceDB().ensureDevicetok({ userid: 'u1' } as never), 'bad_record')
     })
 

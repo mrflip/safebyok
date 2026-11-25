@@ -740,7 +740,7 @@ describe("device.ensureDevicetok()", () => {
     expect(await one.ensureDevicetok()).to.not.eq(await other.ensureDevicetok())
   })
 
-  it("with no devicetok from the host, refuses absent_vault before signin", async () => {
+  it("with no devicetok from the host, refuses before signin", async () => {
     await TH.expectRefusal(TH.makeDevice({ userid: null }, { devicetok: undefined }).ensureDevicetok(), 'absent_vault')
   })
 
