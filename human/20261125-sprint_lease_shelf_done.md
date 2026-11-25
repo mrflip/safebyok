@@ -2,17 +2,11 @@
 
 The lease_shelf sprint gave the new core one lease per device, shared across tabs and reloads. The lease is a Thing-shaped record in a device database, filed at its own `lease/<label>`. A softlock caps the lease on a gate change. A janitor runs from sign-in to disable: it autolocks, retries a stopped watch, and re-reads a stale gate. `connect`/`disconnect` replace `sweep`. Lifecycle announcements, with `#setStage`, log each stage crossing. One tab holds the watch, and a lost watch lock is asked for again. A devicetok lasts, one per user. `world.stats()` and a self-test probe were added. Postgres mints `read_tc`, and a ThingCar's `read_at` is the one read time. Fourteen threads; YOLO mode.
 
-## The line still to merge, bottom first
+## What merged, and the closing PR
 
-Every PR's base is `main`, so merging the top, with a merge commit, merges the rest.
+Merged on 2026-11-25, in order: #904 (the 899 agent's), #900, #902, #903, #907, #908, #909, #912, #915, #910, #906, #905, #911, #924, then the last line: #927 `lease_names`, #926 `watch_recovery`, #925 `set_stage`, #928 (guidance and TODO entries) and #901 (this sprint's whiteboard and this note).
 
-1. [#927](https://github.com/mrflip/safebyok/pull/927) `lease_names`: a lease names itself by its own `lease/<label>` through `LeaseLabelpath.of`; one devicetok per user; a lease citing a newer gate revision leaves the gate stored as it is.
-2. [#926](https://github.com/mrflip/safebyok/pull/926) `watch_recovery`: `VaultDB.watch` gains `onEnded`, so a watch that cannot start ends and the janitor asks for the lock again; the lock and channel are named `safebyok/<userid>/<banklabel>/bank`.
-3. [#925](https://github.com/mrflip/safebyok/pull/925) `set_stage`: the world's `#setStage` announces `stage_crossed`, and the default `onLifecycle` logs the fields it names.
-4. [#928](https://github.com/mrflip/safebyok/pull/928): `CLAUDE.md`'s `#lock-is-intent`, the thread-reviewer guidance, and the sprint's TODO entries.
-5. [#901](https://github.com/mrflip/safebyok/pull/901): this sprint's whiteboard and this note. **The top.**
-
-Already merged: #904 (the 899 agent's), then #900, #902, #903, #907, #908, #909, #912, #915, #910, #906, #905, #911 and #924.
+The closing PR, against main: [#929](https://github.com/mrflip/safebyok/pull/929) `watch_ended`. A watch that ends of itself is announced to `onLifecycle` as `watch_ended`, which the default handler logs (the Coach: "great idea. Also lifecycle announce"). It carries these notes' last update too.
 
 ## YOLO decisions
 
@@ -23,11 +17,7 @@ Already merged: #904 (the 899 agent's), then #900, #902, #903, #907, #908, #909,
 
 ## Still open, for the Coach
 
-In the sprint doc's Open Matters (https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh):
-
-- **TOP `VaultDB.watch` gains `onEnded`** (#926): a new optional parameter on an exported interface. Rec: keep.
-- **The watch lock's name keeps the banklabel** (#926): every bank's labelpath is `bank`, so the labelpath alone would make two banks of one user share a lock. Rec: keep.
-- **The stored lease checked against its gate's label** (#927): see YOLO decisions. Rec: keep the check.
+Nothing: Open Matters is empty. The last three rows (`onEnded`, the watch lock's name, the restored lease check) were all kept as built; see the resolutions file.
 
 ## Still open, for later work
 

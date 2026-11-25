@@ -919,9 +919,11 @@ describe("device.announce(announcement)", () => {
     vi.clearAllMocks()
     device.announce({ kind: 'lock_taken_up' })
     device.announce({ kind: 'stage_crossed', from: 'locked', to: 'unlocked' })
+    device.announce({ kind: 'watch_ended' })
     expect((logger.log.mock.calls as [string, unknown][]).map(([message, story]) => [message, story])).to.deep.equal([
       ["The device's lease changed: lock_taken_up.", { oplabel: 'Device.onLifecycle', kind: 'lock_taken_up' }],
       ["The bank's stage went from 'locked' to 'unlocked'.", { oplabel: 'Device.onLifecycle', kind: 'stage_crossed', from: 'locked', to: 'unlocked' }],
+      ["The device's watch of its bank ended; it starts again at the janitor's next tick.", { oplabel: 'Device.onLifecycle', kind: 'watch_ended' }],
     ])
     expect([logger.warn, logger.error].map((logged) => logged.mock.calls.length)).to.deep.equal([0, 0])
   })

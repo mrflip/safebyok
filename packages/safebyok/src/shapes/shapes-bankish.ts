@@ -79,7 +79,7 @@ function isHostedVault(val: unknown): val is HostedVault {
 }
 // --
 
-// == [The device]: BankishChecks, DefaultBanklabel, DeviceRecord, DeviceJSON, BadNews, BadNewsHandler, leasekindVals, lifecyclekindVals, Lifecyclekind, LeaseAnnouncement, StageCrossing, DeviceAnnouncement, DeviceEvent, LifecycleHandler, GuardedLifecycleHandler, RootShelf, isRootShelf, RootShelfMethodnames, DeviceOpts
+// == [The device]: BankishChecks, DefaultBanklabel, DeviceRecord, DeviceJSON, BadNews, BadNewsHandler, leasekindVals, lifecyclekindVals, Lifecyclekind, LeaseAnnouncement, StageCrossing, WatchEnding, DeviceAnnouncement, DeviceEvent, LifecycleHandler, GuardedLifecycleHandler, RootShelf, isRootShelf, RootShelfMethodnames, DeviceOpts
 
 /** The banklabel of the bank a device serves where its record names none. */
 export const DefaultBanklabel = 'main'
@@ -110,7 +110,7 @@ export type BadNewsHandler = (badnews: BadNews) => unknown
 export const leasekindVals = ['lease_taken_up', 'lock_taken_up', 'autolocked', 'softlocked'] as const
 
 /** The kinds of {@link DeviceAnnouncement}. */
-export const lifecyclekindVals = [...leasekindVals, 'stage_crossed'] as const
+export const lifecyclekindVals = [...leasekindVals, 'stage_crossed', 'watch_ended'] as const
 
 /** One of {@link lifecyclekindVals}. */
 export type Lifecyclekind = typeof lifecyclekindVals[number]
@@ -127,13 +127,16 @@ export type LeaseAnnouncement = Readonly<{ kind: typeof leasekindVals[number] }>
 /** A change of the world's stage, from the stage it was at to the one it is at now. The tab that caused it hears it too. */
 export type StageCrossing = Readonly<{ kind: 'stage_crossed', from: BankStage, to: BankStage }>
 
-/** What a device announces to `onLifecycle`, by its `kind`: a {@link LeaseAnnouncement}, or a {@link StageCrossing}. */
-export type DeviceAnnouncement = LeaseAnnouncement | StageCrossing
+/** The device's watch of its bank ended of itself, before anything stopped it. */
+export type WatchEnding = Readonly<{ kind: 'watch_ended' }>
+
+/** What a device announces to `onLifecycle`, by its `kind`: a {@link LeaseAnnouncement}, a {@link StageCrossing} or a {@link WatchEnding}. */
+export type DeviceAnnouncement = LeaseAnnouncement | StageCrossing | WatchEnding
 
 /** What `onLifecycle` hears: a {@link DeviceAnnouncement}, and the device it happened to. */
 export type DeviceEvent = DeviceAnnouncement & Readonly<{ device: Device }>
 
-/** `Device.make`'s `onLifecycle`: hears what changed the device's lease, other than its own lock, unlock or disable. */
+/** `Device.make`'s `onLifecycle`: hears each {@link DeviceAnnouncement}. */
 export type LifecycleHandler = (event: DeviceEvent) => unknown
 
 /** `onLifecycle` as a device keeps it, wrapped by `guardOnLifecycle`. It never throws. */
@@ -176,7 +179,7 @@ export interface DeviceOpts {
   gateStaleMinutes?: number | undefined
   /** Hears each refusal no caller waits on. Default: {@link DefaultOnBadNews}, a warning on the device's logger. */
   onBadNews?:        BadNewsHandler | undefined
-  /** Hears what changed the device's lease, other than your own lock, unlock or disable: a lease taken up as the device signs in or connects, a lock or an unlock in another tab, the autolock, a softlock. Your own gate verb (replacing the passphrase, adding or revoking a passkey) announces `softlocked` in its own tab. Also hears each crossing from one stage to another as a `stage_crossed`, including those your own lock, unlock or disable cause. What it throws or rejects with is reported to the platform. Default: {@link DefaultOnLifecycle}, which logs each announcement. */
+  /** Hears what changed the device's lease, other than your own lock, unlock or disable: a lease taken up as the device signs in or connects, a lock or an unlock in another tab, the autolock, a softlock. Your own gate verb (replacing the passphrase, adding or revoking a passkey) announces `softlocked` in its own tab. Also hears each crossing from one stage to another as a `stage_crossed`, including those your own lock, unlock or disable cause, and a `watch_ended` where the device's watch of its bank ends of itself. What it throws or rejects with is reported to the platform. Default: {@link DefaultOnLifecycle}, which logs each announcement. */
   onLifecycle?:      LifecycleHandler | undefined
   /** The QueryClient the signed-in user's boxes are kept in, under their bank's key: your own, so one client serves your queries and the vault's. Default: one the device makes. */
   queryClient?:      QueryClient | undefined

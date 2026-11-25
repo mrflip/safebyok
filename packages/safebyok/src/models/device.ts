@@ -390,6 +390,8 @@ export const DefaultOnLifecycle: LifecycleHandler = ({ device, ...announcement }
   // The story names each field it logs, so a field added to an announcement is logged only by a decision.
   if (announcement.kind === 'stage_crossed') {
     device.logger.log(Phrases.StageCrossed(announcement.from, announcement.to), { oplabel: 'Device.onLifecycle', kind: announcement.kind, from: announcement.from, to: announcement.to })
+  } else if (announcement.kind === 'watch_ended') {
+    device.logger.log(Phrases.WatchEnded, { oplabel: 'Device.onLifecycle', kind: announcement.kind })
   } else {
     device.logger.log(Phrases.LeaseAnnounced(announcement.kind), { oplabel: 'Device.onLifecycle', kind: announcement.kind })
   }
@@ -457,6 +459,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom, oneof, 
   announcement:  union([
     obj({ kind: oneof(leasekindVals) }).strict(),
     obj({ kind: lit('stage_crossed'), from: oneof(bankStageVals), to: oneof(bankStageVals) }).strict(),
+    obj({ kind: lit('watch_ended') }).strict(),
   ]),
   tellBadNewsToArgs: obj({
     onBadNews: fn<BadNewsHandler>(),
