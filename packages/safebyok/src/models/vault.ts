@@ -237,6 +237,7 @@ export class Vault {
    * Resolves a report of each step's time in milliseconds, and whether the whisper unsealed was the one put. It never waits for an `unlock` gating.
    * The box at `asked.labelpath`, by default {@link ProbeLabelpath}, is written over and then deleted: give a labelpath none of your boxes use.
    * A step's refusal rejects as a refusal of the same kind, its `meta.stepkind` naming the step and the step's refusal its cause.
+   * A probe refused after its put leaves its box in storage, for the next probe at that labelpath to write over.
    * Two probes at one labelpath at once may refuse each other's steps.
    * @example
    *   const { whisperMatched, steps } = await vault.probe()
