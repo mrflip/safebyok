@@ -16,16 +16,16 @@ export function describeVaultDBGetWorld({ fresh, bornBank, rowsOf }: VaultDBBatt
   const roots = { bank: bankThingOf(), gate: gateThingOf(), root: rootBoxOf() }
 
   describe("tryGetWorld(ask)", () => {
-    it("answers the three roots stored live, with the world and the bank's lifetok", async () => {
+    it("answers the three roots stored live, with the bank's lifetok", async () => {
       const vaultDB = await bornBank()
       expect(await vaultDB.tryGetWorld(getWorldAskOf())).to.deep.include({
-        ok: true, act: 'got', val: roots, world: { ...roots.bank, maingate: roots.gate }, banktok: roots.bank.lifetok,
+        ok: true, act: 'got', val: roots, banktok: roots.bank.lifetok,
       })
     })
 
     it("answers the shell at each root where none is stored, to an ask with the void lifetok", async () => {
       const vaultDB = await fresh()
-      expect(await vaultDB.tryGetWorld(getWorldAskOf({ banktok: SX.VoidLifeTok }))).to.deep.include({ ok: true, act: 'got', val: Shells, world: null, banktok: SX.VoidLifeTok })
+      expect(await vaultDB.tryGetWorld(getWorldAskOf({ banktok: SX.VoidLifeTok }))).to.deep.include({ ok: true, act: 'got', val: Shells, banktok: SX.VoidLifeTok })
     })
 
     it("answers a tombstone among the roots as stored", async () => {
@@ -40,7 +40,7 @@ export function describeVaultDBGetWorld({ fresh, bornBank, rowsOf }: VaultDBBatt
       const vaultDB = await bornBank()
       await rowsOf(vaultDB).remove(GateScope)
       await rowsOf(vaultDB).remove(RootScope)
-      expect(await vaultDB.tryGetWorld(getWorldAskOf())).to.deep.include({ ok: true, act: 'got', val: { ...roots, gate: Shells.gate, root: Shells.root }, world: null })
+      expect(await vaultDB.tryGetWorld(getWorldAskOf())).to.deep.include({ ok: true, act: 'got', val: { ...roots, gate: Shells.gate, root: Shells.root }, banktok: roots.bank.lifetok })
     })
 
     it("answers 'same' for each root stored at the revision the ask tracks, else the root stored", async () => {

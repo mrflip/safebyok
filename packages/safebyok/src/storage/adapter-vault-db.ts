@@ -6,32 +6,29 @@ import { bulletproofHandlerOf } from '../helpers/bulletproof'
 import { Labelpath, type Lifetok } from '../shapes/primitives'
 import type { ThingRecord, VoidSentinel } from '../shapes/shapes-thing'
 import type { TombstoneOf } from '../shapes/shapes-sealers'
-import { type ReadTc, type VaultEvent, type VaultItemEvent, VaultDBSourcelabel } from '../shapes/shapes-vault-event'
+import { type VaultEvent, type VaultItemEvent, VaultDBSourcelabel } from '../shapes/shapes-vault-event'
 import {
-  type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
+  type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
 } from '../shapes/shapes-asks'
 import {
   type Actual, type ActualBeside, type Answer, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type GetThingAnswer, type GetWorldActual, type GetWorldAnswer, type GotActual, type ListThingsActual, type ListThingsAnswer,
   type Received, type WriteThingAnswer, type WroteActual, ActualChecks,
 } from '../shapes/shapes-answers'
 import { VacantAgerank, itemSeenOf, readTcNow } from './agerank'
-import type { AboveFetched, BankRootsFetched, ThingsFetched, WorldFetched } from './thing-classifier'
+import type { AboveFetched, BankFetched, BankRootsFetched, ThingsFetched } from './thing-classifier'
 import * as Classifier from './thing-classifier'
 import type { VaultDB } from './vault-db'
 import * as Throwers from '../refusals/throwers'
 
-// == [Answers]: AnswerBeside, besideOf, answerOf, frozenAnswerOf, banktokOf, itemEventOf
-
-/** What every answer carries beside its `val` or `dbhas`. */
-type AnswerBeside = { world: WorldRecord | null, banktok: Lifetok, tracked: Tracked, read_tc: ReadTc }
+// == [Answers]: besideOf, answerOf, frozenAnswerOf, itemEventOf
 
 // A concrete adapter's report is the module's entry: what the answer carries of it beside the record is read through its check.
-/** What the answer to `actual` carries beside its `val` or `dbhas`: its world and the world's banktok, its `tracked` and its `read_tc`.
- * Throws `storage_issue` for a report whose world is neither null nor an object, whose `tracked` is no object, or whose `read_tc` is no UUID version 7.
+/** What the answer to `actual` carries beside its `val` or `dbhas`: its `banktok`, its `tracked` and its `read_tc`.
+ * Throws `storage_issue` for a report whose banktok is no UUID, whose `tracked` is no object, or whose `read_tc` is no UUID version 7.
  */
-function besideOf(actual: ActualBeside): AnswerBeside {
-  const { world, tracked, read_tc } = ActualChecks.beside.parse(actual)
-  return { world, banktok: banktokOf(world), tracked, read_tc }
+function besideOf(actual: ActualBeside): ActualBeside {
+  const { banktok, tracked, read_tc } = ActualChecks.beside.parse(actual)
+  return { banktok, tracked, read_tc }
 }
 
 /** The answer a verb gives for its concrete adapter's report: `record` becomes `val` when good, `dbhas` when refused.
@@ -64,13 +61,10 @@ function frozenAnswerOf<AnswerT extends { ask: unknown, err?: unknown }>(answer:
   return answer
 }
 
-/** The lifetok of the bank in `world`, or the void lifetok for no world: an answer's `banktok`. */
-function banktokOf(world: WorldRecord | null): Lifetok { return world?.lifetok ?? SX.VoidLifeTok }
-
-/** The `item` notice for `record`, read now, from this vaultDB, with the vacant agerank, and its bank's lifetok where `record` or `world` is the bank */
-function itemEventOf(record: ThingRecord, world: WorldRecord | null): VaultItemEvent {
+/** The `item` notice for `record`, read now, from this vaultDB, with the vacant agerank, and the lifetok of `record` where it is the bank, else `received` */
+function itemEventOf(record: ThingRecord, received: Lifetok): VaultItemEvent {
   const { userid, banklabel, labelpath } = record
-  const banktok = ('lifetok' in record) ? record.lifetok : banktokOf(world)
+  const banktok = ('lifetok' in record) ? record.lifetok : received
   const unsorted = { agerank: VacantAgerank, agerankWas: VacantAgerank, banktok, sourcelabel: VaultDBSourcelabel, read_tc: readTcNow() }
   return Object.freeze({ eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), ...unsorted, ...itemSeenOf(record) })
 }
@@ -85,17 +79,17 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   // == [Classifying]: classifyGetThing, classifyWriteThing, classifyListThings, classifyBirthBank, classifyGetWorld
   // A subclass's `do*` calls these. A concrete adapter that reaches some of the verdict itself overrides them to read it. Each
-  // is given the raw bank and main gate of the ask's bank, fetched in the same step, as its world; a get and a write, also
+  // is given the raw bank of the ask's bank, fetched in the same step, which its banktok is read from; a get and a write, also
   // the nearest Thing stored above the ask's scope ({@link AboveFetched}).
 
-  /** Classify a get against the raw Thing fetched at its scope, null for none, and the raw world and nearest Thing stored above it, which gives the shell's lifepath where none is stored. */
+  /** Classify a get against the raw Thing fetched at its scope, null for none, and the raw bank and nearest Thing stored above it, which gives the shell's lifepath where none is stored. */
   protected classifyGetThing(ask: GetAsk, raw: unknown, above: AboveFetched): GotActual { return Classifier.classifyGetThing(ask, raw, above) }
 
-  /** Classify a write against the raw Thing fetched at its scope, null for none, and the raw world and nearest Thing stored above it, checking the born_at and storage policies of a replace, and a bank write's lifetok. */
+  /** Classify a write against the raw Thing fetched at its scope, null for none, and the raw bank and nearest Thing stored above it, checking the born_at and storage policies of a replace, and a bank write's lifetok. */
   protected classifyWriteThing(ask: WriteAsk, raw: unknown, above: AboveFetched): WroteActual { return Classifier.classifyWriteThing(ask, raw, above) }
 
   /** Classify a listing against the raw parent and the raw Things one label under it. */
-  protected classifyListThings(ask: ListAsk, fetched: ThingsFetched, world: WorldFetched): ListThingsActual { return Classifier.classifyListThings(ask, fetched, world) }
+  protected classifyListThings(ask: ListAsk, fetched: ThingsFetched, bankFetched: BankFetched): ListThingsActual { return Classifier.classifyListThings(ask, fetched, bankFetched) }
 
   /** Classify a bank's birth, by its three puts, against its raw bank, main gate and root box, each null for none. */
   protected classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual { return Classifier.classifyBirthBank(puts, fetched) }
@@ -172,10 +166,10 @@ export abstract class AdapterVaultDB implements VaultDB {
     const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews })
     // A notice handler that throws is a bug in the host's code, not trouble in storage.
     const notify = bulletproofHandlerOf(onNotice, { ifError: 'tell', transformer: Throwers.refusalOfThrown, onBadNews })
-    return this.doWatch(bankScope, ({ record, world }) => {
+    return this.doWatch(bankScope, ({ record, banktok }) => {
       let event: VaultItemEvent
       try {
-        event = itemEventOf(deepFreeze(Classifier.watchedThingOf(bankScope, record)), world)
+        event = itemEventOf(deepFreeze(Classifier.watchedThingOf(bankScope, record)), banktok)
       } catch (err) {
         onBadNews(Outcome.storageRefusalOf(err))
         return
@@ -199,9 +193,9 @@ export abstract class AdapterVaultDB implements VaultDB {
       Object.assign(err, { meta: { ...err.meta, oplabel, ask: loggableAsk } })
       // Only the classifier sets rows.dbhas, to a Thing it has checked.
       const dbhas = (Errors.rowsOfRefusal(err).dbhas ?? null) as ThingRecord | null
-      return frozenAnswerOf({ ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', world: null, banktok: SX.VoidLifeTok, tracked: 'unread', read_tc: readTcNow(), dbhas, err })
+      return frozenAnswerOf({ ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', banktok: SX.VoidLifeTok, tracked: 'unread', read_tc: readTcNow(), dbhas, err })
     } catch {
-      return { ok: false, ask: {}, act: 'unclassified_storing', world: null, banktok: SX.VoidLifeTok, tracked: 'unread', read_tc: readTcNow(), dbhas: null, err: Throwers.answerNotMade() }
+      return { ok: false, ask: {}, act: 'unclassified_storing', banktok: SX.VoidLifeTok, tracked: 'unread', read_tc: readTcNow(), dbhas: null, err: Throwers.answerNotMade() }
     }
   }
   // --
@@ -209,11 +203,11 @@ export abstract class AdapterVaultDB implements VaultDB {
   // == [Protected, for a subclass to write]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doWatch
   // Each is one atomic step: fetch the Thing at the ask's scope, classify it, and when `isWriteAct(act)` is true, write
   // `ask.record` and report the Thing the datastore reports writing, checked by `writtenThingOf`, in place of the one
-  // fetched. A datastore that can run code of its own may run the whole step there. The step also compares the ask's `track`
-  // with the bank and main gate the world is read from, and with the root box read beside them, and reports that as the
-  // answer's `tracked` (`trackedFetchedOf` makes the comparison in TypeScript). The world it fetches carries
-  // when the step read it, its `read_tc`: `readTcNow()` in the step, or the datastore's own UUID version 7. After a write,
-  // the report's world, `tracked` and `read_tc` are those read after the write.
+  // fetched. A datastore that can run code of its own may run the whole step there. The step also fetches the bank, main
+  // gate and root box, compares the ask's `track` with them, and reports that as the answer's `tracked` (`trackedFetchedOf`
+  // makes the comparison in TypeScript). The bank it fetches gives the answer's `banktok`, and carries when the step read
+  // it, its `read_tc`: `readTcNow()` in the step, or the datastore's own UUID version 7. After a write, the report's
+  // banktok, `tracked` and `read_tc` are those read after the write.
   //
   // A write checks only its preconditions of the Thing stored: the revision cited, the born_at a live Thing leaves unchanged,
   // the lifetok a write of the bank over a live bank keeps, and the storage policies it names (`classifyWriteThing` reads no
@@ -228,18 +222,18 @@ export abstract class AdapterVaultDB implements VaultDB {
   // `storage_issue` where no verdict explains the refusal. A birth answers with `unwrittenBirthOf`, or `storage_issue`
   // where it finds a write.
 
-  /** In one step: fetch the Thing at `ask`'s scope, its bank's raw world and the nearest Thing stored above it, and return `this.classifyGetThing(ask, raw, above)`. */
+  /** In one step: fetch the Thing at `ask`'s scope, its bank's raw roots and the nearest Thing stored above it, and return `this.classifyGetThing(ask, raw, above)`. */
   protected abstract doGetThing(ask: GetAsk): Helpers.Awaitable<GotActual>
-  /** In one step: fetch the Thing at `ask`'s scope, its bank's raw world and the nearest Thing stored above it, classify, and if the act
-   * is a write, write `ask.record` and report the Thing written, with its bank's world after the write.
+  /** In one step: fetch the Thing at `ask`'s scope, its bank's raw roots and the nearest Thing stored above it, classify, and if the act
+   * is a write, write `ask.record` and report the Thing written, with its banktok and `tracked` after the write.
    */
   protected abstract doWriteThing(ask: WriteAsk): Helpers.Awaitable<WroteActual>
-  /** In one step: fetch the raw parent at `ask`'s scope, each raw Thing one label under it, and its bank's raw world, and return
-   * `this.classifyListThings(ask, fetched, world)`.
+  /** In one step: fetch the raw parent at `ask`'s scope, each raw Thing one label under it, and its bank's raw roots, and return
+   * `this.classifyListThings(ask, fetched, bankFetched)`.
    */
   protected abstract doListThings(ask: ListAsk): Helpers.Awaitable<ListThingsActual>
   /** In one step: fetch the raw bank, main gate and root box, return `this.classifyBirthBank(puts, fetched)`, and under `born` first
-   * write each put's record and report the three as written, checked by `writtenRootsOf`, and the world the bank and main gate make.
+   * write each put's record and report the three as written, checked by `writtenRootsOf`, with the banktok and `tracked` after the write.
    */
   protected abstract doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Helpers.Awaitable<BirthBankActual>
   /** In one step, the same atomic unit as a get's: fetch the raw bank, main gate and root box, and return `this.classifyGetWorld(ask, fetched)`. */

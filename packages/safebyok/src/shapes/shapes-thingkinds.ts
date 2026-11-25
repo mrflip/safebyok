@@ -12,11 +12,11 @@ import { type Thingkind, PerKindChecks, policiesByModelkind } from './shapes-thi
 // sit below this module and read their checks where they are made.
 
 /** The checks of the bank's Thing: its record, its citation and what is stored of it, the storage policies it may name (none), and its labelpath.
- * Also its `recordOrShell`, which a Bank begins from, its lifetok, as a write over the bank stored reads it (`storedLifetok`), its `stamp`, and `birthAsk`, the ask that writes a new bank's first Things: it leaves its three records unchecked, for `BankChecks.record`, `GateChecks.record` and `BoxChecks.record`.
+ * Also its `shell`, its lifetok, as a write over the bank stored reads it (`storedLifetok`), its `stamp`, and `birthAsk`, the ask that writes a new bank's first Things: it leaves its three records unchecked, for `BankChecks.record`, `GateChecks.record` and `BoxChecks.record`.
  */
 export const BankChecks = Object.freeze({
   record:        PerKindChecks.bankThing,
-  recordOrShell: PerKindChecks.bankThingOrShell,
+  shell:         PerKindChecks.bankShell,
   cited:         PerKindChecks.bankCited,
   stored:        PerKindChecks.bankThing.refusingAs('damaged_row'),
   storedLifetok: PerKindChecks.storedLifetok,
@@ -27,11 +27,11 @@ export const BankChecks = Object.freeze({
 })
 
 /** The checks of a gate's Thing: its record, its citation and what is stored of it, the storage policies it may name, and its labelpath.
- * Also its `recordOrShell`, which a Gate begins from, its wayins, the wayins as a write under a storage policy reads them of the gate stored, its `stamp`, and its `stampedGate`.
+ * Also its `shell`, its wayins, the wayins as a write under a storage policy reads them of the gate stored, its `stamp`, and its `stampedGate`.
  */
 export const GateChecks = Object.freeze({
   record:        PerKindChecks.gateThing,
-  recordOrShell: PerKindChecks.gateThingOrShell,
+  shell:         PerKindChecks.gateShell,
   cited:         PerKindChecks.gateCited,
   stored:        PerKindChecks.gateThing.refusingAs('damaged_row'),
   policies:      policiesByModelkind.gate,
@@ -43,12 +43,12 @@ export const GateChecks = Object.freeze({
 })
 
 /** The checks of a box's Thing: its record, its citation and what is stored of it, the storage policies it may name (none), and its labelpath.
- * Also its `recordOrShell`, which a Box begins from, its `live` record, its `liveOrShell` record, which a bank has of its root box, its `sparse` form, a live box without its body, and its `stamp`.
+ * Also its `shell`, its `live` record, its `liveOrShell` record, which a bank has of its root box, its `sparse` form, a live box without its body, and its `stamp`.
  * And what its seal is given: its sealable, a live one for a tombstone (`liveSealable`), the public props of a revision and of a tombstone, and the cleartexts.
  */
 export const BoxChecks = Object.freeze({
   record:               PerKindChecks.boxThing,
-  recordOrShell:        PerKindChecks.boxThingOrShell,
+  shell:                PerKindChecks.boxShell,
   cited:                PerKindChecks.boxCited,
   stored:               PerKindChecks.boxThing.refusingAs('damaged_row'),
   policies:             policiesByModelkind.box,

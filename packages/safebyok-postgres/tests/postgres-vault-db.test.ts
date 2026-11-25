@@ -108,7 +108,7 @@ function tellingListen(text: string) {
   return { listen, stopped }
 }
 
-/** A notice of the root box in the battery's bank that carries neither the Thing nor its world. */
+/** A notice of the root box in the battery's bank that carries neither the Thing nor its bank row. */
 const BareNotice = JSON.stringify({ at: { userid: VT.ThingBank.userid, banklabel: VT.ThingBank.banklabel, labelpath: VT.getAskAt('box').labelpath } })
 // --
 

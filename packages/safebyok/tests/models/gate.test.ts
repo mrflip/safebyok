@@ -28,7 +28,7 @@ const AloneFriend: WorldGateFriend = {
 }
 
 /** The gate of `record`, made alone on `device`, by default a new device of {@link TH.WorldScope}. */
-function makeGate(record: GateRecord | ShellOf<GateRecord>, device = TH.makeDevice()): Gate { return Gate.make(record, { device }, AloneFriend) }
+function makeGate(record: GateRecord | ShellOf<GateRecord>, device = TH.makeDevice()): Gate { return Gate.make(TH.begunOf(record), { world: device.world }, AloneFriend) }
 
 interface DnaWayins { main: Wayin, passkey0: Wayin | null }
 
@@ -87,8 +87,8 @@ describe("Gate.makeRecord(dna)", () => {
   }
 })
 
-describe("Gate.make(record, { device }, friend)", () => {
-  it("pickles to the very record it was made from", async () => {
+describe("Gate.make(begun, { world }, friend)", () => {
+  it("pickles to the very record its item event carried", async () => {
     const record = await gateRecordOf(true)
     expect(makeGate(record).pickle()).to.eq(record)
   })
@@ -109,11 +109,10 @@ describe("Gate.make(record, { device }, friend)", () => {
     [(record: GateRecord) => ({ ...record, lifeseq: Lifeseq.ofLifenum(2) }),                                                  'a lifeseq its lifepath does not end with'],
     [(record: GateRecord) => ({ ...record, am: 'x', lifeseq: Lifeseq.ofLifenum(1), lifepath: Lifeseq.ofLifenum(1) }),                 'am x, where the main gate is never deleted'],
     [(record: GateRecord) => ({ ...record, maingate: record }),                                                       'a field no gate Thing has'],
-    [() => null,                                                                                                     'null'],
   ] as const
 
   for (const [recordOf, blurb] of RecordCases) {
-    it(`refuses a record with ${blurb}`, async () => {
+    it(`refuses an item event of a record with ${blurb}`, async () => {
       const record = recordOf(await gateRecordOf(true))
       TH.expectSyncRefusal(() => makeGate(record as never), 'bad_record')
     })
@@ -147,8 +146,16 @@ describe("Gate.make(record, { device }, friend)", () => {
 
   it("refuses no opts at all, or no friend", async () => {
     const record = await gateRecordOf()
-    TH.expectSyncRefusal(() => Gate.make(record, undefined as never, undefined as never))
-    TH.expectSyncRefusal(() => Gate.make(record, { device: TH.makeDevice() }, undefined as never), 'bad_record')
+    TH.expectSyncRefusal(() => Gate.make(TH.thingEventOf(record), undefined as never, undefined as never))
+    TH.expectSyncRefusal(() => Gate.make(TH.thingEventOf(record), { world: TH.makeDevice().world }, undefined as never), 'bad_record')
+  })
+
+  it("refuses nothing at all, a whole record with no item event, and another kind's shell", async () => {
+    const { world } = TH.makeDevice()
+    const record    = await gateRecordOf()
+    TH.expectSyncRefusal(() => Gate.make(null as never, { world }, AloneFriend), 'bad_record')
+    TH.expectSyncRefusal(() => Gate.make(record as never, { world }, AloneFriend), 'bad_record')
+    TH.expectSyncRefusal(() => Gate.make(TH.bankShellOf(), { world }, AloneFriend), 'bad_record')
   })
 
   it("quotes none of a refused record in its refusal: no ciphertext", async () => {

@@ -20,43 +20,45 @@ async function signedInDevice(): Promise<Device> {
   return device
 }
 
-describe("world.makeThing(seen)", () => {
-  it("makes a Bank, a Gate or a Box by the modelkind of the record's labelpath, holding the record", () => {
+describe("world.makeThing(begun)", () => {
+  it("makes a Bank, a Gate or a Box by the modelkind of the item event's labelpath, holding the record it received", () => {
     const { world } = TH.makeDevice()
     const [bankRecord, gateRecord, boxRecord] = [TH.bankThingOf(), TH.gateThingOf(), TH.boxThingOf()]
-    const [bank, gate, box] = [world.makeThing(bankRecord), world.makeThing(gateRecord), world.makeThing(boxRecord)]
+    const [bank, gate, box] = [world.makeThing(TH.thingEventOf(bankRecord)), world.makeThing(TH.thingEventOf(gateRecord)), world.makeThing(TH.thingEventOf(boxRecord))]
     expectTypeOf(bank).toEqualTypeOf<Bank>()
     expectTypeOf(gate).toEqualTypeOf<Gate>()
     expectTypeOf(box).toEqualTypeOf<Box>()
     expect([bank, gate, box].map((thing) => thing.constructor)).to.deep.equal([Bank, Gate, Box])
     expect([bank.pickle(), gate.pickle(), box.pickle()]).to.deep.equal([bankRecord, gateRecord, boxRecord])
+    expect([bank.agekind, gate.agekind, box.agekind]).to.deep.equal(['here', 'here', 'here'])
   })
 
-  it("makes the Thing of the shell, holding it", () => {
+  it("makes the Thing of the shell, holding it, which has received nothing", () => {
     const thing = TH.makeDevice().world.makeThing(TH.gateShellOf())
     expect(thing).to.be.instanceOf(Gate)
     expect(thing.pickle()).to.deep.equal(TH.gateShellOf())
+    expect(thing.agekind).to.eq('vacant')
   })
 
-  it("makes the Thing of a sparse record over its kind's shell, which then cites the record it receives", () => {
+  it("makes the Thing of an item event of a sparse record over its kind's shell, which then cites the record", () => {
     const sparse = TH.boxSparseOf(TH.boxThingOf())
-    const thing = TH.makeDevice().world.makeThing(sparse)
-    if (! (thing instanceof Box)) { throw new TypeError("A box's sparse record made no Box.") }
-    expect(thing.pickle()).to.deep.equal(Shell.inParentLivesOf(sparse))
-    thing.receive(TH.thingEventOf<BoxRecord>(sparse))
+    const thing = TH.makeDevice().world.makeThing(TH.thingEventOf<BoxRecord>(sparse))
+    expect(thing).to.be.instanceOf(Box)
     expect(thing.pickle()).to.deep.equal(Shell.inParentLivesOf(sparse))
     expect(thing.citable).to.deep.include({ revtok: sparse.revtok, revseq: sparse.revseq, lifepath: sparse.lifepath })
   })
 
   const RefusedCases = [
-    [{ ...TH.bankThingOf(), labelpath: 'vault' }, 'bad_record',      'a labelpath of no kind of Thing'],
-    [{ ...TH.boxThingOf(), userid: 'u2' },        'record_conflict', "a record of another bank than its device's"],
-    [null,                                        'bad_record',      'no record at all'],
+    [TH.thingEventOf({ ...TH.bankThingOf(), labelpath: 'vault' } as never), 'bad_record',      'an item event at a labelpath of no kind of Thing'],
+    [TH.thingEventOf({ ...TH.boxThingOf(), userid: 'u2' }),                 'record_conflict', "an item event of a record of another bank than its device's"],
+    [Shell.inParentLivesOf({ ...TH.boxThingOf(), banklabel: 'other' }),    'record_conflict', "the shell of another bank than its device's"],
+    [TH.boxThingOf(),                                                       'bad_record',      'a whole record with no item event'],
+    [null,                                                                  'bad_record',      'nothing at all'],
   ] as const
 
-  for (const [seen, refusalkind, blurb] of RefusedCases) {
+  for (const [begun, refusalkind, blurb] of RefusedCases) {
     it(`refuses ${blurb}`, () => {
-      TH.expectSyncRefusal(() => TH.makeDevice().world.makeThing(seen as never), refusalkind)
+      TH.expectSyncRefusal(() => TH.makeDevice().world.makeThing(begun as never), refusalkind)
     })
   }
 })
@@ -80,7 +82,7 @@ describe("world.bank, world.gate, world.rootBox and world.bankStamp", () => {
     expect(world.bank!.pickle()).to.deep.equal(TH.bankShellOf())
     expect(world.gate!.pickle()).to.deep.equal(TH.gateShellOf())
     TH.expectSyncRefusal(() => world.bankStamp, 'absent_thing')
-    TH.expectSyncRefusal(() => world.makeThing(TH.gateThingOf()).bankStamp, 'absent_thing')
+    TH.expectSyncRefusal(() => world.makeThing(TH.thingEventOf(TH.gateThingOf())).bankStamp, 'absent_thing')
   })
 })
 

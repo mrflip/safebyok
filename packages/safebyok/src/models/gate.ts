@@ -7,15 +7,18 @@ import type { Proving } from './proving'
 import { Wayin } from './wayin'
 import type { World } from './world'
 import type {
-  AddPasskeyDna, GateDna, GateGatingFriend, GateOpts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, PassphraseReplaceCleartexts, ReplacePassphraseDna,
+  AddPasskeyDna, GateDna, GateGatingFriend, PasskeyAddCleartexts, PasskeyRevokeCleartexts, PassphraseReplaceCleartexts, ReplacePassphraseDna,
   RevokePasskeyDna, UnlockCleartexts, UnlockDna, WorldGateFriend,
 } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type BankStamp, type GateStamp, type LeaseLoggable, type LeaseStamp, StampChecks } from '../shapes/shapes-stamps'
-import { type GateRecord, type Modelkind, type Sparse, type ThingRecord, type ThingScope, type Wayins, ThingChecks, ThingFormat, ThingMakeChecks } from '../shapes/shapes-thing'
+import { type GateRecord, type Modelkind, type Sparse, type ThingRecord, type ThingScope, type Wayins, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
+import { type ThingMakeOpts, ThingMakeChecks } from '../shapes/shapes-bankish'
+import { type VaultItemEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { GateChecks } from '../shapes/shapes-thingkinds'
 import type { PutAskDraft } from '../shapes/shapes-asks'
-import type { EpochMillis } from '../shapes/primitives'
+import { type EpochMillis, Labelpath } from '../shapes/primitives'
+import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
 /** A bank's gate: its passphrase wayin and its passkey wayin if it has one.
@@ -78,22 +81,25 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
   // == [Construction]: make, constructor, adopt, makeRecord, makeNextRecord
 
-  /** Make the gate of `record`, on `opts.device`, handing its leases to the world through `friend`. Locked, and nothing is fetched or stored.
-   * `record` is a whole gate record or the gate's shell. Each subscriber is wrapped by `opts.bulletproofCallback`, where given.
+  /** Make the gate at `begun`, its shell, or an item event of its record, which it then receives, handing its leases to `opts.world` through `friend`. Locked, and nothing is fetched or stored.
+   * Throws where it refuses `begun`'s record.
    * Internal: the device's world makes the gate its VaultMinder keeps.
    */
-  static make(record: GateRecord | Sealers.ShellOf<GateRecord>, opts: GateOpts, friend: WorldGateFriend): Gate {
-    const { opts: gateOpts, friend: worldFriend } = Checks.gateMakeArgs.parse({ record, opts, friend })
+  static make(begun: Sealers.ShellOf<GateRecord> | VaultItemEvent<GateRecord>, opts: ThingMakeOpts, friend: WorldGateFriend): Gate {
+    Checks.gateMakeArgs.parse({ begun, opts, friend })
+    const { world } = opts
+    const seen = ('eventkind' in begun) ? begun.val : begun
     // A gate's life is its own, so only the bank's scope is checked: a gate of another life of the bank passes.
-    Validator.checkedConsistent(StampChecks.bankScope.parse(record), gateOpts.device.scope, { kind: 'record_conflict' })
-    // A gate models the very record it is handed, never the check's copy.
-    return new Gate(record, gateOpts, worldFriend)
+    Validator.checkedConsistent(StampChecks.bankScope.parse(seen), world.device.scope, { kind: 'record_conflict' })
+    const gate = new Gate(super.shellOf(seen), world, friend)
+    if ('eventkind' in begun) { gate.receive(begun) }
+    return gate
   }
 
-  private constructor(begun: GateRecord | Sealers.ShellOf<GateRecord>, opts: GateOpts, friend: WorldGateFriend) {
-    super(begun, opts.bulletproofCallback)
-    this.#device    = opts.device
-    this.#world     = opts.device.world
+  private constructor(shell: Sealers.ShellOf<GateRecord>, world: World, friend: WorldGateFriend) {
+    super(shell, world.bulletproofCallback)
+    this.#device    = world.device
+    this.#world     = world
     this.#friend    = friend
   }
 
@@ -334,13 +340,13 @@ function wayinsOf({ main, passkey0 }: GateDna['wayins']): Wayins {
 
 // Defined here, not with the shapes: they name a model class.
 /** The checks of the arguments of {@link Gate.make}, {@link Gate.makeRecord} and {@link Gate.makeNextRecord}. */
-const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn }) => {
+const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn, union }) => {
   const wayin = custom<Wayin>()
   const wayins = obj({ main: wayin, passkey0: wayin.nullable() })
   return {
     gateMakeArgs:   obj({
-      record: GateChecks.recordOrShell,
-      opts:   ThingMakeChecks.thingMakeOpts.extend({ device: custom<Device>() }),
+      begun:  union([GateChecks.shell, SeenChecks.itemEvent]).refine(({ labelpath }) => Labelpath.isOfModelkind(labelpath, 'gate'), Phrases.BegunOfOtherKind),
+      opts:   ThingMakeChecks.thingMakeOpts,
       friend: obj({ leaseGateOf: fn<WorldGateFriend['leaseGateOf']>(), renewal: fn<WorldGateFriend['renewal']>(), attachLease: fn<WorldGateFriend['attachLease']>() }),
     }),
     makeRecordArgs: GateChecks.stamp.extend({ wayins }),

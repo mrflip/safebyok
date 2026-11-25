@@ -80,7 +80,7 @@ describe("Bank.makeRecord(stamp)", () => {
   })
 })
 
-describe("Bank.make(record, { device }), by the device's world", () => {
+describe("Bank.make(begun, { world }), by the device's world", () => {
   it("makes the bank its device's world keeps, its main gate the world's, locked as the world is", async () => {
     const { record, device, bank } = await TH.buildBornBank()
     device.lock()
@@ -150,9 +150,10 @@ describe("Bank.make(record, { device }), by the device's world", () => {
   ] as const
 
   for (const [recordOf, blurb] of RecordCases) {
-    it(`refuses a record with ${blurb}`, async () => {
+    it(`refuses an item event of a record with ${blurb}`, async () => {
       const born = await TH.buildBornBank()
-      TH.expectSyncRefusal(() => Bank.make(recordOf(born.record) as never, { device: born.device }), 'bad_record')
+      const begun = { ...TH.thingEventOf(born.record), val: recordOf(born.record) }
+      TH.expectSyncRefusal(() => Bank.make(begun as never, { world: born.device.world }), 'bad_record')
     })
   }
 
@@ -165,7 +166,7 @@ describe("Bank.make(record, { device }), by the device's world", () => {
     it(`refuses ${blurb}`, async () => {
       const born = await TH.buildBornBank()
       const device = TH.makeDevice(moved)
-      const err = TH.expectSyncRefusal(() => Bank.make(born.record, { device }), 'record_conflict')
+      const err = TH.expectSyncRefusal(() => Bank.make(TH.thingEventOf(born.record), { world: device.world }), 'record_conflict')
       expect(err.meta).to.deep.equal({ fieldnames: [fieldname] })
     })
   }
@@ -179,22 +180,29 @@ describe("Bank.make(record, { device }), by the device's world", () => {
     expect(bank.rootBox).to.equal(device.world.rootBox?.pickle())
   })
 
-  it("refuses no opts at all", async () => {
-    const { record } = await TH.buildBornBank()
-    TH.expectSyncRefusal(() => Bank.make(record, undefined as never), 'bad_record')
+  it("refuses no opts at all, and a world that is not one", async () => {
+    const { record, device } = await TH.buildBornBank()
+    TH.expectSyncRefusal(() => Bank.make(TH.thingEventOf(record), undefined as never), 'bad_record')
+    TH.expectSyncRefusal(() => Bank.make(TH.thingEventOf(record), { device } as never), 'bad_record')
   })
 
-  it("pickles to the very record it was made from", () => {
+  it("refuses a whole record with no item event, and another kind's shell", () => {
+    const { world } = TH.makeDevice()
+    TH.expectSyncRefusal(() => Bank.make(TH.bankThingOf() as never, { world }), 'bad_record')
+    TH.expectSyncRefusal(() => Bank.make(TH.gateShellOf() as never, { world }), 'bad_record')
+  })
+
+  it("pickles to the very record its item event carried", () => {
     const record = TH.bankThingOf()
-    expect(Bank.make(record, { device: TH.makeDevice() }).pickle()).to.eq(record)
+    expect(Bank.make(TH.thingEventOf(record), { world: TH.makeDevice().world }).pickle()).to.eq(record)
   })
 })
 
 describe("a bank over the shell or a tombstone", () => {
   /** A bank of `record`, the bank's shell or a tombstone, made on a device that has heard of no world. */
   function makeBankOf(record: BankRecord | ShellOf<BankRecord>): Bank {
-    const device = TH.makeDevice()
-    return Bank.make(record, { device })
+    const { world } = TH.makeDevice()
+    return Bank.make(TH.begunOf(record), { world })
   }
 
   /** A whole tombstone of the bank, in its second life. */

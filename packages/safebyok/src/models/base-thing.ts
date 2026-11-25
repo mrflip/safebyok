@@ -2,7 +2,8 @@ import { pick } from 'es-toolkit'
 import { SX } from 'safebyok-big/internals'
 import { type Banklabel, type EpochMillis, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq, VoidLifeseq } from '../shapes/primitives'
 import type { ShellOf } from '../shapes/shapes-sealers'
-import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, ThingChecks } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, Shell, ThingChecks } from '../shapes/shapes-thing'
+import type { SeenThing } from '../shapes/shapes-vault-event'
 import { BoxChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
 
 // == [Kinds]: KindRecords, RecordOfKind, Kinded, MembersOfKind, LiveOfKind, TombstoneOfKind, VoidSentinelOfKind, WholeOfKind
@@ -112,7 +113,13 @@ export abstract class BaseThing implements Sparse<ThingRecord> {
   }
   // --
 
-  // == [Reading records]: haveSameScope, cmp, sparseOf, nextLifeOf
+  // == [Reading records]: shellOf, haveSameScope, cmp, sparseOf, nextLifeOf
+
+  // The shell is built at `seen`'s labelpath, so it is of `seen`'s kind, which TypeScript cannot follow through `Shell`.
+  /** The shell a Thing of `seen` is made at: `seen` itself where it is the void sentinel, else the shell under the lives it names above it. */
+  static shellOf<RecordT extends ThingRecord>(seen: SeenThing<RecordT>): ShellOf<RecordT> {
+    return (isVoidSentinelOfKind(null, seen) ? seen : Shell.inParentLivesOf(seen)) as ShellOf<RecordT>
+  }
 
   /** True when `ante` and `post` are at one labelpath of one bank. */
   static haveSameScope(ante: ThingScope, post: ThingScope): boolean {

@@ -27,7 +27,7 @@ export const VacantReadTc: ReadTc = '00000000-0000-7000-8000-000000000000'
 type AgerankFields = readonly [lifepath: Lifepath, highRevseq: string, itemRevseq: string, tcchunk: string]
 
 // A concrete adapter with a clock of its own in the statement that reads may report its own UUID version 7 in place of this one.
-/** A {@link ReadTc} made now, for a concrete adapter to report as the `read_tc` of the world it fetches in the same step. */
+/** A {@link ReadTc} made now, for a concrete adapter to report as the `read_tc` of the step it is made in. */
 export function readTcNow(): ReadTc { return uuidv7() }
 
 // A UUID version 7 begins with its Unix time in milliseconds, 48 bits: the first eight hexadecimal digits and the four after the dash.

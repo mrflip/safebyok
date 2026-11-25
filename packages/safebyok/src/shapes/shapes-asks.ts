@@ -10,7 +10,7 @@ import {
 } from './shapes-thing'
 import * as Throwers from '../refusals/throwers'
 
-// == [Asks]: RawChecks, loggableAsk, AskChecks, Track, VoidTrack, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, GetWorldAsk, WorldRoots, ThingWatchScope, WorldRecord, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
+// == [Asks]: RawChecks, loggableAsk, AskChecks, Track, VoidTrack, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, GetWorldAsk, WorldRoots, ThingWatchScope, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
 type Kinded   = { modelkind: Thingkind, labelpath: Labelpath }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
@@ -137,8 +137,6 @@ export type AnyAsk          = GetAsk | ListAsk | WriteAsk | BirthBankAsk | GetWo
 export type BirthPuts       = readonly [BankWriteAsk, GateWriteAsk, BoxWriteAsk]
 /** The scope of a watch: a bank. */
 export type ThingWatchScope = Readonly<Z.infer<typeof AskChecks.thingWatchScope>>
-/** The `world` of a vaultDB answer: the bank's record, with its main gate's Thing as `maingate`. */
-export type WorldRecord     = BankRecord & Readonly<{ maingate: GateRecord }>
 // Unspecified for a missing or damaged row: notes/wontfix.md.
 /** For each Thing an ask tracks, `'same'` if it is stored at the revseq and lifepath tracked, else the Thing stored. */
 export type Tracked         = Readonly<{ bank: BankRecord | 'same', [Labelpath.MainGate]: GateRecord | 'same', [Labelpath.RootBox]: BoxRecord | 'same' }>

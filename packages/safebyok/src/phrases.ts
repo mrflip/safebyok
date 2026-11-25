@@ -1,6 +1,6 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, RootShelfExpected, ThingSoonestBare
+// == [Models]: VaultDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, RootShelfExpected, ThingSoonestBare, WorldExpected, ThingExpected, BegunOfOtherKind
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
@@ -46,6 +46,15 @@ export const RootShelfExpected = 'Expected a root shelf, such as localStorage: a
 
 /** A box the device has heard a newer revision of, with no whole record of its newest life to unseal. */
 export const ThingSoonestBare = 'This device has heard of a newer revision of this record but has not fetched it yet.'
+
+/** What a Thing or a car is made with in place of a device's world. */
+export const WorldExpected = "Expected a device's world: an object with a function for each of its verbs, makeThing, seal, unseal, lock and sweep."
+
+/** What a car is made from that is neither a Thing, the shell, nor an item event. */
+export const ThingExpected = 'Expected a Thing, the shell at its labelpath, or an item event of its record.'
+
+/** What a kind of Thing is made from that is another kind's. */
+export const BegunOfOtherKind = "A Thing is made from the shell or an item event at a labelpath of its own kind."
 // --
 
 // == [Things]: the sentences of a Thing's checks, of a shell's, and of a vaultDB's asks

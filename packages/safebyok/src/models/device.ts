@@ -203,7 +203,7 @@ export class Device {
   /** Start the signed-in user's bank over a VaultMinder of it: from the roots shelved, where there are any, and from the three roots the vaultDB answers. */
   async #doSignin(): Promise<void> {
     try {
-      const vaultMinder = VaultMinder.make(this.scope, { vaultDB: this.vaultDB, makeThing: (shell) => this.#world.makeThing(shell) })
+      const vaultMinder = VaultMinder.make(this.scope, { vaultDB: this.vaultDB, world: this.#world })
       this.#vaultTSQ = VaultTSQ.make({ vaultMinder, queryClient: this.#vaultTsqClient, scope: this.scope, onBadNews: (news) => { this.tellBadNews([news]) } })
       this.#world.signin(vaultMinder, this.#rootShelf)
       this.#vault = Vault.make(this.#world, this.#vaultTSQ)

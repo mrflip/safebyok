@@ -359,11 +359,11 @@ describe("a device's root shelf", () => {
 
 /** A bank born on a device that keeps its roots on a memory shelf, and a second device over its vaultDB and the same shelf, signed out: the page reloaded. */
 // The VaultMinder reads no wayin, so the gate's Thing is the first to refuse it.
-/** `answer`, its main gate's wayins mangled in its world and its roots, at `revseq` where given */
+/** `answer`, its main gate's wayins mangled in its roots, at `revseq` where given */
 function withGateMangled(answer: GetWorldAnswer, revseq?: number): GetWorldAnswer {
-  if ((! answer.ok) || (answer.world === null)) { return answer }
+  if (! answer.ok) { return answer }
   const gate = { ...answer.val.gate, wayins: { main: {}, passkey0: null }, ...((revseq !== undefined) && { revseq }) } as GateRecord
-  return { ...answer, world: { ...answer.world, maingate: gate }, val: { ...answer.val, gate } }
+  return { ...answer, val: { ...answer.val, gate } }
 }
 
 async function bornAndReloaded(opts: Partial<DeviceOpts> = {}): Promise<{ born: TH.BornBank, device: Device, rootShelf: TH.MemoryShelf }> {
@@ -540,6 +540,33 @@ describe("device.birthGating(cleartexts)", () => {
     await TH.expectRefusal(device.birthGating({ passphraseCleartext: TH.TestPassphrase }).attempt(), 'weak_passphrase')
     expect(device.bank).to.be.null
     expect(device.world.getSnapshot()).to.include({ stage: 'unborn' })
+  })
+})
+
+/** A device signed in where no bank is stored, its watch muted where `isWatching` is false, and a bank born on another device over its vaultDB after. */
+async function unbornThenBornElsewhere(isWatching: boolean): Promise<Device> {
+  const vaultDB = new MemoryVaultDB()
+  if (! isWatching) { vi.spyOn(vaultDB, 'watch').mockReturnValue(noop) }
+  const device = TH.makeDevice({ userid: null }, { vaultDB })
+  await device.signin(TH.WorldScope.userid)
+  expect(device.world.getSnapshot().stage).to.eq('unborn')
+  await TH.buildBornBank({ device: TH.makeDevice({ userid: null }, { vaultDB }) })
+  return device
+}
+
+describe("a device signed in to an unborn bank, of the bank born on another device over its vaultDB", () => {
+  it("shows it locked once an ordinary get answers", async () => {
+    const device = await unbornThenBornElsewhere(false)
+    await TH.aWhile()
+    expect(device.world.getSnapshot().stage).to.eq('unborn')
+    await device.world.demandVaultMinder().tryGetOnce({ ...TH.WorldScope, labelpath: 'box/openai' })
+    expect(device.world.getSnapshot().stage).to.eq('locked')
+  })
+
+  it("shows it locked from its watch's notices", async () => {
+    const device = await unbornThenBornElsewhere(true)
+    await TH.eventually(() => device.world.getSnapshot().stage === 'locked')
+    expect(device.world.getSnapshot()).to.include({ stage: 'locked', lastErr: null })
   })
 })
 

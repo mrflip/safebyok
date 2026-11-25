@@ -53,7 +53,7 @@ async function gateWithPassphrase(): Promise<TH.LiveGate> {
 
 /** The gate of `record`, made by the world of `gate`, a gate of {@link TH.WorldBankStamp}'s bank. */
 function gateOf(gate: TH.LiveGate, record: unknown): TH.LiveGate {
-  return TH.liveGateOf(gate.device.world.makeThing(record as GateRecord))
+  return TH.liveGateOf(gate.device.world.makeThing(TH.thingEventOf(record as GateRecord)))
 }
 
 /** The arguments of a proving of `gate`, under a bank's stamp and a gate's stamp each moved by `moves`: the stamps a Gate would refuse to be made under. */

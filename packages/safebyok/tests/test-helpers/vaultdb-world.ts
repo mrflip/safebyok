@@ -2,7 +2,7 @@
 
 import { type Lifepath, type Lifetok, Labelpath, Lifeseq } from '../../src/shapes/primitives'
 import {
-  type BankRecord, type BoxRecord, type BoxSparse, type GateRecord, type ThingCited, type ThingRecord,
+  type BankRecord, type BoxRecord, type BoxSparse, type GateRecord, type ThingCited, type ThingRecord, type VoidSentinel,
   Shell, ThingFormat,
 } from '../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
@@ -11,6 +11,8 @@ import { type SeenThing, type VaultEvent, type VaultItemEvent, VaultDBSourcelabe
 import { SX } from 'safebyok-big/internals'
 import { VacantAgerank, itemSeenOf, readTcNow } from '../../src/storage/agerank'
 import { PlainThing } from './plain-thing'
+import type { ShellOf } from '../../src/shapes/shapes-sealers'
+import type { CarWorld } from '../../src/shapes/shapes-vault-minder'
 import { WayinChecks } from '../../src/shapes/shapes-wayin'
 import { type BirthBankAsk, type CitedOf, type GetAsk, type GetWorldAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, VoidTrack, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { FirstLifetok, FirstRevtok, T0, revtokOf } from './models-world'
@@ -174,14 +176,22 @@ export function maskedReadTcsOf(events: readonly VaultEvent[]): VaultEvent[] {
   return events.map((event) => (ReadTcPattern.test(event.read_tc) ? { ...event, read_tc: AnyReadTc } : event))
 }
 
-/** The Thing a test's VaultMinder keeps at each labelpath: a plain one, as a device's is. */
-export function makePlainThing(seen: SeenThing): PlainThing { return PlainThing.make(seen) }
+/** The Thing a test's VaultMinder keeps at each labelpath: a plain one, at its shell. */
+export function makePlainThing(shell: VoidSentinel): PlainThing { return PlainThing.make(shell) }
+
+/** The world of a test's VaultMinder, which makes a plain Thing at each labelpath. */
+export const PlainWorld: CarWorld<PlainThing> = Object.freeze({ makeThing: makePlainThing })
 
 /** The `item` notice a vaultDB's raw watch gets for `record`, at the liveness its record has, with the vacant agerank, at {@link AnyReadTc}, and with the void lifetok unless given another. */
 export function itemEventOf(record: SeenThing, banktok: Lifetok = SX.VoidLifeTok): VaultItemEvent {
   const { userid, banklabel, labelpath } = record
   const unsorted = { agerank: VacantAgerank, agerankWas: VacantAgerank, banktok, sourcelabel: VaultDBSourcelabel, read_tc: AnyReadTc }
   return { eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), ...unsorted, ...itemSeenOf(record) }
+}
+
+/** What a Thing is made from at `seen`: `seen` itself where it is the shell, else its item event, read now. */
+export function begunOf<RecordT extends ThingRecord>(seen: SeenThing<RecordT>): ShellOf<RecordT> | VaultItemEvent<RecordT> {
+  return BaseThing.isVoidSentinel(seen) ? seen : thingEventOf(seen)
 }
 
 // itemEventOf types its record as of any kind; a Thing of one kind receives only events of its own.

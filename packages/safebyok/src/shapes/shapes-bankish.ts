@@ -9,7 +9,7 @@ import type { World } from '../models/world'
 import type { VaultDB } from '../storage/vault-db'
 import type { StrengthChecker } from './shapes-gateish'
 import type { BoxCleartexts, UnsealedOf } from './shapes-sealers'
-import type { BoxRecord, ThingMakeOpts } from './shapes-thing'
+import type { BoxRecord } from './shapes-thing'
 import type { GetAsk, ListAsk } from './shapes-asks'
 import type { Banklabel, DeviceTok, EpochMillis, Labelpath, Userid } from './primitives'
 import * as Phrases from '../phrases'
@@ -28,13 +28,28 @@ export type BoxUnsealed = UnsealedOf<BoxRecord, BoxCleartexts>
 export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent }>
 // --
 
-// == [The bank's making]: BankOpts, WorldOpts, HostedVault, WorldChecks
+// == [The bank's making]: ThingMakeOpts, ThingMakeChecks, isWorld, WorldMembernames, WorldOpts, HostedVault, WorldChecks
 
-/** The options of {@link Bank.make}, beside its record. */
-export interface BankOpts extends ThingMakeOpts {
-  /** The device the bank is on. Its scope must be the bank's. */
-  device:  Device
+/** The options every kind of Thing is made with, beside the shell or item event it is made from. */
+export type ThingMakeOpts = Readonly<{
+  /** The device's world, which the Thing's bank is locked, unlocked and ended in, and whose `bulletproofCallback` wraps each of its subscribers. */
+  world: World
+}>
+
+/** The check of {@link ThingMakeOpts}. */
+export const ThingMakeChecks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
+  thingMakeOpts: obj({ world: custom<World>(isWorld, Phrases.WorldExpected) }),
+}))
+
+/** True for an object with a function for each of {@link World}'s verbs. */
+export function isWorld(val: unknown): val is World {
+  if ((typeof val !== 'object') || (val === null)) { return false }
+  const members: Partial<Record<string, unknown>> = val
+  return WorldMembernames.every((membername) => typeof members[membername] === 'function')
 }
+
+/** The members of {@link World} that are functions. */
+const WorldMembernames = ['makeThing', 'seal', 'unseal', 'lock', 'sweep', 'signin', 'ensureUnlocked', 'dismissUnlock', 'demandEnabled', 'hostVault', 'bulletproofCallback'] as const satisfies readonly (keyof World)[]
 
 /** The options of {@link World.make}. */
 export interface WorldOpts {

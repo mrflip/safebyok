@@ -1,29 +1,28 @@
 import { isEqual, noop } from 'es-toolkit'
-import { type Errors, SX, Validator, VX } from 'safebyok-big/internals'
+import { type Errors, Phrases as BigPhrases, SX, Validator, VX } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { BaseThing } from './base-thing'
 import { Box } from './box'
-import type { Device } from './device'
+import { Device } from './device'
 import { Gate } from './gate'
 import { BirthGating } from './gating'
 import type { Lease } from './lease'
 import type { Proving } from './proving'
-import type { Adoptable } from './thing'
 import { bulletproofHandlerOf } from '../helpers/bulletproof'
-import type { BankStage, HostedVault, RefusalSnapshot, RootShelf, WorldOpts, WorldSnapshot } from '../shapes/shapes-bankish'
+import type { BankStage, HostedVault, RefusalSnapshot, RootShelf, ThingMakeOpts, WorldOpts, WorldSnapshot } from '../shapes/shapes-bankish'
 import { PendingWorld, SignedOutWorld, WorldChecks, isRootShelf } from '../shapes/shapes-bankish'
 import type { BirthCleartexts, BirthDna, BirthGatingFriend, GateRevisionedStamp, LeaseGate, WorldGateFriend } from '../shapes/shapes-gateish'
 import { type MaskedViewLease, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type BankStamp, type LeaseLoggable, StampChecks } from '../shapes/shapes-stamps'
-import { type BankRecord, type BoxRecord, type BulletproofCallback, type GateRecord, type Sparse, type ThingMakeOpts, type ThingRecord, type Thingkind, PerKindChecks, Shell } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type BulletproofCallback, type GateRecord, type Sparse, type ThingRecord, type Thingkind, type VoidSentinel, PerKindChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
-import { type ReadTc, type SeenThing, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
+import { type ReadTc, type SeenThing, type VaultEvent, type VaultItemEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { type EpochMillis, type Lifetok, Labelpath } from '../shapes/primitives'
 import { peekRoots, stowRoots } from '../minding/root-shelf'
 import { VacantAgerank, itemSeenOf } from '../storage/agerank'
 import type { VaultMinder } from '../minding/vault-minder'
-import { isVaultMinder } from '../shapes/shapes-vault-minder'
+import { type ReceivingThing, isVaultMinder } from '../shapes/shapes-vault-minder'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
@@ -71,7 +70,7 @@ export class World {
   })
   // --
 
-  // == [Getters]: vaultMinder, bank, gate, rootBox, bankStamp, leaseEndsAt, leaseLoggable, getSnapshot, subscribe, bulletproofCallback
+  // == [Getters]: vaultMinder, bank, gate, rootBox, bankStamp, leaseEndsAt, leaseLoggable, getSnapshot, subscribe, bulletproofCallback, device
 
   /** The signed-in user's bank's records, sorted, as handed to {@link signin}, or null until then. */
   get vaultMinder(): VaultMinder | null { return this.#vaultMinder }
@@ -119,6 +118,9 @@ export class World {
 
   /** Wrap `callback`, one the core keeps for someone else, so that what it throws goes to the device's `onBadNews`, never to whoever calls it. Already bound. */
   get bulletproofCallback(): BulletproofCallback { return this.#bulletproofCallback }
+
+  /** The device this world is of. */
+  get device(): Device { return this.#device }
   // --
 
   // == [Construction]: make, constructor, makeThing
@@ -135,21 +137,23 @@ export class World {
     Object.freeze(this)
   }
 
-  /** Make the Thing of `seen`, a record of the device's bank: a {@link Bank}, a {@link Gate} or a {@link Box}, by its modelkind. Nothing is fetched or stored.
-   * Begun from a record that is not whole, the Thing holds its kind's shell, under the lives the record names above it: have it receive the record after.
+  // A root's Thing is subscribed to before it receives its first record, so that this world hears of that record too.
+  /** Make the Thing at `begun`, of the device's bank: a {@link Bank}, a {@link Gate} or a {@link Box}, by its modelkind. Nothing is fetched or stored.
+   * Made from the shell, it holds the shell; made from an item event, it receives the event after, and throws where it refuses its record.
    * What its subscribers throw goes to the device's `onBadNews`.
    */
-  makeThing(seen: BankRecord): Bank
-  makeThing(seen: GateRecord): Gate
-  makeThing(seen: BoxRecord): Box
-  makeThing(seen: SeenThing): SomeThing
-  makeThing(seen: SeenThing): SomeThing {
-    const { labelpath } = SeenChecks.seenCited.parse(seen)
+  makeThing(begun: VaultItemEvent<BankRecord>): Bank
+  makeThing(begun: VaultItemEvent<GateRecord>): Gate
+  makeThing(begun: VaultItemEvent<BoxRecord>): Box
+  makeThing(begun: VoidSentinel | VaultItemEvent): SomeThing
+  makeThing(begun: VoidSentinel | VaultItemEvent): SomeThing {
+    SeenChecks.begun.parse(begun)
+    const seen = ('eventkind' in begun) ? begun.val : begun
     Validator.checkedConsistent(StampChecks.bankScope.parse(seen), this.#device.scope, { kind: 'record_conflict' })
-    const begun = BaseThing.isWhole(seen) ? seen : Shell.inParentLivesOf(seen)
-    const thingClass: ThingClass = thingClassOf(Labelpath.modelkindOf(labelpath))
-    const thing = thingClass.make(begun, { device: this.#device, bulletproofCallback: this.#bulletproofCallback }, this.#gateFriend())
-    if (RootLabelpaths.has(labelpath)) { thing.subscribe(() => { this.#hearRoot() }) }
+    const thingClass: ThingClass = thingClassOf(Labelpath.modelkindOf(seen.labelpath))
+    const thing = thingClass.make(BaseThing.shellOf(seen), { world: this }, this.#gateFriend())
+    if (RootLabelpaths.has(seen.labelpath)) { thing.subscribe(() => { this.#hearRoot() }) }
+    if ('eventkind' in begun) { receiveFirst(thing, begun) }
     return thing
   }
   // --
@@ -456,7 +460,7 @@ export class World {
   // --
 }
 
-// == [Helpers]: RootLabelpaths, ShelvedSourcelabel, banktokOf, shelvedEventOf, ThingClass, thingClassOf, isLive, refusalSnapshotOf, WorldLeaseGate, Wait, makeWait
+// == [Helpers]: RootLabelpaths, ShelvedSourcelabel, banktokOf, shelvedEventOf, ThingClass, receiveFirst, thingClassOf, isLive, refusalSnapshotOf, WorldLeaseGate, Wait, makeWait
 
 /** The labelpaths of the bank's roots, which the stage is read from. */
 const RootLabelpaths: ReadonlySet<Labelpath> = new Set(['bank', Labelpath.MainGate, Labelpath.RootBox])
@@ -481,8 +485,11 @@ function shelvedEventOf({ record, read_tc }: Readonly<{ record: SeenThing, read_
 
 /** The class a world makes a Thing of one kind from, as {@link World.makeThing} calls it. */
 interface ThingClass {
-  make(record: Adoptable<ThingRecord>, opts: ThingMakeOpts & { device: Device }, friend: WorldGateFriend): SomeThing
+  make(begun: VoidSentinel | VaultItemEvent, opts: ThingMakeOpts, friend: WorldGateFriend): SomeThing
 }
+
+/** Have `thing`, which has received nothing, receive `event` */
+function receiveFirst(thing: ReceivingThing, event: VaultItemEvent): void { thing.receive(event) }
 
 // Read as a world makes a Thing, not as this module loads: the model modules import one another, and a class may not be
 // defined yet while this one loads.
@@ -547,7 +554,7 @@ function makeWait(): Wait {
 // Defined here, not with the shapes: they name a model class.
 /** The checks of {@link World.make}'s arguments, {@link World.signin}'s, and a root read from a root shelf. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom, union }) => ({
-  worldOpts:   obj({ device: custom<Device>() }),
+  worldOpts:   obj({ device: custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected) }),
   signinArgs:  obj({
     vaultMinder: custom<VaultMinder>(isVaultMinder, Phrases.VaultMinderExpected),
     shelf:       custom<RootShelf>(isRootShelf, Phrases.RootShelfExpected).nullable(),
