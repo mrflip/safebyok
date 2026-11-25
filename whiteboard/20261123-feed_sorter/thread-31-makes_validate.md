@@ -1,6 +1,6 @@
 # Thread 31: makes_validate (2026-11-25)
 
-Branch `20261125-makes_validate`, PR (to come), stacked on [#896](https://github.com/mrflip/safebyok/pull/896). Proved:
+Branch `20261125-makes_validate`, PR [#898](https://github.com/mrflip/safebyok/pull/898), stacked on [#896](https://github.com/mrflip/safebyok/pull/896). Proved:
 `pnpm justify` green in full, nothing skipped: safebyok 1992 (1950 + 42 new), react-lean 338, idb-lean 115, postgres 365, dojo 111,
 knockknock 26, envman 24, e2e 576, root scripts 331. React-lean and the three demos run again by hand, the same.
 
