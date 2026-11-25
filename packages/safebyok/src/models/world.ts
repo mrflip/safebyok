@@ -345,7 +345,7 @@ export class World {
   }
   // --
 
-  // == [The janitor]: tidy, isGateStale, refreshRoots
+  // == [The janitor]: #tidy, #isGateStale, #refreshRoots
   // #lock-is-intent: autolock is a best-effort time, not a deadline. A lease past its end still seals and unseals until
   // the next tick, which may come a janitor period late, or later while the page sleeps. Meanwhile isSoftlocked holds,
   // so a call to ensureUnlocked asks the user first.
