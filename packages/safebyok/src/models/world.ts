@@ -1,4 +1,4 @@
-import { isEqual, noop, pick } from 'es-toolkit'
+import { isEqual, noop } from 'es-toolkit'
 import { Clock, type Errors, Outcome, Phrases as BigPhrases, SX, Validator, VX } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { BaseThing } from './base-thing'
@@ -279,7 +279,8 @@ export class World {
   /** The Thing fields a lease granted under the gate at `gateScope` follows: the lease record stored, or this world's lease where none is stored or this one is newer, or else the gate's lease shell. */
   async #leaseFollowed(gateScope: LeaseShellScope): Promise<Sparse<LeaseRecord>> {
     const shell  = Lease.shellOf(gateScope)
-    const stored = await this.#peekStored(pick(shell, ['userid', 'banklabel', 'labelpath']))
+    const { userid, banklabel, labelpath } = shell
+    const stored = await this.#peekStored({ userid, banklabel, labelpath })
     if (this.#isNewerThanLease(stored)) { return this.#endedIfStale(stored) }
     return this.#lease ?? shell
   }
