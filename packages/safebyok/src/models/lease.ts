@@ -147,7 +147,7 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
     return StampChecks.liveLeaseRecord.parse({ ...liveRecord, ...this.nextRevisionOf(liveRecord), ends_at })
   }
 
-  /** The tombstone of the live lease `live`, written at `written_at`, or now: the next life, with its Thing fields alone. A lock stows it in place of `live`.
+  /** The tombstone of the live lease `live`, written at `written_at`, or now: the next life, with its Thing fields alone and no keys.
    * Pass a live record or a `Lease`.
    */
   static tombstoneOf(live: Sparse<LiveOf<LeaseRecord>>, written_at: EpochMillis = Clock.nowMillis()): LeaseTombstone {

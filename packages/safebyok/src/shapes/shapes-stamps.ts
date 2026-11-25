@@ -48,6 +48,7 @@ export const LeaseFormat = ThingFormat
 /** A lease's labelpath: `lease/` and the label of the gate it was granted under. It is no Thing's labelpath. */
 export type LeaseLabelpath = `lease/${string}`
 
+/** A {@link LeaseLabelpath}: `lease/` and one segment. */
 const LeaseLabelpathPattern = /^lease\/[^/]+$/
 
 /** The labelpath of a lease granted under the gate at `gateLabelpath`: `lease/gate` for the main gate, `lease/passkeys` for `gate/passkeys`. */
