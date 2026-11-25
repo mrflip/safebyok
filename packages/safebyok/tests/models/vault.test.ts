@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { noop } from 'es-toolkit'
 import { Bank } from '../../src/models/bank'
 import { Box } from '../../src/models/box'
 import { Vault } from '../../src/models/vault'
@@ -76,18 +77,18 @@ async function buildVaultBeside(bank: Bank): Promise<Vault> {
   return device.vault!
 }
 
-describe("Vault.make(bank, vaultTSQ)", () => {
-  it("makes the vault of the bank's boxes, over the vault TSQ given", async () => {
+describe("Vault.make(world, vaultTSQ)", () => {
+  it("makes the vault of the boxes of the world's bank, over the vault TSQ given", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const vault = Vault.make(bank, device.vaultTSQ)
+    const vault = Vault.make(device.world, device.vaultTSQ)
     expect(vault.bank).to.equal(bank)
     expect(Object.isFrozen(vault)).to.be.true
   })
 
-  it("refuses a swept bank", async () => {
+  it("refuses a swept world", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.sweep()
-    TH.expectSyncRefusal(() => Vault.make(bank, device.vaultTSQ), 'disabled')
+    TH.expectSyncRefusal(() => Vault.make(device.world, device.vaultTSQ), 'disabled')
   })
 })
 
@@ -752,14 +753,29 @@ describe("vault.forceTimelyUnlocked(labelpath, opts)", () => {
   })
 })
 
-describe("a vault of a bank over the shell", () => {
+describe("a vault of a bank not stored", () => {
   it("refuses a seal and an unseal, and its try forms resolve the refusal", async () => {
-    const { device } = await TH.buildBornBank()
-    const vault = Vault.make(Bank.make(TH.bankShellOf(), { device }), device.vaultTSQ)
+    const device = TH.makeDevice({})
+    await device.signin(TH.WorldScope.userid)
+    const vault = device.vault!
+    expect(device.world.getSnapshot().stage).to.eq('unborn')
     await TH.expectRefusal(vault.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'absent_thing')
     await TH.expectRefusal(vault.unsealBox(TH.boxThingOf()), 'absent_thing')
     expect(await vault.trySealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })).to.deep.include({ ok: false })
     expect(await vault.tryUnsealBox(TH.boxThingOf())).to.deep.include({ ok: false })
+  })
+
+  it("refuses absent_thing to each verb that reads a box, before any wait for an unlock, and answers its bank absent", async () => {
+    const device = TH.makeDevice({})
+    await device.signin(TH.WorldScope.userid)
+    const vault = device.vault!
+    TH.expectSyncRefusal(() => vault.bank, 'absent_thing')
+    await TH.expectRefusal(vault.withWhisper('box/openai', noop), 'absent_thing')
+    await TH.expectRefusal(vault.withUnlockedWhisper('box/openai', noop), 'absent_thing')
+    await TH.expectRefusal(vault.forceTimelyUnlocked('box/openai'), 'absent_thing')
+    expect(await vault.tryPutBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })).to.deep.include({ ok: false })
+    await TH.expectRefusal(vault.delBoxOnce('box/openai'), 'absent_thing')
+    expect(device.world.getSnapshot().isUnlockWanted).to.be.false
   })
 })
 

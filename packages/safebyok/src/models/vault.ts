@@ -20,34 +20,35 @@ import type { VaultMinder } from '../minding/vault-minder'
  * Each seal is made under the bank's lease, so it needs the bank unlocked. A write answers the record stored.
  */
 export class Vault {
-  // == [Props]: #bank, #world, #vaultTSQ
+  // == [Props]: #world, #vaultTSQ
 
-  readonly #bank:     Bank
   /** The bank's world, which holds its Things and its lease. */
   readonly #world:    World
   readonly #vaultTSQ: VaultTSQ
   // --
 
-  // == [Getters]: bank
+  // == [Getters]: bank, #bank
 
-  /** The bank whose boxes this vault carries. */
+  /** The bank whose boxes this vault carries. Refuses `absent_thing` while the bank, its main gate or its root box is not live. */
   get bank(): Bank { return this.#bank }
+
+  /** The world's bank, refusing while it, its main gate or its root box is not live */
+  get #bank(): Bank { return this.#world.demandRootsLive() }
   // --
 
   // == [Construction]: make, constructor
 
-  /** Make the vault of `bank`'s boxes, reading them through `vaultTSQ`, the vault TSQ of the same bank.
-   * The bank's sweep sweeps the vault too. Refuses a swept bank.
+  /** Make the vault of the boxes of `world`'s bank, reading them through `vaultTSQ`, the vault TSQ of the same bank.
+   * The world's sweep sweeps the vault too. Refuses a swept world. Its verbs refuse while the bank is not live.
    */
-  static make(bank: Bank, vaultTSQ: VaultTSQ): Vault {
-    const vault = new Vault(bank, vaultTSQ)
-    bank.hostVault(vault)
+  static make(world: World, vaultTSQ: VaultTSQ): Vault {
+    const vault = new Vault(world, vaultTSQ)
+    world.hostVault(vault)
     return vault
   }
 
-  private constructor(bank: Bank, vaultTSQ: VaultTSQ) {
-    this.#bank     = bank
-    this.#world    = bank.device.world
+  private constructor(world: World, vaultTSQ: VaultTSQ) {
+    this.#world    = world
     this.#vaultTSQ = vaultTSQ
     Object.freeze(this)
   }

@@ -12,6 +12,7 @@ import { Bank } from '../../src/models/bank'
 import { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from '../../src/models/device'
 import { BirthGating } from '../../src/models/gating'
 import { VaultTSQ } from '../../src/minding/vault-tsq'
+import { Vault } from '../../src/models/vault'
 import { BankRootsMissing } from '../../src/phrases'
 import { EmptyMaskedView } from '../../src/shapes/shapes-masked-view'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -122,6 +123,16 @@ describe("Device.make(record, opts)", () => {
     await device.signin(TH.WorldScope.userid)
     expect(device.vaultTSQ).to.be.instanceOf(VaultTSQ)
     expect(device.vaultTSQ).to.equal(device.vaultTSQ)
+  })
+
+  it("makes the vault last as signin starts the bank, null before then, before the vaultDB answers", () => {
+    const vaultDB = new MemoryVaultDB()
+    vi.spyOn(vaultDB, 'tryGetWorld').mockReturnValue(new Promise(noop))
+    const device = TH.makeDevice({ userid: null }, { vaultDB })
+    expect(device.vault).to.be.null
+    void device.signin(TH.WorldScope.userid)
+    expect(device.vault).to.be.instanceOf(Vault)
+    expect(device.world.getSnapshot().stage).to.eq('starting')
   })
 
   it("serializes as its user, banklabel and token alone, and is frozen", () => {
@@ -409,7 +420,8 @@ describe("device.signin(userid)", () => {
     await device.signin(TH.WorldScope.userid)
     expect(device.world.getSnapshot()).to.include({ stage: 'unborn', isLocked: true, lastErr: null })
     expect(device.bank).to.be.null
-    expect(device.vault).to.be.null
+    const { vault } = device
+    TH.expectSyncRefusal(() => vault!.bank, 'absent_thing')
     const shownLocked: (Bank | null)[] = []
     device.world.subscribe(() => { if (device.world.getSnapshot().stage === 'locked') { shownLocked.push(device.bank) } })
     const bank = await device.birthGating({ passphraseCleartext: TH.TestPassphrase }).attempt()
@@ -417,7 +429,8 @@ describe("device.signin(userid)", () => {
     expect(shownLocked).to.have.lengthOf(1)
     expect(shownLocked[0]).to.equal(bank)
     expect(device.bank).to.equal(bank)
-    expect(device.vault!.bank).to.equal(bank)
+    expect(device.vault).to.equal(vault)
+    expect(vault!.bank).to.equal(bank)
     expect(device.world.getSnapshot()).to.include({ stage: 'unlocked' })
   })
 

@@ -64,7 +64,7 @@ export class Device {
   #userid: Userid | null = null
   /** The vault TSQ of the signed-in user's boxes, made as `signin` starts the bank. */
   #vaultTSQ: VaultTSQ | null = null
-  /** The vault of the bank's boxes, made at the first read of {@link vault} once the bank is live. */
+  /** The vault of the bank's boxes, made as `signin` starts the bank. */
   #vault: Vault | null = null
   /** What `signin` resolves, once it has been called. */
   #signinAnswer: Promise<void> | null = null
@@ -109,13 +109,10 @@ export class Device {
   /** The signed-in user's bank, or null until its world has it live, with its main gate and root box: found stored, or born on this device. */
   get bank(): Bank | null { return this.#world.areRootsLive ? this.#world.bank : null }
 
-  /** The vault of this device's bank's boxes, or null while the device has no bank. The same one from its first read on. */
-  get vault(): Vault | null {
-    const { bank } = this
-    if (bank === null) { return null }
-    this.#vault ??= Vault.make(bank, this.vaultTSQ)
-    return this.#vault
-  }
+  /** The vault of this device's bank's boxes, or null until `signin` starts the bank. The same one from then on.
+   * Its verbs refuse `absent_thing` while {@link bank} is null.
+   */
+  get vault(): Vault | null { return this.#vault }
   // --
 
   // == [Construction]: make, constructor
@@ -201,13 +198,15 @@ export class Device {
   // bank unborn, or broken. A failure to fetch them, once a bank is up from what was restored, is no caller's to hear.
   // The VaultMinder is made right before the vault TSQ and the world listen to it, with nothing awaited between: its
   // Things remember what they take, so a record it took with no one listening would reach them later only as a repeat,
-  // which it drops. The world takes the roots shelved before the vaultDB is asked.
+  // which it drops. The world takes the roots shelved before the vaultDB is asked. The vault is made last, on everything
+  // made before it.
   /** Start the signed-in user's bank over a VaultMinder of it: from the roots shelved, where there are any, and from the three roots the vaultDB answers. */
   async #doSignin(): Promise<void> {
     try {
       const vaultMinder = VaultMinder.make(this.scope, { vaultDB: this.vaultDB, makeThing: (shell) => this.#world.makeThing(shell) })
       this.#vaultTSQ = VaultTSQ.make({ vaultMinder, queryClient: this.#vaultTsqClient, scope: this.scope, onBadNews: (news) => { this.tellBadNews([news]) } })
       this.#world.signin(vaultMinder, this.#rootShelf)
+      this.#vault = Vault.make(this.#world, this.#vaultTSQ)
       const answer = await vaultMinder.tryGetWorldOnce()
       if (! answer.ok) { throw answer.err }
       if (! (this.#world.areRootsLive || isUnbornIn(answer.val))) { throw Throwers.bankRootsMissing() }

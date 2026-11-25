@@ -222,7 +222,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
   /** The vault of the signed-in user's bank. Refuses as {@link demandBank} does. */
   function demandVault(): Vault {
     const signedIn = demandDevice()
-    if (signedIn.vault === null) { throw bankAbsentOf(signedIn) }
+    if ((signedIn.bank === null) || (signedIn.vault === null)) { throw bankAbsentOf(signedIn) }
     return signedIn.vault
   }
 
