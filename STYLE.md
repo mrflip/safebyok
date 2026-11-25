@@ -156,6 +156,12 @@ is named for the act.
 | `fooOf(thing)` | Pure: the foo derived from `thing`. |
 | `tryFoo` | `foo`, resolving an `Outcome` instead of throwing. |
 
+**The front door is `foo`; a captive layer beneath it is `doFoo`.** When a function splits into
+the entrypoint callers call and the part that does the work, the entrypoint keeps the plain verb,
+and `doFoo` is called by `foo` alone (`tryGetThing` and its protected `doGetThing`). One function
+that does both is plain `foo`, with no `doFoo`. Never coin a synonym for the second layer: a `tell`
+that calls `notify` hides which one a caller should use.
+
 **`make` and `build` say whether to await; the suffix says what comes back.** With no suffix, the name is the thing itself; a suffix says you get something else:
 
 | Name | Gives you |
@@ -274,6 +280,12 @@ two apart, so this is kept by hand.
   work on the text. Don't parse it into a scope to join it again.
 * **Accept one form of input.** A function accepting a scope *or* its scopepath branches on its
   argument and trusts one branch; accept the scope.
+* **A method's shape.** Validate its arguments and field preconditions (a zod parse); check its
+  starting invariants with `demandFoo` or `ensureFoo` guards; establish its finishing invariants;
+  and keep its critical window as small as is reasonable, failing if a precondition no longer holds
+  at either end (a lock came down). End every operation in a state that already exists: a
+  nice-to-have that needs a new state is not built. State the invariants; don't add a check to the
+  end of every method.
 * **Constants shared across modules** (`ScopepathDelimiter`) live in `consts.ts`, which
   imports no runtime value, so any module can name them without a cycle.
 * **Familiar over cute.** A named target and `===` beats an equality-predicate factory:
@@ -562,6 +574,7 @@ rows with it.
 ## Comments and doc blocks
 
 **WRITE PLAIN ENGLISH** `#plain-english`. Sometimes a sentence fragment is enough. Usually a doc block is one line of readable prose describing the essentials, and when warranted, important details follow on the next lines.
+Read each sentence back as normal English. The tells of a compressed register: openings like "What the foo verbs" or "How a foo verbs", "the one X", "over the", "as the foo says", and an "as" with no verb after it ("as after a fetch", "as by a loader").
 
 `/** */` for doc blocks, `//` for a running clarification or commented-out code. A bulleted list in a doc block uses `-`,
 indented two spaces per level.
@@ -576,6 +589,9 @@ A member that will not describe in a line is a smell: report it.
 * **A doc block has no past and no future** `#purpose-not-path`: nothing on how the code came to be, what it replaced,
   which thread or ruling shaped it, why it is built this way, or what is next. A reason worth keeping is a `//` comment
   above the block (below); a caveat, a progress note or an open question goes to `human/` or the whiteboard, never here.
+* **Say what is observed, not how it came to be** `#observed-not-cause`: "the stored token equals the proposed one", never
+  "a late retry" or "whoever sent it twice". Retry, replay, resend and duplicate are guesses about a world outside our
+  guarantees, in a doc block, a spec or a test title alike: name the comparison instead.
 * **A doc block does not read the body aloud** `#purpose-not-machinery`: not the steps or their order, the helpers it calls,
   the fields it touches, or the state a refusal leaves behind. The body is a line below, and a caller who needs it will open
   it. The test: cover the body and ask of each sentence whether the caller still needs it. The one exception is a

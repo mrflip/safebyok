@@ -54,7 +54,19 @@ when any of them is meant; otherwise say which call: `ensureVault`, `vault.refre
 
 Size every subagent. Each Agent call names its `model`, and its `effort` where that should differ
 from the agent's own, by your best estimate of the task: `sonnet` for the mechanical, `opus` for
-judgment.
+judgment. Every brief says: "Check with the Coach or your orchestrating agent before fanning out."
+
+* **Important details go in the reply itself**: findings, rulings needed, surprises, in words a
+  Coach can act on without opening a link. A PR or a `human/` note repeats them; it is never where
+  a Coach first meets them.
+* **A line reference carries a short verbatim snippet** to search on: Coaches edit as they read,
+  and line numbers drift. A table row's label (S2, R1) carries words from its row.
+* **Mark the temporary**: start anything that only keeps callers working until a later thread
+  with "Scaffolding:", and name the thread that removes it.
+* **Argue on the merits.** A plan, an earlier ruling or the code as it stands is context for a
+  design choice, never its reason; a guarantee is evidence.
+* **A Coach's text earns the same scrutiny as any other.** Fix what is wrong in it, and say so; a
+  quotation stays word for word.
 
 ## Values
 
@@ -72,11 +84,24 @@ passphrase, the customer integrating the package, and the security reviewer read
   misdirected you: say so.
 * **Maintainability and legibility beat performance** unless it is shown to be slow where it
   matters. Cleverness is rarely called for; if it seems to be, propose it.
+* **Write for the reader debugging one verb.** One plain function per verb, each a straight
+  line, and one thrower per refusal kind, named for it; repetition across short functions is
+  fine. Ask: "if I were debugging the put method, would I want it to look like this?"
+* **Count branches, not lines.** Lines of code are measured in branches: `if`s, ternaries, early
+  returns, per-case functions. Folding throwers saves lines and no branches.
+* **A throw marks an error**, never a scope limit. Where a case is out of scope ("the main gate
+  only, for now"), build nothing for it, and add no refusal, guard or tightened validator to
+  forbid it: such a throw sends later agents off building workarounds.
 * **Validate at each module entrypoint**, every export, then write confident, paranoia-free code
   past it: a private helper trusts its exported caller.
 * **Security first.** Where the stronger measure (Argon2id, say) is not available on every
   platform, implement it first anyway, and make it pluggable second.
 * **Secret material never leaves through a side door**: beware leakage via error objects or logging.
+* **The host is not our threat model** `#the-host-is-not-our-threat-model`. We protect the end
+  user's secrets from storage and from leaks, not from the host that integrates us. Validate a
+  host's input by its interface, never the wisdom of its choices. Don't hunt for host errors, or
+  explain what you think is happening: report what is observed. Don't complicate the common path
+  for an edge case, and never accommodate misuse by swallowing errors or stripping bad fields.
 
 ## What the package promises
 
@@ -106,6 +131,13 @@ govern how code is changed:
   where the new core's loosened guarantees are kept. Report it only if it could corrupt what the
   bankDB stores or put secret material where it should not be, and then report it, never fix it.
   A setting a comment marks `#no-slop-crossings` is fixed: leave what changing it might cross unexamined.
+  This binds what a worker, a brief or a plan does on its own call. In a design talk with a
+  Coach, a crossing is weighed on its merits: trace the events, say what covers it, recommend.
+* **Cost follows frequency.** A bank's build or delete ends everything. A gate verb is thousands
+  of times rarer than a vault put or delete, a vault op rarer than a box op, and a box op rarer
+  than a read. So reads stay cheap (indexed, one round trip), a gate verb may be heavy, and an
+  ending may be blunt. Don't buy speed at the rare end with clarity, or add work at the hot end
+  for symmetry.
 
 ## Commands
 
@@ -127,7 +159,9 @@ pnpm changeset                     # a PR's release note; `--empty` when it need
 * `whiteboard/` and `winboard/` -- thread and session folders, `YYYYMMDD-<label>/`, open and
   done. Your own thread's folder is yours to read and search, by name: `rg` skips the rest. Every
   other is a historic artifact: open one only when your task names it. Precedence: your
-  instructions and plan, then your whiteboard, then the code.
+  instructions and plan, then your whiteboard, then the code. A Coach reads and fingerpaints in
+  the base checkout (`/workspace/byok`); the `base-sync` agent carries a line into it and keeps
+  the Coach's uncommitted edits.
 * `human/` -- from agents to Coaches. Progress notes, caveats and open questions go here or in the
   thread's whiteboard, never in doc blocks or comments. Write to it, never read it
   (`human/README.md`).

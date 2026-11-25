@@ -27,6 +27,11 @@ what consequence. A case that loses typed text and corrupts nothing is a row in 
 grounds: a `draft.saveAction`; `putBoxAction` handing a refused form its fields back; a check that the bundler wrote
 `'use client'`.
 
+An idiom is not machinery. The package and demos are what customers copy, so write React as React's docs teach it,
+everywhere: an effect's cleanup ignoring a stale result, a keyed reset, an event handler where an effect is not needed.
+Where such an idiom closes a crossing in a line or two, it beats a row in `notes/wontfix.md`. A counter, a token, a
+lock or a new state is still machinery, and still a row.
+
 ## The layers, and what each owes a host
 
 * **A demo is a pure exercise in one modality**, and passes the niece test: "would you offer it to your niece as an

@@ -16,6 +16,10 @@ const isolatedEnv = (home: string, now: number) => {
     HOME:                home,
     XDG_CONFIG_HOME:     home,
     GIT_CONFIG_NOSYSTEM: '1',
+    // Never the repository of a git that runs these tests (`rebase --exec`, a hook)
+    GIT_DIR:             undefined,
+    GIT_WORK_TREE:       undefined,
+    GIT_INDEX_FILE:      undefined,
     GIT_AUTHOR_NAME:     'Tess Ter',
     GIT_AUTHOR_EMAIL:    'tess@example.com',
     GIT_COMMITTER_NAME:  'Tess Ter',
