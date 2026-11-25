@@ -321,7 +321,7 @@ export class World {
     if (this.#isConnected) { vault.connect() }
   }
 
-  /** Start the VaultMinder's watch, where someone has signed in, telling the device's `onBadNews` what the host's vaultDB throws */
+  /** Start the VaultMinder's watch, where someone has signed in, telling the device's `onBadNews` what the host's vaultDB throws. */
   #connectMinder(): void {
     try { this.#vaultMinder?.connect() } catch (err) { this.#device.tellBadNews([err]) }
   }
