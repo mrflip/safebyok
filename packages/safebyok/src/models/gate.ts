@@ -248,17 +248,11 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   }
   // --
 
-  // == [Locking and sweeping]: lock, sweep
+  // == [Locking]: lock
 
   /** Lock this gate's world: drop its lease and the keys in it ({@link World.lock}). */
   lock(): this {
     this.#world.lock()
-    return this
-  }
-
-  /** End this gate's world for good, and with it the bank ({@link World.sweep}). An `endCause` that is not a refusal refuses `bad_record`; nothing else throws. */
-  sweep(endCause: Errors.VaultError | null = null): this {
-    this.#world.sweep(endCause)
     return this
   }
   // --
@@ -289,10 +283,10 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
   // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, demandEnabled, demandPasskeyAddable
 
-  /** True until this gate's world is swept or its device ends. */
+  /** True until its device ends. */
   get isEnabled(): boolean { return this.#world.isEnabled }
 
-  /** The refusal every call on this gate meets once its world is swept or its device ends, or null while it is enabled. */
+  /** The refusal every call on this gate meets once its device ends, or null while it is enabled. */
   get endCause(): Errors.VaultError | null { return this.#world.endCause }
 
   /** True while this gate's world holds no lease. */

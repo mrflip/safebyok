@@ -48,10 +48,10 @@ function stubVaultDBOf(stop: () => void) {
   } satisfies VaultDB
 }
 
-/** A VaultMinder over a MemoryVaultDB, and that MemoryVaultDB, to write beside it. */
+/** A VaultMinder over a MemoryVaultDB, watching it, and that MemoryVaultDB, to write beside it. */
 function sortedOverMemory(): { vaultDB: VaultMinder<TH.PlainThing>, inner: MemoryVaultDB } {
   const inner = new MemoryVaultDB()
-  return { vaultDB: VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld }), inner }
+  return { vaultDB: VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld }).connect(), inner }
 }
 
 /** The track of a sender that knows only the root box, at its revision. */
@@ -135,22 +135,31 @@ describe("VaultMinder, what only a wrapper can show", () => {
     expect(inner.tryGetWorld.mock.calls[0]![0]).to.equal(asks.world)
   })
 
-  it("watches its bank in the vaultDB it wraps once, from when it is made, whoever listens to it, asking nothing", () => {
+  it("watches nothing until connected", () => {
+    const inner = stubVaultDBOf(vi.fn())
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
+    heardOf(vaultDB)
+    expect([inner.watch.mock.calls.length, vaultDB.isWatching]).to.deep.equal([0, false])
+  })
+
+  it("watches its bank in the vaultDB it wraps once while connected, however often connected and whoever listens to it, asking nothing", () => {
     const stop = vi.fn()
     const inner = stubVaultDBOf(stop)
     const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
+    expect(vaultDB.connect().connect()).to.equal(vaultDB)
     expect(inner.watch.mock.calls.map(([scope]) => scope)).to.deep.equal([TH.ThingBank])
     const ends = [heardOf(vaultDB).end, heardOf(vaultDB).end]
     for (const end of ends) { end() }
     heardOf(vaultDB)
-    expect([inner.watch.mock.calls.length, stop.mock.calls.length]).to.deep.equal([1, 0])
+    expect([inner.watch.mock.calls.length, stop.mock.calls.length, vaultDB.isWatching]).to.deep.equal([1, 0, true])
     expect([inner.tryGetThing, inner.tryWriteThing, inner.tryListThings, inner.tryBirthBank].every((verb) => verb.mock.calls.length === 0)).to.equal(true)
   })
 
-  it("stops its watch of the vaultDB it wraps at its sweep, and still tells of an answer's records", async () => {
+  it("stops its watch of the vaultDB it wraps at its disconnect, and still tells of an answer's records", async () => {
     const { vaultDB, inner } = sortedOverMemory()
     const { events } = heardOf(vaultDB)
-    expect(vaultDB.sweep().sweep()).to.equal(vaultDB)
+    expect(vaultDB.disconnect().disconnect()).to.equal(vaultDB)
+    expect(vaultDB.isWatching).to.equal(false)
     await inner.tryBirthBank(TH.birthBankAskOf())
     await TH.aWhile()
     expect(events).to.deep.equal([])
@@ -158,12 +167,24 @@ describe("VaultMinder, what only a wrapper can show", () => {
     expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ...firstSeen('box')])
   })
 
-  it("calls the wrapped watch's stop once, however often swept", () => {
+  it("calls the wrapped watch's stop once, however often disconnected, and watches again at its next connect", () => {
     const stop = vi.fn()
-    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: stubVaultDBOf(stop), world: TH.PlainWorld })
-    vaultDB.sweep()
-    vaultDB.sweep()
+    const inner = stubVaultDBOf(stop)
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld }).connect()
+    vaultDB.disconnect()
+    vaultDB.disconnect()
     expect(stop).toHaveBeenCalledTimes(1)
+    vaultDB.connect()
+    expect([inner.watch.mock.calls.length, vaultDB.isWatching]).to.deep.equal([2, true])
+  })
+
+  it("watches nothing when the wrapped watch throws as it connects, and throws that", () => {
+    const inner = stubVaultDBOf(vi.fn())
+    const thrown = new Error('watch refused')
+    inner.watch.mockImplementation(() => { throw thrown })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
+    expect(() => vaultDB.connect()).to.throw(thrown)
+    expect(vaultDB.isWatching).to.equal(false)
   })
 
   const BadArgs = [
@@ -510,7 +531,7 @@ describe("VaultMinder.thingAt(scoped)", () => {
 
   it("answers undefined for a labelpath it has learned of no record at, and a Thing holding the shell where it learned only of a record its Thing refused", () => {
     const inner = stubVaultDBOf(noop)
-    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld }).connect()
     const { badNews } = heardOf(vaultDB)
     expect(vaultDB.thingAt(TH.BoxScope)).to.eq(undefined)
     const [, onNotice] = inner.watch.mock.calls[0]!

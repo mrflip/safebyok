@@ -128,7 +128,7 @@ describe("world.getSnapshot() and world.subscribe(listener)", () => {
     expect(Object.isFrozen(world.getSnapshot())).to.be.true
   })
 
-  it("tells its subscribers once each for a lock, an `unlock` gating and a sweep, the snapshot the same object between them", async () => {
+  it("tells its subscribers once each for a lock, an `unlock` gating and a disconnect, which locks, the snapshot the same object between them", async () => {
     const { bank } = await TH.buildBornBank()
     const { world } = bank.device
     const counter = TH.countCalls(world.subscribe)
@@ -145,13 +145,12 @@ describe("world.getSnapshot() and world.subscribe(listener)", () => {
     expect(counter.calls).to.eq(2)
     expect(world.getSnapshot()).to.deep.equal(unlocked)
 
-    bank.sweep()
+    bank.device.disconnect()
     expect(counter.calls).to.eq(3)
-    expect(world.getSnapshot()).to.deep.equal({ stage: 'swept', isLocked: true, isEnded: true, endCause: bank.endCause, leaseEndsAt: null, lastErr: null, isUnlockWanted: false })
-    expect(world.getSnapshot().endCause).to.equal(bank.endCause).and.include({ refusalkind: 'disabled' })
+    expect(world.getSnapshot()).to.deep.equal(locked)
   })
 
-  it("tells no subscriber of a call that changes nothing in the snapshot: a second lock or sweep, a wrong passphrase, or a box landing", async () => {
+  it("tells no subscriber of a call that changes nothing in the snapshot: a second lock, a disconnect or connect while locked, a wrong passphrase, or a box landing", async () => {
     const { bank, vault } = await TH.buildBornVault()
     const { world } = bank.device
     const counter = TH.countCalls(world.subscribe)
@@ -161,10 +160,9 @@ describe("world.getSnapshot() and world.subscribe(listener)", () => {
     bank.lock()
     bank.lock()
     await TH.expectRefusal(bank.gate.gatingUnlockAttempt({ passphrase: 'not the passphrase' }), 'wrong_passphrase')
+    bank.device.disconnect()
+    bank.device.connect()
     expect(counter.calls).to.eq(1)
-    bank.sweep()
-    bank.sweep()
-    expect(counter.calls).to.eq(2)
   })
 
   it("shows an `unlock` gating wanted while a call waits for one, and carries no cleartext", async () => {
@@ -184,37 +182,13 @@ describe("world.getSnapshot() and world.subscribe(listener)", () => {
     expect(JSON.stringify(snapshots)).not.to.include(passphraseCleartext)
   })
 
-  it("shows the bank swept once its device is swept", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    const { world } = device
-    const counter = TH.countCalls(world.subscribe)
-    device.sweep()
-    expect(counter.calls).to.eq(1)
-    expect(world.getSnapshot()).to.include({ stage: 'swept', isEnded: true, endCause: bank.endCause })
-  })
-
-  it("leaves its snapshot unchanged once swept, telling no subscriber of a lock or of its device's sweep", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    const { world } = device
-    bank.sweep()
-    const swept = world.getSnapshot()
-    const counter = TH.countCalls(world.subscribe)
-    bank.lock()
-    device.sweep()
-    expect(counter.calls).to.eq(0)
-    expect(world.getSnapshot()).to.equal(swept)
-    expect(swept.endCause).to.equal(bank.endCause)
-  })
-
   it("shows only stages that bankStageVals lists", async () => {
     const { bank } = await TH.buildBornBank()
     const { world } = bank.device
     const snapshots = [world.getSnapshot()]
     bank.lock()
     snapshots.push(world.getSnapshot())
-    bank.sweep()
-    snapshots.push(world.getSnapshot())
-    expect(snapshots.map(({ stage }) => stage)).to.deep.equal(['unlocked', 'locked', 'swept'])
+    expect(snapshots.map(({ stage }) => stage)).to.deep.equal(['unlocked', 'locked'])
     expect(bankStageVals).to.include.members(snapshots.map(({ stage }) => stage))
   })
 
@@ -225,7 +199,7 @@ describe("world.getSnapshot() and world.subscribe(listener)", () => {
     const unsubscribe = world.subscribe(listener)
     bank.lock()
     unsubscribe()
-    bank.sweep()
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(listener).toHaveBeenCalledOnce()
   })
 

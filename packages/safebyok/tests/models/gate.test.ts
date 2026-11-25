@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { noop } from 'es-toolkit'
-import { Crypto, Errors } from 'safebyok-big/internals'
+import { Crypto } from 'safebyok-big/internals'
 import { BaseBox } from '../../src/models/base-box'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
@@ -361,14 +361,12 @@ describe("gate.seal(sealer, donor, publicProps, secretProps) and gate.unseal(sea
     expect(await bank.device.vault!.unsealBox(box)).to.deep.include({ whisper: TH.Whisper })
   })
 
-  it("refuse 'bank_locked' while the gate is locked, and its end cause once it is swept", async () => {
+  it("refuse 'bank_locked' while the gate is locked", async () => {
     const { bank } = await TH.buildBornBank()
     const box = await bank.gate.seal(BaseBox, TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     bank.gate.lock()
     await TH.expectRefusal(bank.gate.seal(BaseBox, TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bank_locked')
     await TH.expectRefusal(bank.gate.unseal(BaseBox, box), 'bank_locked')
-    bank.gate.sweep()
-    expect(await TH.expectRefusal(bank.gate.unseal(BaseBox, box), 'disabled')).to.equal(bank.gate.endCause)
   })
 })
 
@@ -404,40 +402,5 @@ describe("the lease a proof grants a gate", () => {
     const make = vi.spyOn(Lease, 'make')
     await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'a different passphrase, just as long' })
     expect(make.mock.calls[0]![0]).to.include({ born_at: TH.T0, proved_at: TH.T0 + 5, gate_revtok: bank.gate.revtok })
-  })
-})
-
-describe("gate.sweep(endCause)", () => {
-  it("drops its world's lease, disables the gate and its bank for good, and rejects a waiter with the end cause given", async () => {
-    const { bank } = await TH.buildBornBank()
-    const { gate } = bank
-    gate.lock()
-    const endCause = new Errors.VaultError('disabled', "the bank was swept")
-    const ensuring = TH.expectRefusal(gate.ensureUnlocked(), 'disabled')
-    gate.sweep(endCause)
-    expect(await ensuring).to.equal(endCause)
-    expect([gate.isEnabled, gate.isLocked, gate.endCause]).to.deep.equal([false, true, endCause])
-    gate.sweep(new Errors.VaultError('disabled', "a second sweep"))
-    expect(gate.endCause).to.equal(endCause)
-    expect(bank.endCause).to.equal(endCause)
-  })
-
-  it("takes its device's end cause, or a 'disabled' refusal of its own, where none is given", async () => {
-    const { bank } = await TH.buildBornBank()
-    bank.gate.sweep()
-    expect(bank.gate.endCause).to.include({ refusalkind: 'disabled' })
-    expect(TH.expectSyncRefusal(() => bank.gate.demandEnabled(), 'disabled')).to.equal(bank.gate.endCause)
-  })
-
-  it("is swept with its bank's end cause as its bank is swept", async () => {
-    const { bank } = await TH.buildBornBank()
-    bank.sweep()
-    expect(bank.gate.endCause).to.equal(bank.endCause)
-  })
-
-  it("refuses an end cause that is not a VaultError, leaving the gate enabled", async () => {
-    const gate = makeGate(await gateRecordOf())
-    TH.expectSyncRefusal(() => gate.sweep(new Error("not a refusal") as never), 'bad_record')
-    expect(gate.isEnabled).to.be.true
   })
 })

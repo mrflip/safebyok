@@ -40,7 +40,7 @@ export class Vault {
   // == [Construction]: make, constructor
 
   /** Make the vault of the boxes of `world`'s bank, reading them through `vaultTSQ`, the vault TSQ of the same bank.
-   * The world's sweep sweeps the vault too. Refuses a swept world. Its verbs refuse while the bank is not live.
+   * It connects and disconnects with the world. Refuses a world that has ended. Its verbs refuse while the bank is not live.
    */
   static make(world: World, vaultTSQ: VaultTSQ): Vault {
     const args = VaultChecks.makeArgs.parse({ world, vaultTSQ })
@@ -56,11 +56,17 @@ export class Vault {
   }
   // --
 
-  // == [Ending]: sweep
+  // == [Connecting]: connect, disconnect
 
-  /** Stop the vault TSQ hearing of the bank's boxes ({@link VaultTSQ.sweep}). Never throws. */
-  sweep(): this {
-    this.#vaultTSQ.sweep()
+  /** Have the vault TSQ hear of the bank's boxes ({@link VaultTSQ.connect}). Never throws. */
+  connect(): this {
+    this.#vaultTSQ.connect()
+    return this
+  }
+
+  /** Stop the vault TSQ hearing of the bank's boxes ({@link VaultTSQ.disconnect}). Never throws. */
+  disconnect(): this {
+    this.#vaultTSQ.disconnect()
     return this
   }
   // --

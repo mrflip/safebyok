@@ -253,7 +253,7 @@ describe("a bank over the shell or a tombstone", () => {
   })
 })
 
-describe("bank.lock() and bank.sweep()", () => {
+describe("bank.lock() and bank.hostVault(vault)", () => {
   it("locks, evicting its lease, and locks again with nothing to evict", async () => {
     const { bank } = await TH.buildBornBank()
     const evict = vi.spyOn(Lease.prototype, 'evict')
@@ -263,49 +263,30 @@ describe("bank.lock() and bank.sweep()", () => {
     expect(evict).toHaveBeenCalledTimes(1)
   })
 
-  it("sweeps its lease and disables the bank for good, leaving its device enabled, and never throws", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    const sweep = vi.spyOn(Lease.prototype, 'sweep')
-    expect(bank.sweep()).to.equal(bank)
-    expect(sweep).toHaveBeenCalledTimes(1)
-    expect(bank.isLocked).to.be.true
-    expect(bank.isEnabled).to.be.false
-    expect(bank.endCause).to.include({ refusalkind: 'disabled' })
-    expect(device.isEnabled).to.be.true
-    expect(bank.sweep()).to.equal(bank)
-    expect(sweep).toHaveBeenCalledTimes(1)
-  })
-
-  it("refuses every call that needs it enabled once swept", async () => {
-    const { bank } = await TH.buildBornBank()
-    bank.sweep()
-    TH.expectSyncRefusal(() => bank.demandEnabled(), 'disabled')
-    await TH.expectRefusal(bank.put({ cited: bank.pickle(), record: nextBankThingOf(bank) }), 'disabled')
-  })
-
-  it("hosts only a vault, with a sweep to call, and only while enabled", async () => {
+  it("hosts only a vault, with a connect and a disconnect to call", async () => {
     const { bank } = await TH.buildBornBank()
     TH.expectSyncRefusal(() => { bank.hostVault({} as never) }, 'bad_record')
+    TH.expectSyncRefusal(() => { bank.hostVault({ connect: vi.fn() } as never) }, 'bad_record')
     TH.expectSyncRefusal(() => { bank.hostVault(null as never) }, 'bad_record')
-    bank.sweep()
-    TH.expectSyncRefusal(() => { bank.hostVault({ sweep: vi.fn() }) }, 'disabled')
   })
 
-  it("sweeps each vault it hosts once, as it is swept, and lets them go", async () => {
+  it("connects a vault it hosts at once while its device is connected, then disconnects and connects it with the device", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const hosted = { sweep: vi.fn(() => { expect(bank.isEnabled).to.be.false }) }
+    const hosted = { connect: vi.fn(), disconnect: vi.fn() }
     bank.hostVault(hosted)
-    bank.sweep()
-    device.sweep()
-    expect(hosted.sweep).toHaveBeenCalledOnce()
+    expect([hosted.connect.mock.calls.length, hosted.disconnect.mock.calls.length]).to.deep.equal([1, 0])
+    device.disconnect()
+    expect([hosted.connect.mock.calls.length, hosted.disconnect.mock.calls.length]).to.deep.equal([1, 1])
+    device.connect()
+    expect([hosted.connect.mock.calls.length, hosted.disconnect.mock.calls.length]).to.deep.equal([2, 1])
   })
 
-  it("is swept once its device is swept, the device staying enabled", async () => {
+  it("leaves a vault it hosts unconnected while its device is disconnected", async () => {
     const { bank, device } = await TH.buildBornBank()
-    device.sweep()
-    expect(bank.isEnabled).to.be.false
-    expect(bank.endCause).to.include({ refusalkind: 'disabled' })
-    expect(device.isEnabled).to.be.true
+    device.disconnect()
+    const hosted = { connect: vi.fn(), disconnect: vi.fn() }
+    bank.hostVault(hosted)
+    expect(hosted.connect).not.toHaveBeenCalled()
   })
 })
 
@@ -376,14 +357,5 @@ describe("bank.put(args)", () => {
     expect(vaultMinder.makeGetAsk({ labelpath: 'bank' }).track.bank).to.deep.equal({ revseq: 1, lifepath: record.lifepath })
     const answer = await device.vaultDB.tryGetThing(vaultMinder.makeGetAsk({ labelpath: 'bank' }))
     expect(answer).to.deep.include({ ok: true, tracked: { bank: 'same', gate: 'same', box: 'same' } })
-  })
-
-  it("refuses once its device is swept, before it reaches the vaultDB", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    const tryWriteThing = vi.spyOn(device.vaultDB, 'tryWriteThing')
-    device.sweep()
-    const err = await TH.expectRefusal(bank.put({ cited: bank.pickle(), record: nextBankThingOf(bank) }), 'disabled')
-    expect(err).to.equal(bank.endCause)
-    expect(tryWriteThing).not.toHaveBeenCalled()
   })
 })

@@ -2,7 +2,7 @@
 
 import type { QueryClient } from '@tanstack/query-core'
 import type * as Z from 'zod'
-import { CX, type Deriver, type EX, Errors, type Logger, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
+import { CX, type Deriver, type EX, type Errors, type Logger, Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
 import type { DefaultOnBadNews, Device } from '../models/device'
 import type { World } from '../models/world'
@@ -28,7 +28,7 @@ export type BoxUnsealed = UnsealedOf<BoxRecord, BoxCleartexts>
 export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent }>
 // --
 
-// == [The bank's making]: ThingMakeOpts, ThingMakeChecks, isWorld, WorldMembernames, WorldOpts, HostedVault, WorldChecks
+// == [The bank's making]: ThingMakeOpts, ThingMakeChecks, isWorld, WorldMembernames, WorldOpts, HostedVault, WorldChecks, isHostedVault
 
 /** The options every kind of Thing is made with, beside the shell or item event it is made from. */
 export type ThingMakeOpts = Readonly<{
@@ -49,7 +49,7 @@ export function isWorld(val: unknown): val is World {
 }
 
 /** The members of {@link World} that are functions. */
-const WorldMembernames = ['makeThing', 'seal', 'unseal', 'lock', 'sweep', 'signin', 'ensureUnlocked', 'dismissUnlock', 'demandEnabled', 'hostVault', 'bulletproofCallback'] as const satisfies readonly (keyof World)[]
+const WorldMembernames = ['makeThing', 'seal', 'unseal', 'lock', 'connect', 'disconnect', 'signin', 'ensureUnlocked', 'dismissUnlock', 'demandEnabled', 'hostVault', 'bulletproofCallback'] as const satisfies readonly (keyof World)[]
 
 /** The options of {@link World.make}. */
 export interface WorldOpts {
@@ -58,17 +58,24 @@ export interface WorldOpts {
 }
 
 // `safebyok/core` carries no caching, so the bank knows its vaults by this method alone, not by the Vault class.
-/** A vault a world hosts: the world's sweep sweeps it. */
+/** A vault a world hosts: it connects and disconnects with the world. */
 export interface HostedVault {
-  /** End the vault, as its world ends. */
-  sweep(): unknown
+  /** Start what the vault keeps running, as its world connects. */
+  connect(): unknown
+  /** Stop what the vault keeps running, as its world disconnects. */
+  disconnect(): unknown
 }
 
-/** The checks of the end cause `World.sweep` is handed, and of the vault `World.hostVault` is. */
+/** The check of the vault `World.hostVault` is handed. */
 export const WorldChecks = Validator.Checkers('bad_record', ({ custom }) => ({
-  endCause:    custom<Errors.VaultError>(Errors.isVaultError, BigPhrases.VaultErrorExpected).nullable(),
-  hostedVault: custom<HostedVault>((val) => typeof (val as Partial<HostedVault> | null)?.sweep === 'function', Phrases.HostedVaultExpected),
+  hostedVault: custom<HostedVault>(isHostedVault, Phrases.HostedVaultExpected),
 }))
+
+/** True for an object with a `connect` and a `disconnect` function. */
+function isHostedVault(val: unknown): val is HostedVault {
+  const members = val as Partial<HostedVault> | null
+  return (typeof members?.connect === 'function') && (typeof members.disconnect === 'function')
+}
 // --
 
 // == [The device]: BankishChecks, DefaultBanklabel, DeviceRecord, DeviceJSON, BadNews, BadNewsHandler, RootShelf, isRootShelf, RootShelfMethodnames, DeviceOpts

@@ -91,7 +91,7 @@ export function isQueryClient(val: unknown): val is TSQ.QueryClient {
 }
 
 /** The members of {@link VaultTSQ} that are functions. */
-const VaultTSQMembernames = ['itemQueryOptions', 'getOnce', 'listOnce', 'sweep', 'inspectable'] as const satisfies readonly (keyof VaultTSQ)[]
+const VaultTSQMembernames = ['itemQueryOptions', 'getOnce', 'listOnce', 'connect', 'disconnect', 'inspectable'] as const satisfies readonly (keyof VaultTSQ)[]
 
 /** True for an object with a function for each member of {@link VaultTSQ}. */
 export function isVaultTSQ(val: unknown): val is VaultTSQ {

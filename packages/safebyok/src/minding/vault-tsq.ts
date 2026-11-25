@@ -2,7 +2,7 @@
 
 import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
-import { Outcome } from 'safebyok-big/internals'
+import { type Errors, Outcome } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
 import type { MaskedRow } from '../shapes/shapes-masked-view'
 import { type ThingRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
@@ -28,24 +28,28 @@ import { bankKeyHeadOf, labelsOf } from './query-keys'
  * than the item holds, the item is null; a box known only sparse from the first has no data. An item is stale while a
  * newer revision is known only sparse.
  * A listing is the kids value a list last answered, kept while nothing observes it, and invalidated once a child's life changes.
+ * It hears the VaultMinder from its `connect` to its `disconnect`. An item or a listing is fresh for good only while it
+ * hears a VaultMinder that watches its vaultDB; otherwise it is stale at once.
  * Its queries never retry, and run whether or not the browser reports itself online.
  */
 export class VaultTSQ {
-  // == [Props]: #vaultMinder, #queryClient, #scope, #unlisten
+  // == [Props]: #vaultMinder, #queryClient, #scope, #onBadNews, #unlisten
 
   readonly #vaultMinder: VaultMinder
   readonly #queryClient: TSQ.QueryClient
   /** The bank. */
   readonly #scope:       BankScope
-  /** Ends the listen to the VaultMinder. */
-  readonly #unlisten:    () => void
+  /** The host's `onBadNews`, told of each record refused. */
+  readonly #onBadNews:   (news: Errors.VaultError) => void
+  /** Ends the listen to the VaultMinder, or null while it is not heard. */
+  #unlisten:             (() => void) | null = null
   // --
 
   // == [Construction]: make, constructor
 
   // TanStack Query merges every query default whose key is a prefix of a query's key, and a query's own options over
   // them, so a host's options win and nothing outside the bank's key is touched.
-  /** Keep the bank's boxes in `opts.queryClient` from what `opts.vaultMinder` tells, from now on, telling `opts.onBadNews` of trouble.
+  /** Keep the bank's boxes in `opts.queryClient` from what `opts.vaultMinder` tells once {@link connect}ed, telling `opts.onBadNews` of trouble.
    * Its query and mutation defaults go under the bank's key, where a host's own options override them.
    */
   static make(opts: VaultTSQOpts): VaultTSQ { return new VaultTSQ(VaultTSQChecks.makeArgs.parse(opts)) }
@@ -54,26 +58,19 @@ export class VaultTSQ {
     this.#vaultMinder = vaultMinder
     this.#queryClient = queryClient
     this.#scope       = Object.freeze({ userid: scope.userid, banklabel: scope.banklabel })
+    this.#onBadNews   = onBadNews
     const bankHead    = VaultTSQ.bankQueryKeyOf(this.#scope)
     queryClient.setQueryDefaults(bankHead, BankDefaults)
     queryClient.setMutationDefaults(bankHead, BankDefaults)
     queryClient.setQueryDefaults([...bankHead, Itemkind], {
       queryFn:   async ({ queryKey }) => await this.#itemOf(labelpathOfItemKey(queryKey)),
-      staleTime: ({ queryKey }) => ((this.#vaultMinder.carAt(this.#scopeOf(labelpathOfItemKey(queryKey)))?.agekind === 'here') ? Infinity : 0),
+      staleTime: ({ queryKey }) => ((this.#isMinded && (this.#vaultMinder.carAt(this.#scopeOf(labelpathOfItemKey(queryKey)))?.agekind === 'here')) ? Infinity : 0),
     })
     // A listing is kept nowhere but its query, so it stays while no one observes it.
     queryClient.setQueryDefaults([...bankHead, Listkind], {
       queryFn:   async ({ queryKey }) => await this.#vaultMinder.listOnce(labelpathOfListKey(queryKey)),
-      staleTime: Infinity,
+      staleTime: () => (this.#isMinded ? Infinity : 0),
       gcTime:    Infinity,
-    })
-    // Synchronous on purpose: the VaultMinder tells an answer's records before its verb resolves.
-    this.#unlisten = vaultMinder.listen({
-      hear:      (event) => { this.#hear(event) },
-      onBadNews: (news, labelpath) => {
-        this.#hearRefused(labelpath)
-        onBadNews(news)
-      },
     })
     Object.freeze(this)
   }
@@ -138,13 +135,34 @@ export class VaultTSQ {
   }
   // --
 
-  // == [Ending]: sweep
+  // == [Hearing]: connect, disconnect, #isMinded
 
-  /** Stop hearing the VaultMinder, for good: the items and listings stay as they are. */
-  sweep(): this {
-    this.#unlisten()
+  // What was missed while not hearing a watching VaultMinder is unknown, so everything kept may be out of date.
+  /** Hear the VaultMinder, and invalidate every item and listing of the bank. A second call does nothing. */
+  connect(): this {
+    if (this.#unlisten !== null) { return this }
+    // Synchronous on purpose: the VaultMinder tells an answer's records before its verb resolves.
+    this.#unlisten = this.#vaultMinder.listen({
+      hear:      (event) => { this.#hear(event) },
+      onBadNews: (news, labelpath) => {
+        this.#hearRefused(labelpath)
+        this.#onBadNews(news)
+      },
+    })
+    void this.#queryClient.invalidateQueries({ queryKey: VaultTSQ.bankQueryKeyOf(this.#scope) }, { cancelRefetch: false })
     return this
   }
+
+  /** Stop hearing the VaultMinder until the next {@link connect}: the items and listings stay as they are, stale. A second call does nothing. */
+  disconnect(): this {
+    const unlisten = this.#unlisten
+    this.#unlisten = null
+    unlisten?.()
+    return this
+  }
+
+  /** True while this hears the VaultMinder and it watches its vaultDB: what is kept is then told each change. */
+  get #isMinded(): boolean { return (this.#unlisten !== null) && this.#vaultMinder.isWatching }
   // --
 
   // == [The writer]: #hear, #hearLife, #hearRefused

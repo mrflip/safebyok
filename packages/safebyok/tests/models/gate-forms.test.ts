@@ -126,16 +126,6 @@ describe("bank.gate.unlock(cleartexts)", () => {
     expect(bank.isUnlocked).to.be.true
   })
 
-  it("refuses a swept bank, deriving no key, and zeroes a passkey answer", async () => {
-    const { bank, deriveKeyBytes } = await bankDerivingWatched()
-    bank.sweep()
-    await TH.expectRefusal(bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase }), 'disabled')
-    expect(deriveKeyBytes).not.toHaveBeenCalled()
-    const answer = TH.passkeyAnswerOf()
-    await TH.expectRefusal(bank.gate.unlock({ passkeyCleartext: answer }), 'disabled')
-    expect(TH.isZeroed(answer.prfBytes)).to.be.true
-  })
-
   it("refuses with nothing of what a throwing getter threw", async () => {
     const { bank } = await TH.buildBornBank()
     const err = await TH.expectRefusal(bank.gate.unlock({ get passphraseCleartext(): string { throw new Error(TH.TestPassphrase) } }), 'unexpected_error')
@@ -453,13 +443,6 @@ describe("bank.ensureUnlocked()", () => {
     expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.false
   })
 
-  it("rejects with the bank's end cause when a subscriber sweeps the bank as it hears an `unlock` gating is wanted", async () => {
-    const { bank } = await TH.buildBornBank()
-    bank.lock()
-    bank.device.world.subscribe(() => { if (bank.device.world.getSnapshot().isUnlockWanted) { bank.sweep() } })
-    expect(await TH.expectRefusal(bank.ensureUnlocked(), 'disabled')).to.equal(bank.endCause)
-  })
-
   it("dismissUnlock changes nothing with no call waiting", async () => {
     const { bank } = await TH.buildBornBank()
     bank.lock()
@@ -468,27 +451,15 @@ describe("bank.ensureUnlocked()", () => {
     expect(bank.device.world.getSnapshot()).to.equal(before)
   })
 
-  it("rejects every waiter with the bank's end cause, synchronously, when the bank is swept", async () => {
-    const { bank } = await TH.buildBornBank()
-    bank.lock()
-    const ensurings = [bank.ensureUnlocked(), bank.ensureUnlocked()]
-    bank.sweep()
-    expect(bank.device.world.getSnapshot()).to.include({ isUnlockWanted: false, stage: 'swept' })
-    for (const ensuring of ensurings) { expect(await TH.expectRefusal(ensuring, 'disabled')).to.equal(bank.endCause) }
-  })
-
-  it("rejects every waiter with the bank's end cause when the device is swept", async () => {
+  it("keeps every waiter waiting through a disconnect, still wanting an `unlock` gating, and resolves them once one lands, disconnected or not", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
-    const ensuring = bank.ensureUnlocked()
-    device.sweep()
-    expect(await TH.expectRefusal(ensuring, 'disabled')).to.equal(bank.endCause)
-  })
-
-  it("refuses a swept bank, wanting no unlock", async () => {
-    const { bank } = await TH.buildBornBank()
-    bank.sweep()
-    await TH.expectRefusal(bank.ensureUnlocked(), 'disabled')
-    expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.false
+    const ensurings = [bank.ensureUnlocked(), bank.ensureUnlocked()]
+    const settled = settledFlag(Promise.race(ensurings))
+    device.disconnect()
+    await TH.wakeupAtNextTick()
+    expect([settled.isSettled, bank.device.world.getSnapshot().isUnlockWanted]).to.deep.equal([false, true])
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    expect(await Promise.all(ensurings)).to.deep.equal([bank, bank])
   })
 })

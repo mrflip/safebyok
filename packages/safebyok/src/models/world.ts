@@ -29,12 +29,12 @@ import * as Throwers from '../refusals/throwers'
 /** A Thing of the signed-in user's bank, as its world makes one: the bank, a gate or a box. */
 export type SomeThing = Bank | Gate | Box
 
-/** The signed-in user's bank as this device locks, unlocks and ends it: its lease, the wait for an unlock, its end, and its snapshot, which a host renders.
+/** The signed-in user's bank as this device locks, unlocks and connects it: its lease, the wait for an unlock, and its snapshot, which a host renders.
  * Made with its device, it lives as long. Its gates build leases and hand them to it, and boxes are sealed and unsealed under the lease it holds, which no member hands out.
  * Its snapshot's stage is read from the bank, the main gate and the root box its VaultMinder keeps, each of which it subscribes to, and from the lease.
  */
 export class World {
-  // == [Props]: #device, #vaultMinder, #lease, #unlockWait, #endCause, #lastErr, #vaults, #snapshot, #subscribers, #getSnapshot, #subscribe, #bulletproofCallback
+  // == [Props]: #device, #vaultMinder, #lease, #unlockWait, #isConnected, #lastErr, #vaults, #snapshot, #subscribers, #getSnapshot, #subscribe, #bulletproofCallback
 
   readonly #device: Device
 
@@ -47,13 +47,13 @@ export class World {
   /** The wait every call in {@link ensureUnlocked} shares, or null while none waits. */
   #unlockWait: Wait | null = null
 
-  /** Why a sweep disabled the world, or null until then. */
-  #endCause: Errors.VaultError | null = null
+  /** True from {@link connect} until {@link disconnect}. */
+  #isConnected = false
 
   /** Why sign-in failed, or null while it has not. */
   #lastErr: RefusalSnapshot | null = null
 
-  /** The vaults made on the device's bank, which a sweep sweeps. */
+  /** The vaults made on the device's bank, which connect and disconnect with this world. */
   readonly #vaults = new Set<HostedVault>()
 
   /** The current snapshot, which {@link getSnapshot} returns. */
@@ -162,7 +162,7 @@ export class World {
 
   // Its Things are seeded before it listens to keep them on the shelf, which would only put back what it read.
   /** Take `vaultMinder`, the signed-in user's bank's records, sorted, whose Things this world makes; seed them from the roots `shelf` keeps, and keep the roots there from then on. A second call does nothing.
-   * With no shelf, the roots are kept nowhere between page loads.
+   * With no shelf, the roots are kept nowhere between page loads. Where this world is connected, the VaultMinder starts watching the vaultDB.
    */
   signin(vaultMinder: VaultMinder, shelf: RootShelf | null): void {
     Checks.signinArgs.parse({ vaultMinder, shelf })
@@ -172,6 +172,7 @@ export class World {
       this.#seedFromShelf(vaultMinder, shelf)
       this.#keepOnShelf(vaultMinder, shelf)
     }
+    if (this.#isConnected) { this.#connectMinder() }
     this.align()
   }
 
@@ -215,16 +216,16 @@ export class World {
   // --
 
   // == [The awaited `unlock` gating]: ensureUnlocked, dismissUnlock, settleUnlockWait
-  // One wait is shared by every caller, opened by the first and settled once: by any unlock, a dismissal or the world's end.
+  // One wait is shared by every caller, opened by the first and settled once: by any unlock, or a dismissal.
 
   /** Resolve this world once it is unlocked: at once, or when an `unlock` gating or a gate change lands.
    * While it waits, {@link isUnlockWanted} is true: render the unlock form, and call the gate's `unlock` from it.
-   * Rejects `dismissed` when {@link dismissUnlock} is called, and with the world's `endCause` when it ends.
+   * Rejects `dismissed` when {@link dismissUnlock} is called. A {@link disconnect} leaves it waiting.
    */
   async ensureUnlocked(): Promise<this> {
     this.demandEnabled()
     if (this.isUnlocked) { return this }
-    // Read here: a subscriber told of the wait may dismiss it or sweep the world, which clears #unlockWait.
+    // Read here: a subscriber told of the wait may dismiss it, which clears #unlockWait.
     const wait = (this.#unlockWait ??= makeWait())
     this.align()
     await wait.promise
@@ -277,7 +278,7 @@ export class World {
   }
   // --
 
-  // == [Locking and sweeping]: lock, sweep, hostVault
+  // == [Locking and connecting]: lock, connect, disconnect, hostVault, #connectMinder
 
   /** Lock the world: drop its lease and the keys in it. */
   lock(): this {
@@ -287,32 +288,42 @@ export class World {
     return this
   }
 
-  // It shuts first, so that a subscriber told of the end, or a vault as it is swept, finds every call refusing.
-  /** End this world for good: drop its lease, reject every call waiting for an `unlock` gating, and sweep each vault it hosts.
-   * Every call after meets `endCause`, or, left out, the device's end cause or a `disabled` refusal. An `endCause` that is not a refusal refuses `bad_record`; nothing else throws.
-   * Its subscribers hear of the end, and of nothing after.
+  // The watch starts before the vaults hear it, so that what a vault refetches as it connects is fetched under the watch.
+  /** Start what this world keeps running: its VaultMinder's watch of the vaultDB, once someone signs in, and each vault it hosts hearing the VaultMinder. Never throws, and a second call does nothing.
+   * What the host's vaultDB throws as the watch starts goes to the device's `onBadNews`.
    */
-  sweep(endCause: Errors.VaultError | null = null): this {
-    WorldChecks.endCause.parse(endCause)
-    if (this.#endCause !== null) { return this }
-    this.#endCause = endCause ?? this.#device.endCause ?? Throwers.bankSwept()
-    this.#lease?.sweep()
-    this.#lease = null
-    this.#settleUnlockWait(this.#endCause)
-    this.align()
-    for (const vault of this.#vaults) { vault.sweep() }
-    this.#vaults.clear()
-    this.#subscribers.clear()
+  connect(): this {
+    this.#isConnected = true
+    this.#connectMinder()
+    for (const vault of this.#vaults) { vault.connect() }
     return this
   }
 
-  /** Sweep `vault` when this world is swept. Internal.
-   * Refuses once the world is swept.
+  /** Lock this world, and stop what it keeps running: each vault it hosts stops hearing the VaultMinder, and the VaultMinder stops watching the vaultDB. Never throws, and a second call does nothing.
+   * The world stays enabled: its verbs still work, a call waiting in {@link ensureUnlocked} still waits, and {@link connect} resumes it.
+   * What the host's vaultDB throws as the watch stops goes to the device's `onBadNews`.
+   */
+  disconnect(): this {
+    this.#isConnected = false
+    this.lock()
+    for (const vault of this.#vaults) { vault.disconnect() }
+    try { this.#vaultMinder?.disconnect() } catch (err) { this.#device.tellBadNews([err]) }
+    return this
+  }
+
+  /** Connect and disconnect `vault` with this world, from now on: at once, where this world is connected. Internal.
+   * Refuses once the world has ended.
    */
   hostVault(vault: HostedVault): void {
     WorldChecks.hostedVault.parse(vault)
     this.demandEnabled()
     this.#vaults.add(vault)
+    if (this.#isConnected) { vault.connect() }
+  }
+
+  /** Start the VaultMinder's watch, where someone has signed in, telling the device's `onBadNews` what the host's vaultDB throws */
+  #connectMinder(): void {
+    try { this.#vaultMinder?.connect() } catch (err) { this.#device.tellBadNews([err]) }
   }
   // --
 
@@ -346,11 +357,11 @@ export class World {
 
   // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, areRootsLive, demandEnabled, demandRootsLive, demandVaultMinder, demandLease, thingAt
 
-  /** True until this world is swept or its device ends. */
+  /** True until its device ends. */
   get isEnabled(): boolean { return this.endCause === null }
 
-  /** The refusal every call meets once this world is swept or its device ends, or null while it is enabled. */
-  get endCause(): Errors.VaultError | null { return this.#endCause ?? this.#device.endCause }
+  /** The refusal every call meets once its device ends, or null while it is enabled. */
+  get endCause(): Errors.VaultError | null { return this.#device.endCause }
 
   /** True when no lease is attached. */
   get isLocked(): boolean { return this.#lease === null }
@@ -414,7 +425,7 @@ export class World {
     for (const told of this.#subscribers.values()) { told() }
   }
 
-  // A sweep is the one way a bank ends, so an ended bank's stage is 'swept'.
+  // An ended bank's stage is 'swept'.
   /** The stage the snapshot shows, the first that holds. */
   #stageOf(): BankStage {
     if (this.endCause !== null)       { return 'swept' }
@@ -515,7 +526,7 @@ class WorldLeaseGate implements LeaseGate {
     Object.freeze(this)
   }
 
-  /** True until the world is swept or its device ends. */
+  /** True until the world's device ends. */
   get isEnabled(): boolean { return this.#world.isEnabled }
 
   /** Drop the world's lease, and the keys in it. */
