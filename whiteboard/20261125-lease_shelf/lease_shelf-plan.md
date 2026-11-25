@@ -3,7 +3,7 @@
 Mode: **YOLO**. Issued by the Coach, 2026-11-25. Cap: 3 threads at once.
 Default levels: review `medium`; worker `opus` (thread-worker), reviewer `opus` for threads touching what
 `notes/guarantees-big.md` covers (lease, keys), else its `sonnet` pin; style pass on `style-reviewer`'s pin.
-Status: 0, 1c, 1a, 4, 2, 1d out of draft (#900, #902, #903, #906, #905, #907); 8 janitor (#908) filed on #907, CI; 1b (#909) ready, in review (`high` on opus); 5 devicetok building (from 1b); 6 waits on 1b's review; 7 last. Closer Look triaged (E1, E3, E9 ruled; rest dropped).
+Status: #904, #900, #902 merged; the line restacked onto main (2026-11-25): #903 -> #907 -> #908 -> #909 -> #912 -> #915 -> #910 -> #906 -> #905 -> #911 -> #924 -> #901. 10 car_read_at (#924) ready, in review; 11 lease_names, 12 set_stage, 13 watch_recovery building, each cut from 10.
 
 Sprint doc: https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh (Open Matters bookmark rev 3).
 
@@ -170,6 +170,30 @@ its own section (the Closer Look's E4 is open). Levels: review `medium` on opus.
 Gloss: PostgresVaultDB takes `read_tc` from Postgres 18's built-in `uuidv7()`, in the statement that reads the rows,
 not from the client's `readTcNow()`; its watch too. README: Postgres 18 or later. Memory and IndexedDB keep minting
 locally. Levels: worker opus medium; review `medium`. Branch `20261125-pg_read_tc`, cut from 2 (#905). Building.
+
+### 10. `car_read_at`: one read time, on the car
+
+The Coach: "would you make it read_at for consistency, and yes let's put the bookkeeping together. All the boxes ticked"
+
+`ThingCar` gains `read_at`, decoded from its `read_tc` (0 with no record), and every time sum on a read_tc reads it: World's `#isGateStale`, VaultTSQ's `initialDataUpdatedAt` and the dating of heard items; `setDataOptionsOf` goes. Behind it: "what matters is when the ground truth was consulted. You don't have control over the device clock. read_tc is set by the backing store and carried thru after." Small; core only. Review `medium`, sonnet. Depends on 9.
+
+### 11. `lease_names`: the lease names itself; one devicetok per user
+
+The Coach's rulings, from the last sweep: "everything lease-y should be at lease/label (where label happens to match the gate), referencing it own label"; on the devicetok, "We'd prefer it to be per user+browser, there is already a banktok"; and on a lease citing a newer gate revision, "it can't overwrite, though, yes? -- is there a test for that?"
+
+A lease carries and reads its own `lease/<label>` instead of deriving it from the gate's at each use; the devicetok is keyed by the user alone; a test shows a lease citing a newer gate revision leaves the stored gate unchanged. Depends on 10. opus worker; review `medium`.
+
+### 12. `set_stage`: the world inscribes and announces each stage crossing
+
+The Coach: "let's have it log each of the stage crossings with a #setStage method that inscribes and announces"; and on a host's own passphrase change announcing `softlocked` in its own tab, "if it works out in the end add to wontfix".
+
+A private `#setStage` on World records and announces a crossing; a default lifecycle handler logs; a wontfix row. Depends on 10. sonnet worker; review `low`.
+
+### 13. `watch_recovery`: a lost watch lock is asked for again
+
+The Coach: "yes do your fix for the lock loss"; and on the lock's name, "it should be named for safebyok, userid and bank's labelpath".
+
+When the watch-holding tab's watch fails to start, OneWatchVaultDB tells its minder, so `isWatching` goes false in every tab and the janitor's retry asks for the lock again; tested in the failing case. The Web Lock and BroadcastChannel are named for safebyok, the userid and the bank's labelpath. Split from 11 by the sizing rule. Depends on 10. opus worker; review `medium`.
 
 ## For the Coach
 - **safebyok-convex is still on safebyok-big.** Thread 7's wrapper works for any new-core vaultDB. *Coach:* "convex and
