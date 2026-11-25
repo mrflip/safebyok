@@ -1,6 +1,6 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, RootShelfExpected, ThingSoonestBare, WorldExpected, ThingExpected, BegunOfOtherKind
+// == [Models]: VaultDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, RootShelfExpected, ThingSoonestBare, WorldExpected, ThingExpected, BegunOfOtherKind, WayinExpected, WayinKeyExpected
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
@@ -55,6 +55,12 @@ export const ThingExpected = 'Expected a Thing, the shell at its labelpath, or a
 
 /** What a kind of Thing is made from that is another kind's. */
 export const BegunOfOtherKind = "A Thing is made from the shell or an item event at a labelpath of its own kind."
+
+/** What a proving is made with, as the wayin it proves, that is not a Wayin. */
+export const WayinExpected = 'Expected a Wayin, or null for a new wayin.'
+
+/** What a proving is made with, as its wayinKey, that is not one. */
+export const WayinKeyExpected = 'Expected a wayinKey: a non-extractable 256-bit AES-GCM CryptoKey for wrapKey and unwrapKey.'
 // --
 
 // == [Things]: the sentences of a Thing's checks, of a shell's, and of a vaultDB's asks
@@ -181,10 +187,13 @@ export const ListParentNotLive = "The Thing listed is not stored live: it was ne
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: QueryClientExpected, ListOfBoxes, NotMinded, WorldNotHeard, StaleTimeShape, ChildrenStoredDamaged
+// == [Minding]: QueryClientExpected, VaultTSQExpected, ListOfBoxes, NotMinded, WorldNotHeard, StaleTimeShape, ChildrenStoredDamaged
 
 /** A VaultTSQ made without a TanStack Query client. */
 export const QueryClientExpected = 'Expected a TanStack Query QueryClient: an object with setQueryDefaults, setMutationDefaults, getQueryData, setQueryData, query, invalidateQueries and resetQueries.'
+
+/** What a vault is made with that lacks one of a VaultTSQ's members. */
+export const VaultTSQExpected = 'Expected a VaultTSQ: an object with a function for each of its verbs, itemQueryOptions, getOnce, listOnce and sweep.'
 
 /** A listing asked of a VaultTSQ for a Thing other than a box. */
 export const ListOfBoxes = "A VaultTSQ lists only a box's children: the root box's, or a box's under it."

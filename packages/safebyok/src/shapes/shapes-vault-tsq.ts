@@ -5,6 +5,7 @@ import type * as Z from 'zod'
 import { type Errors, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import type { VaultMinder } from '../minding/vault-minder'
+import type { VaultTSQ } from '../minding/vault-tsq'
 import { isVaultMinder } from './shapes-vault-minder'
 import { Labelpath } from './primitives'
 import type { BankScope } from './shapes-stamps'
@@ -58,7 +59,7 @@ export type TsqStaleTime = Z.input<typeof VaultTSQChecks.tsqStaleTime>
 export type GetOnceOpts = Z.input<typeof VaultTSQChecks.getOnceOpts>
 // --
 
-// == [Checks]: VaultTSQChecks, isQueryClient
+// == [Checks]: VaultTSQChecks, isQueryClient, VaultTSQMembernames, isVaultTSQ
 
 /** The checks of `VaultTSQ.make`'s arguments, of the scope of a listing it keeps, of a mutationFn, and of a get's options. */
 export const VaultTSQChecks = Validator.Checkers('bad_record', ({ obj, custom, fn, uint, lit, union }) => {
@@ -87,5 +88,15 @@ export function isQueryClient(val: unknown): val is TSQ.QueryClient {
   if (typeof val !== 'object' || val === null) { return false }
   const members: Partial<Record<string, unknown>> = val
   return QueryClientMembernames.every((membername) => typeof members[membername] === 'function')
+}
+
+/** The members of {@link VaultTSQ} that are functions. */
+const VaultTSQMembernames = ['itemQueryOptions', 'getOnce', 'listOnce', 'sweep', 'inspectable'] as const satisfies readonly (keyof VaultTSQ)[]
+
+/** True for an object with a function for each member of {@link VaultTSQ}. */
+export function isVaultTSQ(val: unknown): val is VaultTSQ {
+  if (typeof val !== 'object' || val === null) { return false }
+  const members: Partial<Record<string, unknown>> = val
+  return VaultTSQMembernames.every((membername) => typeof members[membername] === 'function')
 }
 // --
