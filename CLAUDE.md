@@ -124,8 +124,8 @@ govern how code is changed:
   code we provide, can add them as warranted.
   A lock where none was needed before is a last resort too.
 * **Hours separate updates** `#no-slop-crossings`. A gate change, a lock, a sweep or a delete happens a few times a
-  day; a fetch is in flight for milliseconds. A fetch, a write or a waiter that lands across an
-  end-of-life event (sweep, vacate, delete, goodbye) is a rare event overlapping a millisecond
+  day; a fetch is in flight for milliseconds. A fetch, a write or a waiter that lands across a
+  lifecycle event (disconnect, vacate, delete, goodbye) is a rare event overlapping a millisecond
   window: its outcome is unspecified, and it is never a design input. It earns no guard, token,
   state or test, and no reshaping of a common path. Write it as a row in `notes/wontfix.md`,
   where the new core's loosened guarantees are kept. Report it only if it could corrupt what the
@@ -133,6 +133,14 @@ govern how code is changed:
   A setting a comment marks `#no-slop-crossings` is fixed: leave what changing it might cross unexamined.
   This binds what a worker, a brief or a plan does on its own call. In a design talk with a
   Coach, a crossing is weighed on its merits: trace the events, say what covers it, recommend.
+* **A disable, a disconnect or a lock is intent, not a crisis** `#lock-is-intent`. A `lock()`
+  says "ask the user before the next promptable action"; none of the three is an alarm that
+  something is compromised. An operation checks that its bank is unlocked and enabled at two
+  points only: before it starts its critical path, and before it returns an unsealed value. So a
+  write that passed the first check finishes; an unseal under way when the lock comes returns no
+  cleartext; a get of stored records is untouched, since what it returns is sealed; and an unlock
+  attempt under way (enter, then lock, then the KDF finishes) unlocks, which is correct. Autolock
+  is likewise a best-effort time, not a deadline.
 * **Cost follows frequency.** A bank's build or delete ends everything. A gate verb is thousands
   of times rarer than a vault put or delete, a vault op rarer than a box op, and a box op rarer
   than a read. So reads stay cheap (indexed, one round trip), a gate verb may be heavy, and an
