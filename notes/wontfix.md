@@ -52,7 +52,7 @@ the Coach, 2026-11-20, soon_item rework.
 
 ### The VaultMinder detects no conflict among the records it holds
 
-* current outcome: a Thing's agerank orders records by lifepath and then revseq, and reads no revtok: two records of one
+* current outcome: the agerank a Thing's car keeps orders records by lifepath and then revseq, and reads no revtok: two records of one
   revision with different revtoks are one revision to it. A VaultTSQ's get answers what the box's Thing holds once storage
   answers: a whole record of the Thing's newest life, older than its newest revision known, shows as the item, and an
   answer of an earlier life changes nothing. The get refuses `stale_read` only where that leaves the Thing known only
@@ -293,9 +293,9 @@ Reasoning for wontfix: a gate change comes a few times a day, and a lease is bui
 separate updates*, `#no-slop-crossings`). Nothing stored changes, and no secret moves. Written by the gate_super thread 1
 worker, 2026-11-21, awaiting a ruling.
 
-### A `read_tc` from a clock running ahead pins a Thing's agerank time in the future
+### A `read_tc` from a clock running ahead pins the agerank time of a Thing's car in the future
 
-* current outcome: a `VaultMinder` keeps, as the last field of each Thing's agerank, the first eight hexadecimal
+* current outcome: a `VaultMinder` keeps, as the last field of the agerank each Thing's car keeps, the first eight hexadecimal
   digits of the `read_tc` its newest revision was last seen at, whatever their time. A source whose clock runs ahead (a
   datastore's, or another device's records rung and handed to its `receive`) hands a `read_tc` in the future, and the
   time is pinned there: a true sighting of that revision tells nothing until real time passes it. A newer revision or a
