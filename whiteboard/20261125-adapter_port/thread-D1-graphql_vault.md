@@ -67,6 +67,8 @@ PGlite, through an in-process GraphQL server; the rest unit tests); core 2316; s
 * **Discoveries**:
   * The PGlite battery's cheat plants rows with safebyok-postgres's table names (`safebyok_*_things`), which are not
     exports: thread F (postgres_standalone) renaming them breaks `tests/test-helpers.ts`, nothing else.
+  * tsdown wrote `inlinedDependencies: { zod }` into package.json on build, though no zod reaches dist (the checks'
+    declarations name zod's types mid-build). `tsdown.config.ts` now has `deps.neverBundle` for zod; dist is unchanged.
   * The subagent's security entry cited "G4" for what the backend stores; G4 is the leaseKey's, so I dropped the cite.
   * `@urql/exchange-execute` and the battery passed first time over both stores: the client's checks agree with the core's.
 
