@@ -405,7 +405,8 @@ one_watch worker.
 * current outcome: where a tab's request for the bank's Web Lock rejects after the watch that asked for it was stopped,
   that watch's `onEnded` and `onBadNews` are still called. The VaultMinder clears whatever watch it holds then, so if a
   `connect` came between, its live watch counts as not watching: the janitor's next tick connects again, and the
-  uncleared watch runs beside the new one until the tab closes, so each notice is told twice.
+  uncleared watch runs beside the new one until the tab closes, so each notice is told twice. That ending also calls the `onEnded` of the
+  `connect` that started it, so the device announces a `watch_ended` for a watch that still runs.
 * alternatives:
   - check in the OneWatchVaultDB that the watch was not stopped before ending it: a state checked on a lifecycle path,
     for a crossing.
