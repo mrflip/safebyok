@@ -5,7 +5,7 @@ import type * as Z from 'zod'
 import type { BoxLabelpath } from './primitives'
 import { VaultChecks } from './shapes-vault'
 
-// == [Asked]: ProbeLabelpath, ProbeChecks, ProbeAsked
+// == [Asked]: ProbeLabelpath, ProbeChecks, ProbeArgs
 
 // A label a host would choose only by naming its box for safebyok's probe: nothing reserves it.
 /** Where `Vault.probe` puts its box unless it is asked for another labelpath. */
@@ -13,7 +13,7 @@ export const ProbeLabelpath = 'box/safebyok_probe' satisfies BoxLabelpath
 
 /** The checks of what `Vault.probe` is asked: the labelpath of its box, never the root box's, and the whisper and sidecar it puts, each with a default. */
 export const ProbeChecks = Validator.Checkers('bad_record', ({ obj }) => ({
-  probeAsked: obj({
+  probeArgs: obj({
     labelpath: VaultChecks.boxLabelpath.default(ProbeLabelpath),
     whisper:   CX.whisper.default({ note: 'Shhh, this is a whisper' }),
     sidecar:   CX.sidecar.default({ example: true }),
@@ -21,7 +21,7 @@ export const ProbeChecks = Validator.Checkers('bad_record', ({ obj }) => ({
 }))
 
 /** What `Vault.probe` is asked: where its box goes and what it holds, each with a default. */
-export type ProbeAsked = Z.input<typeof ProbeChecks.probeAsked>
+export type ProbeArgs = Z.input<typeof ProbeChecks.probeArgs>
 // --
 
 // == [Reported]: probeStepkindVals, ProbeStepkind, ProbeStep, ProbeReport

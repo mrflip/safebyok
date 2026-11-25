@@ -15,7 +15,7 @@ import type { PutOnceArgs } from '../shapes/shapes-vault-minder'
 import type { BoxRecord, ScopeAt, ThingScope } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 import { VaultChecks } from '../shapes/shapes-vault'
-import { type ProbeAsked, ProbeChecks, type ProbeLabelpath, type ProbeReport, type ProbeStep, type ProbeStepkind } from '../shapes/shapes-vault-probe'
+import { type ProbeArgs, ProbeChecks, type ProbeLabelpath, type ProbeReport, type ProbeStep, type ProbeStepkind } from '../shapes/shapes-vault-probe'
 import type { VaultMinder } from '../minding/vault-minder'
 import type { ThingCar } from '../minding/thing-car'
 
@@ -235,23 +235,27 @@ export class Vault {
 
   /** Test storage and keys end to end: put a box, get it back from storage, unseal it, check its whisper, and delete it. Needs the bank unlocked.
    * Resolves a report of each step's time in milliseconds, and whether the whisper unsealed was the one put. It never waits for an `unlock` gating.
-   * The box at `asked.labelpath`, by default {@link ProbeLabelpath}, is written over and then deleted: give a labelpath none of your boxes use.
+   * The box at `args.labelpath`, by default {@link ProbeLabelpath}, is written over and then deleted: give a labelpath none of your boxes use.
    * A step's refusal rejects as a refusal of the same kind, its `meta.stepkind` naming the step and the step's refusal its cause.
    * A probe refused after its put leaves its box in storage, for the next probe at that labelpath to write over.
    * Two probes at one labelpath at once may refuse each other's steps.
    * @example
    *   const { whisperMatched, steps } = await vault.probe()
    */
-  async probe(asked: ProbeAsked = {}): Promise<ProbeReport> {
-    const { labelpath, whisper, sidecar } = ProbeChecks.probeAsked.parse(asked)
+  async probe(args: ProbeArgs = {}): Promise<ProbeReport> {
+    const { labelpath, whisper, sidecar } = ProbeChecks.probeArgs.parse(args)
     const scope = this.#scopeAt(labelpath as BoxLabelpath)
     this.#bank.demandEnabled()
     if (this.#bank.isLocked) { throw Throwers.needUnlocked() }
     const put    = await timeStep('put', () => this.putBoxOnce(scope.labelpath, { sidecar }, { whisper }))
     // The vault TSQ's get may answer from its item even under a staleTime of 0, since storage's clock dates the item: the minder's get always asks storage.
+    // Its answer's own record is checked, never the box this device holds, which right after the put is the put's record whatever storage kept.
     const got    = await timeStep('get', async () => {
-      await this.#vaultMinder.getOnce(scope)
-      return this.#demandReadableBox(scope)
+      const answer = await this.#vaultMinder.tryGetOnce(scope)
+      if (! answer.ok) { throw answer.err }
+      const isPutsRevision = (answer.val !== null) && (answer.val.revtok === put.val.revtok)
+      if (! isPutsRevision) { throw Throwers.probePutNotGot(scope.labelpath) }
+      return answer.val as BoxRecord
     })
     const unseal = await timeStep('unseal', async () => {
       const unsealed = await this.unsealBox(got.val)
@@ -266,7 +270,7 @@ export class Vault {
   }
 
   /** {@link probe}, resolving an `Outcome` instead of throwing. */
-  tryProbe(asked: ProbeAsked = {}): Promise<Outcome.Outcome<ProbeReport>> { return Outcome.outcomeOf(() => this.probe(asked)) }
+  tryProbe(args: ProbeArgs = {}): Promise<Outcome.Outcome<ProbeReport>> { return Outcome.outcomeOf(() => this.probe(args)) }
   // --
 
   // == [Helpers]: #vaultMinder, #sealedWriteOf, #donorAt, #boxCarAt, #scopeAt, #demandOwnBox

@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Bank } from '../../src/models/bank'
+import { Vault } from '../../src/models/vault'
 import { type ProbeReport, ProbeLabelpath } from '../../src/shapes/shapes-vault-probe'
-import type { LiveOf } from '../../src/shapes/shapes-sealers'
-import type { BoxRecord } from '../../src/shapes/shapes-thing'
 import type { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { refusedAnswerOf } from '../../src/storage/refused-answer'
 import * as Throwers from '../../src/refusals/throwers'
@@ -37,7 +36,20 @@ function getAfterPut(bank: Bank, before: () => unknown): void {
   })
 }
 
-describe("vault.probe(asked)", () => {
+/** Have `bank`'s vaultDB answer the probe's put as stored, then put back what was stored at its labelpath before, as storage that lost the write would. */
+function loseProbePut(bank: Bank): void {
+  const { vaultDB } = bank.device
+  const write = vaultDB.tryWriteThing.bind(vaultDB)
+  vi.spyOn(vaultDB, 'tryWriteThing').mockImplementation(async (ask) => {
+    const before = rowsOf(bank).get(ProbeLabelpath)
+    const answer = await write(ask)
+    if ((ask.labelpath !== ProbeLabelpath) || (ask.op !== 'put')) { return answer }
+    if (before === undefined) { rowsOf(bank).delete(ProbeLabelpath) } else { rowsOf(bank).set(ProbeLabelpath, before) }
+    return answer
+  })
+}
+
+describe("vault.probe(args)", () => {
   it("probes storage and keys end to end", async () => {
     // probe @example
     const { bank, vault } = await TH.buildBornVault()
@@ -86,16 +98,29 @@ describe("vault.probe(asked)", () => {
     expect(whisperMatched).to.be.true
   })
 
-  it("reports a whisper that did not match, where storage answers another revision, and still deletes the box", async () => {
+  it("reports a whisper that did not match, where the box unseals to another, and still deletes the box", async () => {
     const { bank, vault } = await TH.buildBornVault()
-    // Storage answers a revision of the box whose whisper is not the one the probe put.
-    getAfterPut(bank, async () => {
-      const stored = rowsOf(bank).get(ProbeLabelpath) as LiveOf<BoxRecord>
-      rowsOf(bank).set(ProbeLabelpath, await vault.sealBox(stored, {}, { whisper: { apiKey: 'sk-test-1111' } }))
-    })
+    // Storage cannot bring this about, since the seal authenticates the revision: the unseal is stubbed.
+    vi.spyOn(Vault.prototype, 'unsealBox').mockResolvedValue({ whisper: { apiKey: 'sk-test-1111' } } as never)
     const { whisperMatched } = await vault.probe()
     expect(whisperMatched).to.be.false
-    expect(rowsOf(bank).get(ProbeLabelpath)).to.include({ am: 'x', revseq: 2 })
+    expect(rowsOf(bank).get(ProbeLabelpath)).to.include({ am: 'x' })
+  })
+
+  it("refuses at the get where storage answers the put ok but stores nothing", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    loseProbePut(bank)
+    const err = await TH.expectRefusal(vault.probe(), 'stale_read')
+    expect(err.meta?.stepkind).to.equal('get')
+  })
+
+  it("refuses at the get where storage answers the revision before the put", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(ProbeLabelpath, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    loseProbePut(bank)
+    const err = await TH.expectRefusal(vault.probe(), 'stale_read')
+    expect(err.meta?.stepkind).to.equal('get')
+    expect(rowsOf(bank).get(ProbeLabelpath)).to.include({ am: 'a', revseq: 0 })
   })
 
   it("refuses on a locked bank before it gets or writes anything, never asking for an unlock", async () => {
@@ -139,7 +164,7 @@ describe("vault.probe(asked)", () => {
   })
 })
 
-describe("vault.tryProbe(asked)", () => {
+describe("vault.tryProbe(args)", () => {
   it("answers a good outcome of the report, and the refusal probe throws", async () => {
     const { bank, vault } = await TH.buildBornVault()
     const report: ProbeReport = await TH.expectGood(vault.tryProbe())

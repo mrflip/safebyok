@@ -139,12 +139,17 @@ export function childrenStoredDamaged(ask: ListAsk, damaged_rows: readonly Damag
 }
 // --
 
-// == [Probing Throwers]: probeStepRefused
+// == [Probing Throwers]: probeStepRefused, probePutNotGot
 
 // The step's own kind is kept, so a host branches on a probe's refusal as it would on the verb's.
 /** The refusal of `stepkind`, a step of `Vault.probe`, for what it threw: of that refusal's kind, its meta naming the step, the refusal its cause. */
 export function probeStepRefused(stepkind: ProbeStepkind, thrown: unknown): Errors.VaultError {
   const cause = refusalOfThrown(thrown)
   return new Errors.VaultError(cause.refusalkind, Phrases.probeStepRefused(stepkind), { cause, meta: { ...cause.meta, stepkind } })
+}
+
+/** The refusal of `Vault.probe`'s get, where storage answers the box at `labelpath` missing, or in a revision other than the one the probe put. */
+export function probePutNotGot(labelpath: string): Errors.VaultError {
+  return new Errors.VaultError('stale_read', Phrases.ProbePutNotGot, { meta: { labelpaths: [labelpath] } })
 }
 // --
