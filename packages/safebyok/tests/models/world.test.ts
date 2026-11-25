@@ -40,12 +40,11 @@ describe("world.makeThing(begun)", () => {
     expect(thing.agekind).to.eq('vacant')
   })
 
-  it("makes the Thing of an item event of a sparse record over its kind's shell, which then cites the record", () => {
+  it("makes the Thing of an item event of a sparse record over its kind's shell, which it holds", () => {
     const sparse = TH.boxSparseOf(TH.boxThingOf())
     const thing = TH.makeDevice().world.makeThing(TH.thingEventOf<BoxRecord>(sparse))
     expect(thing).to.be.instanceOf(Box)
     expect(thing.pickle()).to.deep.equal(Shell.inParentLivesOf(sparse))
-    expect(thing.citable).to.deep.include({ revtok: sparse.revtok, revseq: sparse.revseq, lifepath: sparse.lifepath })
   })
 
   const RefusedCases = [

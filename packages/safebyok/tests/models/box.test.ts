@@ -98,7 +98,7 @@ describe("a Box's props", () => {
     const box = Box.make(Shell.inParentLivesOf(TH.boxThingOf()), { world })
     expect([box.sidecar, box.whisper_sealed]).to.deep.equal([undefined, undefined])
     expect(BaseBox.nextRevisionOf(box, { sidecar: {} })).to.deep.include({ am: 'a', revseq: 0, sidecar: {} })
-    expect(BoxChecks.cited.parse(box)).to.deep.include(box.citable)
+    expect(BoxChecks.cited.parse(box)).to.deep.include(Thing.sparseOf(box.pickle()))
   })
 
   it("answers the tombstone's own body once it adopts one, never its live record's", () => {

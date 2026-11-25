@@ -15,6 +15,7 @@ import type { BoxRecord, ScopeAt, ThingScope } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 import { VaultChecks } from '../shapes/shapes-vault'
 import type { VaultMinder } from '../minding/vault-minder'
+import type { ThingCar } from '../minding/thing-car'
 
 /** One bank's boxes in this tab: the verbs to seal and write them, and to use their whispers.
  * Each seal is made under the bank's lease, so it needs the bank unlocked. A write answers the record stored.
@@ -205,7 +206,7 @@ export class Vault {
     try {
       await this.#vaultTSQ.getOnce(scope)
     } catch (err) {
-      if (! Errors.isVaultError(err, 'storage_unavailable') || (this.#boxAt(scope) === undefined)) { throw err }
+      if (! Errors.isVaultError(err, 'storage_unavailable') || (this.#boxCarAt(scope) === undefined)) { throw err }
     }
     return await fn(await this.unsealBox(this.#demandReadableBox(scope)))
   }
@@ -214,15 +215,15 @@ export class Vault {
    * Refuses `stale_read` where the box is unknown or known only sparse in its newest life, then `absent_box` where it holds a tombstone or the shell.
    */
   #demandReadableBox(scope: ScopeAt<BoxLabelpath>): LiveOf<BoxRecord> {
-    const box = this.#boxAt(scope)
-    if ((box === undefined) || (box.agekind === 'bare')) { throw Throwers.thingSoonestBare(scope.labelpath) }
-    const record = box.pickle()
+    const car = this.#boxCarAt(scope)
+    if ((car === undefined) || (car.thing.agekind === 'bare')) { throw Throwers.thingSoonestBare(scope.labelpath) }
+    const record = car.thing.pickle()
     if (! BaseBox.isLive(record)) { throw Throwers.boxAbsent({ boxlabel: scope.labelpath }) }
     return record
   }
   // --
 
-  // == [Helpers]: #vaultMinder, #sealedWriteOf, #donorAt, #boxAt, #scopeAt, #demandOwnBox
+  // == [Helpers]: #vaultMinder, #sealedWriteOf, #donorAt, #boxCarAt, #scopeAt, #demandOwnBox
 
   /** The bank's VaultMinder, which holds its Things and sends its writes */
   get #vaultMinder(): VaultMinder { return this.#world.demandVaultMinder() }
@@ -237,16 +238,16 @@ export class Vault {
   /** The newest revision seen of the box at `labelpath`: the record it holds where that was seen whole, else its citable, the box got first where none is seen */
   async #donorAt(labelpath: BoxLabelpath): Promise<Sealable<LiveOf<BoxRecord>>> {
     const scope = this.#scopeAt(labelpath)
-    if (this.#boxAt(scope) === undefined) { await this.#vaultTSQ.getOnce(scope) }
-    const box = this.#boxAt(scope)
-    if (box === undefined) { throw Throwers.storageIssue() }
-    return (box.agekind === 'here') ? box.pickle() : box.citable
+    if (this.#boxCarAt(scope) === undefined) { await this.#vaultTSQ.getOnce(scope) }
+    const car = this.#boxCarAt(scope)
+    if (car === undefined) { throw Throwers.storageIssue() }
+    return (car.thing.agekind === 'here') ? car.thing.pickle() : car.citable
   }
 
-  /** The box at `scope`, or undefined where this device has seen no record of it */
-  #boxAt(scope: ThingScope): Box | undefined {
-    const thing = this.#vaultMinder.thingAt(scope)
-    return (thing instanceof Box) ? thing : undefined
+  /** The car of the box at `scope`, or undefined where this device has seen no record of it */
+  #boxCarAt(scope: ThingScope): ThingCar<Box> | undefined {
+    const car = this.#vaultMinder.carAt(scope)
+    return isBoxCar(car) ? car : undefined
   }
 
   /** The scope of the box at `labelpath`, in this vault's bank. Refuses the root box's labelpath. */
@@ -261,3 +262,6 @@ export class Vault {
   }
   // --
 }
+
+/** True of the car of a box */
+function isBoxCar(car: ThingCar | undefined): car is ThingCar<Box> { return car?.thing instanceof Box }

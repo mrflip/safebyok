@@ -5,7 +5,6 @@ import { Lease } from '../../src/models/lease'
 import type { ShellOf } from '../../src/shapes/shapes-sealers'
 import { Lifeseq } from '../../src/shapes/primitives'
 import { type BankRecord, ThingFormat } from '../../src/shapes/shapes-thing'
-import { Thing } from '../../src/models/thing'
 import { getAskOf } from '../../src/shapes/shapes-asks'
 import * as TH from '../test-helpers'
 
@@ -225,12 +224,11 @@ describe("a bank over the shell or a tombstone", () => {
     await TH.expectRefusal(bank.put({ cited: TH.bankShellOf(), record: TH.bankThingOf() }), 'absent_thing')
   })
 
-  it("is made from the shell with no world heard of, which it pickles to, with no lifetok and the scope and citation of the shell", () => {
+  it("is made from the shell with no world heard of, which it pickles to, with no lifetok and the scope of the shell", () => {
     const bank = makeBankOf(TH.bankShellOf())
     expect(bank.pickle()).to.deep.equal(TH.bankShellOf())
     expect(bank.lifetok).to.be.undefined
     expect(bank.scope).to.deep.equal(TH.ThingBank)
-    expect(bank.citable).to.deep.equal(Thing.sparseOf(TH.bankShellOf()))
     expect([bank.isLocked, bank.isEnabled, bank.modelkind]).to.deep.equal([true, true, 'bank'])
     TH.expectSyncRefusal(() => bank.gate, 'absent_thing')
   })

@@ -5,6 +5,7 @@ import { Box } from '../../src/models/box'
 import { Thing } from '../../src/models/thing'
 import { ThingCar } from '../../src/minding/thing-car'
 import type { CarWorld } from '../../src/shapes/shapes-vault-minder'
+import { Lifeseq } from '../../src/shapes/primitives'
 import type { ReadTc, SeenThing } from '../../src/shapes/shapes-vault-event'
 import { VacantReadTc, readAtOf, readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
@@ -30,6 +31,9 @@ function carReceived(car: ThingCar | undefined, record: SeenThing, read_tc: Read
   receiver.receive({ ...TH.thingEventOf(record), read_tc })
   return receiver
 }
+
+/** A box's lifepath of life `life`, under the root box's life of the same number, ordered as the lives are. */
+function lifepathOf(life: number): string { return `${Lifeseq.ofLifenum(life)}/${Lifeseq.ofLifenum(life)}` }
 
 /** What `car` holds, as a plain object. */
 function carFieldsOf(car: ThingCar): Pick<ThingCar, 'thing' | 'lastErr' | 'erred_at' | 'read_tc'> {
@@ -179,9 +183,72 @@ describe("car.read_tc", () => {
     expect(TH.PlainThing.isVoidSentinel(car.thing.pickle())).to.eq(true)
   })
 
-  it("is left as it was by a record its Thing refuses", () => {
+  it("is left as it was by a record its Thing refuses, as is its citable", () => {
     const car     = ThingCar.make({ ...TH.thingEventOf(Revs.two), read_tc: readTcAt(1000) }, { world: RefusingWorld })
+    const { citable } = car
     TH.expectSyncRefusal(() => car.receive({ ...TH.thingEventOf(Revs.three), read_tc: readTcAt(2000) }), 'unexpected_error')
     expect(car.read_tc).to.eq(readTcAt(1000))
+    expect(car.citable).to.equal(citable)
+  })
+})
+
+describe("car.citable", () => {
+  it("made from a Thing, cites what the Thing holds: the shell, or a record", () => {
+    const shell = Thing.shellOf(TH.boxThingOf())
+    expect(ThingCar.make(TH.PlainThing.make(shell), { world: TH.PlainWorld }).citable).to.deep.equal(Thing.sparseOf(shell))
+    const record = TH.boxThingOf('openai', { revseq: 2 })
+    const thing  = TH.PlainThing.make(TH.thingEventOf(record))
+    expect(ThingCar.make(thing, { world: TH.PlainWorld }).citable).to.deep.equal(Thing.sparseOf(record))
+  })
+
+  it("cites each record of a later life", () => {
+    const live0 = TH.boxThingOf('openai', { revseq: 3 })
+    const tomb1 = TH.boxThingOf('openai', { am: 'x', lifepath: lifepathOf(1), lifeseq: Lifeseq.ofLifenum(1), revseq: 4, written_at: TH.T0 + 9 })
+    const live2 = TH.boxThingOf('openai', { lifepath: lifepathOf(2), lifeseq: Lifeseq.ofLifenum(2), revseq: 5, born_at: TH.T0 + 10, written_at: TH.T0 + 10 })
+    const car = carReceived(undefined, live0)
+    for (const record of [tomb1, live2]) {
+      carReceived(car, record)
+      expect(car.citable).to.deep.equal(Thing.sparseOf(record))
+    }
+  })
+
+  it("moves on a newer soon, its Thing holding its record, then stays as the whole record that catches up is adopted", () => {
+    const whole2 = TH.boxThingOf('openai', { revseq: 2 })
+    const whole4 = TH.boxThingOf('openai', { revseq: 4, revtok: TH.revtokOf('four') })
+    const car = carReceived(undefined, whole2)
+    carReceived(car, TH.boxSparseOf(whole4))
+    expect(car.citable).to.deep.equal(Thing.sparseOf(whole4))
+    expect(car.thing.pickle()).to.eq(whole2)
+    carReceived(car, whole4)
+    expect(car.thing.pickle()).to.eq(whole4)
+    expect(car.citable).to.deep.equal(Thing.sparseOf(whole4))
+  })
+
+  it("cites the Thing fields of a newer soon over a cold record: no body, nothing secret, frozen", () => {
+    const whole2 = TH.boxThingOf('openai', { revseq: 2, sidecar: { account: 'work' } })
+    const soon4  = TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 4, revtok: TH.revtokOf('four'), written_at: TH.T0 + 4 }))
+    const car = carReceived(carReceived(undefined, whole2), soon4)
+    expect(car.thing.agekind).to.eq('cold')
+    expect(car.citable).to.deep.equal(soon4)
+    expect(car.citable).to.not.have.any.keys('sidecar', 'whisper_sealed')
+    expect(Object.isFrozen(car.citable)).to.be.true
+  })
+
+  it("stays at the newest revision when an older whole record is adopted", () => {
+    const whole4 = TH.boxThingOf('openai', { revseq: 4, revtok: TH.revtokOf('four') })
+    const whole2 = TH.boxThingOf('openai', { revseq: 2 })
+    const car = carReceived(carReceived(undefined, TH.boxSparseOf(whole4)), whole2)
+    expect(car.thing.pickle()).to.eq(whole2)
+    expect(car.citable).to.deep.include({ revseq: 4, revtok: whole4.revtok })
+  })
+
+  it("cites a soon over the shell, and a newer soon after it, its Thing at the shell", () => {
+    const soon4 = TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 4, revtok: TH.revtokOf('four') }))
+    const soon5 = TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 5, revtok: TH.revtokOf('five') }))
+    const car = carReceived(undefined, soon4)
+    expect(car.citable).to.deep.equal(soon4)
+    carReceived(car, soon5)
+    expect(car.citable).to.deep.include({ revseq: 5, revtok: soon5.revtok })
+    expect(car.thing.pickle()).to.deep.equal(Thing.shellOf(soon4))
   })
 })

@@ -223,14 +223,14 @@ function lifeOf(cache: CachePrecis): number | 'vacant' {
 
 /** The précis of what `world` shows of the box, from its Thing and its item, and whether the root box's listing is invalidated or reset. */
 function cachePrecisOf(world: TSQWorld<MemoryVaultDB>): CachePrecis {
-  const thing   = world.sorted.thingAt(TH.BoxScope)
+  const car     = world.sorted.carAt(TH.BoxScope)
   const item    = itemQueryAt(world)?.state.data as ThingRecord | null | undefined
-  const held    = thing?.pickle()
+  const held    = car?.thing.pickle()
   const listing = listQueryAt(world)?.state
   return {
     ...((item !== undefined) && { item: (item === null) ? null : precisOf(item) }),
-    ...((thing !== undefined) && (thing.agekind !== 'here') && { soon: precisOf(thing.citable) }),
-    ...((item === null) && (thing?.agekind === 'here') && (held !== undefined) && Thing.isGone(held) && { dead: precisOf(held) }),
+    ...((car !== undefined) && (car.thing.agekind !== 'here') && { soon: precisOf(car.citable) }),
+    ...((item === null) && (car?.thing.agekind === 'here') && (held !== undefined) && Thing.isGone(held) && { dead: precisOf(held) }),
     ...((listing !== undefined) && (listing.isInvalidated || (listing.data === undefined)) && { isListingStale: true }),
   }
 }

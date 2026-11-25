@@ -879,7 +879,7 @@ describe("VaultMinder.tryListOnce(labelpath) and listOnce(labelpath)", () => {
     const ask  = vaultDB.makeListAsk({ labelpath: 'box' })
     const kids = await vaultDB.listOnce('box')
     expect(Object.keys(kids.items)).to.deep.equal(['openai'])
-    expect(vaultDB.thingAt(TH.BoxScope)?.citable).to.deep.equal(TH.boxSparseOf(TH.boxThingOf()))
+    expect(vaultDB.carAt(TH.BoxScope)?.citable).to.deep.equal(TH.boxSparseOf(TH.boxThingOf()))
     expect(listed.mock.calls).to.deep.equal([[ask]])
   })
 

@@ -2,7 +2,7 @@ import { deepFreeze, isEqual, pick } from 'es-toolkit'
 import { Helpers, VX } from 'safebyok-big/internals'
 import { BaseThing } from './base-thing'
 import type { LiveOf, ShellOf } from '../shapes/shapes-sealers'
-import type { BulletproofCallback, Sparse, ThingRecord, Tombstone } from '../shapes/shapes-thing'
+import type { BulletproofCallback, ThingRecord, Tombstone } from '../shapes/shapes-thing'
 import { type Agekind, type Agerank, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { VacantAgerank, agekindOf, eventsOf, nextAgerankOf } from '../storage/agerank'
 import * as Throwers from '../refusals/throwers'
@@ -27,12 +27,10 @@ export type Adoptable<RecordT extends ThingRecord> = RecordT | Tombstone<RecordT
  * A listener can {@link subscribe} to it, and is told each time {@link receive} returns news.
  */
 export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT extends Adoptable<RecordT> = Adoptable<RecordT>> extends BaseThing {
-  // == [Props]: #record, #citable, #agerank, #bulletproofCallback, #subscribers, #subscribe
+  // == [Props]: #record, #agerank, #bulletproofCallback, #subscribers, #subscribe
 
   // Set by the constructor's adopt.
   #record: Adoptable<RecordT> | undefined = undefined
-  /** The Thing fields of the newest revision seen. */
-  #citable: Sparse<ThingRecord>
   #agerank: Agerank = VacantAgerank
 
   /** Wraps each subscriber as it subscribes: what one throws goes where the maker said, or reaches `receive`'s caller where it said nothing. */
@@ -53,7 +51,6 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
     this.#bulletproofCallback = bulletproofCallback
     const { userid, banklabel, labelpath } = shell
     Helpers.tattoo(this, { userid, banklabel, labelpath }, { configurable: false })
-    this.#citable = citedOf(shell)
     this.adopt(shell)
   }
 
@@ -64,14 +61,10 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
     this.#record = deepFreeze(record)
     const { label, fmt, lifepath, lifeseq, revtok, revseq, born_at, written_at, am } = record
     Helpers.tattoo(this, { label, fmt, lifepath, lifeseq, revtok, revseq, born_at, written_at, am })
-    if (BaseThing.cmp(this.#citable, record) > 0) { this.#citable = citedOf(record) }
   }
   // --
 
-  // == [Feed]: citable, agerank, agekind, receive
-
-  /** What a write over this Thing cites: the Thing fields of the newest revision seen, whole or a live box's sparse form. */
-  get citable(): Sparse<ThingRecord> { return this.#citable }
+  // == [Feed]: agerank, agekind, receive
 
   /** How far this Thing has been seen, as {@link Agerank} spells it: the vacant agerank until it first receives a record. */
   get agerank(): Agerank { return this.#agerank }
@@ -84,7 +77,7 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
    * News is a record that leaves the agerank greater than it was: from a later life, newer than any revision seen, a whole record newer than any
    * whole one seen, or the newest revision seen again in a later tcchunk, a span of 65.536 seconds, than it was last seen in.
    * The events are `proposed` with its ageranks, then any `life`, then any `aged`, each frozen. A whole record, a tombstone
-   * or the void sentinel is adopted, unless it equals the record held, which stays the same object; a live box's sparse form moves only `citable` and `agerank`.
+   * or the void sentinel is adopted, unless it equals the record held, which stays the same object; a live box's sparse form moves only `agerank`.
    * Each subscriber is told once the news is taken in. A `life` or `aged` event returns none. Refuses an event of another Thing, and a record in any other form.
    */
   receive(proposed: VaultEvent<RecordT>): readonly VaultEvent<RecordT>[] {
@@ -98,7 +91,6 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
     // Adopted first, so that an adopt that throws leaves this Thing as it was.
     if ((liveness !== 'soon') && ! isEqual(this.#record, val)) { this.adopt(val) }
     this.#agerank = agerank
-    if (BaseThing.cmp(this.#citable, val) > 0) { this.#citable = citedOf(val) }
     this.#tellSubscribers()
     return eventsOf(proposed, agerankWas, agerank)
   }
@@ -144,14 +136,11 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   // --
 }
 
-// == [Helpers]: NoEvents, callAsIs, citedOf
+// == [Helpers]: NoEvents, callAsIs
 
 /** What `receive` returns for an event that is not news. */
 const NoEvents: readonly never[] = Object.freeze([])
 
 /** The {@link BulletproofCallback} of a Thing whose maker gave none: `callback` as it is. */
 function callAsIs<ArgsT extends unknown[]>(callback: (...args: ArgsT) => void): (...args: ArgsT) => void { return callback }
-
-/** The Thing fields of `seen`, frozen */
-function citedOf(seen: Sparse<ThingRecord>): Sparse<ThingRecord> { return Object.freeze(BaseThing.sparseOf(seen)) }
 // --

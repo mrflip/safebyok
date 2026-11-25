@@ -217,10 +217,10 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
 
   // The act tables read a revseq of -1 and the void revtok as citing nothing stored. The cited lives above it are the
   // record's, as the ask's checks demand, so a record of a life after the first refuses there.
-  /** The citable of the Thing kept at `record`'s labelpath, as a write of `record` cites it, or the void revision where none is kept */
+  /** The citable of the car kept at `record`'s labelpath, as a write of `record` cites it, or the void revision where none is kept */
   #citableAt<RecordT extends ThingRecord>(record: RecordT): CitedOf<RecordT> {
-    const thing = this.thingAt(record)
-    if (thing !== undefined) { return thing.citable as CitedOf<RecordT> }
+    const car = this.carAt(record)
+    if (car !== undefined) { return car.citable as CitedOf<RecordT> }
     const parentLifepath = Lifeseq.leadingOf(ThingChecks.lifepath.parse(record.lifepath))
     return ((parentLifepath === '') ? Shell.Cited : Shell.childCited(parentLifepath)) as CitedOf<RecordT>
   }

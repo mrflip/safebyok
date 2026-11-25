@@ -3,7 +3,7 @@
 import { Clock, type Errors } from 'safebyok-big/internals'
 import type { EpochMillis } from '../shapes/primitives'
 import type { MaskedRow } from '../shapes/shapes-masked-view'
-import type { ThingCited, VoidSentinel } from '../shapes/shapes-thing'
+import type { Sparse, ThingCited, ThingRecord, VoidSentinel } from '../shapes/shapes-thing'
 import type { Agekind, ReadTc, VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
 import { type CarWorld, type ReceivingThing, type ThingCarOpts, ThingCarChecks } from '../shapes/shapes-vault-minder'
 import { BaseThing } from '../models/base-thing'
@@ -18,12 +18,14 @@ import * as Throwers from '../refusals/throwers'
  * A devtool reads it, and nothing it keeps changes what the Thing answers.
  */
 export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
-  // == [Props]: thing, #lastErr, #erredAt, #readTc
+  // == [Props]: thing, #lastErr, #erredAt, #citable, #readTc
 
   /** The Thing, the same object for as long as the car lives. */
   readonly thing: ThingT
   #lastErr: Errors.VaultError | null = null
   #erredAt: EpochMillis | null = null
+  /** The Thing fields of the newest revision seen. */
+  #citable: Sparse<ThingRecord>
   #readTc:  ReadTc = VacantReadTc
   // --
 
@@ -42,19 +44,24 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
     return car
   }
 
+  // A Thing handed in may hold a record already: the car starts from it, so that it never calls an older one news.
   private constructor(thing: ThingT) {
     this.thing = thing
+    this.#citable = citedOf(thing.pickle())
     Object.freeze(this)
   }
   // --
 
-  // == [Bookkeeping]: lastErr, erred_at, read_tc
+  // == [Bookkeeping]: lastErr, erred_at, citable, read_tc
 
   /** The refusal the Thing raised at the last record it was handed, or null where it took that record. For a devtool, never for an app's own logic. */
   get lastErr(): Errors.VaultError | null { return this.#lastErr }
 
   /** When the Thing last refused a record, or null where it has refused none. */
   get erred_at(): EpochMillis | null { return this.#erredAt }
+
+  /** What a write over the Thing cites: the Thing fields of the newest revision seen, whole or a live box's sparse form, frozen. */
+  get citable(): Sparse<ThingRecord> { return this.#citable }
 
   /** When the newest revision the Thing took as news was last read: the `VacantReadTc` until it takes one. */
   get read_tc(): ReadTc { return this.#readTc }
@@ -65,7 +72,7 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
   // The Thing's receive checks the event, so the car reads its record only once the Thing has taken it.
   /** Have the Thing receive `event`, returning the events it returns: keep its refusal, and throw it, or clear the refusal kept, and keep when the record was read where it was news. */
   receive(event: VaultEvent): readonly VaultEvent[] {
-    const { citable, agekind } = this.thing
+    const { agekind } = this.thing
     let events: readonly VaultEvent[]
     try {
       events = this.thing.receive(event)
@@ -76,14 +83,17 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
       throw refusal
     }
     this.#lastErr = null
-    if ((events.length > 0) && (event.eventkind === 'item')) { this.#readTc = this.#readTcAfter(citable, agekind, event.val, event.read_tc) }
+    if ((events.length > 0) && (event.eventkind === 'item')) {
+      this.#readTc = this.#readTcAfter(agekind, event.val, event.read_tc)
+      if (BaseThing.cmp(this.#citable, event.val) > 0) { this.#citable = citedOf(event.val) }
+    }
     return events
   }
 
   // The time belongs to the newest revision, as the agerank's tcchunk does: a newer one brings its own, the same one the later, an older one leaves it.
-  /** The `read_tc` after `seen` is read at `read_tc`, over `citable`, the newest revision seen before it: moved where `seen` is that revision, or newer */
-  #readTcAfter(citable: Pick<ThingCited, 'lifepath' | 'revseq'>, agekind: Agekind, seen: Pick<ThingCited, 'lifepath' | 'revseq'>, read_tc: ReadTc): ReadTc {
-    const order = BaseThing.cmp(citable, seen)
+  /** The `read_tc` after `seen` is read at `read_tc`: moved where `seen` is the newest revision seen, or newer */
+  #readTcAfter(agekind: Agekind, seen: Pick<ThingCited, 'lifepath' | 'revseq'>, read_tc: ReadTc): ReadTc {
+    const order = BaseThing.cmp(this.#citable, seen)
     if ((agekind === 'vacant') || (order > 0)) { return read_tc }
     return ((order === 0) && (read_tc > this.#readTc)) ? read_tc : this.#readTc
   }
@@ -111,7 +121,7 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
 }
 // --
 
-// == [Helpers]: thingOf, isItemEvent, isShell
+// == [Helpers]: thingOf, isItemEvent, isShell, citedOf
 
 /** The Thing `begun` is, or the one `world` makes at the shell `begun` is or names */
 function thingOf<ThingT extends ReceivingThing>(begun: ThingT | VoidSentinel | VaultItemEvent, world: CarWorld<ThingT>): ThingT {
@@ -127,4 +137,7 @@ function isItemEvent(begun: unknown): begun is VaultItemEvent {
 
 /** True of the shell, among the forms a car is made from */
 function isShell(begun: unknown): begun is VoidSentinel { return BaseThing.isVoidSentinel(begun) }
+
+/** The Thing fields of `seen`, frozen */
+function citedOf(seen: Sparse<ThingRecord>): Sparse<ThingRecord> { return Object.freeze(BaseThing.sparseOf(seen)) }
 // --
