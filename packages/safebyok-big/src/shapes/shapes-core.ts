@@ -28,23 +28,24 @@ export const ciphered = objCheck(({ str }) => ({
 export type Ciphered = Z.infer<typeof ciphered>
 // --
 
-// == [Record fields]: epochMillis, bank_tok, gate_tok, vault_tok, box_tok, revision_tok, device_tok, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, bank_key_wayin_wrapped, bank_key_lease_wrapped, prfSalt, EpochMillis, PassphraseSalt, PrfSalt, WhisperCiphered, BoxKeyWrapped, BankKeyWayinWrapped, BankKeyLeaseWrapped
+// == [Record fields]: epochMillis, bank_tok, gate_tok, vault_tok, box_tok, revision_tok, device_tok, devicetok, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, bank_key_wayin_wrapped, bank_key_lease_wrapped, prfSalt, EpochMillis, PassphraseSalt, PrfSalt, WhisperCiphered, BoxKeyWrapped, BankKeyWayinWrapped, BankKeyLeaseWrapped
 
 export { epochMillis, type EpochMillis } from './primitives'
 
 /** The checks of the stored records' tokens, ids, salts and ciphered fields, each named for its field. No refusal quotes the value.
  * A token is any text, not empty, as a host's adapter may write one by hand, and so are a key deriver's
- * label and a credential id. A `device_tok` is a UUID. A passphrase's salt is base64url text of
+ * label and a credential id. A `device_tok` is a UUID, and so is the new core's `devicetok`. A passphrase's salt is base64url text of
  * {@link PassphraseSaltSize} bytes. A passkey's salt is text, not empty, whose length {@link prfSalt} judges.
  * A salt or a ciphered field is branded for its role, as nothing but safebyok makes one.
  */
-export const { bank_tok, gate_tok, vault_tok, box_tok, revision_tok, device_tok, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, bank_key_wayin_wrapped, bank_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
+export const { bank_tok, gate_tok, vault_tok, box_tok, revision_tok, device_tok, devicetok, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, bank_key_wayin_wrapped, bank_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
   bank_tok:                str.min(1),
   gate_tok:                str.min(1),
   vault_tok:               str.min(1),
   box_tok:                 str.min(1),
   revision_tok:            str.min(1),
   device_tok:              uuid(Phrases.DeviceTokShape),
+  devicetok:               uuid(Phrases.DevicetokShape),
   key_deriver_label:       str.min(1),
   credential_id:           str.min(1),
   salt_b64:                str.length(PassphraseSaltChars, { error: SaltShape, abort: true }).regex(Patterns.b64url, { error: SaltShape, abort: true }).refine((salt) => fromB64OrNull(salt) !== null, SaltShape).brand<'PassphraseSalt'>(),
