@@ -17,8 +17,8 @@ export type {
   SealedOf, SealedPartsOf, Sealer, ShellOf, SparseOf, TombstoneOf, TombstonePublicProps, UnsealedOf,
 } from './shapes/shapes-sealers'
 export {
-  type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseLabelpath, type LeaseLoggable, type LeaseRecord, type LeaseSparse, type LeaseStamp, type LeaseTombstone, type StampedGate,
-  LeaseFormat, StampChecks, leaseLabelpathOf,
+  type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseLabelpath, type LeaseLoggable, type LeaseRecord, type LeaseScope, type LeaseSparse, type LeaseStamp, type LeaseTombstone, type StampedGate,
+  LeaseFormat, LeaseLifeRoot, StampChecks, leaseLabelpathOf, leaseLifepathOf, leaseScopeOf,
 } from './shapes/shapes-stamps'
 export { Wayin } from './models/wayin'
 export { type PasskeyWayinHeader, type PasskeyWayinRecord, type PassphraseWayinHeader, type PassphraseWayinRecord, type WayinHeader, type WayinRecord, WayinChecks } from './shapes/shapes-wayin'
@@ -38,7 +38,7 @@ export {
 } from './shapes/shapes-bankish'
 export {
   type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateGatingFriend, type GateRevisionedStamp, type GatingCleartexts, type GuardedKeyDeriver,
-  type GuardedStrengthChecker, type HandedCleartexts, type LeaseGate, type LeaseOpts, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type ProvedCleartexts, type ProvingDevice,
+  type GuardedStrengthChecker, type HandedCleartexts, type LeaseGate, type LeaseOpts, type LeaseShellScope, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type ProvedCleartexts, type ProvingDevice,
   type ProvingOpts, type ProvingParts, type ReplacePassphraseDna, type RevokePasskeyDna, type SecretFieldname, type StrengthChecker, type UnlockCleartexts, type UnlockDna, type WorldGateFriend, CleartextChecks,
   FormSecretFieldnames, GateishChecks, GatingChecks,
 } from './shapes/shapes-gateish'

@@ -1,13 +1,16 @@
-/** The lease records a deviceDB's tests store: a live lease and a tombstone of {@link WorldScope}'s bank, at the life and revision a test asks for. */
+/** The lease records a deviceDB's tests store, and where: a live lease and a tombstone of {@link WorldScope}'s main gate, at the life and revision a test asks for. */
 import { Crypto } from 'safebyok-big/internals'
 import { fakeCiphered } from 'safebyok-big/testing'
 import { type Lifenum, Lifeseq } from '../../src/shapes/primitives'
 import type { LiveOf } from '../../src/shapes/shapes-sealers'
 import type { Sparse } from '../../src/shapes/shapes-thing'
-import { type LeaseRecord, type LeaseTombstone, LeaseFormat } from '../../src/shapes/shapes-stamps'
+import { type LeaseRecord, type LeaseScope, type LeaseTombstone, LeaseFormat, leaseLifepathOf } from '../../src/shapes/shapes-stamps'
 import { T0, WorldBankStamp, WorldGate, WorldScope, revtokOf } from './models-world'
 
-// == [Lease records]: LeaseGiven, leaseThingOf, liveLeaseRecordOf, leaseTombstoneOf
+// == [Lease records]: WorldLeaseScope, LeaseGiven, leaseThingOf, liveLeaseRecordOf, leaseTombstoneOf
+
+/** Where a deviceDB files the lease of {@link WorldScope}'s main gate. */
+export const WorldLeaseScope: LeaseScope = Object.freeze({ ...WorldScope, labelpath: 'lease/gate' })
 
 /** The life and revision of a lease record a test builds, as a lifenum and a revseq. */
 export type LeaseGiven = { lifenum?: Lifenum, revseq?: number }
@@ -17,7 +20,7 @@ function leaseThingOf(lifenum: Lifenum, revseq: number): Omit<Sparse<LeaseRecord
   const lifeseq = Lifeseq.ofLifenum(lifenum)
   return {
     fmt: LeaseFormat, ...WorldScope, labelpath: 'lease/gate', label: 'gate',
-    lifeseq, lifepath: lifeseq, revseq, revtok: revtokOf(`${String(lifenum)}.${String(revseq)}`), born_at: T0, written_at: T0,
+    lifeseq, lifepath: leaseLifepathOf(lifeseq), revseq, revtok: revtokOf(`${String(lifenum)}.${String(revseq)}`), born_at: T0, written_at: T0,
   }
 }
 

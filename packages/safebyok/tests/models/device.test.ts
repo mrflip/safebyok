@@ -15,6 +15,7 @@ import { VaultTSQ } from '../../src/minding/vault-tsq'
 import { Vault } from '../../src/models/vault'
 import { BankRootsMissing } from '../../src/phrases'
 import { EmptyMaskedView } from '../../src/shapes/shapes-masked-view'
+import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { type GateRecord, type ThingRecord, ThingFormat } from '../../src/shapes/shapes-thing'
 import { v7 as uuidv7 } from 'uuid'
@@ -70,12 +71,22 @@ describe("Device.make(record, opts)", () => {
     expect([tryGetWorld, tryGetThing, watch].map((spied) => spied.mock.calls.length)).to.deep.equal([1, 0, 1])
   })
 
-  it("accepts the bag of browserOpts() spread in, ignoring its device database", () => {
+  it("accepts the bag of browserOpts() spread in, keeping the lease in its device database", () => {
     const vaultDB = new MemoryVaultDB()
-    const device = Device.make({ banklabel: TH.WorldScope.banklabel, device_tok: TH.DeviceTok }, { ...browserOpts({ dbName: 'device-test' }), vaultDB, logger: TH.quietLogger })
+    const opts = browserOpts({ dbName: 'device-test' })
+    const device = Device.make({ banklabel: TH.WorldScope.banklabel, device_tok: TH.DeviceTok }, { ...opts, vaultDB, logger: TH.quietLogger })
     expect(device.isEnabled).to.be.true
-    expect(device.vaultDB).to.equal(vaultDB)
-    expect(device).to.not.have.property('deviceDB')
+    expect([device.vaultDB, device.deviceDB]).to.deep.equal([vaultDB, opts.deviceDB])
+  })
+
+  it("keeps the lease in a MemoryDeviceDB of its own where the host gives no deviceDB", () => {
+    const [device, other] = [TH.makeDevice(), TH.makeDevice()]
+    expect(device.deviceDB).to.be.instanceOf(MemoryDeviceDB).and.not.equal(other.deviceDB)
+  })
+
+  it("refuses a deviceDB missing a verb, naming it", () => {
+    const err = TH.expectSyncRefusal(() => TH.makeDevice({}, { deviceDB: { peekLease: vi.fn(), stowLease: vi.fn() } } as never), 'bad_record')
+    expect(err.message).to.include('deviceDB: ')
   })
 
   it("gives each bank made on it the vaultDB it is given", () => {
@@ -599,7 +610,7 @@ describe("device.connect() and device.disconnect()", () => {
     expect(watch).toHaveBeenCalledOnce()
   })
 
-  it("locks its bank and stops the watch, however often disconnected, the device and its bank staying enabled, and watches again at its next connect", async () => {
+  it("locks its bank and stops the watch, however often disconnected, the device and its bank staying enabled, and at its next connect watches again and takes up the lease stored", async () => {
     const vaultDB = new MemoryVaultDB()
     const stop = vi.fn()
     const watch = vi.spyOn(vaultDB, 'watch').mockReturnValue(stop)
@@ -609,6 +620,7 @@ describe("device.connect() and device.disconnect()", () => {
     expect(device.world.getSnapshot()).to.include({ stage: 'locked' })
     device.connect()
     expect(watch).toHaveBeenCalledTimes(2)
+    await TH.eventually(() => bank.isUnlocked)
   })
 
   it("leaves a call waiting for an `unlock` gating waiting, and the next unlock resolves it", async () => {

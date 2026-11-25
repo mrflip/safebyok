@@ -6,8 +6,9 @@ import { BaseBox } from '../../src/models/base-box'
 import { Lease, withoutSecrets } from '../../src/models/lease'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import { BaseThing, ThingFieldnames } from '../../src/models/base-thing'
+import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import type { BoxCleartexts, LiveOf, Sealer, ShellOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
-import { type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat } from '../../src/shapes/shapes-stamps'
+import { type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat, leaseLifepathOf } from '../../src/shapes/shapes-stamps'
 import { type EpochMillis, Lifeseq } from '../../src/shapes/primitives'
 import { type BoxRecord, type Sparse, type ThingFieldname, type ThingRecord, type Tombstone, Shell, ThingChecks } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
@@ -480,10 +481,10 @@ describe("a tampered lease record", () => {
 describe("a lease's Thing fields", () => {
   it("are its record's: its labelpath and label, its life and revision, and am 'a'", async () => {
     const { gate, record } = await leaseWorld()
-    const revised = { ...record, revseq: 3, revtok: TH.revtokOf('lease3'), written_at: TH.T0 + 5, lifeseq: Lifeseq.ofLifenum(2), lifepath: Lifeseq.ofLifenum(2) }
+    const revised = { ...record, revseq: 3, revtok: TH.revtokOf('lease3'), written_at: TH.T0 + 5, lifeseq: Lifeseq.ofLifenum(2), lifepath: leaseLifepathOf(Lifeseq.ofLifenum(2)) }
     const lease = Lease.make(revised, { gate })
     expect(pick(lease, ['labelpath', 'label', 'am', 'lifeseq', 'lifepath', 'revseq', 'revtok', 'born_at', 'written_at'])).to.deep.equal({
-      labelpath: 'lease/gate', label: 'gate', am: 'a', lifeseq: Lifeseq.ofLifenum(2), lifepath: Lifeseq.ofLifenum(2), revseq: 3, revtok: TH.revtokOf('lease3'), born_at: TH.T0, written_at: TH.T0 + 5,
+      labelpath: 'lease/gate', label: 'gate', am: 'a', lifeseq: Lifeseq.ofLifenum(2), lifepath: leaseLifepathOf(Lifeseq.ofLifenum(2)), revseq: 3, revtok: TH.revtokOf('lease3'), born_at: TH.T0, written_at: TH.T0 + 5,
     })
     expect(lease.scope).to.deep.equal({ userid: 'u1', banklabel: 'acme', labelpath: 'lease/gate' })
   })
@@ -509,7 +510,7 @@ describe("Lease.shellOf(gateScope)", () => {
   for (const [labelpath, label, leaseLabelpath, blurb] of GateLabelpathCases) {
     it(`is the void record at its gate's label, for ${blurb}`, () => {
       expect(Lease.shellOf({ ...TH.WorldScope, labelpath })).to.deep.equal({
-        fmt: LeaseFormat, ...TH.WorldScope, labelpath: leaseLabelpath, label, am: 'x', lifeseq: Shell.VoidLifeseq, lifepath: Shell.VoidLifeseq,
+        fmt: LeaseFormat, ...TH.WorldScope, labelpath: leaseLabelpath, label, am: 'x', lifeseq: Shell.VoidLifeseq, lifepath: leaseLifepathOf(Shell.VoidLifeseq),
         revseq: SX.VoidRevisionSeq, revtok: SX.VoidRevisionTok, born_at: SX.VoidTime, written_at: SX.VoidTime,
       })
     })
@@ -524,7 +525,7 @@ describe("Lease.shellOf(gateScope)", () => {
 describe("Lease.nextRevisionOf(followed, written_at)", () => {
   it("is born in the first life after the shell", () => {
     expect(Lease.nextRevisionOf(TH.leaseShellOf(), TH.T0 + 5)).to.deep.include({
-      labelpath: 'lease/gate', am: 'a', lifeseq: Lifeseq.ofLifenum(0), lifepath: Lifeseq.ofLifenum(0), revseq: 0, born_at: TH.T0 + 5, written_at: TH.T0 + 5,
+      labelpath: 'lease/gate', am: 'a', lifeseq: Lifeseq.ofLifenum(0), lifepath: leaseLifepathOf(Lifeseq.ofLifenum(0)), revseq: 0, born_at: TH.T0 + 5, written_at: TH.T0 + 5,
     })
   })
 
@@ -550,10 +551,10 @@ describe("Lease.nextRevisionOf(followed, written_at)", () => {
     expect(omit(Lease.nextRevisionOf(lease, TH.T0 + 5), ['revtok'])).to.deep.equal(omit(Lease.nextRevisionOf(record, TH.T0 + 5), ['revtok']))
   })
 
-  it("refuses to follow a Thing that is not a lease, or a lease whose life is above its own", async () => {
+  it("refuses to follow a Thing that is not a lease, or a lease whose lifepath lacks its placeholder", async () => {
     TH.expectSyncRefusal(() => Lease.nextRevisionOf(TH.boxShellOf() as never), 'bad_record')
     const live = await TH.liveLeaseRecordOf()
-    TH.expectSyncRefusal(() => Lease.nextRevisionOf({ ...live, lifepath: `${live.lifeseq}/${live.lifeseq}` }), 'bad_record')
+    TH.expectSyncRefusal(() => Lease.nextRevisionOf({ ...live, lifepath: live.lifeseq }), 'bad_record')
   })
 })
 
@@ -585,11 +586,61 @@ describe("Lease.makeNextRecord(live, { ends_at })", () => {
   })
 })
 
+describe("lease.nextEndingAt(ends_at)", () => {
+  it("is a new Lease at the next revision, ending when told, that unseals what this one sealed", async () => {
+    const { lease } = await leaseWorld()
+    const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    vi.setSystemTime(TH.T0 + 5)
+    const softlocked = lease.nextEndingAt(TH.T0 + 10)
+    expect(softlocked).to.not.equal(lease)
+    expect(softlocked).to.include({ revseq: lease.revseq + 1, written_at: TH.T0 + 5, ends_at: TH.T0 + 10, born_at: lease.born_at })
+    expect(await softlocked.unseal(BaseBox, sealed)).to.deep.include(Cleartexts)
+  })
+
+  it("refuses once this lease is evicted, and an ends_at that is no time", async () => {
+    const { lease } = await leaseWorld()
+    TH.expectSyncRefusal(() => lease.nextEndingAt('soon' as never), 'bad_record')
+    lease.evict()
+    TH.expectSyncRefusal(() => lease.nextEndingAt(TH.T0 + 10), 'bank_locked')
+  })
+})
+
+describe("lease.stow(deviceDB)", () => {
+  it("stows its record, its keys with it, so that a Lease made of the record peeked unseals what it sealed", async () => {
+    const { gate, lease } = await leaseWorld()
+    const deviceDB = new MemoryDeviceDB()
+    const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    await lease.stow(deviceDB)
+    const stored = await deviceDB.peekLease(TH.WorldLeaseScope)
+    expect(stored).to.deep.include(pick(lease, ShownFieldnames))
+    const reloaded = Lease.make(stored as LiveLeaseRecord, { gate })
+    expect(await reloaded.unseal(BaseBox, sealed)).to.deep.include(Cleartexts)
+  })
+
+  it("leaves a newer record stored in place", async () => {
+    const { lease } = await leaseWorld()
+    const deviceDB = new MemoryDeviceDB()
+    const tombstone = Lease.tombstoneOf(lease)
+    await deviceDB.stowLease(tombstone)
+    await lease.stow(deviceDB)
+    expect(await deviceDB.peekLease(TH.WorldLeaseScope)).to.deep.equal(tombstone)
+  })
+
+  it("refuses once this lease is evicted, stowing nothing, and a deviceDB that is not one", async () => {
+    const { lease } = await leaseWorld()
+    const deviceDB = new MemoryDeviceDB()
+    await TH.expectRefusal(lease.stow({ peekLease: vi.fn() } as never), 'bad_record')
+    lease.evict()
+    await TH.expectRefusal(lease.stow(deviceDB), 'bank_locked')
+    expect(await deviceDB.peekLease(TH.WorldLeaseScope)).to.be.null
+  })
+})
+
 describe("Lease.tombstoneOf(live, written_at)", () => {
   it("is the next odd life at the next revision, with its Thing fields alone and no keys", async () => {
     const live = await TH.liveLeaseRecordOf({ lifenum: 2, revseq: 4 })
     const tombstone = Lease.tombstoneOf(live, TH.T0 + 5)
-    expect(tombstone).to.deep.include({ ...TH.WorldScope, labelpath: 'lease/gate', label: 'gate', am: 'x', lifeseq: Lifeseq.ofLifenum(3), lifepath: Lifeseq.ofLifenum(3), revseq: 5, born_at: TH.T0, written_at: TH.T0 + 5 })
+    expect(tombstone).to.deep.include({ ...TH.WorldScope, labelpath: 'lease/gate', label: 'gate', am: 'x', lifeseq: Lifeseq.ofLifenum(3), lifepath: leaseLifepathOf(Lifeseq.ofLifenum(3)), revseq: 5, born_at: TH.T0, written_at: TH.T0 + 5 })
     expect(Object.keys(tombstone)).to.have.members([...ThingFieldnames])
     expect(BaseThing.cmp(live, tombstone)).to.be.greaterThan(0)
   })

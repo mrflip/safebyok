@@ -16,6 +16,9 @@ import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthCheck
 import type { BankScope } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
+import type { DeviceDB } from '../storage/device-db'
+import { MemoryDeviceDB } from '../storage/memory-device-db'
+import { DeviceDBChecks } from '../shapes/shapes-device-db'
 import type { WorldRoots } from '../shapes/shapes-asks'
 import { VaultMinder } from '../minding/vault-minder'
 import { type Modelkind, ThingChecks } from '../shapes/shapes-thing'
@@ -47,7 +50,7 @@ export const DefaultGateStaleMillis = 12 * 60 * 60_000
  * reloading the page.
  */
 export class Device {
-  // == [Props]: banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, softlockMillis, janitorMillis, gateStaleMillis, #onBadNews, #rootShelf, #vaultTsqClient, #world, #userid, #vaultTSQ, #vault, #signinAnswer, #endCause, toJSON
+  // == [Props]: banklabel, device_tok, vaultDB, deviceDB, keyDeriver, strengthChecker, logger, leaseMillis, softlockMillis, janitorMillis, gateStaleMillis, #onBadNews, #rootShelf, #vaultTsqClient, #world, #userid, #vaultTSQ, #vault, #signinAnswer, #endCause, toJSON
 
   /** The label of the bank this device serves each user. */
   readonly banklabel:          Banklabel
@@ -56,6 +59,8 @@ export class Device {
   // Hidden, so that a spread or a log line of the device passes by the host's objects and their guards.
   /** Where this device's banks are stored. */
   declare readonly vaultDB:            VaultDB
+  /** Where the signed-in bank's lease is kept, shared by every tab given the same one: the host's, or one in this device's memory. */
+  declare readonly deviceDB:           DeviceDB
   declare readonly keyDeriver:         GuardedKeyDeriver
   declare readonly strengthChecker:    GuardedStrengthChecker
   declare readonly logger:             Logger.VaultLogger
@@ -63,7 +68,7 @@ export class Device {
   readonly leaseMillis:        number
   /** How near its end, in milliseconds, a lease asks the user again: `softlockMinutes`, at most a twentieth of {@link leaseMillis}, or 0 where that is under a minute. */
   readonly softlockMillis:     number
-  /** How often, in milliseconds, the world's janitor locks a lease past its end and checks whether the gate is stale. */
+  /** How often, in milliseconds, the world's janitor locks a lease past its end, and, while connected, starts the watch where it is not running and checks whether the gate is stale. */
   readonly janitorMillis:      number
   /** How long after this device last read the gate, in milliseconds, the world reads it again. */
   readonly gateStaleMillis:    number
@@ -140,10 +145,10 @@ export class Device {
   static make(record: DeviceRecord, opts: DeviceOpts): Device { return new Device(record, opts) }
 
   private constructor(record: DeviceRecord, opts: DeviceOpts) {
-    const { record: { banklabel, device_tok }, opts: { vaultDB, keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, softlockMinutes, janitorMinutes, gateStaleMinutes, onBadNews = DefaultOnBadNews, queryClient = new QueryClient(), rootShelf } } = Checks.deviceMakeArgs.parse({ record, opts })
+    const { record: { banklabel, device_tok }, opts: { vaultDB, deviceDB = new MemoryDeviceDB(), keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, softlockMinutes, janitorMinutes, gateStaleMinutes, onBadNews = DefaultOnBadNews, queryClient = new QueryClient(), rootShelf } } = Checks.deviceMakeArgs.parse({ record, opts })
     this.banklabel = banklabel
     this.device_tok = device_tok
-    Helpers.decorate<Device>(this, { vaultDB, keyDeriver: guardKeyDeriver(keyDeriver), strengthChecker: guardStrengthChecker(strengthChecker), logger: Logger.parseLogger(logger) })
+    Helpers.decorate<Device>(this, { vaultDB, deviceDB, keyDeriver: guardKeyDeriver(keyDeriver), strengthChecker: guardStrengthChecker(strengthChecker), logger: Logger.parseLogger(logger) })
     this.leaseMillis     = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.softlockMillis  = softlockMillisOf(millisOf(softlockMinutes, DefaultSoftlockMillis), this.leaseMillis)
     this.janitorMillis   = millisOf(janitorMinutes, DefaultJanitorMillis)
@@ -244,14 +249,14 @@ export class Device {
   // == [Locking and connecting]: lock, connect, disconnect, disable
 
   // #lock-is-intent: a lock asks the user again at the next promptable action, and is not an alarm.
-  /** Lock the signed-in user's bank ({@link World.lock}). Never throws. */
+  /** Lock the signed-in user's bank, in every tab sharing this device's deviceDB ({@link World.lock}). Never throws. */
   lock(): this {
     this.#world.lock()
     return this
   }
 
   // Call it as a QueryClient's `mount` is called, from an effect whose cleanup calls `disconnect`.
-  /** Keep the device in step with the vaultDB: watch the signed-in user's bank there, from now or from `signin` ({@link World.connect}). Never throws; a second call, or a call once the device is disabled, does nothing.
+  /** Keep the device in step with the vaultDB and the deviceDB: watch the signed-in user's bank in the vaultDB, from now or from `signin`, and follow the lease the deviceDB stores ({@link World.connect}). Never throws; a second call, or a call once the device is disabled, does nothing.
    * @example
    *   useEffect(() => { device.connect(); return () => { device.disconnect() } }, [device])
    */
@@ -260,8 +265,8 @@ export class Device {
     return this
   }
 
-  /** Lock the signed-in user's bank, and stop watching the vaultDB, until the next {@link connect} ({@link World.disconnect}). Never throws; calling it twice in a row is the same as once, and each call locks.
-   * The device stays enabled: its verbs still work, and a call waiting for an `unlock` gating still waits.
+  /** Lock the signed-in user's bank in this tab alone, and stop watching the vaultDB and following the deviceDB, until the next {@link connect} ({@link World.disconnect}). Never throws; calling it twice in a row is the same as once.
+   * The device stays enabled: its verbs still work, and a call waiting for an `unlock` gating still waits. The next connect takes up the lease the deviceDB stores.
    */
   disconnect(): this {
     this.#world.disconnect()
@@ -269,7 +274,7 @@ export class Device {
   }
 
   // It shuts first, so that a subscriber told of the lock, or a vault as it disconnects, finds every call refusing.
-  /** End the device for good: lock its bank, reject every call waiting for an `unlock` gating, and disconnect. Never throws; calling it twice in a row is the same as once.
+  /** End the device for good: lock its bank in this tab alone, reject every call waiting for an `unlock` gating, and disconnect. Never throws; calling it twice in a row is the same as once.
    * Every call on its bank, gate, vault or world after refuses `disabled`, and its world's snapshot shows the stage `'disabled'`.
    */
   disable(): this {
@@ -396,8 +401,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
       onBadNews:        fn<BadNewsHandler>().optional(),
       queryClient:      custom<QueryClient>(isQueryClient, Phrases.QueryClientExpected).optional(),
       rootShelf:        custom<RootShelf>(isRootShelf, Phrases.RootShelfExpected).optional(),
-      // Ignored: the new core has no device database. Accepted so that `...browserOpts()` from safebyok/browser, which carries one, spreads in.
-      deviceDB:         custom<unknown>().optional(),
+      deviceDB:         DeviceDBChecks.deviceDB.optional(),
     }), { refusalkind: 'bad_record' }),
   }),
   tellBadNewsToArgs: obj({

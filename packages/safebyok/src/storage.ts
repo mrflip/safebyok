@@ -1,5 +1,5 @@
 // safebyok/storage: what a storage adapter is written against. The vaultDB, where every kind is a Thing, its memory
-// store, the asks it is given and the answers it gives; the deviceDB, which has each bank's lease record, and its memory
+// store, the asks it is given and the answers it gives; the deviceDB, which has each gate's lease record, and its memory
 // store; and from safebyok-big the acts, throwers and checkers an adapter's own code reaches for, re-exported so that
 // each stays one binding across both packages.
 export { AdapterVaultDB } from './storage/adapter-vault-db'
@@ -21,9 +21,9 @@ export {
 export * as Classifier from './storage/thing-classifier'
 export { VacantAgerank, readAtOf, readTcNow } from './storage/agerank'
 export {
-  type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseLabelpath, type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat, StampChecks, leaseLabelpathOf,
+  type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseLabelpath, type LeaseRecord, type LeaseScope, type LeaseStamp, type LeaseTombstone, LeaseFormat, LeaseLifeRoot, StampChecks, leaseLabelpathOf, leaseLifepathOf, leaseScopeOf,
 } from './shapes/shapes-stamps'
-// The deviceDB, which has each bank's lease record on this device, and its memory store. The IndexedDB store is on `safebyok/browser`.
+// The deviceDB, which has each gate's lease record on this device, and its memory store. The IndexedDB store is on `safebyok/browser`.
 export { DeviceDB } from './storage/device-db'
 export { MemoryDeviceDB } from './storage/memory-device-db'
 export { type LeaseListener, type LeaseScopepath, DeviceDBChecks } from './shapes/shapes-device-db'

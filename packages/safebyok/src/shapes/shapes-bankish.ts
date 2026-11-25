@@ -6,6 +6,7 @@ import { CX, type Deriver, type EX, type Errors, type Logger, Validator } from '
 import type { Bank } from '../models/bank'
 import type { DefaultOnBadNews, Device } from '../models/device'
 import type { World } from '../models/world'
+import type { DeviceDB } from '../storage/device-db'
 import type { VaultDB } from '../storage/vault-db'
 import type { StrengthChecker } from './shapes-gateish'
 import type { BoxCleartexts, UnsealedOf } from './shapes-sealers'
@@ -135,7 +136,7 @@ export interface DeviceOpts {
   autolockMinutes?:  number | undefined
   /** How near its end a lease asks the user again, in minutes: from then on, a call that wants the bank unlocked waits for an `unlock` gating, which renews the lease. At most a twentieth of the lease, and none under a minute. Default: 10. */
   softlockMinutes?:  number | undefined
-  /** How often the device locks a lease past its end, and checks whether its gate is stale, in minutes. Autolock is a best-effort time, not a deadline. Default: 10. */
+  /** How often the device locks a lease past its end, and, while connected, starts the watch where it is not running and checks whether its gate is stale, in minutes. Autolock is a best-effort time, not a deadline. Default: 10. */
   janitorMinutes?:   number | undefined
   /** How long after this device last read the bank's gate it reads the gate again, with the bank and root box, in minutes. Default: 720, twelve hours. */
   gateStaleMinutes?: number | undefined
@@ -145,8 +146,8 @@ export interface DeviceOpts {
   queryClient?:      QueryClient | undefined
   /** Where the device keeps the signed-in bank's three roots between page loads: hand it `localStorage`. Without one, nothing is kept, and each page load waits on the vaultDB for the bank. */
   rootShelf?:        RootShelf | undefined
-  /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
-  deviceDB?:         unknown
+  /** Where the device keeps the signed-in bank's lease, which every tab given the same one shares, and which outlasts a page load: `browserOpts()` from `safebyok/browser` hands an `IdbDeviceDB`. Default: one in the device's memory, so this tab's lease is its own and ends with the page. */
+  deviceDB?:         DeviceDB | undefined
 }
 // --
 

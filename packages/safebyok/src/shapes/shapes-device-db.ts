@@ -1,18 +1,31 @@
-/** What a deviceDB's verbs are given beyond a lease record, what its listeners hear, and what an IdbDeviceDB is made with and files a record under. */
+/** What a deviceDB is, what its verbs are given beyond a lease record, what its listeners hear, and what an IdbDeviceDB is made with and files a record under. */
 
 import type * as Z from 'zod'
 import { Validator } from 'safebyok-big/internals'
 import { objCheck } from 'safebyok-big/storage'
-import type { BankScope } from './shapes-stamps'
+import type { DeviceDB } from '../storage/device-db'
+import * as Phrases from '../phrases'
+import type { LeaseLabelpath, LeaseScope } from './shapes-stamps'
 import type { Banklabel, Userid } from './primitives'
 
-// == [Listening]: LeaseListener, DeviceDBChecks
+// == [The deviceDB]: isDeviceDB, LeaseListener, DeviceDBChecks
 
-/** Called with the scope of a bank whose lease record was stored, in this tab or another. It gets the scope only: peek for the record. */
-export type LeaseListener = (scope: BankScope) => void
+/** True for an object with a function for each of a {@link DeviceDB}'s verbs. */
+export function isDeviceDB(val: unknown): val is DeviceDB {
+  if ((typeof val !== 'object') || (val === null)) { return false }
+  const members: Partial<Record<string, unknown>> = val
+  return DeviceDBMembernames.every((membername) => typeof members[membername] === 'function')
+}
 
-/** The check of what `listen` is given. */
-export const DeviceDBChecks = Object.freeze(Validator.Checkers('bad_record', ({ obj, fn }) => ({
+/** The verbs of a {@link DeviceDB}. */
+const DeviceDBMembernames = ['peekLease', 'stowLease', 'listen'] as const satisfies readonly (keyof DeviceDB)[]
+
+/** Called with the scope of a lease record stored, in this tab or another. It gets the scope only: peek for the record. */
+export type LeaseListener = (scope: LeaseScope) => void
+
+/** The check of a deviceDB, and of what `listen` is given. */
+export const DeviceDBChecks = Object.freeze(Validator.Checkers('bad_record', ({ obj, fn, custom }) => ({
+  deviceDB:   custom<DeviceDB>(isDeviceDB, Phrases.DeviceDBExpected),
   listenArgs: obj({ listener: fn<LeaseListener>() }),
 })))
 // --
@@ -28,8 +41,8 @@ export interface IdbDeviceDBOpts {
 /** The check of an IdbDeviceDB's options, which `browserOpts` takes too. */
 export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_record')
 
-/** Where the lease database files a bank's lease record. */
-export type LeaseScopepath = [userid: Userid, banklabel: Banklabel]
+/** Where the lease database files a gate's lease record. */
+export type LeaseScopepath = [userid: Userid, banklabel: Banklabel, labelpath: LeaseLabelpath]
 // --
 
 true satisfies Z.core.util.AssertEqual<IdbDeviceDBOpts, Z.input<typeof idbDeviceDBOpts>>

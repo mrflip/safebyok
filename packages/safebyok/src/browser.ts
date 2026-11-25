@@ -18,11 +18,11 @@ export { idbDeviceDBOpts, type IdbDeviceDBOpts, type LeaseScopepath } from './sh
 
 // == [The bag]: BrowserOpts, bagsByDbName, browserOpts
 
-/** The `Device.make` options {@link browserOpts} answers, to spread in beside your own. `Device.make` ignores the `deviceDB`. */
+/** The `Device.make` options {@link browserOpts} answers, to spread in beside your own. */
 export interface BrowserOpts {
   /** `argon2idWebV1Deriver`. */
   readonly keyDeriver:      KeyDeriver
-  /** An {@link IdbDeviceDB} over the database of the `dbName` asked. */
+  /** An {@link IdbDeviceDB} over the database of the `dbName` asked, where the device keeps the lease every tab of the origin shares. */
   readonly deviceDB:        IdbDeviceDB
   /** `zxcvbnStrengthChecker`. */
   readonly strengthChecker: StrengthChecker

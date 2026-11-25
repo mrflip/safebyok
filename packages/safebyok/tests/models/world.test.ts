@@ -1,15 +1,20 @@
 /** The world: the Things `world.makeThing` makes of each record, the bank, main gate and bank stamp it finds in its VaultMinder, and its snapshot. */
 
+import { noop } from 'es-toolkit'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { Consts } from 'safebyok-big/internals'
+import { Clock, Consts } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
 import { Box } from '../../src/models/box'
 import type { Device } from '../../src/models/device'
 import { Gate } from '../../src/models/gate'
-import { type BadNews, type WorldSnapshot, PendingWorld, bankStageVals } from '../../src/shapes/shapes-bankish'
+import * as Throwers from '../../src/refusals/throwers'
+import { Lifeseq } from '../../src/shapes/primitives'
+import { type BadNews, type DeviceOpts, type WorldSnapshot, PendingWorld, bankStageVals } from '../../src/shapes/shapes-bankish'
+import type { LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import type { SeenThing } from '../../src/shapes/shapes-vault-event'
 import { readAtOf, readTcNow } from '../../src/storage/agerank'
+import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as TH from '../test-helpers'
 
@@ -325,6 +330,16 @@ describe("a world's janitor", () => {
     expect([world.isLocked, world.getSnapshot().stage]).to.deep.equal([true, 'locked'])
   })
 
+  it("locks a world unlocked while disconnected once the lease has ended", async () => {
+    const { bank, device } = await TH.buildBornBank({ device: TH.makeDevice({}, { autolockMinutes: 25, janitorMinutes: 10 }) })
+    device.disconnect()
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await vi.advanceTimersByTimeAsync(20 * Consts.MinuteMillis)
+    expect(device.world.isLocked).to.be.false
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
+    expect(device.world.isLocked).to.be.true
+  })
+
   it("re-reads the roots at the first tick after the gate goes stale", async () => {
     setClockPastEveryReadTc()
     const vaultDB = new MemoryVaultDB()
@@ -352,7 +367,7 @@ describe("a world's janitor", () => {
     expect(world.getSnapshot().stage).to.eq('unlocked')
   })
 
-  it("stops on disconnect, and starts again on connect", async () => {
+  it("re-reads no stale gate while disconnected, and does again once connected", async () => {
     setClockPastEveryReadTc()
     const vaultDB = new MemoryVaultDB()
     const tryGetWorld = vi.spyOn(vaultDB, 'tryGetWorld')
@@ -366,13 +381,30 @@ describe("a world's janitor", () => {
     expect(tryGetWorld.mock.calls.length - asked).to.be.at.least(1)
   })
 
-  it("does not start until the device signs in", async () => {
+  it("starts the watch at its next tick, where it threw as it started", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const onBadNews = vi.fn()
+    vi.spyOn(vaultDB, 'watch').mockImplementationOnce(() => { throw new Error('the socket is down') })
+    const { device: { world } } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, onBadNews, janitorMinutes: 10 }) })
+    expect([world.demandVaultMinder().isWatching, onBadNews.mock.calls.length]).to.deep.equal([false, 1])
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
+    expect([world.demandVaultMinder().isWatching, onBadNews.mock.calls.length]).to.deep.equal([true, 1])
+  })
+
+  it("starts no watch while disconnected", async () => {
+    const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { janitorMinutes: 10 }) })
+    device.disconnect()
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
+    expect(device.world.demandVaultMinder().isWatching).to.be.false
+  })
+
+  it("runs from sign-in, and through a disconnect", async () => {
     const device = TH.makeDevice({ userid: null })
     const before = vi.getTimerCount()
     await device.signin(TH.WorldScope.userid)
     expect(vi.getTimerCount() - before).to.eq(1)
     device.disconnect()
-    expect(vi.getTimerCount() - before).to.eq(0)
+    expect(vi.getTimerCount() - before).to.eq(1)
   })
 
   it("stops for good once the device is disabled", async () => {
@@ -382,5 +414,209 @@ describe("a world's janitor", () => {
     device.disable()
     device.connect()
     expect(vi.getTimerCount() - before).to.eq(0)
+  })
+
+  it("does not start on a device disabled before it signs in", async () => {
+    const device = TH.makeDevice({ userid: null })
+    const before = vi.getTimerCount()
+    device.disable()
+    await device.signin(TH.WorldScope.userid)
+    expect(vi.getTimerCount() - before).to.eq(0)
+  })
+})
+
+/** Two tabs of one browser: a bank born unlocked in the first, over a vaultDB and a deviceDB the second shares, which has signed in. */
+interface TwoTabs {
+  first:    TH.BornBank
+  second:   Device
+  deviceDB: MemoryDeviceDB
+  vaultDB:  MemoryVaultDB
+}
+
+/** {@link TwoTabs}, each device made with `opts` too, once the second's world has done what its sign-in started. */
+async function twoTabs(opts: Partial<DeviceOpts> = {}): Promise<TwoTabs> {
+  const [vaultDB, deviceDB] = [new MemoryVaultDB(), new MemoryDeviceDB()]
+  const first  = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, deviceDB, ...opts }) })
+  const second = TH.makeDevice({}, { vaultDB, deviceDB, ...opts })
+  await second.signin(TH.WorldScope.userid)
+  await settle()
+  return { first, second, deviceDB, vaultDB }
+}
+
+/** Let what is under way finish: every promise settled, every timer due now run. */
+async function settle(): Promise<void> { await vi.advanceTimersByTimeAsync(0) }
+
+/** The lease record `deviceDB` stores for {@link TH.WorldScope}'s main gate. */
+async function storedLeaseOf(deviceDB: MemoryDeviceDB): Promise<LeaseRecord | null> { return await deviceDB.peekLease(TH.WorldLeaseScope) }
+
+/** A device of another browser over `vaultDB`, its own deviceDB, unlocked, whose passphrase it then replaces: a gate change the tabs of `vaultDB` hear of. */
+async function changeGateElsewhere(vaultDB: MemoryVaultDB): Promise<void> {
+  const elsewhere = TH.makeDevice({}, { vaultDB })
+  await elsewhere.signin(TH.WorldScope.userid)
+  const gate = elsewhere.world.gate!
+  await gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'a different passphrase, just as long' })
+  await settle()
+}
+
+describe("a lease shared by the tabs of one deviceDB", () => {
+  it("unlocks a tab as it signs in under the lease another tab stowed, as a page reload does", async () => {
+    const { first, second } = await twoTabs()
+    expect(second.world.getSnapshot().stage).to.eq('unlocked')
+    expect(second.world.leaseLoggable).to.deep.equal(first.device.world.leaseLoggable)
+    expect(second.world.leaseEndsAt).to.eq(first.device.world.leaseEndsAt)
+  })
+
+  it("unlocks a tab from its root shelf before the vaultDB answers", async () => {
+    const [vaultDB, deviceDB, rootShelf] = [new MemoryVaultDB(), new MemoryDeviceDB(), new TH.MemoryShelf()]
+    await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, deviceDB, rootShelf }) })
+    vi.spyOn(vaultDB, 'tryGetWorld').mockReturnValue(new Promise(noop))
+    const reloaded = TH.makeDevice({}, { vaultDB, deviceDB, rootShelf })
+    await settle()
+    expect(reloaded.world.getSnapshot().stage).to.eq('unlocked')
+  })
+
+  it("follows an unlock in one tab to the other, resuming a call waiting there", async () => {
+    const { first, second } = await twoTabs()
+    first.bank.lock()
+    await settle()
+    const ensuring = second.world.ensureUnlocked()
+    await first.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    expect(await ensuring).to.equal(second.world)
+    expect(second.world.getSnapshot()).to.include({ stage: 'unlocked', isUnlockWanted: false })
+  })
+
+  it("locks every tab at a lock in one, leaving the lease's tombstone stored", async () => {
+    const { first, second, deviceDB } = await twoTabs()
+    second.lock()
+    await settle()
+    expect([first.device.world.isLocked, second.world.isLocked]).to.deep.equal([true, true])
+    expect(await storedLeaseOf(deviceDB)).to.include({ am: 'x', lifeseq: Lifeseq.ofLifenum(1) })
+  })
+
+  it("takes up a renewal made in another tab, ending when it ends", async () => {
+    const { first, second } = await twoTabs()
+    vi.setSystemTime(TH.T0 + Consts.MinuteMillis)
+    await first.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await settle()
+    expect(second.world.leaseEndsAt).to.eq(TH.T0 + Consts.MinuteMillis + second.leaseMillis)
+  })
+
+  it("starts the next life at an unlock after a lock in any tab, which every tab takes up", async () => {
+    const { first, second, deviceDB } = await twoTabs()
+    second.lock()
+    await settle()
+    await first.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await settle()
+    expect(await storedLeaseOf(deviceDB)).to.include({ am: 'a', lifeseq: Lifeseq.ofLifenum(2), born_at: TH.T0 })
+    expect(second.world.isUnlocked).to.be.true
+  })
+
+  it("leaves a tab locked as it signs in where the lease stored has passed its end", async () => {
+    const [vaultDB, deviceDB] = [new MemoryVaultDB(), new MemoryDeviceDB()]
+    const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, deviceDB }) })
+    device.disconnect()
+    vi.setSystemTime(TH.T0 + device.leaseMillis)
+    const later = TH.makeDevice({}, { vaultDB, deviceDB })
+    await later.signin(TH.WorldScope.userid)
+    await settle()
+    expect(later.world.getSnapshot().stage).to.eq('locked')
+  })
+
+  it("keeps its own lease where an older lease record rings", async () => {
+    const onBadNews = vi.fn()
+    const { first, second, deviceDB } = await twoTabs({ onBadNews })
+    vi.setSystemTime(TH.T0 + Consts.MinuteMillis)
+    await first.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await settle()
+    const endsAt = second.world.leaseEndsAt
+    deviceDB._cheat_leases().set(MemoryDeviceDB.ckeyOf(TH.WorldLeaseScope), await TH.liveLeaseRecordOf({ revseq: 0 }))
+    await deviceDB.stowLease(TH.leaseTombstoneOf({ userid: 'u2' }))
+    await settle()
+    expect([first.device.world.leaseEndsAt, second.world.leaseEndsAt]).to.deep.equal([endsAt, endsAt])
+    expect(onBadNews).not.toHaveBeenCalled()
+  })
+
+  it("softlocks the lease in every tab when the gate changes elsewhere, writing the revision once", async () => {
+    const { first, second, deviceDB, vaultDB } = await twoTabs()
+    await changeGateElsewhere(vaultDB)
+    const softlockEnd = Clock.nowMillis() + second.softlockMillis
+    expect([first.device.world.leaseEndsAt, second.world.leaseEndsAt]).to.deep.equal([softlockEnd, softlockEnd])
+    expect([first.device.world.isSoftlocked, second.world.isSoftlocked]).to.deep.equal([true, true])
+    expect(await storedLeaseOf(deviceDB)).to.include({ am: 'a', lifeseq: Lifeseq.ofLifenum(0), revseq: 1, ends_at: softlockEnd })
+  })
+
+  it("leaves the lease's end alone at a gate change where it comes before the softlock's", async () => {
+    const { first, second, deviceDB, vaultDB } = await twoTabs()
+    const nearEnd = first.device.world.leaseEndsAt! - Consts.MinuteMillis
+    vi.setSystemTime(nearEnd)
+    const stow = vi.spyOn(deviceDB, 'stowLease')
+    await changeGateElsewhere(vaultDB)
+    expect(second.world.leaseEndsAt).to.eq(nearEnd + Consts.MinuteMillis)
+    expect(stow).not.toHaveBeenCalled()
+  })
+
+  it("softlocks a lease it takes up that cites an older revision of the gate", async () => {
+    const [vaultDB, deviceDB] = [new MemoryVaultDB(), new MemoryDeviceDB()]
+    const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, deviceDB }) })
+    device.disconnect()
+    await changeGateElsewhere(vaultDB)
+    const later = TH.makeDevice({}, { vaultDB, deviceDB })
+    await later.signin(TH.WorldScope.userid)
+    await settle()
+    expect([later.world.isUnlocked, later.world.leaseEndsAt]).to.deep.equal([true, Clock.nowMillis() + later.softlockMillis])
+  })
+
+  it("drops the lease in a tab that disconnects alone, and takes it up again as it connects", async () => {
+    const { first, second } = await twoTabs()
+    second.disconnect()
+    await settle()
+    expect([first.device.world.isUnlocked, second.world.isUnlocked]).to.deep.equal([true, false])
+    second.connect()
+    await settle()
+    expect(second.world.isUnlocked).to.be.true
+  })
+
+  it("leaves the other tabs unlocked when one is disabled, as a disconnect does", async () => {
+    const { first, second } = await twoTabs()
+    second.disable()
+    await settle()
+    expect([first.device.world.isUnlocked, second.world.isLocked]).to.deep.equal([true, true])
+  })
+
+  it("locks every tab at the janitor's autolock in any one", async () => {
+    const { first, second } = await twoTabs({ autolockMinutes: 25, janitorMinutes: 10 })
+    await vi.advanceTimersByTimeAsync(30 * Consts.MinuteMillis)
+    expect([first.device.world.isLocked, second.world.isLocked]).to.deep.equal([true, true])
+  })
+
+  it("tells onBadNews where the deviceDB refuses a stow, and keeps the lease in the tab", async () => {
+    const onBadNews = vi.fn()
+    const deviceDB = new MemoryDeviceDB()
+    vi.spyOn(deviceDB, 'stowLease').mockRejectedValue(Throwers.deviceDBFailed('stowLease', new Error('the disk is full')))
+    const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { deviceDB, onBadNews }) })
+    await settle()
+    expect(onBadNews.mock.calls.map(([heard]) => (heard as BadNews).news.refusalkind)).to.deep.equal(['storage_unavailable'])
+    expect(device.world.isUnlocked).to.be.true
+  })
+
+  it("tells onBadNews where the deviceDB refuses a peek as it connects, and stays as it was", async () => {
+    const onBadNews = vi.fn()
+    const deviceDB = new MemoryDeviceDB()
+    const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { deviceDB, onBadNews }) })
+    device.disconnect()
+    vi.spyOn(deviceDB, 'peekLease').mockRejectedValue(Throwers.deviceDBFailed('peekLease', new Error('the disk is gone')))
+    device.connect()
+    await settle()
+    expect(onBadNews.mock.calls.map(([heard]) => (heard as BadNews).news.refusalkind)).to.deep.equal(['storage_unavailable'])
+    expect(device.world.isLocked).to.be.true
+  })
+
+  it("keeps each tab's lease its own where the host gives no deviceDB", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB }) })
+    const second = TH.makeDevice({}, { vaultDB })
+    await second.signin(TH.WorldScope.userid)
+    await settle()
+    expect(second.world.getSnapshot().stage).to.eq('locked')
   })
 })

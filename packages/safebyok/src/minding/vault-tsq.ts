@@ -137,8 +137,10 @@ export class VaultTSQ {
 
   // == [Hearing]: connect, disconnect, #isMinded
 
-  // What was missed while not hearing a watching VaultMinder is unknown, so everything kept may be out of date.
-  /** Hear the VaultMinder, and invalidate every item and listing of the bank. A second call does nothing. */
+  // What was missed while not hearing a watching VaultMinder is unknown, so a listing may be out of date. An item is
+  // left be: a listing refetched tells the VaultMinder each child's sparse record, and a box that moved meanwhile goes
+  // cold, which invalidates its item.
+  /** Hear the VaultMinder, and invalidate every listing of the bank. A second call does nothing. */
   connect(): this {
     if (this.#unlisten !== null) { return this }
     // Synchronous on purpose: the VaultMinder tells an answer's records before its verb resolves.
@@ -149,7 +151,7 @@ export class VaultTSQ {
         this.#onBadNews(news)
       },
     })
-    void this.#queryClient.invalidateQueries({ queryKey: VaultTSQ.bankQueryKeyOf(this.#scope) }, { cancelRefetch: false })
+    void this.#queryClient.invalidateQueries({ queryKey: [...VaultTSQ.bankQueryKeyOf(this.#scope), Listkind] }, { cancelRefetch: false })
     return this
   }
 

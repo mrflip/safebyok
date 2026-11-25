@@ -11,7 +11,7 @@ import * as Phrases from './phrases-giver'
 export type GiverBanks<BanklabelT extends string = string> = Readonly<Record<BanklabelT, Readonly<{ vaultDB: VaultDB }>>>
 
 /** A giver's config: its one bank and where that is stored, and the options of each device it makes. */
-export type GiverConfig<BanklabelT extends string = string> = Readonly<{ banks: GiverBanks<BanklabelT> }> & Readonly<Omit<DeviceOpts, 'vaultDB' | 'deviceDB'>>
+export type GiverConfig<BanklabelT extends string = string> = Readonly<{ banks: GiverBanks<BanklabelT> }> & Readonly<Omit<DeviceOpts, 'vaultDB'>>
 
 // The rest would configure the vault TSQ's own query while a hook observes it: its key, fetch, staleness, cache time, retries,
 // structural sharing, initial data or persister.

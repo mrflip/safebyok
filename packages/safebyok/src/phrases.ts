@@ -1,9 +1,12 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, RootShelfExpected, ThingSoonestBare, WorldExpected, ThingExpected, BegunOfOtherKind, WayinExpected, WayinKeyExpected, WayinOfOtherHeader
+// == [Models]: VaultDBExpected, DeviceDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, RootShelfExpected, ThingSoonestBare, WorldExpected, ThingExpected, BegunOfOtherKind, WayinExpected, WayinKeyExpected, WayinOfOtherHeader
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
+
+/** A deviceDB that lacks one of its verbs. */
+export const DeviceDBExpected = 'Expected a DeviceDB: an object with a function for each of peekLease, stowLease and listen.'
 
 /** What a vault TSQ is made with that lacks one of a VaultMinder's members. */
 export const VaultMinderExpected = 'Expected a VaultMinder: an object with a function for each of its verbs, listen, receive, thingAt, connect and disconnect.'
@@ -99,7 +102,7 @@ export const LifepathDepth = "A Thing's lifepath has one lifeseq for each segmen
 export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tombstone (am: 'x')."
 
 /** A lease record whose lifepath is more than its lifeseq. */
-export const LeaseLifepathOwn = "A lease record's lifepath is its lifeseq alone: no life is above a lease's own."
+export const LeaseLifepathOwn = "A lease record's lifepath is `0000000000/` and its own lifeseq: no life is above a lease's own."
 
 /** A lease record whose labelpath is not `lease/` and one label. */
 export const LeaseLabelpathShape = "A lease's labelpath is `lease/` and the label of its gate, such as `lease/gate`."

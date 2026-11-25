@@ -4,7 +4,7 @@ import { Consts, Crypto, Errors, GX, Phrases } from 'safebyok-big/internals'
 import { BaseBox } from '../../src/models/base-box'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
 import type { ProvingDevice } from '../../src/shapes/shapes-gateish'
-import type { StampedGate } from '../../src/shapes/shapes-stamps'
+import { type StampedGate, leaseLifepathOf } from '../../src/shapes/shapes-stamps'
 import type { GateRecord } from '../../src/shapes/shapes-thing'
 import type { WayinHeader, WayinRecord } from '../../src/shapes/shapes-wayin'
 import { Wayin } from '../../src/models/wayin'
@@ -706,7 +706,7 @@ describe("proving.buildLease(gate, cited, followed)", () => {
     vi.setSystemTime(TH.T0 + 5)
     const lease = await proving.buildLease(TH.fakeLeaseGateOf(), TH.WorldGate, TH.leaseShellOf())
     expect(lease).to.include({
-      labelpath: 'lease/gate', label: 'gate', am: 'a', lifeseq: Lifeseq.ofLifenum(0), lifepath: Lifeseq.ofLifenum(0), revseq: 0,
+      labelpath: 'lease/gate', label: 'gate', am: 'a', lifeseq: Lifeseq.ofLifenum(0), lifepath: leaseLifepathOf(Lifeseq.ofLifenum(0)), revseq: 0,
       born_at: TH.T0 + 5, written_at: TH.T0 + 5, proved_at: TH.T0 + 5, ends_at: TH.T0 + 5 + TH.FakeLeaseMillis,
     })
   })
@@ -724,7 +724,7 @@ describe("proving.buildLease(gate, cited, followed)", () => {
     const { proving } = await novelWithWayin()
     vi.setSystemTime(TH.T0 + 5)
     const lease = await proving.buildLease(TH.fakeLeaseGateOf(), TH.WorldGate, TH.leaseTombstoneOf({ lifenum: 3, revseq: 4 }))
-    expect(lease).to.include({ lifeseq: Lifeseq.ofLifenum(4), lifepath: Lifeseq.ofLifenum(4), revseq: 5, born_at: TH.T0 + 5 })
+    expect(lease).to.include({ lifeseq: Lifeseq.ofLifenum(4), lifepath: leaseLifepathOf(Lifeseq.ofLifenum(4)), revseq: 5, born_at: TH.T0 + 5 })
   })
 
   it("ends at the latest time a record takes, for a gate whose leases last forever", async () => {
