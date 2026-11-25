@@ -230,7 +230,8 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
    * It makes a device at its mount, and signs in on it the first userid it is handed, for the life of this mount. A null or undefined userid changes nothing.
    * Under it, a hook never shows a device whose userid is not the prop's: it shows `starting` instead. Until its effects run,
    * as in a server render, a hook shows `starting` for a userid and `signed_out` for none.
-   * The calls that are not hooks act on the device of the provider mounted, and refuse once it unmounts. Unmounting ends nothing.
+   * The calls that are not hooks act on the device of the provider mounted, and refuse once it unmounts.
+   * While mounted, its device watches the vaultDB; unmounting locks the bank and stops the watch, and ends nothing.
    * Mount one at a time: under two mounted at once, those calls act on the one mounted last, until it unmounts.
    * The parts and the kit beneath it use its giver and bank, unless handed their own as props.
    */
@@ -253,6 +254,10 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
       mounted = device
       void device.hello()
       return () => { if (mounted === device) { mounted = null } }
+    }, [device])
+    useEffect(() => {
+      device.connect()
+      return () => { device.disconnect() }
     }, [device])
     useEffect(() => { if (typeof userid === 'string') { signin(userid) } }, [userid])
     const shown = useMemo(() => shownOf(signedIn, userid, device.vaultTsqClient), [signedIn, userid, device])
