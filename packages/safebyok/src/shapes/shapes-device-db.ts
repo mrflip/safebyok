@@ -1,4 +1,4 @@
-/** What a deviceDB's verbs are given beyond a lease row, what its listeners hear, and what an IdbDeviceDB is made with and files a row under. */
+/** What a deviceDB's verbs are given beyond a lease record, what its listeners hear, and what an IdbDeviceDB is made with and files a record under. */
 
 import type * as Z from 'zod'
 import { Validator } from 'safebyok-big/internals'
@@ -8,7 +8,7 @@ import type { Banklabel, Userid } from './primitives'
 
 // == [Listening]: LeaseListener, DeviceDBChecks
 
-/** Called with the scope of a bank whose lease row was stored, in this tab or another. It gets the scope only: peek for the row. */
+/** Called with the scope of a bank whose lease record was stored, in this tab or another. It gets the scope only: peek for the record. */
 export type LeaseListener = (scope: BankScope) => void
 
 /** The check of what `listen` is given. */
@@ -28,7 +28,7 @@ export interface IdbDeviceDBOpts {
 /** The check of an IdbDeviceDB's options, which `browserOpts` takes too. */
 export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_record')
 
-/** Where the lease database files a bank's row. */
+/** Where the lease database files a bank's lease record. */
 export type LeaseScopepath = [userid: Userid, banklabel: Banklabel]
 // --
 

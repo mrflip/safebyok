@@ -2,7 +2,7 @@
 
 import type { UseStore } from 'idb-keyval'
 import { dbprefixOf, inOneStep, rowAt, versionedShelfOf } from 'safebyok-big/storage'
-import type { BankScope, LeaseRow } from '../shapes/shapes-stamps'
+import type { BankScope, LeaseRecord } from '../shapes/shapes-stamps'
 import { type IdbDeviceDBOpts, type LeaseScopepath, idbDeviceDBOpts } from '../shapes/shapes-device-db'
 import { DeviceDB } from './device-db'
 
@@ -21,15 +21,15 @@ function leaseShelfOf(dbName: string | undefined): UseStore {
 /** The name of the IndexedDB database an IdbDeviceDB of `dbName` opens. */
 export function leaseDatabasenameOf(dbName?: string): string { return `${dbprefixOf(dbName)}:lease-v${LeaseDBVersion}` }
 
-/** The name of the BroadcastChannel that tells every tab of the lease rows stored in the database of `dbName`. */
+/** The name of the BroadcastChannel that tells every tab of the lease records stored in the database of `dbName`. */
 export function leaseBellnameOf(dbName?: string): string { return `${dbprefixOf(dbName)}:lease` }
 
-/** Where the lease row of `scope`'s bank is filed. */
+/** Where the lease record of `scope`'s bank is filed. */
 export function scopepathOf({ userid, banklabel }: BankScope): LeaseScopepath { return [userid, banklabel] }
 // --
 
-/** A device database of each bank's lease row, in this browser's IndexedDB, shared by every tab of its origin.
- * A row's leaseKey is stored as its `CryptoKey` handle, by structured clone, and never as bytes (G4).
+/** A device database of each bank's lease record, in this browser's IndexedDB, shared by every tab of its origin.
+ * A live record's leaseKey is stored as its `CryptoKey` handle, by structured clone, and never as bytes (G4).
  */
 export class IdbDeviceDB extends DeviceDB {
   // == [Props]: #shelf, #bellname
@@ -54,10 +54,10 @@ export class IdbDeviceDB extends DeviceDB {
     return await inOneStep(this.#shelf, 'readonly', (store) => rowAt(store, scopepathOf(scope)))
   }
 
-  protected async doStowLease(row: LeaseRow, isReplaced: (raw: unknown) => boolean): Promise<unknown> {
+  protected async doStowLease(record: LeaseRecord, isReplaced: (raw: unknown) => boolean): Promise<unknown> {
     return await inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const before = await rowAt(store, scopepathOf(row))
-      if (isReplaced(before)) { store.put(row, scopepathOf(row)) }
+      const before = await rowAt(store, scopepathOf(record))
+      if (isReplaced(before)) { store.put(record, scopepathOf(record)) }
       return before
     })
   }

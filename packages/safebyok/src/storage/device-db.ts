@@ -1,45 +1,45 @@
-/** The deviceDB, which has the lease row of each bank on this device, shared by every tab. A subclass writes the `do*` calls. */
+/** The deviceDB, which has the lease record of each bank on this device, shared by every tab. A subclass writes the `do*` calls. */
 
 import { Errors, type Helpers } from 'safebyok-big/internals'
 import { BaseThing } from '../models/base-thing'
 import * as Throwers from '../refusals/throwers'
-import { type BankScope, type LeaseRow, StampChecks } from '../shapes/shapes-stamps'
+import { type BankScope, type LeaseRecord, StampChecks } from '../shapes/shapes-stamps'
 import { DeviceDBChecks, type LeaseListener } from '../shapes/shapes-device-db'
 
 // == [The deviceDB]: DeviceDB
 
 /** The base class of a device database: a subclass writes the `do*` calls, each one atomic step.
  * Anything but a refusal that a subclass throws reaches the caller as `storage_unavailable`, with nothing of the throw but its `name`,
- * since what it threw may quote a lease row (G8).
+ * since what it threw may quote a lease record (G8).
  */
 export abstract class DeviceDB {
   // == [Lease verbs]: peekLease, stowLease, listen
 
-  /** The lease row stored for `scope`'s bank, or null for none. Refuses `damaged_lease` when the row stored fails its checks. */
-  async peekLease(scope: BankScope): Promise<LeaseRow | null> {
+  /** The lease record stored for `scope`'s bank, or null for none. Refuses `damaged_lease` when the record stored fails its checks. */
+  async peekLease(scope: BankScope): Promise<LeaseRecord | null> {
     try {
       const { userid, banklabel } = StampChecks.bankScope.parse(scope)
       const raw = await this.doPeekLease({ userid, banklabel })
-      return (raw === null) ? null : storedRowOf(raw)
+      return (raw === null) ? null : storedLeaseOf(raw)
     } catch (err) { throw refusalOf(err, 'peekLease') }
   }
 
-  /** Stow `row` for its bank if it is newer than the row stored there, and answer the row stored afterward.
-   * - Newer means a later life, or a later revision of the same life: a row of the same life and revision is not newer, and is not stored.
-   * - A row stored that fails its checks is replaced by any row.
-   * - Every listener of this database, in this tab or another, hears of each row stored.
+  /** Stow `record` for its bank if it is newer than the lease record stored there, and answer the record stored afterward.
+   * - Newer means a later life, or a later revision of the same life: a record of the same life and revision is not newer, and is not stored.
+   * - A record stored that fails its checks is replaced by any record.
+   * - Every listener of this database, in this tab or another, hears of each record stored.
    */
-  async stowLease(row: LeaseRow): Promise<LeaseRow> {
+  async stowLease(record: LeaseRecord): Promise<LeaseRecord> {
     try {
-      const leaseRow = StampChecks.leaseRow.parse(row)
-      const before   = await this.doStowLease(leaseRow, (raw) => isReplaced(raw, leaseRow))
-      if (! isReplaced(before, leaseRow)) { return storedRowOf(before) }
-      this.doRing({ userid: leaseRow.userid, banklabel: leaseRow.banklabel })
-      return leaseRow
+      const lease  = StampChecks.leaseRecord.parse(record)
+      const before = await this.doStowLease(lease, (raw) => isReplaced(raw, lease))
+      if (! isReplaced(before, lease)) { return storedLeaseOf(before) }
+      this.doRing({ userid: lease.userid, banklabel: lease.banklabel })
+      return lease
     } catch (err) { throw refusalOf(err, 'stowLease') }
   }
 
-  /** Call `listener` with the bank's scope each time a lease row is stored in this database, by this tab or another; answers a function that stops it.
+  /** Call `listener` with the bank's scope each time a lease record is stored in this database, by this tab or another; answers a function that stops it.
    * It is called later, never inside the stow. A message on the bell that is not a bank's scope is not passed on.
    */
   listen(listener: LeaseListener): () => void {
@@ -56,11 +56,11 @@ export abstract class DeviceDB {
   // == [Protected, for a subclass to write]: doPeekLease, doStowLease, doRing, doListen
 
   // A device database must start each call's work in the order of the calls: otherwise a `peekLease` made after a
-  // `stowLease` may miss the row it stored.
-  /** The row stored at this bank scope, unchecked, or null. */
+  // `stowLease` may miss the record it stored.
+  /** The lease record stored at this bank scope, unchecked, or null. */
   protected abstract doPeekLease(scope: BankScope): Helpers.Awaitable<unknown>
-  /** In one step: read the row stored at `row`'s bank scope, and put `row` there when `isReplaced` holds of what was read. Answer what was read, or null. */
-  protected abstract doStowLease(row: LeaseRow, isReplaced: (raw: unknown) => boolean): Helpers.Awaitable<unknown>
+  /** In one step: read the lease record stored at `record`'s bank scope, and put `record` there when `isReplaced` holds of what was read. Answer what was read, or null. */
+  protected abstract doStowLease(record: LeaseRecord, isReplaced: (raw: unknown) => boolean): Helpers.Awaitable<unknown>
   /** Ring the bell for `scope`: call every listener of this database, in each tab, with it, each later than now. */
   protected abstract doRing(scope: BankScope): void
   /** Call `hear` with each scope the bell rings for until the function answered is called. */
@@ -69,20 +69,20 @@ export abstract class DeviceDB {
 }
 // --
 
-// == [Helpers]: storedRowOf, isReplaced, refusalOf
+// == [Helpers]: storedLeaseOf, isReplaced, refusalOf
 
-/** The lease row `raw` as checked; refuses `damaged_lease` when it fails its checks. */
-function storedRowOf(raw: unknown): LeaseRow {
-  const storedReport = StampChecks.leaseRow.safeParse(raw)
+/** The lease record `raw` as checked; refuses `damaged_lease` when it fails its checks. */
+function storedLeaseOf(raw: unknown): LeaseRecord {
+  const storedReport = StampChecks.leaseRecord.safeParse(raw)
   if (! storedReport.success) { throw Throwers.damagedLease() }
   return storedReport.data
 }
 
-/** True when `row` replaces `raw`, the row stored: none is stored, it fails its checks, or `row` is newer by life and revision. */
-function isReplaced(raw: unknown, row: LeaseRow): boolean {
+/** True when `record` replaces `raw`, the lease record stored: none is stored, it fails its checks, or `record` is newer by life and revision. */
+function isReplaced(raw: unknown, record: LeaseRecord): boolean {
   if (raw === null) { return true }
-  const storedReport = StampChecks.leaseRow.safeParse(raw)
-  return (! storedReport.success) || (BaseThing.cmp(storedReport.data, row) > 0)
+  const storedReport = StampChecks.leaseRecord.safeParse(raw)
+  return (! storedReport.success) || (BaseThing.cmp(storedReport.data, record) > 0)
 }
 
 /** The refusal for a verb's throw: a refusal as it is, anything else as `storage_unavailable`, with nothing of it but its `name`. */

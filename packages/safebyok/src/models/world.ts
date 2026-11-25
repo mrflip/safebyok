@@ -6,7 +6,7 @@ import { Box } from './box'
 import { Device } from './device'
 import { Gate } from './gate'
 import { BirthGating } from './gating'
-import type { Lease } from './lease'
+import { Lease } from './lease'
 import type { Proving } from './proving'
 import { bulletproofHandlerOf } from '../helpers/bulletproof'
 import type { BankStage, HostedVault, RefusalSnapshot, RootShelf, ThingMakeOpts, WorldOpts, WorldSnapshot } from '../shapes/shapes-bankish'
@@ -212,8 +212,8 @@ export class World {
   /** This world's lease verbs, for a birth's gating to call. */
   #birthFriend(): BirthGatingFriend {
     return {
-      // A birth's lease is born when proved.
-      leaseByProving: (proving: Proving, bankStamp: BankStamp, cited: GateRevisionedStamp) => proving.buildLease(this.#leaseGateOf(bankStamp), cited, null),
+      // A birth's lease follows the shell, so it is born in its first life when proved.
+      leaseByProving: (proving: Proving, bankStamp: BankStamp, cited: GateRevisionedStamp) => proving.buildLease(this.#leaseGateOf(bankStamp), cited, Lease.shellOf(cited)),
       attachLease:    (lease: Lease) => { this.#attachLease(lease) },
     }
   }
@@ -260,7 +260,7 @@ export class World {
   #gateFriend(): WorldGateFriend {
     return {
       leaseGateOf: (bankStamp: BankStamp) => this.#leaseGateOf(bankStamp),
-      renewal:     () => ((this.#lease === null) ? null : { born_at: this.#lease.born_at }),
+      renewal:     () => this.#lease,
       attachLease: (lease: Lease) => { this.#attachLease(lease) },
     }
   }
@@ -597,6 +597,9 @@ class WorldLeaseGate implements LeaseGate {
     this.#world    = world
     Object.freeze(this)
   }
+
+  /** How long a lease granted in the world lasts: its device's `leaseMillis`. */
+  get leaseMillis(): number { return this.#world.device.leaseMillis }
 
   /** True until the world's device ends. */
   get isEnabled(): boolean { return this.#world.isEnabled }

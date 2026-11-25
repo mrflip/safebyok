@@ -51,20 +51,20 @@ describe("IdbDeviceDB's options", () => {
 })
 
 describe("IdbDeviceDB's database and bell", () => {
-  it("peeks a row stowed on another connection, as after a reload", async () => {
+  it("peeks a lease stowed on another connection, as after a reload", async () => {
     const deviceDB = makeIdbDeviceDB()
-    const row      = await TH.liveLeaseRowOf()
-    await deviceDB.stowLease(row)
-    expect(await makeTwin(deviceDB).peekLease(TH.WorldScope)).to.have.property('revtok', row.revtok)
+    const lease    = await TH.liveLeaseRecordOf()
+    await deviceDB.stowLease(lease)
+    expect(await makeTwin(deviceDB).peekLease(TH.WorldScope)).to.have.property('revtok', lease.revtok)
   })
 
-  it("parts each dbName's rows and bell from another's", async () => {
+  it("parts each dbName's leases and bell from another's", async () => {
     const deviceDB = makeIdbDeviceDB()
     const other    = makeIdbDeviceDB()
     const heard: string[] = []
     other.listen(({ banklabel }) => { heard.push(`other:${banklabel}`) })
     deviceDB.listen(({ banklabel }) => { heard.push(banklabel) })
-    await deviceDB.stowLease(await TH.liveLeaseRowOf())
+    await deviceDB.stowLease(await TH.liveLeaseRecordOf())
     await TH.eventually(() => heard.length > 0)
     await TH.aWhile()
     expect(heard).to.deep.equal([TH.WorldScope.banklabel])
