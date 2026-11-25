@@ -56,7 +56,7 @@ class MemoryShelf implements RootShelf {
 
 /** A signed-in device of `userid`, over the fixture's vaultDB, keeping its roots on `rootShelf` where given. */
 async function signedInDevice(userid: string, rootShelf?: RootShelf): Promise<Device> {
-  const device = Device.make({ banklabel: Banklabel, device_tok: globalThis.crypto.randomUUID() }, {
+  const device = Device.make({ banklabel: Banklabel }, {
     vaultDB, keyDeriver: dojoDeriver, strengthChecker: zxcvbnStrengthChecker, ...(rootShelf && { rootShelf }),
   })
   await device.hello()

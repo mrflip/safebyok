@@ -10,7 +10,7 @@ import { switchableChecker } from '../../src/lib/switchable-checker'
 
 /** A device of the app's settings with `userid` signed in, its sign-in answered. */
 async function signedInDevice(userid: string): Promise<Device> {
-  const device = Device.make({ banklabel: Banklabel, device_tok: globalThis.crypto.randomUUID() }, {
+  const device = Device.make({ banklabel: Banklabel }, {
     vaultDB: new IdbVaultDB({ dbName: DojoDBName }), keyDeriver: dojoDeriver, strengthChecker: switchableChecker,
   })
   await device.hello()
