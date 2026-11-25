@@ -175,7 +175,7 @@ export interface DeviceOpts {
   rootShelf?:        RootShelf | undefined
   /** Where the device keeps the signed-in bank's lease, which every tab given the same one shares, and which outlasts a page load: `browserOpts()` from `safebyok/browser` hands an `IdbDeviceDB`. Default: one in the device's memory, so this tab's lease is its own and ends with the page. It keeps this device's devicetok for each bank too. */
   deviceDB?:         DeviceDB | undefined
-  /** The token each wayin this device builds records, a UUID, visible in storage. Default: the one the deviceDB keeps for the signed-in user's bank, made at its first use. Make it at random: one derived from anything about the device would link records the vault does not link. */
+  /** The token each wayin this device builds records, a UUID, visible in storage. Default: the one the deviceDB keeps for the signed-in user's bank, made at its first use. Make it at random, and another for each user: one shared by users, or derived from anything about the device, would link records the vault does not link. */
   devicetok?:        Devicetok | undefined
 }
 // --
