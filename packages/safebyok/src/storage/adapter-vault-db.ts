@@ -258,8 +258,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doStats(ask: StatsAsk): Helpers.Awaitable<StatsActual>
   /** Start watching the datastore: call `receive` with each changed Thing, one at a time ({@link Received}), and `onBadNews` with any trouble,
    * whether or not it ends the watch. Return a function that stops it. Left unwritten, for a datastore with no watch, it calls neither.
-   * Where the watch ends before its stop is called, call `onEnded` once, then `onBadNews` with why ({@link VaultDB.watch}).
+   * Where the watch ends before its stop is called, call `onEnded` once, then `onBadNews` with why ({@link VaultDB.watch}). A watch that never ends itself may leave `onEnded` out.
    */
-  protected doWatch(_scope: ThingWatchScope, _receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void, _onEnded: () => void): () => void { return noop }
+  protected doWatch(_scope: ThingWatchScope, _receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void, _onEnded?: () => void): () => void { return noop }
   // --
 }
