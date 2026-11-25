@@ -374,4 +374,13 @@ describe("a world's janitor", () => {
     device.disconnect()
     expect(vi.getTimerCount() - before).to.eq(0)
   })
+
+  it("stops for good once the device is disabled", async () => {
+    const device = TH.makeDevice({ userid: null })
+    const before = vi.getTimerCount()
+    await device.signin(TH.WorldScope.userid)
+    device.disable()
+    device.connect()
+    expect(vi.getTimerCount() - before).to.eq(0)
+  })
 })
