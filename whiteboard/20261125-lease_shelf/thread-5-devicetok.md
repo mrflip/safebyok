@@ -1,6 +1,6 @@
 # Thread 5: devicetok (2026-11-25)
 
-Branch `20261125-devicetok`, PR #910, stacked on #909. Proved: safebyok 2176 tests, safebyok-react-lean 339,
+Branch `20261125-devicetok`, PR #910, stacked on #909. Proved: safebyok 2177 tests, safebyok-react-lean 339,
 safebyok-big 2951, dojo 111, each typechecked and linted; `pnpm justify` after the catch-up (see the PR's **Tests:**).
 
 * **Built**:
