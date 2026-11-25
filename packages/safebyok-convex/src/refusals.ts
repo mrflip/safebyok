@@ -21,6 +21,10 @@ export const safebyokRefusal = DB.Checker(({ discrim, obj, lit, str }) => discri
   obj({ kind: lit('bad_record'), message: str }),
 ]), 'unexpected_error')
 
+// The kinds are written three times, in the list, the type and the checker; these tie each to the next.
+true satisfies DB.AssertEqual<SafebyokErrorkind, SafebyokRefusal['kind']>
+true satisfies DB.AssertEqual<SafebyokRefusal, DB.CheckerInput<typeof safebyokRefusal>>
+
 /** True when `val`, a `ConvexError`'s `data`, is a {@link SafebyokRefusal}. */
 export function isSafebyokRefusal(val: unknown): val is SafebyokRefusal {
   return safebyokRefusal.safeParse(val).success
