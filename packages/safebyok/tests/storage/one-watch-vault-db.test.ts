@@ -216,6 +216,18 @@ describe("OneWatchVaultDB", () => {
     })
   })
 
+  const WatchnameCases = [
+    [{ userid: "u1",           banklabel: "notes" },     "safebyok/u1/notes/bank",                'a plain userid and banklabel'],
+    [{ userid: "a:b@x.com",    banklabel: "notes" },     "safebyok/a:b@x.com/notes/bank",         'a userid may hold a colon and an at sign'],
+    [{ userid: "a",            banklabel: "b_notes" },   "safebyok/a/b_notes/bank",               'a banklabel may hold an underbar'],
+  ] as const
+
+  describe("watchnameOf(scope)", () => {
+    for (const [scope, expected, blurb] of WatchnameCases) {
+      it(blurb, () => { expect(watchnameOf(scope)).to.eq(expected) })
+    }
+  })
+
   it("answers each other verb from the wrapped vaultDB", async () => {
     const wrapper = oneWatchVaultDB(memory)
     await TH.expectGood(wrapper.tryWriteThing(TH.birthAskOf()))

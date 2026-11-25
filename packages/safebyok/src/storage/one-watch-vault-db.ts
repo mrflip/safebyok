@@ -13,8 +13,9 @@ import type { VaultDB } from './vault-db'
 
 // == [Names]: watchnameOf, lockManagerOf
 
-/** The name of the Web Lock, and of the BroadcastChannel, of the watch of the bank at `scope`. */
-export function watchnameOf({ userid, banklabel }: ThingWatchScope): string { return `safebyok:watch:${JSON.stringify([userid, banklabel])}` }
+// A userid and a banklabel never hold a `/`, so the name reads back into its parts.
+/** The name of the Web Lock, and of the BroadcastChannel, of the watch of the bank at `scope`: safebyok's, then the userid, the banklabel and the bank's labelpath. */
+export function watchnameOf({ userid, banklabel }: ThingWatchScope): string { return `safebyok/${userid}/${banklabel}/bank` }
 
 /** This page's Web Locks manager, or undefined where the platform has none */
 function lockManagerOf(): LockManager | undefined {
