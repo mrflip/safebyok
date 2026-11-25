@@ -17,6 +17,10 @@ export default defineConfig({
   platform:   'neutral',
   target:     'es2022',
   dts:        true,
+  // A checker's declared type (`safebyokRefusal`) refers to zod's types, through safebyok's validators. zod is a
+  // peer dependency of safebyok, so any host that has the core already has it: keep it external, like safebyok.
+  // Bundled, the declarations would carry a copy of zod's, and a clean install fails on its CommonJS .d.cts.
+  deps:       { neverBundle: [/^zod(\/|$)/] },
   sourcemap:  true,
   clean:      true,
   publint:    { level: 'warning' },
