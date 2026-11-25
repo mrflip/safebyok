@@ -83,5 +83,20 @@ Built by hand (no /sprint), from the orchestrator's brief. The last thread of th
   revision or the same revision a chunk later; "adopts an older whole record after a newer soon" answers `true` where
   it returned `['item', 'aged']` (the events are now pinned at the car).
 
+* **After review** (thread-reviewer, opus, `high`, with a sonnet style pass; no behaviour defect found; the feed table
+  diffed byte for byte against main, 190 rows identical; V4's makers return what each site built):
+  * The reviewer fixed stale comments (the minder's class doc, `carAt`, the device's sign-in comment) and a banner.
+  * **Its significant finding, fixed by the orchestrator**: step 3 had the Thing tell its subscribers before the car
+    moved, where main told them "once the news is taken in". `Thing.receive` is now `take` (adopt, tell no one) then
+    `publish`; the car calls `take`, moves, then `publish`. `ReceivingThing` gains `take` and `publish`. A record the
+    Thing refuses still leaves the car as it was. One test pins a subscriber finding the car moved.
+  * **Found while testing that, older than this thread** (thread 30): `ThingCar.make(thing)` of a Thing holding its
+    shell made a second Thing, since such a Thing passes `isVoidSentinel`. No production caller hands a car a Thing;
+    the test compared by value. `isShell` now asks first that it is no Thing, and the test compares by identity.
+  * VOCABULARY.md's **car**, **agerank**, **citable** and **soon** say the car keeps them.
+  * Left: `ThingCar.receive`'s long doc block (a documentarian pass); four harness helpers defined in both
+    `thing.test.ts` and `thing-car.test.ts`; `revisionAfter` and `itemEventOf` tested only through callers; a car made
+    of a Thing holding a record dates its row at epoch 0 (no production caller).
+
 * **For the Coach**:
   * **Root voids at signin (blocking step 3)**: recommend (C), the device aligning its world once the roots answer.
