@@ -3,7 +3,7 @@
 Mode: **YOLO**. Issued by the Coach, 2026-11-25. Cap: 3 threads at once.
 Default levels: review `medium`; worker `opus` (thread-worker), reviewer `opus` for threads touching what
 `notes/guarantees-big.md` covers (lease, keys), else its `sonnet` pin; style pass on `style-reviewer`'s pin.
-Status: 0, 1c, 1a filed and out of draft (#900, #902, #903); 2 stats (#905) reviewed (fixed), in rework for the quota floor; 4 probe (#906) in review; 1d lease_thing building; 1b waits on 1d; Closer Look done (doc tab), awaiting triage.
+Status: 0, 1c, 1a filed and out of draft (#900, #902, #903); 2 stats (#905) reviewed (fixed), in rework for the quota floor; 4 probe (#906) reviewed (flagged), in rework; 1d lease_thing building; 8 janitor building; 1b waits on 1d; Closer Look done (doc tab), awaiting triage.
 
 Sprint doc: https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh (Open Matters bookmark rev 3).
 
@@ -103,7 +103,7 @@ Gloss: a vaultDB verb (`AdapterVaultDB` `doStats`; MemoryVaultDB, `IdbVaultDB`, 
 on the Vault. `box` and `gate` each `{ count, live_count, size }`: `count` is rows stored, live and tombstones;
 `live_count` the live ones; `size` their summed record weight in bytes. `max` is `{ count, size }`, the store's
 limits, never `Infinity`: where a store has none, both are `19_006_492_568` (a named constant). No enforcement.
-*Coach (2026-11-25), on a store limit of 0:* "continuing to operate with a limit of 0 is surprising behavior. In the notes/sizings file, take the size of a single medium box, plus the world record, add 50% again and round up to the nearest 1000 bytes. A quota less than 2 or that size should refuse at start." *Orchestrator (YOLO calls):* the floor is 5,000 bytes (medium box 1,087 + gate 1,029 + root box 566 from `notes/reference-sizes.md`, which sizes no bank record; ×1.5, rounded up); a quota below twice that, 10,000, refuses `storage_blocked` when IdbVaultDB first opens its database. A rework after the review.
+*Coach (2026-11-25), on a store limit of 0:* "continuing to operate with a limit of 0 is surprising behavior. In the notes/sizings file, take the size of a single medium box, plus the world record, add 50% again and round up to the nearest 1000 bytes. A quota less than 2 or that size should refuse at start." *Orchestrator (YOLO calls):* the floor is 5,000 bytes (medium box 1,087 + gate 1,029 + root box 566 from `notes/reference-sizes.md`, which sizes no bank record; ×1.5, rounded up); a quota below twice that, 10,000, refuses `storage_blocked` when IdbVaultDB first opens its database. A rework after the review. *Coach, correcting that reading:* "less than 2 or that size -- meaning, you must allow two boxes and 5000 bytes or we can't help you." Amended on #905: the floor is two boxes and 5,000 bytes, in the store-limit shape and at IdbVaultDB's open.
 *Review:* `medium` on opus, fixed: isVaultMinder's member list (outside the diff, kept), the `stats()` example, `FiledRaw` moved to shapes, a doc block, a chai form. Left (minor): idb-lean `Filed` duplicates `FiledRaw` (Cleanup); `quotaNow` readability (taste); mechanism-walking doc blocks with their `doGetWorld` siblings (documentarian). Depends on 0 only (storage verbs); cut from 0 when capacity frees. Size: medium, three adapters.
 
 ### 3. ~~`tidy_gone`~~: dropped
@@ -121,7 +121,8 @@ old). Then it is a vaultDB verb beside `stats`. Depends on 2 (same files).~~
 
 Gloss: port big's `bank.probe()`. On an unlocked vault it puts a probe box, gets it back, unseals and compares it,
 deletes it, and reports each step with its timing. Report types ported from big's `ProbeReport`/`ProbeStep`, adapted
-to labelpaths. Depends on 0. Size: small. Branch `20261125-probe`, PR #906, cut from 1c. Ready; in review (`medium` on opus).
+to labelpaths. Depends on 0. Size: small. Branch `20261125-probe`, PR #906, cut from 1c. Reviewed; in rework.
+*Review:* `medium` on opus, flagged: the get step trusted the minder's newest record, not storage's answer, so storage that dropped the write still passed (carried from big). YOLO rework: check storage's answer; `ProbeAsked` → `ProbeArgs`. Fixed: a doc block (a refused probe leaves its box), `timedStepOf` → `timeStep`, two titles. Left (minor): put timing includes `#donorAt`'s get; generic step message and one thrower for every kind (recorded, with the Coach).
 
 ### 5. `devicetok`: a device token that lasts
 > "add the device_tok generation."
@@ -129,7 +130,7 @@ to labelpaths. Depends on 0. Size: small. Branch `20261125-probe`, PR #906, cut 
 Gloss: today the provider makes `device_tok: crypto.randomUUID()` on every mount, and each wayin records it. The
 device keeps one token in the device database, made once, read at connect or sign-in. *Coach:* "device_tok should
 be devicetok": the field is renamed throughout the new core, stored wayins included. `Device.make`'s record drops it
-(a YOLO decision, recorded). Without a device database, a fresh one per Device. Depends on 1b.
+(a YOLO decision, recorded). Without a device database, a fresh one per Device. *Coach (2026-11-25):* "the host may want to set it, if given one use it": an optional `devicetok` on DeviceOpts wins over the stored or made one. Depends on 1b.
 
 ### 6. `lifecycle`: lifecycle announcements
 > "probe and lifecycle announcements seem reasonable"
@@ -145,6 +146,22 @@ Gloss: a vaultDB wrapper. Each tab asks for a Web Lock; the holder runs the watc
 BroadcastChannel; the others hand them to `vaultMinder.receive`. On taking the lock, the new holder refreshes the
 world. `connect()` asks for the lock, and `disconnect()` releases it. Check first whether Chrome freezes a
 background tab that holds a Web Lock. Depends on 1b (the line's tip). Last.
+
+### 8. `janitor`: the janitor's rulings, and freshness on reconnect
+> "ok you can also have the janitor check watches" · (autolock only while connected) Rec taken: "start the janitor at
+> sign-in, and have it re-read the gate only while connected." · "yes. Add comment there confirming that autolock is a
+> best-effort quota not a hard boundary" · "car and thing can provide a readAt getter" · on items invalidated on
+> reconnect: "doesn't it have every sparse record in its delta? We will later have something trigger the listing, which
+> invalidates only the boxes that need listing. ... Remember how slowly everything changes vs. time from mount to unmount"
+
+Gloss: the janitor starts at sign-in and runs until the device is disabled; while not connected it only locks past the
+lease's end; while connected it also re-reads a stale gate and retries a watch that is not running (a refusal is bad
+news). A `//` comment at the autolock says it is a best-effort time, not a hard boundary. A `readAt` getter on the car
+and the Thing, used by the janitor and root-shelf, so the World no longer decodes `read_tc`. `VaultTSQ.connect`
+invalidates listings and roots, not items (the listing's sparse records already mark a moved item cold through
+VaultMinder). World.connect's doc block says a call after a failed watch retries it. The janitor stays in World, in
+its own section (the Closer Look's E4 is open). Levels: review `medium` on opus. Branch `20261125-janitor`, cut from
+1a's tip. Depends on 1c; beside 1d; 1b builds on both at the restack. Size: medium.
 
 ## For the Coach
 - **safebyok-convex is still on safebyok-big.** Thread 7's wrapper works for any new-core vaultDB. *Coach:* "convex and
