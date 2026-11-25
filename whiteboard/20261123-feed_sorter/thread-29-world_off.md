@@ -1,6 +1,6 @@
 # Thread 29: world_off (2026-11-25)
 
-Branch `20261125-world_off` (the brief named `20261124-world_off`; `cut-thread` cut it under today's date), PR #NNN,
+Branch `20261125-world_off` (the brief named `20261124-world_off`; `cut-thread` cut it under today's date), PR [#895](https://github.com/mrflip/safebyok/pull/895),
 stacked on [#894](https://github.com/mrflip/safebyok/pull/894). Proved: `pnpm justify` green in full, nothing skipped:
 safebyok 1924, react-lean 338, idb-lean 115, postgres 365, dojo 111, knockknock 26, envman 24, e2e 576.
 
