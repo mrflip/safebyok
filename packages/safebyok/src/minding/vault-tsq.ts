@@ -10,7 +10,7 @@ import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetOnceOpts, type ItemQueryOptions, type VaultMutationOptions, type VaultTSQOpts, VaultTSQChecks } from '../shapes/shapes-vault-tsq'
 import type { ReadTc, VaultEvent } from '../shapes/shapes-vault-event'
 import { BaseThing } from '../models/base-thing'
-import type { ReceivingThing } from '../shapes/shapes-vault-minder'
+import type { ThingCar } from './thing-car'
 import type { VaultMinder } from './vault-minder'
 import { readAtOf } from '../storage/agerank'
 import type { Kids } from '../shapes/shapes-answers'
@@ -59,7 +59,7 @@ export class VaultTSQ {
     queryClient.setMutationDefaults(bankHead, BankDefaults)
     queryClient.setQueryDefaults([...bankHead, Itemkind], {
       queryFn:   async ({ queryKey }) => await this.#itemOf(labelpathOfItemKey(queryKey)),
-      staleTime: ({ queryKey }) => ((this.#vaultMinder.thingAt(this.#scopeOf(labelpathOfItemKey(queryKey)))?.agekind === 'here') ? Infinity : 0),
+      staleTime: ({ queryKey }) => ((this.#vaultMinder.carAt(this.#scopeOf(labelpathOfItemKey(queryKey)))?.agekind === 'here') ? Infinity : 0),
     })
     // A listing is kept nowhere but its query, so it stays while no one observes it.
     queryClient.setQueryDefaults([...bankHead, Listkind], {
@@ -107,8 +107,8 @@ export class VaultTSQ {
     const itemScope = this.#parseItemScope(scope)
     const car       = this.#vaultMinder.carAt(itemScope)
     const queryKey  = VaultTSQ.itemQueryKeyOf(itemScope)
-    const seed      = car && itemValOf(car.thing)
-    if ((seed === undefined) || (car === undefined) || (car.thing.agekind === 'vacant')) { return { queryKey } }
+    const seed      = car && itemValOf(car)
+    if ((seed === undefined) || (car === undefined) || (car.agekind === 'vacant')) { return { queryKey } }
     return { queryKey, initialData: seed, initialDataUpdatedAt: readAtOf(car.read_tc) }
   }
 
@@ -259,10 +259,10 @@ function setDataOptionsOf(read_tc: ReadTc | undefined): TSQ.SetDataOptions {
 /** True for the labelpath of a box under the root box: the Things an item is kept for. */
 function isItemLabelpath(labelpath: Labelpath): boolean { return Labelpath.isBox(labelpath) && (labelpath !== Labelpath.RootBox) }
 
-/** The item `thing` stands for: its live record, null for a tombstone or the shell, undefined where no whole record of its newest life is known */
-function itemValOf(thing: ReceivingThing): ThingRecord | null | undefined {
-  if (thing.agekind === 'bare') { return undefined }
-  const record = thing.pickle()
+/** The item `car`'s Thing stands for: its live record, null for a tombstone or the shell, undefined where no whole record of its newest life is known */
+function itemValOf(car: ThingCar): ThingRecord | null | undefined {
+  if (car.agekind === 'bare') { return undefined }
+  const record = car.thing.pickle()
   return BaseThing.isTombstone(record) ? null : record
 }
 

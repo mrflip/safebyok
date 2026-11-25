@@ -20,7 +20,6 @@ describe("Box.make(begun, { world })", () => {
     const record = TH.boxThingOf()
     const box = boxOf(record)
     expect(box.pickle()).to.deep.equal(record)
-    expect(box.agekind).to.eq('here')
     expect(box.scope).to.deep.equal({ ...TH.ThingBank, labelpath: 'box/openai' })
     expect(box.stamp).to.deep.include({ revtok: record.revtok, lifepath: record.lifepath })
     expect(box.stamp).to.not.have.property('whisper_sealed')
@@ -35,7 +34,6 @@ describe("Box.make(begun, { world })", () => {
     const shell = Shell.inParentLivesOf(TH.boxThingOf())
     const box = Box.make(shell, { world })
     expect(box.pickle()).to.deep.equal(shell)
-    expect(box.agekind).to.eq('vacant')
     TH.expectSyncRefusal(() => box.stamp, 'bad_record')
   })
 

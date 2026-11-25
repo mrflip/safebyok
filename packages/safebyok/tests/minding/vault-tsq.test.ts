@@ -121,7 +121,7 @@ describe("VaultTSQ's writer, on each event the VaultMinder tells", () => {
     const held  = boxHeldIn(world)
     const asked = vi.spyOn(world.vaultDB, 'tryGetThing')
     world.notify(noticeOf(TH.boxSparseOf(Box1)))
-    expect(world.sorted.thingAt(TH.BoxScope)?.agekind).to.eq('cold')
+    expect(world.sorted.carAt(TH.BoxScope)?.agekind).to.eq('cold')
     expect(itemQueryAt(world)?.state).to.deep.include({ data: held, isInvalidated: true })
     expect(asked).not.toHaveBeenCalled()
   })
@@ -130,7 +130,7 @@ describe("VaultTSQ's writer, on each event the VaultMinder tells", () => {
     const world   = await worldWithBox()
     const read_tc = readTcNow()
     world.notify(noticeOf(TH.boxSparseOf(Reborn), read_tc))
-    expect(world.sorted.thingAt(TH.BoxScope)?.agekind).to.eq('bare')
+    expect(world.sorted.carAt(TH.BoxScope)?.agekind).to.eq('bare')
     expect(itemQueryAt(world)?.state).to.deep.include({ data: null, status: 'success', isInvalidated: true, dataUpdatedAt: readAtOf(read_tc) })
   })
 
@@ -145,7 +145,7 @@ describe("VaultTSQ's writer, on each event the VaultMinder tells", () => {
     const world = await worldWithBox()
     world.queryClient.removeQueries({ queryKey: BoxKey })
     world.notify(noticeOf(TH.boxSparseOf(Reborn)))
-    expect(world.sorted.thingAt(TH.BoxScope)?.agekind).to.eq('bare')
+    expect(world.sorted.carAt(TH.BoxScope)?.agekind).to.eq('bare')
     expect(itemQueryAt(world)).to.be.undefined
   })
 
@@ -241,7 +241,7 @@ describe("VaultTSQ's items", () => {
     const world = await worldWithBox()
     world.notify(noticeOf(TH.boxSparseOf(Box1)))
     expect(await world.vaultTSQ.getOnce(TH.BoxScope)).to.deep.equal(boxHeldIn(world))
-    expect(world.sorted.thingAt(TH.BoxScope)?.agekind).to.eq('cold')
+    expect(world.sorted.carAt(TH.BoxScope)?.agekind).to.eq('cold')
     expect(itemQueryAt(world)?.state.isInvalidated).to.eq(false)
     expect(isObservedStale(world.queryClient, BoxKey)).to.eq(true)
   })

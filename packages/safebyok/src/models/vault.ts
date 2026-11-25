@@ -216,7 +216,7 @@ export class Vault {
    */
   #demandReadableBox(scope: ScopeAt<BoxLabelpath>): LiveOf<BoxRecord> {
     const car = this.#boxCarAt(scope)
-    if ((car === undefined) || (car.thing.agekind === 'bare')) { throw Throwers.thingSoonestBare(scope.labelpath) }
+    if ((car === undefined) || (car.agekind === 'bare')) { throw Throwers.thingSoonestBare(scope.labelpath) }
     const record = car.thing.pickle()
     if (! BaseBox.isLive(record)) { throw Throwers.boxAbsent({ boxlabel: scope.labelpath }) }
     return record
@@ -241,7 +241,7 @@ export class Vault {
     if (this.#boxCarAt(scope) === undefined) { await this.#vaultTSQ.getOnce(scope) }
     const car = this.#boxCarAt(scope)
     if (car === undefined) { throw Throwers.storageIssue() }
-    return (car.thing.agekind === 'here') ? car.thing.pickle() : car.citable
+    return (car.agekind === 'here') ? car.thing.pickle() : car.citable
   }
 
   /** The car of the box at `scope`, or undefined where this device has seen no record of it */

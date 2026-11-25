@@ -162,10 +162,10 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   async getOnce(scoped: ThingScope): Promise<ReturnType<ThingT['pickle']>> {
     const answer = await this.tryGetOnce(scoped)
     if (! answer.ok) { throw answer.err }
-    // A good answer's own record was told and taken, so a Thing is kept at its labelpath.
-    const thing = this.thingAt(scoped)!
-    if (thing.agekind === 'bare') { throw Throwers.thingSoonestBare(this.#labelpathOf(scoped)) }
-    return thing.pickle() as ReturnType<ThingT['pickle']>
+    // A good answer's own record was told and taken, so a car is kept at its labelpath.
+    const car = this.carAt(scoped)!
+    if (car.agekind === 'bare') { throw Throwers.thingSoonestBare(this.#labelpathOf(scoped)) }
+    return car.thing.pickle() as ReturnType<ThingT['pickle']>
   }
 
   /** List the children of the live Thing at `labelpath` once. A parent deleted or never stored refuses `absent_thing`. A child stored damaged is told to each listener's `onBadNews`. */

@@ -30,14 +30,12 @@ describe("world.makeThing(begun)", () => {
     expectTypeOf(box).toEqualTypeOf<Box>()
     expect([bank, gate, box].map((thing) => thing.constructor)).to.deep.equal([Bank, Gate, Box])
     expect([bank.pickle(), gate.pickle(), box.pickle()]).to.deep.equal([bankRecord, gateRecord, boxRecord])
-    expect([bank.agekind, gate.agekind, box.agekind]).to.deep.equal(['here', 'here', 'here'])
   })
 
   it("makes the Thing of the shell, holding it, which has received nothing", () => {
     const thing = TH.makeDevice().world.makeThing(TH.gateShellOf())
     expect(thing).to.be.instanceOf(Gate)
     expect(thing.pickle()).to.deep.equal(TH.gateShellOf())
-    expect(thing.agekind).to.eq('vacant')
   })
 
   it("makes the Thing of an item event of a sparse record over its kind's shell, which it holds", () => {
