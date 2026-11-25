@@ -9,24 +9,24 @@ safebyok-big 2951, dojo 111, each typechecked and linted; `pnpm justify` after t
     database. It answers the one stored, or stores and answers a fresh `Crypto.randomId()` where none is or the one
     stored fails `BankishChecks.devicetok`, in one step (`doStowDevicetok(scope, made, isReplaced)`, shaped as
     `doStowLease`). A subclass's throw refuses `storage_unavailable` (`refusalOf`). Memory keeps a map by
-    `MemoryDeviceDB.devicetokCkeyOf(scope)` (cheat `_cheat_plantDevicetok(scope, raw)`); IndexedDB files it in the
+    `MemoryDeviceDB.devicetokCkeyOf(scope)` (cheat `_cheat_devicetoks()`, the map itself, as `_cheat_leases` is); IndexedDB files it in the
     lease store at `devicetokScopepathOf(scope)` = `[userid, banklabel, 'devicetok']` (type `DevicetokScopepath`,
     exported beside `LeaseScopepath`). That never meets a lease's scopepath `[userid, banklabel, labelpath]`, since a
     lease's labelpath always matches `lease/<label>` (`LeaseLabelpathPattern`). `isDeviceDB` asks for the verb too.
-  * `Device.ensureDevicetok()` (`models/device.ts`): the host's `devicetok` option (new on `DeviceOpts`, checked as a
-    UUID), else `deviceDB.ensureDevicetok(this.scope)`; with no host token, it refuses `absent_vault` before signin
-    (the `scope` getter's refusal, outside the try, so not turned into bad news; a wayin is only built signed in). Where the deviceDB refuses, it tells `onBadNews` and answers a fresh token
-    for that call alone, as `World.#stowLease` does with a refused lease stow: the wayin is still built.
+  * `Device.ensureDevicetok(scope)` (`models/device.ts`): the host's `devicetok` option (new on `DeviceOpts`, checked as a
+    UUID), else `deviceDB.ensureDevicetok(scope)`, for the bank at the `scope` it is handed (signed in or not). Where the
+    deviceDB refuses, it tells `onBadNews` and answers a fresh token for that call alone, as `World.#stowLease` does with a refused lease stow: the wayin is still built.
   * Read at each wayin build, nowhere else: `PassphraseProving.buildNovel` and `PasskeyProving.buildNovel` await
-    `device.ensureDevicetok()` and hand it to `mintPassphraseHeader` / `mintPasskeyHeader`. `ProvingDevice` is big's
-    `GX.provingDevice` without `device_tok`, with `ensureDevicetok: fn()`.
+    `device.ensureDevicetok(bankStamp)` (the bank scope the proving already holds, as `judgeStrength` is handed one) and
+    hand it to `mintPassphraseHeader` / `mintPasskeyHeader`. `ProvingDevice` is big's `GX.provingDevice` without
+    `device_tok`, with `ensureDevicetok: fn(scope)`.
   * Rename `device_tok` → `devicetok`, `DeviceTok` → `Devicetok` throughout safebyok, safebyok-react-lean and their
     tests; the wayin header and so the ctx bytes (`ctx-bytes.test.ts`) included. safebyok-idb-lean and
     safebyok-postgres had no `device_tok`.
   * safebyok-big gains `CX.devicetok` and `Phrases.DevicetokShape` beside `device_tok` (the orchestrator's call; a new
     checker, which CLAUDE.md allows). Nothing on big changed otherwise.
   * Tests: a `describeDeviceDBDevicetokBattery` beside the lease battery (`tests/test-helpers/devicedb-battery.ts`), run
-    for memory and IndexedDB; `device.ensureDevicetok()` cases in `device.test.ts`; `ensureDevicetok`'s refusal in
+    for memory and IndexedDB; `device.ensureDevicetok(scope)` cases in `device.test.ts`; a `proving.test.ts` case that both `buildNovel`s hand the device the bank stamp; `ensureDevicetok`'s refusal in
     `memory-device-db.test.ts`.
 * **Decisions made**:
   * **Read lazily, at each wayin build**, not at sign-in: no state on the device beyond the host's option, nothing on
@@ -34,6 +34,10 @@ safebyok-big 2951, dojo 111, each typechecked and linted; `pnpm justify` after t
     with a passkey reads twice; both answers are the same.
   * **A damaged devicetok stored is replaced**, not refused: nothing else reads it, and big did the same with its row.
   * **The device drops it from `toJSON`, its spread, and the bank's getter** (`bank.device_tok` is gone): it is async now.
+  * **The proving hands the device the bank's scope** (rework, the orchestrator's YOLO call on the review): first,
+    `Device.ensureDevicetok()` took none and read `this.scope`, so a proving (handed `bankStamp`) depended on the
+    device's sign-in state, and refused `absent_vault` before signin. Reversed: the scope is an argument, nothing reads
+    the device's scope, the refusal is gone, and the host's `devicetok` still wins.
   * **One per bank scope** (rework, the orchestrator's YOLO call on my open matter): first built one per device
     database, as briefed, which let a storage reader link two users' banks in one browser by their shared devicetok.
     Big's `device_tok` was per bank scope, and NOTYET.md recorded that as the design. Set aside: a scope-free
