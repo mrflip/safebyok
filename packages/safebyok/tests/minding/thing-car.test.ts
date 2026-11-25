@@ -697,6 +697,15 @@ describe("car.receive(event)", () => {
   })
 })
 
+describe("car.read_at", () => {
+  it("is the time in its read_tc, in epoch milliseconds, and zero for a car that has taken no record", () => {
+    const shell = Thing.shellOf(TH.boxThingOf())
+    const car   = carReceived(undefined, TH.boxThingOf(), readTcAt(500_000))
+    expect(car.read_at).to.eq(500_000).and.eq(readAtOf(car.read_tc))
+    expect(ThingCar.make(shell, { world: TH.PlainWorld }).read_at).to.eq(0)
+  })
+})
+
 describe("car.read_tc", () => {
   it("is the read_tc of the record that was news, its first 48 bits the time it was read", () => {
     const car = carReceived(undefined, TH.boxThingOf(), '0190a1b2-c3d4-7000-8000-000000000000')
