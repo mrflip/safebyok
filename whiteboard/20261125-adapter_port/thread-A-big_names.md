@@ -1,12 +1,21 @@
 # Thread A: big_names (2026-11-25)
 
-Branch `20261125-big_names`, PR [#916](https://github.com/mrflip/safebyok/pull/916), stacked on #912. Proved: package tests and typechecks green: safebyok-postgres 123,
-safebyok-postgres-big 246, safebyok-fastkey 43, safebyok-indexeddb 115, safebyok-indexeddb-big 215, safebyok-react 339,
-safebyok-react-big 277, safebyok-graphql-big 448, safebyok-convex-big 334, the demos and e2e (111, 24, 26, 99, 576), root
-scripts 327; lint clean. `pnpm justify` after the catch-up rebase: see the PR's **Tests:** line.
+Branch `20261125-big_names`, PR [#916](https://github.com/mrflip/safebyok/pull/916), stacked on main. Proved: `pnpm justify`
+green after the rebase onto main: safebyok 2291, safebyok-big 2951, safebyok-postgres 134, safebyok-postgres-big 246,
+safebyok-fastkey 43, safebyok-indexeddb 130, safebyok-indexeddb-big 215, safebyok-react 339, safebyok-react-big 277,
+safebyok-graphql-big 448, safebyok-convex-big 334, the demos and e2e (dojo 111, envman 24, knockknock 26, react 99, e2e 576),
+root scripts 331; lint, typecheck and build clean.
+
+* **Rebased onto main** (2026-11-25), after #912 and the rest of the lease_shelf line (#905 `stats`, #911 `pg_read_tc`,
+  #915, #924) merged. Git carried main's edits across every rename on its own (idb-vault-db, vault-shelf, react-giver,
+  provider-world and their tests land in safebyok-indexeddb and safebyok-react as main has them). Three conflicts, by hand:
+  idb-lean's README, deleted here, gained main's quota-under-5,000-bytes `storage_blocked` line, which now sits in
+  safebyok-indexeddb's README; safebyok-postgres's README keeps this thread's vault text with main's "needs Postgres 18 or
+  later" paragraph, minus its "(not yet exported)"; postgres-vault-db.ts imports from `./postgres-driver` and takes main's
+  `StatsSql`. The -big packages are as this thread left them.
 
 * **Built**
-  * Renames, in one pure commit first (b749119f1), so #905 and #911 rebase across a rename:
+  * Renames, in one pure commit first (6fbc3b45c), so #905 and #911 rebase across a rename:
     * indexeddb → indexeddb-big, idb-lean → indexeddb
     * react → react-big, react-lean → react
     * convex → convex-big, graphql → graphql-big
