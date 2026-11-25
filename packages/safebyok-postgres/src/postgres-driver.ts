@@ -26,7 +26,7 @@ export function jsonOrNull(text: string): unknown {
 // == [Refusals]: refusalOf, isTransient, causeOf, codeOf, TransientSqlstate, TransientSystemCodes, PgConnectionLost
 
 /** The VaultError for what a driver threw: `storage_unavailable` where a retry may mend it, else `unexpected_error`. A VaultError is kept as it is.
- * A lost connection, a conflict between transactions, a busy or read-only server: anything else fails the same way again.
+ * A retry may mend a lost connection, a conflict between transactions, or a busy or read-only server; anything else fails the same way again.
  */
 export function refusalOf(thrown: unknown): VaultError {
   if (DB.isVaultError(thrown)) { return thrown }
@@ -40,7 +40,8 @@ function isTransient(thrown: unknown): boolean {
   return (thrown instanceof Error) && PgConnectionLost.has(thrown.message)
 }
 
-// A driver's error can include the statement's parameters, which may include a row. Keep only its message and code.
+// A driver's error can include the statement's parameters, which may include a row.
+/** The cause to keep for `thrown`: its message and code, and nothing else. */
 function causeOf(thrown: unknown): Error {
   const code = codeOf(thrown)
   return Object.assign(new Error(DB.sanitizeForeignError(thrown).message), (code === undefined) ? {} : { code })

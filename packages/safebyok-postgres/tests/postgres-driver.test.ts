@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
-import { isVaultError } from 'safebyok/storage'
+import { isVaultError, unexpectedError } from 'safebyok/storage'
 import { PgConnectionLost, refusalOf } from '../src/postgres-driver'
 
 /** An Error with a driver's `code`. */
@@ -22,6 +22,12 @@ describe("refusalOf", () => {
     ]
     for (const err of transient) { expect(isVaultError(refusalOf(err), 'storage_unavailable'), err.message).to.be.true }
     for (const err of lasting) { expect(isVaultError(refusalOf(err), 'unexpected_error'), err.message).to.be.true }
+  })
+
+  it("returns a VaultError as it is, and reports a thrown null, undefined or string as an unexpected error", () => {
+    const vaultError = unexpectedError(new Error('already refused'))
+    expect(refusalOf(vaultError)).to.equal(vaultError)
+    for (const thrown of [null, undefined, 'boom']) { expect(isVaultError(refusalOf(thrown), 'unexpected_error'), String(thrown)).to.be.true }
   })
 
   // pg gives these failures no code, so a release that rewords one would turn a lost connection into an unexpected error.
