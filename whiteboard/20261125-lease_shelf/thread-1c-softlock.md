@@ -1,6 +1,6 @@
 # Thread 1c: softlock (2026-11-25)
 
-Branch `20261125-softlock`, PR #TBD, stacked on #900 (thread 0, connect). Proved: `pnpm --filter safebyok test` 1992
+Branch `20261125-softlock`, PR #902, stacked on #900 (thread 0, connect). Proved: `pnpm --filter safebyok test` 1992
 passed, lint and typecheck clean; `safebyok-react-lean` typecheck clean, 339 tests passed. `pnpm justify` runs after
 the catch-up.
 
