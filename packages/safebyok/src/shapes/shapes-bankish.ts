@@ -127,7 +127,7 @@ export type LeaseAnnouncement = Readonly<{ kind: typeof leasekindVals[number] }>
 /** A change of the world's stage, from the stage it was at to the one it is at now. The tab that caused it hears it too. */
 export type StageCrossing = Readonly<{ kind: 'stage_crossed', from: BankStage, to: BankStage }>
 
-/** The device's watch of its bank's vaultDB ended before anything stopped it, as one that cannot start may: the janitor starts it again at its next tick, and the bad news that follows says why. */
+/** The device's watch of its bank ended of itself, before anything stopped it. */
 export type WatchEnding = Readonly<{ kind: 'watch_ended' }>
 
 /** What a device announces to `onLifecycle`, by its `kind`: a {@link LeaseAnnouncement}, a {@link StageCrossing} or a {@link WatchEnding}. */

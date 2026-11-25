@@ -765,7 +765,7 @@ describe("the host's onLifecycle", () => {
     expect(eventsHeardOn(onLifecycle, second)).to.deep.equal([])
   })
 
-  it("hears once that the watch ended, where a OneWatchVaultDB's wrapped watch threw as it started, and nothing as the janitor starts it again", async () => {
+  it("hears the watch's end once, and not again as the janitor starts it", async () => {
     vi.stubGlobal('navigator', { locks: TH.fakeLockManager() })
     const memory = new MemoryVaultDB()
     vi.spyOn(memory, 'watch').mockImplementationOnce(() => { throw new Error('the socket is down') })

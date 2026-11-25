@@ -383,7 +383,7 @@ export class World {
     if (this.#isConnected) { vault.connect() }
   }
 
-  /** Start the VaultMinder's watch, where someone has signed in, telling the device's `onBadNews` what the host's vaultDB throws, and announcing the watch's end where it ends of itself */
+  /** Start the VaultMinder's watch, where someone has signed in. */
   #startWatch(): void {
     if (this.#vaultMinder === null) { return }
     try { this.#vaultMinder.connect(() => { this.#device.announce({ kind: 'watch_ended' }) }) } catch (err) { this.#device.tellBadNews([err]) }
