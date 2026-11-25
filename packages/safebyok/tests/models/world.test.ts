@@ -522,6 +522,18 @@ describe("a lease shared by the tabs of one deviceDB", () => {
     expect(later.world.getSnapshot().stage).to.eq('locked')
   })
 
+  it("starts the next life at an unlock after the lease stored has passed its end, as when every tab closed while it was live", async () => {
+    const [vaultDB, deviceDB] = [new MemoryVaultDB(), new MemoryDeviceDB()]
+    const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, deviceDB }) })
+    device.disconnect()
+    const later = TH.T0 + device.leaseMillis
+    vi.setSystemTime(later)
+    const reloaded = TH.makeDevice({}, { vaultDB, deviceDB })
+    await reloaded.signin(TH.WorldScope.userid)
+    await reloaded.world.gate!.unlock({ passphraseCleartext: TH.TestPassphrase })
+    expect(await storedLeaseOf(deviceDB)).to.include({ am: 'a', lifeseq: Lifeseq.ofLifenum(2), revseq: 2, born_at: later })
+  })
+
   it("keeps its own lease where an older lease record rings", async () => {
     const onBadNews = vi.fn()
     const { first, second, deviceDB } = await twoTabs({ onBadNews })

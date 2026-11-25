@@ -279,8 +279,16 @@ export class World {
   /** The Thing fields a lease granted under the gate at `gateScope` follows: the lease record stored, or this world's lease where none is stored or this one is newer, or else the gate's lease shell. */
   async #leaseFollowed(gateScope: LeaseShellScope): Promise<Sparse<LeaseRecord>> {
     const stored = await this.#peekStored(gateScope)
-    if (this.#isNewerThanLease(stored)) { return stored }
+    if (this.#isNewerThanLease(stored)) { return this.#endedIfStale(stored) }
     return this.#lease ?? Lease.shellOf(gateScope)
+  }
+
+  // A renewal happens only while a lease is granted: a grant after the stored lease has ended, as when every tab closed
+  // past its end, starts the next life.
+  /** `stored` as a grant follows it: a live record that can no longer unlock the bank as its tombstone, written now, and anything else as it is */
+  #endedIfStale(stored: LeaseRecord): Sparse<LeaseRecord> {
+    const isStale = (stored.am === 'a') && ! this.#canUnlock(stored)
+    return isStale ? Lease.tombstoneOf(stored) : stored
   }
 
   /** Attach `lease`, and stow it in the deviceDB for every tab to take up. */
