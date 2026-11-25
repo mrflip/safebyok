@@ -1,7 +1,7 @@
 # Thread F: postgres_standalone (2026-11-25)
 
-Branch `20261125-postgres_standalone`, PR #930, stacked on #923. Proved: `pnpm --filter safebyok-postgres lint typecheck test`
-(170 tests), the core's tests (2318); `pnpm justify` pending.
+Branch `20261125-postgres_standalone`, PR #930, stacked on #923. Proved: `pnpm justify` green after the catch-up
+(safebyok-postgres 170 tests, the core 2318).
 
 * **Built**:
   - `packages/safebyok-postgres/src/postgres-driver.ts` is gone. Its pieces now live in the files that own them:
