@@ -76,7 +76,7 @@ async function plant(scope: ThingScope, raw: unknown): Promise<void> {
 function rowsOf(): VT.VaultDBRowCheats { return { plant, remove } }
 // --
 
-// == [Fakes]: coded, throwingClient, answeringClient, capturingListen, tellingListen, unconnectedListen, watchCalls, MissingTable, BareNotice
+// == [Fakes]: coded, throwingClient, answeringClient, capturingListen, tellingListen, unconnectedListen, watchCalls, MissingTable, BareNotification
 
 /** An Error with a driver's `code`. */
 function coded(message: string, code: string): Error { return Object.assign(new Error(message), { code }) }
@@ -129,8 +129,8 @@ function watchCalls() {
 /** The failure of a missing table, which a retry would not mend. */
 const MissingTable = coded('relation "safebyok_box_things" does not exist', '42P01')
 
-/** A notice of the root box in the battery's bank that carries neither the Thing nor its bank row. */
-const BareNotice = JSON.stringify({ at: { userid: VT.ThingBank.userid, banklabel: VT.ThingBank.banklabel, labelpath: VT.getAskAt('box').labelpath } })
+/** A notification of the root box in the battery's bank that carries neither the Thing nor its bank row. */
+const BareNotification = JSON.stringify({ at: { userid: VT.ThingBank.userid, banklabel: VT.ThingBank.banklabel, labelpath: VT.getAskAt('box').labelpath } })
 // --
 
 beforeAll(async () => { await database() }, TH.BootMillis)
@@ -264,26 +264,26 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     expect(calls).to.deep.equal([])
   })
 
-  it("ends a watch, calling its onEnded and then its onBadNews, where a notice's fetch fails in a way a retry would not mend", async () => {
+  it("ends a watch, calling its onEnded and then its onBadNews, where a notification's fetch fails in a way a retry would not mend", async () => {
     const { listen, onNotifies, stopped } = capturingListen()
     const vaultDB = new PostgresVaultDB({ client: throwingClient(MissingTable), listen })
     const { calls, badnews, onBadNews, onEnded } = watchCalls()
     vaultDB.watch(VT.ThingBank, () => undefined, onBadNews, onEnded)
     await vi.waitFor(() => { expect(onNotifies).to.have.lengthOf(1) })
-    onNotifies[0]?.(BareNotice)
+    onNotifies[0]?.(BareNotification)
     await vi.waitFor(() => { expect(stopped).to.have.lengthOf(1) })
     expect(calls).to.deep.equal(['ended', 'storage_issue'])
     expect(badnews[0]?.cause).to.deep.include({ code: '42P01' })
   })
 
-  it("calls onEnded once where two notices' fetches fail together", async () => {
+  it("calls onEnded once where two notifications' fetches fail together", async () => {
     const { listen, onNotifies, stopped } = capturingListen()
     const vaultDB = new PostgresVaultDB({ client: throwingClient(MissingTable), listen })
     const { calls, onBadNews, onEnded } = watchCalls()
     vaultDB.watch(VT.ThingBank, () => undefined, onBadNews, onEnded)
     await vi.waitFor(() => { expect(onNotifies).to.have.lengthOf(1) })
-    onNotifies[0]?.(BareNotice)
-    onNotifies[0]?.(BareNotice)
+    onNotifies[0]?.(BareNotification)
+    onNotifies[0]?.(BareNotification)
     await VT.aWhile()
     expect(calls).to.deep.equal(['ended', 'storage_issue'])
     expect(stopped).to.have.lengthOf(1)
@@ -294,7 +294,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     const vaultDB = new PostgresVaultDB({ client: throwingClient(MissingTable), listen })
     const unwatch = vaultDB.watch(VT.ThingBank, () => undefined, () => undefined)
     await vi.waitFor(() => { expect(onNotifies).to.have.lengthOf(1) })
-    onNotifies[0]?.(BareNotice)
+    onNotifies[0]?.(BareNotification)
     await vi.waitFor(() => { expect(stopped).to.have.lengthOf(1) })
     unwatch()
     await VT.aWhile()
@@ -302,7 +302,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
   })
 
   it("hears a notice told while its listen is still starting", async () => {
-    const { listen, stopped } = tellingListen(BareNotice)
+    const { listen, stopped } = tellingListen(BareNotification)
     const vaultDB = new PostgresVaultDB({ client: throwingClient(MissingTable), listen })
     const { calls, onBadNews, onEnded } = watchCalls()
     vaultDB.watch(VT.ThingBank, () => undefined, onBadNews, onEnded)
@@ -310,13 +310,13 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     expect(calls).to.deep.equal(['ended', 'storage_issue'])
   })
 
-  it("drops a notice whose fetch fails in a way a retry may mend, and keeps watching", async () => {
+  it("drops a notification whose fetch fails in a way a retry may mend, and keeps watching", async () => {
     const { listen, onNotifies, stopped } = capturingListen()
     const vaultDB = new PostgresVaultDB({ client: throwingClient(coded('terminating connection due to administrator command', '57P01')), listen })
     const { calls, onBadNews, onEnded } = watchCalls()
     const unwatch = vaultDB.watch(VT.ThingBank, () => undefined, onBadNews, onEnded)
     await vi.waitFor(() => { expect(onNotifies).to.have.lengthOf(1) })
-    onNotifies[0]?.(BareNotice)
+    onNotifies[0]?.(BareNotification)
     await VT.aWhile()
     expect(calls).to.deep.equal([])
     expect(stopped).to.deep.equal([])

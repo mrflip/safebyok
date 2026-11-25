@@ -128,7 +128,7 @@ reconnecting. A watch is only a hint: a device that misses one learns of the wri
 **How a watch ends.** `vaultDB.watch(scope, onNotice, onBadNews, onEnded)` listens until you call the stop function it
 returns, or until it ends of itself:
 
-* **A notice whose fetch fails** in a way a retry may mend is dropped, and the watch listens on. Any other failure ends
+* **A notification whose fetch fails** in a way a retry may mend is dropped, and the watch listens on. Any other failure ends
   the watch: it calls `onEnded`, then `onBadNews` with the refusal, and listens no more.
 * **A `listen` that fails** ends the watch the same way, once `watch` has returned: `onEnded`, then `onBadNews`.
 * **An unlisten that fails**, the function your `listen` returned throwing or rejecting, is handed to `onBadNews`. It

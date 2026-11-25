@@ -160,7 +160,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
     return this.classifyStats(ask, bankFetched, { box, gate, max: storeLimitsOf() })
   }
 
-  // A notice may come before or after a read or a write made beside it, and before or after another notice.
+  // A notification may come before or after a read or a write made beside it, and before or after another notification.
   protected override doWatch(scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: VaultError) => void, onEnded: () => void): () => void {
     const listen = this.#listen
     if (listen === undefined) { return super.doWatch(scope, receive, onBadNews, onEnded) }
