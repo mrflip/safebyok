@@ -226,13 +226,11 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
   // == [The gatings' private verbs]: unlockByProving, buildLease, putGate
 
-  // Scaffolding: until thread 1b has an unlock follow the lease record its deviceDB stores, a lease granted after a lock
-  // follows the shell, and starts the first life again.
-  /** Unlock this gate's world under a lease `proved` builds, citing the revision this gate models.
-   * A lease the world holds is renewed: the new one is its next revision, and keeps its `born_at`. Otherwise the new one follows the shell.
+  /** Unlock this gate's world under a lease `proved` builds, citing the revision this gate models, and stow the lease in the deviceDB for every tab.
+   * The lease follows the one stored, or the world's where that is newer: after a live lease it is that lease's next revision, a renewal keeping its `born_at`; after a lock's tombstone it starts the next life.
    */
   async #unlockByProving(proved: Proving): Promise<this> {
-    const lease = await this.#buildLease(proved, this.#friend.renewal() ?? Lease.shellOf(this))
+    const lease = await this.#buildLease(proved, await this.#friend.leaseFollowed(this))
     this.#friend.attachLease(lease)
     return this
   }
@@ -347,7 +345,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn, union }) => 
     gateMakeArgs:   obj({
       begun:  union([GateChecks.shell, SeenChecks.itemEvent]).refine(({ labelpath }) => Labelpath.isOfModelkind(labelpath, 'gate'), Phrases.BegunOfOtherKind),
       opts:   ThingMakeChecks.thingMakeOpts,
-      friend: obj({ leaseGateOf: fn<WorldGateFriend['leaseGateOf']>(), renewal: fn<WorldGateFriend['renewal']>(), attachLease: fn<WorldGateFriend['attachLease']>() }),
+      friend: obj({ leaseGateOf: fn<WorldGateFriend['leaseGateOf']>(), leaseFollowed: fn<WorldGateFriend['leaseFollowed']>(), attachLease: fn<WorldGateFriend['attachLease']>() }),
     }),
     makeRecordArgs: GateChecks.stamp.extend({ wayins }),
     nextRecordArgs: obj({ cited: GateChecks.record, wayins }),

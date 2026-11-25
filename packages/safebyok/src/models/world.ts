@@ -11,10 +11,11 @@ import type { Proving } from './proving'
 import { bulletproofHandlerOf } from '../helpers/bulletproof'
 import type { BankStage, HostedVault, RefusalSnapshot, RootShelf, ThingMakeOpts, WorldOpts, WorldSnapshot } from '../shapes/shapes-bankish'
 import { PendingWorld, SignedOutWorld, WorldChecks, isRootShelf } from '../shapes/shapes-bankish'
-import type { BirthCleartexts, BirthDna, BirthGatingFriend, GateRevisionedStamp, LeaseGate, WorldGateFriend } from '../shapes/shapes-gateish'
+import type { BirthCleartexts, BirthDna, BirthGatingFriend, GateRevisionedStamp, LeaseGate, LeaseShellScope, WorldGateFriend } from '../shapes/shapes-gateish'
 import { type MaskedViewLease, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import type * as Sealers from '../shapes/shapes-sealers'
-import { type BankStamp, type LeaseLoggable, StampChecks } from '../shapes/shapes-stamps'
+import type { LiveOf } from '../shapes/shapes-sealers'
+import { type BankStamp, type LeaseLoggable, type LeaseRecord, StampChecks } from '../shapes/shapes-stamps'
 import { type BankRecord, type BoxRecord, type BulletproofCallback, type GateRecord, type Sparse, type ThingRecord, type Thingkind, type VoidSentinel, PerKindChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type ReadTc, type SeenThing, type VaultEvent, type VaultItemEvent, SeenChecks } from '../shapes/shapes-vault-event'
@@ -32,10 +33,11 @@ export type SomeThing = Bank | Gate | Box
 
 /** The signed-in user's bank as this device locks, unlocks and connects it: its lease, the wait for an unlock, and its snapshot, which a host renders.
  * Made with its device, it lives as long. Its gates build leases and hand them to it, and boxes are sealed and unsealed under the lease it holds, which no member hands out.
+ * While connected, its lease is the one its device's deviceDB stores, which every tab given that deviceDB shares: an unlock, a renewal or a lock in one tab reaches the rest.
  * Its snapshot's stage is read from the bank, the main gate and the root box its VaultMinder keeps, each of which it subscribes to, and from the lease.
  */
 export class World {
-  // == [Props]: #device, #vaultMinder, #lease, #unlockWait, #isConnected, #janitor, #lastErr, #vaults, #snapshot, #subscribers, #getSnapshot, #subscribe, #bulletproofCallback
+  // == [Props]: #device, #vaultMinder, #lease, #unlockWait, #isConnected, #unlisten, #janitor, #lastErr, #vaults, #snapshot, #subscribers, #getSnapshot, #subscribe, #bulletproofCallback
 
   readonly #device: Device
 
@@ -50,6 +52,9 @@ export class World {
 
   /** True from {@link connect} until {@link disconnect}. */
   #isConnected = false
+
+  /** Stops the deviceDB's listener, which runs from {@link connect} until {@link disconnect}; null otherwise. */
+  #unlisten: (() => void) | null = null
 
   /** The janitor's timer, running from {@link signin} until the device is disabled; null otherwise. */
   #janitor: ReturnType<typeof setInterval> | null = null
@@ -106,7 +111,7 @@ export class World {
 
   // Every read of the lease's end goes through here: the janitor's, and isSoftlocked's.
   /** When the attached lease stops unlocking the bank, or null while locked. */
-  get leaseEndsAt(): EpochMillis | null { return (this.#lease === null) ? null : this.#lease.proved_at + this.#device.leaseMillis }
+  get leaseEndsAt(): EpochMillis | null { return this.#lease?.ends_at ?? null }
 
   /** What a log wants of the attached lease, or null while locked. */
   get leaseLoggable(): LeaseLoggable | null { return this.#lease?.loggable ?? null }
@@ -214,9 +219,8 @@ export class World {
   /** This world's lease verbs, for a birth's gating to call. */
   #birthFriend(): BirthGatingFriend {
     return {
-      // A birth's lease follows the shell, so it is born in its first life when proved.
-      leaseByProving: (proving: Proving, bankStamp: BankStamp, cited: GateRevisionedStamp) => proving.buildLease(this.#leaseGateOf(bankStamp), cited, Lease.shellOf(cited)),
-      attachLease:    (lease: Lease) => { this.#attachLease(lease) },
+      leaseByProving: async (proving: Proving, bankStamp: BankStamp, cited: GateRevisionedStamp) => await proving.buildLease(this.#leaseGateOf(bankStamp), cited, await this.#leaseFollowed(cited)),
+      attachLease:    (lease: Lease) => { this.#attachAndStow(lease) },
     }
   }
   // --
@@ -256,21 +260,36 @@ export class World {
   }
   // --
 
-  // == [The gate's friend]: gateFriend, leaseGateOf, attachLease
+  // == [The gate's friend]: gateFriend, leaseGateOf, leaseFollowed, attachAndStow, attachLease, dropLease
 
   /** This world's lease verbs, for a gate it makes to call. */
   #gateFriend(): WorldGateFriend {
     return {
-      leaseGateOf: (bankStamp: BankStamp) => this.#leaseGateOf(bankStamp),
-      renewal:     () => this.#lease,
-      attachLease: (lease: Lease) => { this.#attachLease(lease) },
+      leaseGateOf:   (bankStamp: BankStamp) => this.#leaseGateOf(bankStamp),
+      leaseFollowed: async (gateScope: LeaseShellScope) => await this.#leaseFollowed(gateScope),
+      attachLease:   (lease: Lease) => { this.#attachAndStow(lease) },
     }
   }
 
   /** This world as a lease granted under `bankStamp` reads it back. */
   #leaseGateOf(bankStamp: BankStamp): LeaseGate { return new WorldLeaseGate(this, bankStamp) }
 
-  /** Attach `lease` in place of the current one, and resume every call waiting for an `unlock` gating.
+  // A grant follows the deviceDB, so one after a lock in any tab starts the life after that lock's tombstone. It follows
+  // this world's lease where that is newer, as a softlock not yet stowed is.
+  /** The Thing fields a lease granted under the gate at `gateScope` follows: the lease record stored, or this world's lease where none is stored or this one is newer, or else the gate's lease shell. */
+  async #leaseFollowed(gateScope: LeaseShellScope): Promise<Sparse<LeaseRecord>> {
+    const stored = await this.#peekStored()
+    if (this.#isNewerThanLease(stored)) { return stored }
+    return this.#lease ?? Lease.shellOf(gateScope)
+  }
+
+  /** Attach `lease`, as `#attachLease` does, and stow it in the deviceDB, for every tab to take up. */
+  #attachAndStow(lease: Lease): void {
+    this.#attachLease(lease)
+    void this.#stowLease(lease)
+  }
+
+  /** Attach `lease` in place of the current one, and resume every call waiting for an `unlock` gating, unless the lease is near its end ({@link isSoftlocked}).
    * On a disabled world, it evicts `lease` instead, and refuses.
    */
   #attachLease(lease: Lease): void {
@@ -280,51 +299,63 @@ export class World {
     }
     this.#lease?.evict()
     this.#lease = lease
-    this.#settleUnlockWait(null)
+    if (! this.isSoftlocked) { this.#settleUnlockWait(null) }
+    this.align()
+  }
+
+  /** Drop this world's lease, and the keys in it, in this tab alone: the deviceDB keeps what it stores. */
+  #dropLease(): void {
+    this.#lease?.evict()
+    this.#lease = null
     this.align()
   }
   // --
 
-  // == [Locking and connecting]: lock, connect, disconnect, disable, hostVault, #startWatch
+  // == [Locking and connecting]: lock, connect, disconnect, disable, hostVault, #startWatch, #startListening, #stopListening
 
   // #lock-is-intent: a lock asks the user again at the next promptable action, and is not an alarm. A seal under way
   // finishes; an unseal under way returns no cleartext.
-  /** Lock the world: drop its lease and the keys in it. */
+  /** Lock the world: drop its lease and the keys in it, and stow the lease's tombstone in the deviceDB, which locks every tab sharing it. */
   lock(): this {
-    this.#lease?.evict()
-    this.#lease = null
-    this.align()
+    const lease = this.#lease
+    this.#dropLease()
+    if (lease !== null) { void this.#stowTombstoneOf(lease) }
     return this
   }
 
   // The watch starts before the vaults hear it, so that what a vault refetches as it connects is fetched under the watch.
-  /** Start what this world keeps running: its VaultMinder's watch of the vaultDB, once someone signs in, and each vault it hosts hearing the VaultMinder. Never throws; a call once the device is disabled does nothing.
-   * What the host's vaultDB throws as the watch starts goes to the device's `onBadNews`, and a later call, or the janitor's next tick, starts the watch again. A call while the watch runs leaves it running.
+  /** Start what this world keeps running: its VaultMinder's watch of the vaultDB, once someone signs in, the deviceDB's listener, and each vault it hosts hearing the VaultMinder; and take up the lease the deviceDB stores. Never throws; a call once the device is disabled does nothing.
+   * What the host's vaultDB or deviceDB throws goes to the device's `onBadNews`; a later call, or the janitor's next tick, starts the watch again. A call while the watch runs leaves it running.
    */
   connect(): this {
     if (! this.isEnabled) { return this }
     this.#isConnected = true
     this.#startWatch()
+    this.#startListening()
+    void this.#followStored()
     for (const vault of this.#vaults) { vault.connect() }
     return this
   }
 
-  /** Lock this world, and stop what it keeps running: each vault it hosts stops hearing the VaultMinder, and the VaultMinder stops watching the vaultDB. Never throws; calling it twice in a row is the same as once, and each call locks.
-   * The world stays enabled: its verbs still work, a call waiting in {@link ensureUnlocked} still waits, its janitor still locks it past its lease's end, and {@link connect} resumes it.
-   * What the host's vaultDB throws as the watch stops goes to the device's `onBadNews`.
+  // A disconnect drops this tab's lease alone, and stows no tombstone: one tab unmounting its provider locks no other.
+  /** Drop this world's lease in this tab alone, and stop what it keeps running: the deviceDB's listener, each vault it hosts hearing the VaultMinder, and the VaultMinder's watch of the vaultDB. Never throws; calling it twice in a row is the same as once.
+   * The world stays enabled: its verbs still work, a call waiting in {@link ensureUnlocked} still waits, and {@link connect} resumes it, taking up the lease the deviceDB stores.
+   * What the host's vaultDB or deviceDB throws as they stop goes to the device's `onBadNews`.
    */
   disconnect(): this {
     this.#isConnected = false
-    this.lock()
+    this.#dropLease()
+    this.#stopListening()
     for (const vault of this.#vaults) { vault.disconnect() }
     try { this.#vaultMinder?.disconnect() } catch (err) { this.#device.tellBadNews([err]) }
     return this
   }
 
-  /** Reject every call waiting in {@link ensureUnlocked} with the device's end cause, stop the janitor, and {@link disconnect}. Internal: call `device.disable`, which ends the device first. */
+  /** Reject every call waiting in {@link ensureUnlocked} with the device's end cause, stop the janitor, {@link lock} and {@link disconnect}. Internal: call `device.disable`, which ends the device first. */
   disable(): this {
     this.#settleUnlockWait(this.endCause)
     this.#stopJanitor()
+    this.lock()
     return this.disconnect()
   }
 
@@ -342,6 +373,86 @@ export class World {
   #startWatch(): void {
     if (this.#vaultMinder === null) { return }
     try { this.#vaultMinder.connect() } catch (err) { this.#device.tellBadNews([err]) }
+  }
+
+  /** Follow the lease the deviceDB stores each time any tab stows one, where the listener is not running already, telling the device's `onBadNews` what the deviceDB throws */
+  #startListening(): void {
+    try { this.#unlisten ??= this.#device.deviceDB.listen(() => { void this.#followStored() }) } catch (err) { this.#device.tellBadNews([err]) }
+  }
+
+  /** Stop the deviceDB's listener, where it runs, telling the device's `onBadNews` what the deviceDB throws */
+  #stopListening(): void {
+    try { this.#unlisten?.() } catch (err) { this.#device.tellBadNews([err]) }
+    this.#unlisten = null
+  }
+  // --
+
+  // == [Following the stored lease]: followStored, isNewerThanLease, takeUp, canUnlock, softlockPastGate, peekStored, stowLease, stowTombstoneOf
+  // Each tab's lease is the one the deviceDB stores, compared by life, then revision. The newest stow wins there, so a
+  // late stow never brings a locked lease back. A stow or a peek refused is bad news, and the tab keeps its lease.
+
+  /** Make this world's lease the one the deviceDB stores, where that one is newer, then softlock it where the gate has moved past it. Does nothing until the roots are live. Never throws: a refusal goes to the device's `onBadNews`. */
+  async #followStored(): Promise<void> {
+    if (! this.areRootsLive) { return }
+    try {
+      const stored = await this.#device.deviceDB.peekLease(this.#device.scope)
+      if (this.#isNewerThanLease(stored)) { this.#takeUp(stored) }
+      this.#softlockPastGate()
+    } catch (err) {
+      this.#device.tellBadNews([err])
+    }
+  }
+
+  /** True of a lease record newer than this world's lease, by life then revision; any record is newer than none */
+  #isNewerThanLease(stored: LeaseRecord | null): stored is LeaseRecord {
+    return (stored !== null) && ((this.#lease === null) || (BaseThing.cmp(this.#lease, stored) > 0))
+  }
+
+  // Thread 6 announces here an unlock, or a lock, taken up from another tab.
+  /** Attach the Lease of `stored` where it can unlock the bank, or else drop this world's lease */
+  #takeUp(stored: LeaseRecord): void {
+    if (this.#canUnlock(stored)) {
+      this.#attachLease(Lease.make(stored, { gate: this.#leaseGateOf(this.bankStamp) }))
+    } else {
+      this.#dropLease()
+    }
+  }
+
+  /** True of a live lease record not past its end, granted under the main gate's life */
+  #canUnlock(stored: LeaseRecord): stored is LiveOf<LeaseRecord> {
+    const { gate } = this
+    return (stored.am === 'a') && (Clock.nowMillis() < stored.ends_at) && (stored.gate_labelpath === gate?.labelpath) && (stored.gate_lifeseq === gate.lifeseq)
+  }
+
+  // Thread 6 announces a softlock here. A softlock only ever brings the end nearer, so every tab that hears the same gate
+  // change writes the same revision, and the first stow keeps it (notes/wontfix.md).
+  /** Attach and stow the next revision of this world's lease, ending the device's `softlockMillis` from now, where the gate has moved past the revision the lease cites and that end is the nearer */
+  #softlockPastGate(): void {
+    const lease = this.#lease
+    const gateRevseq = this.gate?.revseq ?? SX.VoidRevisionSeq
+    const ends_at = Clock.nowMillis() + this.#device.softlockMillis
+    if ((lease === null) || (gateRevseq <= lease.gate_revseq) || (ends_at >= lease.ends_at)) { return }
+    this.#attachAndStow(lease.nextEndingAt(ends_at))
+  }
+
+  /** The lease record the deviceDB stores for the bank, or null for none, or where the deviceDB refuses, which goes to the device's `onBadNews` */
+  async #peekStored(): Promise<LeaseRecord | null> {
+    try {
+      return await this.#device.deviceDB.peekLease(this.#device.scope)
+    } catch (err) {
+      this.#device.tellBadNews([err])
+      return null
+    }
+  }
+
+  /** Stow `lease` in the deviceDB, telling the device's `onBadNews` where it refuses: this world keeps the lease either way */
+  async #stowLease(lease: Lease): Promise<void> {
+    try { await lease.stow(this.#device.deviceDB) } catch (err) { this.#device.tellBadNews([err]) }
+  }
+
+  /** Stow the tombstone of `lease` in the deviceDB, telling the device's `onBadNews` where it refuses */
+  async #stowTombstoneOf(lease: Lease): Promise<void> {
+    try { await this.#device.deviceDB.stowLease(Lease.tombstoneOf(lease)) } catch (err) { this.#device.tellBadNews([err]) }
   }
   // --
 
@@ -496,8 +607,12 @@ export class World {
 
   // The three roots may arrive in any order, one at a time: a set of them partly live is never shown as a stage of its
   // own. The last of them to land live brings `'locked'`, so a birth shows no stage between `'unborn'` and `'locked'`.
-  /** Realign on news of a root, once all three are live or the bank holds no live record. */
+  // The softlock is at once, so a grant under way in this tab follows it; the lease stored is taken up once the roots
+  // are live, as when they first arrive.
+  /** Softlock the lease where the gate has moved past it; while connected, follow the lease the deviceDB stores; and realign, once all three roots are live or the bank holds no live record. */
   #hearRoot(): void {
+    this.#softlockPastGate()
+    if (this.#isConnected) { void this.#followStored() }
     if (this.areRootsLive || ! isLive(this.bank)) { this.align() }
   }
 

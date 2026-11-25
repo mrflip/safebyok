@@ -6,6 +6,7 @@ import { BaseBox } from '../../src/models/base-box'
 import { Lease, withoutSecrets } from '../../src/models/lease'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import { BaseThing, ThingFieldnames } from '../../src/models/base-thing'
+import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import type { BoxCleartexts, LiveOf, Sealer, ShellOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
 import { type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat } from '../../src/shapes/shapes-stamps'
 import { type EpochMillis, Lifeseq } from '../../src/shapes/primitives'
@@ -582,6 +583,56 @@ describe("Lease.makeNextRecord(live, { ends_at })", () => {
     const live = await TH.liveLeaseRecordOf()
     TH.expectSyncRefusal(() => Lease.makeNextRecord(TH.leaseTombstoneOf() as never, { ends_at: TH.T0 }), 'bad_record')
     TH.expectSyncRefusal(() => Lease.makeNextRecord(live, { ends_at: 'soon' } as never), 'bad_record')
+  })
+})
+
+describe("lease.nextEndingAt(ends_at)", () => {
+  it("is a new Lease at the next revision, ending when told, that unseals what this one sealed", async () => {
+    const { lease } = await leaseWorld()
+    const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    vi.setSystemTime(TH.T0 + 5)
+    const softlocked = lease.nextEndingAt(TH.T0 + 10)
+    expect(softlocked).to.not.equal(lease)
+    expect(softlocked).to.include({ revseq: lease.revseq + 1, written_at: TH.T0 + 5, ends_at: TH.T0 + 10, born_at: lease.born_at })
+    expect(await softlocked.unseal(BaseBox, sealed)).to.deep.include(Cleartexts)
+  })
+
+  it("refuses once this lease is evicted, and an ends_at that is no time", async () => {
+    const { lease } = await leaseWorld()
+    TH.expectSyncRefusal(() => lease.nextEndingAt('soon' as never), 'bad_record')
+    lease.evict()
+    TH.expectSyncRefusal(() => lease.nextEndingAt(TH.T0 + 10), 'bank_locked')
+  })
+})
+
+describe("lease.stow(deviceDB)", () => {
+  it("stows its record, its keys with it, so that a Lease made of the record peeked unseals what it sealed", async () => {
+    const { gate, lease } = await leaseWorld()
+    const deviceDB = new MemoryDeviceDB()
+    const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    await lease.stow(deviceDB)
+    const stored = await deviceDB.peekLease(TH.WorldScope)
+    expect(stored).to.deep.include(pick(lease, ShownFieldnames))
+    const reloaded = Lease.make(stored as LiveLeaseRecord, { gate })
+    expect(await reloaded.unseal(BaseBox, sealed)).to.deep.include(Cleartexts)
+  })
+
+  it("leaves a newer record stored in place", async () => {
+    const { lease } = await leaseWorld()
+    const deviceDB = new MemoryDeviceDB()
+    const tombstone = Lease.tombstoneOf(lease)
+    await deviceDB.stowLease(tombstone)
+    await lease.stow(deviceDB)
+    expect(await deviceDB.peekLease(TH.WorldScope)).to.deep.equal(tombstone)
+  })
+
+  it("refuses once this lease is evicted, stowing nothing, and a deviceDB that is not one", async () => {
+    const { lease } = await leaseWorld()
+    const deviceDB = new MemoryDeviceDB()
+    await TH.expectRefusal(lease.stow({ peekLease: vi.fn() } as never), 'bad_record')
+    lease.evict()
+    await TH.expectRefusal(lease.stow(deviceDB), 'bank_locked')
+    expect(await deviceDB.peekLease(TH.WorldScope)).to.be.null
   })
 })
 

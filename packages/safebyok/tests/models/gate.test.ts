@@ -22,9 +22,9 @@ const GateFields = [...ThingFields, 'wayins', 'auth', 'sigs', 'meta']
 
 /** The lease verbs of a world, for a gate made alone, on which no test here builds a lease. */
 const AloneFriend: WorldGateFriend = {
-  leaseGateOf: () => { throw new Error("No lease is built on a gate made alone.") },
-  renewal:     () => null,
-  attachLease: noop,
+  leaseGateOf:   () => { throw new Error("No lease is built on a gate made alone.") },
+  leaseFollowed: () => { throw new Error("No lease is built on a gate made alone.") },
+  attachLease:   noop,
 }
 
 /** The gate of `record`, made alone on `device`, by default a new device of {@link TH.WorldScope}. */
@@ -408,11 +408,14 @@ describe("the lease a proof grants a gate", () => {
     expect(make.mock.calls[0]![0]).to.include({ born_at: TH.T0 + 5, proved_at: TH.T0 + 5 })
   })
 
-  it("renews the lease the gate holds across a gate verb, citing the revision it writes", async () => {
+  it("renews the lease the gate holds across a gate verb, citing the revision it writes, and leaves it out of its softlock", async () => {
     const { bank } = await TH.buildBornBank()
     vi.setSystemTime(TH.T0 + 5)
     const make = vi.spyOn(Lease, 'make')
     await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'a different passphrase, just as long' })
-    expect(make.mock.calls[0]![0]).to.include({ born_at: TH.T0, proved_at: TH.T0 + 5, gate_revtok: bank.gate.revtok })
+    // The gate's news softlocks the lease first; the renewal follows that softlock.
+    expect(make.mock.calls.map(([record]) => record.revseq)).to.deep.equal([1, 2])
+    expect(make.mock.lastCall![0]).to.include({ born_at: TH.T0, proved_at: TH.T0 + 5, gate_revtok: bank.gate.revtok })
+    expect(bank.gate.isSoftlocked).to.be.false
   })
 })

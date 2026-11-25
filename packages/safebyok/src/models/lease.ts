@@ -7,13 +7,15 @@ import * as Phrases from '../phrases'
 import { maskUuid } from '../helpers/mask-uuid'
 import { type Banklabel, type EpochMillis, type Lifepath, type Lifeseq, type Lifetok, type Revtok, type Userid, Labelpath, VoidLifeseq } from '../shapes/primitives'
 import type { Modelkind, Sparse, ThingRecord, ThingScope } from '../shapes/shapes-thing'
-import { type LeaseGate, type LeaseOpts, type SecretFieldname, GateishChecks } from '../shapes/shapes-gateish'
+import { type LeaseGate, type LeaseOpts, type LeaseShellScope, type SecretFieldname, GateishChecks } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import type { LiveOf, ShellOf } from '../shapes/shapes-sealers'
 import {
-  type BankStamp, type GateStamp, type LeaseLabelpath, type LeaseLoggable, type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat, StampChecks, leaseLabelpathOf,
+  type BankStamp, type LeaseLabelpath, type LeaseLoggable, type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat, StampChecks, leaseLabelpathOf,
 } from '../shapes/shapes-stamps'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
+import { DeviceDBChecks } from '../shapes/shapes-device-db'
+import type { DeviceDB } from '../storage/device-db'
 import * as Throwers from '../refusals/throwers'
 
 /** Any sealer, whatever it seals. */
@@ -117,7 +119,7 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
   // within a life. None of these is bound into the wrap of its bankKey, which binds the stamp alone.
 
   /** The shell of the lease of the gate at `gateScope`: what the first lease follows where none is stored. */
-  static shellOf(gateScope: Pick<GateStamp, 'userid' | 'banklabel' | 'labelpath'>): ShellOf<LeaseRecord> {
+  static shellOf(gateScope: LeaseShellScope): ShellOf<LeaseRecord> {
     const { userid, banklabel, labelpath: gate_labelpath } = Checks.gateScope.parse(gateScope)
     const labelpath = leaseLabelpathOf(gate_labelpath)
     return StampChecks.leaseShell.parse({
@@ -153,6 +155,24 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
   static tombstoneOf(live: Sparse<LiveOf<LeaseRecord>>, written_at: EpochMillis = Clock.nowMillis()): LeaseTombstone {
     const { live: lease, written_at: writtenAt } = Checks.tombstoneArgs.parse({ live, written_at })
     return StampChecks.leaseTombstone.parse({ ...lease, ...BaseThing.nextLifeOf(lease), revtok: Crypto.randomId(), revseq: lease.revseq + 1, written_at: writtenAt, am: 'x' })
+  }
+  // --
+
+  // == [Revising and stowing]: nextEndingAt, stow
+
+  /** This lease's next revision, ending at `ends_at`, such as a softlock's: a new Lease, granted to the same gate, whose bankKey unwraps as this one's does. Refuses once this lease is evicted. */
+  nextEndingAt(ends_at: EpochMillis): Lease {
+    this.demandEnabled()
+    // demandEnabled refuses an evicted lease, whose record is null.
+    return Lease.make(Lease.makeNextRecord(this.#record!, { ends_at }), { gate: this.#gate })
+  }
+
+  /** Stow this lease's record, its keys with it, in `deviceDB`, where it is newer than the record stored there. Refuses as `deviceDB.stowLease` does, and once this lease is evicted. */
+  async stow(deviceDB: DeviceDB): Promise<void> {
+    const { deviceDB: checked } = Checks.stowArgs.parse({ deviceDB })
+    this.demandEnabled()
+    // demandEnabled refuses an evicted lease, whose record is null.
+    await checked.stowLease(this.#record!)
   }
   // --
 
@@ -321,7 +341,7 @@ function sealerMembersOf(val: unknown): Partial<Record<keyof AnySealer, unknown>
 // == [Checks]: Checks
 
 // Defined here, not with the shapes: it names a model class.
-/** The checks of the arguments of {@link Lease.make} and the record statics, and of the sealer a seal or unseal is given. */
+/** The checks of the arguments of {@link Lease.make}, the record statics and {@link Lease.stow}, and of the sealer a seal or unseal is given. */
 const Checks = Validator.Checkers('bad_record', ({ obj, str, fn, custom, epochMillis }) => {
   const sealerMembers = obj({
     donorPropsOf:     fn(),
@@ -344,6 +364,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, str, fn, custom, epochMi
     nextRevisionArgs:  obj({ followed: StampChecks.leaseSparseOrShell, written_at: epochMillis }),
     nextRecordArgs:    obj({ live: StampChecks.liveLeaseRecord, revised: obj({ ends_at: epochMillis }) }),
     tombstoneArgs:     obj({ live: StampChecks.liveLeaseSparse, written_at: epochMillis }),
+    stowArgs:          obj({ deviceDB: DeviceDBChecks.deviceDB }),
     sealer:            custom<AnySealer>((val) => sealerMembers.safeParse(sealerMembersOf(val)).success, Phrases.SealerExpected),
   }
 })

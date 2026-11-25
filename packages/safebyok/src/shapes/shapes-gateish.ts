@@ -114,15 +114,18 @@ export type AddPasskeyDna = { passphrase: string, nextPasskeyAnswer: GX.PasskeyA
 export type RevokePasskeyDna = { passphrase?: string | undefined, passkeyAnswer?: GX.PasskeyAnswer | null | undefined }
 // --
 
-// == [Given to a gating]: BirthGatingFriend, GateGatingFriend, WorldGateFriend
+// == [Given to a gating]: BirthGatingFriend, GateGatingFriend, LeaseShellScope, WorldGateFriend
 
 /** A world's lease verbs, for {@link Bank.birth}'s gating to call. Internal. */
 export interface BirthGatingFriend {
   /** A lease `proving` builds, granted in the world under `bankStamp` and citing `cited`, the gate revision it proves: the birth seals its root box under it. */
   leaseByProving: (proving: Proving, bankStamp: BankStamp, cited: GateRevisionedStamp) => Promise<Lease>
-  /** Attach `lease` to the world, unlocking it. */
+  /** Attach `lease` to the world, unlocking it, and stow it in the deviceDB. */
   attachLease:    (lease: Lease) => void
 }
+
+/** What names a gate's lease shell: the gate's bank scope and labelpath. */
+export type LeaseShellScope = Pick<GateStamp, 'userid' | 'banklabel' | 'labelpath'>
 
 /** A gate's private verbs, for its form verbs' gatings to call. Internal. */
 export interface GateGatingFriend {
@@ -135,11 +138,11 @@ export interface GateGatingFriend {
 /** A world's lease verbs, for each gate it makes to call. Internal. */
 export interface WorldGateFriend {
   /** The world as a lease granted under `bankStamp` reads it back. */
-  leaseGateOf: (bankStamp: BankStamp) => LeaseGate
-  /** The world's lease, as the Thing fields a renewal follows, or null while locked. */
-  renewal:     () => Sparse<LeaseRecord> | null
-  /** Attach `lease` in place of the world's lease, resuming every call waiting for an `unlock` gating. Refuses on a disabled world. */
-  attachLease: (lease: Lease) => void
+  leaseGateOf:   (bankStamp: BankStamp) => LeaseGate
+  /** The Thing fields a lease granted under the gate at `gateScope` follows: the lease record the deviceDB stores, the world's lease, or the gate's lease shell. */
+  leaseFollowed: (gateScope: LeaseShellScope) => Promise<Sparse<LeaseRecord>>
+  /** Attach `lease` in place of the world's lease, resuming every call waiting for an `unlock` gating, and stow it in the deviceDB. Refuses on a disabled world. */
+  attachLease:   (lease: Lease) => void
 }
 // --
 
