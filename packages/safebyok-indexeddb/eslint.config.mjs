@@ -1,4 +1,4 @@
-// eslint.config.mjs -- lint rules for the IndexedDB bankDB, copied from the core's (packages/safebyok-big/).
+// eslint.config.mjs -- lint rules for the IndexedDB vaultDB, copied from the core's (packages/safebyok-big/).
 // The core's config is the authority on house style: where the two disagree, the core's is right and this
 // one has the bug. This copy has its own config names and no console logger to exempt.
 //
@@ -79,7 +79,7 @@ export default defineConfig([
   // src/, through the `@safebyok/source` condition the tsconfig asks for too (tsconfig.base.json),
   // so lint never depends on a dist/ that may be missing or stale.
   {
-    name: 'safebyok-indexeddb/type-aware',
+    name: 'safebyok-idb-lean/type-aware',
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -97,7 +97,7 @@ export default defineConfig([
 
   // == [3a. House style] ==
   {
-    name: 'safebyok-indexeddb/house-style',
+    name: 'safebyok-idb-lean/house-style',
     files: SourceFiles,
     plugins: { '@stylistic': stylistic },
     rules: {
@@ -195,7 +195,7 @@ export default defineConfig([
   // decides what may be logged. A stray debug line is how a key ends up in someone's log drain.
   // Randomness is the platform's CSPRNG (`crypto.getRandomValues`), never Math.random.
   {
-    name: 'safebyok-indexeddb/secret-keeping',
+    name: 'safebyok-idb-lean/secret-keeping',
     files: ['src/**/*.ts'],
     rules: {
       'no-console':              'error',
@@ -213,7 +213,7 @@ export default defineConfig([
   // src/ is platform-neutral: no Node module, and none of Node's globals. The tests and configs run
   // under Node, so the TS project types Node's globals for them, and only this rule keeps src/ clean.
   {
-    name: 'safebyok-indexeddb/platform-neutral',
+    name: 'safebyok-idb-lean/platform-neutral',
     files: ['src/**/*.ts'],
     rules: {
       'import-x/no-nodejs-modules': 'error',
@@ -228,7 +228,7 @@ export default defineConfig([
   // on, so a host bundles one Zod. `zod/mini` would bundle a second beside it, some 7 kB gzipped
   // more; named and star imports shake alike.
   {
-    name: 'safebyok-indexeddb/zod-size',
+    name: 'safebyok-idb-lean/zod-size',
     files: ['src/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', {
@@ -245,7 +245,7 @@ export default defineConfig([
   // Each of these is a reasonable default that STYLE.md rules out explicitly. Turned off here
   // rather than disabled at every call site.
   {
-    name: 'safebyok-indexeddb/house-overrides',
+    name: 'safebyok-idb-lean/house-overrides',
     files: SourceFiles,
     rules: {
       // STYLE.md sanctions the one-line doc block: `/** Brief statement, if that's truly enough */`.
@@ -308,7 +308,7 @@ export default defineConfig([
   // variable, a parameter, a destructured name -- never a property, so `{ name: 'AES-GCM' }`, as
   // WebCrypto spells its algorithms, stays legal.
   {
-    name: 'safebyok-indexeddb/forbidden-names',
+    name: 'safebyok-idb-lean/forbidden-names',
     files: SourceFiles,
     rules: {
       'no-restricted-syntax': ['error', ...[
@@ -327,7 +327,7 @@ export default defineConfig([
   // A config file's whole job is the call it exports. The package itself is `sideEffects: false`,
   // so the rule stays on everywhere else.
   {
-    name: 'safebyok-indexeddb/config-files',
+    name: 'safebyok-idb-lean/config-files',
     files: ['*.config.{ts,mts,mjs}', 'eslint.config.mjs'],
     rules: {
       'unicorn/no-top-level-side-effects': 'off',
@@ -338,7 +338,7 @@ export default defineConfig([
   // etc can send the coach-coder development loop into a tailspin.
   // Use them judiciously, and ALWAYS report it in chat.
   {
-    name: 'safebyok-indexeddb/can-we-be-adults-yes-we-can',
+    name: 'safebyok-idb-lean/can-we-be-adults-yes-we-can',
     files: SourceFiles,
     rules: {
       '@typescript-eslint/ban-ts-comment':                'off',
@@ -351,7 +351,7 @@ export default defineConfig([
   // STYLE.md *Comments and doc blocks*: only rules that remove content or fix the shape; no count caps. Every rule is at
   // warn until the documentarian sweep has brought the code up to them.
   {
-    name: 'safebyok-indexeddb/doc-blocks',
+    name: 'safebyok-idb-lean/doc-blocks',
     files: ['src/**/*.ts'],
     plugins: { jsdoc },
     rules: {
@@ -410,14 +410,14 @@ export default defineConfig([
   // This file and any other loose script sit outside the TS project, so the
   // type-aware rules above cannot run on them. Last, so it wins.
   {
-    name: 'safebyok-indexeddb/untyped-config-files',
+    name: 'safebyok-idb-lean/untyped-config-files',
     files: ['**/*.mjs', '**/*.js', '**/*.cjs'],
     extends: [tseslint.configs.disableTypeChecked],
   },
 
   // == [Tests] ==
   {
-    name: 'safebyok-indexeddb/tests',
+    name: 'safebyok-idb-lean/tests',
     files: ['tests/**/*.ts'],
     extends: [vitest.configs.recommended],
     rules: {
@@ -450,7 +450,7 @@ export default defineConfig([
   // no-unused-expressions lets an expect chain stand as a statement, and still reports any other
   // expression that does nothing.
   {
-    name: 'safebyok-indexeddb/tests-chai',
+    name: 'safebyok-idb-lean/tests-chai',
     files: ['tests/**/*.ts'],
     plugins: { 'chai-expect': chaiExpect, 'chai-friendly': chaiFriendly },
     rules: {

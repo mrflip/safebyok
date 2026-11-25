@@ -1,9 +1,25 @@
 {
-  "name": "safebyok-react-lean",
-  "private": true,
-  "version": "0.0.0",
-  "description": "The new React layer for safebyok: the giver, the provider and their parts. Private until it replaces safebyok-react.",
+  "name": "safebyok-react",
+  "private": false,
+  "version": "0.5.0",
+  "description": "React binding for safebyok: a provider that follows the signed-in user, snapshot hooks, and the ask-for-the-passphrase-on-demand guard.",
+  "keywords": [
+    "safebyok",
+    "react",
+    "vault",
+    "e2ee"
+  ],
   "license": "Apache-2.0",
+  "author": "Philip (flip) Kromer <flip@mrflip.com>",
+  "homepage": "https://github.com/mrflip/safebyok#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrflip/safebyok.git",
+    "directory": "packages/safebyok-react"
+  },
+  "bugs": {
+    "url": "https://github.com/mrflip/safebyok/issues"
+  },
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -16,7 +32,7 @@
     "build": "tsdown",
     "prebuild": "pnpm build:deps",
     "build:watch": "tsdown --watch",
-    "build:deps": "[ \"$SAFEBYOK_SKIP_BUILD_DEPS\" = 1 ] || SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok-react-lean^...' build",
+    "build:deps": "[ \"$SAFEBYOK_SKIP_BUILD_DEPS\" = 1 ] || SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok-react^...' build",
     "lint": "eslint --cache --cache-strategy content --cache-location .eslintcache .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -24,7 +40,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "pretest:coverage": "pnpm build:deps",
-    "justify": "pnpm install && pnpm lint && pnpm typecheck && pnpm test && SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm build"
+    "justify": "pnpm install && pnpm lint && pnpm typecheck && pnpm test && SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm build",
+    "prepublishOnly": "node ../../scripts/require-pnpm.ts && pnpm justify"
   },
   "devDependencies": {
     "@arethetypeswrong/core": "^0.18.5",
@@ -52,18 +69,22 @@
     "publint": "^0.3.25",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "safebyok-big": "workspace:*",
     "tsdown": "^0.23.7",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.72.2",
-    "use-effect-event": "^2.0.4",
     "vitest": "^5.1.0"
   },
   "peerDependencies": {
-    "@tanstack/react-query": "^5.107.1",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "use-effect-event": "^2.0.4",
-    "vitest": "^5.0.0"
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "safebyok-big": "workspace:^",
+    "@tanstack/react-query": "^5.107.1"
+  },
+  "peerDependenciesMeta": {
+    "@tanstack/react-query": {
+      "optional": true
+    }
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -74,26 +95,19 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./kit": {
-      "@safebyok/source": "./src/kit/index.ts",
-      "import": "./dist/kit/index.js",
-      "require": "./dist/kit/index.cjs"
-    },
-    "./parts": {
-      "@safebyok/source": "./src/parts/index.ts",
-      "import": "./dist/parts/index.js",
-      "require": "./dist/parts/index.cjs"
-    },
-    "./testing": {
-      "@safebyok/source": "./tests/testing.ts",
-      "import": "./dist/testing.js",
-      "require": "./dist/testing.cjs"
+    "./devmode": {
+      "@safebyok/source": "./src/devmode/index.ts",
+      "import": "./dist/devmode/index.js",
+      "require": "./dist/devmode/index.cjs"
     },
     "./package.json": "./package.json"
   },
-  "dependencies": {
-    "es-toolkit": "^1.53.2",
-    "safebyok": "workspace:*"
+  "typesVersions": {
+    "*": {
+      "devmode": [
+        "./dist/devmode/index.d.cts"
+      ]
+    }
   },
   "publishConfig": {
     "exports": {
@@ -101,37 +115,11 @@
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
       },
-      "./kit": {
-        "import": "./dist/kit/index.js",
-        "require": "./dist/kit/index.cjs"
-      },
-      "./parts": {
-        "import": "./dist/parts/index.js",
-        "require": "./dist/parts/index.cjs"
-      },
-      "./testing": {
-        "import": "./dist/testing.js",
-        "require": "./dist/testing.cjs"
+      "./devmode": {
+        "import": "./dist/devmode/index.js",
+        "require": "./dist/devmode/index.cjs"
       },
       "./package.json": "./package.json"
-    }
-  },
-  "typesVersions": {
-    "*": {
-      "parts": [
-        "./dist/parts/index.d.cts"
-      ],
-      "kit": [
-        "./dist/kit/index.d.cts"
-      ],
-      "testing": [
-        "./dist/testing.d.cts"
-      ]
-    }
-  },
-  "peerDependenciesMeta": {
-    "vitest": {
-      "optional": true
     }
   }
 }

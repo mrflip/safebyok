@@ -1,5 +1,5 @@
 {
-  // The IndexedDB vault store: platform-neutral src/, whose IndexedDB and BroadcastChannel are
+  // IdbVaultDB, the IndexedDB vault database: platform-neutral src/, whose IndexedDB and BroadcastChannel are
   // typed by the DOM lib, and tests and configs run under Node, with fake-indexeddb as the
   // database. eslint keeps Node's modules and globals out of src/.
   "extends": "../../tsconfig.base.json",

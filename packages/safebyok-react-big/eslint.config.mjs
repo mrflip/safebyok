@@ -165,8 +165,6 @@ export default defineConfig([
       'no-negated-condition':                      ['error'],
       // STYLE.md: const by default, let where genuinely reassigned, never var.
       'no-var':                                    ['error'],
-      // Strict equality only: `== null` folds undefined into null, and the two mean different things here.
-      'eqeqeq':                                    ['error', 'always'],
       'no-unsafe-negation':                        ['error', { enforceForOrderingRelations: true }],
       'prefer-destructuring':                      ['warn', { object: true, array: false }],
 

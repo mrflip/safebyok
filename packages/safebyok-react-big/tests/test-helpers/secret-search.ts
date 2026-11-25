@@ -1,8 +1,5 @@
 /** Searches for a secret in what a test can reach: a value's own data, and everything React holds of a rendered tree. */
 
-import type { QueryClient } from '@tanstack/react-query'
-import { expect } from 'vitest'
-
 // == [Searching]: holdsText, childrenOf, reactTreeOf
 
 /** True when `text` appears in a string reachable from `root` through own data properties, Map and Set entries, FormData entries, or an Error's message and cause.
@@ -39,16 +36,5 @@ export function reactTreeOf(container: Element): unknown {
   const ckey = Object.keys(container).find((each) => each.startsWith('__reactContainer$'))
   if (ckey === undefined) { throw new Error('Nothing is rendered into this container') }
   return (container as unknown as Record<string, unknown>)[ckey]
-}
-// --
-
-// == [Asserting]: expectTextUnheld
-
-/** Assert `text` is in nothing React holds of the tree rendered into `container`, and, given `clients`, in no query or mutation one keeps. */
-export function expectTextUnheld(text: string, container: Element, clients?: QueryClient | readonly QueryClient[]): void {
-  expect(holdsText(reactTreeOf(container), text), 'React holds the text').to.eq(false)
-  if (clients === undefined) { return }
-  const entries = [clients].flat().flatMap((client) => [...client.getQueryCache().getAll(), ...client.getMutationCache().getAll()])
-  expect(holdsText(entries.map((entry) => entry.state), text), 'the QueryClient holds the text').to.eq(false)
 }
 // --
