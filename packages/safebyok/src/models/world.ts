@@ -14,7 +14,6 @@ import { PendingWorld, SignedOutWorld, WorldChecks, isRootShelf } from '../shape
 import type { BirthCleartexts, BirthDna, BirthGatingFriend, GateRevisionedStamp, LeaseGate, LeaseShellScope, WorldGateFriend } from '../shapes/shapes-gateish'
 import { type MaskedViewLease, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import type * as Sealers from '../shapes/shapes-sealers'
-import type { LiveOf } from '../shapes/shapes-sealers'
 import { type BankStamp, type LeaseLoggable, type LeaseRecord, StampChecks, leaseScopeOf } from '../shapes/shapes-stamps'
 import { type BankRecord, type BoxRecord, type BulletproofCallback, type GateRecord, type Sparse, type ThingRecord, type Thingkind, type VoidSentinel, PerKindChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
@@ -279,8 +278,16 @@ export class World {
   /** The Thing fields a lease granted under the gate at `gateScope` follows: the lease record stored, or this world's lease where none is stored or this one is newer, or else the gate's lease shell. */
   async #leaseFollowed(gateScope: LeaseShellScope): Promise<Sparse<LeaseRecord>> {
     const stored = await this.#peekStored(gateScope)
-    if (this.#isNewerThanLease(stored)) { return stored }
+    if (this.#isNewerThanLease(stored)) { return this.#endedIfStale(stored) }
     return this.#lease ?? Lease.shellOf(gateScope)
+  }
+
+  // A renewal happens only while a lease is granted: a grant after the stored lease has ended, as when every tab closed
+  // past its end, starts the next life.
+  /** The record a grant follows over `stored`: its tombstone, written now, where `stored` is live but can no longer unlock the bank, or else `stored` itself */
+  #endedIfStale(stored: LeaseRecord): Sparse<LeaseRecord> {
+    const isStale = (stored.am === 'a') && ! this.#canUnlock(stored)
+    return isStale ? Lease.tombstoneOf(stored) : stored
   }
 
   /** Attach `lease`, and stow it in the deviceDB for every tab to take up. */
@@ -409,30 +416,33 @@ export class World {
     return (stored !== null) && ((this.#lease === null) || (BaseThing.cmp(this.#lease, stored) > 0))
   }
 
-  /** Attach the Lease of `stored` where it can unlock the bank, or else drop this world's lease */
+  /** Attach the Lease of `stored` where it can unlock the bank, or else drop this world's lease where it has one, announcing either */
   #takeUp(stored: LeaseRecord): void {
-    if (this.#canUnlock(stored)) {
+    if ((stored.am === 'a') && this.#canUnlock(stored)) {
       this.#attachLease(Lease.make(stored, { gate: this.#leaseGateOf(this.bankStamp) }))
-    } else {
+      this.#device.announce({ kind: 'lease_taken_up' })
+    } else if (this.isUnlocked) {
       this.#dropLease()
+      this.#device.announce({ kind: 'lock_taken_up' })
     }
   }
 
   /** True of a live lease record not past its end, granted under the main gate's life */
-  #canUnlock(stored: LeaseRecord): stored is LiveOf<LeaseRecord> {
+  #canUnlock(stored: Sealers.LiveOf<LeaseRecord>): boolean {
     const { gate } = this
-    return (stored.am === 'a') && (Clock.nowMillis() < stored.ends_at) && (stored.gate_labelpath === gate?.labelpath) && (stored.gate_lifeseq === gate.lifeseq)
+    return (Clock.nowMillis() < stored.ends_at) && (stored.gate_labelpath === gate?.labelpath) && (stored.gate_lifeseq === gate.lifeseq)
   }
 
   // A softlock only ever brings the end nearer, so every tab that hears the same gate change writes the same revision,
   // and the first stow keeps it (notes/wontfix.md).
-  /** Attach and stow the next revision of this world's lease, ending the device's `softlockMillis` from now, where the gate has moved past the revision the lease cites and that end is the nearer */
+  /** Attach, stow and announce the next revision of this world's lease, ending the device's `softlockMillis` from now, where the gate has moved past the revision the lease cites and that end is the nearer */
   #softlockPastGate(): void {
     const lease = this.#lease
     const gateRevseq = this.gate?.revseq ?? SX.VoidRevisionSeq
     const ends_at = Clock.nowMillis() + this.#device.softlockMillis
     if ((lease === null) || (gateRevseq <= lease.gate_revseq) || (ends_at >= lease.ends_at)) { return }
     this.#attachAndStow(lease.nextEndingAt(ends_at))
+    this.#device.announce({ kind: 'softlocked' })
   }
 
   /** The lease record the deviceDB stores for the gate at `gateScope`, or null for none, or where the deviceDB refuses, which goes to the device's `onBadNews` */
@@ -484,10 +494,12 @@ export class World {
   // #lock-is-intent: autolock is a best-effort time, not a deadline. A lease past its end still seals and unseals until
   // the next tick, which may come a janitor period late, or later while the page sleeps. Meanwhile isSoftlocked holds,
   // so a call to ensureUnlocked asks the user first.
-  /** Lock this world where its lease has passed its end */
+  /** Lock this world, and announce it, where its lease has passed its end */
   #lockPastLeaseEnd(): void {
     const { leaseEndsAt } = this
-    if ((leaseEndsAt !== null) && (Clock.nowMillis() >= leaseEndsAt)) { this.lock() }
+    if ((leaseEndsAt === null) || (Clock.nowMillis() < leaseEndsAt)) { return }
+    this.lock()
+    this.#device.announce({ kind: 'autolocked' })
   }
 
   /** Start the VaultMinder's watch where it is not running, and read the roots again where the gate is stale */

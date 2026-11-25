@@ -1,7 +1,7 @@
-/** The world: the Things `world.makeThing` makes of each record, the bank, main gate and bank stamp it finds in its VaultMinder, and its snapshot. */
+/** The world: the Things `world.makeThing` makes of each record, the bank, main gate and bank stamp it finds in its VaultMinder, its snapshot, the lease its tabs share, and what it announces to `onLifecycle`. */
 
 import { noop } from 'es-toolkit'
-import { describe, expect, expectTypeOf, it, vi } from 'vitest'
+import { type Mock, afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { Clock, Consts } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
 import { Box } from '../../src/models/box'
@@ -9,7 +9,7 @@ import type { Device } from '../../src/models/device'
 import { Gate } from '../../src/models/gate'
 import * as Throwers from '../../src/refusals/throwers'
 import { Lifeseq } from '../../src/shapes/primitives'
-import { type BadNews, type DeviceOpts, type WorldSnapshot, PendingWorld, bankStageVals } from '../../src/shapes/shapes-bankish'
+import { type BadNews, type DeviceOpts, type LifecycleHandler, type Lifecyclekind, type WorldSnapshot, PendingWorld, bankStageVals } from '../../src/shapes/shapes-bankish'
 import type { LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import type { SeenThing } from '../../src/shapes/shapes-vault-event'
@@ -522,6 +522,18 @@ describe("a lease shared by the tabs of one deviceDB", () => {
     expect(later.world.getSnapshot().stage).to.eq('locked')
   })
 
+  it("starts the next life at an unlock after the lease stored has passed its end, as when every tab closed while it was live", async () => {
+    const [vaultDB, deviceDB] = [new MemoryVaultDB(), new MemoryDeviceDB()]
+    const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, deviceDB }) })
+    device.disconnect()
+    const later = TH.T0 + device.leaseMillis
+    vi.setSystemTime(later)
+    const reloaded = TH.makeDevice({}, { vaultDB, deviceDB })
+    await reloaded.signin(TH.WorldScope.userid)
+    await reloaded.world.gate!.unlock({ passphraseCleartext: TH.TestPassphrase })
+    expect(await storedLeaseOf(deviceDB)).to.include({ am: 'a', lifeseq: Lifeseq.ofLifenum(2), revseq: 2, born_at: later })
+  })
+
   it("keeps its own lease where an older lease record rings", async () => {
     const onBadNews = vi.fn()
     const { first, second, deviceDB } = await twoTabs({ onBadNews })
@@ -618,5 +630,78 @@ describe("a lease shared by the tabs of one deviceDB", () => {
     await second.signin(TH.WorldScope.userid)
     await settle()
     expect(second.world.getSnapshot().stage).to.eq('locked')
+  })
+})
+
+/** The kinds `onLifecycle` heard announced on `device`, in order. */
+function kindsHeardOn(onLifecycle: Mock<LifecycleHandler>, device: Device): Lifecyclekind[] {
+  return onLifecycle.mock.calls.filter(([event]) => event.device === device).map(([event]) => event.kind)
+}
+
+describe("the host's onLifecycle", () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it("hears of the lease a tab takes up as it signs in, and nothing of the birth", async () => {
+    const onLifecycle = vi.fn<LifecycleHandler>()
+    const { first, second } = await twoTabs({ onLifecycle })
+    expect([kindsHeardOn(onLifecycle, first.device), kindsHeardOn(onLifecycle, second)]).to.deep.equal([[], ['lease_taken_up']])
+  })
+
+  it("hears of a lock taken up from another tab, and nothing in the tab whose host locked", async () => {
+    const onLifecycle = vi.fn<LifecycleHandler>()
+    const { first, second } = await twoTabs({ onLifecycle })
+    onLifecycle.mockClear()
+    first.device.lock()
+    await settle()
+    expect([kindsHeardOn(onLifecycle, first.device), kindsHeardOn(onLifecycle, second)]).to.deep.equal([[], ['lock_taken_up']])
+  })
+
+  it("hears of an unlock taken up from another tab, and nothing in the tab whose host unlocked", async () => {
+    const onLifecycle = vi.fn<LifecycleHandler>()
+    const { first, second } = await twoTabs({ onLifecycle })
+    first.device.lock()
+    await settle()
+    onLifecycle.mockClear()
+    await first.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await settle()
+    expect([kindsHeardOn(onLifecycle, first.device), kindsHeardOn(onLifecycle, second)]).to.deep.equal([[], ['lease_taken_up']])
+  })
+
+  it("hears of no lock in a tab that signs in locked", async () => {
+    const onLifecycle = vi.fn<LifecycleHandler>()
+    const { first, vaultDB, deviceDB } = await twoTabs({ onLifecycle })
+    first.device.lock()
+    await settle()
+    const later = TH.makeDevice({}, { vaultDB, deviceDB, onLifecycle })
+    await later.signin(TH.WorldScope.userid)
+    await settle()
+    expect(kindsHeardOn(onLifecycle, later)).to.deep.equal([])
+  })
+
+  it("hears of the janitor's autolock", async () => {
+    const onLifecycle = vi.fn<LifecycleHandler>()
+    const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { autolockMinutes: 25, janitorMinutes: 10, onLifecycle }) })
+    await vi.advanceTimersByTimeAsync(30 * Consts.MinuteMillis)
+    expect(kindsHeardOn(onLifecycle, device)).to.deep.equal(['autolocked'])
+  })
+
+  it("hears of a softlock as the gate changes elsewhere", async () => {
+    const onLifecycle = vi.fn<LifecycleHandler>()
+    const vaultDB = new MemoryVaultDB()
+    const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, onLifecycle }) })
+    await changeGateElsewhere(vaultDB)
+    expect(kindsHeardOn(onLifecycle, device)).to.deep.equal(['softlocked'])
+  })
+
+  it("may throw, and the tab still follows the stored lease", async () => {
+    vi.stubGlobal('reportError', vi.fn())
+    const onLifecycle = vi.fn<LifecycleHandler>(() => { throw new Error("The handler is broken.") })
+    const { first, second } = await twoTabs({ onLifecycle })
+    first.device.lock()
+    await settle()
+    expect(second.world.isLocked).to.be.true
+    await first.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await settle()
+    expect(second.world.isUnlocked).to.be.true
   })
 })

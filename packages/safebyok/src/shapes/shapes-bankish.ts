@@ -4,7 +4,7 @@ import type { QueryClient } from '@tanstack/query-core'
 import type * as Z from 'zod'
 import { CX, type Deriver, type EX, type Errors, type Logger, Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
-import type { DefaultOnBadNews, Device } from '../models/device'
+import type { DefaultOnBadNews, DefaultOnLifecycle, Device } from '../models/device'
 import type { World } from '../models/world'
 import type { DeviceDB } from '../storage/device-db'
 import type { VaultDB } from '../storage/vault-db'
@@ -79,7 +79,7 @@ function isHostedVault(val: unknown): val is HostedVault {
 }
 // --
 
-// == [The device]: BankishChecks, DefaultBanklabel, DeviceRecord, DeviceJSON, BadNews, BadNewsHandler, RootShelf, isRootShelf, RootShelfMethodnames, DeviceOpts
+// == [The device]: BankishChecks, DefaultBanklabel, DeviceRecord, DeviceJSON, BadNews, BadNewsHandler, lifecyclekindVals, Lifecyclekind, DeviceAnnouncement, DeviceEvent, LifecycleHandler, GuardedLifecycleHandler, RootShelf, isRootShelf, RootShelfMethodnames, DeviceOpts
 
 /** The banklabel of the bank a device serves where its record names none. */
 export const DefaultBanklabel = 'main'
@@ -104,6 +104,30 @@ export interface BadNews {
 
 /** `Device.make`'s `onBadNews`: hears each refusal no caller waits on. */
 export type BadNewsHandler = (badnews: BadNews) => unknown
+
+/** The kinds of what a device announces to `onLifecycle`, as {@link DeviceAnnouncement} tells them. */
+export const lifecyclekindVals = ['lease_taken_up', 'lock_taken_up', 'autolocked', 'softlocked'] as const
+
+/** One of {@link lifecyclekindVals}. */
+export type Lifecyclekind = typeof lifecyclekindVals[number]
+
+// #lock-is-intent: each is news of what happened, never an alarm.
+/** What changed a device's lease, other than its own lock, unlock or disable, by its `kind`:
+ * - `'lease_taken_up'` -- this tab took up the lease the deviceDB stores, newer than its own: an unlock, a renewal or a softlock in another tab, or, as it signs in or connects, one stowed before
+ * - `'lock_taken_up'`  -- this tab dropped its lease, as the deviceDB stores one that no longer unlocks the bank: a lock in another tab, its autolock among them
+ * - `'autolocked'`     -- this tab's janitor locked the lease past its end, in every tab
+ * - `'softlocked'`     -- the bank's gate changed, so this tab brought its lease's end to `softlockMinutes` from now
+ */
+export type DeviceAnnouncement = Readonly<{ kind: Lifecyclekind }>
+
+/** What `onLifecycle` hears: a {@link DeviceAnnouncement}, and the device it happened to. */
+export type DeviceEvent = DeviceAnnouncement & Readonly<{ device: Device }>
+
+/** `Device.make`'s `onLifecycle`: hears what changed the device's lease, other than its own lock, unlock or disable. */
+export type LifecycleHandler = (event: DeviceEvent) => unknown
+
+/** `onLifecycle` as a device keeps it, wrapped by `guardOnLifecycle`. It never throws. */
+export type GuardedLifecycleHandler = (event: DeviceEvent) => Promise<void>
 
 /** Where a device keeps the signed-in bank's three roots between page loads: `localStorage`, or anything with its three methods. */
 export type RootShelf = Readonly<{
@@ -142,6 +166,8 @@ export interface DeviceOpts {
   gateStaleMinutes?: number | undefined
   /** Hears each refusal no caller waits on. Default: {@link DefaultOnBadNews}, a warning on the device's logger. */
   onBadNews?:        BadNewsHandler | undefined
+  /** Hears what changed the device's lease, other than your own lock, unlock or disable: a lease taken up as the device signs in or connects, a lock or an unlock in another tab, the autolock, a softlock. Your own gate verb (replacing the passphrase, adding or revoking a passkey) announces `softlocked` in its own tab. What it throws or rejects with is reported to the platform. Default: {@link DefaultOnLifecycle}, which does nothing. */
+  onLifecycle?:      LifecycleHandler | undefined
   /** The QueryClient the signed-in user's boxes are kept in, under their bank's key: your own, so one client serves your queries and the vault's. Default: one the device makes. */
   queryClient?:      QueryClient | undefined
   /** Where the device keeps the signed-in bank's three roots between page loads: hand it `localStorage`. Without one, nothing is kept, and each page load waits on the vaultDB for the bank. */

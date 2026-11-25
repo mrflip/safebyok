@@ -3,7 +3,7 @@
 // while it is built. The proving classes are exported as types alone: a proving's `buildLease` is public, and a proving is
 // built only in a form verb's gating, which hands it to the gate's private verbs.
 export { Bank } from './models/bank'
-export { DefaultGateStaleMillis, DefaultJanitorMillis, DefaultLeaseMillis, DefaultOnBadNews, DefaultSoftlockMillis, Device, tellBadNewsTo } from './models/device'
+export { DefaultGateStaleMillis, DefaultJanitorMillis, DefaultLeaseMillis, DefaultOnBadNews, DefaultOnLifecycle, DefaultSoftlockMillis, Device, tellBadNewsTo } from './models/device'
 export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
 export { BaseBox } from './models/base-box'
 export { Box } from './models/box'
@@ -32,9 +32,9 @@ export {
 export { type VaultDB, isVaultDB } from './storage/vault-db'
 export type { Agerank, ItemSeen, Liveness, ReadTc, VaultAgedEvent, VaultEvent, VaultEventOf, VaultEventkind, VaultItemEvent, VaultLifeEvent } from './shapes/shapes-vault-event'
 export {
-  type BadNews, type BadNewsHandler, type BankAskDraft, type BankStage, type BoxUnsealed, type DeviceJSON, type DeviceOpts, type DeviceRecord,
-  type HostedVault, type RefusalSnapshot, type RootShelf, type ThingMakeOpts, type WorldOpts, type WorldSnapshot,
-  BankishChecks, DefaultBanklabel, PendingWorld, SignedOutWorld, ThingMakeChecks, bankStageVals, isRootShelf, isWorld,
+  type BadNews, type BadNewsHandler, type BankAskDraft, type BankStage, type BoxUnsealed, type DeviceAnnouncement, type DeviceEvent, type DeviceJSON, type DeviceOpts, type DeviceRecord,
+  type HostedVault, type LifecycleHandler, type Lifecyclekind, type RefusalSnapshot, type RootShelf, type ThingMakeOpts, type WorldOpts, type WorldSnapshot,
+  BankishChecks, DefaultBanklabel, PendingWorld, SignedOutWorld, ThingMakeChecks, bankStageVals, isRootShelf, isWorld, lifecyclekindVals,
 } from './shapes/shapes-bankish'
 export {
   type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateGatingFriend, type GateRevisionedStamp, type GatingCleartexts, type GuardedKeyDeriver,

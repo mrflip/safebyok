@@ -9,7 +9,7 @@ import { BaseThing } from './base-thing'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import { guardRootShelf } from '../minding/root-shelf'
 import { VaultTSQ } from '../minding/vault-tsq'
-import { type BadNewsHandler, type DeviceJSON, type DeviceOpts, type DeviceRecord, type RootShelf, BankishChecks, isRootShelf } from '../shapes/shapes-bankish'
+import { type BadNewsHandler, type DeviceAnnouncement, type DeviceEvent, type DeviceJSON, type DeviceOpts, type DeviceRecord, type GuardedLifecycleHandler, type LifecycleHandler, type RootShelf, BankishChecks, isRootShelf, lifecyclekindVals } from '../shapes/shapes-bankish'
 import { type MaskedView, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import { isQueryClient } from '../shapes/shapes-vault-tsq'
 import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
@@ -50,7 +50,7 @@ export const DefaultGateStaleMillis = 12 * 60 * 60_000
  * reloading the page.
  */
 export class Device {
-  // == [Props]: banklabel, device_tok, vaultDB, deviceDB, keyDeriver, strengthChecker, logger, leaseMillis, softlockMillis, janitorMillis, gateStaleMillis, #onBadNews, #rootShelf, #vaultTsqClient, #world, #userid, #vaultTSQ, #vault, #signinAnswer, #endCause, toJSON
+  // == [Props]: banklabel, device_tok, vaultDB, deviceDB, keyDeriver, strengthChecker, logger, leaseMillis, softlockMillis, janitorMillis, gateStaleMillis, #onBadNews, #onLifecycle, #rootShelf, #vaultTsqClient, #world, #userid, #vaultTSQ, #vault, #signinAnswer, #endCause, toJSON
 
   /** The label of the bank this device serves each user. */
   readonly banklabel:          Banklabel
@@ -75,6 +75,8 @@ export class Device {
 
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
+  /** The host's `onLifecycle`, or the default, guarded. */
+  readonly #onLifecycle: GuardedLifecycleHandler
   /** The host's root shelf, guarded, which the signed-in bank's roots are read from and put to, or null for none. */
   readonly #rootShelf: RootShelf | null
   /** The QueryClient the vault TSQ keeps the boxes in: the host's, or one made with the device. */
@@ -145,7 +147,7 @@ export class Device {
   static make(record: DeviceRecord, opts: DeviceOpts): Device { return new Device(record, opts) }
 
   private constructor(record: DeviceRecord, opts: DeviceOpts) {
-    const { record: { banklabel, device_tok }, opts: { vaultDB, deviceDB = new MemoryDeviceDB(), keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, softlockMinutes, janitorMinutes, gateStaleMinutes, onBadNews = DefaultOnBadNews, queryClient = new QueryClient(), rootShelf } } = Checks.deviceMakeArgs.parse({ record, opts })
+    const { record: { banklabel, device_tok }, opts: { vaultDB, deviceDB = new MemoryDeviceDB(), keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, softlockMinutes, janitorMinutes, gateStaleMinutes, onBadNews = DefaultOnBadNews, onLifecycle = DefaultOnLifecycle, queryClient = new QueryClient(), rootShelf } } = Checks.deviceMakeArgs.parse({ record, opts })
     this.banklabel = banklabel
     this.device_tok = device_tok
     Helpers.decorate<Device>(this, { vaultDB, deviceDB, keyDeriver: guardKeyDeriver(keyDeriver), strengthChecker: guardStrengthChecker(strengthChecker), logger: Logger.parseLogger(logger) })
@@ -154,6 +156,7 @@ export class Device {
     this.janitorMillis   = millisOf(janitorMinutes, DefaultJanitorMillis)
     this.gateStaleMillis = millisOf(gateStaleMinutes, DefaultGateStaleMillis)
     this.#onBadNews = onBadNews
+    this.#onLifecycle = guardOnLifecycle(onLifecycle)
     this.#rootShelf = (rootShelf === undefined) ? null : guardRootShelf(rootShelf, (news) => { this.tellBadNews([news]) })
     this.#vaultTsqClient = queryClient
     this.#world = World.make({ device: this })
@@ -285,7 +288,7 @@ export class Device {
   }
   // --
 
-  // == [Telling the host]: tellBadNews
+  // == [Telling the host]: tellBadNews, announce
 
   /** Tell the host's `onBadNews` of failures no caller is waiting on. Never throws.
    * Anything but a refusal is told as `unexpected_error`, and a `disabled` refusal is dropped. Once the device ends, the
@@ -295,6 +298,13 @@ export class Device {
     const refusals = badnews.map((news) => Throwers.refusalOfThrown(news))
     // A thing disabled since is no news: its bank went away.
     tellBadNewsTo(this.isEnabled ? this.#onBadNews : DefaultOnBadNews, this, refusals.filter((refusal) => refusal.refusalkind !== 'disabled'))
+  }
+
+  // Not awaited: an announcement is news of what happened, and nothing waits on the host's answer.
+  /** Tell the host's `onLifecycle` of `announcement`. What the handler throws or rejects with is reported to the platform, never thrown. Internal: the world calls it. */
+  announce(announcement: DeviceAnnouncement): void {
+    Checks.announcement.parse(announcement)
+    void this.#onLifecycle({ ...announcement, device: this })
   }
   // --
 
@@ -334,7 +344,7 @@ export class Device {
   // --
 }
 
-// == [Host functions]: DefaultOnBadNews, tellBadNewsTo
+// == [Host functions]: DefaultOnBadNews, tellBadNewsTo, DefaultOnLifecycle, guardOnLifecycle
 
 /** The default `onBadNews`: warn of each failure on the device's logger. */
 export const DefaultOnBadNews: BadNewsHandler = ({ news, device }) => {
@@ -356,6 +366,20 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
       }
     })()
   }
+}
+
+/** The default `onLifecycle`: it does nothing, since each announcement is news a host may want, never a failure to report. */
+export const DefaultOnLifecycle: LifecycleHandler = () => undefined
+
+/** Guard the host's `onLifecycle`: anything it throws or rejects with is reported to the platform, never thrown. */
+function guardOnLifecycle(onLifecycle: LifecycleHandler): GuardedLifecycleHandler {
+  return Consts.brandGuarded(async (event: DeviceEvent): Promise<void> => {
+    try {
+      await onLifecycle(event)
+    } catch (err) {
+      ReportError.reportToPlatform(err)
+    }
+  })
 }
 // --
 
@@ -384,8 +408,8 @@ function isUnbornIn({ bank, gate, root }: WorldRoots): boolean { return (bank.am
 
 // == [Checks]: Checks
 
-/** The checks of {@link Device.make}'s arguments, {@link Device.signin}'s, and {@link tellBadNewsTo}'s. */
-const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
+/** The checks of {@link Device.make}'s arguments, {@link Device.signin}'s, {@link Device.announce}'s and {@link tellBadNewsTo}'s. */
+const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom, oneof }) => ({
   userid:        BankishChecks.userid,
   deviceMakeArgs: obj({
     record: BankishChecks.deviceRecord,
@@ -399,11 +423,13 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
       janitorMinutes:   VX.positiveMinutes.optional(),
       gateStaleMinutes: VX.positiveMinutes.optional(),
       onBadNews:        fn<BadNewsHandler>().optional(),
+      onLifecycle:      fn<LifecycleHandler>().optional(),
       queryClient:      custom<QueryClient>(isQueryClient, Phrases.QueryClientExpected).optional(),
       rootShelf:        custom<RootShelf>(isRootShelf, Phrases.RootShelfExpected).optional(),
       deviceDB:         DeviceDBChecks.deviceDB.optional(),
     }), { refusalkind: 'bad_record' }),
   }),
+  announcement:  obj({ kind: oneof(lifecyclekindVals) }).strict(),
   tellBadNewsToArgs: obj({
     onBadNews: fn<BadNewsHandler>(),
     device:    custom<Device>(),

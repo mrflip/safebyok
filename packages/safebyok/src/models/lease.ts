@@ -169,10 +169,10 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
 
   /** Stow this lease's record, its keys with it, in `deviceDB`, where it is newer than the record stored there. Refuses as `deviceDB.stowLease` does, and once this lease is evicted. */
   async stow(deviceDB: DeviceDB): Promise<void> {
-    const { deviceDB: checked } = Checks.stowArgs.parse({ deviceDB })
+    Checks.stowArgs.parse({ deviceDB })
     this.demandEnabled()
     // demandEnabled refuses an evicted lease, whose record is null.
-    await checked.stowLease(this.#record!)
+    await deviceDB.stowLease(this.#record!)
   }
   // --
 

@@ -325,10 +325,11 @@ feed_sorter (the redistribution design, section 12); narrowed to an item with no
   no longer among them. The disconnect stops the world's janitor, but a re-read of the roots its last tick began goes
   on, and its roots land in the VaultMinder as a get's answer does. A peek of the deviceDB that a connect, a root's news
   or a ring began goes on too, and where the lease stored is newer it is taken up: the disconnected tab holds it until a
-  lock, a later disconnect or the janitor's autolock past its end. The next `device.connect()` invalidates the bank's
+  lock, a later disconnect or the janitor's autolock past its end. The take-up is announced to the host's `onLifecycle`
+  as it lands, as a `lease_taken_up`. The next `device.connect()` invalidates the bank's
   items and listings, so what is shown then is fetched again. A `device.disable()` disconnects, so the same holds of
   it, and no connect follows: what lands is kept by a device whose every verb refuses, and a lease taken up is evicted
-  as it is attached.
+  as it is attached, which refuses before anything is announced.
 * alternatives:
   - have the disconnect wait for, or cancel, what is in flight: abort machinery in a primitive's critical path.
   - drop an answer or a notice that lands once disconnected: a token or a state checked on every answer, for a crossing.
@@ -343,7 +344,7 @@ Reasoning for wontfix: a disconnect comes when a provider unmounts, and a get is
 the lock, and guarding it would put a token or a wait on every answer. A lease taken up after a disconnect is the one
 every connected tab holds, and nothing is stored. Written by lease_shelf thread 0, 2026-11-25,
 awaiting a ruling; widened to the janitor's re-read by thread 1c, 2026-11-25, and to a take-up of the stored lease by
-thread 1b, 2026-11-25.
+thread 1b, 2026-11-25; its announcement to `onLifecycle` added by thread 6, 2026-11-25.
 
 ### Two tabs that stow a lease record at once keep only what stow-keeps-newest keeps
 
@@ -372,6 +373,32 @@ case where they stow together on purpose is a gate change, which every tab softl
 as good as the rest. The stow-keeps-newest rule decides, and that is all. Nothing the bankDB stores changes, and no key leaves the device's
 database other than by a stow over it. Directed by the lease_shelf handoff (thread 1a), 2026-11-25; written by the
 device_db worker; the softlock and the tab whose record lost added by thread 1b, 2026-11-25.
+
+### A change notified while a OneWatchVaultDB's lock changes hands reaches no tab
+
+* current outcome: the wrapped vaultDB's watch runs in the tab holding the bank's Web Lock. When that tab stops its
+  watch (a disconnect, a sign-out, an unload), it stops the wrapped watch, and the next tab waiting for the lock starts
+  its own a task or more later; the first tab to watch likewise starts the wrapped watch only once the lock is granted.
+  A change the datastore reports between the one watch stopping and the next starting is notified to no tab.
+  The new holder reads nothing again as it takes the lock: what it missed is caught by the janitor's re-read of a stale
+  gate and by the next listing or get of each box.
+* alternatives:
+  - a refresh of the world, or a listing of every box, on taking the lock: a startup concern where freshness is the
+    janitor's (the Coach: "All that matters is when it was read. This is not a startup concern, it's a janitorial
+    concern"), and a read that every hand-over pays for a window of milliseconds.
+  - the old holder keeping its watch until the new one reports it has started: a hand-shake between tabs, a new state
+    in each, for the same window.
+* workaround: none needed: the janitor and the next read of each Thing bring the tab up to date.
+
+Steps to reproduce: in two tabs over a OneWatchVaultDB, close the tab holding the lock, and in the same few milliseconds
+write a box from another device.
+
+Reasoning for wontfix: a hand-over happens at a tab's mount, unmount or sign-out, minutes or hours apart, and a change
+landing in the milliseconds it takes is a crossing (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`): "Remember
+how slowly everything changes vs. time from mount to unmount" (the Coach). Fixing it costs a read at every hand-over or a
+hand-shake between tabs. Nothing the bankDB stores changes, and no notice carries secret material beyond the sealed
+records any reader of the vaultDB sees. Directed by the lease_shelf handoff (thread 7), 2026-11-25; written by the
+one_watch worker.
 
 ## React
 
