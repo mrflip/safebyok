@@ -154,7 +154,7 @@ export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unl
  * - `'unborn'`     -- no bank is stored for this user, or it was deleted
  * - `'locked'`     -- the bank is stored, and needs the passphrase or passkey before a whisper can be read
  * - `'unlocked'`   -- the bank has a lease, and whispers can be read and written
- * - `'disabled'`   -- the device was disabled: everything was unloaded, and nothing follows until the host acts
+ * - `'disabled'`   -- the device was disabled for good: everything was unloaded, and nothing follows
  * - `'failed'`     -- bringing the bank up failed, as `lastErr` says
  */
 export type BankStage = typeof bankStageVals[number]
