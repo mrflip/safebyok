@@ -3,9 +3,9 @@ import type { Deriver } from 'safebyok-big/internals'
 import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { Lease } from './lease'
 import { type GateRevisionedStamp, type GuardedKeyDeriver, type LeaseGate, type ProvingDevice, type ProvingOpts, type ProvingParts, GateishChecks } from '../shapes/shapes-gateish'
-import type { BankScope, BankStamp, GateStamp, LeaseStamp, StampedGate } from '../shapes/shapes-stamps'
+import type { BankScope, BankStamp, GateStamp, LeaseRecord, StampedGate } from '../shapes/shapes-stamps'
 import * as Stamps from '../shapes/shapes-stamps'
-import type { Modelkind } from '../shapes/shapes-thing'
+import type { Modelkind, Sparse } from '../shapes/shapes-thing'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { Wayin, wayinCtxOf } from './wayin'
 import { bulletproofAsyncHandlerOf } from '../helpers/bulletproof'
@@ -94,32 +94,38 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   }
 
   // The bankKey is unwrapped, wrapped again under the leaseKey and dropped here, crossing no method boundary (G3).
-  /** Build a lease granted to `gate`, citing its revision `cited`. The bankKey this proving unwraps is wrapped under a fresh, non-extractable leaseKey.
-   * Given `renewed`, the lease the gate holds, the new lease keeps its `born_at`; given null, it is born when it is proved.
+  // The wrap binds the lease's stamp alone, never its life or revision, so a later revision of the record keeps it.
+  /** Build a lease granted to `gate`, citing its revision `cited`, that follows `followed`: the lease stored or held for the gate, or its shell where there is none.
+   * After a live lease it is that lease's life at the next revision, keeping its `born_at`; after a tombstone or the shell, it is born in the next life.
+   * It ends `gate.leaseMillis` after it is proved. The bankKey this proving unwraps is wrapped under a fresh, non-extractable leaseKey.
    */
-  async buildLease(gate: LeaseGate, cited: GateRevisionedStamp, renewed: Pick<LeaseStamp, 'born_at'> | null): Promise<Lease> {
-    const { gate: { bankStamp }, cited: gateRevision, renewed: renewedStamp } = Checks.provingLeaseArgs.parse({ gate, cited, renewed })
+  async buildLease(gate: LeaseGate, cited: GateRevisionedStamp, followed: Sparse<LeaseRecord>): Promise<Lease> {
+    const { gate: { bankStamp, leaseMillis }, cited: gateRevision } = Checks.provingLeaseArgs.parse({ gate, cited })
     Validator.checkedConsistent(bankStamp,    this.bankStamp, { kind: 'unexpected_error', message: BigPhrases.LeaseOfOtherGate })
     Validator.checkedConsistent(gateRevision, this.gateStamp, { kind: 'unexpected_error', message: BigPhrases.LeaseOfOtherGate })
     const proved_at = Clock.nowMillis()
+    const revision  = Lease.nextRevisionOf(followed, proved_at)
+    const { userid, banklabel, labelpath } = revision
+    Validator.checkedConsistent({ userid, banklabel, labelpath }, Lease.shellOf(gateRevision), { kind: 'unexpected_error', message: BigPhrases.LeaseOfOtherGate })
     const granted = {
       fmt:            Stamps.StampChecks.LeaseFormat,
-      userid:         bankStamp.userid,
-      banklabel:      bankStamp.banklabel,
+      userid,
+      banklabel,
       bank_lifeseq:   bankStamp.lifeseq,
       bank_born_at:   bankStamp.born_at,
       bank_lifetok:   bankStamp.lifetok,
       gate_labelpath: gateRevision.labelpath,
       gate_lifeseq:   gateRevision.lifeseq,
       gate_revtok:    gateRevision.revtok,
-      born_at:        renewedStamp?.born_at ?? proved_at,
+      born_at:        revision.born_at,
       proved_at,
       wayinkind:      this.wayinkind,
     } as const
     const bankKey = await this.#unwrapBankKey()
     const leaseKey = await Crypto.makeLeaseKey()
     const bank_key_lease_wrapped = await Crypto.wrapKeyUnder(leaseKey, bankKey, Crypto.cipherCtx([bankStamp, granted], 'bank_key_lease_wrapped'))
-    return Lease.make({ ...granted, lease_key: leaseKey, bank_key_lease_wrapped }, { gate })
+    const ends_at = Math.min(proved_at + leaseMillis, ConstsX.FarFuture)
+    return Lease.make({ ...revision, ...granted, lease_key: leaseKey, bank_key_lease_wrapped, ends_at, gate_revseq: gateRevision.revseq }, { gate })
   }
 
   /** The wayin of this proving's header, with `bankKey` wrapped under its wayinKey */
@@ -343,7 +349,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => {
   return {
     passphraseMakeArgs:   obj({ parts: provingParts.extend({ header: WayinChecks.passphraseWayinHeader.strict() }).strict().refine(isStoredOfHeader, Phrases.WayinOfOtherHeader), opts: GateishChecks.provingOpts }),
     passkeyMakeArgs:      obj({ parts: provingParts.extend({ header: WayinChecks.passkeyWayinHeader.strict() }).strict().refine(isStoredOfHeader, Phrases.WayinOfOtherHeader), opts: GateishChecks.provingOpts }),
-    provingLeaseArgs:     obj({ gate: GateishChecks.leaseGate, cited: GateishChecks.gateRevisionedStamp, renewed: Stamps.StampChecks.leaseStamp.pick({ born_at: true }).nullable() }),
+    provingLeaseArgs:     obj({ gate: GateishChecks.leaseGate, cited: GateishChecks.gateRevisionedStamp }),
     passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: BankChecks.stamp, gateStamp: GateChecks.stamp, device: GateishChecks.provingDevice }),
     passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: BankChecks.stamp, gateStamp: GateChecks.stamp, device: GateishChecks.provingDevice }),
     passphraseStoredArgs: GX.passphraseStoredArgs.extend({ gate: GateChecks.stampedGate, device: GateishChecks.provingDevice }),

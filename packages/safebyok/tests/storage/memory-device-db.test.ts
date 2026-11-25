@@ -5,10 +5,10 @@ import * as TH from '../test-helpers'
 TH.describeDeviceDBLeaseBattery('MemoryDeviceDB', {
   makeDeviceDB: () => new MemoryDeviceDB(),
   makeTwin:     (deviceDB) => deviceDB,
-  plant:        (deviceDB, scope, raw) => { deviceDB._cheat_rows().set(MemoryDeviceDB.ckeyOf(scope), raw) },
+  plant:        (deviceDB, scope, raw) => { deviceDB._cheat_leases().set(MemoryDeviceDB.ckeyOf(scope), raw) },
 })
 
-/** A MemoryDeviceDB whose every peek, stow and listen throws an error that quotes a lease row. */
+/** A MemoryDeviceDB whose every peek, stow and listen throws an error that quotes a lease record. */
 class FailingDeviceDB extends MemoryDeviceDB {
   protected override doPeekLease(): never { throw new TypeError('lease_key quoted here') }
   protected override doStowLease(): never { throw new TypeError('lease_key quoted here') }
@@ -16,12 +16,12 @@ class FailingDeviceDB extends MemoryDeviceDB {
 }
 
 describe("MemoryDeviceDB, what only a store in memory can show", () => {
-  it("stores a copy of the row it is handed, and answers a copy of what it stores", async () => {
+  it("stores a copy of the lease record it is handed, and answers a copy of what it stores", async () => {
     const deviceDB = new MemoryDeviceDB()
-    const row      = await TH.liveLeaseRowOf()
-    await deviceDB.stowLease(row)
+    const lease    = await TH.liveLeaseRecordOf()
+    await deviceDB.stowLease(lease)
     const peeked   = await deviceDB.peekLease(TH.WorldScope)
-    expect(peeked).to.not.equal(deviceDB._cheat_rows().get(MemoryDeviceDB.ckeyOf(TH.WorldScope)))
+    expect(peeked).to.not.equal(deviceDB._cheat_leases().get(MemoryDeviceDB.ckeyOf(TH.WorldScope)))
     expect(await deviceDB.peekLease(TH.WorldScope)).to.not.equal(peeked)
   })
 
@@ -29,7 +29,7 @@ describe("MemoryDeviceDB, what only a store in memory can show", () => {
     const deviceDB = new MemoryDeviceDB()
     const heard: string[] = []
     deviceDB.listen(({ banklabel }) => { heard.push(banklabel) })
-    const stowed = deviceDB.stowLease(await TH.liveLeaseRowOf())
+    const stowed = deviceDB.stowLease(await TH.liveLeaseRecordOf())
     expect(heard).to.have.lengthOf(0)
     await stowed
     await TH.eventually(() => heard.length > 0)
@@ -40,7 +40,7 @@ describe("MemoryDeviceDB, what only a store in memory can show", () => {
 describe("DeviceDB, what a store throws", () => {
   const VerbCases = [
     [(deviceDB: MemoryDeviceDB) => deviceDB.peekLease(TH.WorldScope), 'peekLease', 'refuses a peek that throws as storage_unavailable, naming only what it threw'],
-    [async (deviceDB: MemoryDeviceDB) => deviceDB.stowLease(await TH.liveLeaseRowOf()), 'stowLease', 'refuses a stow that throws as storage_unavailable, naming only what it threw'],
+    [async (deviceDB: MemoryDeviceDB) => deviceDB.stowLease(await TH.liveLeaseRecordOf()), 'stowLease', 'refuses a stow that throws as storage_unavailable, naming only what it threw'],
   ] as const
   for (const [verbOf, oplabel, blurb] of VerbCases) {
     it(blurb, async () => {

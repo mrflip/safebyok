@@ -44,7 +44,7 @@ type Lived    = { lifepath: Lifepath, am: string }
 type Revised  = { revtok: Revtok, revseq: number, lifepath: Lifepath }
 
 /** True when a Thing's label is the last segment of its labelpath. A root's label is its modelkind. */
-function isLabelLast({ labelpath, label }: Labelled): boolean { return labelpath.slice(labelpath.lastIndexOf('/') + 1) === label }
+export function isLabelLast({ labelpath, label }: Labelled): boolean { return labelpath.slice(labelpath.lastIndexOf('/') + 1) === label }
 /** True when a Thing's lifeseq is the last of its lifepath. */
 function isLifeseqOwn({ lifepath, lifeseq }: Lived & { lifeseq: Lifeseq }): boolean { return Lifeseq.ofLifepath(lifepath) === lifeseq }
 /** True when a Thing's lifepath has one lifeseq for each segment of its labelpath. */

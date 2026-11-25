@@ -2,7 +2,7 @@ import { Clock, Crypto, type Errors, Validator } from 'safebyok-big/internals'
 import { type Adoptable, Thing } from './thing'
 import type { Device } from './device'
 import { AddPasskeyGating, ReplacePassphraseGating, RevokePasskeyGating, UnlockGating } from './gating'
-import type { Lease } from './lease'
+import { Lease } from './lease'
 import type { Proving } from './proving'
 import { Wayin } from './wayin'
 import type { World } from './world'
@@ -11,7 +11,7 @@ import type {
   RevokePasskeyDna, UnlockCleartexts, UnlockDna, WorldGateFriend,
 } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
-import { type BankStamp, type GateStamp, type LeaseLoggable, type LeaseStamp, StampChecks } from '../shapes/shapes-stamps'
+import { type BankStamp, type GateStamp, type LeaseLoggable, type LeaseRecord, StampChecks } from '../shapes/shapes-stamps'
 import { type GateRecord, type Modelkind, type Sparse, type ThingRecord, type ThingScope, type Wayins, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
 import { type ThingMakeOpts, ThingMakeChecks } from '../shapes/shapes-bankish'
 import { type VaultItemEvent, SeenChecks } from '../shapes/shapes-vault-event'
@@ -226,18 +226,20 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
   // == [The gatings' private verbs]: unlockByProving, buildLease, putGate
 
+  // Scaffolding: until thread 1b has an unlock follow the lease record its deviceDB stores, a lease granted after a lock
+  // follows the shell, and starts the first life again.
   /** Unlock this gate's world under a lease `proved` builds, citing the revision this gate models.
-   * A lease the world holds is renewed: the new one keeps its `born_at`.
+   * A lease the world holds is renewed: the new one is its next revision, and keeps its `born_at`. Otherwise the new one follows the shell.
    */
   async #unlockByProving(proved: Proving): Promise<this> {
-    const lease = await this.#buildLease(proved, this.#friend.renewal())
+    const lease = await this.#buildLease(proved, this.#friend.renewal() ?? Lease.shellOf(this))
     this.#friend.attachLease(lease)
     return this
   }
 
-  /** A lease `proved` builds, granted in this gate's world under its bank's stamp and citing the revision this gate models, keeping the `born_at` of `renewed` where given. */
-  async #buildLease(proved: Proving, renewed: Pick<LeaseStamp, 'born_at'> | null): Promise<Lease> {
-    return await proved.buildLease(this.#friend.leaseGateOf(this.bankStamp), this, renewed)
+  /** A lease `proved` builds, granted in this gate's world under its bank's stamp, citing the revision this gate models, and following `followed`. */
+  async #buildLease(proved: Proving, followed: Sparse<LeaseRecord>): Promise<Lease> {
+    return await proved.buildLease(this.#friend.leaseGateOf(this.bankStamp), this, followed)
   }
 
   /** Write `ask.record`, this gate's next revision, over `ask.cited`. Resolves this gate, which then models the revision written. */

@@ -23,7 +23,7 @@ import { PassphraseProving, type Proving, guardKeyDeriver } from '../../src/mode
 import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import type { DeviceOpts, DeviceRecord, RootShelf } from '../../src/shapes/shapes-bankish'
 import type { LiveOf, ShellOf } from '../../src/shapes/shapes-sealers'
-import type { BankRecord, BoxRecord, GateRecord, Wayins } from '../../src/shapes/shapes-thing'
+import type { BankRecord, BoxRecord, GateRecord, Sparse, Wayins } from '../../src/shapes/shapes-thing'
 import { type GateRevisionedStamp, type GatingCleartexts, type LeaseGate, type ProvingDevice, type StrengthChecker, GatingChecks } from '../../src/shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { Shell, ThingFormat } from '../../src/shapes/shapes-thing'
@@ -77,7 +77,7 @@ export const WorldBankStamp: BankStamp = Object.freeze({ userid: WorldScope.user
 export const WorldGateStamp: GateStamp = Object.freeze({ ...WorldScope, labelpath: 'gate', lifeseq: Lifeseq.ofLifenum(0), born_at: T0 })
 
 /** The gate a lease cites when a test says nothing else: {@link WorldGateStamp}'s gate, at a revision of its own. */
-export const WorldGate: GateRevisionedStamp = Object.freeze({ ...WorldGateStamp, revtok: revtokOf('gate1') })
+export const WorldGate: GateRevisionedStamp = Object.freeze({ ...WorldGateStamp, revtok: revtokOf('gate1'), revseq: 0 })
 // --
 
 // == [Devices]: TestPassphrase, DeviceTok, ProvingDeviceGiven, provingDeviceOf, DeviceGiven, makeDevice, MemoryShelf, passkeyAnswerOf
@@ -288,24 +288,32 @@ const VoidRootRevision = {
 } as const
 // --
 
-// == [Leases]: FakeLeaseGate, fakeLeaseGateOf, _cheat_grantedLease
+// == [Leases]: FakeLeaseGate, FakeLeaseMillis, fakeLeaseGateOf, leaseShellOf, _cheat_grantedLease
 
-/** A fake of the gate a lease is granted to: its bank's stamp, a spy for `lock`, and an enabled check that always passes. */
+/** A fake of the gate a lease is granted to: its bank's stamp, a lease's length, a spy for `lock`, and an enabled check that always passes. */
 export type FakeLeaseGate = LeaseGate & { lock: Mock<() => void> }
+
+/** How long a lease granted to a {@link FakeLeaseGate} lasts: an hour. */
+export const FakeLeaseMillis = 3_600_000
 
 /** A {@link FakeLeaseGate} whose bank's stamp is {@link WorldBankStamp}, as `overrides` moves it. */
 export function fakeLeaseGateOf(overrides: Partial<BankStamp> = {}): FakeLeaseGate {
-  const gate = { bankStamp: { ...WorldBankStamp, ...overrides }, lock: vi.fn<() => void>(), isEnabled: true, demandEnabled: () => gate }
+  const gate = { bankStamp: { ...WorldBankStamp, ...overrides }, leaseMillis: FakeLeaseMillis, lock: vi.fn<() => void>(), isEnabled: true, demandEnabled: () => gate }
   return gate
 }
 
-/** A test cheat: a lease `proving` builds, granted to `gate` and citing `cited`, beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */
-export async function _cheat_grantedLease(proving: Proving, gate: LeaseGate, cited: GateRevisionedStamp = WorldGate): Promise<{ lease: Lease, record: LeaseRecord }> {
+/** The shell of the lease of `cited`'s gate, {@link WorldGate}'s unless given: what a first lease follows. */
+export function leaseShellOf(cited: GateRevisionedStamp = WorldGate): ShellOf<LeaseRecord> { return Lease.shellOf(cited) }
+
+/** A test cheat: a lease `proving` builds, granted to `gate`, citing `cited` and following `followed` (the shell unless given), beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */
+export async function _cheat_grantedLease(
+  proving: Proving, gate: LeaseGate, cited: GateRevisionedStamp = WorldGate, followed: Sparse<LeaseRecord> = leaseShellOf(cited),
+): Promise<{ lease: Lease, record: LiveOf<LeaseRecord> }> {
   const make = vi.spyOn(Lease, 'make')
-  const lease = await proving.buildLease(gate, cited, null)
+  const lease = await proving.buildLease(gate, cited, followed)
   const [record] = make.mock.calls.at(-1)!
   make.mockRestore()
-  return { lease, record: record as LeaseRecord }
+  return { lease, record: record as LiveOf<LeaseRecord> }
 }
 // --
 

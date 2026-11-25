@@ -11,9 +11,9 @@ import type { Gating } from '../models/gating'
 import type { Lease } from '../models/lease'
 import type { Proving, guardKeyDeriver } from '../models/proving'
 import type { Wayin } from '../models/wayin'
-import type { BankScope, BankStamp, GateStamp, LeaseStamp } from './shapes-stamps'
+import type { BankScope, BankStamp, GateStamp, LeaseRecord } from './shapes-stamps'
 import { BankChecks, GateChecks } from './shapes-thingkinds'
-import { type GateRecord, ThingChecks } from './shapes-thing'
+import { type GateRecord, type Sparse, ThingChecks } from './shapes-thing'
 import type { PutAskDraft } from './shapes-asks'
 import type { WayinHeader } from './shapes-wayin'
 
@@ -136,8 +136,8 @@ export interface GateGatingFriend {
 export interface WorldGateFriend {
   /** The world as a lease granted under `bankStamp` reads it back. */
   leaseGateOf: (bankStamp: BankStamp) => LeaseGate
-  /** The `born_at` of the world's lease, which a renewal keeps, or null while locked. */
-  renewal:     () => Pick<LeaseStamp, 'born_at'> | null
+  /** The world's lease, as the Thing fields a renewal follows, or null while locked. */
+  renewal:     () => Sparse<LeaseRecord> | null
   /** Attach `lease` in place of the world's lease, resuming every call waiting for an `unlock` gating. Refuses on a disabled world. */
   attachLease: (lease: Lease) => void
 }
@@ -152,10 +152,10 @@ export type GateDna = GateStamp & { wayins: { main: Wayin, passkey0: Wayin | nul
 // == [What a proving is handed]: RawChecks, leaseGate, isWayinKey, GateRevisionedStamp, ProvingDevice, GuardedKeyDeriver, ProvingParts, ProvingOpts
 
 /** The checks of what a lease and a proving are handed. */
-const RawChecks = Validator.Checkers('bad_record', ({ obj, fn, bool, custom }) => ({
-  leaseGate:           obj({ bankStamp: BankChecks.stamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }),
+const RawChecks = Validator.Checkers('bad_record', ({ obj, fn, bool, uint, custom }) => ({
+  leaseGate:           obj({ bankStamp: BankChecks.stamp, leaseMillis: uint, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }),
   // A gate's stamp is fixed for its life; the lease pins one revision of the gate too.
-  gateRevisionedStamp: GateChecks.stamp.extend(ThingChecks.sparse.pick({ revtok: true }).shape),
+  gateRevisionedStamp: GateChecks.stamp.extend(ThingChecks.sparse.pick({ revtok: true, revseq: true }).shape),
   provingDevice:       GX.provingDevice.extend({ strengthChecker: custom<GuardedStrengthChecker>(Consts.isGuarded, BigPhrases.GuardedExpected) }),
   provingOpts:         obj({ wayinKey: custom<CryptoKey>(isWayinKey, Phrases.WayinKeyExpected) }).strict(),
 }))
@@ -167,7 +167,7 @@ function isWayinKey(val: unknown): val is CryptoKey {
     && (val.usages.length === 2) && val.usages.includes('wrapKey') && val.usages.includes('unwrapKey')
 }
 
-/** A {@link GateStamp} with the `revtok` of one revision of the gate: the revision a lease is granted under. */
+/** A {@link GateStamp} with the `revtok` and `revseq` of one revision of the gate: the revision a lease is granted under. */
 export type GateRevisionedStamp = Z.infer<typeof GateishChecks.gateRevisionedStamp>
 
 /** The parts of its device a proving is given: the wrapped key deriver and strength checker, and the device's token. */
@@ -198,6 +198,8 @@ export interface ProvingOpts {
 export interface LeaseGate {
   /** The stamp of the bank the lease was granted under, fixed for the lease's life. */
   readonly bankStamp: BankStamp
+  /** How long a lease granted in the world lasts, in milliseconds. */
+  readonly leaseMillis: number
   /** True until the world's device ends. */
   readonly isEnabled: boolean
   /** Lock the world, dropping its lease. */

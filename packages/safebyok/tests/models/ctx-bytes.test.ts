@@ -5,7 +5,7 @@ import { Crypto } from 'safebyok-big/internals'
 import { BaseBox } from '../../src/models/base-box'
 import type { LiveOf } from '../../src/shapes/shapes-sealers'
 import type { BoxRecord } from '../../src/shapes/shapes-thing'
-import { LeaseFormat, type LeaseRecord } from '../../src/shapes/shapes-stamps'
+import { type LeaseRecord, type LeaseStamp, LeaseFormat } from '../../src/shapes/shapes-stamps'
 import { Lifeseq } from '../../src/shapes/primitives'
 
 import * as TH from '../test-helpers'
@@ -55,11 +55,11 @@ async function unsealByHand(bankKey: CryptoKey, box: LiveOf<BoxRecord>, bankStam
   return new TextDecoder().decode(await Crypto.decipherBytes(partKey, ciphered, Crypto.cipherCtx([bankStamp, boxStamp], 'whisper_sealed.ciphered', tags)))
 }
 
-/** A lease's record, built by a born bank's passphrase proving on a fake bank of {@link TH.WorldBankStamp}. */
-async function leaseRecordOf(): Promise<LeaseRecord> {
+/** A lease's record and its stamp, built by a born bank's passphrase proving on a fake bank of {@link TH.WorldBankStamp}. */
+async function leaseRecordOf(): Promise<{ record: LiveOf<LeaseRecord>, stamp: LeaseStamp }> {
   const { proving } = await TH.buildBornBank()
-  const { record } = await TH._cheat_grantedLease(proving, TH.fakeLeaseGateOf())
-  return record
+  const { lease, record } = await TH._cheat_grantedLease(proving, TH.fakeLeaseGateOf())
+  return { record, stamp: lease.stamp }
 }
 
 /** Whether a born bank's passphrase wayin unwraps under the ctx of the stamps `bankStamp` and `gateStamp`, built field for field without a check. */
@@ -98,8 +98,8 @@ describe("each ctx, byte for byte", () => {
     expect(await Crypto.unwrapKeyUnder(passkeyKey, wayin.bank_key_wayin_wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
   })
 
-  it("binds a lease's wrap of the bankKey to the bank's stamp and its own", async () => {
-    const record = await leaseRecordOf()
+  it("binds a lease's wrap of the bankKey to the bank's stamp and its own, and nothing of its life, revision or end", async () => {
+    const { record } = await leaseRecordOf()
     const leaseText = `{"bank_born_at":${String(TH.T0)},"bank_lifeseq":"0000000000","bank_lifetok":"${TH.FirstLifetok}","banklabel":"acme","born_at":${String(TH.T0)},"fmt":"${LeaseFormat}","gate_labelpath":"gate","gate_lifeseq":"0000000000","gate_revtok":"${TH.WorldGate.revtok}","proved_at":${String(TH.T0)},"userid":"u1","wayinkind":"passphrase"}`
     const ctx = textBytes(`[${BankStampText},${leaseText},"bank_key_lease_wrapped"]`)
     expect(await Crypto.unwrapKeyUnder(record.lease_key, record.bank_key_lease_wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
@@ -125,8 +125,8 @@ describe("each ctx binds every field of its stamps", () => {
   })
 
   it("names every field of a lease's stamp below", async () => {
-    const record = await leaseRecordOf()
-    expect(Object.keys(record).filter((fieldname) => (fieldname !== 'lease_key') && (fieldname !== 'bank_key_lease_wrapped'))).to.have.members([...LeaseStampFields])
+    const { stamp } = await leaseRecordOf()
+    expect(Object.keys(stamp)).to.have.members([...LeaseStampFields])
   })
 
   it("names every field of a bank's and a gate's stamps below", async () => {
@@ -179,7 +179,7 @@ describe("each ctx binds every field of its stamps", () => {
     })
 
     it(`a lease will not unwrap under a bank stamp with another ${fieldname}`, async () => {
-      const { lease_key, bank_key_lease_wrapped, ...stamp } = await leaseRecordOf()
+      const { record: { lease_key, bank_key_lease_wrapped }, stamp } = await leaseRecordOf()
       const ctx = Crypto.cipherCtx([{ ...TH.WorldBankStamp, [fieldname]: changed(TH.WorldBankStamp[fieldname]) as string }, stamp], 'bank_key_lease_wrapped')
       await expect(Crypto.unwrapKeyUnder(lease_key, bank_key_lease_wrapped, ctx, CheckUsage)).rejects.toThrow()
     })
@@ -193,7 +193,7 @@ describe("each ctx binds every field of its stamps", () => {
 
   for (const fieldname of LeaseStampFields) {
     it(`a lease will not unwrap under a lease stamp with another ${fieldname}`, async () => {
-      const { lease_key, bank_key_lease_wrapped, ...stamp } = await leaseRecordOf()
+      const { record: { lease_key, bank_key_lease_wrapped }, stamp } = await leaseRecordOf()
       const ctx = Crypto.cipherCtx([TH.WorldBankStamp, { ...stamp, [fieldname]: changed(stamp[fieldname]) as string }], 'bank_key_lease_wrapped')
       await expect(Crypto.unwrapKeyUnder(lease_key, bank_key_lease_wrapped, ctx, CheckUsage)).rejects.toThrow()
     })
