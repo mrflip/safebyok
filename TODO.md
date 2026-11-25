@@ -129,6 +129,11 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
 * **A check on `scopepathOf`.** `scopepathOf` (from `safebyok/browser`) is exported without parsing its argument.
   Give it a check at the entrypoint and a test of its own, in a thread that may rename exports (the Coach, 2026-11-25,
   on #907; the `leaseLabelpathOf` half was done by `LeaseLabelpath.of`, #927).
+* **A watch that ends on its own says so.** `VaultDB.watch`'s `onEnded` (#926) lets a vaultDB say its watch ended
+  before its stop, so the minder stops counting itself watching and the janitor restarts it. Today only
+  `OneWatchVaultDB` calls it, for a start that fails. `AdapterVaultDB` should call it when a datastore's subscription
+  drops after it started, and `OneWatchVaultDB`'s holder should pass its own `onEnded` through to the wrapped watch
+  (resolve the hold, close the channel, call `onEnded`). From #926's review.
 * **A hidden watch-holding tab on iOS Safari.** `OneWatchVaultDB` hands the watch to the tab holding a Web Lock.
   Chrome does not freeze a page holding a lock others wait on, and Firefox does not freeze pages, but WebKit suspends a
   background tab soon after it goes quiet, and nothing found says a held lock exempts it. If it does not, a hidden
