@@ -17,11 +17,11 @@ export { default as schema } from './component/schema'
  *   const app = defineTestApp({ schema, components: { safebyok: { register } } })
  *   new SafebyokVaultComponent(app.components.safebyok).api({ getUserId })
  */
-export const register = <ComponentPath extends string = 'safebyok'>(
+export const register = <Componentpath extends string = 'safebyok'>(
   testRoot: Pick<TestConvexRoot<GenericDataModel>, 'registerComponent'>,
-  componentPath: ComponentPath = 'safebyok' as ComponentPath,
-): ComponentApi<ComponentPath> => {
-  testRoot.registerComponent(componentPath, schema, modules)
+  componentpath: Componentpath = 'safebyok' as Componentpath,
+): ComponentApi<Componentpath> => {
+  testRoot.registerComponent(componentpath, schema, modules)
   // This is what the host's generated `components` object is at runtime. Its type is derived from the component's functions.
-  return (componentsGeneric() as Record<string, unknown>)[componentPath] as ComponentApi<ComponentPath>
+  return (componentsGeneric() as Record<string, unknown>)[componentpath] as ComponentApi<Componentpath>
 }
