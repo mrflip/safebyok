@@ -13,8 +13,8 @@ export {
 } from 'safebyok-big/browser'
 // Big's browser entry exports its own `StrengthChecker`, `BrowserOpts`, `browserOpts` and device database as well; the ones `Device.make` takes are `safebyok`'s.
 export type { StrengthChecker } from './shapes/shapes-gateish'
-export { IdbDeviceDB, LeaseDBVersion, idbDeviceDB, leaseBellnameOf, leaseDatabasenameOf, scopepathOf } from './storage/idb-device-db'
-export { idbDeviceDBOpts, type IdbDeviceDBOpts, type LeaseScopepath } from './shapes/shapes-device-db'
+export { IdbDeviceDB, LeaseDBVersion, idbDeviceDB, leaseBellnameOf, leaseDatabasenameOf, scopepathOf, devicetokScopepathOf } from './storage/idb-device-db'
+export { idbDeviceDBOpts, type IdbDeviceDBOpts, type DevicetokScopepath, type LeaseScopepath } from './shapes/shapes-device-db'
 export { OneWatchVaultDB, oneWatchVaultDB, watchnameOf } from './storage/one-watch-vault-db'
 
 // == [The bag]: BrowserOpts, bagsByDbName, browserOpts

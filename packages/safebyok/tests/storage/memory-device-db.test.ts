@@ -11,7 +11,7 @@ TH.describeDeviceDBLeaseBattery('MemoryDeviceDB', {
 TH.describeDeviceDBDevicetokBattery('MemoryDeviceDB', {
   makeDeviceDB:   () => new MemoryDeviceDB(),
   makeTwin:       (deviceDB) => deviceDB,
-  plantDevicetok: (deviceDB, raw) => { deviceDB._cheat_plantDevicetok(raw) },
+  plantDevicetok: (deviceDB, scope, raw) => { deviceDB._cheat_plantDevicetok(scope, raw) },
 })
 
 /** A MemoryDeviceDB whose every peek, stow and listen throws an error that quotes a lease record, and whose devicetok stow throws too. */
@@ -48,7 +48,7 @@ describe("DeviceDB, what a store throws", () => {
   const VerbCases = [
     [(deviceDB: MemoryDeviceDB) => deviceDB.peekLease(TH.WorldLeaseScope), 'peekLease', 'refuses a peek that throws as storage_unavailable, naming only what it threw'],
     [async (deviceDB: MemoryDeviceDB) => deviceDB.stowLease(await TH.liveLeaseRecordOf()), 'stowLease', 'refuses a stow that throws as storage_unavailable, naming only what it threw'],
-    [(deviceDB: MemoryDeviceDB) => deviceDB.ensureDevicetok(), 'ensureDevicetok', 'refuses an ensureDevicetok that throws as storage_unavailable, naming only what it threw'],
+    [(deviceDB: MemoryDeviceDB) => deviceDB.ensureDevicetok(TH.WorldScope), 'ensureDevicetok', 'refuses an ensureDevicetok that throws as storage_unavailable, naming only what it threw'],
   ] as const
   for (const [verbOf, oplabel, blurb] of VerbCases) {
     it(blurb, async () => {

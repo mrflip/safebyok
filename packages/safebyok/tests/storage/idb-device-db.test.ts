@@ -5,7 +5,7 @@ import 'fake-indexeddb/auto'
 import { createStore } from 'idb-keyval'
 import { describe, expect, it } from 'vitest'
 import { inOneStep } from 'safebyok-big/storage'
-import { DevicetokCkey, IdbDeviceDB, idbDeviceDB, leaseBellnameOf, leaseDatabasenameOf, scopepathOf } from '../../src/storage/idb-device-db'
+import { IdbDeviceDB, devicetokScopepathOf, idbDeviceDB, leaseBellnameOf, leaseDatabasenameOf, scopepathOf } from '../../src/storage/idb-device-db'
 import * as TH from '../test-helpers'
 
 /** The `dbName` each IdbDeviceDB under test was made with. */
@@ -37,9 +37,9 @@ TH.describeDeviceDBLeaseBattery('IdbDeviceDB', {
 TH.describeDeviceDBDevicetokBattery('IdbDeviceDB', {
   makeDeviceDB:   () => makeIdbDeviceDB(),
   makeTwin,
-  plantDevicetok: async (deviceDB, raw) => {
+  plantDevicetok: async (deviceDB, scope, raw) => {
     const shelf = createStore(leaseDatabasenameOf(DbNameForDeviceDB.get(deviceDB)), 'leases')
-    await inOneStep(shelf, 'readwrite', (store) => { store.put(raw, DevicetokCkey) })
+    await inOneStep(shelf, 'readwrite', (store) => { store.put(raw, devicetokScopepathOf(scope)) })
   },
 })
 

@@ -719,29 +719,40 @@ class DevicetokFailingDB extends MemoryDeviceDB {
 }
 
 describe("device.ensureDevicetok()", () => {
-  it("answers the host's devicetok, asking the deviceDB nothing", async () => {
+  it("answers the host's devicetok, asking the deviceDB nothing, before signin as after", async () => {
     const deviceDB = new MemoryDeviceDB()
     const ensure   = vi.spyOn(deviceDB, 'ensureDevicetok')
     expect(await TH.makeDevice({ userid: null }, { deviceDB }).ensureDevicetok()).to.eq(TH.Devicetok)
+    expect(await TH.makeDevice({}, { deviceDB }).ensureDevicetok()).to.eq(TH.Devicetok)
     expect(ensure).not.toHaveBeenCalled()
   })
 
-  it("with no devicetok from the host, answers the one its deviceDB keeps: the same at each call, and to each device given that deviceDB", async () => {
+  it("with no devicetok from the host, answers the one its deviceDB keeps for its bank: the same at each call, and to each device of that bank given that deviceDB", async () => {
     const deviceDB   = new MemoryDeviceDB()
-    const [one, other] = [TH.makeDevice({ userid: null }, { deviceDB, devicetok: undefined }), TH.makeDevice({ userid: null }, { deviceDB, devicetok: undefined })]
+    const [one, other] = [TH.makeDevice({}, { deviceDB, devicetok: undefined }), TH.makeDevice({}, { deviceDB, devicetok: undefined })]
     const devicetok  = await one.ensureDevicetok()
-    expect([await one.ensureDevicetok(), await other.ensureDevicetok(), await deviceDB.ensureDevicetok()]).to.deep.equal([devicetok, devicetok, devicetok])
+    expect([await one.ensureDevicetok(), await other.ensureDevicetok(), await deviceDB.ensureDevicetok(one.scope)]).to.deep.equal([devicetok, devicetok, devicetok])
+  })
+
+  it("with no devicetok from the host, answers another devicetok for another user's bank given the same deviceDB", async () => {
+    const deviceDB     = new MemoryDeviceDB()
+    const [one, other] = [TH.makeDevice({}, { deviceDB, devicetok: undefined }), TH.makeDevice({ userid: 'u2' }, { deviceDB, devicetok: undefined })]
+    expect(await one.ensureDevicetok()).to.not.eq(await other.ensureDevicetok())
+  })
+
+  it("with no devicetok from the host, refuses absent_vault before signin", async () => {
+    await TH.expectRefusal(TH.makeDevice({ userid: null }, { devicetok: undefined }).ensureDevicetok(), 'absent_vault')
   })
 
   it("with no deviceDB from the host either, answers a devicetok of each device's own", async () => {
-    const [one, other] = [TH.makeDevice({ userid: null }, { devicetok: undefined }), TH.makeDevice({ userid: null }, { devicetok: undefined })]
+    const [one, other] = [TH.makeDevice({}, { devicetok: undefined }), TH.makeDevice({}, { devicetok: undefined })]
     expect(await one.ensureDevicetok()).to.not.eq(await other.ensureDevicetok())
   })
 
   it("is recorded in each wayin a birth builds", async () => {
     const deviceDB = new MemoryDeviceDB()
     const { bank } = await TH.buildBornBank({ passkeyCleartext: TH.passkeyAnswerOf(), device: TH.makeDevice({}, { deviceDB, devicetok: undefined }) })
-    const devicetok = await deviceDB.ensureDevicetok()
+    const devicetok = await deviceDB.ensureDevicetok(TH.WorldScope)
     expect([bank.gate.main.devicetok, bank.gate.passkey0?.devicetok]).to.deep.equal([devicetok, devicetok])
   })
 

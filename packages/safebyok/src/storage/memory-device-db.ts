@@ -2,30 +2,33 @@
 
 import { Helpers } from 'safebyok-big/internals'
 import { DeviceDB } from './device-db'
-import type { LeaseRecord, LeaseScope } from '../shapes/shapes-stamps'
+import type { BankScope, LeaseRecord, LeaseScope } from '../shapes/shapes-stamps'
 import type { Devicetok } from '../shapes/primitives'
 
 /** A device database in this tab's memory, gone when the tab closes. Two Devices given one stand for two tabs of a browser. */
 export class MemoryDeviceDB extends DeviceDB {
-  // == [Props]: #leases, #hearers, #devicetok
+  // == [Props]: #leases, #hearers, #devicetoks
 
   /** Each gate's lease record, by the ckey of its scope. */
   readonly #leases  = new Map<string, unknown>()
   readonly #hearers = new Set<(rung: unknown) => void>()
-  /** The devicetok stored, or null for none. */
-  #devicetok: unknown = null
+  /** Each bank's devicetok, by the ckey of its scope. */
+  readonly #devicetoks = new Map<string, unknown>()
   // --
 
-  // == [Cheats and ckeys]: _cheat_leases, _cheat_plantDevicetok, ckeyOf
+  // == [Cheats and ckeys]: _cheat_leases, _cheat_plantDevicetok, ckeyOf, devicetokCkeyOf
 
   /** For tests: each gate's lease record, by {@link MemoryDeviceDB.ckeyOf} its scope, to read or change in place. */
   _cheat_leases(): Map<string, unknown> { return this.#leases } // eslint-disable-line unicorn/prefer-private-class-fields
 
-  /** For tests: store `raw` as the devicetok, unchecked. */
-  _cheat_plantDevicetok(raw: unknown): void { this.#devicetok = raw } // eslint-disable-line unicorn/prefer-private-class-fields
+  /** For tests: store `raw` as the devicetok of the bank at `scope`, unchecked. */
+  _cheat_plantDevicetok(scope: BankScope, raw: unknown): void { this.#devicetoks.set(MemoryDeviceDB.devicetokCkeyOf(scope), raw) } // eslint-disable-line unicorn/prefer-private-class-fields
 
   /** The ckey of the lease record at `scope`, in {@link _cheat_leases}. */
   static ckeyOf({ userid, banklabel, labelpath }: LeaseScope): string { return Helpers.ckeyOf(userid, banklabel, labelpath) }
+
+  /** The ckey of the devicetok of the bank at `scope`. */
+  static devicetokCkeyOf({ userid, banklabel }: BankScope): string { return Helpers.ckeyOf(userid, banklabel, 'devicetok') }
   // --
 
   // == [Protected, the calls of DeviceDB]: doPeekLease, doStowLease, doRing, doListen, doStowDevicetok
@@ -49,9 +52,10 @@ export class MemoryDeviceDB extends DeviceDB {
     return () => { this.#hearers.delete(hear) }
   }
 
-  protected doStowDevicetok(devicetok: Devicetok, isReplaced: (raw: unknown) => boolean): unknown {
-    const before = this.#devicetok
-    if (isReplaced(before)) { this.#devicetok = devicetok }
+  protected doStowDevicetok(scope: BankScope, devicetok: Devicetok, isReplaced: (raw: unknown) => boolean): unknown {
+    const ckey   = MemoryDeviceDB.devicetokCkeyOf(scope)
+    const before = this.#devicetoks.get(ckey) ?? null
+    if (isReplaced(before)) { this.#devicetoks.set(ckey, devicetok) }
     return before
   }
   // --

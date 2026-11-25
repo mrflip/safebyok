@@ -176,13 +176,14 @@ export class Device {
   // == [The devicetok]: ensureDevicetok
 
   // As a refused lease stow is (World.#stowLease), a refused devicetok is bad news: the wayin is still built.
-  /** The token each wayin this device builds records: the host's `devicetok`, or the one the deviceDB keeps, made at its first use. Never rejects.
-   * Where the deviceDB refuses, it tells `onBadNews`, and answers a fresh token for this call alone.
+  /** The token each wayin this device builds records: the host's `devicetok`, or the one the deviceDB keeps for the signed-in user's bank, made at its first use.
+   * Where the deviceDB refuses, it tells `onBadNews`, and answers a fresh token for this call alone. Refuses `absent_vault` until `signin`, and never otherwise.
    */
   async ensureDevicetok(): Promise<Devicetok> {
     if (this.#devicetok !== null) { return this.#devicetok }
+    const { scope } = this
     try {
-      return await this.deviceDB.ensureDevicetok()
+      return await this.deviceDB.ensureDevicetok(scope)
     } catch (err) {
       this.tellBadNews([err])
       return Crypto.randomId()

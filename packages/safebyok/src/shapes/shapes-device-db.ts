@@ -30,7 +30,7 @@ export const DeviceDBChecks = Object.freeze(Validator.Checkers('bad_record', ({ 
 })))
 // --
 
-// == [IndexedDB]: IdbDeviceDBOpts, idbDeviceDBOpts, LeaseScopepath
+// == [IndexedDB]: IdbDeviceDBOpts, idbDeviceDBOpts, LeaseScopepath, DevicetokScopepath
 
 /** What an IdbDeviceDB is made with. */
 export interface IdbDeviceDBOpts {
@@ -43,6 +43,9 @@ export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optio
 
 /** Where the lease database files a gate's lease record. */
 export type LeaseScopepath = [userid: Userid, banklabel: Banklabel, labelpath: LeaseLabelpath]
+
+/** Where the lease database files a bank's devicetok. */
+export type DevicetokScopepath = [userid: Userid, banklabel: Banklabel, devicetok: 'devicetok']
 // --
 
 true satisfies Z.core.util.AssertEqual<IdbDeviceDBOpts, Z.input<typeof idbDeviceDBOpts>>

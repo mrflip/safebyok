@@ -94,7 +94,7 @@ function paddedSeqOf(seqnum: number): string {
 // --
 
 // == [Device]: Devicetok, EpochMillis
-/** This device's token, a UUID recorded in each wayin it builds: the host's `devicetok`, or the one its deviceDB keeps. */
+/** This device's token for a bank, a UUID recorded in each wayin it builds: the host's `devicetok`, or the one its deviceDB keeps for the bank. */
 export type Devicetok = string
 /** An instant: whole UTC epoch milliseconds, as `Date.now()` gives. */
 export type EpochMillis = CX.EpochMillis
