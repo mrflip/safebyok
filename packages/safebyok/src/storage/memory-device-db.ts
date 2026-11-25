@@ -16,13 +16,13 @@ export class MemoryDeviceDB extends DeviceDB {
   readonly #devicetoks = new Map<string, unknown>()
   // --
 
-  // == [Cheats and ckeys]: _cheat_leases, _cheat_plantDevicetok, ckeyOf, devicetokCkeyOf
+  // == [Cheats and ckeys]: _cheat_leases, _cheat_devicetoks, ckeyOf, devicetokCkeyOf
 
   /** For tests: each gate's lease record, by {@link MemoryDeviceDB.ckeyOf} its scope, to read or change in place. */
   _cheat_leases(): Map<string, unknown> { return this.#leases } // eslint-disable-line unicorn/prefer-private-class-fields
 
-  /** For tests: store `raw` as the devicetok of the bank at `scope`, unchecked. */
-  _cheat_plantDevicetok(scope: BankScope, raw: unknown): void { this.#devicetoks.set(MemoryDeviceDB.devicetokCkeyOf(scope), raw) } // eslint-disable-line unicorn/prefer-private-class-fields
+  /** For tests: each bank's devicetok, by {@link MemoryDeviceDB.devicetokCkeyOf} its scope, to read or change in place. */
+  _cheat_devicetoks(): Map<string, unknown> { return this.#devicetoks } // eslint-disable-line unicorn/prefer-private-class-fields
 
   /** The ckey of the lease record at `scope`, in {@link _cheat_leases}. */
   static ckeyOf({ userid, banklabel, labelpath }: LeaseScope): string { return Helpers.ckeyOf(userid, banklabel, labelpath) }

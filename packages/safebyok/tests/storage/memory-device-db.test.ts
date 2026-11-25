@@ -11,7 +11,7 @@ TH.describeDeviceDBLeaseBattery('MemoryDeviceDB', {
 TH.describeDeviceDBDevicetokBattery('MemoryDeviceDB', {
   makeDeviceDB:   () => new MemoryDeviceDB(),
   makeTwin:       (deviceDB) => deviceDB,
-  plantDevicetok: (deviceDB, scope, raw) => { deviceDB._cheat_plantDevicetok(scope, raw) },
+  plantDevicetok: (deviceDB, scope, raw) => { deviceDB._cheat_devicetoks().set(MemoryDeviceDB.devicetokCkeyOf(scope), raw) },
 })
 
 /** A MemoryDeviceDB whose every peek, stow and listen throws an error that quotes a lease record, and whose devicetok stow throws too. */
