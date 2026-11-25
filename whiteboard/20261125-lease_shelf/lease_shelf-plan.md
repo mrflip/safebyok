@@ -3,7 +3,7 @@
 Mode: **YOLO**. Issued by the Coach, 2026-11-25. Cap: 3 threads at once.
 Default levels: review `medium`; worker `opus` (thread-worker), reviewer `opus` for threads touching what
 `notes/guarantees-big.md` covers (lease, keys), else its `sonnet` pin; style pass on `style-reviewer`'s pin.
-Status: 0 (#900) and 1c (#902) filed, out of draft; 1a (#903) filed onto 1c, out of draft once CI is green; 2 stats and 4 probe building; 1b held for the Coach's ruling on 'row' in the lease row's names; Closer Look running at e135f59d4.
+Status: 0, 1c, 1a filed; 1d lease_thing building (400k), 2 stats and 4 probe building; 1b waits on 1d; Closer Look running at e135f59d4.
 
 Sprint doc: https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh (Open Matters bookmark rev 3).
 
@@ -73,6 +73,17 @@ Depends on 0. Reviewed; filing.
 Left (doc rows): autolock runs only while connected; the World decodes the minder's `read_tc`; the janitor is
 private to its timer.
 
+### 1d. `lease_thing`: the stored lease is a Thing-shaped LeaseRecord
+> "What would it cost us to make it Thing-shaped enough for Record<Lease> and Tombstone<Lease | LeaseRecord> to work?
+> It's being stored, after all." "Either way Lease, LeaseRecord and LeaseTombstone are apposite; peekLease and
+> stowLease, etc"
+
+Gloss: the stored `LeaseRecord` carries every Thing sparse field, as a union on `am` (live: stamp, keys, `ends_at`,
+`gate_revseq`; tombstone: Thing fields only); `LeaseTombstone` is `TombstoneOf<LeaseRecord>`; "row" leaves every
+lease name; `Lease` is the model over `LiveOf<LeaseRecord>`; `Proving.buildLease` takes the stored lease it follows.
+The wrap stays bound to the stamp alone. `'lease'` stays out of `Thingkind`. Levels: worker `thread-worker-400k` on
+opus; review `high` on opus. Depends on 1a. Building.
+
 ### 1b. `lease_shared`: one lease on disk, shared by every tab
 > "Lease is same on all tabs." "Newer gate revision should move lease expiry time to now+softlock time" ... "The
 > softlock is a max: if it's 20 minutes and there's 10 minutes left in the lease, nothing changes"
@@ -80,8 +91,7 @@ private to its timer.
 Gloss: design 2 to 4, 9, 10. `Device.make` takes the device database. The lease is stowed on attach, tombstoned on
 lock, and taken up or evicted from what other tabs write. A gate change softlocks it. `ends_at` moves into the row.
 A refused stow or peek is told as bad news, and the tab keeps its in-memory lease. The listener starts and stops
-with connect/disconnect. Levels: review `high` on `opus`; worker `thread-worker-400k`. Depends on 1a and 1c,
-restacked into one line first. Look-ahead: 5 and 6 build on its device wiring.
+with connect/disconnect. Levels: review `high` on `opus`; worker `thread-worker-400k`. Depends on 1d (on 1a, on 1c). Look-ahead: 5 and 6 build on its device wiring.
 
 ### 2. `stats`: storage stats
 > "add a stats() call that returns { box: { count, size }, gate: { count, size }, max: { count, size } }"
