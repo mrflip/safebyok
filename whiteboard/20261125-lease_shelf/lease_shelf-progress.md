@@ -68,3 +68,9 @@ Curated by the orchestrator. Newer than the plan where they disagree.
 ## For the wrap-up (*Orchestrator:*)
 - World.connect's doc block says a second call "does nothing"; it should say a call after a failed watch retries it
   (VaultMinder's `#unwatchWrapped ??=` stays null when watch throws). For the documentarian pass, or 1b's first commit.
+
+## The Closer Look (*Orchestrator:*)
+- The tab is in the sprint doc. *Coach (2026-11-25):* "Not concerned about other closer look stuff". Ruled: E1 (a
+  disconnect drops this tab's copy, YOLO in 1b, a row); E3 (read_tc stays storage's: "what matters is when the ground
+  truth was consulted"); E9 (`MaxTimerMillis`: "Maxmillis of 24.5 days is correct one", imported in thread 8). The
+  rest (E2 lazy expiry, E4 janitor object, E5 VaultTSQ reach, E6 softlock and the kit, E7, E8, E10–E12) is dropped.
