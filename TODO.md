@@ -126,10 +126,9 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   record's weight; where the datastore cannot measure that cheaply, it stores the size in a field of its own, written
   with the record. A Thing record's size can be worked out once the labelpath's and the body's sizes are known: every
   other field has a fixed or bounded width (the Coach, 2026-11-25, on thread 2).
-* **`LeaseLabelpath.of` in place of `leaseLabelpathOf`.** `leaseLabelpathOf` (from `safebyok/core` and
-  `safebyok/storage`) and `scopepathOf` (from `safebyok/browser`) are exported without parsing their argument, as their
-  neighbours (`leaseBellnameOf`) are. Give each a check at the entrypoint and a test of its own, in a thread that may
-  rename exports (the Coach, 2026-11-25, on #907).
+* **A check on `scopepathOf`.** `scopepathOf` (from `safebyok/browser`) is exported without parsing its argument.
+  Give it a check at the entrypoint and a test of its own, in a thread that may rename exports (the Coach, 2026-11-25,
+  on #907; the `leaseLabelpathOf` half was done by `LeaseLabelpath.of`, #927).
 * **A hidden watch-holding tab on iOS Safari.** `OneWatchVaultDB` hands the watch to the tab holding a Web Lock.
   Chrome does not freeze a page holding a lock others wait on, and Firefox does not freeze pages, but WebKit suspends a
   background tab soon after it goes quiet, and nothing found says a held lock exempts it. If it does not, a hidden
