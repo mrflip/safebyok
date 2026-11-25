@@ -110,6 +110,9 @@ export const LeaseLabelpathShape = "A lease's labelpath is `lease/` and its labe
 /** A tombstone of a lease asked of a lease that is not live. */
 export const LeaseTombstoneOfLiveOnly = "Only a live lease has a tombstone: a tombstone or the shell has none."
 
+/** A live lease record whose labelpath is not the one its gate's labelpath gives it. */
+export const LeaseLabelpathOfOtherGate = "A live lease's labelpath is `lease/` and the label of the gate in its gate_labelpath."
+
 /** A read_tc that is not a UUID version 7. */
 export const ReadTcShape = "A read_tc is a UUID version 7, in lowercase hex."
 

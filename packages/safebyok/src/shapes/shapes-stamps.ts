@@ -40,7 +40,7 @@ export type StampedGate = Z.infer<typeof StampChecks.stampedGate>
 export type BoxStamp    = Z.infer<typeof StampChecks.boxStamp>
 // --
 
-// == [The lease's forms]: LeaseFormat, LeaseLabelpath, LeaseLifeRoot, leaseLifepathOf, isLifepathOwn, LeaseChecks, StampChecks, LeaseStamp, LeaseSparse, LeaseRecord, LeaseTombstone, LeaseLoggable
+// == [The lease's forms]: LeaseFormat, LeaseLabelpath, LeaseLifeRoot, leaseLifepathOf, isLifepathOwn, isOfItsGate, LeaseChecks, StampChecks, LeaseStamp, LeaseSparse, LeaseRecord, LeaseTombstone, LeaseLoggable
 
 /** The `fmt` a lease carries, the same as every Thing's. It is bound into the wrap of the lease's bankKey. */
 export const LeaseFormat = ThingFormat
@@ -68,12 +68,15 @@ export function leaseLifepathOf(lifeseq: Lifeseq): Lifepath { return `${LeaseLif
 /** True when a lease's lifepath is {@link LeaseLifeRoot} and then its own lifeseq. */
 function isLifepathOwn({ lifeseq, lifepath }: { lifeseq: string, lifepath: string }): boolean { return lifepath === leaseLifepathOf(lifeseq) }
 
+/** True when a live lease's labelpath is the one {@link LeaseLabelpath.of} gives its gate's labelpath. */
+function isOfItsGate({ labelpath, gate_labelpath }: { labelpath: string, gate_labelpath: Labelpath }): boolean { return labelpath === LeaseLabelpath.of(gate_labelpath) }
+
 /** The checks of a lease's stamp, of the lease record a deviceDB stores, live or a tombstone, and of its shell. */
 const LeaseChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, discrim, union, custom, epochMillis, bank_key_lease_wrapped }) => {
   const { userid, banklabel, lifeseq, born_at, lifetok } = PlainChecks.bankStamp.shape
   const leaseStamp  = obj({
     fmt: lit(LeaseFormat), userid, banklabel, bank_lifeseq: lifeseq, bank_born_at: born_at, bank_lifetok: lifetok,
-    gate_labelpath: PlainChecks.gateStamp.shape.labelpath, gate_lifeseq: PlainChecks.gateStamp.shape.lifeseq, gate_revtok: ThingChecks.sparse.shape.revtok,
+    gate_labelpath: PerKindChecks.gateLabelpath, gate_lifeseq: PlainChecks.gateStamp.shape.lifeseq, gate_revtok: ThingChecks.sparse.shape.revtok,
     born_at: epochMillis, proved_at: epochMillis, wayinkind: GX.wayinkind,
   })
   const leaseKeys   = {
@@ -90,6 +93,8 @@ const LeaseChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, discrim,
     .refine(isLabelLast,   Phrases.LabelNotLast)
     .refine(isLifepathOwn, Phrases.LeaseLifepathOwn)
     .refine(isParityRight, Phrases.LifeseqParity)
+    // Only once every field passes: LeaseLabelpath.of refuses, by throwing, a gate_labelpath that is no gate's.
+    .refine(isOfItsGate,   { error: Phrases.LeaseLabelpathOfOtherGate, when: ({ issues }) => issues.length === 0 })
   const tombstone   = obj({ ...thingFields, am: lit('x') }).strict()
     .refine(isLabelLast,   Phrases.LabelNotLast)
     .refine(isLifepathOwn, Phrases.LeaseLifepathOwn)
