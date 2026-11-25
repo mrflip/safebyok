@@ -587,6 +587,7 @@ describe("ThingCar.make(begun, { world })", () => {
   it("made from a Thing, carries that Thing, and has taken nothing", () => {
     const thing = TH.PlainThing.make(Thing.shellOf(TH.boxThingOf()))
     const car   = ThingCar.make(thing, { world: TH.PlainWorld })
+    expect(car.thing).to.equal(thing)
     expect(carFieldsOf(car)).to.deep.equal({ thing, lastErr: null, erred_at: null, read_tc: VacantReadTc })
   })
 
@@ -667,6 +668,16 @@ describe("car.receive(event)", () => {
     expect(car.read_tc).to.eq(event.read_tc)
     expect(car.receive({ ...event, read_tc: readTcNow() })).to.deep.equal([])
     expect(car.read_tc).to.eq(event.read_tc)
+  })
+
+  it("has its Thing publish once the car is past the record: a subscriber finds its agekind, citable and read_tc moved", () => {
+    const thing = TH.makePlainThing(Thing.shellOf(Revs.two))
+    const car   = ThingCar.make(thing, { world: TH.PlainWorld })
+    const event = TH.thingEventOf(Revs.two)
+    const found: unknown[] = []
+    thing.subscribe(() => { found.push([car.agekind, car.citable.revseq, car.read_tc]) })
+    car.receive(event)
+    expect(found).to.deep.equal([['here', Revs.two.revseq, event.read_tc]])
   })
 
   it("keeps and throws its Thing's refusal and when, then clears it at a record taken, keeping when", () => {

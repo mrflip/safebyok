@@ -102,8 +102,8 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
     return events
   }
 
-  // The Thing receives first, so that a record it refuses leaves the car as it was. A subscriber it tells finds the car
-  // as it was before the record.
+  // The Thing takes the record first, so that one it refuses leaves the car as it was, and publishes last, so that a
+  // subscriber finds the car past the record.
   /** The events of `proposed` that are news, this car moved past it */
   #take(proposed: VaultEvent): readonly VaultEvent[] {
     SeenChecks.event.parseConsistent(proposed, pick(this.thing, ['userid', 'banklabel', 'labelpath']))
@@ -113,10 +113,11 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
     const agerankWas = this.#agerank
     const agerank    = nextAgerankOf(agerankWas, val, read_tc, liveness !== 'soon')
     if (agerank === undefined) { return NoEvents }
-    if (liveness !== 'soon') { this.thing.receive(proposed) }
+    const isAdopted = (liveness !== 'soon') && this.thing.take(proposed)
     this.#readTc  = this.#readTcAfter(val, read_tc)
     this.#agerank = agerank
     if (BaseThing.cmp(this.#citable, val) > 0) { this.#citable = citedOf(val) }
+    if (isAdopted) { this.thing.publish() }
     return eventsOf(proposed, agerankWas, agerank)
   }
 
@@ -168,8 +169,9 @@ function isItemEvent(begun: unknown): begun is VaultItemEvent {
   return (typeof begun === 'object') && (begun !== null) && ('eventkind' in begun) && (begun.eventkind === 'item')
 }
 
+// A Thing holding the shell reads as the shell, so a shell is one that is no Thing.
 /** True of the shell, among the forms a car is made from */
-function isShell(begun: unknown): begun is VoidSentinel { return BaseThing.isVoidSentinel(begun) }
+function isShell(begun: unknown): begun is VoidSentinel { return (! (begun instanceof BaseThing)) && BaseThing.isVoidSentinel(begun) }
 
 /** The Thing fields of `seen`, frozen */
 function citedOf(seen: Sparse<ThingRecord>): Sparse<ThingRecord> { return Object.freeze(BaseThing.sparseOf(seen)) }

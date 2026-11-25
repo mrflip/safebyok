@@ -58,19 +58,28 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   }
   // --
 
-  // == [Receiving]: receive
+  // == [Receiving]: receive, take
 
-  /** Adopt the record of `proposed`, an item event of this Thing, where it is whole, a tombstone or the void sentinel, and newer than the record held; tell each subscriber, and return true.
-   * A live box's sparse form, a record no newer, and a `life` or `aged` event change nothing. Refuses an event of another Thing, and a record in any other form.
+  /** Take the record of `proposed`, an item event of this Thing, and publish to each subscriber where it is adopted. Returns whether it was.
+   * {@link take} says which records are adopted, and what refuses.
    */
   receive(proposed: VaultEvent<RecordT>): boolean {
+    const isAdopted = this.take(proposed)
+    if (isAdopted) { this.publish() }
+    return isAdopted
+  }
+
+  // A car moves how far its Thing has been seen between the two halves of a receive, so that a subscriber finds the car past the record.
+  /** Adopt the record of `proposed` where it is whole, a tombstone or the void sentinel, and newer than the record held, and return whether it did. No subscriber is told: call {@link publish} after.
+   * A live box's sparse form, a record no newer, and a `life` or `aged` event change nothing. Refuses an event of another Thing, and a record in any other form.
+   */
+  take(proposed: VaultEvent<RecordT>): boolean {
     SeenChecks.event.parseConsistent(proposed, pick(this, ['userid', 'banklabel', 'labelpath']))
     if (proposed.eventkind !== 'item') { return false }
     SeenChecks.item.parse(proposed)
     const { val, liveness } = proposed
     if ((liveness === 'soon') || (BaseThing.cmp(this.pickle(), val) <= 0)) { return false }
     this.adopt(val)
-    this.#tellSubscribers()
     return true
   }
   // --
@@ -98,15 +107,15 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   }
   // --
 
-  // == [Subscribers]: subscribe, #tellSubscribers, dropSubscribers
+  // == [Subscribers]: subscribe, publish, dropSubscribers
 
   /** Subscribe a listener to this Thing's news, returning its unsubscribe. Already bound, as `useSyncExternalStore` wants it.
    * The listener is called with no argument each time this Thing adopts a record: read the Thing again. Its record, {@link pickle}, is the same object until a newer one is adopted.
    */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
 
-  /** Call each subscriber. */
-  #tellSubscribers(): void {
+  /** Call each subscriber, as {@link receive} does once a record is adopted. */
+  publish(): void {
     for (const told of this.#subscribers.values()) { told() }
   }
 
