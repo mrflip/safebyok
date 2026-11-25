@@ -1,6 +1,6 @@
 # Thread A: big_names (2026-11-25)
 
-Branch `20261125-big_names`, PR #TBD, stacked on #912. Proved: package tests and typechecks green: safebyok-postgres 123,
+Branch `20261125-big_names`, PR [#916](https://github.com/mrflip/safebyok/pull/916), stacked on #912. Proved: package tests and typechecks green: safebyok-postgres 123,
 safebyok-postgres-big 246, safebyok-fastkey 43, safebyok-indexeddb 115, safebyok-indexeddb-big 215, safebyok-react 339,
 safebyok-react-big 277, safebyok-graphql-big 448, safebyok-convex-big 334, the demos and e2e (111, 24, 26, 99, 576), root
 scripts 327; lint clean. `pnpm justify` after the catch-up rebase: see the PR's **Tests:** line.
