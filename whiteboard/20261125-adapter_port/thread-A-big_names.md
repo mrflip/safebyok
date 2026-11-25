@@ -74,3 +74,7 @@ root scripts 331; lint, typecheck and build clean.
   one-commit allowance; no test matched a phrase's text). `notes/wontfix.md` and `notes/react_lib_principles.md` say
   `safebyok-react`, with the "To reproduce" paths fixed; the tests' `RowChanged` strings quote row headings, so they stayed.
   The review's rework is wholly in two commits, and `safebyok-big` tests pass (2950).
+
+* **Second rebase onto main (2026-11-25)**: onto e3196fcdb (#919, unicorn 80). One conflict, `pnpm-lock.yaml` at the
+  lockfile commit, resolved by taking main's lockfile and running `pnpm install`; no other conflict, no lint fixes needed.
+  `pnpm justify` green.
