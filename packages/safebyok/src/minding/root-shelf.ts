@@ -7,9 +7,8 @@ import type { World } from '../models/world'
 import type { RootShelf } from '../shapes/shapes-bankish'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type BankRecord, type BoxRecord, type GateRecord, ThingFormat } from '../shapes/shapes-thing'
-import { Labelpath } from '../shapes/primitives'
 
-// == [The shelf]: guardRootShelf, peekRoots, stowRoots, isRootLabelpath
+// == [The shelf]: guardRootShelf, peekRoots, stowRoots
 
 /** `shelf`, each method wrapped so that what it throws is told to `onBadNews` as a refusal, and a get that throws answers null. */
 export function guardRootShelf(shelf: RootShelf, onBadNews: (news: Errors.VaultError) => void): RootShelf {
@@ -40,12 +39,9 @@ export function stowRoots(shelf: RootShelf, scope: BankScope, world: World): voi
   }
   shelf.setItem(shelfCkeyOf(scope), shelvedOf([bank.pickle(), gate.pickle(), rootBox.pickle()]))
 }
-
-/** True for the labelpath of one of a bank's three roots. */
-export function isRootLabelpath(labelpath: Labelpath): boolean { return RootLabelpaths.includes(labelpath) }
 // --
 
-// == [The value]: ShelvedRoots, ShelvedVersion, shelvedOf, rootsOfShelved, shelfCkeyOf, RootLabelpaths
+// == [The value]: ShelvedRoots, ShelvedVersion, shelvedOf, rootsOfShelved, shelfCkeyOf
 
 /** The bank's three records, as the vaultDB stores them: the bank, its main gate and its root box. */
 type ShelvedRoots = readonly [bank: Adoptable<BankRecord>, gate: Adoptable<GateRecord>, rootBox: Adoptable<BoxRecord>]
@@ -72,7 +68,4 @@ function rootsOfShelved(shelved: string): readonly unknown[] | null {
 // The banklabel is a label, with no colon, so the userid after it is all the rest.
 /** The shelf's key for the roots of the bank at `scope`. */
 function shelfCkeyOf({ userid, banklabel }: BankScope): string { return `safebyok:roots:${banklabel}:${userid}` }
-
-/** The labelpaths of a bank's roots, in the order they are shelved. */
-const RootLabelpaths: readonly Labelpath[] = Object.freeze(['bank', Labelpath.MainGate, Labelpath.RootBox])
 // --

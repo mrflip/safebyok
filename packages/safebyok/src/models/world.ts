@@ -1,5 +1,5 @@
-import { isEqual } from 'es-toolkit'
-import { type Errors, Validator, VX } from 'safebyok-big/internals'
+import { isEqual, noop } from 'es-toolkit'
+import { type Errors, SX, Validator, VX } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { BaseThing } from './base-thing'
 import { Box } from './box'
@@ -10,15 +10,18 @@ import type { Lease } from './lease'
 import type { Proving } from './proving'
 import type { Adoptable } from './thing'
 import { bulletproofHandlerOf } from '../helpers/bulletproof'
-import type { BankStage, HostedVault, RefusalSnapshot, WorldOpts, WorldSnapshot } from '../shapes/shapes-bankish'
-import { PendingWorld, SignedOutWorld, WorldChecks } from '../shapes/shapes-bankish'
+import type { BankStage, HostedVault, RefusalSnapshot, RootShelf, WorldOpts, WorldSnapshot } from '../shapes/shapes-bankish'
+import { PendingWorld, SignedOutWorld, WorldChecks, isRootShelf } from '../shapes/shapes-bankish'
 import type { BirthCleartexts, BirthDna, BirthGatingFriend, GateRevisionedStamp, LeaseGate, WorldGateFriend } from '../shapes/shapes-gateish'
 import { type MaskedViewLease, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type BankStamp, type LeaseLoggable, StampChecks } from '../shapes/shapes-stamps'
-import { type BankRecord, type BoxRecord, type BulletproofCallback, type GateRecord, type Sparse, type ThingMakeOpts, type ThingRecord, type Thingkind, Shell } from '../shapes/shapes-thing'
-import { type SeenThing, SeenChecks } from '../shapes/shapes-vault-event'
-import { type EpochMillis, Labelpath } from '../shapes/primitives'
+import { type BankRecord, type BoxRecord, type BulletproofCallback, type GateRecord, type Sparse, type ThingMakeOpts, type ThingRecord, type Thingkind, PerKindChecks, Shell } from '../shapes/shapes-thing'
+import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
+import { type ReadTc, type SeenThing, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
+import { type EpochMillis, type Lifetok, Labelpath } from '../shapes/primitives'
+import { peekRoots, stowRoots } from '../minding/root-shelf'
+import { VacantAgerank, itemSeenOf, readTcNow } from '../storage/agerank'
 import type { VaultMinder } from '../minding/vault-minder'
 import { isVaultMinder } from '../shapes/shapes-vault-minder'
 import * as Phrases from '../phrases'
@@ -151,14 +154,42 @@ export class World {
   }
   // --
 
-  // == [Signing in]: signin, showSigninRefusal, birthGating, birthFriend
+  // == [Signing in]: signin, seedFromShelf, keepOnShelf, showSigninRefusal, birthGating, birthFriend
 
-  /** Take `vaultMinder`, the signed-in user's bank's records, sorted, whose Things this world makes. A second call does nothing. */
-  signin(vaultMinder: VaultMinder): void {
-    Checks.vaultMinder.parse(vaultMinder)
+  // Its Things are seeded before it listens to keep them on the shelf, which would only put back what it read.
+  /** Take `vaultMinder`, the signed-in user's bank's records, sorted, whose Things this world makes; seed them from the roots `shelf` keeps, and keep the roots there from then on. A second call does nothing.
+   * With no shelf, the roots are kept nowhere between page loads.
+   */
+  signin(vaultMinder: VaultMinder, shelf: RootShelf | null): void {
+    Checks.signinArgs.parse({ vaultMinder, shelf })
     if (this.#vaultMinder !== null) { return }
     this.#vaultMinder = vaultMinder
+    if (shelf !== null) {
+      this.#seedFromShelf(vaultMinder, shelf)
+      this.#keepOnShelf(vaultMinder, shelf)
+    }
     this.align()
+  }
+
+  // Each root is told apart, so a damaged one is news, and the rest still reach their Things.
+  /** Hand `vaultMinder` each root `shelf` keeps of the device's bank. */
+  #seedFromShelf(vaultMinder: VaultMinder, shelf: RootShelf): void {
+    const read_tc = readTcNow()
+    const roots   = peekRoots(shelf, this.#device.scope)
+    const banktok = banktokOf(roots[0])
+    for (const root of roots) {
+      try { vaultMinder.receive(shelvedEventOf(Checks.shelvedRoot.parse(root), read_tc, banktok)) } catch (err) { this.#device.tellBadNews([err]) }
+    }
+  }
+
+  // The Things hear each root first, so the roots put are the ones this world shows.
+  /** Put this world's roots on `shelf` at each root `vaultMinder` tells of, or remove them while they are not all live. */
+  #keepOnShelf(vaultMinder: VaultMinder, shelf: RootShelf): void {
+    const hear = this.#bulletproofCallback((event: VaultEvent) => {
+      if ((event.eventkind === 'item') && RootLabelpaths.has(event.labelpath)) { stowRoots(shelf, this.#device.scope, this) }
+    })
+    // The onBadNews of the vault TSQ, listening beside it, tells the device of the same record refused.
+    vaultMinder.listen({ hear, onBadNews: noop })
   }
 
   /** Show `err` as the snapshot's `lastErr`, at stage `'failed'`, while the bank's roots are not all live. Internal: the device's sign-in calls it. */
@@ -426,10 +457,28 @@ export class World {
   // --
 }
 
-// == [Helpers]: RootLabelpaths, ThingClass, thingClassOf, isLive, refusalSnapshotOf, WorldLeaseGate, Wait, makeWait
+// == [Helpers]: RootLabelpaths, ShelvedSourcelabel, banktokOf, shelvedEventOf, ThingClass, thingClassOf, isLive, refusalSnapshotOf, WorldLeaseGate, Wait, makeWait
 
 /** The labelpaths of the bank's roots, which the stage is read from. */
 const RootLabelpaths: ReadonlySet<Labelpath> = new Set(['bank', Labelpath.MainGate, Labelpath.RootBox])
+
+/** The `sourcelabel` of the events of the roots a world read from its root shelf. */
+const ShelvedSourcelabel = 'root_shelf'
+
+/** The lifetok of `root`, where it is a live bank's record, else the void lifetok, as the events of the roots shelved carry it */
+function banktokOf(root: unknown): Lifetok {
+  const report = PerKindChecks.bankThing.safeParse(root)
+  return (report.success && (report.data.am === 'a')) ? report.data.lifetok : SX.VoidLifeTok
+}
+
+/** The `item` event of `record`, a root read from a root shelf, read at `read_tc` in the bank of `banktok`, with the vacant agerank */
+function shelvedEventOf(record: SeenThing, read_tc: ReadTc, banktok: Lifetok): VaultEvent {
+  const { userid, banklabel, labelpath } = record
+  return {
+    eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: VacantAgerank, agerankWas: VacantAgerank,
+    sourcelabel: ShelvedSourcelabel, read_tc, banktok, ...itemSeenOf(record),
+  }
+}
 
 /** The class a world makes a Thing of one kind from, as {@link World.makeThing} calls it. */
 interface ThingClass {
@@ -497,9 +546,14 @@ function makeWait(): Wait {
 // == [Checks]: Checks
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link World.make}'s arguments and {@link World.signin}'s. */
-const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
+/** The checks of {@link World.make}'s arguments, {@link World.signin}'s, and a root read from a root shelf. */
+const Checks = Validator.Checkers('bad_record', ({ obj, custom, union }) => ({
   worldOpts:   obj({ device: custom<Device>() }),
-  vaultMinder: custom<VaultMinder>(isVaultMinder, Phrases.VaultMinderExpected),
+  signinArgs:  obj({
+    vaultMinder: custom<VaultMinder>(isVaultMinder, Phrases.VaultMinderExpected),
+    shelf:       custom<RootShelf>(isRootShelf, Phrases.RootShelfExpected).nullable(),
+  }),
+  // The shelf keeps the roots only while all three are live, each whole.
+  shelvedRoot: union([BankChecks.record, GateChecks.record, BoxChecks.record]),
 }))
 // --
