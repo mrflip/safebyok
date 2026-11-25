@@ -44,8 +44,8 @@ implementation.
   too damaged to name its epoch, meeting a healthy store.
 * **The Postgres adapter's own tests on a real server.** The Coach (2026-10-16, thread 11,
   [#131](https://github.com/mrflip/safebyok/pull/131)): the adapter's own tests
-  (`packages/safebyok-postgres/tests/`) stay on PGlite, in-process, because they are written against
-  PGlite's interface; only `e2e/tests/postgres/` runs on the container. A PGlite-shaped wrapper over
+  (`packages/safebyok-postgres/tests/`, and `packages/safebyok-postgres-big/tests/`) stay on PGlite, in-process, because they are written against
+  PGlite's interface; only `e2e/tests/postgres/`, over safebyok-postgres-big, runs on the container. A PGlite-shaped wrapper over
   a `pg` pool would run them there too, so that "every Postgres test, one line" were true.
 
 * **One sentence per refusal.** A value that fails several checks gets a sentence for each, which
