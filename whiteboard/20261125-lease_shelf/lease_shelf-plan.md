@@ -3,7 +3,7 @@
 Mode: **YOLO**. Issued by the Coach, 2026-11-25. Cap: 3 threads at once.
 Default levels: review `medium`; worker `opus` (thread-worker), reviewer `opus` for threads touching what
 `notes/guarantees-big.md` covers (lease, keys), else its `sonnet` pin; style pass on `style-reviewer`'s pin.
-Status: done (2026-11-25). Merged: #904, #900, #902, #903, #907, #908, #909, #912, #915, #910, #906, #905, #911, #924. The last line: main -> #927 (11 lease_names) -> #926 (13 watch_recovery) -> #925 (12 set_stage) -> #928 (docs) -> #901 (this plan, the top). Done note: human/20261125-sprint_lease_shelf_done.md.
+Status: done (2026-11-25). Merged: #904, #900, #902, #903, #907, #908, #909, #912, #915, #910, #906, #905, #911, #924, then the last line #927, #926, #925, #928, #901. The closing PR: #929 (14 watch_ended, with these notes). Done note: human/20261125-sprint_lease_shelf_done.md.
 
 Sprint doc: https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh (Open Matters bookmark rev 3).
 
@@ -194,6 +194,14 @@ A private `#setStage` on World records and announces a crossing; a default lifec
 The Coach: "yes do your fix for the lock loss"; and on the lock's name, "it should be named for safebyok, userid and bank's labelpath".
 
 When the watch-holding tab's watch fails to start, OneWatchVaultDB tells its minder, so `isWatching` goes false in every tab and the janitor's retry asks for the lock again; tested in the failing case. The Web Lock and BroadcastChannel are named for safebyok, the userid and the bank's labelpath. Split from 11 by the sizing rule. Depends on 10. opus worker; review `medium`.
+
+### 14. `watch_ended`: the device announces a watch that ends of itself
+
+The Coach, on `VaultDB.watch` gaining `onEnded` (#926): "great idea. Also lifecycle announce".
+
+When the world's watch ends before its stop, the device announces `watch_ended` through `onLifecycle`, and the default handler logs it. `VaultMinder.connect` takes an optional `onEnded`; the World passes it the announcement, so the minder knows nothing of the device. Cut from 12 after the line was out of draft; filed onto main once the line merged. opus worker; review `medium`.
+
+*Review:* fixed: four small fixes (alignment; a sentence on the existing wontfix crossing row; doc blocks trimmed to what a caller can rely on; a one-clause test title). Left: `Phrases.WatchEnded` says the watch starts again at the janitor's next tick, untrue only after a disconnect.
 
 ## For the Coach
 - **safebyok-convex is still on safebyok-big.** Thread 7's wrapper works for any new-core vaultDB. *Coach:* "convex and
