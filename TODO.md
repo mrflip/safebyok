@@ -121,3 +121,8 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   an item event, so that no read time is invented for a record. Let them take a bare record too, `Thing.make(record, {
   world })`: the "constructor does not assume this weird way of doing it". Open: a bare record has no `read_tc`, and the
   car's `VacantReadTc`, which sorts below every read, is the honest one for it (the Coach, 2026-11-25, who builds it).
+
+* **A store for which measuring each record's size is costly records it at write time.** `stats()` sums each stored
+  record's weight; where the datastore cannot measure that cheaply, it stores the size in a field of its own, written
+  with the record. A Thing record's size can be worked out once the labelpath's and the body's sizes are known: every
+  other field has a fixed or bounded width (the Coach, 2026-11-25, on thread 2).
