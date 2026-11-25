@@ -1,0 +1,140 @@
+{
+  "name": "safebyok-convex",
+  "private": false,
+  "version": "0.5.0",
+  "description": "Convex storage for safebyok: a Convex component keeping a bank's Things as ciphertext, and the vaultDB that speaks to it, each call one Convex query or mutation.",
+  "keywords": [
+    "safebyok",
+    "convex",
+    "convex-component",
+    "vault",
+    "e2ee"
+  ],
+  "license": "Apache-2.0",
+  "author": "Philip (flip) Kromer <flip@mrflip.com>",
+  "homepage": "https://github.com/mrflip/safebyok#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrflip/safebyok.git",
+    "directory": "packages/safebyok-convex"
+  },
+  "bugs": {
+    "url": "https://github.com/mrflip/safebyok/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "src"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "prebuild": "pnpm build:deps",
+    "build:watch": "tsdown --watch",
+    "build:deps": "[ \"$SAFEBYOK_SKIP_BUILD_DEPS\" = 1 ] || SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok-convex^...' build",
+    "lint": "eslint --cache --cache-strategy content --cache-location .eslintcache .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "pretest": "pnpm build:deps",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "pretest:coverage": "pnpm build:deps",
+    "justify": "pnpm install && pnpm lint && pnpm typecheck && pnpm test && SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm build",
+    "prepublishOnly": "node ../../scripts/require-pnpm.ts && pnpm justify"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/core": "^0.18.5",
+    "@edge-runtime/vm": "^5.0.0",
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@vitest/coverage-v8": "^5.1.0",
+    "@vitest/eslint-plugin": "^1.6.28",
+    "convex": "^1.49.0",
+    "convex-test": "^0.0.69",
+    "eslint": "^10.14.0",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-chai-expect": "^4.1.1",
+    "eslint-plugin-chai-friendly": "^1.2.1",
+    "eslint-plugin-import-x": "^4.18.1",
+    "eslint-plugin-jsdoc": "^65.4.5",
+    "eslint-plugin-sonarjs": "^4.2.2",
+    "eslint-plugin-unicorn": "^79.0.0",
+    "publint": "^0.3.25",
+    "safebyok": "workspace:*",
+    "tsdown": "^0.23.7",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.72.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0",
+    "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "convex": "^1.49.0",
+    "safebyok": "workspace:^"
+  },
+  "exports": {
+    ".": {
+      "@safebyok/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "@safebyok/source": "./src/server.ts",
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./convex.config": {
+      "@safebyok/source": "./src/component/convex.config.ts",
+      "types": "./dist/component/convex.config.d.ts",
+      "default": "./dist/component/convex.config.js"
+    },
+    "./convex.config.js": {
+      "@safebyok/source": "./src/component/convex.config.ts",
+      "types": "./dist/component/convex.config.d.ts",
+      "default": "./dist/component/convex.config.js"
+    },
+    "./_generated/component.js": {
+      "@safebyok/source": "./src/component-api.ts",
+      "types": "./dist/component-api.d.ts"
+    },
+    "./test": "./src/test.ts",
+    "./testing": {
+      "@safebyok/source": "./src/testing.ts",
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./server": {
+        "types": "./dist/server.d.ts",
+        "default": "./dist/server.js"
+      },
+      "./convex.config": {
+        "types": "./dist/component/convex.config.d.ts",
+        "default": "./dist/component/convex.config.js"
+      },
+      "./convex.config.js": {
+        "types": "./dist/component/convex.config.d.ts",
+        "default": "./dist/component/convex.config.js"
+      },
+      "./_generated/component.js": {
+        "types": "./dist/component-api.d.ts"
+      },
+      "./test": "./src/test.ts",
+      "./testing": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}
