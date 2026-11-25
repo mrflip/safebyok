@@ -1,6 +1,6 @@
 # Principles of the React library
 
-What the Coach and the react_targets workshop settled about `safebyok-react-lean` and its demos, in November 2026.
+What the Coach and the react_targets workshop settled about `safebyok-react` and its demos, in November 2026.
 `docs/react-overview.md` has the layers and the supported targets; the four `docs/guide-*.md` sketch the interface each
 audience is promised. This note is the reasoning behind them, for whoever changes the library next.
 
