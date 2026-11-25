@@ -8,7 +8,7 @@ Branch `20261125-janitor`, PR #908, stacked on #903 (1a, on #902 and #900). Prov
     `disconnect`. A tick is `#lockPastLeaseEnd`, then, while connected, `#tidyConnected`: a watch that is not running
     (`vaultMinder.isWatching` false) is started again through `#connectSignedIn` (its throw is bad news, as at
     sign-in), and a stale gate re-reads the roots as before. `#startJanitor` does nothing on a disabled device, so a
-    sign-in after `disable` starts no timer. The timer is `unref`'d where the runtime has it.
+    sign-in after `disable` starts no timer.
   * The `#lock-is-intent` comment ("autolock is a best-effort time, not a deadline") now sits at `#lockPastLeaseEnd`.
   * `#isGateStale` reads `this.gate?.read_at`: World no longer imports `readAtOf`, nor reads the minder's car.
   * World imports `MaxTimerMillis` from `shapes-vault-tsq.ts`; its own copy is gone.
@@ -26,8 +26,10 @@ Branch `20261125-janitor`, PR #908, stacked on #903 (1a, on #902 and #900). Prov
     from `connect`, `signin` and the janitor. 1b's device-database listener can start beside it there.
   * The janitor reads `isWatching` before retrying, though `VaultMinder.connect` does nothing while watching: one
     branch more, but the tick says what it is for.
-  * `unref` carries an `eslint-disable-line @typescript-eslint/no-unnecessary-condition`: Node's types are in scope
-    for src/ (tests share its tsconfig), so TS sees `unref` as always there; in a browser the timer is a number.
+  * **No `unref`.** The timer stops at `disable` and never starts on a disabled device. I tried `unref` against a
+    timer keeping a test process alive, and set it aside: the demos typecheck src/ under the DOM's types alone, where
+    a timer is a number, so it took a cast or a hatch, and Node is no runtime src/ serves. Nor is it needed: a device
+    signed in and never disconnected already left a janitor running before this thread, and vitest exits all the same.
 * **Deviations**: none from the gloss but the getter above. The janitor stays in World, in its own section (E4).
 * **Discoveries**:
   * No test outside `vault-tsq.test.ts` pinned item invalidation on reconnect. The flagged test ("leaves no item or

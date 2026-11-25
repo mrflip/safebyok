@@ -352,9 +352,6 @@ export class World {
   #startJanitor(): void {
     if ((this.#janitor !== null) || ! this.isEnabled) { return }
     this.#janitor = setInterval(() => { this.#tidy() }, Math.min(this.#device.janitorMillis, MaxTimerMillis))
-    // Under Node, as in a test, a timer keeps the process running. Node's types are in scope, but a browser's timer is a
-    // number, with no unref.
-    this.#janitor.unref?.() // eslint-disable-line @typescript-eslint/no-unnecessary-condition
   }
 
   /** Stop the janitor, where it runs */
