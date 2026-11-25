@@ -180,32 +180,45 @@ describe("VaultTSQ.connect and disconnect", () => {
     expect(world.queryClient.getQueryData(VaultTSQ.listQueryKeyOf(TH.RootScope))).to.eq(kids)
   })
 
-  it("leaves no item or listing fresh while disconnected, or while its VaultMinder is not watching", async () => {
+  it("leaves no item or listing fresh while its VaultMinder is not watching, or while disconnected", async () => {
     const world   = await worldWithBox()
     const ListKey = VaultTSQ.listQueryKeyOf(TH.RootScope)
     await world.vaultTSQ.listOnce('box')
     expect([isObservedStale(world.queryClient, BoxKey), isObservedStale(world.queryClient, ListKey)]).to.deep.equal([false, false])
-    world.vaultTSQ.disconnect()
-    expect([isObservedStale(world.queryClient, BoxKey), isObservedStale(world.queryClient, ListKey)]).to.deep.equal([true, true])
-    world.vaultTSQ.connect()
     world.sorted.disconnect()
     expect(world.sorted.carAt(TH.BoxScope)?.agekind).to.eq('here')
     expect([isObservedStale(world.queryClient, BoxKey), isObservedStale(world.queryClient, ListKey)]).to.deep.equal([true, true])
+    world.sorted.connect()
+    expect([isObservedStale(world.queryClient, BoxKey), isObservedStale(world.queryClient, ListKey)]).to.deep.equal([false, false])
+    world.vaultTSQ.disconnect()
+    expect([isObservedStale(world.queryClient, BoxKey), isObservedStale(world.queryClient, ListKey)]).to.deep.equal([true, true])
   })
 
-  it("hears again once connected, invalidating every item and listing of its bank, and a second connect does nothing more", async () => {
+  it("hears again once connected, invalidating every listing of its bank and no item, and a second connect does nothing more", async () => {
     const world   = await worldWithBox()
     const ListKey = VaultTSQ.listQueryKeyOf(TH.RootScope)
     await world.vaultTSQ.listOnce('box')
     world.vaultTSQ.disconnect()
     expect(world.vaultTSQ.connect()).to.eq(world.vaultTSQ)
-    expect([itemQueryAt(world)?.state.isInvalidated, listQueryAt(world)?.state.isInvalidated]).to.deep.equal([true, true])
-    expect([isObservedStale(world.queryClient, BoxKey), isObservedStale(world.queryClient, ListKey)]).to.deep.equal([true, true])
+    expect([itemQueryAt(world)?.state.isInvalidated, listQueryAt(world)?.state.isInvalidated]).to.deep.equal([false, true])
+    expect([isObservedStale(world.queryClient, BoxKey), isObservedStale(world.queryClient, ListKey)]).to.deep.equal([false, true])
     world.notify(noticeOf(Box1))
     expect(world.queryClient.getQueryData(BoxKey)).to.deep.equal(Box1)
     const invalidating = vi.spyOn(world.queryClient, 'invalidateQueries')
     world.vaultTSQ.connect()
     expect(invalidating).not.toHaveBeenCalled()
+  })
+
+  it("invalidates an item once its listing, refetched on connect, tells of a newer revision of its box", async () => {
+    const world = await worldWithBox()
+    await world.vaultTSQ.listOnce('box')
+    world.vaultTSQ.disconnect()
+    cheatStored(world.vaultDB, Box1)
+    world.vaultTSQ.connect()
+    expect(itemQueryAt(world)?.state.isInvalidated).to.eq(false)
+    await world.vaultTSQ.listOnce('box')
+    expect(world.sorted.carAt(TH.BoxScope)?.agekind).to.eq('cold')
+    expect(itemQueryAt(world)?.state.isInvalidated).to.eq(true)
   })
 })
 
