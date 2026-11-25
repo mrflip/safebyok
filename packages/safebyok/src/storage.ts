@@ -2,6 +2,8 @@
 // store, the asks it is given and the answers it gives; the deviceDB, which has each gate's lease record, and its memory
 // store; and from safebyok-big the acts, throwers and checkers an adapter's own code reaches for, re-exported so that
 // each stays one binding across both packages.
+import { EX } from 'safebyok-big/internals'
+
 export { AdapterVaultDB } from './storage/adapter-vault-db'
 export { type Watcher, MemoryVaultDB } from './storage/memory-vault-db'
 export { type Banklabel, type BoxLabelpath, type Devicetok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
@@ -45,10 +47,16 @@ export {
 // own options and rows with.
 export { VoidLifeTok, storagePolicyVals, type Awaitable, type DelAct, type GoodAct, type GotAct, type PutAct, type StoragePolicy, type WriteAct } from 'safebyok-big/storage'
 export type { IfAbsent, IfPresent, PutIfAbsent, RefusedAct } from 'safebyok-big/internals'
+// The values of an ask's flags, of each verb's acts and of a refusal's kind, for an adapter that names them on a wire.
+export { badActVals, ifAbsentVals, refusedActVals, refusalkindVals } from 'safebyok-big/storage'
+/** The values of a put's `ifPresent` and `ifAbsent`, and of a get's, a put's and a del's acts. */
+export const { delActVals, gotActVals, ifPresentVals, putActVals, putIfAbsentVals } = EX
 export { VaultError, isVaultError, type Capacity, type RefusalFamily, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'
 export { fetchFailed, identityRevoked, sanitizeForeignError, storageFailed, storageRefusalOf, storageUnavailable, unexpectedError } from 'safebyok-big/storage'
 export { storageIssue } from 'safebyok-big/refusals/throwers'
-export { storageCallRefused, storeQuotaTooSmall } from './refusals/throwers'
+export { storageCallRefused, storeQuotaTooSmall, vaultErrorOfCrossed } from './refusals/throwers'
+// What crosses a wire, for an adapter whose server runs a whole vaultDB: a refusal, and the parts of an answer the classifier's `crossed*` functions read.
+export { type CrossedErr, CrossedChecks, crossedErrOf } from './shapes/shapes-crossed'
 // An IndexedDB store's own: each call's one transaction, the row at a key within it, and the versioned database.
 export { dbprefixOf, inOneStep, rowAt, versionedShelfOf, type VersionedShelfSpec } from 'safebyok-big/storage'
 export { Checker, Checkers, objCheck, type AssertEqual, type CheckerInput, type ConsistencyRefusal, type ObjCheckOpts, type Refusing, type Story } from 'safebyok-big/storage'

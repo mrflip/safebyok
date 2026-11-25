@@ -10,6 +10,7 @@ import { StoreLimitFloor } from '../shapes/shapes-vault-stats'
 import { type ListAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
 import type { DamagedThing } from '../shapes/shapes-answers'
 import type { ProbeStepkind } from '../shapes/shapes-vault-probe'
+import type { CrossedErr } from '../shapes/shapes-crossed'
 
 // == [Big's Throwers]: every thrower of safebyok-big, re-exported
 
@@ -92,7 +93,7 @@ export function bornAtNotNow(ask: WriteAsk): Errors.VaultError { return new Erro
 export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
 // --
 
-// == [Storing Throwers]: PoliciedMeta, gateIssue, storeQuotaTooSmall, storageCallRefused, bornAtNotStored, lifetokNotStored, rowOfOtherAddress, bankRootsMissing, listParentNotLive, answerNotMade
+// == [Storing Throwers]: PoliciedMeta, gateIssue, storeQuotaTooSmall, storageCallRefused, vaultErrorOfCrossed, bornAtNotStored, lifetokNotStored, rowOfOtherAddress, bankRootsMissing, listParentNotLive, answerNotMade
 
 // Big types a refusal's meta.act as its own BadAct, which has no `policied`.
 /** Refusal meta with act `policied`, for a write the act tables allow but a storage policy, the born_at check or the lifetok check refuses. */
@@ -112,6 +113,16 @@ export function storeQuotaTooSmall(quota: number): Errors.VaultError {
 export function storageCallRefused(oplabel: string, thrown: unknown): Errors.VaultError {
   return new Errors.VaultError('storage_issue', Phrases.storageCallRefused(oplabel), { cause: sanitizeForeignError(thrown) })
 }
+
+// Ported from safebyok-big's shapes-bank-answers.ts.
+/** The refusal `crossed` stands for, as it crossed a wire: its meta what crossed, with `answered` laid over it, and `rows` handed to the answer. */
+export function vaultErrorOfCrossed({ refusalkind, message, meta }: CrossedErr, answered: Errors.RefusalMeta, rows: Errors.RefusalRows): Errors.VaultError {
+  const crossedMeta = withoutNulls(meta ?? {}) as Errors.RefusalMeta
+  return new Errors.VaultError(refusalkind, message, { meta: { ...crossedMeta, ...answered }, rows })
+}
+
+/** The fields of `crossed` that are not null. */
+function withoutNulls(crossed: object): Record<string, unknown> { return Object.fromEntries(Object.entries(crossed).filter(([, field]) => field !== null)) }
 
 /** A `bad_record` refusal of a write over `stored`, the live Thing whose born_at it changes. */
 export function bornAtNotStored(stored: ThingRecord | null): Errors.VaultError {
