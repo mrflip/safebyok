@@ -254,7 +254,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     unwatch()
   })
 
-  it("dates each read by the database's clock, each later read in a session later than the one before", async () => {
+  it("dates each read in a session by the database's clock, in order", async () => {
     const vaultDB = await makeVaultDB()
     const db      = await database()
     const { rows } = await db.query<{ millis: number }>('SELECT (extract(epoch FROM clock_timestamp()) * 1000)::float8 AS millis')
