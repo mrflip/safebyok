@@ -1,5 +1,5 @@
 import { isEqual, noop } from 'es-toolkit'
-import { type Errors, Phrases as BigPhrases, SX, Validator, VX } from 'safebyok-big/internals'
+import { Clock, type Errors, Phrases as BigPhrases, SX, Validator, VX } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { BaseThing } from './base-thing'
 import { Box } from './box'
@@ -20,7 +20,7 @@ import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type ReadTc, type SeenThing, type VaultEvent, type VaultItemEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { type EpochMillis, type Lifetok, Labelpath } from '../shapes/primitives'
 import { peekRoots, stowRoots } from '../minding/root-shelf'
-import { itemEventOf } from '../storage/agerank'
+import { itemEventOf, readAtOf } from '../storage/agerank'
 import type { VaultMinder } from '../minding/vault-minder'
 import { type ReceivingThing, isVaultMinder } from '../shapes/shapes-vault-minder'
 import * as Phrases from '../phrases'
@@ -34,7 +34,7 @@ export type SomeThing = Bank | Gate | Box
  * Its snapshot's stage is read from the bank, the main gate and the root box its VaultMinder keeps, each of which it subscribes to, and from the lease.
  */
 export class World {
-  // == [Props]: #device, #vaultMinder, #lease, #unlockWait, #isConnected, #lastErr, #vaults, #snapshot, #subscribers, #getSnapshot, #subscribe, #bulletproofCallback
+  // == [Props]: #device, #vaultMinder, #lease, #unlockWait, #isConnected, #janitor, #lastErr, #vaults, #snapshot, #subscribers, #getSnapshot, #subscribe, #bulletproofCallback
 
   readonly #device: Device
 
@@ -49,6 +49,9 @@ export class World {
 
   /** True from {@link connect} until {@link disconnect}. */
   #isConnected = false
+
+  /** The janitor's timer, running while this world is connected and someone has signed in; null otherwise. */
+  #janitor: ReturnType<typeof setInterval> | null = null
 
   /** Why sign-in failed, or null while it has not. */
   #lastErr: RefusalSnapshot | null = null
@@ -100,6 +103,7 @@ export class World {
     return bank.stamp
   }
 
+  // Every read of the lease's end goes through here: the janitor's, and isSoftlocked's.
   /** When the attached lease stops unlocking the bank, or null while locked. */
   get leaseEndsAt(): EpochMillis | null { return (this.#lease === null) ? null : this.#lease.proved_at + this.#device.leaseMillis }
 
@@ -162,7 +166,7 @@ export class World {
 
   // Its Things are seeded before it listens to keep them on the shelf, which would only put back what it read.
   /** Take `vaultMinder`, the signed-in user's bank's records, sorted, whose Things this world makes; seed them from the roots `shelf` keeps, and keep the roots there from then on. A second call does nothing.
-   * With no shelf, the roots are kept nowhere between page loads. Where this world is connected, the VaultMinder starts watching the vaultDB.
+   * With no shelf, the roots are kept nowhere between page loads. Where this world is connected, the VaultMinder starts watching the vaultDB, and the janitor starts.
    */
   signin(vaultMinder: VaultMinder, shelf: RootShelf | null): void {
     Checks.signinArgs.parse({ vaultMinder, shelf })
@@ -172,7 +176,7 @@ export class World {
       this.#seedFromShelf(vaultMinder, shelf)
       this.#keepOnShelf(vaultMinder, shelf)
     }
-    if (this.#isConnected) { this.#connectMinder() }
+    if (this.#isConnected) { this.#connectSignedIn() }
     this.align()
   }
 
@@ -218,13 +222,14 @@ export class World {
   // == [The awaited `unlock` gating]: ensureUnlocked, dismissUnlock, settleUnlockWait
   // One wait is shared by every caller, opened by the first and settled once: by any unlock, a dismissal or the device's disable.
 
-  /** Resolve this world once it is unlocked: at once, or when an `unlock` gating or a gate change lands.
-   * While it waits, {@link isUnlockWanted} is true: render the unlock form, and call the gate's `unlock` from it.
+  /** Resolve this world once it is unlocked and not softlocked ({@link isSoftlocked}): at once, or when an `unlock` gating or a gate change lands.
+   * While it waits, {@link isUnlockWanted} is true: render the unlock form, and call the gate's `unlock` from it. Near the
+   * lease's end, that is so even while the world shows unlocked, and the `unlock` gating renews the lease.
    * Rejects `dismissed` when {@link dismissUnlock} is called, and with the device's end cause when it is disabled. A {@link disconnect} leaves it waiting.
    */
   async ensureUnlocked(): Promise<this> {
     this.demandEnabled()
-    if (this.isUnlocked) { return this }
+    if (! this.isSoftlocked) { return this }
     // Read here: a subscriber told of the wait may dismiss it, which clears #unlockWait.
     const wait = (this.#unlockWait ??= makeWait())
     this.align()
@@ -278,8 +283,10 @@ export class World {
   }
   // --
 
-  // == [Locking and connecting]: lock, connect, disconnect, disable, hostVault, #connectMinder
+  // == [Locking and connecting]: lock, connect, disconnect, disable, hostVault, #connectSignedIn
 
+  // #lock-is-intent: a lock asks the user again at the next promptable action, and is not an alarm. A seal under way
+  // finishes; an unseal under way returns no cleartext.
   /** Lock the world: drop its lease and the keys in it. */
   lock(): this {
     this.#lease?.evict()
@@ -289,24 +296,26 @@ export class World {
   }
 
   // The watch starts before the vaults hear it, so that what a vault refetches as it connects is fetched under the watch.
-  /** Start what this world keeps running: its VaultMinder's watch of the vaultDB, once someone signs in, and each vault it hosts hearing the VaultMinder. Never throws; a second call, or a call once the device is disabled, does nothing.
+  /** Start what this world keeps running: its VaultMinder's watch of the vaultDB and its janitor, once someone signs in, and each vault it hosts hearing the VaultMinder. Never throws; a second call, or a call once the device is disabled, does nothing.
    * What the host's vaultDB throws as the watch starts goes to the device's `onBadNews`.
    */
   connect(): this {
     if (! this.isEnabled) { return this }
     this.#isConnected = true
-    this.#connectMinder()
+    this.#connectSignedIn()
     for (const vault of this.#vaults) { vault.connect() }
     return this
   }
 
-  /** Lock this world, and stop what it keeps running: each vault it hosts stops hearing the VaultMinder, and the VaultMinder stops watching the vaultDB. Never throws; calling it twice in a row is the same as once, and each call locks.
+  /** Lock this world, and stop what it keeps running: its janitor stops, each vault it hosts stops hearing the VaultMinder, and the VaultMinder stops watching the vaultDB. Never throws; calling it twice in a row is the same as once, and each call locks.
    * The world stays enabled: its verbs still work, a call waiting in {@link ensureUnlocked} still waits, and {@link connect} resumes it.
    * What the host's vaultDB throws as the watch stops goes to the device's `onBadNews`.
    */
   disconnect(): this {
     this.#isConnected = false
     this.lock()
+    if (this.#janitor !== null) { clearInterval(this.#janitor) }
+    this.#janitor = null
     for (const vault of this.#vaults) { vault.disconnect() }
     try { this.#vaultMinder?.disconnect() } catch (err) { this.#device.tellBadNews([err]) }
     return this
@@ -328,9 +337,46 @@ export class World {
     if (this.#isConnected) { vault.connect() }
   }
 
-  /** Start the VaultMinder's watch, where someone has signed in, telling the device's `onBadNews` what the host's vaultDB throws. */
-  #connectMinder(): void {
-    try { this.#vaultMinder?.connect() } catch (err) { this.#device.tellBadNews([err]) }
+  /** Start the VaultMinder's watch, telling the device's `onBadNews` what the host's vaultDB throws, and the janitor, where someone has signed in */
+  #connectSignedIn(): void {
+    if (this.#vaultMinder === null) { return }
+    try { this.#vaultMinder.connect() } catch (err) { this.#device.tellBadNews([err]) }
+    this.#janitor ??= setInterval(() => { this.#tidy() }, Math.min(this.#device.janitorMillis, MaxTimerMillis))
+  }
+  // --
+
+  // == [The janitor]: tidy, isGateStale, refreshRoots
+  // #lock-is-intent: autolock is a best-effort time, not a deadline. A lease past its end still seals and unseals until
+  // the next tick, which may come a janitor period late, or later while the page sleeps. Meanwhile isSoftlocked holds,
+  // so a call to ensureUnlocked asks the user first.
+
+  /** Lock this world once its lease has passed its end, and read its roots again once the gate was last read longer ago than the device's `gateStaleMillis`. Never throws: a refusal goes to the device's `onBadNews`. */
+  #tidy(): void {
+    try {
+      const now = Clock.nowMillis()
+      const { leaseEndsAt } = this
+      if ((leaseEndsAt !== null) && (now >= leaseEndsAt)) { this.lock() }
+      if (this.#isGateStale(now)) { void this.#refreshRoots() }
+    } catch (err) {
+      this.#device.tellBadNews([err])
+    }
+  }
+
+  // Each tab judges for itself, by when it last read the gate as news: a gate never heard of is not stale.
+  /** True where the main gate was last read more than the device's `gateStaleMillis` before `now` */
+  #isGateStale(now: EpochMillis): boolean {
+    const car = this.#vaultMinder?.carAt({ ...this.#device.scope, labelpath: Labelpath.MainGate })
+    return (car !== undefined) && (now - readAtOf(car.read_tc) > this.#device.gateStaleMillis)
+  }
+
+  /** Get the bank, the main gate and the root box from the vaultDB, past anything kept here, telling the device's `onBadNews` of a refusal */
+  async #refreshRoots(): Promise<void> {
+    try {
+      const answer = await this.demandVaultMinder().tryGetWorldOnce()
+      if (! answer.ok) { this.#device.tellBadNews([answer.err]) }
+    } catch (err) {
+      this.#device.tellBadNews([err])
+    }
   }
   // --
 
@@ -362,7 +408,7 @@ export class World {
   }
   // --
 
-  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, areRootsLive, demandEnabled, demandRootsLive, demandVaultMinder, demandLease, thingAt
+  // == [Guards]: isEnabled, endCause, isLocked, isSoftlocked, isUnlocked, isUnlockWanted, areRootsLive, demandEnabled, demandRootsLive, demandVaultMinder, demandLease, thingAt
 
   /** True until its device ends. */
   get isEnabled(): boolean { return this.endCause === null }
@@ -372,6 +418,14 @@ export class World {
 
   /** True when no lease is attached. */
   get isLocked(): boolean { return this.#lease === null }
+
+  /** True when locked, or once the attached lease is within the device's `softlockMillis` of its end: {@link ensureUnlocked} then waits for an `unlock` gating, which renews the lease.
+   * Seals and unseals still run until the world locks.
+   */
+  get isSoftlocked(): boolean {
+    const { leaseEndsAt } = this
+    return (leaseEndsAt === null) || (Clock.nowMillis() >= leaseEndsAt - this.#device.softlockMillis)
+  }
 
   /** True when a lease is attached. */
   get isUnlocked(): boolean { return this.#lease !== null }
@@ -477,7 +531,11 @@ export class World {
   // --
 }
 
-// == [Helpers]: RootLabelpaths, ShelvedSourcelabel, banktokOf, shelvedEventOf, ThingClass, receiveFirst, thingClassOf, isLive, refusalSnapshotOf, WorldLeaseGate, Wait, makeWait
+// == [Helpers]: MaxTimerMillis, RootLabelpaths, ShelvedSourcelabel, banktokOf, shelvedEventOf, ThingClass, receiveFirst, thingClassOf, isLive, refusalSnapshotOf, WorldLeaseGate, Wait, makeWait
+
+// A browser's timer runs at once for a longer delay.
+/** The longest delay a timer waits, in milliseconds: about 24.8 days. */
+const MaxTimerMillis = 2 ** 31 - 1
 
 /** The labelpaths of the bank's roots, which the stage is read from. */
 const RootLabelpaths: ReadonlySet<Labelpath> = new Set(['bank', Labelpath.MainGate, Labelpath.RootBox])

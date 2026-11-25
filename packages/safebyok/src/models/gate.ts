@@ -211,7 +211,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
   // == [The awaited `unlock` gating]: ensureUnlocked, dismissUnlock
 
-  /** Resolve this gate once its world is unlocked ({@link World.ensureUnlocked}). While it waits, {@link isUnlockWanted} is true: render the unlock form, and call {@link unlock} from it. */
+  /** Resolve this gate once its world is unlocked, its lease not near its end ({@link World.ensureUnlocked}). While it waits, {@link isUnlockWanted} is true: render the unlock form, and call {@link unlock} from it. */
   async ensureUnlocked(): Promise<this> {
     await this.#world.ensureUnlocked()
     return this
@@ -250,6 +250,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
   // == [Locking]: lock
 
+  // #lock-is-intent: a lock asks the user again at the next promptable action, and is not an alarm.
   /** Lock this gate's world: drop its lease and the keys in it ({@link World.lock}). */
   lock(): this {
     this.#world.lock()
@@ -281,7 +282,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   }
   // --
 
-  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, demandEnabled, demandPasskeyAddable
+  // == [Guards]: isEnabled, endCause, isLocked, isSoftlocked, isUnlocked, isUnlockWanted, demandEnabled, demandPasskeyAddable
 
   /** True until its device ends. */
   get isEnabled(): boolean { return this.#world.isEnabled }
@@ -291,6 +292,9 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
   /** True while this gate's world holds no lease. */
   get isLocked(): boolean { return this.#world.isLocked }
+
+  /** True while this gate's world is locked, or its lease is near its end ({@link World.isSoftlocked}): {@link ensureUnlocked} then waits for an `unlock` gating. */
+  get isSoftlocked(): boolean { return this.#world.isSoftlocked }
 
   /** True while this gate's world holds a lease. */
   get isUnlocked(): boolean { return this.#world.isUnlocked }

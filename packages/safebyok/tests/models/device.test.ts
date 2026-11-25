@@ -149,11 +149,11 @@ describe("Device.make(record, opts)", () => {
     expect([device.keyDeriver, device.strengthChecker]).to.not.include(TH.testDeriver).and.to.not.include(TH.anyStrengthChecker)
   })
 
-  it("spreads to its banklabel, token and leaseMillis alone: nothing secret and nothing opaque", () => {
+  it("spreads to its banklabel, token and durations alone: nothing secret and nothing opaque", () => {
     const device = TH.makeDevice()
     // The spread is this test's subject: what a log line or a host's `{ ...device }` sees of a device.
     const spread = { ...device } // eslint-disable-line @typescript-eslint/no-misused-spread
-    expect(Object.keys(spread)).to.have.members(['banklabel', 'device_tok', 'leaseMillis'])
+    expect(Object.keys(spread)).to.have.members(['banklabel', 'device_tok', 'leaseMillis', 'softlockMillis', 'janitorMillis', 'gateStaleMillis'])
     expect(Object.values(spread).every((val) => ['string', 'number'].includes(typeof val))).to.be.true
     expect([device.vaultDB, device.keyDeriver, device.strengthChecker, device.logger]).to.not.include(undefined)
   })

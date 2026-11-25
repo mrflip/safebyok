@@ -124,23 +124,29 @@ const RootShelfMethodnames = ['getItem', 'setItem', 'removeItem'] as const
 /** The options of {@link Device.make}, beside the device's record. */
 export interface DeviceOpts {
   /** Where this device's banks are stored: each bank made on it is given this vaultDB. */
-  vaultDB:          VaultDB
+  vaultDB:           VaultDB
   /** Makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok-big/browser`, or your own. */
-  keyDeriver:       Deriver.KeyDeriver
+  keyDeriver:        Deriver.KeyDeriver
   /** Judges each new passphrase before the bank accepts it. Without one, every new passphrase is too weak. */
-  strengthChecker?: StrengthChecker | undefined
+  strengthChecker?:  StrengthChecker | undefined
   /** Where the device reports what it has no caller to throw to. Default: the console. */
-  logger?:          Logger.VaultLogger | undefined
+  logger?:           Logger.VaultLogger | undefined
   /** How long a lease lasts on this device, in minutes. `Infinity` lasts until locked. Default: 14 days. */
-  autolockMinutes?: number | undefined
+  autolockMinutes?:  number | undefined
+  /** How near its end a lease asks the user again, in minutes: from then on, a call that wants the bank unlocked waits for an `unlock` gating, which renews the lease. At most a twentieth of the lease, and none under a minute. Default: 10. */
+  softlockMinutes?:  number | undefined
+  /** How often the device locks a lease past its end, and checks whether its gate is stale, in minutes. Autolock is a best-effort time, not a deadline. Default: 10. */
+  janitorMinutes?:   number | undefined
+  /** How long after this device last read the bank's gate it reads the gate again, with the bank and root box, in minutes. Default: 720, twelve hours. */
+  gateStaleMinutes?: number | undefined
   /** Hears each refusal no caller waits on. Default: {@link DefaultOnBadNews}, a warning on the device's logger. */
-  onBadNews?:       BadNewsHandler | undefined
+  onBadNews?:        BadNewsHandler | undefined
   /** The QueryClient the signed-in user's boxes are kept in, under their bank's key: your own, so one client serves your queries and the vault's. Default: one the device makes. */
-  queryClient?:     QueryClient | undefined
+  queryClient?:      QueryClient | undefined
   /** Where the device keeps the signed-in bank's three roots between page loads: hand it `localStorage`. Without one, nothing is kept, and each page load waits on the vaultDB for the bank. */
-  rootShelf?:       RootShelf | undefined
+  rootShelf?:        RootShelf | undefined
   /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
-  deviceDB?:        unknown
+  deviceDB?:         unknown
 }
 // --
 
