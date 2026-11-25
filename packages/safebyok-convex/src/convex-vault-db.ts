@@ -138,18 +138,15 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
   // is not reported.
   protected override doWatch(scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: VaultError) => void): () => void {
     let seen: ReadonlyMap<string, string> | null = null
-    let isWatching = true
     const hearThings = (things: Filed[]): void => {
-      if (! isWatching) { return }
       if (seen !== null) { for (const received of changesOf(scope, seen, things)) { receive(received) } }
       seen = serializedOf(things)
     }
-    const fail = (thrown: unknown): void => {
-      if (isWatching) { onBadNews(refusalOf('watchThings', thrown)) }
-    }
+    const fail = (thrown: unknown): void => { onBadNews(refusalOf('watchThings', thrown)) }
     const unsubscribe = this.#subscribe(scope, hearThings, fail)
     // Convex counts a query's watchers, and each unsubscribe call lowers that count. A second call would end another watch
     // of the same bank on the same client.
+    let isWatching = true
     return () => {
       if (! isWatching) { return }
       isWatching = false
