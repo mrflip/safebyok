@@ -126,3 +126,7 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   record's weight; where the datastore cannot measure that cheaply, it stores the size in a field of its own, written
   with the record. A Thing record's size can be worked out once the labelpath's and the body's sizes are known: every
   other field has a fixed or bounded width (the Coach, 2026-11-25, on thread 2).
+* **`LeaseLabelpath.of` in place of `leaseLabelpathOf`.** `leaseLabelpathOf` (from `safebyok/core` and
+  `safebyok/storage`) and `scopepathOf` (from `safebyok/browser`) are exported without parsing their argument, as their
+  neighbours (`leaseBellnameOf`) are. Give each a check at the entrypoint and a test of its own, in a thread that may
+  rename exports (the Coach, 2026-11-25, on #907).
