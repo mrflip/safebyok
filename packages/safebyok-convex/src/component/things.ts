@@ -1,5 +1,5 @@
 import * as DB from 'safebyok/storage'
-import type { AnyAsk, BirthBankActual, ThingScope, WroteActual } from 'safebyok/storage'
+import type { AnyAsk, BirthBankActual, ThingScope, ThingWatchScope, WroteActual } from 'safebyok/storage'
 import { ConvexError } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
@@ -16,8 +16,8 @@ import * as CVX from './validators'
 // * writes the ask's record over the Thing it cites if the act is a write, and reads back what was stored.
 // It returns what it fetched, as it stood before any write, and as `written` what it read back, or null if it wrote nothing.
 // The client classifies what was fetched with the same classifier, so it reaches the same act, outcome or refusal, checks
-// that the act agrees with whether anything was written, and answers what was read back. A get, a listing and a get of the
-// world only read, from one snapshot.
+// that the act agrees with whether anything was written, and answers what was read back. A get, a listing, a get of the
+// world and the stats only read, from one snapshot.
 
 // == [Gets]: getThing, listThings, getWorld
 
@@ -86,6 +86,21 @@ export const birthBank = mutation({
 })
 // --
 
+// == [Stats]: stats
+
+/** Count and weigh the boxes and gates of a bank, and fetch the bank and how its roots compare with the ask's track, in one snapshot. */
+export const stats = query({
+  args:    CVX.askArgs,
+  returns: CVX.statsFetched,
+  handler: async (ctx, { ask: sent }) => {
+    const ask = askFor(() => DB.AskChecks.statsAsk.parse(sent))
+    const [filed, { bank, tracked }] = await Promise.all([bankThingsIn(ctx.db, ask), rootsIn(ctx.db, ask)])
+    const { box, gate } = DB.vaultStatsOf(filed)
+    return { box, gate, bank, tracked }
+  },
+})
+// --
+
 // == [Watching]: watchThings
 
 // Convex re-runs this query whenever a Thing of the bank changes, and sends the client its whole result each time.
@@ -94,9 +109,7 @@ export const watchThings = query({
   args:    CVX.watchArgs,
   returns: CVX.thingsWatched,
   handler: async (ctx, { scope: sent }) => {
-    const { userid, banklabel } = askFor(() => DB.AskChecks.thingWatchScope.parse(sent))
-    const docs: ThingDoc[] = await ctx.db.query('things').withIndex('by_scope', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel)).collect()
-    return docs.map(({ labelpath, thing }) => ({ labelpath, raw: thing }))
+    return await bankThingsIn(ctx.db, askFor(() => DB.AskChecks.thingWatchScope.parse(sent)))
   },
 })
 // --
@@ -128,7 +141,7 @@ function wouldWrite(classify: () => WroteActual | BirthBankActual): boolean {
 }
 // --
 
-// == [Things stored]: ThingDoc, docAt, rawAt, rootsIn, aboveIn, childrenIn, writeAt
+// == [Things stored]: ThingDoc, docAt, rawAt, rootsIn, aboveIn, childrenIn, bankThingsIn, writeAt
 
 /** A Thing's document. Its `thing` is `unknown` until the core has checked it. */
 type ThingDoc = Omit<Doc<'things'>, 'thing'> & { thing: unknown }
@@ -176,6 +189,12 @@ async function childrenIn(db: DatabaseReader, { userid, banklabel, labelpath }: 
     .withIndex('by_scope', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel).gte('labelpath', under).lt('labelpath', `${labelpath}0`))
     .collect()
   return docs.filter((doc) => ! doc.labelpath.includes('/', under.length)).map((doc) => ({ labelpath: doc.labelpath, raw: doc.thing }))
+}
+
+/** Every raw Thing of a bank, each beside its labelpath. */
+async function bankThingsIn(db: DatabaseReader, { userid, banklabel }: ThingWatchScope) {
+  const docs: ThingDoc[] = await db.query('things').withIndex('by_scope', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel)).collect()
+  return docs.map(({ labelpath, thing }) => ({ labelpath, raw: thing }))
 }
 
 /** Write `thing` at `scope`, over the document there or as a new one, and return the Thing then stored. */

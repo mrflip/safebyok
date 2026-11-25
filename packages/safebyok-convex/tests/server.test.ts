@@ -25,6 +25,7 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['listThings',  (caller) => caller.query(fns.listThings, { ask: TH.listAskAt('box') })],
   ['birthBank',   (caller) => caller.mutation(fns.birthBank, { ask: TH.birthBankAskOf() })],
   ['getWorld',    (caller) => caller.query(fns.getWorld, { ask: TH.getWorldAskOf() })],
+  ['stats',       (caller) => caller.query(fns.stats, { ask: TH.statsAskOf() })],
   ['watchThings', (caller) => caller.query(fns.watchThings, { scope: TH.ThingBank })],
 ]
 

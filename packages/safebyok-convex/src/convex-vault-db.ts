@@ -5,7 +5,8 @@ import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex
 import { ConvexError } from 'convex/values'
 import * as DB from 'safebyok/storage'
 import type {
-  BirthBankActual, BirthBankAsk, BirthPuts, GetAsk, GetWorldActual, GetWorldAsk, GotActual, ListAsk, ListThingsActual, Received, ThingWatchScope, VaultError, WriteAsk, WroteActual,
+  BirthBankActual, BirthBankAsk, BirthPuts, GetAsk, GetWorldActual, GetWorldAsk, GotActual, ListAsk, ListThingsActual, Received, StatsActual, StatsAsk, ThingWatchScope, VaultError, WriteAsk,
+  WroteActual,
 } from 'safebyok/storage'
 import * as Phrases from './phrases'
 import { safebyokRefusal } from './refusals'
@@ -73,12 +74,14 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
   }
   // --
 
-  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doWatch
+  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats, doWatch
   // A get is one query, and what it fetched is classified here. A write is one mutation, so one transaction: the component
   // fetches the Things, classifies the ask with the same classifier, and writes the record if the act is a write. It returns
   // the Things as it fetched them, which are classified here to the same outcome, and what it wrote, read back, or null if
   // it wrote nothing. Whether it wrote is checked against the act, and a write answers what was stored. Each call's
-  // `read_tc` is made before it is sent, so no later than the snapshot it reads.
+  // `read_tc` is made before it is sent, so no later than the snapshot it reads, and a watch's notice is dated as it
+  // arrives. Convex's own clock is no better: a query's Date.now() is frozen as it starts, and Convex serves a query's
+  // result again from its cache, so a later call could answer an earlier read_tc.
 
   protected async doGetThing(ask: GetAsk): Promise<GotActual> {
     const read_tc = DB.readTcNow()
@@ -122,6 +125,12 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
     const read_tc = DB.readTcNow()
     const fetched = await runOrRefuse('getWorld', () => this.#client.query(this.#api.getWorld, { ask }))
     return this.classifyGetWorld(ask, { ...fetched, read_tc })
+  }
+
+  protected async doStats(ask: StatsAsk): Promise<StatsActual> {
+    const read_tc = DB.readTcNow()
+    const { box, gate, ...bankFetched } = await runOrRefuse('stats', () => this.#client.query(this.#api.stats, { ask }))
+    return this.classifyStats(ask, { ...bankFetched, read_tc }, { box, gate, max: ConvexBankLimits })
   }
 
   // Convex re-sends a watched query's whole result each time it changes, so `receive` gets only the Things that differ from
@@ -169,6 +178,14 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
   }
   // --
 }
+// --
+
+// == [Limits]: ConvexBankLimits
+
+// docs.convex.dev/production/state/limits: one query may scan 32,000 documents and read 16 MiB. The stats and the watch each
+// read every Thing of a bank in one query, so a bank holds no more than that.
+/** The most a bank holds in Convex: the documents and bytes one query may read. */
+const ConvexBankLimits = DB.storeLimitsOf({ count: 32_000, size: 16_777_216 })
 // --
 
 // == [Helpers]: runOrRefuse, refusalOf, refusalOfCrossed, storedOutOfStep, demandUnwritten, checkedWritten, serializedOf, changesOf, latestOf
@@ -249,7 +266,7 @@ function isConvexClient(candidate: unknown): candidate is ConvexVaultClient {
 }
 
 /** The names of the safebyok vaultDB functions the adapter calls. */
-const SafebyokVaultFnnames = ['getThing', 'writeThing', 'listThings', 'birthBank', 'getWorld', 'watchThings'] as const
+const SafebyokVaultFnnames = ['getThing', 'writeThing', 'listThings', 'birthBank', 'getWorld', 'stats', 'watchThings'] as const
 
 // Each reference must have a name of the form `<module>:<function>`. The generated `api` returns a reference for any
 // property, so `api.getThing` exists, but it names no module and `getFunctionName` throws on it.

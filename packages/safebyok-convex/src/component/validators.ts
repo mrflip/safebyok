@@ -14,7 +14,7 @@ export const askArgs = { ask: v.any() }
 export const watchArgs = { scope: v.any() }
 // --
 
-// == [Fetched]: tracked, filed, thingFetched, thingsFetched, rootsFetched, thingsWatched
+// == [Fetched]: tracked, filed, thingkindStats, thingFetched, thingsFetched, rootsFetched, statsFetched, thingsWatched
 // The Things a call fetched, in one snapshot, each raw and null for none.
 
 /** How the bank, main gate and root box compare with what the ask tracks: for each, `'same'` or the raw Thing, null for none. */
@@ -22,6 +22,9 @@ const tracked = v.object({ bank: v.any(), gate: v.any(), box: v.any() })
 
 /** A raw Thing, with the labelpath it is stored at. */
 const filed = v.object({ labelpath: v.string(), raw: v.any() })
+
+/** The Things of one kind stored for a bank: how many, how many of them live, and their summed weight in bytes. */
+const thingkindStats = v.object({ count: v.number(), live_count: v.number(), size: v.number() })
 
 /** What `getThing` returns: the Thing at the ask's scope, the bank, the nearest Thing stored above the scope, and `tracked`. */
 export const thingFetched = v.object({ thing: v.any(), bank: v.any(), ancestor: v.any(), tracked })
@@ -31,6 +34,9 @@ export const thingsFetched = v.object({ parent: v.any(), children: v.array(filed
 
 /** What `getWorld` returns: the bank, main gate and root box, and `tracked`. */
 export const rootsFetched = v.object({ bank: v.any(), gate: v.any(), root: v.any(), tracked })
+
+/** What `stats` returns: the bank's boxes and gates as stored, the bank, and `tracked`. */
+export const statsFetched = v.object({ box: thingkindStats, gate: thingkindStats, bank: v.any(), tracked })
 
 /** What `watchThings` returns: every Thing of the bank. */
 export const thingsWatched = v.array(filed)

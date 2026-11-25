@@ -33,7 +33,7 @@ export default app
 import { SafebyokVaultComponent } from 'safebyok-convex/server'
 import { components } from './_generated/api'
 
-export const { getThing, writeThing, listThings, birthBank, getWorld, watchThings } =
+export const { getThing, writeThing, listThings, birthBank, getWorld, stats, watchThings } =
   new SafebyokVaultComponent(components.safebyok).api({
     getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
   })
@@ -88,8 +88,10 @@ One table inside the component, `things`: each Thing as the core wrote it, besid
 `labelpath`, indexed `by_scope` on those three, so one range fetches the children of a Thing. A deleted Thing stays as
 its tombstone.
 
-**How big a bank can be.** `watchThings` reads every Thing of the bank each time one changes, within a Convex query's
-limits (16 MiB read), so a bank past that makes its watch go quiet.
+**How big a bank can be.** `watchThings` reads every Thing of the bank each time one changes, and `stats` reads them
+all once, within a Convex query's limits (32,000 documents, 16 MiB read), so a bank past that makes its watch go quiet
+and its stats refuse. The stats report those two limits as the bank's `max`, and weigh each Thing as the UTF-8 length
+of its JSON, a little under what Convex counts for its document.
 
 **What a sidecar may hold.** Convex refuses an object key, anywhere in a stored Thing, that starts with `$`, holds a
 character outside printable ASCII, or runs past 1024 characters. A box whose sidecar has such a key is never stored:

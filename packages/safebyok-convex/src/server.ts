@@ -36,7 +36,7 @@ export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataMode
  *
  * @example
  *   // convex/safebyokVault.ts
- *   export const { getThing, writeThing, listThings, birthBank, getWorld, watchThings } =
+ *   export const { getThing, writeThing, listThings, birthBank, getWorld, stats, watchThings } =
  *     new SafebyokVaultComponent(components.safebyok).api({
  *       getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
  *     })
@@ -108,6 +108,14 @@ export class SafebyokVaultComponent {
         handler: async (ctx, args) => {
           await checkCaller(ctx, args.ask)
           return await ctx.runQuery(things.getWorld, args)
+        },
+      }),
+      stats: publicQuery({
+        args:    CVX.askArgs,
+        returns: CVX.statsFetched,
+        handler: async (ctx, args) => {
+          await checkCaller(ctx, args.ask)
+          return await ctx.runQuery(things.stats, args)
         },
       }),
       watchThings: publicQuery({
