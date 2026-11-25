@@ -31,11 +31,11 @@ export abstract class DeviceDB {
    */
   async stowLease(record: LeaseRecord): Promise<LeaseRecord> {
     try {
-      const lease  = StampChecks.leaseRecord.parse(record)
-      const before = await this.doStowLease(lease, (raw) => isReplaced(raw, lease))
-      if (! isReplaced(before, lease)) { return storedLeaseOf(before) }
-      this.doRing({ userid: lease.userid, banklabel: lease.banklabel })
-      return lease
+      const leaseRecord = StampChecks.leaseRecord.parse(record)
+      const before      = await this.doStowLease(leaseRecord, (raw) => isReplaced(raw, leaseRecord))
+      if (! isReplaced(before, leaseRecord)) { return storedLeaseOf(before) }
+      this.doRing({ userid: leaseRecord.userid, banklabel: leaseRecord.banklabel })
+      return leaseRecord
     } catch (err) { throw refusalOf(err, 'stowLease') }
   }
 
