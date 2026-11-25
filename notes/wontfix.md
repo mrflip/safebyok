@@ -400,6 +400,26 @@ hand-shake between tabs. Nothing the bankDB stores changes, and no notice carrie
 records any reader of the vaultDB sees. Directed by the lease_shelf handoff (thread 7), 2026-11-25; written by the
 one_watch worker.
 
+### A OneWatchVaultDB's lock request that fails after its watch is stopped ends the VaultMinder's next watch
+
+* current outcome: where a tab's request for the bank's Web Lock rejects after the watch that asked for it was stopped,
+  that watch's `onEnded` and `onBadNews` are still called. The VaultMinder clears whatever watch it holds then, so if a
+  `connect` came between, its live watch counts as not watching: the janitor's next tick connects again, and the
+  uncleared watch runs beside the new one until the tab closes, so each notice is told twice.
+* alternatives:
+  - check in the OneWatchVaultDB that the watch was not stopped before ending it: a state checked on a lifecycle path,
+    for a crossing.
+  - have the VaultMinder clear its watch only where the ending is that watch's: a token per connect, for the same.
+* workaround: none needed: a notice told twice lands as it did once, and the tab's next load watches once.
+
+Steps to reproduce: over a OneWatchVaultDB whose lock manager rejects a request only once it was made, call `connect`,
+`disconnect` and `connect` on a VaultMinder before the first request rejects.
+
+Reasoning for wontfix: a Web Lock request without a signal rejects only where the platform refuses it, as when its page
+is torn down, and a disconnect then a connect in the moment before it rejects is a crossing (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). Guarding it puts a
+state or a token on the watch's lifecycle path. Nothing the bankDB stores changes, and a notice carries only the sealed
+records any reader of the vaultDB sees. Written by the lease_shelf thread 13 reviewer, 2026-11-25, awaiting a ruling.
+
 ## React
 
 Cases in the React layer, `packages/safebyok-react-lean`, and in an app built on it.
