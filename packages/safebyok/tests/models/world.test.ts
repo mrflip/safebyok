@@ -376,7 +376,7 @@ describe("a world's janitor", () => {
     expect(tryGetWorld.mock.calls.length - asked).to.be.at.least(1)
   })
 
-  it("starts the watch at its next tick while connected, where the watch threw as it started, telling the device's onBadNews", async () => {
+  it("starts the watch at its next tick, where it threw as it started", async () => {
     const vaultDB = new MemoryVaultDB()
     const onBadNews = vi.fn()
     vi.spyOn(vaultDB, 'watch').mockImplementationOnce(() => { throw new Error('the socket is down') })
