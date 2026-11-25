@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { noop } from 'es-toolkit'
 import { Bank } from '../../src/models/bank'
 import { Box } from '../../src/models/box'
+import type { Device } from '../../src/models/device'
 import { Vault } from '../../src/models/vault'
 import { VaultTSQ } from '../../src/minding/vault-tsq'
 import { type BadNews, type BoxUnsealed } from '../../src/shapes/shapes-bankish'
@@ -90,6 +91,36 @@ describe("Vault.make(world, vaultTSQ)", () => {
     bank.sweep()
     TH.expectSyncRefusal(() => Vault.make(device.world, device.vaultTSQ), 'disabled')
   })
+
+  const NotWorldCases = [
+    [() => null,                                 'null'],
+    [(device: Device) => device,                 'the device'],
+    [(device: Device) => device.vaultTSQ,        'a vault TSQ'],
+    [() => ({ hostVault: noop }),                'an object with hostVault alone'],
+  ] as const
+
+  for (const [worldOf, blurb] of NotWorldCases) {
+    it(`refuses ${blurb} as its world, as 'bad_record'`, async () => {
+      const { device } = await TH.buildBornBank()
+      const err = TH.expectSyncRefusal(() => Vault.make(worldOf(device) as never, device.vaultTSQ), 'bad_record')
+      expect(err.message).to.include(Phrases.WorldExpected)
+    })
+  }
+
+  const NotVaultTSQCases = [
+    [() => undefined,                            'undefined'],
+    [(device: Device) => device.world,           'the world'],
+    [(device: Device) => device.vaultTsqClient,  'a QueryClient'],
+    [() => ({ sweep: noop, getOnce: noop }),     'an object with sweep and getOnce alone'],
+  ] as const
+
+  for (const [vaultTSQOf, blurb] of NotVaultTSQCases) {
+    it(`refuses ${blurb} as its vault TSQ, as 'bad_record'`, async () => {
+      const { device } = await TH.buildBornBank()
+      const err = TH.expectSyncRefusal(() => Vault.make(device.world, vaultTSQOf(device) as never), 'bad_record')
+      expect(err.message).to.include(Phrases.VaultTSQExpected)
+    })
+  }
 })
 
 /** A vault born on a device whose vaultDB counts the watches stopped, read as `unwatched.calls`. */

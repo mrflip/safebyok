@@ -42,8 +42,9 @@ export class Vault {
    * The world's sweep sweeps the vault too. Refuses a swept world. Its verbs refuse while the bank is not live.
    */
   static make(world: World, vaultTSQ: VaultTSQ): Vault {
-    const vault = new Vault(world, vaultTSQ)
-    world.hostVault(vault)
+    const args = VaultChecks.makeArgs.parse({ world, vaultTSQ })
+    const vault = new Vault(args.world, args.vaultTSQ)
+    args.world.hostVault(vault)
     return vault
   }
 

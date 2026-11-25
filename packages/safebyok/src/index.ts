@@ -15,7 +15,7 @@ export {
 export { ThingCar } from './minding/thing-car'
 export { VaultTSQ } from './minding/vault-tsq'
 export {
-  type GetOnceOpts, type ItemQueryOptions, type TsqStaleTime, type VaultMutationOptions, type VaultTSQOpts, MaxTimerHours, MaxTimerMillis, VaultTSQChecks, isQueryClient,
+  type GetOnceOpts, type ItemQueryOptions, type TsqStaleTime, type VaultMutationOptions, type VaultTSQOpts, MaxTimerHours, MaxTimerMillis, VaultTSQChecks, isQueryClient, isVaultTSQ,
 } from './shapes/shapes-vault-tsq'
 export type { ScopeAt } from './shapes/shapes-thing'
 export { Vault } from './models/vault'
