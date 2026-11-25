@@ -1,6 +1,6 @@
 // Kept off the front door (`safebyok`) so an app that derives, writes or judges some other way never ships the Argon2id code,
 // idb-keyval or zxcvbn (notes/good_bank_opts_are_in_browser.md).
-/** `safebyok/browser`: the key deriver, device database and strength checker a browser app gives to `Device.make`, and the rest of `safebyok-big/browser`. */
+/** `safebyok/browser`: the key deriver, device database and strength checker a browser app gives to `Device.make`, the wrapper that runs a vaultDB's watch in one tab, and the rest of `safebyok-big/browser`. */
 
 import { argon2idWebV1Deriver, zxcvbnStrengthChecker, type KeyDeriver } from 'safebyok-big/browser'
 import type { StrengthChecker } from './shapes/shapes-gateish'
@@ -15,6 +15,7 @@ export {
 export type { StrengthChecker } from './shapes/shapes-gateish'
 export { IdbDeviceDB, LeaseDBVersion, idbDeviceDB, leaseBellnameOf, leaseDatabasenameOf, scopepathOf } from './storage/idb-device-db'
 export { idbDeviceDBOpts, type IdbDeviceDBOpts, type LeaseScopepath } from './shapes/shapes-device-db'
+export { OneWatchVaultDB, oneWatchVaultDB, watchnameOf } from './storage/one-watch-vault-db'
 
 // == [The bag]: BrowserOpts, bagsByDbName, browserOpts
 

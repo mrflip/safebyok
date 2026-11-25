@@ -374,6 +374,32 @@ as good as the rest. The stow-keeps-newest rule decides, and that is all. Nothin
 database other than by a stow over it. Directed by the lease_shelf handoff (thread 1a), 2026-11-25; written by the
 device_db worker; the softlock and the tab whose record lost added by thread 1b, 2026-11-25.
 
+### A change notified while a OneWatchVaultDB's lock changes hands reaches no tab
+
+* current outcome: the wrapped vaultDB's watch runs in the tab holding the bank's Web Lock. When that tab stops its
+  watch (a disconnect, a sign-out, an unload), it stops the wrapped watch, and the next tab waiting for the lock starts
+  its own a task or more later; the first tab to watch likewise starts the wrapped watch only once the lock is granted.
+  A change the datastore reports between the one watch stopping and the next starting is notified to no tab.
+  The new holder reads nothing again as it takes the lock: what it missed is caught by the janitor's re-read of a stale
+  gate and by the next listing or get of each box.
+* alternatives:
+  - a refresh of the world, or a listing of every box, on taking the lock: a startup concern where freshness is the
+    janitor's (the Coach: "All that matters is when it was read. This is not a startup concern, it's a janitorial
+    concern"), and a read that every hand-over pays for a window of milliseconds.
+  - the old holder keeping its watch until the new one reports it has started: a hand-shake between tabs, a new state
+    in each, for the same window.
+* workaround: none needed: the janitor and the next read of each Thing bring the tab up to date.
+
+Steps to reproduce: in two tabs over a OneWatchVaultDB, close the tab holding the lock, and in the same few milliseconds
+write a box from another device.
+
+Reasoning for wontfix: a hand-over happens at a tab's mount, unmount or sign-out, minutes or hours apart, and a change
+landing in the milliseconds it takes is a crossing (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`): "Remember
+how slowly everything changes vs. time from mount to unmount" (the Coach). Fixing it costs a read at every hand-over or a
+hand-shake between tabs. Nothing the bankDB stores changes, and no notice carries secret material beyond the sealed
+records any reader of the vaultDB sees. Directed by the lease_shelf handoff (thread 7), 2026-11-25; written by the
+one_watch worker.
+
 ## React
 
 Cases in the React layer, `packages/safebyok-react-lean`, and in an app built on it.
