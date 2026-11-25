@@ -2,7 +2,7 @@
 
 import { getFunctionName } from 'convex/server'
 import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex/server'
-import { ConvexError } from 'convex/values'
+import { ConvexError, convexToJson } from 'convex/values'
 import * as DB from 'safebyok/storage'
 import type {
   BirthBankActual, BirthBankAsk, BirthPuts, GetAsk, GetWorldActual, GetWorldAsk, GotActual, ListAsk, ListThingsActual, Received, StatsActual, StatsAsk, ThingWatchScope, VaultError, WriteAsk,
@@ -90,6 +90,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
   }
 
   protected async doWriteThing(ask: WriteAsk): Promise<WroteActual> {
+    demandStorableKeys(ask)
     const read_tc = DB.readTcNow()
     const { thing, written, ...above } = await runOrRefuse('writeThing', () => this.#client.mutation(this.#api.writeThing, { ask }))
     const actual = this.classifyWriteThing(ask, thing, { ...above, read_tc })
@@ -109,6 +110,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
   }
 
   protected async doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthBankActual> {
+    demandStorableKeys(ask)
     const read_tc = DB.readTcNow()
     const { written, ...fetched } = await runOrRefuse('birthBank', () => this.#client.mutation(this.#api.birthBank, { ask }))
     const actual = this.classifyBirthBank(puts, { ...fetched, read_tc })
@@ -185,7 +187,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 const ConvexBankLimits = DB.storeLimitsOf({ count: 32_000, size: 16_777_216 })
 // --
 
-// == [Helpers]: runOrRefuse, refusalOf, refusalOfCrossed, storedOutOfStep, demandUnwritten, checkedWritten, serializedOf, changesOf, latestOf
+// == [Helpers]: runOrRefuse, refusalOf, refusalOfCrossed, storedOutOfStep, demandStorableKeys, demandUnwritten, checkedWritten, serializedOf, changesOf, latestOf
 
 // Accepts a thunk because ConvexReactClient.query can throw synchronously, before it returns a promise.
 /** Run `thunk`, converting anything it throws into a safebyok refusal. */
@@ -216,6 +218,18 @@ function refusalOfCrossed(crossed: SafebyokRefusal): VaultError {
 // A disagreement is a component out of step with this copy of safebyok, never a damaged Thing: the classifier checked what was fetched.
 /** The `unexpected_error` for a component that wrote where the classifier found no write, or wrote nothing where it found one. */
 function storedOutOfStep(): VaultError { return DB.unexpectedError(new Error(Phrases.StoredOutOfStep)) }
+
+// Convex refuses an object key that starts with `$`, holds a character outside printable ASCII, or runs past 1024
+// characters, and `convexToJson` applies its rules (`validateObjectField`, not exported). Of the keys in an ask, only those
+// of a box's sidecar are not safebyok's own. Convex's error names the key and its fault, never a value, and is the cause.
+/** Throw `bad_record` if `ask` holds an object key Convex would refuse to store, before it is sent. */
+function demandStorableKeys(ask: WriteAsk | BirthBankAsk): void {
+  try {
+    convexToJson(ask)
+  } catch (err) {
+    throw new DB.VaultError('bad_record', Phrases.SidecarKeyRefused, { cause: err })
+  }
+}
 
 /** Throw unless the component wrote nothing. */
 function demandUnwritten(written: unknown): void {

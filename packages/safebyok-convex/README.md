@@ -96,8 +96,9 @@ and its stats refuse. The stats report those two limits as the bank's `max`, and
 of its JSON, a little under what Convex counts for its document.
 
 **What a sidecar may hold.** Convex refuses an object key, anywhere in a stored Thing, that starts with `$`, holds a
-character outside printable ASCII, or runs past 1024 characters. A box whose sidecar has such a key is never stored:
-its put refuses `storage_unavailable`, every time.
+character outside printable ASCII, or runs past 1024 characters. A put of a box whose sidecar has such a key, at any
+depth, refuses `bad_record` before it is sent; the refusal's cause names the key, and nothing of the sidecar's values.
+To keep such keys, store them inside a string of your own, a JSON text, say.
 
 **Upgrading.** Until 1.0 there is no migration. A release that changes the table says so in its changelog. Coming from
 `safebyok-convex-big`, the old component's tables (`safebyok_banks`, `safebyok_gates`, `safebyok_vaults`,

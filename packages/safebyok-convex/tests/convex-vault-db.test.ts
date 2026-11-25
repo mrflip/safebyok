@@ -5,7 +5,7 @@ import { anyApi } from 'convex/server'
 import type { FunctionReference } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import type { ConvexClient } from 'convex/browser'
-import { type ThingScope, type VaultEvent, Shell } from 'safebyok/storage'
+import { type BoxRecord, type ThingScope, type VaultEvent, Shell } from 'safebyok/storage'
 import * as TH from './test-helpers'
 import { ConvexVaultDB } from '../src/index'
 import { fakeDeployment } from '../src/testing'
@@ -194,6 +194,52 @@ describe("ConvexVaultDB's component", () => {
     const refusal = await TH.convexRefusalOf(TH.componentTest().query(TH.rootVaultApi.getThing, { ask: { ...TH.getGateAskOf(), banklabel: '' } }))
     expect(refusal.kind).to.eq('bad_record')
     expect(refusal).to.have.property('message').that.is.a('string')
+  })
+})
+
+const SidecarKeyCases: readonly (readonly [BoxRecord['sidecar'], string])[] = [
+  // the three rules Convex holds an object key to:
+  [{ $team: "acme" },                 'refuses a sidecar key that starts with a dollar sign'],
+  [{ "équipe": "acme" },              'refuses a sidecar key with a character outside printable ASCII'],
+  [{ "tab\tkey": "acme" },            'refuses a sidecar key with a control character'],
+  [{ ["k".repeat(1025)]: "acme" },    'refuses a sidecar key past 1024 characters'],
+  // anywhere in the sidecar:
+  [{ team: { $lead: "ada" } },        'refuses such a key nested within the sidecar'],
+  [{ teams: [{ $lead: "ada" }] },     'refuses such a key in an object within an array'],
+]
+
+describe("ConvexVaultDB's put of a box whose sidecar Convex would not store", () => {
+  for (const [sidecar, blurb] of SidecarKeyCases) {
+    it(blurb, async () => {
+      const convexVaultDB = makeConvexVaultDB()
+      const mutation = vi.spyOn(madeOf(convexVaultDB).client, 'mutation')
+      const ask = TH.birthAskOf(TH.boxThingOf('openai', { sidecar }), Shell.childCited(TH.Life0))
+      await TH.expectBad(convexVaultDB.tryWriteThing(ask), 'bad_record')
+      expect(mutation).not.toHaveBeenCalled()
+    })
+  }
+
+  it("accepts a sidecar key of 1024 printable characters", async () => {
+    const convexVaultDB = makeConvexVaultDB()
+    await TH.expectGood(convexVaultDB.tryBirthBank(TH.birthBankAskOf()))
+    const ask = TH.birthAskOf(TH.boxThingOf('openai', { sidecar: { ["k~ ".repeat(341) + "k"]: "acme" } }), Shell.childCited(TH.Life0))
+    await TH.expectGood(convexVaultDB.tryWriteThing(ask))
+  })
+
+  it("carries nothing of the sidecar's values in its refusal", async () => {
+    const convexVaultDB = makeConvexVaultDB()
+    const ask = TH.birthAskOf(TH.boxThingOf('openai', { sidecar: { $note: "sk-fake-0000", team: "acme-ops" } }), Shell.childCited(TH.Life0))
+    const refusal = await TH.expectBad(convexVaultDB.tryWriteThing(ask), 'bad_record')
+    expect(TH.thrownText(refusal)).not.to.include('sk-fake-0000')
+    expect(TH.thrownText(refusal)).not.to.include('acme-ops')
+  })
+
+  it("refuses a bank born with such a key in its root box's sidecar", async () => {
+    const convexVaultDB = makeConvexVaultDB()
+    const mutation = vi.spyOn(madeOf(convexVaultDB).client, 'mutation')
+    const ask = TH.birthBankAskOf({ root: TH.rootBoxOf({ sidecar: { $team: "acme" } }) })
+    await TH.expectBad(convexVaultDB.tryBirthBank(ask), 'bad_record')
+    expect(mutation).not.toHaveBeenCalled()
   })
 })
 
