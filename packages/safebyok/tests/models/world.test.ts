@@ -18,6 +18,7 @@ import type { SeenThing } from '../../src/shapes/shapes-vault-event'
 import { readAtOf, readTcNow } from '../../src/storage/agerank'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
+import { oneWatchVaultDB } from '../../src/storage/one-watch-vault-db'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -391,6 +392,21 @@ describe("a world's janitor", () => {
     expect([world.demandVaultMinder().isWatching, onBadNews.mock.calls.length]).to.deep.equal([false, 1])
     await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
     expect([world.demandVaultMinder().isWatching, onBadNews.mock.calls.length]).to.deep.equal([true, 1])
+  })
+
+  it("starts the watch at its next tick, where a OneWatchVaultDB's wrapped watch threw as it started", async () => {
+    vi.stubGlobal('navigator', { locks: TH.fakeLockManager() })
+    const memory = new MemoryVaultDB()
+    const innerWatch = vi.spyOn(memory, 'watch').mockImplementationOnce(() => { throw new Error('the socket is down') })
+    const onBadNews = vi.fn()
+    const vaultDB = oneWatchVaultDB(memory)
+    const { device: { world } } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, onBadNews, janitorMinutes: 10 }) })
+    await vi.advanceTimersByTimeAsync(0)
+    expect([world.demandVaultMinder().isWatching, onBadNews.mock.calls.length]).to.deep.equal([false, 1])
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
+    expect([world.demandVaultMinder().isWatching, innerWatch.mock.calls.length, onBadNews.mock.calls.length]).to.deep.equal([true, 2, 1])
+    world.demandVaultMinder().disconnect()
+    vi.unstubAllGlobals()
   })
 
   it("starts no watch while disconnected", async () => {

@@ -61,7 +61,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof,
     getWorldAsk:     obj({ userid: user_id, banklabel: label, op: lit('getworld'), track, banktok: anyBanktok }).strict(),
     statsAsk:        obj({ userid: user_id, banklabel: label, op: lit('stats'), track, banktok: anyBanktok }).strict(),
     thingWatchScope,
-    watchArgs:       obj({ scope: thingWatchScope, onNotice: fn(), onBadNews: fn() }),
+    watchArgs:       obj({ scope: thingWatchScope, onNotice: fn(), onBadNews: fn(), onEnded: fn().optional() }),
   }
 })
 

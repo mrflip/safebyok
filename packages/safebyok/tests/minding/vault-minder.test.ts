@@ -181,6 +181,17 @@ describe("VaultMinder, what only a wrapper can show", () => {
     expect([inner.watch.mock.calls.length, vaultDB.isWatching]).to.deep.equal([2, true])
   })
 
+  it("watches nothing once the wrapped watch ends of itself, and watches again at its next connect", () => {
+    const stop = vi.fn()
+    const inner = stubVaultDBOf(stop)
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld }).connect()
+    const onEnded = inner.watch.mock.calls[0]![3]!
+    onEnded()
+    expect([vaultDB.isWatching, stop.mock.calls.length]).to.deep.equal([false, 0])
+    vaultDB.connect()
+    expect([inner.watch.mock.calls.length, vaultDB.isWatching]).to.deep.equal([2, true])
+  })
+
   it("watches nothing when the wrapped watch throws as it connects, and throws that", () => {
     const inner = stubVaultDBOf(vi.fn())
     const thrown = new Error('watch refused')
