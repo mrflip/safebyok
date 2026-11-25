@@ -209,6 +209,8 @@ export class Device {
       this.#vault = Vault.make(this.#world, this.#vaultTSQ)
       const answer = await vaultMinder.tryGetWorldOnce()
       if (! answer.ok) { throw answer.err }
+      // A root void at signin is no newer than the shell its Thing holds, so no subscriber hears it: the world is told here.
+      this.#world.align()
       if (! (this.#world.areRootsLive || isUnbornIn(answer.val))) { throw Throwers.bankRootsMissing() }
     } catch (err) {
       if (this.bank !== null) {
