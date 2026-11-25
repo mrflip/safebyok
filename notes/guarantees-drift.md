@@ -157,3 +157,5 @@ what differs from big, in a sentence or two.
   not secret. A proving reads it from the device (`ensureDevicetok`, `models/device.ts`): the host's `devicetok` option,
   or the one the deviceDB keeps for the signed-in user's bank, the same for every tab given it and one per bank scope as
   big's was, made at its first use (`storage/device-db.ts`). The bank no longer has it, and the device's `toJSON` no longer shows it.
+  It is never forgotten: big's `vacate` forgot the device row, so the next device of the scope made a new `device_tok`,
+  and the new core has no vacate yet, so a bank born again in the same browser records the old devicetok.
