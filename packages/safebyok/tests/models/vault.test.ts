@@ -1193,7 +1193,7 @@ describe("vault.stats() and vault.tryStats()", () => {
     const { bank, vault } = await TH.buildBornVault()
     const refusal = Throwers.storageIssue()
     vi.spyOn(bank.device.vaultDB, 'tryStats').mockImplementation((ask) => Promise.resolve(refusedAnswerOf(ask, refusal)))
-    await expect(vault.stats()).rejects.toBe(refusal)
+    await expect(vault.stats()).rejects.to.equal(refusal)
     expect(await vault.tryStats()).to.deep.equal({ ok: false, err: refusal })
   })
 })
