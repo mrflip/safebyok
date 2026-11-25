@@ -50,9 +50,8 @@ about to make. Chain each onto the command it heralds.
    or review by hand, and say which. If it fails, or plainly reviewed something other
    than the range, review by hand: `git diff <base-sha>...HEAD`, file by file, with the code
    around each change, at the depth the level asks -- at `low` or `medium`, what you are confident
-   of; at `high` or `max`, wider, uncertain findings included. Either way, look for coupling (one
-   part reaching into what another owns, a fact read in two places, machinery a caller cannot
-   replace), unclear code, and STYLE.md breaches, not for edge cases. Say which way the review ran.
+   of; at `high` or `max`, wider, uncertain findings included. Either way, look for what *What to
+   look for* (below) names, not for edge cases. Say which way the review ran.
 
    **Style** is delegated, because workers do not front-load it. Once `/code-review` has returned and
    before you fix anything, spawn `style-reviewer` (`.claude/agents/style-reviewer.md`) in the
@@ -105,6 +104,43 @@ about to make. Chain each onto the command it heralds.
    files.
 5. **Report** (below).
 
+## What to look for
+
+The Coach cares most about readability and simplicity. Ask of every method the diff adds or changes:
+
+- **How deeply does it branch?** Count each `if`, ternary, `try`/`catch`, `??` and `&&` that chooses a path. A method
+  that branches deeply is a finding, even when every branch is right; propose the flatter shape.
+- **How many files does a call chain cross?** Walk a call from the public verb to the thing that finally does the
+  work. Each file you open to follow it is a cost; a chain that crosses many files for a little work is a finding.
+- **Are its names plain?** Words that say nothing about the value (`held`, `kept`, `entry`, `row`, `checked`,
+  `data`, `payload`) in a method's or a variable's name are a finding. VOCABULARY.md has the names for the cast.
+- **Is it over-DRY?** Code that runs through indirect substitutions (a table of verbs, a generic helper fed a
+  key, a variable that stands for another) where stating the steps plainly would read better is a finding. The test
+  (memory and STYLE.md): if you were debugging this method, would you want it to look like this?
+- **Do the important parts get room?** A method that matters, and the clause in it that matters, should stand on
+  its own line, early or last, not buried in a one-line `if`; and a method is named for its purpose, not its steps.
+  Goofus buries the launch in a nested one-liner:
+
+  ```ts
+  async function checkAndLaunch() { ensureReady(); const report = await checkWeather(); if (! report.isRainy) { launchAtOnce() } }
+  ```
+
+  Gallant names the purpose, returns early, and gives the launch its own line:
+
+  ```ts
+  /** Launch at once, unless it is raining. */
+  async function launchUnlessRaining(): Promise<void> {
+    ensureReady()
+    const weather = await checkWeather()
+    if (weather.isRainy) { return }
+
+    launchAtOnce()
+  }
+  ```
+
+Coupling (one part reaching into what another owns, a fact read in two places) and STYLE.md's rules are findings
+too, as ever.
+
 ## Time scales
 
 Judge a finding against how often its case happens. The Coach's expected times:
@@ -129,8 +165,7 @@ whatever else you fixed, and report `flagged` with the finding, what fixing it w
 your recommendation. The orchestrator decides what happens next.
 
 A crossing -- a fetch, a write or a waiter landing across a disconnect, disable, vacate, delete or
-goodbye -- is no finding (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`): your job is clean
-code, not showing that a failure is possible. Write it as a row in `notes/wontfix.md` and fix nothing; report it only if it could
+goodbye -- is no finding (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). Write it as a row in `notes/wontfix.md` and fix nothing; report it only if it could
 corrupt what the bankDB stores or put secret material where it should not be.
 
 ## Report
