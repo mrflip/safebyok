@@ -68,8 +68,8 @@ export const ThingCarChecks = Validator.Checkers('bad_record', ({ obj, custom, u
 
 /** The checks of `VaultMinder.make`'s arguments, of a listener, of `connect`'s arguments, and of what a device database rang, handed to `receive`. */
 export const VaultMinderChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn }) => ({
-  makeArgs:  obj({ scope: ThingChecks.bankScope, opts: obj({ vaultDB: ThingChecks.vaultDBShape, world: ThingCarChecks.world }) }),
-  listener:  obj({ hear: fn(), onBadNews: fn() }),
+  makeArgs:    obj({ scope: ThingChecks.bankScope, opts: obj({ vaultDB: ThingChecks.vaultDBShape, world: ThingCarChecks.world }) }),
+  listener:    obj({ hear: fn(), onBadNews: fn() }),
   connectArgs: obj({ onEnded: fn().optional() }),
   /** An event rung: its kind and scope, who dispatched it, when it was read, and its bank's lifetok, the void one where its source knew none. Its `val` is checked apart, and the rest is not read. */
   rungEvent: obj({
