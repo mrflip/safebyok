@@ -168,7 +168,7 @@ describe("Device.make(record, opts)", () => {
     expect(TH.makeDevice({}, { autolockMinutes: undefined }).leaseMillis).to.eq(DefaultLeaseMillis)
   })
 
-  it("softlocks, tidies and calls its gate stale after DefaultSoftlockMillis, DefaultJanitorMillis and DefaultGateStaleMillis where the host names none", () => {
+  it("keeps the softlock, janitor period and gate staleness the host names, or their defaults", () => {
     const device = TH.makeDevice()
     expect([device.softlockMillis, device.janitorMillis, device.gateStaleMillis]).to.deep.equal([DefaultSoftlockMillis, DefaultJanitorMillis, DefaultGateStaleMillis])
     expect(TH.makeDevice({}, { softlockMinutes: 3, janitorMinutes: 2, gateStaleMinutes: 60 })).to.include({ softlockMillis: 3 * 60_000, janitorMillis: 2 * 60_000, gateStaleMillis: 60 * 60_000 })

@@ -271,13 +271,14 @@ describe("a world's stage as its roots arrive one at a time", () => {
   }
 })
 
-/** Set the clock past every read_tc minted so far, since uuid's v7 never mints one earlier than the last, whatever the clock says. */
+// uuid's v7 never mints a read_tc earlier than the last, whatever the clock says.
+/** Set the clock past every read_tc minted so far */
 function setClockPastEveryReadTc(): void {
   vi.setSystemTime(readAtOf(readTcNow()) + 1)
 }
 
 describe("a world's softlock, near its lease's end", () => {
-  it("is off on a freshly unlocked world, and on from softlockMillis before the lease ends, on the world, bank and gate alike", async () => {
+  it("turns on softlockMillis before the lease ends, on the world, bank and gate alike", async () => {
     const { bank, device } = await TH.buildBornBank({ device: TH.makeDevice({}, { autolockMinutes: 600, softlockMinutes: 10 }) })
     const { world } = device
     expect(world.leaseEndsAt).to.eq(TH.T0 + (600 * Consts.MinuteMillis))
@@ -295,7 +296,7 @@ describe("a world's softlock, near its lease's end", () => {
     expect([world.isSoftlocked, bank.isSoftlocked]).to.deep.equal([true, true])
   })
 
-  it("has ensureUnlocked want an `unlock` gating though the bank shows unlocked, and the unlock renews the lease and settles the wait", async () => {
+  it("has ensureUnlocked wait, though the bank shows unlocked, for an `unlock` gating that renews the lease", async () => {
     const { bank, device: { world } } = await TH.buildBornBank({ device: TH.makeDevice({}, { autolockMinutes: 600 }) })
     const nearEnd = world.leaseEndsAt! - Consts.MinuteMillis
     vi.setSystemTime(nearEnd)
@@ -324,7 +325,7 @@ describe("a world's janitor", () => {
     expect([world.isLocked, world.getSnapshot().stage]).to.deep.equal([true, 'locked'])
   })
 
-  it("re-reads the roots from the vaultDB at the first tick after the gate was last read gateStaleMillis ago, and not again until it is stale again", async () => {
+  it("re-reads the roots at the first tick after the gate goes stale", async () => {
     setClockPastEveryReadTc()
     const vaultDB = new MemoryVaultDB()
     const tryGetWorld = vi.spyOn(vaultDB, 'tryGetWorld')
