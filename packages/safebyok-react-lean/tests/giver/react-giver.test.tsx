@@ -184,7 +184,7 @@ describe("the provider", () => {
     await waitFor(() => { expect([one.container.textContent, other.container.textContent]).to.deep.equal(['locked jokes', 'locked jokes']) })
     const [oneDevice, otherDevice] = world._cheat_devices() as [Device, Device]
     expect(world._cheat_devices()).to.have.lengthOf(2)
-    expect([oneDevice.device_tok === otherDevice.device_tok, oneDevice.vaultTsqClient === otherDevice.vaultTsqClient]).to.deep.equal([false, false])
+    expect([await oneDevice.ensureDevicetok() === await otherDevice.ensureDevicetok(), oneDevice.vaultTsqClient === otherDevice.vaultTsqClient]).to.deep.equal([false, false])
     await act(() => oneDevice.bank!.gate.unlock({ passphraseCleartext: Passphrase }))
     expect([one.container.textContent, other.container.textContent]).to.deep.equal(['unlocked jokes', 'locked jokes'])
   })
