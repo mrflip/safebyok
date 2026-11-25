@@ -30,3 +30,14 @@ Curated by the orchestrator. Newer than the plan where they disagree.
   `gateStaleMinutes`.
 - **Every read of the lease's end goes through `world.leaseEndsAt`: 1b repoints that one getter.**
 - `read_tc` is uuid v7, monotonic: tests set the clock past every read_tc (`setClockPastEveryReadTc`).
+
+## Thread 1a `device_db` (#903, ready, in review)
+- `safebyok/storage`: abstract `DeviceDB` (`peekLease(scope)`, `stowLease(row)` answering the row stored after,
+  `listen(listener)` answering an unlisten; a listener hears a `BankScope` only), `MemoryDeviceDB`, and the row types
+  `LeaseRow`, `LiveLeaseRow`, `LeaseTombstone`, `LeaseRecord`. `safebyok/browser`: `IdbDeviceDB`/`idbDeviceDB`;
+  `browserOpts()` hands the new one. The IndexedDB database is named `lease`.
+- Test builders `liveLeaseRowOf`, `leaseTombstoneOf` in `tests/test-helpers/devicedb-world.ts`.
+- No `isDeviceDB` duck check: 1b adds one only if the Device needs it.
+- Refusals: damaged row `damaged_lease`; failing store `storage_unavailable` (`Throwers.deviceDBFailed`, name only, G8).
+- **Planning lesson:** 1a compacted twice, ten minutes apart. 1b is larger: it goes to `thread-worker-400k`, and its
+  handoff quotes only what it needs.
