@@ -387,8 +387,12 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 
 /** The default `onLifecycle`: log each announcement on the device's logger, at the level for news and not for trouble. */
 export const DefaultOnLifecycle: LifecycleHandler = ({ device, ...announcement }) => {
-  const message = (announcement.kind === 'stage_crossed') ? Phrases.StageCrossed(announcement.from, announcement.to) : Phrases.LeaseAnnounced(announcement.kind)
-  device.logger.log(message, { oplabel: 'Device.onLifecycle', ...announcement })
+  // The story names each field it logs, so a field added to an announcement is logged only by a decision.
+  if (announcement.kind === 'stage_crossed') {
+    device.logger.log(Phrases.StageCrossed(announcement.from, announcement.to), { oplabel: 'Device.onLifecycle', kind: announcement.kind, from: announcement.from, to: announcement.to })
+  } else {
+    device.logger.log(Phrases.LeaseAnnounced(announcement.kind), { oplabel: 'Device.onLifecycle', kind: announcement.kind })
+  }
 }
 
 /** Guard the host's `onLifecycle`: anything it throws or rejects with is reported to the platform, never thrown. */
