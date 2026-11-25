@@ -3,7 +3,7 @@
 Mode: **YOLO**. Issued by the Coach, 2026-11-25. Cap: 3 threads at once.
 Default levels: review `medium`; worker `opus` (thread-worker), reviewer `opus` for threads touching what
 `notes/guarantees-big.md` covers (lease, keys), else its `sonnet` pin; style pass on `style-reviewer`'s pin.
-Status: 0 in its second rework (the reconnect refresh comes out); 1c (#902) and 1a (#903) ready, in review; 2 stats next when a slot frees; Open Matters bookmark rev 7.
+Status: 0 filed (#900, out of draft); 1c reviewed (fixed), filing hit a conflict, a worker resolves it; 1a in review (#903); 2 stats building; Open Matters bookmark rev 8.
 
 Sprint doc: https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh (Open Matters bookmark rev 3).
 
@@ -35,8 +35,12 @@ The design for threads 0 to 1b, with the rulings behind it: `lease_shelf-design.
 ### 0. `connect`: connect()/disconnect() replace sweep
 > "get rid of sweep, replace with disconnect" ... "yes, do it the right way: connect()/disconnect()"
 
-Gloss: design *Thread 0*. Branch `20261125-connect`, PR #900, from main (#899 merged). Ready; reviewer running.
+Gloss: design *Thread 0*. Branch `20261125-connect`, PR #900, from main (#899 merged). Filed, out of draft.
 Depends on nothing. Size: done.
+*Review:* first review flagged that a reconnect left the roots unrefreshed; a YOLO fix added a fetch on connect, and
+the Coach overruled it ("concurrency machinery and does not belong"), so a second rework removed it and added
+`disable()`. The second review fixed a stale changeset clause, two doc blocks and four test titles. Left: `disable()`
+throws big's refusal phrased "a sweep or a vacate"; device verbs after disable; VOCABULARY's "A vacate disables".
 
 ### 1a. `device_db`: the device database and the stored lease row
 > "each tab's lease should correspond to what's on disk. What's on disk should tombstone the lease with a tick/tock
@@ -55,7 +59,11 @@ Depends on nothing; stays out of `models/`. Building.
 
 Gloss: design 5 to 7, on today's in-memory `leaseEndsAt`. Also: a seal under way finishes, and comments at `lock`.
 `isSoftlocked` stays out of the snapshot. Levels: review `high` on `opus`. Branch `20261125-softlock`, cut from 0.
-Depends on 0. Building.
+Depends on 0. Reviewed; filing.
+*Review:* `high` on opus, fixed. It moved the janitor's start and stop into their own section, corrected
+`dismissUnlock`'s doc, and made two style fixes and four title cuts. Seal and unseal held against the guarantees.
+Left (doc rows): autolock runs only while connected; the World decodes the minder's `read_tc`; the janitor is
+private to its timer.
 
 ### 1b. `lease_shared`: one lease on disk, shared by every tab
 > "Lease is same on all tabs." "Newer gate revision should move lease expiry time to now+softlock time" ... "The
