@@ -708,9 +708,12 @@ describe("the host's onLifecycle", () => {
 
 describe("world.stats() and world.tryStats()", () => {
   it("answer the stats vault.stats() does, with no unlock", async () => {
+    // stats @example
     const { bank, device, vault } = await TH.buildBornVault()
     bank.lock()
     const stats = await device.world.stats()
+    const { box, gate, max } = stats
+    expect(box.size + gate.size).to.be.below(0.9 * max.size)
     expect(stats.box).to.deep.include({ count: 1, live_count: 1 })
     expect(stats).to.deep.equal(await vault.stats())
     expect(await device.world.tryStats()).to.deep.equal({ ok: true, val: stats })
