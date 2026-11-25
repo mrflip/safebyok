@@ -105,13 +105,10 @@ export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tomb
 export const LeaseLifepathOwn = "A lease record's lifepath is `0000000000/` and its own lifeseq: no life is above a lease's own."
 
 /** A lease record whose labelpath is not `lease/` and one label. */
-export const LeaseLabelpathShape = "A lease's labelpath is `lease/` and the label of its gate, such as `lease/gate`."
+export const LeaseLabelpathShape = "A lease's labelpath is `lease/` and its label, such as `lease/gate`."
 
 /** A tombstone of a lease asked of a lease that is not live. */
 export const LeaseTombstoneOfLiveOnly = "Only a live lease has a tombstone: a tombstone or the shell has none."
-
-/** A live lease record whose labelpath is not the one its gate's labelpath gives it. */
-export const LeaseLabelpathOfOtherGate = "A live lease's labelpath is `lease/` and the label of the gate in its gate_labelpath."
 
 /** A read_tc that is not a UUID version 7. */
 export const ReadTcShape = "A read_tc is a UUID version 7, in lowercase hex."

@@ -40,24 +40,22 @@ export type StampedGate = Z.infer<typeof StampChecks.stampedGate>
 export type BoxStamp    = Z.infer<typeof StampChecks.boxStamp>
 // --
 
-// == [The lease's forms]: LeaseFormat, LeaseLabelpath, leaseLabelpathOf, leaseScopeOf, LeaseLifeRoot, leaseLifepathOf, isLifepathOwn, isOfItsGate, LeaseChecks, StampChecks, LeaseStamp, LeaseSparse, LeaseRecord, LeaseTombstone, LeaseLoggable
+// == [The lease's forms]: LeaseFormat, LeaseLabelpath, LeaseLifeRoot, leaseLifepathOf, isLifepathOwn, LeaseChecks, StampChecks, LeaseStamp, LeaseSparse, LeaseRecord, LeaseTombstone, LeaseLoggable
 
 /** The `fmt` a lease carries, the same as every Thing's. It is bound into the wrap of the lease's bankKey. */
 export const LeaseFormat = ThingFormat
 
-/** A lease's labelpath: `lease/` and the label of the gate it was granted under. It is no Thing's labelpath. */
+/** A lease's labelpath: `lease/` and its own label, such as `lease/gate`, the label of the gate it is for. It is no Thing's labelpath. */
 export type LeaseLabelpath = `lease/${string}`
 
 /** A {@link LeaseLabelpath}: `lease/` and one segment. */
 const LeaseLabelpathPattern = /^lease\/[^/]+$/
 
-/** The labelpath of a lease granted under the gate at `gateLabelpath`: `lease/gate` for the main gate, `lease/passkeys` for `gate/passkeys`. */
-export function leaseLabelpathOf(gateLabelpath: Labelpath): LeaseLabelpath { return `lease/${Labelpath.labelOf(gateLabelpath)}` }
-
-/** The scope a deviceDB files the lease of the gate at `gateScope` under: the gate's bank, and the lease's labelpath, which names the gate. */
-export function leaseScopeOf({ userid, banklabel, labelpath }: Pick<GateStamp, 'userid' | 'banklabel' | 'labelpath'>): LeaseScope {
-  return { userid, banklabel, labelpath: leaseLabelpathOf(labelpath) }
-}
+/** The helpers of a {@link LeaseLabelpath}. */
+export const LeaseLabelpath = Object.freeze({
+  /** The labelpath of the lease for the gate at `gateLabelpath`: `lease/gate` for the main gate, `lease/passkeys` for `gate/passkeys`. Refuses `bad_record` for any other labelpath. */
+  of(gateLabelpath: Labelpath): LeaseLabelpath { return `lease/${Labelpath.labelOf(PerKindChecks.gateLabelpath.parse(gateLabelpath))}` },
+})
 
 // A lease has no life above its own, but its lifepath keeps one lifeseq for each segment of its labelpath, as a
 // Thing's does: the first is this placeholder, so a lease's life never resets with its gate's or its bank's.
@@ -69,9 +67,6 @@ export function leaseLifepathOf(lifeseq: Lifeseq): Lifepath { return `${LeaseLif
 
 /** True when a lease's lifepath is {@link LeaseLifeRoot} and then its own lifeseq. */
 function isLifepathOwn({ lifeseq, lifepath }: { lifeseq: string, lifepath: string }): boolean { return lifepath === leaseLifepathOf(lifeseq) }
-
-/** True when a live lease's labelpath is the one its gate's labelpath gives it. */
-function isOfItsGate({ labelpath, gate_labelpath }: { labelpath: string, gate_labelpath: Labelpath }): boolean { return labelpath === leaseLabelpathOf(gate_labelpath) }
 
 /** The checks of a lease's stamp, of the lease record a deviceDB stores, live or a tombstone, and of its shell. */
 const LeaseChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, discrim, union, custom, epochMillis, bank_key_lease_wrapped }) => {
@@ -95,7 +90,6 @@ const LeaseChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, discrim,
     .refine(isLabelLast,   Phrases.LabelNotLast)
     .refine(isLifepathOwn, Phrases.LeaseLifepathOwn)
     .refine(isParityRight, Phrases.LifeseqParity)
-    .refine(isOfItsGate,   Phrases.LeaseLabelpathOfOtherGate)
   const tombstone   = obj({ ...thingFields, am: lit('x') }).strict()
     .refine(isLabelLast,   Phrases.LabelNotLast)
     .refine(isLifepathOwn, Phrases.LeaseLifepathOwn)
@@ -134,13 +128,13 @@ const LeaseChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, discrim,
  * Anything carrying a stamp's fields passes, such as a Bank, a Gate or its Thing, and its other fields are dropped.
  * The lease's stamp has its bank's stamp under `bank_` names, cites the gate the lease was granted under, and is bound into the wrap of its bankKey.
  * Its `born_at` is that of the lease it renews, or its `proved_at` where it renews none.
- * A lease record is what a deviceDB stores for a gate, Thing-shaped at `lease/<gate label>`, its lifepath `0000000000/` and its lifeseq.
+ * A lease record is what a deviceDB stores for a gate, Thing-shaped at its own `lease/<label>`, its lifepath `0000000000/` and its lifeseq.
  * Live, it adds the stamp, the leaseKey, the bankKey wrapped under it, when the lease ends and the gate revision it cites; a tombstone has its Thing fields alone.
  * Also `LeaseFormat`, the `fmt` a lease carries.
  */
 export const StampChecks = Object.freeze({ ...PlainChecks, ...LeaseChecks, LeaseFormat })
 
-/** The scope a lease record is filed under, one for each gate: its bank's `userid` and `banklabel`, and its labelpath, `lease/<gate label>`. */
+/** The scope a lease record is filed under, one for each gate: its bank's `userid` and `banklabel`, and its own labelpath, `lease/<label>`. */
 export type LeaseScope     = Z.infer<typeof StampChecks.leaseScope>
 /** A lease's stamp: see {@link StampChecks}. */
 export type LeaseStamp     = Z.infer<typeof StampChecks.leaseStamp>

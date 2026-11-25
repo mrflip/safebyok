@@ -132,6 +132,10 @@ what differs from big, in a sentence or two.
   `leaseScopeOf`), one for each gate, no longer by its bank's scope alone; a record filed under the bank's scope by an
   earlier build is never peeked. Its lifepath is a placeholder lifeseq, `0000000000`, then its own (the Coach: "keep
   the invariant segments count matches shape"), so its life still never resets with its gate's or its bank's.
+  amended 2026-11-25 (lease_shelf thread 11, lease_names, the Coach: "everything lease-y should be at lease/label"): a
+  record names itself by its own labelpath, `lease/<label>`, its label its gate's (`LeaseLabelpath.of`, which replaces
+  `leaseLabelpathOf` and `leaseScopeOf`), and every peek and stow uses it. A live record's check no longer ties its
+  labelpath to its `gate_labelpath`; a lease taken up still unlocks only where its stamp is its world's bank's.
 
 * 2026-11-25 (lease_shelf thread 1b, lease_shared), G4 and G9: **The lease is persisted and shared by every tab, and
   follows what is stored.** The world (`packages/safebyok/src/models/world.ts`) stows each lease it attaches by a grant,

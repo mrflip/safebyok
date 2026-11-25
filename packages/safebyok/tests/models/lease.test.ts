@@ -8,7 +8,7 @@ import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import { BaseThing, ThingFieldnames } from '../../src/models/base-thing'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import type { BoxCleartexts, LiveOf, Sealer, ShellOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
-import { type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat, leaseLifepathOf } from '../../src/shapes/shapes-stamps'
+import { type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat, LeaseLabelpath, leaseLifepathOf } from '../../src/shapes/shapes-stamps'
 import { type EpochMillis, Lifeseq } from '../../src/shapes/primitives'
 import { type BoxRecord, type Sparse, type ThingFieldname, type ThingRecord, type Tombstone, Shell, ThingChecks } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
@@ -103,7 +103,6 @@ describe("Lease.make(record, { gate })", () => {
     [(record: LeaseRecord) => ({ ...record, wayinkind: 'carrier_pigeon' }),                           'of an unknown wayinkind'],
     [(record: LeaseRecord) => ({ ...record, extra: 'field' }),                                        'with a field no lease has'],
     [({ gate_labelpath, ...record }: LiveLeaseRecord) => ({ ...record, gatelabelpath: gate_labelpath }),  'with its gate labelpath at gatelabelpath'],
-    [(record: LeaseRecord) => ({ ...record, gate_labelpath: 'gate/passkeys' }),                       "whose labelpath is not its gate's"],
     [(record: LeaseRecord) => ({ ...record, ends_at: undefined }),                                    'with no ends_at'],
     [() => TH.leaseTombstoneOf(),                                                                        'that is a tombstone'],
     [() => 'a lease',                                                                                    'that is not a record at all'],
@@ -519,6 +518,24 @@ describe("Lease.shellOf(gateScope)", () => {
   it("refuses a scope that is not a gate's", () => {
     TH.expectSyncRefusal(() => Lease.shellOf({ ...TH.WorldScope, labelpath: 'box' }), 'bad_record')
     TH.expectSyncRefusal(() => Lease.shellOf({ ...TH.WorldScope } as never), 'bad_record')
+  })
+})
+
+describe("LeaseLabelpath.of(gateLabelpath)", () => {
+  const Cases = [
+    ["gate",          "lease/gate",      'the main gate'],
+    ["gate/passkeys", "lease/passkeys",  'a gate with a label'],
+  ] as const
+
+  for (const [gateLabelpath, leaseLabelpath, blurb] of Cases) {
+    it(`is \`lease/\` and its gate's label, for ${blurb}`, () => {
+      expect(LeaseLabelpath.of(gateLabelpath)).to.equal(leaseLabelpath)
+    })
+  }
+
+  it("refuses a labelpath that is not a gate's", () => {
+    TH.expectSyncRefusal(() => LeaseLabelpath.of('box'), 'bad_record')
+    TH.expectSyncRefusal(() => LeaseLabelpath.of('lease/gate'), 'bad_record')
   })
 })
 

@@ -17,7 +17,7 @@ import type { Devicetok, Userid } from '../shapes/primitives'
 export abstract class DeviceDB {
   // == [Lease verbs]: peekLease, stowLease, listen
 
-  /** The lease record stored at `scope`, the gate's lease's (`leaseScopeOf`), or null for none. Refuses `damaged_lease` when the record stored fails its checks. */
+  /** The lease record stored at `scope`, a lease's own, or null for none. Refuses `damaged_lease` when the record stored fails its checks. */
   async peekLease(scope: LeaseScope): Promise<LeaseRecord | null> {
     try {
       const { userid, banklabel, labelpath } = StampChecks.leaseScope.parse(scope)

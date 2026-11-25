@@ -11,7 +11,7 @@ import { type LeaseGate, type LeaseOpts, type LeaseShellScope, type SecretFieldn
 import type * as Sealers from '../shapes/shapes-sealers'
 import type { LiveOf, ShellOf } from '../shapes/shapes-sealers'
 import {
-  type BankStamp, type LeaseLabelpath, type LeaseLoggable, type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat, StampChecks, leaseLabelpathOf, leaseLifepathOf,
+  type BankStamp, type LeaseLoggable, type LeaseRecord, type LeaseStamp, type LeaseTombstone, LeaseFormat, StampChecks, LeaseLabelpath, leaseLifepathOf,
 } from '../shapes/shapes-stamps'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { DeviceDBChecks } from '../shapes/shapes-device-db'
@@ -37,9 +37,9 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
   declare readonly fmt:            LeaseStamp['fmt']
   declare readonly userid:         Userid
   declare readonly banklabel:      Banklabel
-  /** Its labelpath, `lease/` and the label of its gate, such as `lease/passkeys`. It is no Thing's labelpath: a check of a Thing's scope refuses it. */
+  /** Its labelpath, `lease/` and its label, such as `lease/passkeys`. It is no Thing's labelpath: a check of a Thing's scope refuses it. */
   declare readonly labelpath:      LeaseLabelpath
-  /** The label of the gate it was granted under: `passkeys` for `gate/passkeys`, `gate` for the main gate. */
+  /** Its label, the same as its gate's: `passkeys` for the lease of `gate/passkeys`, `gate` for the main gate's. */
   declare readonly label:          string
   /** Always `'a'`: a lease models a live record. */
   declare readonly am:             'a'
@@ -121,7 +121,7 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
   /** The shell of the lease of the gate at `gateScope`: what the first lease follows where none is stored. */
   static shellOf(gateScope: LeaseShellScope): ShellOf<LeaseRecord> {
     const { userid, banklabel, labelpath: gate_labelpath } = Checks.gateScope.parse(gateScope)
-    const labelpath = leaseLabelpathOf(gate_labelpath)
+    const labelpath = LeaseLabelpath.of(gate_labelpath)
     return StampChecks.leaseShell.parse({
       fmt: LeaseFormat, userid, banklabel, labelpath, label: Labelpath.labelOf(labelpath), lifeseq: VoidLifeseq, lifepath: leaseLifepathOf(VoidLifeseq),
       revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', born_at: SX.VoidTime, written_at: SX.VoidTime,
