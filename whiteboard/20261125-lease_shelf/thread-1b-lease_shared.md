@@ -1,8 +1,8 @@
 # Thread 1b: lease_shared (2026-11-25)
 
-Branch `20261125-lease_shared`, PR #TBD, stacked on #908 (8, on #907 1d, #903 1a, #902 1c, #900 0). Proved:
+Branch `20261125-lease_shared`, PR #909, stacked on #908 (8, on #907 1d, #903 1a, #902 1c, #900 0). Proved:
 `pnpm --filter safebyok test` 2143 passed; `pnpm --filter safebyok-react-lean test` 339 passed; both typecheck and
-lint clean. `pnpm justify` not yet run.
+lint clean. `pnpm justify` after the catch-up: see the PR.
 
 * **Built**:
   * First commit (thread 8's review): `World#connectSignedIn` is `#startWatch`; `#tidyConnected()` takes no argument.
