@@ -103,13 +103,18 @@ export const stats = query({
 
 // == [Watching]: watchThings
 
-// Convex re-runs this query whenever a Thing of the bank changes, and sends the client its whole result each time.
-/** Fetch every Thing of a bank, each raw beside its labelpath. */
+// Convex re-runs this query whenever a Thing in its range is committed, and sends the client its whole result each time,
+// so the client watches again from the cursor each result returns. Every later commit has a higher commit timestamp than
+// any this query read, and than the snapshot it read, so watching from that cursor misses nothing.
+/** Fetch the Things of a bank committed after `cursor`, with the bank and the cursor to watch from next.
+ * A null cursor fetches no Thing, and returns the cursor of now.
+ */
 export const watchThings = query({
   args:    CVX.watchArgs,
   returns: CVX.thingsWatched,
-  handler: async (ctx, { scope: sent }) => {
-    return await bankThingsIn(ctx.db, askFor(() => DB.AskChecks.thingWatchScope.parse(sent)))
+  handler: async (ctx, { scope: sent, cursor }) => {
+    const scope = askFor(() => DB.AskChecks.thingWatchScope.parse(sent))
+    return (cursor === null) ? { things: [], bank: null, cursor: ctx.meta.getSnapshotTs() } : await committedAfterIn(ctx.db, scope, cursor)
   },
 })
 // --
@@ -141,7 +146,7 @@ function wouldWrite(classify: () => WroteActual | BirthBankActual): boolean {
 }
 // --
 
-// == [Things stored]: ThingDoc, docAt, rawAt, rootsIn, aboveIn, childrenIn, bankThingsIn, writeAt
+// == [Things stored]: ThingDoc, docAt, rawAt, rootsIn, aboveIn, childrenIn, bankThingsIn, committedAfterIn, writeAt
 
 /** A Thing's document. Its `thing` is `unknown` until the core has checked it. */
 type ThingDoc = Omit<Doc<'things'>, 'thing'> & { thing: unknown }
@@ -197,10 +202,22 @@ async function bankThingsIn(db: DatabaseReader, { userid, banklabel }: ThingWatc
   return docs.map(({ labelpath, thing }) => ({ labelpath, raw: thing }))
 }
 
-/** Write `thing` at `scope`, over the document there or as a new one, and return the Thing then stored. */
+/** The raw Things of a bank committed after `cursor`, with the raw bank and the next cursor. */
+async function committedAfterIn(db: DatabaseReader, { userid, banklabel }: ThingWatchScope, cursor: bigint) {
+  // Only the mutation that writes a document reads its `commit_ts` back as Convex's placeholder; a query reads the timestamp.
+  type CommittedThingDoc = ThingDoc & { commit_ts: bigint }
+  const [docs, bank] = await Promise.all([
+    db.query('things').withIndex('by_commit', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel).gt('commit_ts', cursor)).collect() as Promise<CommittedThingDoc[]>,
+    rawAt(db, { userid, banklabel, labelpath: 'bank' }),
+  ])
+  const things = docs.map(({ labelpath, thing }) => ({ labelpath, raw: thing }))
+  return { things, bank, cursor: docs.at(-1)?.commit_ts ?? cursor }
+}
+
+/** Write `thing` at `scope`, over the document there or as a new one, stamped with the commit's timestamp, and return the Thing then stored. */
 async function writeAt(db: DatabaseWriter, scope: ThingScope, thing: unknown): Promise<unknown> {
   const { userid, banklabel, labelpath } = scope
-  const doc = { userid, banklabel, labelpath, thing }
+  const doc = { userid, banklabel, labelpath, thing, commit_ts: db.vars.commitTs }
   const anteDoc = await docAt(db, scope)
   let id = anteDoc?._id
   if (id === undefined) { id = await db.insert('things', doc) } else { await db.replace('things', id, doc) }

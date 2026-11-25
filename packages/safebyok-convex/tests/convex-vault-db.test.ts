@@ -61,7 +61,8 @@ function _cheat_convexThingsOf(convexVaultDB: ConvexVaultDB): TH.VaultDBRowCheat
       await run(async ({ db }) => {
         const { userid, banklabel, labelpath } = scope
         const doc = await thingDocAt(db, scope)
-        if (doc) { await db.replace('things', doc._id, { userid, banklabel, labelpath, thing: raw }) } else { await db.insert('things', { userid, banklabel, labelpath, thing: raw }) }
+        const planted = { userid, banklabel, labelpath, thing: raw, commit_ts: db.vars.commitTs }
+        if (doc) { await db.replace('things', doc._id, planted) } else { await db.insert('things', planted) }
       })
     },
     remove: async (scope) => {
@@ -191,7 +192,7 @@ describe("ConvexVaultDB's component", () => {
     const deployment = deploy(TH.componentHostWritingAtMost(1))
     const backend = deployment._cheat_backendAs(null)
     for (const thing of [TH.bankThingOf(), TH.gateThingOf(), TH.rootBoxOf()]) {
-      await backend.run(async ({ db }) => { await db.insert('things', { ...TH.ThingBank, labelpath: thing.labelpath, thing }) })
+      await backend.run(async ({ db }) => { await db.insert('things', { ...TH.ThingBank, labelpath: thing.labelpath, thing, commit_ts: db.vars.commitTs }) })
     }
     const convexVaultDB = new ConvexVaultDB({ client: deployment.client(null), api: TH.rootVaultApi })
     const box = TH.boxThingOf()
@@ -217,8 +218,8 @@ const SloppyQueryCases: readonly SloppyCase[] = [
   ["getWorld",    { ask: "acme" },                                        'refuses a world asked as a bare string'],
   ["getWorld",    { ask: { ...TH.getWorldAskOf(), userid: undefined } },  'refuses a world asked without its userid'],
   ["stats",       { ask: {} },                                            'refuses stats asked of an empty object'],
-  ["watchThings", { scope: { userid: 'u1' } },                            'refuses a watch whose scope has no banklabel'],
-  ["watchThings", { scope: [] },                                          'refuses a watch whose scope is an array'],
+  ["watchThings", { scope: { userid: 'u1' }, cursor: null },              'refuses a watch whose scope has no banklabel'],
+  ["watchThings", { scope: [], cursor: null },                            'refuses a watch whose scope is an array'],
 ]
 
 const GateOfOtherBank = TH.gateThingOf({ banklabel: 'other' })
@@ -236,6 +237,10 @@ describe("ConvexVaultDB's component, given sloppy arguments", () => {
       expect(refusal.kind).to.eq('bad_record')
     })
   }
+
+  it("refuses a watch whose cursor is not an int64", async () => {
+    await expect(TH.componentTest().query(TH.rootVaultApi.watchThings, { scope: TH.ThingBank, cursor: 7 as never })).rejects.toThrow()
+  })
 
   for (const [fnname, args, blurb] of SloppyMutationCases) {
     it(blurb, async () => {
@@ -305,6 +310,94 @@ function reactLike(client: ConvexClient) {
     },
   }
 }
+
+/** The ask that writes `box`, new, under the root box of a born bank. */
+function boxBirthAskOf(box: BoxRecord = TH.boxThingOf()) { return TH.birthAskOf(box, Shell.childCited(TH.Life0)) }
+
+describe("ConvexVaultDB's component watch", () => {
+  it("sends only the Things committed after its cursor, and the cursor to watch from next", async () => {
+    const backend = TH.componentTest()
+    await backend.mutation(TH.rootVaultApi.birthBank, { ask: TH.birthBankAskOf() })
+    const start = await backend.query(TH.rootVaultApi.watchThings, { scope: TH.ThingBank, cursor: null })
+    expect(start.things).to.deep.equal([])
+    const box = TH.boxThingOf()
+    await backend.mutation(TH.rootVaultApi.writeThing, { ask: boxBirthAskOf(box) })
+    const since = await backend.query(TH.rootVaultApi.watchThings, { scope: TH.ThingBank, cursor: start.cursor })
+    expect(since).to.deep.include({ things: [{ labelpath: box.labelpath, raw: box }], bank: TH.bankThingOf() })
+    expect(Number(since.cursor - start.cursor)).to.be.above(0)
+    expect(await backend.query(TH.rootVaultApi.watchThings, { scope: TH.ThingBank, cursor: since.cursor })).to.deep.include({ things: [], cursor: since.cursor })
+  })
+
+  it("sends the Things of its own bank alone", async () => {
+    const backend = TH.componentTest()
+    await backend.mutation(TH.rootVaultApi.birthBank, { ask: TH.birthBankAskOf() })
+    const other = await backend.query(TH.rootVaultApi.watchThings, { scope: { ...TH.ThingBank, banklabel: 'other' }, cursor: 0n })
+    expect(other).to.deep.include({ things: [], bank: null, cursor: 0n })
+  })
+})
+
+describe("ConvexVaultDB's watch", () => {
+  it("keeps one subscription as it moves its cursor, and none once stopped", async () => {
+    const convexVaultDB = makeConvexVaultDB()
+    const { deployment } = madeOf(convexVaultDB)
+    const events: VaultEvent[] = []
+    const unwatch = convexVaultDB.watch(TH.ThingBank, (event) => { events.push(event) }, () => undefined)
+    await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
+    await TH.expectGood(convexVaultDB.tryBirthBank(TH.birthBankAskOf()))
+    await vi.waitFor(() => { expect(events).to.have.lengthOf(3) })
+    await TH.expectGood(convexVaultDB.tryWriteThing(boxBirthAskOf()))
+    await vi.waitFor(() => { expect(events).to.have.lengthOf(4) })
+    await TH.aWhile()
+    expect(deployment.watching()).to.have.lengthOf(1)
+    unwatch()
+    await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(0) })
+  })
+
+  it("notifies of each Thing once, though the watch subscribes again after each", async () => {
+    const convexVaultDB = makeConvexVaultDB()
+    const events: VaultEvent[] = []
+    const unwatch = convexVaultDB.watch(TH.ThingBank, (event) => { events.push(event) }, () => undefined)
+    await vi.waitFor(() => { expect(madeOf(convexVaultDB).deployment.watching()).to.have.lengthOf(1) })
+    await TH.expectGood(convexVaultDB.tryBirthBank(TH.birthBankAskOf()))
+    const boxes = [TH.boxThingOf('openai'), TH.boxThingOf('anthropic')]
+    for (const box of boxes) { await TH.expectGood(convexVaultDB.tryWriteThing(boxBirthAskOf(box))) }
+    await vi.waitFor(() => { expect(events).to.have.lengthOf(5) })
+    await TH.aWhile()
+    expect(events.slice(3).map((event) => (event.eventkind === 'item') && event.val)).to.deep.equal(boxes)
+    unwatch()
+  })
+
+  it("subscribes no more once a listener stops it on hearing a Thing", async () => {
+    const convexVaultDB = makeConvexVaultDB()
+    const { deployment } = madeOf(convexVaultDB)
+    const heard = vi.fn()
+    const unwatch: () => void = convexVaultDB.watch(TH.ThingBank, () => { heard(); unwatch() }, () => undefined)
+    await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
+    await TH.expectGood(convexVaultDB.tryWriteThing(TH.birthAskOf()))
+    await vi.waitFor(() => { expect(heard).toHaveBeenCalledTimes(1) })
+    await TH.aWhile()
+    expect(deployment.watching()).to.have.lengthOf(0)
+  })
+
+  it("leaves a second watch of the bank on the same client running when the first stops twice", async () => {
+    const convexVaultDB = makeConvexVaultDB()
+    await TH.expectGood(convexVaultDB.tryBirthBank(TH.birthBankAskOf()))
+    const [firstEvents, secondEvents]: [VaultEvent[], VaultEvent[]] = [[], []]
+    const [openai, anthropic] = [TH.boxThingOf('openai'), TH.boxThingOf('anthropic')]
+    const unwatchFirst = convexVaultDB.watch(TH.ThingBank, (event) => { firstEvents.push(event) }, () => undefined)
+    const unwatchSecond = convexVaultDB.watch(TH.ThingBank, (event) => { secondEvents.push(event) }, () => undefined)
+    const { deployment } = madeOf(convexVaultDB)
+    await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
+    await TH.expectGood(convexVaultDB.tryWriteThing(boxBirthAskOf(openai)))
+    await vi.waitFor(() => { expect([firstEvents.length, secondEvents.length]).to.deep.equal([1, 1]) })
+    unwatchFirst()
+    unwatchFirst()
+    await TH.expectGood(convexVaultDB.tryWriteThing(boxBirthAskOf(anthropic)))
+    await vi.waitFor(() => { expect(secondEvents).to.have.lengthOf(2) })
+    expect(firstEvents).to.have.lengthOf(1)
+    unwatchSecond()
+  })
+})
 
 describe("ConvexVaultDB's watch over a client with watchQuery, as a ConvexReactClient", () => {
   it("notifies of each Thing written after its first result", async () => {

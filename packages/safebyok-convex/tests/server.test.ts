@@ -26,12 +26,12 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['birthBank',   (caller) => caller.mutation(fns.birthBank, { ask: TH.birthBankAskOf() })],
   ['getWorld',    (caller) => caller.query(fns.getWorld, { ask: TH.getWorldAskOf() })],
   ['stats',       (caller) => caller.query(fns.stats, { ask: TH.statsAskOf() })],
-  ['watchThings', (caller) => caller.query(fns.watchThings, { scope: TH.ThingBank })],
+  ['watchThings', (caller) => caller.query(fns.watchThings, { scope: TH.ThingBank, cursor: 0n })],
 ]
 
 /** Every Thing u1 has stored, as the component itself reports it. */
 async function storedIn(backend: Backend) {
-  return await backend.withIdentity({ subject: 'u1' }).query(fns.watchThings, { scope: TH.ThingBank })
+  return await backend.withIdentity({ subject: 'u1' }).query(fns.watchThings, { scope: TH.ThingBank, cursor: 0n })
 }
 
 describe("SafebyokVaultComponent.api, for the user a call names", () => {

@@ -15,7 +15,7 @@ function deploy(opts?: FakeDeploymentOpts) {
 const bank = TH.bankThingOf()
 const birthBankArgs = { ask: TH.birthBankAskOf() }
 const worldAsked = { ask: TH.getWorldAskOf() }
-const watchThingsArgs = { scope: TH.ThingBank }
+const watchThingsArgs = { scope: TH.ThingBank, cursor: 0n }
 
 /** Send a mutation from a client signed in as no one, which the host refuses as `identity_revoked`. */
 function refusedMutation(deployment: ReturnType<typeof deploy>) {
@@ -183,7 +183,7 @@ describe("fakeDeployment", () => {
     expect(await client.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.include({ bank: null })
     const answer = await deployment._cheat_arrange((backend) => backend.withIdentity({ subject: 'u1' }).mutation(deployment.api.safebyokVault.birthBank, birthBankArgs))
     expect(answer).to.deep.nested.include({ bank: null, 'written.bank': bank })
-    expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ labelpath: 'bank', raw: bank })
+    expect(heard.mock.calls.at(-1)?.[0]).to.have.property('things').that.deep.includes({ labelpath: 'bank', raw: bank })
     expect(await client.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.include({ bank })
   })
 })
