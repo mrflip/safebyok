@@ -1,7 +1,7 @@
 # Thread E: convex_deltas (2026-11-25)
 
 Branch `20261125-convex_deltas`, PR #931, stacked on #923. Proved: `pnpm --filter safebyok-convex` lint, typecheck,
-test (231 passed); `pnpm justify` after the catch-up: JUSTIFY.
+test (231 passed); `pnpm justify` after the catch-up: green (safebyok-convex 231, safebyok 2316, scripts 331).
 
 ## Design
 
