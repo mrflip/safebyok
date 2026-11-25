@@ -2,7 +2,7 @@
 
 import type { UseStore } from 'idb-keyval'
 import { dbprefixOf, inOneStep, rowAt, versionedShelfOf } from 'safebyok-big/storage'
-import type { BankScope, LeaseRecord } from '../shapes/shapes-stamps'
+import type { LeaseRecord, LeaseScope } from '../shapes/shapes-stamps'
 import { type IdbDeviceDBOpts, type LeaseScopepath, idbDeviceDBOpts } from '../shapes/shapes-device-db'
 import { DeviceDB } from './device-db'
 
@@ -24,11 +24,11 @@ export function leaseDatabasenameOf(dbName?: string): string { return `${dbprefi
 /** The name of the BroadcastChannel that tells every tab of the lease records stored in the database of `dbName`. */
 export function leaseBellnameOf(dbName?: string): string { return `${dbprefixOf(dbName)}:lease` }
 
-/** Where the lease record of `scope`'s bank is filed. */
-export function scopepathOf({ userid, banklabel }: BankScope): LeaseScopepath { return [userid, banklabel] }
+/** Where the lease record at `scope` is filed: one for each gate. */
+export function scopepathOf({ userid, banklabel, labelpath }: LeaseScope): LeaseScopepath { return [userid, banklabel, labelpath] }
 // --
 
-/** A device database of each bank's lease record, in this browser's IndexedDB, shared by every tab of its origin.
+/** A device database of each gate's lease record, in this browser's IndexedDB, shared by every tab of its origin.
  * A live record's leaseKey is stored as its `CryptoKey` handle, by structured clone, and never as bytes (G4).
  */
 export class IdbDeviceDB extends DeviceDB {
@@ -50,7 +50,7 @@ export class IdbDeviceDB extends DeviceDB {
 
   // == [Protected, the calls of DeviceDB]: doPeekLease, doStowLease, doRing, doListen
 
-  protected async doPeekLease(scope: BankScope): Promise<unknown> {
+  protected async doPeekLease(scope: LeaseScope): Promise<unknown> {
     return await inOneStep(this.#shelf, 'readonly', (store) => rowAt(store, scopepathOf(scope)))
   }
 
@@ -63,9 +63,9 @@ export class IdbDeviceDB extends DeviceDB {
   }
 
   // A channel of its own for each ring, so that every channel listening on the bell, this tab's own among them, hears it.
-  protected doRing({ userid, banklabel }: BankScope): void {
+  protected doRing({ userid, banklabel, labelpath }: LeaseScope): void {
     const channel = new BroadcastChannel(this.#bellname)
-    channel.postMessage({ userid, banklabel })
+    channel.postMessage({ userid, banklabel, labelpath })
     channel.close()
   }
 

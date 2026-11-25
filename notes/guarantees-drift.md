@@ -127,6 +127,11 @@ what differs from big, in a sentence or two.
   a record of an earlier life of the bank is told apart by whoever peeks it. A revision of a live record that changes
   only its `ends_at` (`Lease.makeNextRecord`, a softlock) keeps its keys and its wrap, which binds the lease's stamp
   alone. Nothing calls the deviceDB yet; thread 1b of lease_shelf has the Device stow and follow it.
+  amended 2026-11-25 (lease_shelf thread 1b, the Coach: "File it by gate so it doesn't change later"): a record is
+  filed, peeked and rung by its own scope, its bank's and its labelpath `lease/<gate label>` (`LeaseScope`,
+  `leaseScopeOf`), one for each gate, no longer by its bank's scope alone; a record filed under the bank's scope by an
+  earlier build is never peeked. Its lifepath is a placeholder lifeseq, `0000000000`, then its own (the Coach: "keep
+  the invariant segments count matches shape"), so its life still never resets with its gate's or its bank's.
 
 * 2026-11-25 (lease_shelf thread 1b, lease_shared), G4 and G9: **The lease is persisted and shared by every tab, and
   follows what is stored.** The world (`packages/safebyok/src/models/world.ts`) stows each lease it attaches by a grant,

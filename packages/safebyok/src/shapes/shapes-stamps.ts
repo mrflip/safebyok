@@ -40,7 +40,7 @@ export type StampedGate = Z.infer<typeof StampChecks.stampedGate>
 export type BoxStamp    = Z.infer<typeof StampChecks.boxStamp>
 // --
 
-// == [The lease's forms]: LeaseFormat, LeaseLabelpath, leaseLabelpathOf, LeaseLifeRoot, leaseLifepathOf, isLifepathOwn, isOfItsGate, LeaseChecks, StampChecks, LeaseStamp, LeaseSparse, LeaseRecord, LeaseTombstone, LeaseLoggable
+// == [The lease's forms]: LeaseFormat, LeaseLabelpath, leaseLabelpathOf, leaseScopeOf, LeaseLifeRoot, leaseLifepathOf, isLifepathOwn, isOfItsGate, LeaseChecks, StampChecks, LeaseStamp, LeaseSparse, LeaseRecord, LeaseTombstone, LeaseLoggable
 
 /** The `fmt` a lease carries, the same as every Thing's. It is bound into the wrap of the lease's bankKey. */
 export const LeaseFormat = ThingFormat
@@ -53,6 +53,11 @@ const LeaseLabelpathPattern = /^lease\/[^/]+$/
 
 /** The labelpath of a lease granted under the gate at `gateLabelpath`: `lease/gate` for the main gate, `lease/passkeys` for `gate/passkeys`. */
 export function leaseLabelpathOf(gateLabelpath: Labelpath): LeaseLabelpath { return `lease/${Labelpath.labelOf(gateLabelpath)}` }
+
+/** The scope a deviceDB files the lease of the gate at `gateScope` under: the gate's bank, and the lease's labelpath, which names the gate. */
+export function leaseScopeOf({ userid, banklabel, labelpath }: { userid: string, banklabel: string, labelpath: Labelpath }): LeaseScope {
+  return { userid, banklabel, labelpath: leaseLabelpathOf(labelpath) }
+}
 
 // A lease has no life above its own, but its lifepath keeps one lifeseq for each segment of its labelpath, as a
 // Thing's does: the first is this placeholder, so a lease's life never resets with its gate's or its bank's.
@@ -115,6 +120,7 @@ const LeaseChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, discrim,
     .refine(isLabelLast,   Phrases.LabelNotLast)
   return {
     leaseStamp,
+    leaseScope:         obj({ userid, banklabel, labelpath: thingFields.labelpath }),
     liveLeaseRecord:    live.readonly(),
     leaseTombstone:     tombstone.readonly(),
     leaseRecord:        discrim('am', [live, tombstone]).readonly(),
@@ -134,11 +140,13 @@ const LeaseChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, discrim,
  */
 export const StampChecks = Object.freeze({ ...PlainChecks, ...LeaseChecks, LeaseFormat })
 
+/** The scope a lease record is filed under, one for each gate: its bank's `userid` and `banklabel`, and its labelpath, `lease/<gate label>`. */
+export type LeaseScope     = Z.infer<typeof StampChecks.leaseScope>
 /** A lease's stamp: see {@link StampChecks}. */
 export type LeaseStamp     = Z.infer<typeof StampChecks.leaseStamp>
 /** The parts of a lease that are safe to show: its {@link LeaseStamp}. */
 export type LeaseSparse    = LeaseStamp
-/** A bank's lease as a deviceDB stores it, live (its life even) or a tombstone (odd), with every Thing field. See {@link StampChecks}. */
+/** A gate's lease as a deviceDB stores it, live (its life even) or a tombstone (odd), with every Thing field. See {@link StampChecks}. */
 export type LeaseRecord    = Z.infer<typeof StampChecks.leaseRecord>
 /** A lease record's tombstone, which a lock stores in place of the live record: its Thing fields, and no keys. */
 export type LeaseTombstone = TombstoneOf<LeaseRecord>

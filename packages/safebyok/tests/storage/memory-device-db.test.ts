@@ -20,9 +20,9 @@ describe("MemoryDeviceDB, what only a store in memory can show", () => {
     const deviceDB = new MemoryDeviceDB()
     const lease    = await TH.liveLeaseRecordOf()
     await deviceDB.stowLease(lease)
-    const peeked   = await deviceDB.peekLease(TH.WorldScope)
-    expect(peeked).to.not.equal(deviceDB._cheat_leases().get(MemoryDeviceDB.ckeyOf(TH.WorldScope)))
-    expect(await deviceDB.peekLease(TH.WorldScope)).to.not.equal(peeked)
+    const peeked   = await deviceDB.peekLease(TH.WorldLeaseScope)
+    expect(peeked).to.not.equal(deviceDB._cheat_leases().get(MemoryDeviceDB.ckeyOf(TH.WorldLeaseScope)))
+    expect(await deviceDB.peekLease(TH.WorldLeaseScope)).to.not.equal(peeked)
   })
 
   it("calls a listener later, never inside the stow", async () => {
@@ -39,7 +39,7 @@ describe("MemoryDeviceDB, what only a store in memory can show", () => {
 
 describe("DeviceDB, what a store throws", () => {
   const VerbCases = [
-    [(deviceDB: MemoryDeviceDB) => deviceDB.peekLease(TH.WorldScope), 'peekLease', 'refuses a peek that throws as storage_unavailable, naming only what it threw'],
+    [(deviceDB: MemoryDeviceDB) => deviceDB.peekLease(TH.WorldLeaseScope), 'peekLease', 'refuses a peek that throws as storage_unavailable, naming only what it threw'],
     [async (deviceDB: MemoryDeviceDB) => deviceDB.stowLease(await TH.liveLeaseRecordOf()), 'stowLease', 'refuses a stow that throws as storage_unavailable, naming only what it threw'],
   ] as const
   for (const [verbOf, oplabel, blurb] of VerbCases) {

@@ -4,9 +4,10 @@ import { describe, expect, it } from 'vitest'
 import type { Helpers } from 'safebyok-big/internals'
 import { eventually, expectRefusal, expectSyncRefusal } from 'safebyok-big/testing'
 import type { LiveOf } from '../../src/shapes/shapes-sealers'
-import type { BankScope, LeaseRecord } from '../../src/shapes/shapes-stamps'
+import type { LeaseScope, LeaseRecord } from '../../src/shapes/shapes-stamps'
 import type { DeviceDB } from '../../src/storage/device-db'
 import { WorldScope } from './models-world'
+import { WorldLeaseScope } from './devicedb-world'
 import { type LeaseGiven, leaseTombstoneOf, liveLeaseRecordOf } from './devicedb-world'
 
 // == [The hooks a deviceDB hands the battery]: DeviceDBLeaseBatteryOpts
@@ -18,7 +19,7 @@ export type DeviceDBLeaseBatteryOpts<DBT extends DeviceDB> = {
   /** A deviceDB over the same database as `deviceDB`, as another tab would make: for a store in memory, `deviceDB` itself. */
   makeTwin:     (deviceDB: DBT) => DeviceDB
   /** Stores `raw` as the lease record at `scope`, unchecked. */
-  plant:        (deviceDB: DBT, scope: BankScope, raw: unknown) => Helpers.Awaitable<void>
+  plant:        (deviceDB: DBT, scope: LeaseScope, raw: unknown) => Helpers.Awaitable<void>
 }
 // --
 
@@ -38,15 +39,15 @@ function sansKey(record: LeaseRecord | null): object | null { return (record ===
 /** Register the cases every deviceDB's lease verbs must pass: `peekLease`, `stowLease` and `listen`. */
 export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: string, { makeDeviceDB, makeTwin, plant }: DeviceDBLeaseBatteryOpts<DBT>): void {
   describe(`${dbname}: peekLease and stowLease`, () => {
-    it("answers null for a bank with no lease record", async () => {
-      expect(await makeDeviceDB().peekLease(WorldScope)).to.be.null
+    it("answers null for a gate with no lease record", async () => {
+      expect(await makeDeviceDB().peekLease(WorldLeaseScope)).to.be.null
     })
 
     it("stores a live lease, and answers it and peeks it back with its leaseKey", async () => {
       const deviceDB = makeDeviceDB()
       const lease    = await liveLeaseRecordOf()
       expect(sansKey(await deviceDB.stowLease(lease))).to.deep.equal(sansKey(lease))
-      const peeked   = await deviceDB.peekLease(WorldScope) as LiveLeaseRecord
+      const peeked   = await deviceDB.peekLease(WorldLeaseScope) as LiveLeaseRecord
       expect(sansKey(peeked)).to.deep.equal(sansKey(lease))
       expect(peeked.lease_key).to.be.instanceOf(CryptoKey)
       expect(peeked.lease_key.extractable).to.be.false
@@ -55,8 +56,18 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
     it("peeks only the lease of the bank asked", async () => {
       const deviceDB = makeDeviceDB()
       await deviceDB.stowLease(await liveLeaseRecordOf())
-      expect(await deviceDB.peekLease({ ...WorldScope, banklabel: 'other' })).to.be.null
-      expect(await deviceDB.peekLease({ ...WorldScope, userid: 'u2' })).to.be.null
+      expect(await deviceDB.peekLease({ ...WorldLeaseScope, banklabel: 'other' })).to.be.null
+      expect(await deviceDB.peekLease({ ...WorldLeaseScope, userid: 'u2' })).to.be.null
+    })
+
+    it("files each gate's lease apart: a stow at one gate leaves another gate's lease of the bank", async () => {
+      const deviceDB = makeDeviceDB()
+      const lease    = await liveLeaseRecordOf()
+      await deviceDB.stowLease(lease)
+      const passkeysTombstone = leaseTombstoneOf({ labelpath: 'lease/passkeys', label: 'passkeys', lifenum: 3 })
+      await deviceDB.stowLease(passkeysTombstone)
+      expect(sansKey(await deviceDB.peekLease(WorldLeaseScope))).to.deep.equal(sansKey(lease))
+      expect(await deviceDB.peekLease({ ...WorldLeaseScope, labelpath: 'lease/passkeys' })).to.deep.equal(passkeysTombstone)
     })
 
     const NewerCases = [
@@ -73,7 +84,7 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
         await deviceDB.stowLease(await leaseOf(stored))
         const lease = await leaseOf(stowed)
         expect(sansKey(await deviceDB.stowLease(lease))).to.deep.equal(sansKey(lease))
-        expect(sansKey(await deviceDB.peekLease(WorldScope))).to.deep.equal(sansKey(lease))
+        expect(sansKey(await deviceDB.peekLease(WorldLeaseScope))).to.deep.equal(sansKey(lease))
       })
     }
 
@@ -90,7 +101,7 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
         await deviceDB.stowLease(prior)
         const lease    = await leaseOf(stowed)
         expect(sansKey(await deviceDB.stowLease(lease))).to.deep.equal(sansKey(prior))
-        expect(sansKey(await deviceDB.peekLease(WorldScope))).to.deep.equal(sansKey(prior))
+        expect(sansKey(await deviceDB.peekLease(WorldLeaseScope))).to.deep.equal(sansKey(prior))
       })
     }
 
@@ -98,7 +109,7 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
       const deviceDB = makeDeviceDB()
       await deviceDB.stowLease(await liveLeaseRecordOf())
       await deviceDB.stowLease(leaseTombstoneOf())
-      const peeked = await deviceDB.peekLease(WorldScope)
+      const peeked = await deviceDB.peekLease(WorldLeaseScope)
       expect(peeked).to.deep.equal(leaseTombstoneOf())
       expect(peeked).to.not.have.property('lease_key')
       expect(peeked).to.not.have.property('bank_key_lease_wrapped')
@@ -121,18 +132,18 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
     for (const [damagedOf, blurb] of DamagedCases) {
       it(`refuses to peek ${blurb}`, async () => {
         const deviceDB = makeDeviceDB()
-        await plant(deviceDB, WorldScope, damagedOf(await liveLeaseRecordOf()))
-        await expectRefusal(deviceDB.peekLease(WorldScope), 'damaged_lease')
+        await plant(deviceDB, WorldLeaseScope, damagedOf(await liveLeaseRecordOf()))
+        await expectRefusal(deviceDB.peekLease(WorldLeaseScope), 'damaged_lease')
       })
     }
 
     it("replaces a damaged lease record with any record stowed", async () => {
       const deviceDB = makeDeviceDB()
       const live     = await liveLeaseRecordOf({ lifenum: 4, revseq: 9 })
-      await plant(deviceDB, WorldScope, { ...live, note: 'hi' })
+      await plant(deviceDB, WorldLeaseScope, { ...live, note: 'hi' })
       const lease    = await liveLeaseRecordOf()
       expect(sansKey(await deviceDB.stowLease(lease))).to.deep.equal(sansKey(lease))
-      expect(sansKey(await deviceDB.peekLease(WorldScope))).to.deep.equal(sansKey(lease))
+      expect(sansKey(await deviceDB.peekLease(WorldLeaseScope))).to.deep.equal(sansKey(lease))
     })
   })
 
@@ -149,12 +160,12 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
         const deviceDB = makeDeviceDB()
         const bad      = badOf(await liveLeaseRecordOf())
         await expectRefusal(deviceDB.stowLease(bad as LeaseRecord), 'bad_record')
-        expect(await deviceDB.peekLease(WorldScope)).to.be.null
+        expect(await deviceDB.peekLease(WorldLeaseScope)).to.be.null
       })
     }
 
     it("refuses to peek a scope with no userid", async () => {
-      await expectRefusal(makeDeviceDB().peekLease({ banklabel: 'acme' } as BankScope), 'bad_record')
+      await expectRefusal(makeDeviceDB().peekLease({ banklabel: 'acme' } as LeaseScope), 'bad_record')
     })
 
     it("refuses a listener that is not a function", () => {
@@ -166,14 +177,14 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
     it("calls each listener, another tab's among them, with the scope of a lease stored", async () => {
       const deviceDB = makeDeviceDB()
       const twin     = makeTwin(deviceDB)
-      const heard: BankScope[] = []
-      const twinHeard: BankScope[] = []
+      const heard: LeaseScope[] = []
+      const twinHeard: LeaseScope[] = []
       deviceDB.listen((scope) => { heard.push(scope) })
       twin.listen((scope) => { twinHeard.push(scope) })
       await deviceDB.stowLease(await liveLeaseRecordOf())
       await eventually(() => (heard.length > 0) && (twinHeard.length > 0))
-      expect(heard).to.deep.equal([WorldScope])
-      expect(twinHeard).to.deep.equal([WorldScope])
+      expect(heard).to.deep.equal([WorldLeaseScope])
+      expect(twinHeard).to.deep.equal([WorldLeaseScope])
     })
 
     it("calls no listener for a lease it does not store", async () => {

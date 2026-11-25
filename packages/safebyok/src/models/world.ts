@@ -15,7 +15,7 @@ import type { BirthCleartexts, BirthDna, BirthGatingFriend, GateRevisionedStamp,
 import { type MaskedViewLease, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import type * as Sealers from '../shapes/shapes-sealers'
 import type { LiveOf } from '../shapes/shapes-sealers'
-import { type BankStamp, type LeaseLoggable, type LeaseRecord, StampChecks } from '../shapes/shapes-stamps'
+import { type BankStamp, type LeaseLoggable, type LeaseRecord, StampChecks, leaseScopeOf } from '../shapes/shapes-stamps'
 import { type BankRecord, type BoxRecord, type BulletproofCallback, type GateRecord, type Sparse, type ThingRecord, type Thingkind, type VoidSentinel, PerKindChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type ReadTc, type SeenThing, type VaultEvent, type VaultItemEvent, SeenChecks } from '../shapes/shapes-vault-event'
@@ -278,7 +278,7 @@ export class World {
   // this world's lease where that is newer, as a softlock not yet stowed is.
   /** The Thing fields a lease granted under the gate at `gateScope` follows: the lease record stored, or this world's lease where none is stored or this one is newer, or else the gate's lease shell. */
   async #leaseFollowed(gateScope: LeaseShellScope): Promise<Sparse<LeaseRecord>> {
-    const stored = await this.#peekStored()
+    const stored = await this.#peekStored(gateScope)
     if (this.#isNewerThanLease(stored)) { return stored }
     return this.#lease ?? Lease.shellOf(gateScope)
   }
@@ -391,11 +391,11 @@ export class World {
   // Each tab's lease is the one the deviceDB stores, compared by life, then revision. The newest stow wins there, so a
   // late stow never brings a locked lease back. A stow or a peek refused is bad news, and the tab keeps its lease.
 
-  /** Make this world's lease the one the deviceDB stores, where that one is newer, then softlock it where the gate has moved past it. Does nothing until the roots are live. Never throws: a refusal goes to the device's `onBadNews`. */
+  /** Make this world's lease the one the deviceDB stores for the main gate, where that one is newer, then softlock it where the gate has moved past it. Does nothing until the roots are live. Never throws: a refusal goes to the device's `onBadNews`. */
   async #followStored(): Promise<void> {
     if (! this.areRootsLive) { return }
+    const stored = await this.#peekStored({ ...this.#device.scope, labelpath: Labelpath.MainGate })
     try {
-      const stored = await this.#device.deviceDB.peekLease(this.#device.scope)
       if (this.#isNewerThanLease(stored)) { this.#takeUp(stored) }
       this.#softlockPastGate()
     } catch (err) {
@@ -435,10 +435,10 @@ export class World {
     this.#attachAndStow(lease.nextEndingAt(ends_at))
   }
 
-  /** The lease record the deviceDB stores for the bank, or null for none, or where the deviceDB refuses, which goes to the device's `onBadNews` */
-  async #peekStored(): Promise<LeaseRecord | null> {
+  /** The lease record the deviceDB stores for the gate at `gateScope`, or null for none, or where the deviceDB refuses, which goes to the device's `onBadNews` */
+  async #peekStored(gateScope: LeaseShellScope): Promise<LeaseRecord | null> {
     try {
-      return await this.#device.deviceDB.peekLease(this.#device.scope)
+      return await this.#device.deviceDB.peekLease(leaseScopeOf(gateScope))
     } catch (err) {
       this.#device.tellBadNews([err])
       return null

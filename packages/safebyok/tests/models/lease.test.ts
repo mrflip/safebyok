@@ -611,7 +611,7 @@ describe("lease.stow(deviceDB)", () => {
     const deviceDB = new MemoryDeviceDB()
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     await lease.stow(deviceDB)
-    const stored = await deviceDB.peekLease(TH.WorldScope)
+    const stored = await deviceDB.peekLease(TH.WorldLeaseScope)
     expect(stored).to.deep.include(pick(lease, ShownFieldnames))
     const reloaded = Lease.make(stored as LiveLeaseRecord, { gate })
     expect(await reloaded.unseal(BaseBox, sealed)).to.deep.include(Cleartexts)
@@ -623,7 +623,7 @@ describe("lease.stow(deviceDB)", () => {
     const tombstone = Lease.tombstoneOf(lease)
     await deviceDB.stowLease(tombstone)
     await lease.stow(deviceDB)
-    expect(await deviceDB.peekLease(TH.WorldScope)).to.deep.equal(tombstone)
+    expect(await deviceDB.peekLease(TH.WorldLeaseScope)).to.deep.equal(tombstone)
   })
 
   it("refuses once this lease is evicted, stowing nothing, and a deviceDB that is not one", async () => {
@@ -632,7 +632,7 @@ describe("lease.stow(deviceDB)", () => {
     await TH.expectRefusal(lease.stow({ peekLease: vi.fn() } as never), 'bad_record')
     lease.evict()
     await TH.expectRefusal(lease.stow(deviceDB), 'bank_locked')
-    expect(await deviceDB.peekLease(TH.WorldScope)).to.be.null
+    expect(await deviceDB.peekLease(TH.WorldLeaseScope)).to.be.null
   })
 })
 

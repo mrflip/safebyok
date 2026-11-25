@@ -446,8 +446,8 @@ async function twoTabs(opts: Partial<DeviceOpts> = {}): Promise<TwoTabs> {
 /** Let what is under way finish: every promise settled, every timer due now run. */
 async function settle(): Promise<void> { await vi.advanceTimersByTimeAsync(0) }
 
-/** The lease record `deviceDB` stores for {@link TH.WorldScope}'s bank. */
-async function storedLeaseOf(deviceDB: MemoryDeviceDB): Promise<LeaseRecord | null> { return await deviceDB.peekLease(TH.WorldScope) }
+/** The lease record `deviceDB` stores for {@link TH.WorldScope}'s main gate. */
+async function storedLeaseOf(deviceDB: MemoryDeviceDB): Promise<LeaseRecord | null> { return await deviceDB.peekLease(TH.WorldLeaseScope) }
 
 /** A device of another browser over `vaultDB`, its own deviceDB, unlocked, whose passphrase it then replaces: a gate change the tabs of `vaultDB` hear of. */
 async function changeGateElsewhere(vaultDB: MemoryVaultDB): Promise<void> {
@@ -529,7 +529,7 @@ describe("a lease shared by the tabs of one deviceDB", () => {
     await first.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     await settle()
     const endsAt = second.world.leaseEndsAt
-    deviceDB._cheat_leases().set(MemoryDeviceDB.ckeyOf(TH.WorldScope), await TH.liveLeaseRecordOf({ revseq: 0 }))
+    deviceDB._cheat_leases().set(MemoryDeviceDB.ckeyOf(TH.WorldLeaseScope), await TH.liveLeaseRecordOf({ revseq: 0 }))
     await deviceDB.stowLease(TH.leaseTombstoneOf({ userid: 'u2' }))
     await settle()
     expect([first.device.world.leaseEndsAt, second.world.leaseEndsAt]).to.deep.equal([endsAt, endsAt])

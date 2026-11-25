@@ -55,7 +55,7 @@ describe("IdbDeviceDB's database and bell", () => {
     const deviceDB = makeIdbDeviceDB()
     const lease    = await TH.liveLeaseRecordOf()
     await deviceDB.stowLease(lease)
-    expect(await makeTwin(deviceDB).peekLease(TH.WorldScope)).to.have.property('revtok', lease.revtok)
+    expect(await makeTwin(deviceDB).peekLease(TH.WorldLeaseScope)).to.have.property('revtok', lease.revtok)
   })
 
   it("parts each dbName's leases and bell from another's", async () => {
@@ -68,7 +68,7 @@ describe("IdbDeviceDB's database and bell", () => {
     await TH.eventually(() => heard.length > 0)
     await TH.aWhile()
     expect(heard).to.deep.equal([TH.WorldScope.banklabel])
-    expect(await other.peekLease(TH.WorldScope)).to.be.null
+    expect(await other.peekLease(TH.WorldLeaseScope)).to.be.null
   })
 
   it("passes on no message on its bell that is not a bank's scope", async () => {
@@ -77,10 +77,10 @@ describe("IdbDeviceDB's database and bell", () => {
     deviceDB.listen((scope) => { heard.push(scope) })
     const channel  = new BroadcastChannel(leaseBellnameOf(DbNameForDeviceDB.get(deviceDB)))
     channel.postMessage({ userid: 'u1' })
-    channel.postMessage({ ...TH.WorldScope, extra: 'dropped' })
+    channel.postMessage({ ...TH.WorldLeaseScope, extra: 'dropped' })
     channel.close()
     await TH.eventually(() => heard.length > 0)
     await TH.aWhile()
-    expect(heard).to.deep.equal([TH.WorldScope])
+    expect(heard).to.deep.equal([TH.WorldLeaseScope])
   })
 })
