@@ -1,6 +1,6 @@
 # Thread B: convex_vault (2026-11-25)
 
-Branch `20261125-convex_vault`, PR (see the PR link in the report), stacked on [#916](https://github.com/mrflip/safebyok/pull/916).
+Branch `20261125-convex_vault`, PR [#923](https://github.com/mrflip/safebyok/pull/923), stacked on [#916](https://github.com/mrflip/safebyok/pull/916).
 Proved: `pnpm --filter safebyok-convex test` 183 tests in 6 files, lint and typecheck clean; `pnpm justify` after the
 catch-up rebase: see the PR's **Tests:** line.
 
