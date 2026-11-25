@@ -1,8 +1,8 @@
 # Thread 13: watch_recovery, a OneWatchVaultDB watch that cannot start ends (2026-11-25)
 
 Branch `20261125-watch_recovery`, PR #926, stacked on #924 (thread 10, `20261125-car_read_at`).
-Proved: `pnpm --filter safebyok lint` and `typecheck` clean; the one-watch, minder and world tests pass (19, 715 with
-`tests/minding`, 71 in world). `pnpm justify` pending.
+Proved: `pnpm justify` green after the catch-up onto `cfe6f103e` (8577 tests across 16 suites;
+safebyok 2298).
 
 * **Built**:
   - **`VaultDB.watch` takes an optional fourth argument, `onEnded`** (`src/storage/vault-db.ts`): called where the
