@@ -37,6 +37,12 @@ export const Labelpath = Object.freeze({
   labelOf(labelpath: Labelpath): string { return labelpath.slice(labelpath.lastIndexOf('/') + 1) },
   /** The labelpath of a Thing's parent: its labelpath less its own label, `''` for a root. */
   parentOf(labelpath: Labelpath): Labelpath { return labelpath.slice(0, Math.max(0, labelpath.lastIndexOf('/'))) },
+  /** The labelpaths of the Things above a Thing, nearest first: its parent's, then its parent's parent's, up to its root's. None for a root. */
+  ancestorsOf(labelpath: Labelpath): Labelpath[] {
+    const ancestors: Labelpath[] = []
+    for (let above = Labelpath.parentOf(labelpath); above !== ''; above = Labelpath.parentOf(above)) { ancestors.push(above) }
+    return ancestors
+  },
 })
 // --
 

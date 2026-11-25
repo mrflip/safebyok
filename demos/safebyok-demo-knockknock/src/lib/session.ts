@@ -25,7 +25,7 @@ export function subscribeSession(listener: () => void): () => void {
 }
 
 /** Sign in as `username`, making its account the first time. Throws for a username that is not 2 to 40 lowercase letters, digits and underscores, starting with a letter. */
-export function signIn(username: string): void {
+export function signin(username: string): void {
   if (! /^[a-z][\d_a-z]{1,39}$/u.test(username)) { throw new Error('A username is 2 to 40 lowercase letters, digits and underscores, starting with a letter.') }
   const accountCkey = accountCkeyOf(username)
   const userid = localStorage.getItem(accountCkey) ?? `user_${globalThis.crypto.randomUUID().replaceAll('-', '')}`

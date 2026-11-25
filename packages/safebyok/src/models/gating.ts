@@ -17,7 +17,7 @@ import type { PutAskDraft } from '../shapes/shapes-asks'
 import type { StampedGate } from '../shapes/shapes-stamps'
 import { Labelpath } from '../shapes/primitives'
 import { type GateRecord, Shell } from '../shapes/shapes-thing'
-import { BoxChecks } from '../shapes/shapes-thingkinds'
+import { BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import * as Throwers from '../refusals/throwers'
 
 // == [The gating]: Gating, GatingMarker
@@ -151,22 +151,23 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
   const passkey0 = await passkeyProving?.buildWayin(passphraseProving) ?? null
   const bankRecord = Bank.makeRecord(bankStamp)
   const rootShell  = BoxChecks.liveOrShell.parse(Shell.of({ ...device.scope, labelpath: Labelpath.RootBox }))
-  // The root box is sealed under the lease of the gate the birth makes, and the bank stored is made with that gate,
-  // unlocked. Where the birth refuses, or the vaultDB's answer is broken, the gate is swept, and no bank holds it.
-  const gate = Gate.make(Gate.makeRecord({ ...gateStamp, wayins: { main, passkey0 } }), { device, bankStamp })
+  // The root box is sealed under the lease the birth builds, against the stamps it minted. The lease reaches the
+  // device's world, unlocking it, only once the bank the world's SortedVaultDB keeps is this one. Where the birth refuses,
+  // or the vaultDB's answer is broken, the lease is evicted, and the world holds no lease of it.
+  const gateRecord = Gate.makeRecord({ ...gateStamp, wayins: { main, passkey0 } })
+  const lease = await friend.leaseByProving(passphraseProving, bankStamp, gateRecord)
   try {
-    await friend.unlockByProving(gate, passphraseProving)
-    const root   = await gate.seal(BaseBox, rootShell, { sidecar: {} }, { whisper: {} })
-    // The roots it answers, written or found stored, are then the bank's world in the device's BankMinder.
-    const answer = await device.bankMinder.tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gate.pickle(), root })
+    const root   = await lease.seal(BaseBox, rootShell, { sidecar: {} }, { whisper: {} })
+    // The roots it answers, written or found stored, are then the Things of the device's world, which shows them locked.
+    const answer = await device.world.demandSortedVaultDB().tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gateRecord, root, banktok: bankRecord.lifetok })
     if (! answer.ok) { throw answer.err }
     // The user must hear that their passphrase was not set: the bank stored is another's.
     if (answer.val.bank.revtok !== bankRecord.revtok) { throw Throwers.gateMadeElsewhere() }
-    const bank = Bank.make(answer.val.bank, { device, gate })
-    friend.attachBank(bank)
+    const bank = device.world.demandRootsLive()
+    friend.attachLease(lease)
     return bank
   } catch (err) {
-    gate.sweep()
+    lease.evict()
     throw err
   }
 }
@@ -175,7 +176,7 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
 async function unlockGate(gate: Gate, cleartexts: unknown, friend: Pick<GateGatingFriend, 'unlockByProving'>): Promise<Gate> {
   gate.demandEnabled()
   const proof  = CleartextChecks.unlock.parse(cleartexts)
-  const proved = await provingOf(gate.device, gate, proof)
+  const proved = await provingOf(gate.device, anteOf(gate), proof)
   return await friend.unlockByProving(proved)
 }
 
@@ -236,10 +237,11 @@ interface Ante extends StampedGate {
   passkey0: Wayin | null
 }
 
-/** The revision `gate` models now, as a gate change proves against it and carries it forward. */
+/** The revision `gate` models now, as a gating proves against it and a gate change carries it forward. Refuses a gate that is not live. */
 function anteOf(gate: Gate): Ante {
-  const record = gate.pickle()
-  return { record, bankStamp: gate.bankStamp, stamp: gate.stamp, wayins: record.wayins, main: gate.main, passkey0: gate.passkey0 }
+  const { stamp, main, passkey0, bankStamp } = gate
+  const record = GateChecks.record.parse(gate)
+  return { record, bankStamp, stamp, wayins: record.wayins, main, passkey0 }
 }
 
 /** Refuse `weak_passphrase` unless `device`'s strength checker judges `passphraseCleartext` strong. */

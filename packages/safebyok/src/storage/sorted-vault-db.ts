@@ -1,64 +1,390 @@
-/** `SortedVaultDB`, a vaultDB that wraps another. */
+/** `SortedVaultDB`, which answers a vaultDB's verbs over another, and tells one bank's records that are news as an ordered feed. */
 
-import { type Errors, Validator } from 'safebyok-big/internals'
-import type { BirthBankAsk, GetAsk, ListAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
-import { ThingChecks } from '../shapes/shapes-thing'
-import type { VaultEvent } from '../shapes/shapes-vault-event'
-import type { BirthBankAnswer, GetThingAnswer, ListThingsAnswer, VaultDB, WriteThingAnswer } from './vault-db'
+import { once } from 'es-toolkit'
+import { Errors, Validator } from 'safebyok-big/internals'
+import { type Lifetok, Labelpath } from '../shapes/primitives'
+import {
+  type BirthBankAsk, type CitedOf, type DelAskDraft, type GetAsk, type ListAsk, type LoggableAsk, type PutAskDraft, type Track, type Tracked, type WorldRecord, type WriteAsk,
+  delAskOf, getAskOf, listAskOf, putAskOf,
+} from '../shapes/shapes-asks'
+import type { BankAskDraft } from '../shapes/shapes-bankish'
+import { type BankRecord, type ThingRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
+import type { BankScope } from '../shapes/shapes-stamps'
+import { type DelOnceArgs, type PutOnceArgs, type ReceivingThing, type SortedVaultDBListener, type SortedVaultDBOpts, type ThingMaker, SortedVaultDBChecks } from '../shapes/shapes-sorted-vault-db'
+import { type ReadTc, type SeenThing, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
+import { BaseThing } from '../models/base-thing'
+import type { Adoptable } from '../models/thing'
+import * as Throwers from '../refusals/throwers'
+import { itemSeenOf } from './agerank'
+import { refusedAnswerOf } from './refused-answer'
+import { readTcNow } from './thing-classifier'
+import type { BirthBankAnswer, GetThingAnswer, Kids, ListThingsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
+import type { VaultDB } from './vault-db'
 
-// == [SortedVaultDB]: SortedVaultDBOpts, SortedVaultDB
+// == [SortedVaultDB]: Stamp, Listening, SortedVaultDB
 
-/** Options for {@link SortedVaultDB.make}. */
-export interface SortedVaultDBOpts {
-  /** The vaultDB to wrap. */
-  vaultDB: VaultDB
-}
+/** Who dispatched a record, when it was read, and its bank's lifetok where known: every event of it carries all three. */
+type Stamp = Readonly<{ sourcelabel: string, read_tc: ReadTc, banktok: Lifetok | undefined }>
 
-// Each verb hands what it is given to the vaultDB it wraps, which checks it, and answers a refusal rather than throwing.
-/** A vaultDB that passes each verb and each watch straight through to the vaultDB it wraps. */
-export class SortedVaultDB implements VaultDB {
-  // == [Props]: #vaultDB
+/** One call of `listen`, holding its listener: a listener that listens twice is told twice, and each end stops one. */
+type Listening = Readonly<{ listener: SortedVaultDBListener }>
+
+/** A vaultDB's four verbs over another vaultDB, for one bank, telling its listeners each record it learns of that is news, in order.
+ * It learns of the records each answer carries, of what the wrapped vaultDB's watch notifies, and of the events a device database rings, handed to its `receive`.
+ * It keeps a Thing for each labelpath it learns of a record at, for as long as it lives, and each Thing's `receive` says what is news.
+ * It builds the bank's asks, and its once verbs send them, each answering only once its records have been told.
+ * It watches the wrapped vaultDB from when it is made until its `sweep`. A record it learns of while no one listens is
+ * taken all the same, and reaches no one, then or later: listen before asking it anything.
+ */
+export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> implements Omit<VaultDB, 'watch'> {
+  // == [Props]: VaultDBSourcelabel, #vaultDB, #scope, #makeThing, #things, #listenings, #newestBanktok, #unwatchWrapped
+
+  /** The `sourcelabel` of each event of a record from the wrapped vaultDB, from an answer or its watch. */
+  static get VaultDBSourcelabel(): 'vault_db' { return 'vault_db' }
 
   /** The wrapped vaultDB. */
   readonly #vaultDB: VaultDB
+  /** The bank this vaultDB serves. */
+  readonly #scope: BankScope
+  readonly #makeThing: ThingMaker<ThingT>
+  /** The Thing at each labelpath a record was learned of at. */
+  readonly #things = new Map<Labelpath, ThingT>()
+  readonly #listenings = new Set<Listening>()
+  /** The `banktok` of the newest answer that read the bank, for a notice or an event rung that carries none. */
+  #newestBanktok: Lifetok | undefined = undefined
+  /** The stop of the wrapped vaultDB's watch, which runs once. */
+  readonly #unwatchWrapped: () => void
   // --
 
   // == [Construction]: make, constructor
 
-  /** Wrap `opts.vaultDB`, asking and watching nothing yet. */
-  static make(opts: SortedVaultDBOpts): SortedVaultDB { return new SortedVaultDB(opts) }
+  /** Wrap `opts.vaultDB` for the bank at `scope`, and start watching it. */
+  static make<ThingT extends ReceivingThing>(scope: BankScope, opts: SortedVaultDBOpts<ThingT>): SortedVaultDB<ThingT> { return new SortedVaultDB(scope, opts) }
 
-  private constructor(opts: SortedVaultDBOpts) {
-    const { vaultDB } = Checks.sortedVaultDBOpts.parse(opts)
-    this.#vaultDB = vaultDB
+  private constructor(scope: BankScope, opts: SortedVaultDBOpts<ThingT>) {
+    const { scope: bankScope, opts: { vaultDB } } = SortedVaultDBChecks.makeArgs.parse({ scope, opts })
+    this.#vaultDB   = vaultDB
+    this.#scope     = Object.freeze({ userid: bankScope.userid, banklabel: bankScope.banklabel })
+    this.#makeThing = opts.makeThing
+    this.#unwatchWrapped = once(vaultDB.watch(bankScope, (notice) => { this.#tellNotice(notice) }, (news) => { this.#tellBadNews(news) }))
     Object.freeze(this)
   }
   // --
 
-  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, watch
+  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank
+  // Each verb hands what it is given to the wrapped vaultDB, which checks it and answers a refusal rather than throwing, and
+  // returns that answer unchanged. The records it carries are told first, out to in, at the answer's read_tc.
 
-  /** {@link VaultDB.tryGetThing}, passed to the wrapped vaultDB. */
-  async tryGetThing(ask: GetAsk): Promise<GetThingAnswer> { return await this.#vaultDB.tryGetThing(ask) }
+  /** {@link VaultDB.tryGetThing}: a get that finds nothing tells the shell its answer carries. */
+  async tryGetThing(ask: GetAsk): Promise<GetThingAnswer> {
+    const answer = await this.#vaultDB.tryGetThing(ask)
+    if (! this.#isOwnBank(answer.ask)) { return answer }
+    this.#tellAnswer(answer, [...rootsOf(answer), ...gotRecordsOf(answer)])
+    return answer
+  }
 
-  /** {@link VaultDB.tryWriteThing}, passed to the wrapped vaultDB. */
-  async tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer> { return await this.#vaultDB.tryWriteThing(ask) }
+  /** {@link VaultDB.tryWriteThing}: a write refused over nothing stored tells the shell its answer carries. */
+  async tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer> {
+    const answer = await this.#vaultDB.tryWriteThing(ask)
+    if (! this.#isOwnBank(answer.ask)) { return answer }
+    this.#tellAnswer(answer, [...rootsOf(answer), ...writtenRecordsOf(answer)])
+    return answer
+  }
 
-  /** {@link VaultDB.tryListThings}, passed to the wrapped vaultDB. */
-  async tryListThings(ask: ListAsk): Promise<ListThingsAnswer> { return await this.#vaultDB.tryListThings(ask) }
+  /** {@link VaultDB.tryListThings}: the parent and each Thing listed are told sparse, in labelpath order. */
+  async tryListThings(ask: ListAsk): Promise<ListThingsAnswer> {
+    const answer = await this.#vaultDB.tryListThings(ask)
+    if (! this.#isOwnBank(answer.ask)) { return answer }
+    this.#tellAnswer(answer, [...rootsOf(answer), ...answer.parentage, ...answer.deltas])
+    return answer
+  }
 
-  /** {@link VaultDB.tryBirthBank}, passed to the wrapped vaultDB. */
-  async tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer> { return await this.#vaultDB.tryBirthBank(ask) }
+  /** {@link VaultDB.tryBirthBank} */
+  async tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer> {
+    const answer = await this.#vaultDB.tryBirthBank(ask)
+    if (! this.#isOwnBank(answer.ask)) { return answer }
+    this.#tellAnswer(answer, [...rootsOf(answer), ...bornRecordsOf(answer)])
+    return answer
+  }
 
-  /** {@link VaultDB.watch}, passed to the wrapped vaultDB with the caller's own handlers. */
-  watch(scope: ThingWatchScope, onNotice: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void): () => void { return this.#vaultDB.watch(scope, onNotice, onBadNews) }
+  // --
+
+  // == [Once verbs]: tryGetOnce, getOnce, tryListOnce, listOnce, tryPutOnce, putOnce, tryDelOnce, delOnce
+  // Each sends the wrapped vaultDB one ask of this bank's, and answers once the records the answer carries are told. Each
+  // `try` form answers the vaultDB's whole answer, a refusal included; the other throws the refusal.
+
+  /** Get the Thing at `scoped`, of this bank, once. */
+  async tryGetOnce(scoped: ThingScope): Promise<GetThingAnswer> {
+    let ask: GetAsk
+    try { ask = this.makeGetAsk({ labelpath: this.#labelpathOf(scoped), ifAbsent: 'nil' }) } catch (err) { return refusedAnswerOf(scoped, err) }
+    return await this.tryGetThing(ask)
+  }
+
+  /** Get the Thing at `scoped`, of this bank, once, resolving the record it then holds: live, a tombstone or the shell, the Thing's own frozen object.
+   * Refuses `stale_read` where the Thing is known only sparse in its newest life, as where storage answers an earlier one. Call `thingAt` for the Thing.
+   */
+  async getOnce(scoped: ThingScope): Promise<ReturnType<ThingT['pickle']>> {
+    const answer = await this.tryGetOnce(scoped)
+    if (! answer.ok) { throw answer.err }
+    // A record told that fails its checks leaves no Thing: it went to onBadNews.
+    const thing = this.thingAt(scoped)
+    if (thing === undefined) { throw Throwers.storageIssue() }
+    if (thing.agekind === 'bare') { throw Throwers.boxSoonestBare(this.#labelpathOf(scoped)) }
+    return thing.pickle() as ReturnType<ThingT['pickle']>
+  }
+
+  /** List the children of the Thing at `labelpath` once. A parent deleted or never stored lists none. A child stored damaged is told to each listener's `onBadNews`. */
+  async tryListOnce(labelpath: Labelpath): Promise<ListThingsAnswer> {
+    const ask    = this.makeListAsk({ labelpath, ifAbsent: 'nil' })
+    const answer = await this.tryListThings(ask)
+    if (answer.damaged_rows.length > 0) { this.#tellBadNews(Throwers.childrenStoredDamaged(ask, answer.damaged_rows)) }
+    return answer
+  }
+
+  /** List the children of the Thing at `labelpath` once, as {@link tryListOnce} does, resolving the listing. */
+  async listOnce(labelpath: Labelpath): Promise<Kids> {
+    const answer = await this.tryListOnce(labelpath)
+    if (! answer.ok) { throw answer.err }
+    return answer.val
+  }
+
+  /** Write `args.record` over `args.cited` once. */
+  async tryPutOnce<RecordT extends ThingRecord>(args: PutOnceArgs<RecordT>): Promise<WriteThingAnswer> {
+    let ask: WriteAsk<RecordT>
+    try { ask = this.makePutAsk<RecordT>({ ...args, cited: args.cited ?? this.#citableAt(args.record) }) } catch (err) { return refusedAnswerOf(args, err) }
+    return await this.tryWriteThing(ask)
+  }
+
+  /** Write `args.record` over `args.cited` once, resolving the record the vaultDB reports stored. */
+  async putOnce<RecordT extends ThingRecord>(args: PutOnceArgs<RecordT>): Promise<RecordT> {
+    const answer = await this.tryPutOnce(args)
+    if (! answer.ok) { throw answer.err }
+    // The ask's modelkind is the record's, which the vaultDB checks what it answers against.
+    return answer.val as RecordT
+  }
+
+  /** Write the tombstone `args.record` over `args.cited` once. */
+  async tryDelOnce<RecordT extends ThingRecord>(args: DelOnceArgs<RecordT>): Promise<WriteThingAnswer> {
+    let ask: WriteAsk<RecordT>
+    try { ask = this.makeDelAsk<RecordT>({ ...args, cited: args.cited ?? this.#citableAt(args.record) }) } catch (err) { return refusedAnswerOf(args, err) }
+    return await this.tryWriteThing(ask)
+  }
+
+  /** Write the tombstone `args.record` over `args.cited` once, resolving the tombstone the vaultDB reports stored. */
+  async delOnce<RecordT extends ThingRecord>(args: DelOnceArgs<RecordT>): Promise<RecordT> {
+    const answer = await this.tryDelOnce(args)
+    if (! answer.ok) { throw answer.err }
+    // The ask's modelkind is the record's, which the vaultDB checks what it answers against.
+    return answer.val as RecordT
+  }
+
+  // Where no Thing is kept at its labelpath, the cited is left out, and the vaultDB refuses the ask.
+  /** The citable of the Thing kept at `record`'s labelpath, as a write of `record` cites it */
+  #citableAt<RecordT extends ThingRecord>(record: RecordT): CitedOf<RecordT> {
+    return this.thingAt(record)?.citable as CitedOf<RecordT>
+  }
+
+  /** The labelpath of `scoped`, refusing a scope of another bank */
+  #labelpathOf(scoped: ThingScope): Labelpath { return ThingChecks.thingScope.parseConsistent(scoped, this.#scope).labelpath }
+  // --
+
+  // == [Asks]: makeGetAsk, makeListAsk, makePutAsk, makeDelAsk, knownRoots, #bankFields
+  // Each fills in the modelkind and default flags `getAskOf` and the rest give it, and the verb checks the rest. A bank
+  // not yet heard of live, as at sign-in or before a birth, has asks with no banktok, and with no track until its roots are.
+
+  /** The get ask for the Thing at `draft.labelpath` in this bank. */
+  makeGetAsk(draft: BankAskDraft): GetAsk { return getAskOf({ ...draft, ...this.#scope, ...this.#bankFields() }) }
+
+  /** The list ask for the children of the Thing at `draft.labelpath` in this bank. */
+  makeListAsk(draft: BankAskDraft): ListAsk { return listAskOf({ ...draft, ...this.#scope, ...this.#bankFields() }) }
+
+  /** The put ask writing `draft.record` over `draft.cited`, in this bank. */
+  makePutAsk<RecordT extends ThingRecord>(draft: Omit<PutAskDraft<RecordT>, 'track' | 'banktok'>): WriteAsk<RecordT> {
+    return { ...putAskOf<RecordT>({ ...draft, ...this.#bankFields() }), ...this.#scope }
+  }
+
+  /** The del ask writing the tombstone `draft.record` over `draft.cited`, in this bank. */
+  makeDelAsk<RecordT extends ThingRecord>(draft: Omit<DelAskDraft<RecordT>, 'track' | 'banktok'>): WriteAsk<RecordT> {
+    return { ...delAskOf<RecordT>({ ...draft, ...this.#bankFields() }), ...this.#scope }
+  }
+
+  // A root known newer only sparse is given at its older whole record, so that the answer sends it whole.
+  // The shell is no revision stored, and a track cannot name it.
+  /** The roots this bank's asks track: the revision of the whole record each root's Thing holds, or undefined until all three hold one stored. */
+  get knownRoots(): Track | undefined {
+    const [bank, gate, root] = RootLabelpaths.map((labelpath) => this.#things.get(labelpath)?.pickle())
+    if (! (isStored(bank) && isStored(gate) && isStored(root))) { return undefined }
+    return { bank: trackPairOf(bank), [Labelpath.MainGate]: trackPairOf(gate), [Labelpath.RootBox]: trackPairOf(root) }
+  }
+
+  /** The `banktok` and `track` of this bank's asks, each left out where unknown: the lifetok of the bank's Thing while it holds a live record, and its {@link knownRoots}. */
+  #bankFields(): { banktok?: Lifetok, track?: Track } {
+    const bank = this.#things.get('bank')?.pickle()
+    // The record held at the bank's labelpath is a bank's: the vaultDB checked it as one.
+    const banktok = (bank?.am === 'a') ? (bank as BankRecord).lifetok : undefined
+    const track   = this.knownRoots
+    return { ...((banktok !== undefined) && { banktok }), ...((track !== undefined) && { track }) }
+  }
+  // --
+
+  // == [Listening]: listen
+
+  /** Tell `listener` each event of this bank's records that is news, and of trouble, until the function it returns is called.
+   * - Each event is a {@link VaultEvent} with its `sourcelabel`, `read_tc` and `banktok`. An answer's events carry the
+   *   answer's `banktok`, or undefined where it is null; a notice's or an event rung's carry its own, else that of the
+   *   newest answer that read the bank.
+   * - The events of a verb's answer reach every listener, in order, before the verb resolves.
+   * - Of the records an answer carries, the bank comes first, then the main gate, the root box, a list's parent and the
+   *   Things it lists, and last the answer's own record.
+   * - A record no newer than one seen of its Thing is told to no one, unless it is the newest revision seen, read in a
+   *   later span of 65.536 seconds than that revision was last seen in.
+   * - What `hear` throws goes to the listener's own `onBadNews`.
+   */
+  listen(listener: SortedVaultDBListener): () => void {
+    SortedVaultDBChecks.listener.parse(listener)
+    const listening: Listening = Object.freeze({ listener })
+    this.#listenings.add(listening)
+    return () => { this.#listenings.delete(listening) }
+  }
+  // --
+
+  // == [Receiving]: receive
+
+  /** Take an event a device database rang, and tell every listener, before returning, the events of its `val` that are news, at its `sourcelabel`, `read_tc` and `banktok`.
+   * An `item` event's `val` is taken as an answer's record is, a void sentinel at the lifepath it carries.
+   * A `life` or `aged` event tells nothing, and its agerank is never read: the Thing at its labelpath keeps its own.
+   * Refuses an event of another bank.
+   */
+  receive(event: VaultEvent): void {
+    const rung = SortedVaultDBChecks.rungEvent.parse(event)
+    Validator.demandConsistent(rung, this.#scope)
+    if (event.eventkind !== 'item') { return }
+    const { liveness } = SortedVaultDBChecks.rungItem.parse(event)
+    if (liveness === 'void') { SortedVaultDBChecks.rungVoid.parseConsistent(event.val, rung) } else { SortedVaultDBChecks.rungThing.parseConsistent(event.val, rung) }
+    this.#tell([event.val], { sourcelabel: rung.sourcelabel, read_tc: rung.read_tc, banktok: rung.banktok ?? this.#newestBanktok })
+  }
+  // --
+
+  // == [Reading]: thingAt
+
+  /** The Thing at `scoped`, a labelpath of this vaultDB's bank, or undefined where no record of it has been learned of. The same object across records and lives. */
+  thingAt(scoped: ThingScope): ThingT | undefined {
+    const { labelpath } = ThingChecks.thingScope.parseConsistent(scoped, this.#scope)
+    return this.#things.get(labelpath)
+  }
+  // --
+
+  // == [Ending]: sweep
+
+  /** Stop watching the wrapped vaultDB, for good: what its watch notifies after reaches no one. A second call does nothing.
+   * Its answers still pass through, and their records are still told. What the wrapped vaultDB's stop throws is thrown.
+   */
+  sweep(): this {
+    this.#unwatchWrapped()
+    return this
+  }
+  // --
+
+  // == [Telling]: #isOwnBank, #tellAnswer, #tellNotice, #tell, #receiveAtThing, #tellBadNews
+
+  /** True when `scoped` is of this vaultDB's bank. */
+  #isOwnBank(scoped: LoggableAsk): boolean {
+    return (scoped.userid === this.#scope.userid) && (scoped.banklabel === this.#scope.banklabel)
+  }
+
+  /** Tell every listener the events of `seens`, the records `answer` carries, from the wrapped vaultDB at the answer's `read_tc` and `banktok`. */
+  #tellAnswer(answer: { banktok: Lifetok | null, read_tc: ReadTc }, seens: readonly SeenThing[]): void {
+    const banktok = answer.banktok ?? undefined
+    if (banktok !== undefined) { this.#newestBanktok = banktok }
+    this.#tell(seens, { sourcelabel: SortedVaultDB.VaultDBSourcelabel, read_tc: answer.read_tc, banktok })
+  }
+
+  /** Tell every listener the events of the record in `notice`, a notice of the wrapped vaultDB's watch. */
+  #tellNotice(notice: VaultEvent): void {
+    if (notice.eventkind !== 'item') { return }
+    // The wrapped vaultDB stamps its notices when it classifies their records; one that does not is read now.
+    this.#tell([notice.val], { sourcelabel: SortedVaultDB.VaultDBSourcelabel, read_tc: notice.read_tc ?? readTcNow(), banktok: notice.banktok ?? this.#newestBanktok })
+  }
+
+  /** Tell every listener each event the Things return for `seens`, in order, each carrying `stamp`. A record refused goes to every listener's `onBadNews`. */
+  #tell(seens: readonly SeenThing[], stamp: Stamp): void {
+    for (const seen of seens) {
+      let events: readonly VaultEvent[]
+      try { events = this.#receiveAtThing(seen, stamp) } catch (err) { this.#tellBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)); continue }
+      for (const event of events) {
+        for (const { listener } of this.#listenings) {
+          // A listener whose hear throws has a bug in the host's code, not trouble in storage.
+          try { listener.hear(event) } catch (err) { listener.onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
+        }
+      }
+    }
+  }
+
+  // A Thing is kept only once it has received its first record, so a refused record leaves no Thing behind.
+  /** The events the Thing at `seen`'s labelpath returns for `seen` at `stamp`, the Thing made first where there is none */
+  #receiveAtThing(seen: SeenThing, stamp: Stamp): readonly VaultEvent[] {
+    const { labelpath } = SeenChecks.seenCited.parseConsistent(seen, this.#scope)
+    const proposed = Object.freeze({
+      eventkind: 'item', ...this.#scope, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: undefined, agerankWas: undefined, ...stamp, ...itemSeenOf(seen),
+    } as const)
+    const thing  = this.#things.get(labelpath) ?? this.#makeThing(seen)
+    const events = thing.receive(proposed)
+    this.#things.set(labelpath, thing)
+    return events
+  }
+
+  /** Tell `news` to every listener's `onBadNews`. */
+  #tellBadNews(news: Errors.VaultError): void {
+    for (const { listener } of this.#listenings) { listener.onBadNews(news) }
+  }
   // --
 }
 // --
 
-// == [Checks]: Checks
+// == [Roots]: RootLabelpaths, isStored, trackPairOf
 
-/** The check of {@link SortedVaultDB.make}'s options. */
-const Checks = Validator.Checkers('bad_record', ({ obj }) => ({
-  sortedVaultDBOpts: obj({ vaultDB: ThingChecks.vaultDBShape }),
-}))
+/** The labelpaths of a bank's roots, the bank first and the root box last. */
+const RootLabelpaths = ['bank', Labelpath.MainGate, Labelpath.RootBox] as const
+
+/** True of a record held that was stored: neither none nor the void sentinel */
+function isStored(record: Adoptable<ThingRecord> | undefined): record is ThingRecord { return (record !== undefined) && ! BaseThing.isVoidSentinel(record) }
+
+/** The revseq and lifepath of `record`: the pair a `track` has. */
+function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
+// --
+
+// == [Records of an answer]: rootsOf, bankOfWorld, gotRecordsOf, writtenRecordsOf, bornRecordsOf
+
+// The world and tracked of one step agree, so a root they both carry is told once: its Thing drops the second.
+// Unspecified for a missing or damaged row: notes/wontfix.md.
+/** The roots `answer` carries: its world's bank and main gate, then each root its `tracked` reports other than `'same'`, the bank first and the root box last. */
+function rootsOf({ world, tracked }: { world: WorldRecord | null, tracked?: Tracked }): ThingRecord[] {
+  const worldRoots   = (world === null) ? [] : [bankOfWorld(world), world.maingate]
+  const trackedRoots = (tracked === undefined) ? [] : [tracked.bank, tracked[Labelpath.MainGate], tracked[Labelpath.RootBox]]
+  return [...worldRoots, ...trackedRoots.filter((root) => root !== 'same')]
+}
+
+/** The bank record of `world`, without its main gate. */
+function bankOfWorld(world: WorldRecord): ThingRecord {
+  const { maingate: _maingate, ...bank } = world
+  return bank
+}
+
+/** The record a get's `answer` carries of its own Thing: the live Thing, the tombstone or shell, or a refusal's dbhas, none where the verb threw. */
+function gotRecordsOf(answer: GetThingAnswer): SeenThing[] {
+  if (! answer.ok) { return (answer.dbhas === null) ? [] : [answer.dbhas] }
+  return (answer.act === 'gotlive') ? [answer.val] : [answer.dbhas]
+}
+
+/** The record a write's `answer` carries of its own Thing: the Thing written or found, or a refusal's dbhas, the shell where none is stored, none where the verb threw. */
+function writtenRecordsOf(answer: WriteThingAnswer): SeenThing[] {
+  if (answer.ok) { return [answer.val] }
+  return (answer.dbhas === null) ? [] : [answer.dbhas]
+}
+
+/** The records a birth's `answer` carries of its own: the three roots, or a refusal's dbhas, none where the verb threw. */
+function bornRecordsOf(answer: BirthBankAnswer): SeenThing[] {
+  if (answer.ok) { return [answer.val.bank, answer.val.gate, answer.val.root] }
+  return (answer.dbhas === null) ? [] : [answer.dbhas]
+}
 // --

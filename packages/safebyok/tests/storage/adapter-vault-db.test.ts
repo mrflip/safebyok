@@ -1,28 +1,33 @@
 import { describe, expect, it } from 'vitest'
 import { type EX, Errors } from 'safebyok-big/internals'
 import { AnswerNotMade } from '../../src/phrases'
-import { AdapterVaultDB, type Received } from '../../src/storage/adapter-vault-db'
+import { AdapterVaultDB } from '../../src/storage/adapter-vault-db'
+import type { Actual, BirthBankActual, GotActual, ListThingsActual, Received } from '../../src/shapes/shapes-answers'
 import type { BirthBankAsk, GetAsk, ListAsk, ThingWatchScope, WriteAsk } from '../../src/shapes/shapes-asks'
 import { Thing } from '../../src/models/thing'
-import type { Actual, BirthBankActual, ListThingsActual } from '../../src/storage/vault-db'
+import { Shell } from '../../src/shapes/shapes-thing'
 import type { VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
 import * as Throwers from '../../src/refusals/throwers'
+import { readTcNow } from '../../src/storage/thing-classifier'
 import * as TH from '../test-helpers'
 
-/** A concrete adapter whose every step does what the test hands it: throws, or reports what it is given. */
+/** A concrete adapter whose every step does what the test hands it: throws, or reports what it is given, with a null `tracked` and a `read_tc` made now unless it gives them. */
 class ScriptedVaultDB extends AdapterVaultDB {
   receive: ((received: Received) => void) | null = null
-  readonly step: () => Actual<EX.GoodAct>
+  readonly step: () => object
 
-  constructor(step: () => Actual<EX.GoodAct>) {
+  constructor(step: () => object) {
     super()
     this.step = step
   }
 
-  protected doGetThing(_ask: GetAsk): Actual<EX.GotAct> { return this.step() as Actual<EX.GotAct> }
-  protected doWriteThing(_ask: WriteAsk): Actual<EX.PutAct | EX.DelAct> { return this.step() as Actual<EX.PutAct | EX.DelAct> }
-  protected doListThings(_ask: ListAsk): ListThingsActual { return this.step() as unknown as ListThingsActual }
-  protected doBirthBank(_ask: BirthBankAsk): BirthBankActual { return this.step() as unknown as BirthBankActual }
+  /** What the step reports, with a null `tracked` and a `read_tc` made now unless it gives them. */
+  #report(): unknown { return { tracked: null, read_tc: readTcNow(), ...this.step() } }
+
+  protected doGetThing(_ask: GetAsk): GotActual { return this.#report() as GotActual }
+  protected doWriteThing(_ask: WriteAsk): Actual<EX.PutAct | EX.DelAct> { return this.#report() as Actual<EX.PutAct | EX.DelAct> }
+  protected doListThings(_ask: ListAsk): ListThingsActual { return this.#report() as ListThingsActual }
+  protected doBirthBank(_ask: BirthBankAsk): BirthBankActual { return this.#report() as BirthBankActual }
   protected override doWatch(_scope: ThingWatchScope, receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void {
     this.receive = receive
     return () => { this.receive = null }
@@ -30,9 +35,9 @@ class ScriptedVaultDB extends AdapterVaultDB {
 }
 
 /** The records of the notices a watcher of the test bank gets over `vaultDB`. */
-function noticedRecordsOver(vaultDB: ScriptedVaultDB): VaultItemEvent['record'][] {
-  const noticedRecords: VaultItemEvent['record'][] = []
-  vaultDB.watch(TH.ThingBank, (event) => { if (event.eventkind === 'item') { noticedRecords.push(event.record) } }, () => undefined)
+function noticedRecordsOver(vaultDB: ScriptedVaultDB): VaultItemEvent['val'][] {
+  const noticedRecords: VaultItemEvent['val'][] = []
+  vaultDB.watch(TH.ThingBank, (event) => { if (event.eventkind === 'item') { noticedRecords.push(event.val) } }, () => undefined)
   return noticedRecords
 }
 
@@ -73,12 +78,12 @@ describe("AdapterVaultDB, a step that throws", () => {
     expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing' })
   })
 
-  it("answers a listing that throws with no children, no parentage, no deltas, no damaged rows and no read_tc", async () => {
+  it("answers a listing that throws with no children, no parentage, no deltas, no damaged rows, and a read_tc of when it was refused", async () => {
     const vaultDB = new ScriptedVaultDB(() => { throw new Error('connection reset') })
     const answer = await vaultDB.tryListThings(TH.listAskAt('box'))
     await TH.expectBad(Promise.resolve(answer), 'storage_unavailable')
     expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', dbhas: null, parentage: [], deltas: [], damaged_rows: [] })
-    expect(answer).not.to.have.property('read_tc')
+    expect(answer.read_tc).to.match(TH.ReadTcPattern)
   })
 
   it("answers a bank's birth that throws with its verb", async () => {
@@ -99,9 +104,16 @@ describe("AdapterVaultDB, a step that throws", () => {
 })
 
 describe("AdapterVaultDB.tryGetThing(ask), a store that reports oddly", () => {
-  it("refuses a good get that reports no Thing, other than gotvoid, as a broken store", async () => {
-    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotlive', world: null, record: null }))
-    await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
+  it("refuses a good get that reports no record, gotvoid's void sentinel included, as a broken store", async () => {
+    for (const act of ['gotlive', 'gotgone', 'gotvoid'] as const) {
+      const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act, world: null, record: null }))
+      await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
+    }
+  })
+
+  it("answers gotvoid with the void sentinel a concrete adapter reports as its dbhas", async () => {
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: Shell.of(TH.GateScope) }))
+    expect(await vaultDB.tryGetThing(TH.getGateAskOf())).to.deep.include({ ok: true, act: 'gotvoid', val: null, dbhas: Shell.of(TH.GateScope) })
   })
 })
 
@@ -109,6 +121,70 @@ describe("AdapterVaultDB.tryWriteThing(ask), a store that reports oddly", () => 
   it("refuses a good write that reports no Thing as a broken store", async () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'born', world: null, record: null }))
     await TH.expectBad(vaultDB.tryWriteThing(TH.birthAskOf()), 'storage_issue')
+  })
+})
+
+describe("AdapterVaultDB, the read_tc of an answer", () => {
+  it("answers the read_tc a concrete adapter reports, good or refused, from a get, a write or a birth", async () => {
+    const read_tc = readTcNow()
+    const reports = [{ ok: true, act: 'gotvoid', world: null, read_tc, record: Shell.of(TH.GateScope) }, { ok: false, act: 'stale', world: null, read_tc, record: TH.gateThingOf() }] as const
+    for (const report of reports) {
+      const vaultDB = new ScriptedVaultDB(() => report)
+      expect(await vaultDB.tryGetThing(TH.getGateAskOf())).to.deep.include({ read_tc })
+    }
+    const refusing = new ScriptedVaultDB(() => reports[1])
+    expect(await refusing.tryWriteThing(TH.birthAskOf())).to.deep.include({ read_tc })
+    expect(await refusing.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ read_tc })
+  })
+
+  it("refuses, as a broken store, a report from a get, a write, a list or a birth with no read_tc, or one that is no UUID version 7", async () => {
+    for (const read_tc of [undefined, crypto.randomUUID(), readTcNow().toUpperCase(), 7]) {
+      const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, read_tc, record: Shell.of(TH.GateScope) }))
+      const listing = new ScriptedVaultDB(() => ({ ok: false, act: 'gone', world: null, read_tc, parentage: [], deltas: [], damaged_rows: [] }))
+      await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
+      await TH.expectBad(vaultDB.tryWriteThing(TH.birthAskOf()), 'storage_issue')
+      await TH.expectBad(listing.tryListThings(TH.listAskAt('box')), 'storage_issue')
+      await TH.expectBad(vaultDB.tryBirthBank(TH.birthBankAskOf()), 'storage_issue')
+    }
+  })
+
+  it("answers a listing's read_tc as its Kids value's own", async () => {
+    const read_tc = readTcNow()
+    const kids    = { modelkind: 'kids', parentpath: 'box', parentlife: TH.rootBoxOf().lifepath, items: {}, gones: {} }
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotlive', world: null, read_tc, kids, parentage: [], deltas: [], damaged_rows: [] }))
+    expect(await vaultDB.tryListThings(TH.listAskAt('box'))).to.deep.include({ read_tc, val: { ...kids, read_tc } })
+  })
+
+  it("refuses, as a broken store, a report whose world or tracked is neither null nor an object", async () => {
+    for (const report of [{ world: 'a world' }, { tracked: undefined }, { tracked: 'same' }]) {
+      const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: Shell.of(TH.GateScope), ...report }))
+      await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
+    }
+  })
+})
+
+describe("AdapterVaultDB, the banktok of an answer", () => {
+  it("answers the lifetok of the bank in the world a concrete adapter reports, good or refused, from a get, a write, a list or a birth", async () => {
+    const world   = { ...TH.bankThingOf(), lifetok: TH.OtherLifetok, maingate: TH.gateThingOf() }
+    const refused = { ok: false, act: 'stale', world, record: TH.gateThingOf() } as const
+    const vaultDB = new ScriptedVaultDB(() => refused)
+    const listing = new ScriptedVaultDB(() => ({ ...refused, parentage: [], deltas: [], damaged_rows: [] }))
+    const good    = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world, record: Shell.of(TH.GateScope) }))
+    const answers = [
+      await vaultDB.tryGetThing(TH.getGateAskOf()), await vaultDB.tryWriteThing(TH.birthAskOf()), await listing.tryListThings(TH.listAskAt('box')),
+      await vaultDB.tryBirthBank(TH.birthBankAskOf()), await good.tryGetThing(TH.getGateAskOf()),
+    ]
+    expect(answers.map((answer) => answer.banktok)).to.deep.equal(Array.from({ length: 5 }, () => TH.OtherLifetok))
+  })
+
+  it("answers a null banktok where a concrete adapter reports no world, and where the verb throws", async () => {
+    const worldless = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: Shell.of(TH.GateScope) }))
+    const throwing  = new ScriptedVaultDB(() => { throw new Error('connection reset') })
+    const answers   = [
+      await worldless.tryGetThing(TH.getGateAskOf()), await throwing.tryGetThing(TH.getGateAskOf()), await throwing.tryListThings(TH.listAskAt('box')),
+      await throwing.tryBirthBank(TH.birthBankAskOf()),
+    ]
+    expect(answers.map((answer) => answer.banktok)).to.deep.equal([null, null, null, null])
   })
 })
 
@@ -121,7 +197,7 @@ describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
     vaultDB.receive?.({ record: { ...TH.gateThingOf(), wayins: {} }, world: null })
     vaultDB.receive?.({ record: 'not a Thing', world: null })
     vaultDB.receive?.({ record: TH.gateThingOf(), world: null })
-    expect(events).to.deep.equal([TH.itemEventOf(TH.gateThingOf())])
+    expect(TH.maskedReadTcsOf(events)).to.deep.equal([TH.itemEventOf(TH.gateThingOf())])
     expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['damaged_row', 'storage_issue'])
   })
 
@@ -132,8 +208,21 @@ describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
     vaultDB.watch(TH.ThingBank, (event) => { events.push(event) }, (news) => { badNews.push(news) })
     vaultDB.receive?.({ record: TH.boxThingOf(), world: { ...TH.bankThingOf(), maingate: TH.gateThingOf() } })
     vaultDB.receive?.({ record: TH.boxThingOf('anthropic'), world: { ...TH.bankThingOf(), maingate: TH.gateThingOf({ wayins: {} as never }) } })
-    expect(events).to.deep.equal([TH.boxThingOf(), TH.boxThingOf('anthropic')].map((box) => TH.itemEventOf(box)))
+    expect(TH.maskedReadTcsOf(events)).to.deep.equal([TH.boxThingOf(), TH.boxThingOf('anthropic')].map((box) => TH.itemEventOf(box, TH.bankThingOf().lifetok)))
+    const read_tcs = events.map((event) => event.read_tc ?? '')
+    expect(read_tcs.toSorted((one, two) => one.localeCompare(two)), 'a later notice is read later').to.deep.equal(read_tcs)
     expect(badNews).to.deep.equal([])
+  })
+
+  it("notifies with the bank's lifetok where the bank is the Thing itself or beside it, and none where neither is", () => {
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
+    const events: VaultEvent[] = []
+    vaultDB.watch(TH.ThingBank, (event) => { events.push(event) }, () => undefined)
+    const otherLifetok = crypto.randomUUID()
+    vaultDB.receive?.({ record: TH.bankThingOf({ lifetok: otherLifetok }), world: null })
+    vaultDB.receive?.({ record: TH.boxThingOf(), world: { ...TH.bankThingOf(), maingate: TH.gateThingOf() } })
+    vaultDB.receive?.({ record: TH.boxThingOf(), world: null })
+    expect(events.map((event) => event.banktok)).to.deep.equal([otherLifetok, TH.bankThingOf().lifetok, undefined])
   })
 
   it("sends a Thing of another bank to onBadNews, not to onNotice", () => {
@@ -163,74 +252,31 @@ describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
 })
 
 describe("AdapterVaultDB, what a watcher is notified of from a verb's answer", () => {
-  it("notifies of a refused get's, write's or birth's dbhas once, before the verb answers", async () => {
-    const vaultDB = new ScriptedVaultDB(() => ({ ok: false, act: 'stale', world: null, record: TH.gateThingOf() }))
-    const noticedRecords = noticedRecordsOver(vaultDB)
-    await vaultDB.tryGetThing(TH.getGateAskOf())
-    expect(noticedRecords).to.deep.equal([TH.gateThingOf()])
-    await vaultDB.tryWriteThing(TH.birthAskOf())
-    expect(noticedRecords).to.have.lengthOf(2)
-    await vaultDB.tryBirthBank(TH.birthBankAskOf())
-    expect(noticedRecords).to.deep.equal([TH.gateThingOf(), TH.gateThingOf(), TH.gateThingOf()])
-  })
-
-  it("notifies every watcher of the bank of a dbhas, each with a copy of its own, or sends each one's onBadNews a dbhas that fails its checks", async () => {
-    const dbhases: unknown[] = [TH.gateThingOf(), { ...TH.gateThingOf(), revseq: 'nine' }]
-    const vaultDB = new ScriptedVaultDB(() => ({ ok: false, act: 'stale', world: null, record: dbhases.shift() }) as never)
-    const watches = [1, 2].map(() => {
-      const watch = { events: [] as VaultEvent[], badNews: [] as Errors.VaultError[] }
-      vaultDB.watch(TH.ThingBank, (event) => { watch.events.push(event) }, (news) => { watch.badNews.push(news) })
-      return watch
-    })
-    const elsewhere: unknown[] = []
-    vaultDB.watch({ ...TH.ThingBank, banklabel: 'other' }, (event) => { elsewhere.push(event) }, (news) => { elsewhere.push(news) })
-    await vaultDB.tryGetThing(TH.getGateAskOf())
-    await vaultDB.tryGetThing(TH.getGateAskOf())
-    for (const { events, badNews } of watches) {
-      expect(events).to.deep.equal([TH.itemEventOf(TH.gateThingOf())])
-      expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['damaged_row'])
-    }
-    expect((watches[0]!.events[0] as VaultItemEvent).record).not.to.equal((watches[1]!.events[0] as VaultItemEvent).record)
-    expect(elsewhere).to.deep.equal([])
-  })
-
-  it("notifies of the dbhas a thrown refusal carries once, from a get, a write or a birth", async () => {
-    const vaultDB = new ScriptedVaultDB(() => { throw Throwers.gateIssue(TH.gateThingOf(), 'a test') })
-    const noticedRecords = noticedRecordsOver(vaultDB)
-    await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'gate_issue')
-    await TH.expectBad(vaultDB.tryWriteThing(TH.birthAskOf()), 'gate_issue')
-    await TH.expectBad(vaultDB.tryBirthBank(TH.birthBankAskOf()), 'gate_issue')
-    expect(noticedRecords).to.deep.equal([TH.gateThingOf(), TH.gateThingOf(), TH.gateThingOf()])
-  })
-
-  it("notifies of nothing for a good write's val, a null dbhas, or a throw that carries none, and only of the parentage of a refused listing", async () => {
-    const steps: (() => Actual<EX.GoodAct>)[] = [
+  it("notifies of nothing an answer carries: a refusal's dbhas, a thrown refusal's, a good write's val, or a listing's parentage and deltas", async () => {
+    const parentage = [Thing.sparseOf(TH.rootBoxOf())]
+    const deltas    = [Thing.sparseOf(TH.boxThingOf('anthropic')), Thing.sparseOf(TH.boxThingOf('openai'))]
+    const kids      = { modelkind: 'kids', parentpath: 'box', parentlife: TH.rootBoxOf().lifepath, items: {}, gones: {} }
+    const steps: (() => unknown)[] = [
+      () => ({ ok: false, act: 'stale', world: null, record: TH.gateThingOf() }),
       () => ({ ok: true, act: 'born', world: null, record: TH.gateThingOf() }),
-      () => ({ ok: false, act: 'stale', world: null, record: null }),
-      () => { throw new Error('connection reset') },
+      () => { throw Throwers.gateIssue(TH.gateThingOf(), 'a test') },
     ]
     for (const step of steps) {
-      const vaultDB = new ScriptedVaultDB(step)
+      const vaultDB = new ScriptedVaultDB(step as () => object)
       const noticedRecords = noticedRecordsOver(vaultDB)
+      await vaultDB.tryGetThing(TH.getGateAskOf())
       await vaultDB.tryWriteThing(TH.birthAskOf())
+      await vaultDB.tryBirthBank(TH.birthBankAskOf())
       await TH.aWhile()
       expect(noticedRecords).to.deep.equal([])
     }
-    const parentage = [Thing.sparseOf(TH.rootBoxOf())]
-    const listing = new ScriptedVaultDB(() => ({ ok: false, act: 'gone', world: null, parentage, deltas: [], damaged_rows: [] }) as never)
-    const noticedRecords = noticedRecordsOver(listing)
-    expect(await listing.tryListThings(TH.listAskAt('box'))).to.deep.include({ ok: false, dbhas: [] })
-    await TH.aWhile()
-    expect(noticedRecords).to.deep.equal(parentage)
-  })
-
-  it("notifies of a good listing's parentage, then its deltas in labelpath order, before the listing answers", async () => {
-    const parentage      = [Thing.sparseOf(TH.rootBoxOf())]
-    const deltas         = [Thing.sparseOf(TH.boxThingOf('anthropic')), Thing.sparseOf(TH.boxThingOf('openai'))]
-    const kids           = { modelkind: 'kids', parentpath: 'box', parentlife: TH.rootBoxOf().lifepath, items: {}, gones: {}, read_tc: '' }
-    const vaultDB        = new ScriptedVaultDB(() => ({ ok: true, act: 'gotlive', world: null, kids, parentage, deltas, damaged_rows: [] }) as never)
-    const noticedRecords = noticedRecordsOver(vaultDB)
-    await vaultDB.tryListThings(TH.listAskAt('box'))
-    expect(noticedRecords).to.deep.equal([...parentage, ...deltas])
+    const listings = [{ ok: true, act: 'gotlive', world: null, kids, parentage, deltas, damaged_rows: [] }, { ok: false, act: 'gone', world: null, parentage, deltas: [], damaged_rows: [] }]
+    for (const listed of listings) {
+      const vaultDB = new ScriptedVaultDB(() => listed)
+      const noticedRecords = noticedRecordsOver(vaultDB)
+      await vaultDB.tryListThings(TH.listAskAt('box'))
+      await TH.aWhile()
+      expect(noticedRecords).to.deep.equal([])
+    }
   })
 })

@@ -22,11 +22,15 @@ describe("the front door, safebyok", () => {
     for (const [exportname, val] of Object.entries(Utils)) { expect(Front, exportname).to.have.property(exportname).that.eq(val) }
   })
 
-  it("exports the minder and the vault, which safebyok/core leaves out", () => {
-    expect(Front.VaultMinder).to.be.a('function')
+  it("exports the VaultTSQ and the vault, which safebyok/core leaves out", () => {
+    expect(Front.VaultTSQ).to.be.a('function')
     expect(Front.Vault).to.be.a('function')
-    expect(Core).to.not.have.property('VaultMinder')
+    expect(Core).to.not.have.property('VaultTSQ')
     expect(Core).to.not.have.property('Vault')
+  })
+
+  it("exports none of the old minders", () => {
+    for (const exportname of ['Minder', 'VaultMinder', 'BankMinder', 'newerThingOf', 'MinderChecks', 'MinderEventFormat']) { expect(Front, exportname).to.not.have.property(exportname) }
   })
 
   it("re-exports safebyok-big's refusals, its sanitizer and logger, the very ones the core throws and logs with", () => {

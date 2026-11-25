@@ -60,7 +60,7 @@ async function rowOf(title: string): Promise<HTMLElement> { return await screen.
 function valInputOf(row: HTMLElement, title: string): HTMLInputElement { return within(row).getByLabelText<HTMLInputElement>(`Value of ${title}`) }
 
 /** Sign in as Hue. */
-async function signIn(): Promise<void> {
+async function signin(): Promise<void> {
   fireEvent.change(await screen.findByLabelText('Username'), { target: { value: 'hue' } })
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 }
@@ -91,7 +91,7 @@ async function addEnv(title: string, val: string, lastRotatedDay = ''): Promise<
 /** A new user, signed in, with a vault and two secrets added, the database URL last rotated long ago: the page that did it. */
 async function loadWithEnvs() {
   const page = await loadPage()
-  await signIn()
+  await signin()
   await createVault()
   await addEnv('OPENAI_API_KEY', OpenaiKey)
   await addEnv('DATABASE_URL', DatabaseUrl, '2020-01-01')

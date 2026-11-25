@@ -1,7 +1,8 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { noop } from 'es-toolkit'
 import { type ReactNode, useEffect, useLayoutEffect } from 'react'
-import { type BoxRecord, type GateRecord, type PasskeyWayinHeader, VaultMinder } from 'safebyok'
-import { storageUnavailable } from 'safebyok/storage'
+import { type BoxRecord, type GateRecord, type PasskeyWayinHeader, type PersistedClient, type Persister, MemoryPersister, VaultTSQ } from 'safebyok'
+import { Classifier, SortedVaultDB, storageUnavailable } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { type BoxSelected, passkeyHeaderOf } from '../../src/index'
@@ -10,11 +11,14 @@ import * as TH from '../test-helpers'
 /** The core's labelpath of the box with the joke service's key. */
 const JokesBoxPath = `box/${TH.JokesPath}`
 
-/** The key the minder caches the jokes box under, which the hooks observe. */
-const JokesKey = VaultMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: JokesBoxPath })
+/** The scope of the jokes box. */
+const JokesScope = { ...LeanTH.WorldScope, labelpath: JokesBoxPath }
 
-/** The key the minder caches the listing of the root box's children under. */
-const BoxListKey = VaultMinder.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
+/** The key the vault TSQ keeps the jokes box under, which the hooks observe. */
+const JokesKey = VaultTSQ.itemQueryKeyOf(JokesScope)
+
+/** The key the vault TSQ keeps the listing of the root box's children under. */
+const BoxListKey = VaultTSQ.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
 
 /** The stage of the world's bank, as a page shows it. */
 function StageShown({ world }: Readonly<{ world: TH.ProviderWorld }>) {
@@ -56,7 +60,7 @@ async function setupShowing({ isWatching = true, beforeShowing = () => undefined
   beforeShowing(world)
   const { BoxProbe, seen } = makeBoxProbe(world)
   rerender(treeOf(world, <><StageShown world={world} /><BoxProbe /></>))
-  return { world, seen, minder: world._cheat_device().minder }
+  return { world, seen, vaultTSQ: world._cheat_device().vaultTSQ }
 }
 
 /** {@link setupShowing}, once the hook shows the first revision, which it returns. */
@@ -66,9 +70,16 @@ async function setupShown(opts: Parameters<typeof setupShowing>[0] = {}) {
   return { ...shown, first: shown.seen.current!.data! }
 }
 
+/** A persister of each bank's records, the same one at every call: one of a device's two, kept in memory across a reload. */
+function memoryPersisterOf(): () => MemoryPersister {
+  const persister = new MemoryPersister()
+  return () => persister
+}
+
 /** Write the jokes box's next revision, of tier `pro`, from the other device, as another tab would, resolving it. */
 async function putFromOtherTab(world: TH.ProviderWorld): Promise<BoxRecord> {
-  return await world._cheat_otherVault!.putBoxOnce(JokesBoxPath, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: LeanTH.Whisper })
+  const box = await world._cheat_otherVault!.putBoxOnce(JokesBoxPath, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: LeanTH.Whisper })
+  return box.pickle() as BoxRecord
 }
 
 describe("useBox, mounted before anyone is signed in", () => {
@@ -99,7 +110,7 @@ describe("useBox, mounted before anyone is signed in", () => {
     expect(seen.mounts).to.eq(1)
   })
 
-  it("observes a query that has the minder's defaults once the minder minds", async () => {
+  it("observes a query that has the vault TSQ's defaults once the bank is up", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     const { BoxProbe, seen } = makeBoxProbe(world)
     const { rerender } = render(treeOf(world, <BoxProbe />, null))
@@ -109,17 +120,48 @@ describe("useBox, mounted before anyone is signed in", () => {
     const { options } = client.getQueryCache().find({ queryKey: JokesKey, exact: true })!
     const defaults = client.getQueryDefaults(JokesKey)
     expect(defaults.queryFn).to.be.a('function')
-    expect([options.queryFn, options.gcTime, options.retry]).to.deep.equal([defaults.queryFn, Infinity, false])
+    expect([options.queryFn, options.retry, options.networkMode]).to.deep.equal([defaults.queryFn, false, 'always'])
   })
 })
 
-describe("useBox over the minder's own cache", () => {
-  it("answers on its first render a record the minder already has", async () => {
+describe("useBox on a page reloaded over a device's persisters", () => {
+  it("shows the box's restored record once restored, before the vaultDB answers, when mounted while the bank is starting", async () => {
+    const boxes: Persister = new MemoryPersister()
+    const persisters = { roots: memoryPersisterOf(), boxes: () => boxes }
+    const world      = await TH.buildProviderWorld({ stored: 'jokes', persisters })
+    const saved      = await boxes.restoreClient()
+    let land         = noop
+    vi.spyOn(boxes, 'restoreClient').mockReturnValue(new Promise<PersistedClient | undefined>((resolve) => { land = () => { resolve(saved) } }))
+    const release    = world.pauseGets()
+    onTestFinished(release)
+    const { BoxProbe, seen } = makeBoxProbe(world)
+    render(treeOf(world, <><StageShown world={world} /><BoxProbe /></>))
+    await screen.findByText('starting')
+    expect(seen.current?.data).to.be.undefined
+    act(() => { land() })
+    await waitFor(() => { expect(seen.current?.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
+    expect(seen.mounts).to.eq(1)
+  })
+
+  it("shows the box's restored record while the stage is still starting, where no roots were kept", async () => {
+    const persisters = { roots: () => new MemoryPersister(), boxes: memoryPersisterOf() }
+    const world      = await TH.buildProviderWorld({ stored: 'jokes', persisters })
+    const release    = world.pauseGets()
+    onTestFinished(release)
+    const { BoxProbe, seen } = makeBoxProbe(world)
+    render(treeOf(world, <><StageShown world={world} /><BoxProbe /></>))
+    await waitFor(() => { expect(seen.current?.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
+    expect(screen.getByText('starting')).to.exist
+  })
+})
+
+describe("useBox over the vault TSQ's own items", () => {
+  it("answers on its first render a record the vault TSQ already has", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     const { rerender } = render(treeOf(world, <StageShown world={world} />))
     await screen.findByText('locked')
-    const { minder } = world._cheat_device()
-    const record = await act(() => minder.get({ ...minder.scope, labelpath: JokesBoxPath }))
+    const { vaultTSQ } = world._cheat_device()
+    const record = await act(() => vaultTSQ.getOnce(JokesScope))
     const { gets } = world.counts
     const { BoxProbe, seen } = makeBoxProbe(world)
     rerender(treeOf(world, <><StageShown world={world} /><BoxProbe /></>))
@@ -136,12 +178,12 @@ describe("useBox over the minder's own cache", () => {
   })
 
   it("keeps showing the older record, stale, while the newer revision a list told of is fetched whole", async () => {
-    const { world, seen, minder, first } = await setupShown({ isWatching: false })
+    const { world, seen, vaultTSQ, first } = await setupShown({ isWatching: false })
     const second = await putFromOtherTab(world)
     const { gets } = world.counts
     const release = world.pauseGets()
     onTestFinished(release)
-    await act(() => minder.list('box'))
+    await act(() => vaultTSQ.listOnce('box'))
     await waitFor(() => { expect(seen.current?.fetchStatus).to.eq('fetching') })
     expect([seen.current?.data, seen.current?.isStale]).to.deep.equal([first, true])
     release()
@@ -150,23 +192,21 @@ describe("useBox over the minder's own cache", () => {
   })
 
   it("shows the refusal of a get of its item, keeping the record and fetching nothing more", async () => {
-    const { world, seen, minder, first } = await setupShown({ isWatching: false })
-    // The vaultDB answers an older revision than the minder has: the get refuses stale_read.
-    await putFromOtherTab(world)
-    await act(() => minder.list('box'))
-    await waitFor(() => { expect(seen.current?.data?.revseq).to.eq(1) })
-    const second = seen.current?.data
-    world.vaultDB._cheat_things(LeanTH.WorldScope).set(JokesBoxPath, first)
-    const { gets } = world.counts
-    await act(async () => { await LeanTH.expectBad(minder.tryGet({ ...minder.scope, labelpath: JokesBoxPath }, { staleTime: 0 }), 'stale_read') })
+    const { world, seen, vaultTSQ, first } = await setupShown({ isWatching: false })
+    const gets = { count: 0 }
+    world.vaultDB.tryGetThing = (ask) => {
+      gets.count += 1
+      return Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, banktok: null, read_tc: Classifier.readTcNow(), dbhas: null, err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
+    }
+    await act(async () => { await expect(vaultTSQ.getOnce(JokesScope, { staleTime: 0 })).rejects.toHaveProperty('refusalkind', 'storage_unavailable') })
     await waitFor(() => { expect(seen.current?.isError).to.eq(true) })
-    expect([seen.current?.data, seen.current?.isStale]).to.deep.equal([second, true])
-    expect(minder.tsqClient.getQueryState(JokesKey)).to.deep.include({ isInvalidated: true, data: second })
-    expect(world.counts.gets).to.eq(gets + 1)
+    expect(seen.current?.data).to.eq(first)
+    expect(world._cheat_device().vaultTsqClient.getQueryState(JokesKey)).to.deep.include({ status: 'error', data: first })
+    expect(gets.count).to.eq(1)
   })
 })
 
-// The hook's fetch reads the first revision and waits; meanwhile the minder hears of the second, from the watch or from a
+// The hook's fetch reads the first revision and waits; meanwhile the device hears of the second, from the watch or from a
 // list. Whichever lands first, the hook ends showing the second.
 const OrderCases = [
   [true,  'answer', 'watched: the late answer, then the watch'],
@@ -182,7 +222,7 @@ describe("useBox shows the newest record, in either order of a late answer and t
   for (const [isWatching, firstStep, blurb] of OrderCases) {
     it(blurb, async () => {
       let release = releaseNothing
-      const { world, seen, minder } = await setupShowing({ isWatching, beforeShowing: (world) => { release = world.pauseAnswers() } })
+      const { world, seen, vaultTSQ } = await setupShowing({ isWatching, beforeShowing: (world) => { release = world.pauseAnswers() } })
       onTestFinished(() => { release() })
       await waitFor(() => { expect(seen.current?.fetchStatus).to.eq('fetching') })
       const steps = {
@@ -190,7 +230,7 @@ describe("useBox shows the newest record, in either order of a late answer and t
           act(() => { release() })
           await waitFor(() => { expect(seen.current?.data).to.not.be.undefined })
         },
-        news: async () => { await act(async () => { await (isWatching ? putFromOtherTab(world) : minder.list('box')) }) },
+        news: async () => { await act(async () => { await (isWatching ? putFromOtherTab(world) : vaultTSQ.listOnce('box')) }) },
       }
       if (! isWatching) { await putFromOtherTab(world) }
       await steps[firstStep]()
@@ -214,7 +254,7 @@ async function setupListing() {
   return { world, lists, ...rendered }
 }
 
-describe("useBoxList over the minder's own listing", () => {
+describe("useBoxList over the vault TSQ's own listing", () => {
   it("lists once, and lists again to show a box another device writes", async () => {
     const { world, result, lists } = await setupListing()
     await waitFor(() => { expect(result.current.data).to.deep.equal([TH.JokesPath]) })
@@ -242,12 +282,12 @@ describe("useBoxList over the minder's own listing", () => {
     expect([container.textContent, lists.count]).to.deep.equal([TH.JokesPath, 1])
   })
 
-  it("lists again when the minder marks its listing stale", async () => {
+  it("lists again when its listing is invalidated", async () => {
     const { world, result, lists } = await setupListing()
     await waitFor(() => { expect(result.current.data).to.deep.equal([TH.JokesPath]) })
-    const { minder } = world._cheat_device()
-    act(() => { minder.invalidate('box', { list: 'all' }) })
-    await waitFor(() => { expect(minder.tsqClient.getQueryState(BoxListKey)?.isInvalidated).to.eq(false) })
+    const client = world.Bank.queryClient()
+    act(() => { void client.invalidateQueries({ queryKey: world.Bank.keys.boxList() }) })
+    await waitFor(() => { expect(client.getQueryState(BoxListKey)?.isInvalidated).to.eq(false) })
     expect([lists.count, result.current.data]).to.deep.equal([2, [TH.JokesPath]])
   })
 
@@ -264,7 +304,7 @@ describe("useBoxList over the minder's own listing", () => {
 
   it("shows a list refused as its error", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
-    world.vaultDB.tryListThings = () => Promise.resolve({ ok: false, world: null, err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') } as never)
+    world.vaultDB.tryListThings = (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, banktok: null, read_tc: Classifier.readTcNow(), dbhas: null, parentage: [], deltas: [], damaged_rows: [], err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
     function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
     const { result } = renderHook(() => world.Bank.useBoxList(), { wrapper: Wrapper })
     await waitFor(() => { expect(result.current.isError).to.eq(true) })
@@ -272,7 +312,7 @@ describe("useBoxList over the minder's own listing", () => {
   })
 })
 
-describe("useGate over the BankMinder's world", () => {
+describe("useGate over the world's gate Thing", () => {
   it("shows a passkey another device adds, without fetching again, and without the bankKey it wraps", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     let header: PasskeyWayinHeader | null | undefined
@@ -283,18 +323,18 @@ describe("useGate over the BankMinder's world", () => {
     }
     const { container } = render(TH.providerTreeOf(world, <GateProbe />, { userid: TH.ProviderUser }))
     await waitFor(() => { expect(header).to.be.null })
-    // The minder freezes, so the spy goes on its class, counting the giver's device's calls alone.
-    const { minder } = world._cheat_device()
-    const get = vi.spyOn(VaultMinder.prototype, 'get')
+    // The SortedVaultDB freezes, so the spy goes on its class, counting the giver's device's calls alone.
+    const { sortedVaultDB } = world._cheat_device().world
+    const get = vi.spyOn(SortedVaultDB.prototype, 'tryGetThing')
     onTestFinished(() => { get.mockRestore() })
     const other = LeanTH.makeDevice({}, { vaultDB: world.vaultDB })
     await act(async () => {
-      await other.signIn(TH.ProviderUser)
+      await other.signin(TH.ProviderUser)
       await other.bank!.gate.addPasskey({ passphraseCleartext: LeanTH.TestPassphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })
     })
     await waitFor(() => { expect(header?.wayinkind).to.eq('passkey') })
-    expect(get.mock.contexts.filter((context) => context === minder)).to.have.lengthOf(0)
-    // The BankMinder's world has the whole gate, by design; the giver's client and the page have none of it.
+    expect(get.mock.contexts.filter((context) => context === sortedVaultDB)).to.have.lengthOf(0)
+    // The gate's Thing has the whole gate, by design; the giver's client and the page have none of it.
     const stored = world.vaultDB._cheat_things(LeanTH.WorldScope).get('gate') as GateRecord
     TH.expectTextUnheld(stored.wayins.passkey0!.bank_key_wayin_wrapped.ciphertext_b64, container, world.client)
   })

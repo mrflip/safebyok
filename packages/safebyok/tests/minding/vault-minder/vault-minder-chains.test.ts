@@ -1,11 +1,13 @@
 import { isEqual } from 'es-toolkit'
+import { Errors } from 'safebyok-big/internals'
 import { describe, expect, it } from 'vitest'
+import { VaultTSQ } from '../../../src/minding/vault-tsq'
 import { Lifeseq } from '../../../src/shapes/primitives'
 import type { BoxRecord, Sparse, ThingRecord } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
-import { type MinderWorld, bornOf, cheatBox, isListingStaleAt, minderWorldOf } from './world'
+import { type TSQWorld, cheatStored, isObservedStale, itemQueryAt, listQueryAt, noticeOf, tsqWorldOf } from './tsq-world'
 
 // == [Précis]: Liveness, Precis, CachePrecis, EndPrecis, ChainCase, Route
 
@@ -15,25 +17,25 @@ type Liveness = 'item' | 'gone' | 'soon'
 /** A record in brief: its liveness, its own life's lifenum, and its revseq. */
 type Precis = readonly [Liveness, number, number]
 
-/** The box's three cache entries in brief, each key left out where its entry is undefined, and whether the root box's listing is marked stale. */
+/** What the box at `TH.BoxScope` shows in brief, each key left out where it shows none, and whether the root box's listing is marked stale.
+ * - `item` -- its item's data: the record, or null
+ * - `soon` -- the newest revision of the box known, while no whole record of it is
+ * - `dead` -- the tombstone its Thing holds, while the item is null
+ */
 type CachePrecis = Readonly<{ item?: Precis | null, soon?: Precis, dead?: Precis, isListingStale?: true }>
 
-/** Where a chain ends: the cache in brief, and, where a row states it, whether a get on the way refused `stale_read`. */
+/** Where a chain ends: the box in brief, and, where a row states it, whether a get on the way refused `stale_read`. */
 type EndPrecis = CachePrecis & Readonly<{ isRefused?: boolean }>
 
-/** A chain of records the minder is handed in order, over the start it is seeded at, and where it should end.
- * Where the minder ends elsewhere now, `today` has where it ends by every route, and `todayBy` by the routes named.
- */
+/** A chain of records the box's SortedVaultDB learns of in order, over the start it is seeded at, and where the box should end. */
 type ChainCase = Readonly<{
   initial:  CachePrecis
   chain:    readonly Precis[]
   wanted:   EndPrecis
-  today?:   EndPrecis
-  todayBy?: Readonly<Record<string, EndPrecis>>
   blurb?:   string
 }>
 
-/** How a step reaches the minder: `'f'` by the feed, as a watch notice, or `'g'` by a fetch, a get of a whole record or a list for a sparse one. */
+/** How a step arrives: `'f'` by the feed, as a watch notice, or `'g'` by a fetch, a get of a whole record or a list for a sparse one, both through the VaultTSQ. */
 type Route = 'f' | 'g'
 // --
 
@@ -97,82 +99,79 @@ const ChainCases: readonly ChainCase[] = [
   { initial: Empty,    chain: [["item", 4, 11], ["soon", 4, 12]], wanted: marked(LiveSoon) },
   { initial: Empty,    chain: [["item", 4, 11]],                  wanted: marked(Live) },
   { initial: Empty,    chain: [["gone", 5, 15]],                  wanted: marked(Dead) },
-  { initial: Empty,    chain: [["gone", 5, 15], ["soon", 6, 16]], wanted: marked(BareSoon6),                   today: DeadSoon, todayBy: { ff: marked(DeadSoon), gf: marked(DeadSoon) } },
+  { initial: Empty,    chain: [["gone", 5, 15], ["soon", 6, 16]], wanted: marked(BareSoon6) },
   { initial: Empty,    chain: [["soon", 4, 12]],                  wanted: marked(BareSoon) },
   // On live+soon:
   { initial: LiveSoon, chain: [["item", 0, 1], ["soon", 0, 2]],   wanted: LiveSoon,                            blurb: 'live+soon, older' },
-  { initial: LiveSoon, chain: [["item", 6, 16], ["soon", 6, 17]], wanted: marked(LiveSoon6),                   today: LiveSoon6, blurb: 'live+soon, newer' },
+  { initial: LiveSoon, chain: [["item", 6, 16], ["soon", 6, 17]], wanted: marked(LiveSoon6),                   blurb: 'live+soon, newer' },
   { initial: LiveSoon, chain: [["item", 4, 13], ["soon", 4, 14]], wanted: LiveSoonLater,                       blurb: 'live+soon, newer in its life' },
   { initial: LiveSoon, chain: [["item", 0, 1]],                   wanted: LiveSoon,                            blurb: 'live, older' },
-  { initial: LiveSoon, chain: [["item", 6, 16]],                  wanted: marked(Live6),                       today: Live6, blurb: 'live, newer' },
+  { initial: LiveSoon, chain: [["item", 6, 16]],                  wanted: marked(Live6),                       blurb: 'live, newer' },
   { initial: LiveSoon, chain: [["item", 4, 13]],                  wanted: LiveLater,                           blurb: 'live, newer in its life' },
   { initial: LiveSoon, chain: [["gone", 1, 3]],                   wanted: LiveSoon,                            blurb: 'dead, older' },
-  { initial: LiveSoon, chain: [["gone", 5, 15]],                  wanted: marked(Dead),                        today: Dead, blurb: '(b) dead, newer' },
+  { initial: LiveSoon, chain: [["gone", 5, 15]],                  wanted: marked(Dead),                        blurb: '(b) dead, newer' },
   { initial: LiveSoon, chain: [["gone", 1, 3], ["soon", 2, 4]],   wanted: LiveSoon,                            blurb: 'dead+soon, older' },
-  { initial: LiveSoon, chain: [["gone", 5, 15], ["soon", 6, 16]], wanted: marked(BareSoon6),                   today: DeadSoon, blurb: 'dead+soon, newer' },
+  { initial: LiveSoon, chain: [["gone", 5, 15], ["soon", 6, 16]], wanted: marked(BareSoon6),                   blurb: 'dead+soon, newer' },
   { initial: LiveSoon, chain: [["soon", 0, 2]],                   wanted: LiveSoon,                            blurb: 'bare+soon, older' },
-  { initial: LiveSoon, chain: [["soon", 6, 17]],                  wanted: marked({ soon: ["soon", 6, 17] }),   today: { ...Live, soon: ["soon", 6, 17] }, blurb: '(a) bare+soon, newer' },
+  { initial: LiveSoon, chain: [["soon", 6, 17]],                  wanted: marked({ soon: ["soon", 6, 17] }),   blurb: '(a) bare+soon, newer' },
   { initial: LiveSoon, chain: [["soon", 4, 14]],                  wanted: { ...Live, soon: ["soon", 4, 14] },  blurb: 'bare+soon, newer in its life' },
   // On live:
   { initial: Live,     chain: [["item", 0, 1], ["soon", 0, 2]],   wanted: Live,                                blurb: 'live+soon, older' },
-  { initial: Live,     chain: [["item", 6, 16], ["soon", 6, 17]], wanted: marked(LiveSoon6),                   today: LiveSoon6, blurb: 'live+soon, newer' },
+  { initial: Live,     chain: [["item", 6, 16], ["soon", 6, 17]], wanted: marked(LiveSoon6),                   blurb: 'live+soon, newer' },
   { initial: Live,     chain: [["item", 4, 13], ["soon", 4, 14]], wanted: LiveSoonLater,                       blurb: 'live+soon, newer in its life' },
   { initial: Live,     chain: [["item", 0, 1]],                   wanted: Live,                                blurb: 'live, older' },
-  { initial: Live,     chain: [["item", 6, 16]],                  wanted: marked(Live6),                       today: Live6, blurb: 'live, newer' },
+  { initial: Live,     chain: [["item", 6, 16]],                  wanted: marked(Live6),                       blurb: 'live, newer' },
   { initial: Live,     chain: [["item", 4, 13]],                  wanted: LiveLater,                           blurb: 'live, newer in its life' },
   { initial: Live,     chain: [["gone", 1, 3]],                   wanted: Live,                                blurb: 'dead, older' },
-  { initial: Live,     chain: [["gone", 5, 15]],                  wanted: marked(Dead),                        today: Dead, blurb: 'dead, newer' },
+  { initial: Live,     chain: [["gone", 5, 15]],                  wanted: marked(Dead),                        blurb: 'dead, newer' },
   { initial: Live,     chain: [["gone", 1, 3], ["soon", 2, 4]],   wanted: Live,                                blurb: 'dead+soon, older' },
-  { initial: Live,     chain: [["gone", 5, 15], ["soon", 6, 16]], wanted: marked(BareSoon6),                   today: DeadSoon, blurb: 'dead+soon, newer' },
+  { initial: Live,     chain: [["gone", 5, 15], ["soon", 6, 16]], wanted: marked(BareSoon6),                   blurb: 'dead+soon, newer' },
   { initial: Live,     chain: [["soon", 0, 2]],                   wanted: Live,                                blurb: 'bare+soon, older' },
-  { initial: Live,     chain: [["soon", 6, 17]],                  wanted: marked({ soon: ["soon", 6, 17] }),   today: { ...Live, soon: ["soon", 6, 17] }, blurb: 'bare+soon, newer' },
+  { initial: Live,     chain: [["soon", 6, 17]],                  wanted: marked({ soon: ["soon", 6, 17] }),   blurb: 'bare+soon, newer' },
   { initial: Live,     chain: [["soon", 4, 14]],                  wanted: { ...Live, soon: ["soon", 4, 14] },  blurb: 'bare+soon, newer in its life' },
   // On dead:
   { initial: Dead,     chain: [["item", 0, 1], ["soon", 0, 2]],   wanted: Dead,                                blurb: 'live+soon, older' },
-  { initial: Dead,     chain: [["item", 6, 16], ["soon", 6, 17]], wanted: marked(LiveSoon6),                   today: { ...LiveSoon6, dead: ["gone", 5, 15] }, blurb: 'live+soon, newer' },
+  { initial: Dead,     chain: [["item", 6, 16], ["soon", 6, 17]], wanted: marked(LiveSoon6),                   blurb: 'live+soon, newer' },
   { initial: Dead,     chain: [["item", 0, 1]],                   wanted: Dead,                                blurb: 'live, older' },
-  { initial: Dead,     chain: [["item", 6, 16]],                  wanted: marked(Live6),                       today: { ...Live6, dead: ["gone", 5, 15] }, blurb: '(c) live, newer' },
+  { initial: Dead,     chain: [["item", 6, 16]],                  wanted: marked(Live6),                       blurb: '(c) live, newer' },
   { initial: Dead,     chain: [["gone", 1, 3]],                   wanted: Dead,                                blurb: 'dead, older' },
-  { initial: Dead,     chain: [["gone", 7, 20]],                  wanted: marked(Dead7),                       today: Dead7, blurb: 'dead, newer' },
+  { initial: Dead,     chain: [["gone", 7, 20]],                  wanted: marked(Dead7),                       blurb: 'dead, newer' },
   { initial: Dead,     chain: [["gone", 1, 3], ["soon", 2, 4]],   wanted: Dead,                                blurb: 'dead+soon, older' },
-  { initial: Dead,     chain: [["gone", 7, 20], ["soon", 8, 21]], wanted: marked({ soon: ["soon", 8, 21] }),   today: { ...Dead7, soon: ["soon", 8, 21] }, blurb: 'dead+soon, newer' },
+  { initial: Dead,     chain: [["gone", 7, 20], ["soon", 8, 21]], wanted: marked({ soon: ["soon", 8, 21] }),   blurb: 'dead+soon, newer' },
   { initial: Dead,     chain: [["soon", 0, 2]],                   wanted: Dead,                                blurb: 'bare+soon, older' },
-  { initial: Dead,     chain: [["soon", 6, 17]],                  wanted: marked({ soon: ["soon", 6, 17] }),   today: { ...Dead, soon: ["soon", 6, 17] }, blurb: 'bare+soon, newer' },
+  { initial: Dead,     chain: [["soon", 6, 17]],                  wanted: marked({ soon: ["soon", 6, 17] }),   blurb: 'bare+soon, newer' },
   // On dead+soon:
-  { initial: DeadSoon, chain: [["item", 0, 1], ["soon", 0, 2]],   wanted: BareSoon6,                           today: DeadSoon, blurb: 'live+soon, older' },
-  { initial: DeadSoon, chain: [["item", 8, 21], ["soon", 8, 22]], wanted: marked(LiveSoon8),                   today: { ...LiveSoon8, dead: ["gone", 5, 15] }, blurb: 'live+soon, newer' },
-  { initial: DeadSoon, chain: [["item", 6, 17], ["soon", 6, 18]], wanted: LiveSoon6Later,                      today: { ...LiveSoon6Later, dead: ["gone", 5, 15] }, blurb: 'live+soon, newer in its life' },
-  { initial: DeadSoon, chain: [["item", 0, 1]],                   wanted: BareSoon6,                           today: DeadSoon, blurb: 'live, older' },
-  { initial: DeadSoon, chain: [["item", 8, 21]],                  wanted: marked(Live8),                       today: { ...Live8, dead: ["gone", 5, 15] }, blurb: 'live, newer' },
-  { initial: DeadSoon, chain: [["item", 6, 17]],                  wanted: Live6Later,                          today: { ...Live6Later, dead: ["gone", 5, 15] }, blurb: 'live, newer in its life' },
-  { initial: DeadSoon, chain: [["gone", 1, 3]],                   wanted: BareSoon6,                           today: DeadSoon, blurb: 'dead, older' },
-  { initial: DeadSoon, chain: [["gone", 7, 20]],                  wanted: marked(Dead7),                       today: Dead7, blurb: 'dead, newer' },
-  { initial: DeadSoon, chain: [["gone", 1, 3], ["soon", 2, 4]],   wanted: BareSoon6,                           today: DeadSoon, blurb: 'dead+soon, older' },
-  { initial: DeadSoon, chain: [["gone", 7, 20], ["soon", 8, 21]], wanted: marked({ soon: ["soon", 8, 21] }),   today: { ...Dead7, soon: ["soon", 8, 21] }, blurb: 'dead+soon, newer' },
-  { initial: DeadSoon, chain: [["soon", 0, 2]],                   wanted: BareSoon6,                           today: DeadSoon, blurb: 'bare+soon, older' },
-  { initial: DeadSoon, chain: [["soon", 8, 22]],                  wanted: marked({ soon: ["soon", 8, 22] }),   today: { ...Dead, soon: ["soon", 8, 22] }, blurb: 'bare+soon, newer' },
-  { initial: DeadSoon, chain: [["soon", 6, 18]],                  wanted: { soon: ["soon", 6, 18] },           today: { ...Dead, soon: ["soon", 6, 18] }, blurb: 'bare+soon, newer in its life' },
+  { initial: DeadSoon, chain: [["item", 0, 1], ["soon", 0, 2]],   wanted: BareSoon6,                           blurb: 'live+soon, older' },
+  { initial: DeadSoon, chain: [["item", 8, 21], ["soon", 8, 22]], wanted: marked(LiveSoon8),                   blurb: 'live+soon, newer' },
+  { initial: DeadSoon, chain: [["item", 6, 17], ["soon", 6, 18]], wanted: LiveSoon6Later,                      blurb: 'live+soon, newer in its life' },
+  { initial: DeadSoon, chain: [["item", 0, 1]],                   wanted: BareSoon6,                           blurb: 'live, older' },
+  { initial: DeadSoon, chain: [["item", 8, 21]],                  wanted: marked(Live8),                       blurb: 'live, newer' },
+  { initial: DeadSoon, chain: [["item", 6, 17]],                  wanted: Live6Later,                          blurb: 'live, newer in its life' },
+  { initial: DeadSoon, chain: [["gone", 1, 3]],                   wanted: BareSoon6,                           blurb: 'dead, older' },
+  { initial: DeadSoon, chain: [["gone", 7, 20]],                  wanted: marked(Dead7),                       blurb: 'dead, newer' },
+  { initial: DeadSoon, chain: [["gone", 1, 3], ["soon", 2, 4]],   wanted: BareSoon6,                           blurb: 'dead+soon, older' },
+  { initial: DeadSoon, chain: [["gone", 7, 20], ["soon", 8, 21]], wanted: marked({ soon: ["soon", 8, 21] }),   blurb: 'dead+soon, newer' },
+  { initial: DeadSoon, chain: [["soon", 0, 2]],                   wanted: BareSoon6,                           blurb: 'bare+soon, older' },
+  { initial: DeadSoon, chain: [["soon", 8, 22]],                  wanted: marked({ soon: ["soon", 8, 22] }),   blurb: 'bare+soon, newer' },
+  { initial: DeadSoon, chain: [["soon", 6, 18]],                  wanted: { soon: ["soon", 6, 18] },           blurb: 'bare+soon, newer in its life' },
   // On bare+soon:
-  { initial: BareSoon, chain: [["item", 0, 1], ["soon", 0, 2]],   wanted: BareSoon,
-    todayBy: { ff: { ...BareSoon, item: ["item", 0, 1] }, fg: { ...BareSoon, item: ["item", 0, 1] } }, blurb: 'live+soon, older' },
-  { initial: BareSoon, chain: [["item", 4, 9], ["soon", 4, 10]],  wanted: { ...BareSoon, item: ["item", 4, 9], isRefused: false },
-    todayBy: { gf: { ...BareSoon, isRefused: true }, gg: { ...BareSoon, isRefused: true } }, blurb: 'live+soon, older in its life' },
-  { initial: BareSoon, chain: [["item", 6, 16], ["soon", 6, 17]], wanted: marked(LiveSoon6),                   today: LiveSoon6, blurb: 'live+soon, newer' },
+  { initial: BareSoon, chain: [["item", 0, 1], ["soon", 0, 2]],   wanted: BareSoon,                            blurb: 'live+soon, older' },
+  { initial: BareSoon, chain: [["item", 4, 9], ["soon", 4, 10]],  wanted: { ...BareSoon, item: ["item", 4, 9], isRefused: false }, blurb: 'live+soon, older in its life' },
+  { initial: BareSoon, chain: [["item", 6, 16], ["soon", 6, 17]], wanted: marked(LiveSoon6),                   blurb: 'live+soon, newer' },
   { initial: BareSoon, chain: [["item", 4, 13], ["soon", 4, 14]], wanted: LiveSoonLater,                       blurb: 'live+soon, newer in its life' },
-  { initial: BareSoon, chain: [["item", 0, 1]],                   wanted: BareSoon,                            todayBy: { "f": { ...BareSoon, item: ["item", 0, 1] } }, blurb: 'live, older' },
-  { initial: BareSoon, chain: [["item", 4, 9]],                   wanted: { ...BareSoon, item: ["item", 4, 9], isRefused: false },
-    todayBy: { "g": { ...BareSoon, isRefused: true } }, blurb: 'live, older in its life' },
-  { initial: BareSoon, chain: [["item", 6, 16]],                  wanted: marked(Live6),                       today: Live6, blurb: 'live, newer' },
+  { initial: BareSoon, chain: [["item", 0, 1]],                   wanted: BareSoon,                            blurb: 'live, older' },
+  { initial: BareSoon, chain: [["item", 4, 9]],                   wanted: { ...BareSoon, item: ["item", 4, 9], isRefused: false }, blurb: 'live, older in its life' },
+  { initial: BareSoon, chain: [["item", 6, 16]],                  wanted: marked(Live6),                       blurb: 'live, newer' },
   { initial: BareSoon, chain: [["item", 4, 13]],                  wanted: LiveLater,                           blurb: 'live, newer in its life' },
-  { initial: BareSoon, chain: [["gone", 1, 3]],                   wanted: BareSoon,                            today: { ...BareSoon, item: null, dead: ["gone", 1, 3] }, blurb: 'dead, older' },
-  { initial: BareSoon, chain: [["gone", 5, 15]],                  wanted: marked(Dead),                        today: Dead, blurb: 'dead, newer' },
-  { initial: BareSoon, chain: [["gone", 1, 3], ["soon", 2, 4]],   wanted: BareSoon,                            today: { ...BareSoon, item: null, dead: ["gone", 1, 3] }, blurb: 'dead+soon, older' },
-  { initial: BareSoon, chain: [["gone", 5, 15], ["soon", 6, 16]], wanted: marked(BareSoon6),                   today: DeadSoon, blurb: 'dead+soon, newer' },
+  { initial: BareSoon, chain: [["gone", 1, 3]],                   wanted: BareSoon,                            blurb: 'dead, older' },
+  { initial: BareSoon, chain: [["gone", 5, 15]],                  wanted: marked(Dead),                        blurb: 'dead, newer' },
+  { initial: BareSoon, chain: [["gone", 1, 3], ["soon", 2, 4]],   wanted: BareSoon,                            blurb: 'dead+soon, older' },
+  { initial: BareSoon, chain: [["gone", 5, 15], ["soon", 6, 16]], wanted: marked(BareSoon6),                   blurb: 'dead+soon, newer' },
   { initial: BareSoon, chain: [["soon", 0, 2]],                   wanted: BareSoon,                            blurb: 'bare+soon, older' },
-  { initial: BareSoon, chain: [["soon", 6, 17]],                  wanted: marked({ soon: ["soon", 6, 17] }),   today: { soon: ["soon", 6, 17] }, blurb: 'bare+soon, newer' },
+  { initial: BareSoon, chain: [["soon", 6, 17]],                  wanted: marked({ soon: ["soon", 6, 17] }),   blurb: 'bare+soon, newer' },
   { initial: BareSoon, chain: [["soon", 4, 14]],                  wanted: { soon: ["soon", 4, 14] },           blurb: 'bare+soon, newer in its life' },
   // Each start, a record it has cached again:
-  { initial: LiveSoon, chain: [["item", 4, 11]],                  wanted: { ...LiveSoon, isRefused: false },   todayBy: { "g": { ...LiveSoon, isRefused: true } }, blurb: 'its item again' },
+  { initial: LiveSoon, chain: [["item", 4, 11]],                  wanted: { ...LiveSoon, isRefused: false },   blurb: 'its item again' },
   { initial: LiveSoon, chain: [["soon", 4, 12]],                  wanted: LiveSoon,                            blurb: 'its soon again' },
   { initial: Live,     chain: [["item", 4, 11]],                  wanted: { ...Live, isRefused: false },       blurb: 'its item again' },
   { initial: BareSoon, chain: [["soon", 4, 12]],                  wanted: BareSoon,                            blurb: 'its soon again' },
@@ -180,11 +179,14 @@ const ChainCases: readonly ChainCase[] = [
   // Each start with a soon, the whole record at its soon's revision:
   { initial: LiveSoon, chain: [["item", 4, 12]],                  wanted: { item: ["item", 4, 12] },           blurb: 'the item its soon told of' },
   { initial: BareSoon, chain: [["item", 4, 12]],                  wanted: { item: ["item", 4, 12] },           blurb: 'the item its soon told of' },
-  { initial: DeadSoon, chain: [["item", 6, 16]],                  wanted: Live6,                               today: { ...Live6, dead: ["gone", 5, 15] }, blurb: 'the item its soon told of' },
+  { initial: DeadSoon, chain: [["item", 6, 16]],                  wanted: Live6,                               blurb: 'the item its soon told of' },
 ]
 // --
 
-// == [Running a chain]: recordOf, wholeOf, precisOf, newestOf, lifeOf, cachePrecisOf, arrive, seed, runChain
+// == [Running a chain]: BoxKey, recordOf, wholeOf, precisOf, newestOf, lifeOf, cachePrecisOf, endFaultsOf, arrive, seed, runChain
+
+/** The query key of the item of the box at `TH.BoxScope`. */
+const BoxKey = VaultTSQ.itemQueryKeyOf(TH.BoxScope)
 
 /** The record `precis` stands for: the box at `TH.BoxScope` at that revision of that life, whole or sparse. */
 function recordOf([liveness, lifenum, revseq]: Precis): BoxRecord | Sparse<BoxRecord> {
@@ -202,7 +204,7 @@ function wholeOf([liveness, lifenum, revseq]: Precis): Precis {
   return [(liveness === 'soon') ? 'item' : liveness, lifenum, revseq]
 }
 
-/** The précis of `record`, a cache entry's: a tombstone is `'gone'`, a sparse live record `'soon'`, a whole one `'item'`. */
+/** The précis of `record`: a tombstone is `'gone'`, a sparse live record `'soon'`, a whole one `'item'`. */
 function precisOf(record: Sparse<ThingRecord>): Precis {
   const lifenum = Lifeseq.lifenumOf(record.lifeseq)
   if (Thing.isTombstone(record)) { return ['gone', lifenum, record.revseq] }
@@ -219,55 +221,72 @@ function lifeOf(cache: CachePrecis): number | 'vacant' {
   return newestOf(cache)?.[1] ?? 'vacant'
 }
 
-/** The précis of what `minder` caches for the box, and whether the root box's listing is marked stale. */
-function cachePrecisOf({ minder }: MinderWorld<MemoryVaultDB>): CachePrecis {
-  const item = minder.at(TH.BoxScope)
-  const soon = minder.soonAt(TH.BoxScope)
-  const dead = minder.deadAt(TH.BoxScope)
+/** The précis of what `world` shows of the box, from its Thing and its item, and whether the root box's listing is invalidated or reset. */
+function cachePrecisOf(world: TSQWorld<MemoryVaultDB>): CachePrecis {
+  const thing   = world.sorted.thingAt(TH.BoxScope)
+  const item    = itemQueryAt(world)?.state.data as ThingRecord | null | undefined
+  const held    = thing?.pickle()
+  const listing = listQueryAt(world)?.state
   return {
     ...((item !== undefined) && { item: (item === null) ? null : precisOf(item) }),
-    ...((soon !== undefined) && { soon: precisOf(soon) }),
-    ...((dead !== undefined) && { dead: precisOf(dead) }),
-    ...(isListingStaleAt(minder, TH.RootScope) && { isListingStale: true }),
+    ...((thing !== undefined) && (thing.agekind !== 'here') && { soon: precisOf(thing.citable) }),
+    ...((item === null) && (held !== undefined) && Thing.isGone(held) && { dead: precisOf(held) }),
+    ...((listing !== undefined) && (listing.isInvalidated || (listing.data === undefined)) && { isListingStale: true }),
   }
 }
 
-/** Hand the minder the record `precis` stands for, by `route`, and tell whether a get refused it `stale_read`. By a fetch,
- * the datastore has the record first, and a soon reaches the minder in a list of the root box.
+// An item's staleness depends on its route only through `isInvalidated`, which a fetch clears: an observer's word is the rule's.
+/** Each way `world`'s item breaks the rules an item with data keeps: it is its Thing's own record, and stale just while the Thing is not here. */
+function endFaultsOf(world: TSQWorld<MemoryVaultDB>): string[] {
+  const thing = world.sorted.thingAt(TH.BoxScope)
+  const item  = itemQueryAt(world)?.state.data
+  if ((item === undefined) || (thing === undefined)) { return [] }
+  const isStale  = isObservedStale(world.queryClient, BoxKey)
+  const isHeld   = (item === null) || (item === thing.pickle())
+  const isRuled  = isStale === (thing.agekind !== 'here')
+  return [
+    ...(isHeld ? [] : ["the item is not its Thing's own record"]),
+    ...(isRuled ? [] : [`the item is ${isStale ? 'stale' : 'fresh'} while its Thing is ${String(thing.agekind)}`]),
+  ]
+}
+
+/** Have `world` learn of the record `precis` stands for, by `route`, and tell whether a get refused it `stale_read`. By a fetch,
+ * the datastore has the record first, and a soon arrives in a list of the root box.
  */
-async function arrive(world: MinderWorld<MemoryVaultDB>, precis: Precis, route: Route): Promise<boolean> {
+async function arrive(world: TSQWorld<MemoryVaultDB>, precis: Precis, route: Route): Promise<boolean> {
   const [liveness] = precis
   if (route === 'f') {
-    world.receive(TH.itemEventOf(recordOf(precis), (liveness === 'item') ? 'full' : liveness))
+    world.notify(noticeOf(recordOf(precis)))
     return false
   }
-  cheatBox(world.vaultDB, recordOf(wholeOf(precis)))
+  cheatStored(world.vaultDB, recordOf(wholeOf(precis)))
   if (liveness === 'soon') {
-    await world.minder.list('box')
+    await world.vaultTSQ.listOnce('box')
     return false
   }
-  // A get answered behind what the cache has is refused: a step's outcome, not the test's failure.
-  try { await world.minder.get(TH.BoxScope, { staleTime: 0 }) } catch (err) {
-    if ((err as { refusalkind?: unknown }).refusalkind !== 'stale_read') { throw err }
+  // A get answered by an earlier life than one known only sparse is refused: a step's outcome, not the test's failure.
+  try { await world.vaultTSQ.getOnce(TH.BoxScope, { staleTime: 0 }) } catch (err) {
+    if (! Errors.isVaultError(err) || (err.refusalkind !== 'stale_read')) { throw err }
     return true
   }
   return false
 }
 
-/** Seed a new minder at `initial`, its row from nothing arriving by the feed, then cache the root box's listing over a datastore that has the newest record cached. */
-async function seed(world: MinderWorld<MemoryVaultDB>, initial: CachePrecis): Promise<void> {
+/** Seed a new world at `initial`, its row from nothing arriving by the feed, then list the root box over a datastore that has the newest record of it. */
+async function seed(world: TSQWorld<MemoryVaultDB>, initial: CachePrecis): Promise<void> {
   const chain = seedRowOf(initial)?.chain ?? []
   for (const precis of chain) { await arrive(world, precis, 'f') }
   const newest = newestOf(initial)
-  if (newest) { cheatBox(world.vaultDB, recordOf(wholeOf(newest))) }
-  await world.minder.list('box')
+  if (newest) { cheatStored(world.vaultDB, recordOf(wholeOf(newest))) }
+  await world.vaultTSQ.listOnce('box')
 }
 
-/** What a minder seeded at `row.initial` caches once `row.chain` arrives by `routes`, a route a step, whether a get on the
- * way refused `stale_read`, and the Thing's life when the root box's listing was last read: at the seed, or at a soon arriving in a list.
+/** What a world seeded at `row.initial` shows of the box once `row.chain` arrives by `routes`, a route a step: where it ends,
+ * whether a get on the way refused `stale_read`, the Thing's life when the root box was last listed (at the seed, or at a
+ * soon arriving in a list), and each way its item breaks the rules of {@link endFaultsOf}.
  */
 async function runChain(row: ChainCase, routes: string) {
-  const world = await minderWorldOf(await bornOf(new MemoryVaultDB()))
+  const world = await tsqWorldOf(new MemoryVaultDB())
   await seed(world, row.initial)
   const seeded = cachePrecisOf(world)
   let listedLife = lifeOf(seeded)
@@ -276,11 +295,11 @@ async function runChain(row: ChainCase, routes: string) {
     if (await arrive(world, precis, routes[ii] as Route)) { isRefused = true }
     if ((precis[0] === 'soon') && (routes[ii] === 'g')) { listedLife = lifeOf(cachePrecisOf(world)) }
   }
-  return { seeded, cache: cachePrecisOf(world), listedLife, isRefused }
+  return { seeded, cache: cachePrecisOf(world), listedLife, isRefused, faults: endFaultsOf(world) }
 }
 // --
 
-// == [Reading the table]: seedRowOf, seededOf, routeSetsOf, todayOf, expectedOf, outcomeOf, withoutListing, precisTitleOf, titleOf
+// == [Reading the table]: seedRowOf, seededOf, routeSetsOf, expectedOf, outcomeOf, withoutListing, precisTitleOf, titleOf
 
 /** The row from nothing whose chain seeds `initial`: its dead record, its item, then its soon. */
 function seedRowOf(initial: CachePrecis): ChainCase | undefined {
@@ -288,11 +307,10 @@ function seedRowOf(initial: CachePrecis): ChainCase | undefined {
   return ChainCases.find((row) => (row.initial === Empty) && isEqual(row.chain, records))
 }
 
-/** The cache a minder seeded at `initial` should have, the listing aside: where its row from nothing ends by the feed. */
+/** Where a world seeded at `initial` should be, the listing aside: where its row from nothing should end. */
 function seededOf(initial: CachePrecis): EndPrecis {
   const row = seedRowOf(initial)
-  if (! row) { return Empty }
-  return withoutListing(todayOf(row, row.chain.map(() => 'f').join('')) ?? row.wanted)
+  return row ? withoutListing(row.wanted) : Empty
 }
 
 /** Every way to route `chain`, a route a step, as text. */
@@ -302,17 +320,10 @@ function routeSetsOf(chain: readonly Precis[]): string[] {
   return routeSets
 }
 
-/** Where `row` ends today by `routes`, or undefined where it ends as wanted. */
-function todayOf(row: ChainCase, routes: string): EndPrecis | undefined {
-  return row.todayBy?.[routes] ?? row.today
-}
-
-/** Where `row` should end by `routes` now: its today, else its wanted, with the listing as a list on the way left it.
+/** Where `row` should end by `routes`: its wanted, with the listing as a list on the way left it.
  * `cache` is where it ended, and `listedLife` the Thing's life when the listing was last read.
  */
 function expectedOf(row: ChainCase, routes: string, { cache, listedLife }: Awaited<ReturnType<typeof runChain>>): EndPrecis {
-  const today = todayOf(row, routes)
-  if (today) { return today }
   if (row.chain.every(([liveness], ii) => (liveness !== 'soon') || (routes[ii] !== 'g'))) { return row.wanted }
   // A list reads the listing anew: past it, only a change of life marks the listing.
   return { ...withoutListing(row.wanted), ...((lifeOf(cache) !== listedLife) && { isListingStale: true }) }
@@ -343,8 +354,7 @@ function titleOf(row: ChainCase): string {
 
 /** Every précis `row` names. */
 function precisesOf(row: ChainCase): Precis[] {
-  const states = [row.initial, row.wanted, ...(row.today ? [row.today] : []), ...Object.values(row.todayBy ?? {})]
-  return [...row.chain, ...states.flatMap(({ item, soon, dead }) => [item, soon, dead].filter((precis) => (precis !== undefined) && (precis !== null)))]
+  return [...row.chain, ...[row.initial, row.wanted].flatMap(({ item, soon, dead }) => [item, soon, dead].filter((precis) => (precis !== undefined) && (precis !== null)))]
 }
 
 /** Each précis, or pair of them, in `precises` that no one history of the box could store, as text. */
@@ -390,15 +400,9 @@ describe("the chain table", () => {
     const misses = ChainCases.filter((row) => (lifeOf(seedRowOf(row.initial)?.wanted ?? Empty) !== lifeOf(row.wanted)) !== (row.wanted.isListingStale === true))
     expect(misses.map((row) => titleOf(row))).to.deep.equal([])
   })
-
-  // A todayBy route no chain takes would be skipped without a word, and its row would assert wanted there.
-  it("names in todayBy only routes its chain can take", () => {
-    const strays = ChainCases.flatMap((row) => Object.keys(row.todayBy ?? {}).filter((routes) => ! routeSetsOf(row.chain).includes(routes)).map((routes) => `${titleOf(row)}: ${routes}`))
-    expect(strays).to.deep.equal([])
-  })
 })
 
-describe("a VaultMinder's cache after a chain of records", () => {
+describe("a VaultTSQ's box after a chain of records", () => {
   describe("each arriving by a fetch", () => {
     for (const row of ChainCases) {
       const routes = row.chain.map(() => 'g').join('')
@@ -408,6 +412,7 @@ describe("a VaultMinder's cache after a chain of records", () => {
         expect(run.seeded).to.deep.equal(seededOf(row.initial))
         const expected = expectedOf(row, routes, run)
         expect(outcomeOf(run, expected)).to.deep.equal(expected)
+        expect(run.faults).to.deep.equal([])
       })
     }
   })
@@ -421,6 +426,7 @@ describe("a VaultMinder's cache after a chain of records", () => {
         expect(run.seeded).to.deep.equal(seededOf(row.initial))
         const expected = expectedOf(row, routes, run)
         expect(outcomeOf(run, expected)).to.deep.equal(expected)
+        expect(run.faults).to.deep.equal([])
       })
     }
   })
@@ -436,7 +442,8 @@ describe("a VaultMinder's cache after a chain of records", () => {
         for (const routes of mixes) {
           const run      = await runChain(row, routes)
           const expected = expectedOf(row, routes, run)
-          if (! isEqual(outcomeOf(run, expected), expected)) { misses.push({ routes, end: outcomeOf(run, expected) }) }
+          const end      = outcomeOf(run, expected)
+          if (! isEqual(end, expected) || (run.faults.length > 0)) { misses.push({ routes, end, faults: run.faults }) }
         }
         expect(misses).to.deep.equal([])
       })

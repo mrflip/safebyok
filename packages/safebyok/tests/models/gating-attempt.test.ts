@@ -24,7 +24,7 @@ function fieldnamesOf(form: FormData): string[] { return [...form.keys()] }
 /** A device signed in to an unborn bank, ready for a birth. */
 async function unbornDevice() {
   const device = TH.makeDevice()
-  await device.signIn(TH.WorldScope.userid)
+  await device.signin(TH.WorldScope.userid)
   return device
 }
 
@@ -65,7 +65,7 @@ describe("device.gatingBirthAttempt(params)", () => {
 
   it("refuses as `Bank.birth` does, the form's secret fields deleted all the same, and quotes nothing of them", async () => {
     const device = TH.makeDevice({}, { strengthChecker: () => ({ strong: false, reason: 'too short' }) })
-    await device.signIn(TH.WorldScope.userid)
+    await device.signin(TH.WorldScope.userid)
     const form = formOf({ username: Username, passphrase: TH.TestPassphrase, confirmation: TH.TestPassphrase })
     const err = await TH.expectRefusal(device.gatingBirthAttempt(form), 'weak_passphrase')
     expect(fieldnamesOf(form)).to.deep.equal(['username'])
@@ -73,7 +73,7 @@ describe("device.gatingBirthAttempt(params)", () => {
     expect(device.bank).to.be.null
   })
 
-  it("empties a form's secret fields even where it refuses before `signIn` answers", () => {
+  it("empties a form's secret fields even where it refuses before `signin` answers", () => {
     const form = formOf({ passphrase: TH.TestPassphrase, confirmation: TH.TestPassphrase })
     TH.expectSyncRefusal(() => TH.makeDevice().birthGating(form), 'disabled')
     expect(fieldnamesOf(form)).to.deep.equal([])

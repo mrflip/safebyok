@@ -8,6 +8,7 @@ import * as Phrases from '../src/phrases'
 import { PostgresVaultDB, thingsChannelOf } from '../src/postgres-vault-db'
 import type { PostgresListen } from '../src/postgres-bank-db'
 import { TableVersion, VaultFunctionNames, VaultFunctionsSql } from '../src/vault-functions'
+import { GetThingSql } from '../src/vault-queries'
 import { VaultTablesSql } from '../src/vault-tables'
 import * as TH from './test-helpers'
 
@@ -157,6 +158,31 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
       const { rows } = await db.query(write, [JSON.stringify(record), JSON.stringify(cited)])
       expect(rows).to.deep.equal([{ ok: false, thing: box }])
     }
+  })
+
+  // A labelpath is at most two deep, so only a root is ever above a scope the adapter asks for: these call the statement past it.
+  it("reports, called past the adapter, the Thing stored above a scope with the longest labelpath that, with a '/', begins the scope's", async () => {
+    await makeVaultDB()
+    const db = await database()
+    await plant(VT.RootScope, VT.rootBoxOf())
+    await plant({ ...VT.ThingBank, labelpath: 'box/aa' }, VT.boxThingOf('aa'))
+    const ancestorAt = async (labelpath: string) => {
+      const { rows } = await db.query<{ ancestor: { labelpath: string } | null }>(GetThingSql.box, [VT.ThingBank.userid, VT.ThingBank.banklabel, labelpath, null])
+      return rows[0]?.ancestor?.labelpath ?? null
+    }
+    expect(await ancestorAt('box/aa/bb')).to.eq('box/aa')
+    expect(await ancestorAt('box/aab/cc')).to.eq('box')
+    expect(await ancestorAt('box/aa')).to.eq('box')
+    expect(await ancestorAt('box')).to.eq(null)
+  })
+
+  it("reads a '%' or '_' in a labelpath above a scope as itself, never as a wildcard", async () => {
+    await makeVaultDB()
+    const db = await database()
+    await plant(VT.RootScope, VT.rootBoxOf())
+    for (const label of ['a_', 'a%']) { await plant({ ...VT.ThingBank, labelpath: `box/${label}` }, VT.boxThingOf(label)) }
+    const { rows } = await db.query<{ ancestor: { labelpath: string } }>(GetThingSql.box, [VT.ThingBank.userid, VT.ThingBank.banklabel, 'box/ab/cc', null])
+    expect(rows[0]?.ancestor.labelpath).to.eq('box')
   })
 
   it("keeps no box tombstone whose sidecar is not {}", async () => {

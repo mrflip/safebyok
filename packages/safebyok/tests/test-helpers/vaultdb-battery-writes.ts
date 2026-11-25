@@ -2,30 +2,73 @@
 import { describe, expect, it } from 'vitest'
 import { expectBad, expectGood } from 'safebyok-big/testing'
 import * as Phrases from '../../src/phrases'
-import { Shell } from '../../src/shapes/shapes-thing'
+import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import { Thing } from '../../src/models/thing'
-import { delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
+import { type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import {
   BankScope, GateScope, Life0, MainWayin, OtherMainWayin, Passkey0Wayin, RootScope, ThingBank, WithPasskey, bankThingOf, birthAskOf, boxRebornOf, boxThingOf, boxTombOf,
   delAskFor, gateThingOf, getAskAt, getGateAskOf, nextGateOf, nextOf, replaceAskOf, rootBoxOf,
 } from './vaultdb-world'
 import { FirstRevtok, OtherLifetok, OtherRevtok, T0, revtokOf } from './models-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
-import { Lifeseq } from '../../src/shapes/primitives'
+import { type Labelpath, type Lifepath, Lifeseq } from '../../src/shapes/primitives'
+
+/** The shell at `labelpath` in the test bank, at `lifepath`. */
+function shellAt(labelpath: Labelpath, lifepath: Lifepath) { return Shell.of({ ...ThingBank, labelpath, lifepath }) }
+
+/** The ask that puts a box at `labelpath` over the shell under the root box's life 0, refused where none is stored. */
+function voidPutAt(labelpath: Labelpath): WriteAsk {
+  return { ...birthAskOf(boxThingOf(labelpath.slice('box/'.length)), Shell.childCited(Life0)), ifAbsent: 'fail' }
+}
+
+/** The ask that deletes the box at `box/zz` at its revision 0, refused `ahead` where none is stored. */
+const ZzAheadDel = delAskFor(boxThingOf('zz'), boxTombOf(boxThingOf('zz')))
+
+/** The shell's lifeseq twice: the lifepath of a shell one under a root, where neither is stored. */
+const ShellUnderShell = `${Shell.VoidLifeseq}/${Shell.VoidLifeseq}`
 
 /** Register the battery's cases of a Thing's get and write. */
 export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, gotAt, rowsOf }: VaultDBBatteryWorld): void {
   describe("tryGetThing(ask)", () => {
-    it("answers gotvoid, with null and a null dbhas, where none is stored", async () => {
+    it("answers gotvoid, with null and the root's shell as its dbhas, where none is stored at a root", async () => {
       const vaultDB = await fresh()
       const answer = await vaultDB.tryGetThing(getGateAskOf('nil'))
-      expect(answer).to.deep.include({ ok: true, act: 'gotvoid', val: null, dbhas: null, world: null })
+      expect(answer).to.deep.include({ ok: true, act: 'gotvoid', val: null, dbhas: Shell.of(GateScope), world: null })
+      expect(Shell.of(GateScope)).to.deep.include({ lifepath: Shell.VoidLifeseq })
     })
 
-    it("refuses where none is stored and ifAbsent is 'fail'", async () => {
+    it("refuses where none is stored and ifAbsent is 'fail', with the void sentinel as its dbhas", async () => {
       const vaultDB = await fresh()
-      const answer = await vaultDB.tryGetThing(getGateAskOf('fail'))
-      expect(answer).to.deep.include({ ok: false, act: 'void', dbhas: null })
+      expect(await vaultDB.tryGetThing(getGateAskOf('fail'))).to.deep.include({ ok: false, act: 'void', dbhas: Shell.of(GateScope) })
+      const born = await bornBank()
+      const answer = await born.tryGetThing(getAskAt('box/zz', 'fail'))
+      expect(answer).to.deep.include({ ok: false, act: 'void', dbhas: shellAt('box/zz', `${Life0}/${Shell.VoidLifeseq}`) })
+    })
+
+    it("answers gotvoid under a live parent with the void sentinel under the parent's lifepath", async () => {
+      const vaultDB = await bornBank()
+      expect(await vaultDB.tryGetThing(getAskAt('box/zz'))).to.deep.include({ ok: true, act: 'gotvoid', dbhas: shellAt('box/zz', `${Life0}/${Shell.VoidLifeseq}`) })
+      expect(await vaultDB.tryGetThing(getAskAt('gate/backup'))).to.deep.include({ ok: true, act: 'gotvoid', dbhas: shellAt('gate/backup', `${Life0}/${Shell.VoidLifeseq}`) })
+    })
+
+    it("answers gotvoid under a parent that is a tombstone with the void sentinel under the tombstone's lifepath", async () => {
+      const vaultDB = await bornBank()
+      const [root, rootTomb] = [rootBoxOf(), boxTombOf(rootBoxOf())]
+      await expectGood(vaultDB.tryWriteThing(delAskFor(root, rootTomb)))
+      expect(await vaultDB.tryGetThing(getAskAt('box/zz'))).to.deep.include({ ok: true, act: 'gotvoid', dbhas: shellAt('box/zz', `${rootTomb.lifepath}/${Shell.VoidLifeseq}`) })
+    })
+
+    it("answers gotvoid under a parent not stored with the void sentinel under the shell's lifeseq", async () => {
+      const vaultDB = await withGate()
+      expect(await vaultDB.tryGetThing(getAskAt('box/zz'))).to.deep.include({ ok: true, act: 'gotvoid', dbhas: shellAt('box/zz', ShellUnderShell) })
+    })
+
+    it("takes as the Thing above a scope only one whose labelpath and a '/' begin the scope's: box/open is none of box/openai's", async () => {
+      const vaultDB = await bornBank()
+      await boxesBorn(vaultDB, boxThingOf('open'))
+      for (const labelpath of ['box/openai', 'box/open_ai']) {
+        expect(await vaultDB.tryGetThing(getAskAt(labelpath))).to.deep.include({ ok: true, act: 'gotvoid', dbhas: shellAt(labelpath, `${Life0}/${Shell.VoidLifeseq}`) })
+      }
     })
 
     it("answers gotlive with the Thing stored", async () => {
@@ -120,10 +163,42 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       expect(answer).to.deep.include({ act: 'policied', dbhas: stored })
     })
 
-    it("refuses a write over nothing under ifAbsent 'fail'", async () => {
+    it("refuses a write over nothing under ifAbsent 'fail', and one citing a revision where none is stored, with the root's shell as its dbhas", async () => {
       const vaultDB = await fresh()
-      const answer = await vaultDB.tryWriteThing({ ...birthAskOf(), ifAbsent: 'fail' })
-      expect(answer).to.deep.include({ ok: false, act: 'void', dbhas: null })
+      expect(await vaultDB.tryWriteThing({ ...birthAskOf(), ifAbsent: 'fail' })).to.deep.include({ ok: false, act: 'void', dbhas: Shell.of(GateScope) })
+      const ahead = replaceAskOf(stored, nextGateOf(stored))
+      expect(await vaultDB.tryWriteThing(ahead)).to.deep.include({ ok: false, act: 'ahead', dbhas: Shell.of(GateScope) })
+    })
+
+    it("refuses a write over nothing under a live parent with the shell under the parent's lifepath as its dbhas", async () => {
+      const vaultDB = await bornBank()
+      const shell = shellAt('box/zz', `${Life0}/${Shell.VoidLifeseq}`)
+      expect(await vaultDB.tryWriteThing(voidPutAt('box/zz'))).to.deep.include({ ok: false, act: 'void', dbhas: shell })
+      expect(await vaultDB.tryWriteThing(ZzAheadDel)).to.deep.include({ ok: false, act: 'ahead', dbhas: shell })
+    })
+
+    it("refuses a write over nothing under a parent that is a tombstone with the shell under the tombstone's lifepath as its dbhas", async () => {
+      const vaultDB = await bornBank()
+      const [root, rootTomb] = [rootBoxOf(), boxTombOf(rootBoxOf())]
+      await expectGood(vaultDB.tryWriteThing(delAskFor(root, rootTomb)))
+      const shell = shellAt('box/zz', `${rootTomb.lifepath}/${Shell.VoidLifeseq}`)
+      expect(await vaultDB.tryWriteThing(voidPutAt('box/zz'))).to.deep.include({ ok: false, act: 'void', dbhas: shell })
+      expect(await vaultDB.tryWriteThing(ZzAheadDel)).to.deep.include({ ok: false, act: 'ahead', dbhas: shell })
+    })
+
+    it("refuses a write over nothing under a parent not stored with the shell under the shell's lifeseq as its dbhas", async () => {
+      const vaultDB = await withGate()
+      const shell = shellAt('box/zz', ShellUnderShell)
+      expect(await vaultDB.tryWriteThing(voidPutAt('box/zz'))).to.deep.include({ ok: false, act: 'void', dbhas: shell })
+      expect(await vaultDB.tryWriteThing(ZzAheadDel)).to.deep.include({ ok: false, act: 'ahead', dbhas: shell })
+    })
+
+    it("refuses a write over nothing with the shell under the root box, never under a sibling whose labelpath begins the same", async () => {
+      const vaultDB = await bornBank()
+      await boxesBorn(vaultDB, boxThingOf('open'))
+      for (const labelpath of ['box/openai', 'box/open_ai']) {
+        expect(await vaultDB.tryWriteThing(voidPutAt(labelpath))).to.deep.include({ ok: false, act: 'void', dbhas: shellAt(labelpath, `${Life0}/${Shell.VoidLifeseq}`) })
+      }
     })
 
     it("refuses the main gate's deletion, writing nothing", async () => {
@@ -299,7 +374,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       await expectGood(vaultDB.tryWriteThing(delAskFor(box, tomb)))
       expect(await vaultDB.tryWriteThing(delAskFor(box, tomb))).to.deep.include({ ok: false, act: 'retcon', dbhas: tomb })
       const empty = await fresh()
-      expect(await empty.tryWriteThing(delAskFor(box, tomb))).to.deep.include({ ok: false, dbhas: null })
+      expect(await empty.tryWriteThing(delAskFor(box, tomb))).to.deep.include({ ok: false, act: 'ahead', dbhas: shellAt(box.labelpath, ShellUnderShell) })
     })
 
     it("answers dubdel to a del citing a tombstone", async () => {
@@ -347,6 +422,29 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       const next = nextOf(box)
       expect(await vaultDB.tryWriteThing(replaceAskOf(box, next))).to.deep.include({ ok: true, act: 'replaced', val: next })
       expect(await gotAt(vaultDB, box.labelpath)).to.deep.equal(next)
+    })
+  })
+
+  describe("the records its answers carry", () => {
+    it("are deeply frozen, a box's sidecar and the world's main gate among them", async () => {
+      const vaultDB = await bornBank()
+      const [box] = await boxesBorn(vaultDB, boxThingOf('openai', { sidecar: { account: 'work' } }))
+      const answer = await vaultDB.tryGetThing(getAskAt(box!.labelpath))
+      const val = await expectGood(answer) as BoxRecord
+      expect(val.sidecar).to.deep.equal({ account: 'work' })
+      expect([Object.isFrozen(val), Object.isFrozen(val.sidecar), Object.isFrozen(answer.world?.maingate)]).to.deep.equal([true, true, true])
+      const listed = await vaultDB.tryListThings(listAskOf(RootScope))
+      const kids = await expectGood(listed)
+      expect([Object.isFrozen(kids.items), Object.isFrozen(listed.deltas[0])]).to.deep.equal([true, true])
+    })
+
+    it("never freeze the ask or the record a caller hands a write", async () => {
+      const vaultDB = await bornBank()
+      const box = boxThingOf('openai', { sidecar: { account: 'work' } })
+      const ask = birthAskOf(box, Shell.childCited(Life0))
+      const written = await expectGood(vaultDB.tryWriteThing(ask))
+      expect([Object.isFrozen(ask), Object.isFrozen(box), Object.isFrozen(box.sidecar)]).to.deep.equal([false, false, false])
+      expect(Object.isFrozen(written)).to.be.true
     })
   })
 

@@ -36,7 +36,7 @@ describe("wontfix: a stage switch that shows a suspending subtree once unlocked"
     // The boundary sits above the switch, so the locked screen is content already shown: a transition would keep it, where a new boundary shows its fallback regardless.
     render(TH.providerTreeOf(world, <Suspense fallback={<Fallback />}><StageSwitch /></Suspense>, { userid: TH.ProviderUser }))
     const device = await waitFor(() => world._cheat_device())
-    await act(() => device.signIn(TH.ProviderUser))
+    await act(() => device.signin(TH.ProviderUser))
     await screen.findByText('The stage is locked')
     expect(fallbacksShown).to.eq(0)
     await act(() => device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))

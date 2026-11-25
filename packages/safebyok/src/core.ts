@@ -1,13 +1,15 @@
-// safebyok/core: the device, bank, gate, wayin and lease, the gate's form verbs and the methods that seal the bank's boxes and
-// put its Things, and every type their signatures name; no caching, so neither the VaultMinder nor TanStack Query. Private
+// safebyok/core: the device, its world, bank, gate, wayin and lease, the gate's form verbs and the methods that put its Things,
+// and every type their signatures name; no caching, so neither the VaultTSQ nor TanStack Query. Private
 // while it is built. The proving classes are exported as types alone: a proving's `buildLease` is public, and a proving is
 // built only in a form verb's gating, which hands it to the gate's private verbs.
 export { Bank } from './models/bank'
 export { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from './models/device'
 export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
 export { BaseBox } from './models/base-box'
+export { Box } from './models/box'
 export { Gate } from './models/gate'
-export { Thing } from './models/thing'
+export { type WorldThing, World } from './models/world'
+export { type Adoptable, Thing } from './models/thing'
 export { Lease, withoutSecrets } from './models/lease'
 export type { Novel, PasskeyProving, PassphraseProving, Proving } from './models/proving'
 export type {
@@ -23,20 +25,21 @@ export { type PasskeyWayinHeader, type PasskeyWayinRecord, type PassphraseWayinH
 export type { AddPasskeyGating, BirthGating, Gating, ReplacePassphraseGating, RevokePasskeyGating, UnlockGating } from './models/gating'
 export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
-  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside, type ReadTc,
-  type VaultDB, type WriteThingAnswer, isVaultDB,
-} from './storage/vault-db'
-export type { Agerank, Recordkind, VaultAgedEvent, VaultEvent, VaultEventOf, VaultEventkind, VaultItemEvent, VaultLifeEvent } from './shapes/shapes-vault-event'
+  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside,
+  type WriteThingAnswer,
+} from './shapes/shapes-answers'
+export { type VaultDB, isVaultDB } from './storage/vault-db'
+export type { Agerank, ItemSeen, Liveness, ReadTc, VaultAgedEvent, VaultEvent, VaultEventOf, VaultEventkind, VaultItemEvent, VaultLifeEvent } from './shapes/shapes-vault-event'
 export { type DevicePersisters, type PersistedClient, type Persister, type PersisterOfBank, MemoryPersister, isPersister } from './storage/persister'
 export {
   type BadNews, type BadNewsHandler, type BankAskDraft, type BankOpts, type BankSnapshot, type BankStage, type BoxUnsealed, type DeviceJSON, type DeviceOpts, type DeviceRecord,
-  type DeviceSnapshot, type HostedVault, type RefusalSnapshot,
+  type DeviceSnapshot, type HostedVault, type RefusalSnapshot, type WorldOpts,
   BankishChecks, DefaultBanklabel, PendingBank, SignedOutBank, bankStageVals,
 } from './shapes/shapes-bankish'
 export {
   type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateGatingFriend, type GateOpts, type GateRevisionedStamp, type GatingCleartexts, type GuardedKeyDeriver,
   type GuardedStrengthChecker, type HandedCleartexts, type LeaseGate, type LeaseOpts, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type ProvedCleartexts, type ProvingDevice,
-  type ProvingOpts, type ProvingParts, type ReplacePassphraseDna, type RevokePasskeyDna, type SecretFieldname, type StrengthChecker, type UnlockCleartexts, type UnlockDna, CleartextChecks,
+  type ProvingOpts, type ProvingParts, type ReplacePassphraseDna, type RevokePasskeyDna, type SecretFieldname, type StrengthChecker, type UnlockCleartexts, type UnlockDna, type WorldGateFriend, CleartextChecks,
   FormSecretFieldnames, GateishChecks, GatingChecks,
 } from './shapes/shapes-gateish'
 export {
@@ -48,9 +51,8 @@ export {
   type VoidSentinel, type Wayins, Shell, ThingChecks, thingkindVals,
 } from './shapes/shapes-thing'
 export { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from './shapes/shapes-thingkinds'
-// A bank is made with the defaults its minders set on their cached items and lists, and a device shows a devtool a masked view of
-// its bank TSQ, vault TSQ and lease; the minder itself is on the front door.
-export { type MaskedRow, type MaskedView, type MaskedViewLease, type QueryCacheOpts, EmptyMaskedView } from './shapes/shapes-minder'
+// A device shows a devtool a masked view of the roots it keeps, its vault TSQ and its lease; the VaultTSQ itself is on the front door.
+export { type MaskedRow, type MaskedView, type MaskedViewLease, EmptyMaskedView } from './shapes/shapes-masked-view'
 
 // From safebyok-big, re-exported so that each stays one binding across both packages: its refusals and logger, what a
 // device is handed, what a form verb, a wayin and a box carry, and the acts a vaultDB's answer reports.

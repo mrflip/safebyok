@@ -14,12 +14,12 @@ export const SessionBar = ({ auth, session }: { auth: Auth, session: Session | n
 
   if (session !== null) { return <AccountMenu auth={auth} session={session} /> }
 
-  const signIn = async () => {
+  const signin = async () => {
     // The vault lives in this browser's IndexedDB, which the browser may evict unless asked not to.
     // Ask here, on the user's own click, because a browser may show a prompt for it.
     void keepStorage()
     try {
-      await auth.signIn(userlabelText.trim())
+      await auth.signin(userlabelText.trim())
       setUserlabelText('')
       setGripe(null)
     } catch (err) {
@@ -34,9 +34,9 @@ export const SessionBar = ({ auth, session }: { auth: Auth, session: Session | n
         aria-label="username"
         value={userlabelText}
         onChange={(evt) => { setUserlabelText(evt.target.value) }}
-        onKeyDown={(evt) => { if (evt.key === 'Enter') { void signIn() } }}
+        onKeyDown={(evt) => { if (evt.key === 'Enter') { void signin() } }}
       />
-      <button onClick={() => { void signIn() }}>Sign in</button>
+      <button onClick={() => { void signin() }}>Sign in</button>
       {gripe !== null && <span className="gripe">{gripe}</span>}
     </div>
   )

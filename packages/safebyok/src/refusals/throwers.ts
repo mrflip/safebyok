@@ -3,10 +3,11 @@
 // The rules for a refusal, its thrower and its phrase are at the top of safebyok-big's refusals/throwers.ts.
 
 import { Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
+import { unexpectedError } from 'safebyok-big/refusals/throwers'
 import * as Phrases from '../phrases'
 import { type ThingRecord } from '../shapes/shapes-thing'
-import { type GetAsk, type ListAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
-import type { DamagedThing } from '../storage/vault-db'
+import { type ListAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
+import type { DamagedThing } from '../shapes/shapes-answers'
 
 // == [Big's Throwers]: every thrower of safebyok-big, re-exported
 
@@ -14,19 +15,27 @@ import type { DamagedThing } from '../storage/vault-db'
 export * from 'safebyok-big/refusals/throwers'
 // --
 
-// == [Model Throwers]: bankSwept, bankNotBroughtUp, nobodySignedIn, gateSwept, unlockDismissed, gatingSpent, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, boxSoonestBare
+// == [Outcome Throwers]: refusalOfThrown
+
+/** The refusal standing for what a function threw: a refusal as it is, anything else as `unexpected_error`, a bug in safebyok or in the host's own function. */
+export function refusalOfThrown(thrown: unknown): Errors.VaultError { return Errors.isVaultError(thrown) ? thrown : unexpectedError(thrown) }
+// --
+
+// == [Model Throwers]: bankSwept, signinUnanswered, nobodySignedIn, thingNotLive, unlockDismissed, gatingSpent, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, boxSoonestBare
 
 /** A `disabled` refusal: the bank was swept. */
 export function bankSwept(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.BankSwept) }
 
-/** A `disabled` refusal: the device has not brought up its user's bank yet. */
-export function bankNotBroughtUp(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.BankNotBroughtUp) }
+/** A `disabled` refusal: the device's sign-in has not answered yet. */
+export function signinUnanswered(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.SigninUnanswered) }
 
 /** An `absent_vault` refusal: nobody is signed in on the device. */
 export function nobodySignedIn(): Errors.VaultError { return new Errors.VaultError('absent_vault', Phrases.NobodySignedIn) }
 
-/** A `disabled` refusal: the gate was swept. */
-export function gateSwept(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.GateSwept) }
+/** An `absent_thing` refusal: the bank or gate at `labelpath` holds the shell or a tombstone, not a live record. */
+export function thingNotLive(labelpath: string): Errors.VaultError {
+  return new Errors.VaultError('absent_thing', Phrases.ThingNotLive, { meta: { labelpaths: [labelpath] } })
+}
 
 /** A `dismissed` refusal: the wait for an `unlock` gating was dismissed. */
 export function unlockDismissed(): Errors.VaultError { return new Errors.VaultError('dismissed', Phrases.UnlockDismissed) }
@@ -115,23 +124,13 @@ export function bankRootsMissing(): Errors.VaultError { return new Errors.VaultE
 export function answerNotMade(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerNotMade) }
 // --
 
-// == [Minding Throwers]: notMinded, worldNotHeard, minderNotStarted, staleRead, childrenStoredDamaged
+// == [Minding Throwers]: notMinded, worldNotHeard, childrenStoredDamaged
 
-/** The refusal of a write through a minder of a Thing it does not mind. */
+/** The refusal of a box's item asked of a vault TSQ for a Thing other than a box under the root box. */
 export function notMinded(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.NotMinded) }
 
-/** The refusal of a Bank made or read while its device's BankMinder holds no world of its bank. */
+/** The refusal of a bank's root box read while its world holds none live. */
 export function worldNotHeard(): Errors.VaultError { return new Errors.VaultError('record_conflict', Phrases.WorldNotHeard) }
-
-/** The refusal of a read or a write on a minder that is not minding. */
-export function minderNotStarted(): Errors.VaultError {
-  return new Errors.VaultError('disabled', Phrases.MinderNotStarted)
-}
-
-/** The refusal of a get answered with a revision older than one cached when it began. */
-export function staleRead(ask: GetAsk): Errors.VaultError {
-  return new Errors.VaultError('stale_read', Phrases.StaleRead, { meta: { ask: loggableAskOf(ask) } })
-}
 
 /** The bad news of `damaged_rows`, the children a list for `ask` found stored damaged and left out, each named by its labelpath. */
 export function childrenStoredDamaged(ask: ListAsk, damaged_rows: readonly DamagedThing[]): Errors.VaultError {

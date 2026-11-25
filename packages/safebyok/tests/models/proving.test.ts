@@ -2,10 +2,10 @@ import { describe, expect, it, type Mock, vi } from 'vitest'
 import type { Deriver } from 'safebyok-big/internals'
 import { Consts, Crypto, Errors, GX, Phrases } from 'safebyok-big/internals'
 import { BaseBox } from '../../src/models/base-box'
-import { Gate } from '../../src/models/gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
 import type { ProvingDevice } from '../../src/shapes/shapes-gateish'
 import type { StampedGate } from '../../src/shapes/shapes-stamps'
+import type { GateRecord } from '../../src/shapes/shapes-thing'
 import { Wayin } from '../../src/models/wayin'
 import { Lifeseq } from '../../src/shapes/primitives'
 
@@ -39,26 +39,25 @@ function novelPasskey(answer = TH.passkeyAnswerOf(), device: ProvingDevice = TH.
 }
 
 /** The main gate of a bank born with both wayins, beside a function giving a fresh copy of the answer that unwraps its passkey's. */
-async function gateWithBoth(): Promise<{ gate: Gate, answerOf: () => GX.PasskeyAnswer }> {
+async function gateWithBoth(): Promise<{ gate: TH.LiveGate, answerOf: () => GX.PasskeyAnswer }> {
   const answer = TH.passkeyAnswerOf()
   const { bank } = await TH.buildBornBank({ passkeyCleartext: TH.copyOfAnswer(answer) })
   return { gate: bank.gate, answerOf: () => TH.copyOfAnswer(answer) }
 }
 
 /** The main gate of a bank born with its passphrase's wayin alone. */
-async function gateWithPassphrase(): Promise<Gate> {
+async function gateWithPassphrase(): Promise<TH.LiveGate> {
   const { bank } = await TH.buildBornBank()
   return bank.gate
 }
 
-/** The gate of `record`, of {@link TH.WorldBankStamp}'s bank. */
-function gateOf(record: unknown): Gate {
-  const device = TH.makeDevice()
-  return Gate.make(record as never, { device, bankStamp: TH.WorldBankStamp })
+/** The gate of `record`, made by the world of `gate`, a gate of {@link TH.WorldBankStamp}'s bank. */
+function gateOf(gate: TH.LiveGate, record: unknown): TH.LiveGate {
+  return TH.liveGateOf(gate.device.world.makeThing(record as GateRecord))
 }
 
 /** The arguments of a proving of `gate`, under a bank's stamp and a gate's stamp each moved by `moves`: the stamps a Gate would refuse to be made under. */
-function movedGate(gate: Gate, moves: { bank?: object, gate?: object }): StampedGate {
+function movedGate(gate: TH.LiveGate, moves: { bank?: object, gate?: object }): StampedGate {
   return { bankStamp: { ...TH.WorldBankStamp, ...moves.bank }, stamp: { ...TH.WorldGateStamp, ...moves.gate }, wayins: gate.wayins }
 }
 
@@ -562,13 +561,13 @@ describe("the ctx a wayin is wrapped under", () => {
   for (const [altered, blurb] of HeaderCases) {
     it(`a passphrase wayin will not unwrap under ${blurb}`, async () => {
       const gate = await gateWithPassphrase()
-      const moved = gateOf({ ...gate.pickle(), wayins: { ...gate.wayins, main: { ...gate.wayins.main, ...altered } } })
+      const moved = gateOf(gate, { ...gate.pickle(), wayins: { ...gate.wayins, main: { ...gate.wayins.main, ...altered } } })
       await TH.expectRefusal(PassphraseProving.buildStored(TH.provingDeviceOf(), moved, TH.TestPassphrase), 'wrong_passphrase')
     })
 
     it(`a passkey wayin will not unwrap under ${blurb}`, async () => {
       const { gate, answerOf } = await gateWithBoth()
-      const moved = gateOf({ ...gate.pickle(), wayins: { ...gate.wayins, passkey0: { ...gate.wayins.passkey0!, ...altered } } })
+      const moved = gateOf(gate, { ...gate.pickle(), wayins: { ...gate.wayins, passkey0: { ...gate.wayins.passkey0!, ...altered } } })
       await TH.expectRefusal(PasskeyProving.buildStored(moved, answerOf()), 'wrong_passkey')
     })
   }

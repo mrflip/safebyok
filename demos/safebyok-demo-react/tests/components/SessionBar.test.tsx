@@ -13,7 +13,7 @@ const renderBar = async () => {
 describe("SessionBar", () => {
   it("signs in by username, trimmed, and shows the account menu", async () => {
     const { auth } = await renderBar()
-    TH.signInAs('  margo ')
+    TH.signinAs('  margo ')
     await screen.findByText('margo')
     expect(auth.getSnapshot()?.userlabel).to.eq('margo')
     expect(screen.getByRole('region', { name: 'Account' })).to.not.be.null
@@ -35,7 +35,7 @@ describe("SessionBar", () => {
     try {
       await renderBar()
       expect(persist).not.toHaveBeenCalled()
-      TH.signInAs('margo')
+      TH.signinAs('margo')
       await screen.findByText('margo')
       expect(persist).toHaveBeenCalledOnce()
     } finally {
@@ -45,7 +45,7 @@ describe("SessionBar", () => {
 
   it("says what a username is when one will not do, and stays signed out", async () => {
     const { auth } = await renderBar()
-    TH.signInAs('not a label')
+    TH.signinAs('not a label')
     await screen.findByText(/A username is 2 to 40 lowercase letters/)
     expect(auth.getSnapshot()).to.be.null
   })

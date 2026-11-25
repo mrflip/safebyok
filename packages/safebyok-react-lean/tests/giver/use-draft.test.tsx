@@ -1,6 +1,6 @@
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { type ReactNode, useActionState, useEffect } from 'react'
-import { type BoxRecord, VaultMinder, isVaultError } from 'safebyok'
+import { type BoxRecord, VaultTSQ, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it } from 'vitest'
 import type { Draft, DraftPutOpts } from '../../src/giver/use-draft'
@@ -9,8 +9,8 @@ import * as TH from '../test-helpers'
 /** A key for the joke service a user types, an obvious fake. */
 const TypedKey = 'sk-test-typed-4242'
 
-/** The key the minder caches the jokes box under, for the world's user. */
-const JokesItemKey = VaultMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: `box/${TH.JokesPath}` })
+/** The key the vault TSQ keeps the jokes box under, for the world's user. */
+const JokesItemKey = VaultTSQ.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: `box/${TH.JokesPath}` })
 
 /** What the draft editor last answered and its last put settled to, for a test to read. */
 interface DraftSeen {
@@ -60,7 +60,7 @@ async function renderDraftEditor({ putOpts, isLocked = false, isInForm = false }
   const rendered = render(TH.providerTreeOf(world, <editor.DraftEditor />, { userid: TH.ProviderUser }))
   const device = await waitFor(() => world._cheat_device())
   await act(async () => {
-    await device.signIn(TH.ProviderUser)
+    await device.signin(TH.ProviderUser)
     if (! isLocked) { await device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }) }
   })
   await screen.findByText('Tier none')

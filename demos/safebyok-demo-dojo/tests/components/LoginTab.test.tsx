@@ -37,11 +37,11 @@ describe("the Login form", () => {
     await TH.stageShown('unborn')
   })
 
-  it("Exists: refuses gate_made_elsewhere, every field keeps its text, and the page still shows the bank unborn", async () => {
+  it("Exists: refuses gate_made_elsewhere, every field keeps its text, and the page shows the bank that was stored, locked", async () => {
     const reading = await TH.press(await filledLogin(), 'Exists')
     expect(reading).to.deep.include({ username: 'has text', passphrase: 'has text', confirmation: 'has text', refusal: 'gate_made_elsewhere' })
     expect(reading['message']).to.match(/^This vault's passphrase was just set on another device/u)
-    await TH.stageShown('unborn')
+    await TH.stageShown('locked')
   })
 
   it("Failed: refuses storage_unavailable, and every field keeps its text, the username too", async () => {

@@ -104,7 +104,7 @@ export function bankResolvers<ContextT>(opts: BankResolversOpts<ContextT>): Bank
   const { bankDB, getUserId } = bankResolversOpts.parse(opts)
 
   /** Return null if the request is signed in as `user_id`, else the refusal to send back. */
-  async function signInRefusalOf(context: ContextT, user_id: UserID): Promise<DB.VaultError | null> {
+  async function signinRefusalOf(context: ContextT, user_id: UserID): Promise<DB.VaultError | null> {
     const signedIn = await DB.outcomeOf(() => getUserId(context))
     if (! signedIn.ok) { return signedIn.err }
     return (signedIn.val === user_id) ? null : DB.identityRevoked()
@@ -114,7 +114,7 @@ export function bankResolvers<ContextT>(opts: BankResolversOpts<ContextT>): Bank
    * Otherwise return a bad answer in wire form: the refusal from checking `ask` if it fails, else the sign-in refusal.
    */
   async function serveSignedIn(context: ContextT, user_id: UserID, ask: object, verb: () => Promise<BX.Answer<unknown, DB.GoodAct, unknown>>): Promise<CrossingAnswer> {
-    const refusal = await signInRefusalOf(context, user_id)
+    const refusal = await signinRefusalOf(context, user_id)
     if (refusal === null) { return crossingOf(await verb()) }
     const loggableAsk = await DB.outcomeOf(() => BX.loggableAsk.parse(ask))
     if (! loggableAsk.ok) { return crossingOf(BX.badAnswerOf(loggableAsk.err)) }
@@ -123,7 +123,7 @@ export function bankResolvers<ContextT>(opts: BankResolversOpts<ContextT>): Bank
 
   /** Watch `scope` and yield its notices in wire form, for as long as the request stays signed in as that user. */
   async function watchNotices(context: ContextT, scope: DB.WatchScope): Promise<AsyncIterableIterator<CrossingNotice>> {
-    const refusal = await signInRefusalOf(context, scope.user_id)
+    const refusal = await signinRefusalOf(context, scope.user_id)
     if (refusal !== null) { return endingWith(refusal) }
     // bankDB.watch throws `bad_scope` inside the stream's `start`, and the ReadableStream constructor rethrows it.
     const watched = await DB.outcomeOf(() => openWatch(bankDB, scope))
@@ -135,7 +135,7 @@ export function bankResolvers<ContextT>(opts: BankResolversOpts<ContextT>): Bank
         if (read.done) { return read }
         // Check the sign-in again at every notice. A session revoked after it subscribed gets one last notice
         // carrying the refusal, and so does a watch's bad news. The stream is cancelled, so the read after that is done.
-        const revoked = await signInRefusalOf(context, scope.user_id)
+        const revoked = await signinRefusalOf(context, scope.user_id)
         if (revoked !== null) {
           await reader.cancel()
           return { done: false, value: badNoticeOf(revoked) }

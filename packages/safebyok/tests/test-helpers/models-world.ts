@@ -12,25 +12,27 @@ import type { Deriver } from 'safebyok-big/internals'
 import { Consts, Crypto, GX, SX } from 'safebyok-big/internals'
 import { anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testing'
 import { Bank } from '../../src/models/bank'
+import type { Box } from '../../src/models/box'
+import type { Gate } from '../../src/models/gate'
 import { Device } from '../../src/models/device'
-import { Gate } from '../../src/models/gate'
 import { Gating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
 import type { Vault } from '../../src/models/vault'
-import type { VaultMinder } from '../../src/minding/vault-minder'
+import type { VaultTSQ } from '../../src/minding/vault-tsq'
 import { PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
 import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import type { DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
-import type { ShellOf } from '../../src/shapes/shapes-sealers'
-import type { BankRecord, BoxRecord, GateRecord } from '../../src/shapes/shapes-thing'
+import type { LiveOf, ShellOf } from '../../src/shapes/shapes-sealers'
+import type { BankRecord, BoxRecord, GateRecord, Wayins } from '../../src/shapes/shapes-thing'
 import { type GateRevisionedStamp, type GatingCleartexts, type LeaseGate, type ProvingDevice, type StrengthChecker, GatingChecks } from '../../src/shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { BirthBankAsk } from '../../src/shapes/shapes-asks'
-import type { BirthBankAnswer, VaultDB } from '../../src/storage/vault-db'
-import { type Userid, Lifeseq } from '../../src/shapes/primitives'
+import type { BirthBankAnswer } from '../../src/shapes/shapes-answers'
+import type { VaultDB } from '../../src/storage/vault-db'
+import { type Lifetok, type Userid, Lifeseq } from '../../src/shapes/primitives'
 
 // == [Time]: T0, useFakeClock
 
@@ -101,14 +103,14 @@ export function provingDeviceOf({ keyDeriver = testDeriver, strengthChecker = an
 /** What a {@link makeDevice} device is made of: its record, and the user it signs in, or null to leave it signed out. */
 export type DeviceGiven = Partial<DeviceRecord & { userid: Userid | null }>
 
-/** A Device of {@link WorldScope}'s banklabel and {@link DeviceTok}, signed in as its user and bringing up that user's bank, with `given` laid over them:
+/** A Device of {@link WorldScope}'s banklabel and {@link DeviceTok}, signed in as its user, its sign-in under way, with `given` laid over them:
  * over `testDeriver`, a checker that passes everything, a quiet logger and a fresh MemoryVaultDB, with `opts` laid over those.
- * Await `device.signIn(device.userid!)` for its bank to come up.
+ * Await `device.signin(device.userid!)` for its bank to come up.
  */
 export function makeDevice(given: DeviceGiven = {}, opts: Partial<DeviceOpts> = {}): Device {
   const { userid = WorldScope.userid, ...record } = given
   const device = Device.make({ banklabel: WorldScope.banklabel, device_tok: DeviceTok, ...record }, { keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, vaultDB: new MemoryVaultDB(), ...opts })
-  if (userid !== null) { void device.signIn(userid) }
+  if (userid !== null) { void device.signin(userid) }
   return device
 }
 
@@ -121,7 +123,36 @@ export function passkeyAnswerOf(overrides: Partial<GX.PasskeyAnswer> = {}): GX.P
 export function copyOfAnswer(answer: GX.PasskeyAnswer): GX.PasskeyAnswer { return { ...answer, prfBytes: new Uint8Array(answer.prfBytes) } }
 // --
 
-// == [A born bank]: BornBankGiven, BornBank, buildBornBank, makeStoredBank, BornVault, buildBornVault
+// == [A born bank]: LiveGate, LiveBank, liveGateOf, livePickleOf, BornBankGiven, BornBank, buildBornBank, BornVault, buildBornVault
+
+// The narrowed members come first: TypeScript reads an intersection's methods as overloads, in order.
+/** A gate that models a live record: its pickle is whole and its wayins present. */
+export type LiveGate = { pickle(): GateRecord, readonly wayins: Wayins } & Gate
+
+/** A bank that models a live record, its main gate too, as a born bank does: its pickle is whole and its lifetok present. */
+export type LiveBank = { pickle(): BankRecord, readonly lifetok: Lifetok, readonly gate: LiveGate } & Bank
+
+/** `gate`, narrowed to a {@link LiveGate}. Throws where it models the shell or a tombstone. */
+export function liveGateOf(gate: Gate): LiveGate {
+  if (! isLiveGate(gate)) { throw new Error(`The gate at ${gate.labelpath} models no live record.`) }
+  return gate
+}
+
+/** The whole live record `thing` models, narrowed from its pickle. Throws where it models the shell or a tombstone. */
+export function livePickleOf(thing: Gate): GateRecord
+export function livePickleOf(thing: Bank): BankRecord
+export function livePickleOf(thing: Box): LiveOf<BoxRecord>
+export function livePickleOf(thing: Gate | Bank | Box): GateRecord | BankRecord | BoxRecord {
+  const record = thing.pickle()
+  if (record.am !== 'a') { throw new Error(`The Thing at ${thing.labelpath} models no live record.`) }
+  return record
+}
+
+/** True when `gate` models a live record */
+function isLiveGate(gate: Gate): gate is LiveGate { return gate.pickle().am === 'a' }
+
+/** True when `bank` and its main gate model live records */
+function isLiveBank(bank: Bank): bank is LiveBank { return (bank.pickle().am === 'a') && isLiveGate(bank.gate) }
 
 /** The options of a {@link buildBornBank} bank. */
 export interface BornBankGiven {
@@ -134,8 +165,8 @@ export interface BornBankGiven {
 /** A bank born under {@link TestPassphrase}, unlocked, beside its device, the records its birth stored, and the passphrase's proving. */
 export interface BornBank {
   device:     Device
-  bank:       Bank
-  /** The bank's Thing, as the birth stored it: what `Bank.make` takes. */
+  bank:       LiveBank
+  /** The bank's Thing, as the birth stored it. */
   record:     BankRecord
   /** The main gate's Thing, as the birth stored it. */
   gateRecord: GateRecord
@@ -146,39 +177,34 @@ export interface BornBank {
  * Its proving is a stored proving of the main gate, by {@link TestPassphrase}.
  */
 export async function buildBornBank({ passkeyCleartext, device = makeDevice() }: BornBankGiven = {}): Promise<BornBank> {
-  await device.signIn(device.userid ?? WorldScope.userid)
+  await device.signin(device.userid ?? WorldScope.userid)
   const mintStamps = vi.spyOn(Bank, 'mintStamps').mockReturnValue({ bankStamp: WorldBankStamp, gateStamp: WorldGateStamp })
   try {
     const bank = await Bank.birth(device, { passphraseCleartext: TestPassphrase, passkeyCleartext: passkeyCleartext && copyOfAnswer(passkeyCleartext) })
+    if (! isLiveBank(bank)) { throw new Error("A born bank or its main gate models no live record.") }
     const proving = await PassphraseProving.buildStored(device, bank.gate, TestPassphrase)
-    return { device, bank, record: bank.pickle(), gateRecord: bank.gate.pickle(), proving }
+    return { device, bank, record: livePickleOf(bank), gateRecord: livePickleOf(bank.gate), proving }
   } finally {
     mintStamps.mockRestore()
   }
 }
 
-/** Another Bank over the records a {@link buildBornBank} birth stored, locked, as a device's `signIn` makes one. Its device is not told of it. */
-export function makeStoredBank({ device, record, gateRecord }: Pick<BornBank, 'device' | 'record' | 'gateRecord'>): Bank {
-  const gate = Gate.make(gateRecord, { device, bankStamp: record })
-  return Bank.make(record, { device, gate })
-}
-
-/** A {@link buildBornBank} bank, beside the vault of its boxes and that vault's minder. */
+/** A {@link buildBornBank} bank, beside the vault of its boxes and its device's vault TSQ. */
 export interface BornVault extends BornBank {
-  vault:  Vault
-  minder: VaultMinder
+  vault:    Vault
+  vaultTSQ: VaultTSQ
 }
 
 /** A {@link buildBornBank} bank, unlocked, and the vault of its boxes its device made at the birth. */
 export async function buildBornVault(given: BornBankGiven = {}): Promise<BornVault> {
   const born = await buildBornBank(given)
-  return { ...born, vault: born.device.vault!, minder: born.device.minder }
+  return { ...born, vault: born.device.vault!, vaultTSQ: born.device.vaultTSQ }
 }
 // --
 
 // == [Births]: BirthSpy, spyBirths
 
-/** The births {@link spyBirths} saw, in call order: each bank `Bank.make` made, and each call to the vaultDB's `tryBirthBank`. */
+/** The births {@link spyBirths} saw, in call order: each bank `Bank.make` made, which the device's world makes as it first hears of one, and each call to the vaultDB's `tryBirthBank`. */
 export interface BirthSpy {
   banks:        Bank[]
   tryBirthBank: MockInstance<VaultDB['tryBirthBank']>
@@ -211,7 +237,7 @@ class CheatGating extends Gating {
 }
 // --
 
-// == [Boxes]: Whisper, Sidecar, boxShellOf
+// == [Boxes and shells]: Whisper, Sidecar, boxShellOf, bankShellOf, gateShellOf, VoidRootRevision
 
 /** An obvious fake whisper, never a real one. */
 export const Whisper = Object.freeze({ apiKey: 'sk-test-0000' })
@@ -229,6 +255,21 @@ export function boxShellOf(overrides: Partial<ShellOf<BoxRecord>> = {}): ShellOf
     born_at: T0, written_at: T0, ...overrides,
   }
 }
+
+/** The shell of the bank of {@link WorldScope}: what its Bank models before the bank is born. */
+export function bankShellOf(): ShellOf<BankRecord> {
+  return { ...WorldScope, labelpath: 'bank', label: 'bank', fmt: ThingFormat, ...VoidRootRevision }
+}
+
+/** The shell of the main gate of {@link WorldScope}'s bank: what its Gate models before the bank is born. */
+export function gateShellOf(): ShellOf<GateRecord> {
+  return { ...WorldScope, labelpath: 'gate', label: 'gate', fmt: ThingFormat, ...VoidRootRevision }
+}
+
+/** The fields of a root's shell beside its scope, label and fmt: the void revision, under no life. */
+const VoidRootRevision = {
+  revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifeseq: Shell.VoidLifeseq, lifepath: Shell.RootVoidLifepath, born_at: SX.VoidTime, written_at: SX.VoidTime,
+} as const
 // --
 
 // == [Leases]: FakeLeaseGate, fakeLeaseGateOf, _cheat_grantedLease
@@ -239,7 +280,7 @@ export type FakeLeaseGate = LeaseGate & { lock: Mock<() => void> }
 /** A {@link FakeLeaseGate} whose bank's stamp is {@link WorldBankStamp}, as `overrides` moves it. */
 export function fakeLeaseGateOf(overrides: Partial<BankStamp> = {}): FakeLeaseGate {
   const gate = { bankStamp: { ...WorldBankStamp, ...overrides }, lock: vi.fn<() => void>(), isEnabled: true, demandEnabled: () => gate }
-  return gate as unknown as FakeLeaseGate
+  return gate
 }
 
 /** A test cheat: a lease `proving` builds, granted to `gate` and citing `cited`, beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */

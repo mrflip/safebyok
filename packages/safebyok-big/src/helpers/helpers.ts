@@ -1,21 +1,24 @@
 /** Helpers the package's own modules share: attaching what no loop, spread, log line or `JSON.stringify` finds, or what each of them finds, yielding to queued microtasks, and what the databases share. */
 
-// == [Hidden]: adorn, decorate
+// == [Hidden]: AdornOpts, adorn, decorate
 
-/** Set `obj[ckey]` to `val`, hidden, and return `val`.
+/** The options of {@link adorn} and {@link decorate}: whether what they attach may be assigned anew (`writable`) or removed and redefined (`configurable`), each true unless given false. */
+export type AdornOpts = { writable?: boolean, configurable?: boolean }
+
+/** Set `obj[ckey]` to `val`, hidden, and return `val`. Use `{ writable: false }` to make it read-only.
  * - Hidden properties are not enumerable, so `Object.keys`, a `...` spread, console.log, and `JSON.stringify` pass by them.
  *
  * @example get wayinCtx() { return adorn(this, 'wayinCtx', wayinCtxOf(this)) }   // "memoized": worked out once, every following read returns the same value
  */
-export function adorn<VT>(obj: object, ckey: string, val: VT): VT {
-  Object.defineProperty(obj, ckey, { value: val, enumerable: false, writable: true, configurable: true })
+export function adorn<VT>(obj: object, ckey: string, val: VT, opts: AdornOpts = {}): VT {
+  Object.defineProperty(obj, ckey, { value: val, enumerable: false, writable: opts.writable ?? true, configurable: opts.configurable ?? true })
   return val
 }
 
-/** Add properties of `hidden` to `obj` as a hidden property; return `obj`. */
-export function decorate<OT extends object>(obj: OT, hidden: Partial<OT>): OT {
+/** Add properties of `hidden` to `obj` as a hidden property; return `obj`. {@link adorn} says what `opts` may change. */
+export function decorate<OT extends object>(obj: OT, hidden: Partial<OT>, opts: AdornOpts = {}): OT {
   for (const [ckey, val] of Object.entries(hidden)) {
-    adorn(obj, ckey, val)
+    adorn(obj, ckey, val, opts)
   }
   return obj
 }

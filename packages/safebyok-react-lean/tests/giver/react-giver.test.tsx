@@ -3,7 +3,7 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-li
 import { type ReactNode, useActionState, useEffect, useLayoutEffect, useMemo } from 'react'
 import { type Root, hydrateRoot } from 'react-dom/client'
 import { renderToString } from 'react-dom/server'
-import { type BankSnapshot, type BoxRecord, type Device, type GateRecord, type Gating, type LiveOf, type Whisper, MemoryVaultDB, Thing, VaultMinder, isVaultError } from 'safebyok'
+import { type BankSnapshot, type BoxRecord, type Device, type GateRecord, type Gating, type LiveOf, type Whisper, MemoryVaultDB, Thing, VaultTSQ, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { liveOf, passkeyHeaderOf } from '../../src/giver/giver-defaults'
@@ -102,7 +102,7 @@ describe("the provider", () => {
     expect(seen[0]).to.eq('starting')
     await waitFor(() => { expect(result.current).to.eq('locked') })
     expect(seen).to.not.include('signed_out')
-    expect(world.counts.watches).to.eq(2)
+    expect(world.counts.watches).to.eq(1)
   })
 
   it("shows unborn for a user with no bank stored", async () => {
@@ -118,14 +118,14 @@ describe("the provider", () => {
     expect(result.current).to.eq('locked')
     treeOpts.userid = TH.ProviderUser
     rerender()
-    expect([result.current, world.counts.watches]).to.deep.equal(['locked', 2])
+    expect([result.current, world.counts.watches]).to.deep.equal(['locked', 1])
   })
 
   it("starts one device once under StrictMode, which makes its state twice and runs its effects twice", async () => {
     const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' }, { isStrict: true })
     await waitFor(() => { expect(result.current).to.eq('locked') })
     const signedIn = world._cheat_devices().filter((device) => device.userid !== null)
-    expect([world._cheat_devices().length, signedIn.length, world.counts.watches]).to.deep.equal([2, 1, 2])
+    expect([world._cheat_devices().length, signedIn.length, world.counts.watches]).to.deep.equal([2, 1, 1])
   })
 
   it("shows starting, in the same render, under a userid other than its device's", async () => {
@@ -141,7 +141,7 @@ describe("the provider", () => {
   it("uses the config's vaultDB and key deriver where it is handed none", async () => {
     const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes', isInConfig: true }, { isBare: true })
     await waitFor(() => { expect(result.current).to.eq('locked') })
-    expect(world.counts.watches).to.eq(2)
+    expect(world.counts.watches).to.eq(1)
   })
 
   it("needs no QueryClientProvider for the record hooks under it", async () => {
@@ -535,7 +535,7 @@ describe("useGate", () => {
     const { result, world } = await renderGate()
     expect(result.current.header).to.be.null
     expect(result.current.gate.data?.wayins.main.wayinkind).to.eq('passphrase')
-    expect(world.Bank.queryClient().getQueryCache().findAll().map((tsqQuery) => tsqQuery.queryKey)).to.not.deep.include(VaultMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'gate' }))
+    expect(world.Bank.queryClient().getQueryCache().findAll().map((tsqQuery) => tsqQuery.queryKey)).to.not.deep.include(VaultTSQ.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'gate' }))
   })
 
   // useGate @example
@@ -570,7 +570,7 @@ describe("useGate", () => {
     await waitFor(() => { expect(container.textContent).to.contain('"wayinkind":"passkey"') })
     const wraps = storedWrapsOf(world)
     expect(wraps).to.have.lengthOf(2)
-    // The whole gate is in the device's BankMinder, whose client is neither of these.
+    // The whole gate is in the world's gate Thing, in neither client.
     for (const text of wraps) { TH.expectTextUnheld(text, container, world.clients()) }
     TH.expectTextUnheld(Passphrase, container, world.clients())
   })
@@ -716,14 +716,14 @@ async function renderUnlocked<ResultT>(hook: (world: TH.ProviderWorld) => Result
   const rendered = await renderUnder(hook, { stored: 'jokes' })
   const device = await waitFor(() => rendered.world._cheat_device())
   await act(async () => {
-    await device.signIn(TH.ProviderUser)
+    await device.signin(TH.ProviderUser)
     await device.bank!.gate.unlock({ passphraseCleartext: Passphrase })
   })
   return rendered
 }
 
-/** The key the minder caches the jokes box under, for the world's user. */
-const JokesKey = VaultMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: `box/${TH.JokesPath}` })
+/** The key the vault TSQ keeps the jokes box under, for the world's user. */
+const JokesKey = VaultTSQ.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: `box/${TH.JokesPath}` })
 
 describe("useBox", () => {
   it("shows the stored record once the device starts, and fetches nothing while nobody is signed in", async () => {
@@ -780,13 +780,13 @@ describe("useBox", () => {
     await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
   })
 
-  it("takes only the options that shape what it shows, leaving the minder's own query as the giver sets it", async () => {
+  it("takes only the options that shape what it shows, leaving the vault TSQ's own query as the giver sets it", async () => {
     const hostOpts = { staleTime: 0, gcTime: 0, retry: 3, enabled: false, structuralSharing: false, initialData: LeanTH.boxShellOf(), queryKey: ['mine'], queryFn: () => null }
     const { world, result } = await renderUnder((world) => world.Bank.useBox(TH.JokesPath, { notifyOnChangeProps: 'all', ...hostOpts } as never), { stored: 'jokes' })
     await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
     expect([result.current.isStale, (result.current.data as BoxRecord | null)?.sidecar]).to.deep.equal([false, { service: 'jokes' }])
     const { options } = world.Bank.queryClient().getQueryCache().find({ queryKey: JokesKey, exact: true })!
-    expect([options.gcTime, options.retry, options.structuralSharing === false]).to.deep.equal([Infinity, false, false])
+    expect([options.gcTime === 0, options.retry, options.structuralSharing === false]).to.deep.equal([false, false, false])
   })
 
   it("shows the new box's record when the labelpath changes under a select that returns records", async () => {
@@ -828,8 +828,8 @@ describe("useBox", () => {
   })
 })
 
-/** The world's user's key for the listing of the root box's children, as the minder caches it. */
-const BoxListKey = VaultMinder.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
+/** The world's user's key for the listing of the root box's children, as the vault TSQ keeps it. */
+const BoxListKey = VaultTSQ.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
 
 describe("useBoxList", () => {
   it("lists the stored boxes once the device starts, and fetches nothing while nobody is signed in", async () => {
@@ -857,15 +857,14 @@ describe("useBoxList", () => {
     await waitFor(() => { expect(result.current).to.deep.equal([TH.JokesPath, 'puns']) })
   })
 
-  it("keeps a deleted box listed", async () => {
+  it("drops a deleted box once it lists again", async () => {
     const { world, result } = await renderUnlocked((world) => world.Bank.useBoxList().data)
     await waitFor(() => { expect(result.current).to.deep.equal([TH.JokesPath]) })
-    const first = result.current
     await act(() => world.Bank.delBoxOnce(TH.JokesPath))
-    expect(result.current).to.eq(first)
+    await waitFor(() => { expect(result.current).to.deep.equal([]) })
   })
 
-  it("keys the listing as the bank's minder keys it, under no key from keys.under", async () => {
+  it("keys the listing as the bank's vault TSQ keys it, under no key from keys.under", async () => {
     const { world, result } = await renderUnder((world) => world.Bank.useBoxList(), { stored: 'jokes' })
     await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
     expect(world.Bank.keys.boxList()).to.deep.equal(['sok', 'u1', 'acme', 'list', 'box', '#', 'kids'])
@@ -884,7 +883,7 @@ describe("boxQuery", () => {
     await waitFor(() => { expect(queried.result.current.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
   })
 
-  it("keys the record as the bank's minder keys its item", async () => {
+  it("keys the record as the bank's vault TSQ keys its item", async () => {
     const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' })
     await waitFor(() => { expect(result.current).to.eq('locked') })
     expect(world.Bank.boxQuery(TH.JokesPath).queryKey).to.deep.equal(['sok', 'u1', 'acme', 'item', 'box', '/', 'jokes', '!'])
@@ -907,14 +906,16 @@ describe("boxQuery", () => {
     expect([shown, world.counts.gets]).to.deep.equal([record, gets])
   })
 
-  it("never replaces a record with an older one", async () => {
+  it("never replaces a record with an older one a get answers", async () => {
     const { world, result } = await renderUnlocked((world) => world.Bank.useBox(TH.JokesPath))
     await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
     const client = world.Bank.queryClient()
     const first = client.getQueryData(JokesKey)
     const second = await act(() => world.Bank.putBoxOnce(TH.JokesPath, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: LeanTH.Whisper }))
-    client.setQueryData(JokesKey, structuredClone(first))
-    expect(client.getQueryData(JokesKey)).to.deep.equal(second)
+    world.vaultDB._cheat_things(LeanTH.WorldScope).set(`box/${TH.JokesPath}`, first)
+    const { gets } = world.counts
+    await act(() => client.query({ ...world.Bank.boxQuery(TH.JokesPath), staleTime: 0 }))
+    expect([client.getQueryData(JokesKey), world.counts.gets]).to.deep.equal([second, gets + 1])
   })
 
   it("fetches nothing while nobody is signed in", async () => {
@@ -1002,7 +1003,7 @@ describe("putBoxOnce", () => {
     expect(await world.Bank.withWhisper(TH.JokesPath, (whisper) => String(whisper['apiKey']))).to.eq('sk-test-1111')
   })
 
-  it("writes over the newest revision the minder has heard of, whatever the record that names the box", async () => {
+  it("writes over the newest revision this device has heard of, whatever the record that names the box", async () => {
     const { world, result } = await renderUnlocked((world) => world.Bank.useBox(TH.JokesPath))
     await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
     const first = result.current.data!
@@ -1093,7 +1094,7 @@ async function renderKeyEditor(opts: Partial<PutBoxActionOpts> = {}) {
   const rendered = render(TH.providerTreeOf(world, <editor.KeyEditor />, { userid: TH.ProviderUser }))
   const device = await waitFor(() => world._cheat_device())
   await act(async () => {
-    await device.signIn(TH.ProviderUser)
+    await device.signin(TH.ProviderUser)
     await device.bank!.gate.unlock({ passphraseCleartext: Passphrase })
   })
   return { world, ...editor, ...rendered }
@@ -1272,7 +1273,7 @@ async function renderMutationKeyEditor(opts: Partial<PutBoxActionOpts> = {}) {
   const rendered = render(TH.providerTreeOf(world, <editor.KeyEditor />, { userid: TH.ProviderUser }))
   const device = await waitFor(() => world._cheat_device())
   await act(async () => {
-    await device.signIn(TH.ProviderUser)
+    await device.signin(TH.ProviderUser)
     await device.bank!.gate.unlock({ passphraseCleartext: Passphrase })
   })
   return { world, ...editor, ...rendered }

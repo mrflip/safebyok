@@ -1,6 +1,9 @@
 /** The forms of a sealed record, the `Sealer` a lease seals and unseals with, and a box's records. */
 
-import type { CX, Crypto, SX } from 'safebyok-big/internals'
+import { isEmptyObject } from 'es-toolkit'
+import { exactOptional } from 'zod'
+import { CX, type Crypto, type SX, Validator } from 'safebyok-big/internals'
+import * as Phrases from '../phrases'
 import type { EpochMillis, VoidLifeseq } from './primitives'
 import type { BoxRecord, Sealed, Sparse, ThingRecord } from './shapes-thing'
 
@@ -40,10 +43,13 @@ export type RevisionOf<RecordT, CleartextsT> = RecordT extends unknown ? Omit<Re
 /** The body of a live `RecordT`: its fields other than its Thing fields and its sealed parts, such as a box's sidecar. */
 export type BodyOf<RecordT, CleartextsT> = Omit<LiveOf<RecordT>, keyof Sparse<ThingRecord> | keyof SealedPartsOf<CleartextsT>>
 
+// A body field may be undefined, as a Thing's is over the shell or a sparse tombstone, so that a Thing is sealable as it stands.
 /** The record of `RecordT`'s kind that a seal makes the next revision from: whole, sparse or unsealed, live, a tombstone or the shell.
  * The seal carries over its Thing fields and its body, and never its secrets.
  */
-export type Sealable<RecordT extends Sparse<ThingRecord>> = Omit<Sparse<RecordT>, 'am'> & Readonly<{ am: Sparse<ThingRecord>['am'] }> & Partial<Omit<LiveOf<RecordT>, keyof Sparse<ThingRecord>>>
+export type Sealable<RecordT extends Sparse<ThingRecord>> = Omit<Sparse<RecordT>, 'am'> & Readonly<{ am: Sparse<ThingRecord>['am'] }> & {
+  [FieldT in Exclude<keyof LiveOf<RecordT>, keyof Sparse<ThingRecord>>]?: LiveOf<RecordT>[FieldT] | undefined
+}
 
 /** A seal's public props: the fields it is given that are not secret, each optional.
  * - the body's fields -- replace those of the sealable
@@ -106,7 +112,20 @@ export interface Sealer<RecordT extends Sparse<ThingRecord>, CleartextsT> {
 }
 // --
 
-// == [A box's records]: BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps
+// == [A box's records]: SealerChecks, BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps
+
+// Strict, since a misspelt key in any of these bags would otherwise be dropped without a word.
+/** The checks of what a box's seal is given beside its sealable: the public props of a revision and of a tombstone, and the cleartexts. */
+export const SealerChecks = Validator.Checkers('bad_record', ({ obj, lit, oneof, epochMillis }) => ({
+  boxPublicProps:          obj({ sidecar: exactOptional(CX.sidecar), am: exactOptional(oneof(['a', 'x'])), written_at: exactOptional(epochMillis) }).strict(),
+  // A tombstone's sidecar is always `{}`, and its am `'x'`: each may be given, so long as it is that.
+  boxTombstonePublicProps: obj({
+    sidecar:    exactOptional(CX.sidecar.refine(isEmptyObject, Phrases.TombstoneSidecarNotEmpty)),
+    am:         exactOptional(lit('x')),
+    written_at: exactOptional(epochMillis),
+  }).strict(),
+  boxCleartexts:           obj({ whisper: CX.whisper }).strict(),
+}))
 
 /** The cleartexts of a box: its whisper. */
 export interface BoxCleartexts {

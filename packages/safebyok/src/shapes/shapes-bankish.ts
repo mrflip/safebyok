@@ -1,14 +1,14 @@
 /** The checks and types of the bank and the device: what each is made from and given, and the bank's drafts and answers. */
 
+import type { QueryClient } from '@tanstack/query-core'
 import type * as Z from 'zod'
 import { CX, type Deriver, type EX, type Errors, type Logger, Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
 import type { DefaultOnBadNews, Device } from '../models/device'
-import type { Gate } from '../models/gate'
+import type { World } from '../models/world'
 import type { VaultDB } from '../storage/vault-db'
 import type { DevicePersisters } from '../storage/persister'
 import type { StrengthChecker } from './shapes-gateish'
-import type { DefaultQueryCacheOpts, QueryCacheOpts } from './shapes-minder'
 import type { BoxCleartexts, UnsealedOf } from './shapes-sealers'
 import type { BoxRecord } from './shapes-thing'
 import type { GetAsk, ListAsk } from './shapes-asks'
@@ -22,26 +22,30 @@ export type BoxUnsealed = UnsealedOf<BoxRecord, BoxCleartexts>
 
 // == [The bank's drafts and asks]: BankAskDraft
 
-/** The draft of a get or list ask, for {@link Bank.makeGetAsk} or {@link Bank.makeListAsk}: a labelpath in the bank, and `ifAbsent`, the answer when nothing is stored there.
- * The bank fills in the rest of the {@link GetAsk} or {@link ListAsk}.
+/** The draft of a get or list ask, for `SortedVaultDB.makeGetAsk` or `makeListAsk`: a labelpath in the bank, and `ifAbsent`, the answer when nothing is stored there.
+ * The SortedVaultDB fills in the rest of the {@link GetAsk} or {@link ListAsk}.
  */
 export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent }>
 // --
 
-// == [The bank's making]: BankOpts, HostedVault
+// == [The bank's making]: BankOpts, WorldOpts, HostedVault
 
 /** The options of {@link Bank.make}, beside its record. */
 export interface BankOpts {
   /** The device the bank is on. Its scope must be the bank's. */
   device:  Device
-  /** The bank's main gate, made for this bank's stamp. */
-  gate:    Gate
+}
+
+/** The options of {@link World.make}. */
+export interface WorldOpts {
+  /** The device the world is made with. */
+  device: Device
 }
 
 // `safebyok/core` carries no caching, so the bank knows its vaults by this method alone, not by the Vault class.
-/** A vault a bank hosts: the bank's sweep sweeps it. */
+/** A vault a world hosts: the world's sweep sweeps it. */
 export interface HostedVault {
-  /** End the vault, as its bank ends. */
+  /** End the vault, as its world ends. */
   sweep(): unknown
 }
 // --
@@ -51,7 +55,7 @@ export interface HostedVault {
 /** The banklabel of the bank a device serves where its record names none. */
 export const DefaultBanklabel = 'main'
 
-/** The checks of a {@link DeviceRecord}, and of the userid `Device.signIn` is handed. */
+/** The checks of a {@link DeviceRecord}, and of the userid `Device.signin` is handed. */
 export const BankishChecks = Validator.Checkers('bad_record', ({ obj, user_id, banklabel, device_tok }) => ({
   deviceRecord: obj({ banklabel: banklabel.default(DefaultBanklabel), device_tok }).strict(),
   userid:       user_id,
@@ -86,9 +90,9 @@ export interface DeviceOpts {
   autolockMinutes?: number | undefined
   /** Hears each refusal no caller waits on. Default: {@link DefaultOnBadNews}, a warning on the device's logger. */
   onBadNews?:       BadNewsHandler | undefined
-  /** The defaults each user's minder sets on its items and lists in the device's QueryClient. A missing field defaults from {@link DefaultQueryCacheOpts}. */
-  queryCacheOpts?:  Partial<QueryCacheOpts> | undefined
-  /** Where the device keeps the signed-in bank's caches between page loads, restored at `signIn` before the vaultDB is asked anything. Without them, each page load starts with its caches empty. */
+  /** The QueryClient the signed-in user's boxes are kept in, under their bank's key: your own, so one client serves your queries and the vault's. Default: one the device makes. */
+  queryClient?:     QueryClient | undefined
+  /** Where the device keeps the signed-in bank's caches between page loads, restored at `signin` before the vaultDB is asked anything. Without them, each page load starts with its caches empty. */
   persisters?:      DevicePersisters | undefined
   /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
   deviceDB?:        unknown
@@ -101,7 +105,7 @@ export interface DeviceOpts {
 export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'swept', 'failed'] as const
 /** Where the user stands with their bank, for a host's screen to switch on:
  * - `'signed_out'` -- nobody is signed in, or the bank was vacated or signed out of
- * - `'starting'`   -- signed in, and the bank is being brought up
+ * - `'starting'`   -- signed in, and the device's sign-in has not answered
  * - `'unborn'`     -- no bank is stored for this user, or it was deleted
  * - `'locked'`     -- the bank is stored, and needs the passphrase or passkey before a whisper can be read
  * - `'unlocked'`   -- the bank has a lease, and whispers can be read and written
@@ -137,12 +141,12 @@ export interface BankSnapshot {
 }
 
 // isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
-/** The bank snapshot a device shows from `signIn` until it finds its user's bank stored or not. */
+/** The bank snapshot a device shows from `signin` until it finds its user's bank stored or not. */
 export const PendingBank: BankSnapshot = Object.freeze({
   stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false,
 })
 
-/** The bank snapshot a device shows until `signIn`, while nobody is signed in on it. */
+/** The bank snapshot a device shows until `signin`, while nobody is signed in on it. */
 export const SignedOutBank: BankSnapshot = Object.freeze({ ...PendingBank, stage: 'signed_out' })
 
 /** A device's state, for a host to render. */

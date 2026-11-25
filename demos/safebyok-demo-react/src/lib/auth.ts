@@ -16,7 +16,7 @@ export type Auth = {
   getSnapshot: () => Session | null
   subscribe: (listener: () => void) => () => void
   /** Sign in as `userlabel`, creating the account on first sight. */
-  signIn(userlabel: string): Promise<Session>
+  signin(userlabel: string): Promise<Session>
   /** End the session on this device. Touches nothing on the server. */
   signOut(): void
   /** Delete the signed-in account's row and end the session. Vault rows are the caller's to clean up first. */
@@ -32,7 +32,7 @@ export type Auth = {
  *
  * @example
  *   const auth = createAuth({ banklabel: 'acme', dbStorage, deviceStorage })
- *   const session = await auth.signIn('margo')  // { user_id: 'user_3f...', userlabel: 'margo' }
+ *   const session = await auth.signin('margo')  // { user_id: 'user_3f...', userlabel: 'margo' }
  */
 export const createAuth = (opts: { banklabel: string, dbStorage: StringStorage, deviceStorage: StringStorage, clock?: AuthClock | undefined }): Auth => {
   const { banklabel, dbStorage, deviceStorage, clock = WallClock } = opts
@@ -74,7 +74,7 @@ export const createAuth = (opts: { banklabel: string, dbStorage: StringStorage, 
       return () => { listeners.delete(listener) }
     },
 
-    signIn: (userlabel) => {
+    signin: (userlabel) => {
       if (! isUserlabel(userlabel)) {
         return Promise.reject(new Error('A username is 2 to 40 lowercase letters and digits, joined by single underscores, starting with a letter.'))
       }

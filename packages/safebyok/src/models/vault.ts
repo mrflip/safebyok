@@ -1,125 +1,167 @@
-import { type Helpers, Outcome, Validator } from 'safebyok-big/internals'
-import { Bank } from './bank'
+import { type Helpers, Outcome } from 'safebyok-big/internals'
+import type { Bank } from './bank'
 import { BaseBox } from './base-box'
+import { Box } from './box'
 import { Thing } from './thing'
-import { VaultMinder } from '../minding/vault-minder'
-import * as Phrases from '../phrases'
+import type { World } from './world'
+import type { VaultTSQ } from '../minding/vault-tsq'
 import * as Throwers from '../refusals/throwers'
 import type { BoxUnsealed } from '../shapes/shapes-bankish'
-import type { BoxWriteAsk } from '../shapes/shapes-asks'
-import type { BoxCleartexts, BoxPublicProps, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
-import { type BoxLabelpath, Labelpath } from '../shapes/primitives'
-import { type MinderGetOpts, type ScopeAt, MinderChecks } from '../shapes/shapes-minder'
-import { type BoxRecord, Shell } from '../shapes/shapes-thing'
+import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
+import type { BoxLabelpath } from '../shapes/primitives'
+import { type GetOnceOpts, VaultTSQChecks } from '../shapes/shapes-vault-tsq'
+import type { PutOnceArgs } from '../shapes/shapes-sorted-vault-db'
+import type { BoxRecord, ScopeAt, ThingScope } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
+import { VaultChecks } from '../shapes/shapes-vault'
+import type { SortedVaultDB } from '../storage/sorted-vault-db'
+import type { WriteThingAnswer } from '../shapes/shapes-answers'
 
-/** One bank's boxes in this tab: a minder that caches them, and the verbs to write them and use their whispers.
- * Each write seals under the bank's lease, so it needs the bank unlocked. What it writes is cached before it resolves.
+/** One bank's boxes in this tab: the verbs to seal and write them, and to use their whispers.
+ * Each seal is made under the bank's lease, so it needs the bank unlocked. A box a verb answers is the {@link Box} the
+ * device's world holds for its labelpath, the newest revision seen: read its fields as a record's, or call `pickle()` for the record itself.
  */
 export class Vault {
-  // == [Props]: #bank, #minder
+  // == [Props]: #bank, #world, #vaultTSQ
 
-  readonly #bank:   Bank
-  readonly #minder: VaultMinder
+  readonly #bank:     Bank
+  /** The bank's world, which holds its Things and its lease. */
+  readonly #world:    World
+  readonly #vaultTSQ: VaultTSQ
   // --
 
-  // == [Getters]: bank, minder
+  // == [Getters]: bank
 
   /** The bank whose boxes this vault carries. */
   get bank(): Bank { return this.#bank }
-
-  /** The minder caching this bank's Things, which the vault reads and writes through. */
-  get minder(): VaultMinder { return this.#minder }
   // --
 
   // == [Construction]: make, constructor
 
-  /** Make the vault of `bank`'s boxes, reading and writing them through `minder`, a minder of the same bank.
-   * Its gets refuse until the minder's `hello`. The bank's sweep sweeps the vault too, and so the minder. Refuses a swept bank.
+  /** Make the vault of `bank`'s boxes, reading them through `vaultTSQ`, the vault TSQ of the same bank.
+   * The bank's sweep sweeps the vault too. Refuses a swept bank.
    */
-  static make(bank: Bank, minder: VaultMinder): Vault {
-    const vault = new Vault(bank, minder)
+  static make(bank: Bank, vaultTSQ: VaultTSQ): Vault {
+    const vault = new Vault(bank, vaultTSQ)
     bank.hostVault(vault)
     return vault
   }
 
-  private constructor(bank: Bank, minder: VaultMinder) {
-    this.#bank   = bank
-    this.#minder = minder
+  private constructor(bank: Bank, vaultTSQ: VaultTSQ) {
+    this.#bank     = bank
+    this.#world    = bank.device.world
+    this.#vaultTSQ = vaultTSQ
     Object.freeze(this)
   }
   // --
 
   // == [Ending]: sweep
 
-  /** Stop this vault's minder and empty its cache ({@link VaultMinder.goodbye}). Never throws. */
+  /** Stop the vault TSQ hearing of the bank's boxes ({@link VaultTSQ.sweep}). Never throws. */
   sweep(): this {
-    // The watch's stop is the host's vaultDB code: what it throws is news, and the bank's sweep goes on.
-    try { this.#minder.goodbye() } catch (err) { this.#bank.tellBadNews([err]) }
+    this.#vaultTSQ.sweep()
     return this
   }
   // --
 
   // == [Writing boxes]: tryPutBoxOnce, putBoxOnce, tryDelBoxOnce, delBoxOnce
 
-  /** Seal and write the next revision of the box `cited`, applying `patch` and encrypting `secrets`. Resolves an `Outcome` of the stored box.
-   * Given a labelpath, it writes over the soonest record the minder has of the box (its soon, else its item, else its tombstone or shell where the item is null), fetching it when none is cached.
-   * It tries once. Where another revision is stored, it refuses `stale_write`, and the minder caches that revision when the watch notifies it.
-   * Over a sparse box, a tombstone or no box, `patch` must give the sidecar.
-   * Misuse is a bad outcome too. Rejects, whether or not the write was made, when the answer carries a record of another bank.
+  /** Seal and write the next revision of the box `cited`, applying `patch` and encrypting `secrets`. Resolves an `Outcome` of the box, once it holds what was stored.
+   * Given a labelpath, it writes over the newest revision this device has seen of the box, getting the box first where it has seen none.
+   * It tries once. Where another revision is stored, it refuses `stale_write`, and the box then holds that revision.
+   * Over a sparse box, a tombstone or no box, `patch` must give the sidecar. Misuse is a bad outcome too.
    * @example
    *   const { ok, val: box, err } = await vault.tryPutBoxOnce('box/openai', { sidecar: { account: 'work' } }, { whisper })
    */
-  async tryPutBoxOnce(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<Outcome.Outcome<LiveOf<BoxRecord>>> {
-    const sealed = await Outcome.outcomeOf(async () => {
-      const donorProps = (typeof cited === 'string') ? await this.#soonestAt(cited) : cited
-      return await this.#sealedAsk(donorProps, patch, secrets)
-    })
+  async tryPutBoxOnce(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<Outcome.Outcome<Box>> {
+    const sealed = await Outcome.outcomeOf(async () => await this.#sealedWriteOf(cited, patch, secrets))
     if (! sealed.ok) { return sealed }
-    // The ask's modelkind is a box's, which the vaultDB checks what it answers against.
-    return await this.#minder.tryWrite(sealed.val) as Outcome.Outcome<LiveOf<BoxRecord>>
+    return this.#boxOutcomeOf(await this.#sortedVaultDB.tryPutOnce(sealed.val))
   }
 
-  /** {@link tryPutBoxOnce}, throwing its refusal instead of answering it: the stored box, on success.
+  /** {@link tryPutBoxOnce}, throwing its refusal instead of answering it: the box, on success.
    * @example
    *   const box = await vault.putBoxOnce('box/openai', { sidecar: { account: 'work' } }, { whisper })
    */
-  async putBoxOnce(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<LiveOf<BoxRecord>> {
+  async putBoxOnce(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<Box> {
     return Outcome.valOf(await this.tryPutBoxOnce(cited, patch, secrets))
   }
 
-  /** Delete the box at `labelpath`, resolving an `Outcome` of its stored tombstone.
-   * It writes over the soonest record the minder has of the box (its soon, else its item), fetching it when none is cached. The box's item is then null, and its dead record has the tombstone.
-   * Misuse is a bad outcome too. Rejects, whether or not the write was made, when the answer carries a record of another bank.
+  /** Delete the box at `labelpath`, resolving an `Outcome` of the box, once it holds the tombstone stored.
+   * It writes over the newest revision this device has seen of the box, getting the box first where it has seen none. Misuse is a bad outcome too.
    */
-  async tryDelBoxOnce(labelpath: BoxLabelpath): Promise<Outcome.Outcome<TombstoneOf<BoxRecord>>> {
-    const sealed = await Outcome.outcomeOf(async () => await this.#sealedAsk(await this.#soonestAt(labelpath), { am: 'x' }))
+  async tryDelBoxOnce(labelpath: BoxLabelpath): Promise<Outcome.Outcome<Box>> {
+    const sealed = await Outcome.outcomeOf(async () => await this.#sealedWriteOf(labelpath, { am: 'x' }))
     if (! sealed.ok) { return sealed }
-    // The ask's modelkind is a box's, which the vaultDB checks what it answers against.
-    return await this.#minder.tryWrite(sealed.val) as Outcome.Outcome<TombstoneOf<BoxRecord>>
+    return this.#boxOutcomeOf(await this.#sortedVaultDB.tryDelOnce(sealed.val))
   }
 
-  /** {@link tryDelBoxOnce}, throwing its refusal instead of answering it: the stored tombstone, on success. */
-  async delBoxOnce(labelpath: BoxLabelpath): Promise<TombstoneOf<BoxRecord>> {
+  /** {@link tryDelBoxOnce}, throwing its refusal instead of answering it: the box, holding its tombstone, on success. */
+  async delBoxOnce(labelpath: BoxLabelpath): Promise<Box> {
     return Outcome.valOf(await this.tryDelBoxOnce(labelpath))
   }
   // --
 
-  // == [Using whispers]: forceTimelyUnlocked, withWhisper, withUnlockedWhisper, #demandReadableThing
+  // == [Sealing boxes]: sealBox, trySealBox, unsealBox, tryUnsealBox
+  // The world's seal and unseal, for this vault's own boxes: the root box's lifeseq begins each box's lifepath. They
+  // refuse a locked bank; only withWhisper waits for the unlock.
+
+  /** Seal and return the next revision of the box `donorProps`. Needs the bank unlocked.
+   * The revision applies `publicProps`, and encrypts the whisper of `secretProps`. An unknown key in either refuses.
+   * Pass `donorProps` as you have it: whole or sparse, sealed or unsealed, a tombstone or the shell. It must be a box of this vault's bank.
+   * A whole live box's revision keeps its sidecar unless `publicProps` gives one. Over a sparse box, a tombstone or the shell,
+   * `publicProps` must give the sidecar. After a tombstone or the shell, the revision begins the box's next life.
+   * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live box instead, whose sealed empty whisper authenticates
+   * it, and refuses `secretProps` or any sidecar but `{}`.
+   * Its `written_at` is `publicProps.written_at`, or now. Nothing is written.
+   * @example
+   *   const box = await vault.sealBox(donor, { sidecar: { account: 'work' } }, { whisper })
+   */
+  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxTombstonePublicProps): Promise<TombstoneOf<BoxRecord>>
+  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<LiveOf<BoxRecord>>
+  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxRecord>
+  async sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxRecord> {
+    this.#bank.demandEnabled()
+    this.#demandOwnBox(donorProps)
+    return await this.#world.seal(BaseBox, donorProps, publicProps, secretProps)
+  }
+
+  /** {@link sealBox}, resolving an `Outcome` instead of throwing. */
+  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxTombstonePublicProps): Promise<Outcome.Outcome<TombstoneOf<BoxRecord>>>
+  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<Outcome.Outcome<LiveOf<BoxRecord>>>
+  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<Outcome.Outcome<BoxRecord>>
+  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<Outcome.Outcome<BoxRecord>> {
+    return Outcome.outcomeOf(() => this.sealBox(donorProps, publicProps, secretProps))
+  }
+
+  /** Unseal `box`, returning it with its whisper in place of the sealed one. Needs the bank unlocked.
+   * It authenticates the box, all but its sidecar. For a tombstone, that checks its seal.
+   */
+  async unsealBox(box: BoxRecord): Promise<BoxUnsealed> {
+    this.#bank.demandEnabled()
+    this.#demandOwnBox(box)
+    return await this.#world.unseal(BaseBox, box)
+  }
+
+  /** {@link unsealBox}, resolving an `Outcome` instead of throwing. */
+  tryUnsealBox(box: BoxRecord): Promise<Outcome.Outcome<BoxUnsealed>> { return Outcome.outcomeOf(() => this.unsealBox(box)) }
+  // --
+
+  // == [Using whispers]: forceTimelyUnlocked, withWhisper, withUnlockedWhisper, #demandReadableBox
 
   /** Get the box at `labelpath` and wait for the bank to be unlocked, both at once; resolve once the box can be unsealed.
-   * The get runs under `opts.staleTime` where given, else as the minder schedules it.
+   * The get runs under `opts.staleTime` where given, else only where this device has seen a newer revision than it holds whole.
    * It rejects with the `unlock` gating's refusal where that wait is dismissed or the bank ends ({@link Bank.ensureUnlocked}),
    * else with the get's refusal unchanged, else as {@link withWhisper} would refuse the box: `stale_read` or `absent_box`.
    */
-  async forceTimelyUnlocked(labelpath: BoxLabelpath, opts: MinderGetOpts = {}): Promise<void> {
+  async forceTimelyUnlocked(labelpath: BoxLabelpath, opts: GetOnceOpts = {}): Promise<void> {
     const scope = this.#scopeAt(labelpath)
-    MinderChecks.minderGetOpts.parse(opts)
+    VaultTSQChecks.getOnceOpts.parse(opts)
     // Both settle before either refusal is thrown, so which one rejects never depends on which came first.
-    const [unlocked, got] = await Promise.allSettled([this.#bank.ensureUnlocked(), this.#minder.get(scope, opts)])
+    const [unlocked, got] = await Promise.allSettled([this.#bank.ensureUnlocked(), this.#vaultTSQ.getOnce(scope, opts)])
     if (unlocked.status === 'rejected') { throw unlocked.reason }
     if (got.status === 'rejected')      { throw got.reason }
-    this.#demandReadableThing(scope)
+    this.#demandReadableBox(scope)
   }
 
   /** Call `fn` with the box at `labelpath` unsealed, and resolve what `fn` resolves.
@@ -131,87 +173,92 @@ export class Vault {
   async withWhisper<ResultT>(labelpath: BoxLabelpath, fn: (box: BoxUnsealed) => Helpers.Awaitable<ResultT>): Promise<ResultT> {
     // Checked before the wait, so a call that would refuse never asks the user to unlock.
     this.#scopeAt(labelpath)
-    Checks.fn.parse(fn)
+    VaultChecks.fn.parse(fn)
     await this.#bank.ensureUnlocked()
     return await this.withUnlockedWhisper(labelpath, fn)
   }
 
   /** Call `fn` with the box at `labelpath` unsealed, on an unlocked bank, and resolve what `fn` resolves.
    * It never waits for an `unlock` gating: on a locked bank it refuses `bank_locked`. Call it where the bank shows unlocked, or call {@link withWhisper}.
-   * A refused get rejects with its own refusal where nothing at all is cached for the box, and otherwise rejects nothing by itself.
+   * The box is got only where this device has seen a newer revision than it holds whole, or none. A refused get rejects
+   * with its own refusal where this device has seen nothing of the box, and otherwise rejects nothing by itself.
    * `fn` gets the whole box, in a revision stored at a moment during the call: its whisper, its sidecar and its record's fields.
    * That box may be behind a revision of the same life heard of since.
-   * It refuses `stale_read` where the newest revision heard of is a sparse record of a newer life, or where only a sparse record
-   * of the box is cached, and `absent_box` for a box deleted or never stored.
+   * It refuses `stale_read` where the newest revision heard of is a sparse record of a newer life, and `absent_box` for a box deleted or never stored.
    * Nothing of the unsealed box is retained, and what `fn` throws is rethrown unchanged. Use the whisper only inside `fn`, and return only what is safe to retain.
    * @example
    *   if (vault.bank.isUnlocked) { reply = await vault.withUnlockedWhisper('box/openai', ({ whisper }) => askModel(whisper['apiKey'], question)) }
    */
   async withUnlockedWhisper<ResultT>(labelpath: BoxLabelpath, fn: (box: BoxUnsealed) => Helpers.Awaitable<ResultT>): Promise<ResultT> {
     const scope = this.#scopeAt(labelpath)
-    Checks.fn.parse(fn)
+    VaultChecks.fn.parse(fn)
     this.#bank.demandEnabled()
     if (this.#bank.isLocked) { throw Throwers.needUnlocked() }
-    const got = await this.#minder.tryGet(scope)
-    // A refused get is thrown only where nothing is cached for the box: otherwise the demand judges what this device holds at the last moment.
-    if ((! got.ok) && (this.#minder.at(scope) === undefined) && (this.#minder.soonAt(scope) === undefined)) { throw got.err }
-    return await fn(await this.#bank.unsealBox(this.#demandReadableThing(scope)))
+    // A refused get is thrown only where nothing is known of the box: otherwise the demand judges what this device holds at the last moment.
+    try {
+      await this.#vaultTSQ.getOnce(scope)
+    } catch (err) {
+      if (this.#boxAt(scope) === undefined) { throw err }
+    }
+    return await fn(await this.unsealBox(this.#demandReadableBox(scope)))
   }
 
-  // Read in one synchronous step, so the item and the soon are of one moment. A soon beside a null item is newer than
-  // the item's tombstone or none, and so of a newer life.
-  /** The box `scope`'s item, a live record of the newest life heard of, behind within that life or not.
-   * Refuses `stale_read` for no item or a soon of a newer life, then `absent_box` for an item that is null.
+  /** The live record the box at `scope` holds, of the newest life heard of, behind within that life or not.
+   * Refuses `stale_read` where the box is unknown or known only sparse in its newest life, then `absent_box` where it holds a tombstone or the shell.
    */
-  #demandReadableThing(scope: ScopeAt<BoxLabelpath>): BoxRecord {
-    const item = this.#minder.at(scope)
-    const soon = this.#minder.soonAt(scope)
-    if ((item === undefined) || ((soon !== undefined) && ((item === null) || isOfNewerLife(item, soon)))) { throw Throwers.boxSoonestBare(scope.labelpath) }
-    if (item === null) { throw Throwers.boxAbsent({ boxlabel: scope.labelpath }) }
-    return item
+  #demandReadableBox(scope: ScopeAt<BoxLabelpath>): LiveOf<BoxRecord> {
+    const box = this.#boxAt(scope)
+    if ((box === undefined) || (box.agekind === 'bare')) { throw Throwers.boxSoonestBare(scope.labelpath) }
+    const record = box.pickle()
+    if (! BaseBox.isLive(record)) { throw Throwers.boxAbsent({ boxlabel: scope.labelpath }) }
+    return record
   }
   // --
 
-  // == [Helpers]: #sealedAsk, #scopeAt, #soonestAt
+  // == [Helpers]: #sortedVaultDB, #sealedWriteOf, #donorAt, #boxOutcomeOf, #boxAt, #scopeAt, #demandOwnBox
 
-  /** The put ask of `donorProps`'s next revision, or the del ask of its tombstone. */
-  async #sealedAsk(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxWriteAsk> {
-    const record = await this.#bank.sealBox(donorProps, publicProps, secretProps)
-    const cited  = Thing.sparseOf(donorProps)
-    return BaseBox.isTombstone(record) ? this.#bank.makeDelAsk<BoxRecord>({ cited, record }) : this.#bank.makePutAsk<BoxRecord>({ cited, record })
+  /** The bank's SortedVaultDB, which holds its Things and sends its writes */
+  get #sortedVaultDB(): SortedVaultDB { return this.#world.demandSortedVaultDB() }
+
+  /** The write of the next revision after `cited`, or after the newest revision seen at a labelpath, applying `publicProps` and sealing `secretProps` */
+  async #sealedWriteOf(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<PutOnceArgs<BoxRecord>> {
+    const donor = (typeof cited === 'string') ? await this.#donorAt(cited) : cited
+    return { cited: Thing.sparseOf(donor), record: await this.sealBox(donor, publicProps, secretProps) }
+  }
+
+  // A box whose newest revision is known only sparse is written over that revision, and the patch then gives the sidecar.
+  /** The newest revision seen of the box at `labelpath`: the record it holds where that was seen whole, else its citable, the box got first where none is seen */
+  async #donorAt(labelpath: BoxLabelpath): Promise<Sealable<LiveOf<BoxRecord>>> {
+    const scope = this.#scopeAt(labelpath)
+    if (this.#boxAt(scope) === undefined) { await this.#vaultTSQ.getOnce(scope) }
+    const box = this.#boxAt(scope)
+    if (box === undefined) { throw Throwers.storageIssue() }
+    return (box.agekind === 'here') ? box.pickle() : box.citable
+  }
+
+  /** The good outcome of the box `answer` wrote, or its refusal */
+  #boxOutcomeOf(answer: WriteThingAnswer): Outcome.Outcome<Box> {
+    if (! answer.ok) { return answer }
+    const box = this.#boxAt(answer.val)
+    // A record told that fails its checks leaves no Thing: it went to onBadNews.
+    return (box === undefined) ? Outcome.bad(Throwers.storageIssue()) : Outcome.good(box)
+  }
+
+  /** The box at `scope`, or undefined where this device has seen no record of it */
+  #boxAt(scope: ThingScope): Box | undefined {
+    const thing = this.#sortedVaultDB.thingAt(scope)
+    return (thing instanceof Box) ? thing : undefined
   }
 
   /** The scope of the box at `labelpath`, in this vault's bank. Refuses the root box's labelpath. */
   #scopeAt(labelpath: BoxLabelpath): ScopeAt<BoxLabelpath> {
-    return { ...this.#bank.scope, labelpath: Checks.boxLabelpath.parse(labelpath) as BoxLabelpath }
+    return { ...this.#bank.scope, labelpath: VaultChecks.boxLabelpath.parse(labelpath) as BoxLabelpath }
   }
 
-  // The shell of a box is of the root box's life.
-  /** The soonest record the minder has of the box at `labelpath`: its soon, else its item, else fetched; where the item is null, its tombstone, else its shell. */
-  async #soonestAt(labelpath: BoxLabelpath): Promise<Sealable<LiveOf<BoxRecord>>> {
-    const scope   = this.#scopeAt(labelpath)
-    const heard   = this.#minder.soonAt(scope) ?? this.#minder.at(scope)
-    const soonest = (heard === undefined) ? await this.#minder.get(scope) : heard
-    if (soonest !== null) { return soonest }
-    return this.#minder.deadAt(scope) ?? Shell.of(scope, this.#bank.rootBox)
+  /** Demand that `box` is a box of this vault's bank, under its current root box. */
+  #demandOwnBox(box: unknown): void {
+    const { lifepath } = BoxChecks.sealable.parseConsistent(box, this.#bank.scope, { kind: 'record_conflict' })
+    if (lifepath.split('/', 1)[0] !== this.#bank.rootBox.lifeseq) { throw Throwers.boxOfOtherRoot() }
   }
   // --
 }
-
-// == [Helpers]: isOfNewerLife
-
-/** True when `soon` is of a newer life than `item`. */
-function isOfNewerLife(item: Pick<BoxRecord, 'lifepath' | 'revseq'>, soon: Pick<BoxRecord, 'lifepath' | 'revseq'>): boolean {
-  return (soon.lifepath !== item.lifepath) && (Thing.cmp(item, soon) > 0)
-}
-// --
-
-// == [Checks]: Checks
-
-/** The checks of a box's labelpath, never the root box's, and of the `fn` {@link Vault.withWhisper} and {@link Vault.withUnlockedWhisper} call. */
-const Checks = Validator.Checkers('bad_record', ({ fn }) => ({
-  // The root box is the bank's, minded by its BankMinder: a vault's minder minds only the boxes under it.
-  boxLabelpath: BoxChecks.labelpath.refine((given) => given !== Labelpath.RootBox, Phrases.VaultBoxIsRoot),
-  fn:           fn<(box: BoxUnsealed) => unknown>(),
-}))
-// --

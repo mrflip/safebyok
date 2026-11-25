@@ -10,7 +10,7 @@ describe("useSession", () => {
     const auth = createAuth({ banklabel: 'acme', dbStorage: memoryStorage(), deviceStorage: memoryStorage() })
     const { result } = renderHook(() => useSession(auth))
     expect(result.current).to.be.null
-    const session = await act(() => auth.signIn('margo'))
+    const session = await act(() => auth.signin('margo'))
     expect(result.current).to.eq(session)
     act(() => { auth.signOut() })
     expect(result.current).to.be.null

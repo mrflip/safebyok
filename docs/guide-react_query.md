@@ -28,7 +28,7 @@ package is from it. The other guides ([Suspense](guide-suspense.md), [Next.js](g
 
 const bank = useBank()                       // synchronous, never suspends, never null
 switch (bank.stage) {                        // one field drives the screen
-  case 'signed_out': return <SignIn />
+  case 'signed_out': return <Signin />
   case 'starting':   return <Spinner />
   case 'unborn':     return <CreateVault />  // nothing stored for this user yet
   case 'locked':                             // records show, sealed; a whisper needs the user
@@ -71,7 +71,7 @@ const unlock = useMutation({ mutationFn: vault.unlock })
 ## Doppler-lite: many secrets, each with settings
 
 ```tsx
-const { data: labelpaths } = useBoxList()              // the boxes' labelpaths, deleted ones too; undefined until the first list; lists again only on evidence (a new box, `invalidateQueries`), never on focus or remount
+const { data: labelpaths } = useBoxList()              // the live boxes' labelpaths; undefined until the first list; lists again only on evidence (a box born or deleted, `invalidateQueries`), never on focus or remount
 labelpaths?.map((labelpath) => <Row key={labelpath} labelpath={labelpath} />)   // each Row's useBox redraws for its own box alone
 const { data: boxes } = useBoxes()                     // every live record, sealed: for sorting, counts and "nothing here yet"
 
@@ -127,6 +127,6 @@ Today's package has `reactGiver(config)` at module scope, `SOK.Provider`, and ho
 * `useVault()`, one handle for the calls and the factories (today: `Knock.*`, `Knock.boxQuery`, `SOK.useQueryOptions`).
 * Gate verbs as calls that take the form (today: a hook for each verb, `Knock.useUnlock()`, whose `attempt` takes the form).
 * `vault.putBoxMutationOptions`, the twin of the Suspense guide's `putBoxAction`, exists as `Knock.putBoxMutationOptions`.
-* `useBoxes`; a `useBoxList` without deleted boxes (today: they stay listed, and their `useBox` answers null).
+* `useBoxes`.
 * `idbVaultDB`: no browser vaultDB is ported to the new core.
 * Typed whispers: a schema for each labelpath, so `withWhisper`'s callback is typed.

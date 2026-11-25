@@ -189,6 +189,48 @@ describe("Shell.lifepathWithParentage(raw, parent?)", () => {
   }
 })
 
+describe("Shell.under(scope, ancestor)", () => {
+  it("is a root's shell, where nothing is above it", () => {
+    expect(Shell.under(TH.RootScope, null)).to.deep.equal(Shell.of(TH.RootScope))
+  })
+
+  it("is the shell under the ancestor's lifepath, live or a tombstone, the shell's lifeseq for its own level", () => {
+    const tomb = TH.boxTombOf(TH.rootBoxOf())
+    expect(Shell.under(TH.BoxScope, TH.rootBoxOf())).to.deep.equal(Shell.of(TH.BoxScope, TH.rootBoxOf()))
+    expect(Shell.under(TH.BoxScope, tomb).lifepath).to.eq(`${tomb.lifepath}/${Shell.VoidLifeseq}`)
+  })
+
+  it("is the shell's lifeseq at every level, where nothing is stored above it", () => {
+    expect(Shell.under(TH.BoxScope, null).lifepath).to.eq(`${Shell.VoidLifeseq}/${Shell.VoidLifeseq}`)
+  })
+
+  it("reads only the labelpath and lifepath of an ancestor", () => {
+    expect(Shell.under(TH.BoxScope, { labelpath: 'box', lifepath: Life0 })).to.deep.equal(Shell.under(TH.BoxScope, TH.rootBoxOf()))
+  })
+
+  const BadAncestorCases: [() => unknown, string, string][] = [
+    [() => Shell.under(TH.BoxScope, TH.boxThingOf('open')),                             'labelpath',            'a sibling whose labelpath begins the same'],
+    [() => Shell.under(TH.BoxScope, TH.gateThingOf()),                                  'labelpath',            'a root of another kind'],
+    [() => Shell.under(TH.BoxScope, TH.boxThingOf()),                                   Phrases.LifepathShape,  'the Thing at the scope itself'],
+    [() => Shell.under(TH.BoxScope, { labelpath: 'box', lifepath: Shell.VoidLifeseq }), Phrases.LifepathShape,  "an ancestor with the shell's lifepath"],
+  ]
+
+  for (const [call, said, blurb] of BadAncestorCases) {
+    it(`refuses ${blurb}`, () => {
+      const err = TH.expectSyncRefusal(call, 'bad_record')
+      expect(err.message).to.include(said)
+    })
+  }
+})
+
+describe("Labelpath.ancestorsOf(labelpath)", () => {
+  it("is each labelpath above, nearest first, and none for a root", () => {
+    expect(Labelpath.ancestorsOf('box')).to.deep.equal([])
+    expect(Labelpath.ancestorsOf('box/openai')).to.deep.equal(['box'])
+    expect(Labelpath.ancestorsOf('box/aa/bb')).to.deep.equal(['box/aa', 'box'])
+  })
+})
+
 describe("Labelpath.modelkindOf(labelpath), Labelpath.isOfModelkind(labelpath, modelkind) and Labelpath.isBox(labelpath)", () => {
   const LabelpathCases = [
     ['bank',             'bank', true,  "the bank's root"],
@@ -242,6 +284,12 @@ describe("AskChecks.getAsk and AskChecks.listAsk", () => {
 
   it("refuses a list ask that is a get", () => {
     TH.expectSyncRefusal(() => AskChecks.listAsk.parse(TH.getAskAt('box')), 'bad_record')
+  })
+
+  it("accepts a banktok that is a UUID, and refuses one that is not", () => {
+    expect(AskChecks.getAsk.parse({ ...TH.getGateAskOf(), banktok: TH.FirstLifetok })).to.deep.include({ banktok: TH.FirstLifetok })
+    expect(AskChecks.listAsk.parse({ ...TH.listAskAt('box'), banktok: TH.FirstLifetok })).to.deep.include({ banktok: TH.FirstLifetok })
+    TH.expectSyncRefusal(() => AskChecks.getAsk.parse({ ...TH.getGateAskOf(), banktok: 'life' }), 'bad_record')
   })
 })
 
@@ -394,6 +442,19 @@ describe("the ask builders", () => {
     expect(putAskOf({ cited: Shell.childCited(Life0), record: box, ifPresent: 'fail' })).to.deep.include({ ...TH.BoxScope, modelkind: 'box', ifAbsent: 'add', ifPresent: 'fail' })
   })
 
+  it("carry a banktok given, and none when none is given", () => {
+    const tomb = TH.boxTombOf(box)
+    const banktok = TH.FirstLifetok
+    expect(getAskOf({ ...TH.BoxScope, banktok })).to.deep.equal({ ...TH.getAskAt('box/openai', 'nil'), banktok })
+    expect(listAskOf({ ...TH.RootScope, banktok })).to.deep.equal({ ...TH.listAskAt('box', 'fail'), banktok })
+    expect(putAskOf({ cited: Shell.childCited(Life0), record: box, banktok })).to.deep.include({ banktok })
+    expect(delAskOf({ cited: box, record: tomb, banktok })).to.deep.equal({ ...TH.delAskFor(box, tomb), banktok })
+    expect(getAskOf(TH.BoxScope)).to.not.have.property('banktok')
+    expect(listAskOf(TH.RootScope)).to.not.have.property('banktok')
+    expect(putAskOf({ cited: Shell.childCited(Life0), record: box })).to.not.have.property('banktok')
+    expect(delAskOf({ cited: box, record: tomb })).to.not.have.property('banktok')
+  })
+
   it("fix a del's flags", () => {
     const tomb = TH.boxTombOf(box)
     expect(delAskOf({ cited: box, record: tomb })).to.deep.equal(TH.delAskFor(box, tomb))
@@ -469,6 +530,11 @@ describe("loggableAskOf(ask)", () => {
     expect(loggable.root).to.deep.equal({ revtok: TH.revtokOf('0'), revseq: 0, am: 'a', lifepath: Life0 })
     expect(JSON.stringify(loggable)).to.not.include(TH.MainWayin.salt_b64)
     expect(JSON.stringify(loggable)).to.not.include(TH.FakeSealed.codectag)
+  })
+
+  it("carries over the banktok an ask carries", () => {
+    expect(loggableAskOf({ ...TH.getGateAskOf(), banktok: TH.FirstLifetok })).to.deep.include({ banktok: TH.FirstLifetok })
+    expect(loggableAskOf({ ...TH.birthBankAskOf(), banktok: TH.FirstLifetok })).to.deep.include({ op: 'birth', banktok: TH.FirstLifetok })
   })
 
   it("gives nothing for an ask that will not parse", () => {

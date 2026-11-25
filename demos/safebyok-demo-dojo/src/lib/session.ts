@@ -12,7 +12,7 @@ const ResetCkey = 'dojo:reset'
 export function sessionUserid(): string | null { return localStorage.getItem(SessionCkey) }
 
 /** Sign in as `userid`, on a fresh page. */
-export function signInAs(userid: string): void {
+export function signinAs(userid: string): void {
   localStorage.setItem(SessionCkey, userid)
   globalThis.location.reload()
 }

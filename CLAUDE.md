@@ -119,6 +119,9 @@ pnpm changeset                     # a PR's release note; `--empty` when it need
 ## Layout
 
 * `packages/` -- `safebyok` (the core) and `safebyok-*` (clients, adapters, plugins).
+* **Shapes, throwers and phrases live in their own files.** In nearly all cases a check or a type belongs in a
+  package's `src/shapes/`, a thrower in `src/refusals/throwers.ts` and a phrase in `src/phrases.ts`, never in the
+  module that uses it.
 * Private, never published: the root (`scripts/`, tested in `tests/scripts/`), `demos/`, and
   `e2e/` (adapter-by-framework checks).
 * `whiteboard/` and `winboard/` -- thread and session folders, `YYYYMMDD-<label>/`, open and

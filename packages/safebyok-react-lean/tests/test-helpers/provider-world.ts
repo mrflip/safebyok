@@ -3,7 +3,7 @@
 import { QueryClient } from '@tanstack/react-query'
 import { noop } from 'es-toolkit'
 import { onTestFinished, vi } from 'vitest'
-import { Device, type KeyDeriver, type PassphraseVerdict, type StrengthChecker, type Vault, MemoryVaultDB } from 'safebyok'
+import { type DevicePersisters, Device, type KeyDeriver, type PassphraseVerdict, type StrengthChecker, type Vault, MemoryVaultDB } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { type BankGiver, type ReactGiver, reactGiver } from '../../src/giver/react-giver'
 
@@ -101,13 +101,13 @@ export interface ProviderWorld {
   client:  QueryClient
   /** The host's QueryClient, and the one each device the giver made caches in: every client a secret could reach. */
   clients(): readonly QueryClient[]
-  /** How many watches have been opened on {@link vaultDB} since the world was built, two for each device started over it (its BankMinder's and its VaultMinder's), and how many gets it has been asked. */
+  /** How many watches have been opened on {@link vaultDB} since the world was built, one for each device started over it, which its SortedVaultDB opens, and how many gets it has been asked. */
   counts:  { watches: number, gets: number }
   /** Pause every get {@link vaultDB} is asked from now on before it reads, until the function returned is called. */
   pauseGets(): () => void
   /** Pause every get {@link vaultDB} is asked from now on after it reads, until the function returned is called: it answers what it read. */
   pauseAnswers(): () => void
-  /** The device the giver made first, at a provider's mount: for a test to read its minder once a userid is signed in on it. */
+  /** The device the giver made first, at a provider's mount: for a test to read its vault TSQ or world once a userid is signed in on it. */
   _cheat_device(): Device
   /** Every device the giver has made, in the order made. */
   _cheat_devices(): readonly Device[]
@@ -125,6 +125,8 @@ export interface ProviderWorldGiven {
   isInConfig?:     boolean
   /** False gives the vaultDB no watch of its own, so a device learns of another's writes only by asking: from what its own gets and lists answer, and the watch tells of them. */
   isWatching?:     boolean
+  /** The persisters of every device the giver makes, and of the device that stores `'jokes'`, which saves what it stored to them: a page reloaded. */
+  persisters?:     DevicePersisters
 }
 
 /** A memory vaultDB that reports no change of its own, as a datastore with no watch: its watches hear only what its verbs notify. */
@@ -133,13 +135,15 @@ class UnwatchedVaultDB extends MemoryVaultDB {
 }
 
 /** A giver over nothing yet started, and a vaultDB with what `given` stores. */
-export async function buildProviderWorld({ stored = 'none', isInConfig = false, isWatching = true }: ProviderWorldGiven = {}): Promise<ProviderWorld> {
+export async function buildProviderWorld({ stored = 'none', isInConfig = false, isWatching = true, persisters }: ProviderWorldGiven = {}): Promise<ProviderWorld> {
   const vaultDB = isWatching ? new MemoryVaultDB() : new UnwatchedVaultDB()
   let otherVault: Vault | null = null
   if (stored === 'jokes') {
-    const { vault } = await LeanTH.buildBornVault({ device: LeanTH.makeDevice({}, { vaultDB }) })
+    const { vault } = await LeanTH.buildBornVault({ device: LeanTH.makeDevice({}, { vaultDB, persisters }) })
     await vault.putBoxOnce(`box/${JokesPath}`, { sidecar: { service: 'jokes' } }, { whisper: LeanTH.Whisper })
     otherVault = vault
+    // TanStack tells a persister of a change on a later turn.
+    await new Promise((resolve) => { setTimeout(resolve, 0) })
   }
   const counts = { watches: 0, gets: 0 }
   const watch = vaultDB.watch.bind(vaultDB)
@@ -177,6 +181,7 @@ export async function buildProviderWorld({ stored = 'none', isInConfig = false, 
     keyDeriver:      isInConfig ? deriver : LeanTH.testDeriver,
     strengthChecker: checker,
     logger:          LeanTH.quietLogger,
+    ...(persisters && { persisters }),
   })
   const client = new QueryClient()
   onTestFinished(() => { client.clear() })
@@ -189,7 +194,7 @@ export async function buildProviderWorld({ stored = 'none', isInConfig = false, 
     _cheat_devices: () => [...devices],
     _cheat_putJokesKey: async (passphraseCleartext) => {
       const device = makeDeviceUnspied({ banklabel: LeanTH.WorldScope.banklabel, device_tok: globalThis.crypto.randomUUID() }, { keyDeriver: LeanTH.testDeriver, logger: LeanTH.quietLogger, vaultDB })
-      await device.signIn(ProviderUser)
+      await device.signin(ProviderUser)
       await device.bank!.gate.unlock({ passphraseCleartext })
       await device.vault!.putBoxOnce(`box/${JokesPath}`, { sidecar: { service: 'jokes' } }, { whisper: LeanTH.Whisper })
     },

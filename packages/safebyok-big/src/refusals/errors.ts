@@ -20,7 +20,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  * * **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or have the user free room. `bank_locked`, `wrong_passphrase`,
  *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`,
- *   `absent_box`, `absent_vault`, `absent_wayin`, `box_too_large`, `vault_full`,
+ *   `absent_box`, `absent_vault`, `absent_wayin`, `absent_thing`, `box_too_large`, `vault_full`,
  *   `stale_write`, `stale_read`, `record_conflict`, `storage_unavailable`, `storage_blocked`, `gate_made_elsewhere`,
  *   `vault_gone`, `vault_reborn`, `gating_concluded`, `attempt_in_flight`, `already_asking`, `dismissed`,
  *   `same_passphrase`, `camped`.
@@ -47,6 +47,7 @@ export const refusalkindVals = [
   'absent_box',          // no box under that label
   'absent_vault',        // the vault has never been created, and this call will not create it
   'absent_wayin',        // the vault has no passkey, and one was asked for: to unlock with, or to remove
+  'absent_thing',        // a model of a stored Thing holds the shell or a tombstone, and the call needs its live record: a bank not born yet, or deleted
   'bad_scope',           // a name in a scope -- a label, or the user_id -- that fails its check
   'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage allows in one record
   'vault_full',          // a new box in a vault already at its maxBoxes (a best-effort cap), or a write storage has no room for
@@ -96,6 +97,7 @@ export const RefusalFamilyForKind = {
   absent_box:          'condition',
   absent_vault:        'condition',
   absent_wayin:        'condition',
+  absent_thing:        'condition',
   bad_scope:           'misuse',
   box_too_large:       'condition',
   vault_full:          'condition',

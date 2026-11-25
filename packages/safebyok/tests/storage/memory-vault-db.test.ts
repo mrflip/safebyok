@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as Classifier from '../../src/storage/thing-classifier'
+import { Shell } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.describeVaultDBBattery('MemoryVaultDB', {
@@ -12,11 +13,14 @@ TH.describeVaultDBBattery('MemoryVaultDB', {
 })
 
 describe("MemoryVaultDB, what only a store in memory can show", () => {
-  it("answers with a copy, which the caller can change without changing the store", async () => {
+  it("answers with a copy of what it stores, deeply frozen, and stores a copy of what it is handed", async () => {
     const vaultDB = new MemoryVaultDB()
-    await TH.expectGood(vaultDB.tryWriteThing(TH.birthAskOf()))
-    const val = await TH.expectGood<unknown>(vaultDB.tryGetThing(TH.getGateAskOf())) as { auth: { planted?: boolean } }
-    val.auth.planted = true
+    const gate = TH.gateThingOf()
+    await TH.expectGood(vaultDB.tryWriteThing(TH.birthAskOf(gate)))
+    const val = await TH.expectGood<unknown>(vaultDB.tryGetThing(TH.getGateAskOf())) as { auth: object }
+    expect(Object.isFrozen(val.auth)).to.be.true
+    expect(val).to.not.equal(vaultDB._cheat_things(TH.ThingBank).get('gate'))
+    ;(gate as { label: string }).label = 'changed'
     const again = await vaultDB.tryGetThing(TH.getGateAskOf())
     expect(again).to.deep.include({ val: TH.gateThingOf() })
   })
@@ -54,13 +58,23 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
 describe("Classifier.classifyListThings(ask, fetched, roots)", () => {
   it("refuses, as a broken store, a child a store fetched from outside the parent", () => {
     const child = { labelpath: 'box/aa/deep', raw: TH.boxThingOf('deep') }
-    const fetched = { parent: TH.rootBoxOf(), children: [child], read_tc: Classifier.readTcNow() }
-    TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), fetched, { bank: null, maingate: null }), 'storage_issue')
+    const fetched = { parent: TH.rootBoxOf(), children: [child] }
+    TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), fetched, { bank: null, maingate: null, tracked: null, read_tc: Classifier.readTcNow() }), 'storage_issue')
   })
+})
 
-  it("refuses, as a broken store, a read_tc that is no UUID version 7", () => {
-    for (const read_tc of [undefined, crypto.randomUUID(), Classifier.readTcNow().toUpperCase()]) {
-      TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), { parent: TH.rootBoxOf(), children: [], read_tc }, { bank: null, maingate: null }), 'storage_issue')
-    }
-  })
+describe("Classifier.classifyGetThing(ask, raw, above) and Classifier.classifyWriteThing(ask, raw, above), over nothing stored", () => {
+  const OverNothing = [
+    ['storage_issue', TH.boxThingOf('open'),              'refuses, as a broken store, an ancestor a store fetched that is not above the scope'],
+    ['storage_issue', 'not a Thing',                      'refuses, as a broken store, an ancestor that is not an object'],
+    ['damaged_row',   { ...TH.rootBoxOf(), revseq: -2 },  'refuses, as a damaged row, an ancestor whose revision fails its checks'],
+  ] as const
+
+  for (const [refusalkind, ancestor, blurb] of OverNothing) {
+    it(blurb, () => {
+      const above = { bank: null, maingate: null, tracked: null, read_tc: Classifier.readTcNow(), ancestor }
+      TH.expectSyncRefusal(() => Classifier.classifyGetThing(TH.getAskAt('box/openai'), null, above), refusalkind)
+      TH.expectSyncRefusal(() => Classifier.classifyWriteThing({ ...TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)), ifAbsent: 'fail' }, null, above), refusalkind)
+    })
+  }
 })

@@ -1,9 +1,10 @@
 // safebyok/storage: what a storage adapter is written against. The vaultDB, where every kind is a Thing, its memory
 // store, the asks it is given and the answers it gives, and from safebyok-big the acts, throwers and checkers an adapter's
 // own code reaches for, re-exported so that each stays one binding across both packages.
-export { type Received, AdapterVaultDB } from './storage/adapter-vault-db'
+export { AdapterVaultDB } from './storage/adapter-vault-db'
 export { type Watcher, MemoryVaultDB } from './storage/memory-vault-db'
-export { type SortedVaultDBOpts, SortedVaultDB } from './storage/sorted-vault-db'
+export { SortedVaultDB } from './storage/sorted-vault-db'
+export { type DelOnceArgs, type PutOnceArgs, type ReceivingThing, type SortedVaultDBListener, type SortedVaultDBOpts, type ThingMaker, SortedVaultDBChecks, isSortedVaultDB } from './shapes/shapes-sorted-vault-db'
 export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
   type AnyThingRecord, type BankRecord, type BoxRecord, type GateRecord, type Modelkind, type Sealed, type Sparse, type StoredCited, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind,
@@ -12,7 +13,7 @@ export {
 export { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from './shapes/shapes-thingkinds'
 export type { LiveOf, ShellOf, TombstoneOf } from './shapes/shapes-sealers'
 export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
-export { Thing } from './models/thing'
+export { type Adoptable, Thing } from './models/thing'
 export {
   type AnyAsk, type BankRoots, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAskDraft, type GetAsk, type ListAskDraft,
   type ListAsk, type LoggableAsk, type PutAskDraft, type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk, type WriteAskFlags, AskChecks, delAskOf, getAskOf,
@@ -21,14 +22,14 @@ export {
 export * as Classifier from './storage/thing-classifier'
 export { type BankScope, type BankStamp, type BoxStamp, type GateStamp, StampChecks } from './shapes/shapes-stamps'
 export {
-  type Actual, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer,
-  type KidEntry, type Kids, type ListThingsActual, type ListThingsAnswer, type ListedBeside, type ReadTc, type VaultDB, type WriteThingAnswer, isVaultDB,
-} from './storage/vault-db'
-// The events a vaultDB's watcher is notified with, and FeedSorter, which sorts a bank's records into events.
-export { FeedSorter } from './storage/feed-sorter'
+  type Actual, type ActualBeside, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer, type GotActual,
+  type KidEntry, type Kids, type ListThingsActual, type ListThingsAnswer, type ListedBeside, type Received, type WriteThingAnswer, type WroteActual, ActualChecks,
+} from './shapes/shapes-answers'
+export { type VaultDB, isVaultDB } from './storage/vault-db'
+// The events a vaultDB's watcher is notified with.
 export {
-  type Agekind, type Agerank, type Lifekind, type Recordkind, type SeenThing, type VaultAgedEvent, type VaultEvent, type VaultEventOf, type VaultEventkind, type VaultItemEvent, type VaultLifeEvent,
-  agekindVals, lifekindVals, recordkindVals, vaultEventkindVals,
+  type Agekind, type Agerank, type ItemSeen, type Lifekind, type Liveness, type ReadTc, type SeenThing, type VaultAgedEvent, type VaultEvent, type VaultEventOf, type VaultEventkind, type VaultItemEvent, type VaultLifeEvent,
+  agekindVals, lifekindVals, livenessVals, vaultEventkindVals,
 } from './shapes/shapes-vault-event'
 // What a host's persister is written against: TanStack Query's own interface, as a device takes it.
 export { type DevicePersisters, type PersistedClient, type Persister, type PersisterOfBank, MemoryPersister, isPersister } from './storage/persister'

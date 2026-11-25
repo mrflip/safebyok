@@ -32,6 +32,21 @@ describe("adorn", () => {
     expect(workedOut).to.eq(1)
     expect(Object.keys(handle)).to.deep.equal(['label'])
   })
+
+  it("attaches a read-only value when given writable false, still configurable", () => {
+    const handle = { label: 'anthropic' }
+    adorn(handle, 'vault', { vault_tok: 'v1' }, { writable: false })
+    expect(Object.getOwnPropertyDescriptor(handle, 'vault')).to.deep.include({ enumerable: false, writable: false, configurable: true })
+    expect(Reflect.set(handle, 'vault', { vault_tok: 'v2' })).to.be.false
+    expect(Reflect.deleteProperty(handle, 'vault')).to.be.true
+  })
+
+  it("attaches a value for good when given writable and configurable false", () => {
+    const handle = { label: 'anthropic' }
+    adorn(handle, 'vault', { vault_tok: 'v1' }, { writable: false, configurable: false })
+    expect(Object.getOwnPropertyDescriptor(handle, 'vault')).to.deep.include({ enumerable: false, writable: false, configurable: false })
+    expect(Reflect.deleteProperty(handle, 'vault')).to.be.false
+  })
 })
 
 describe("decorate", () => {
@@ -69,6 +84,13 @@ describe("decorate", () => {
     expect(Reflect.set(handle, 'vault', { vault_tok: 'v2' })).to.be.false
     expect(Reflect.deleteProperty(handle, 'vault')).to.be.false
     expect(handle.vault).to.deep.equal({ vault_tok: 'v1' })
+  })
+
+  it("attaches each entry read-only when given writable false", () => {
+    const handle = decorate<Handle>({ label: 'anthropic' }, { vault: { vault_tok: 'v1' } }, { writable: false })
+    expect(Reflect.set(handle, 'vault', { vault_tok: 'v2' })).to.be.false
+    expect(handle.vault).to.deep.equal({ vault_tok: 'v1' })
+    expect(Object.keys(handle)).to.deep.equal(['label'])
   })
 
   it("leaves the object as it was for an empty set of entries", () => {

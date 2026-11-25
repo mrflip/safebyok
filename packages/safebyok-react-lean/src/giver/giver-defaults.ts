@@ -1,50 +1,15 @@
-/** What every giver supplies React Query: the defaults of a hook's query in the giver's QueryClient and of a form verb's mutation in the host's, and the keys. */
+/** What every giver supplies React Query: the default `select` of a hook's query in the device's QueryClient, the defaults of a form verb's mutation in the host's, and the keys. */
 
-import { type QueryKey, replaceEqualDeep } from '@tanstack/react-query'
+import type { QueryKey } from '@tanstack/react-query'
 import {
-  type DeadAt, type GateRecord, type Gating, type LiveOf, type PasskeyWayinHeader, type Sparse, Thing, type ThingCited, ThingChecks, VaultMinder, type ThingRecord, type Tombstone, type Userid, type WayinHeader, type WayinRecord, newerThingOf,
+  type GateRecord, type Gating, type LiveOf, type PasskeyWayinHeader, type Sparse, Thing, type ThingRecord, type Tombstone, type Userid, VaultTSQ, type WayinHeader, type WayinRecord,
 } from 'safebyok'
 import type { GateShown, HeaderedGate } from './react-giver'
 
-// == [Query defaults]: recordQueryDefaults, newerOrSharedOf, isRecord, liveOf
+// == [Query defaults]: liveOf
 
-// A hook observes the minder's own item, so these options are the item's while a hook is mounted on it. The item is
-// stale only on evidence: while the bank's minder has heard of a newer revision than the item has. Every record the
-// minder hears of lands in the item, so nothing ages it.
-/** The giver's defaults for a hook's query of the record at `labelpath` in the giver's QueryClient, stale while `isBehind` answers true.
- * `deadAt` finds the tombstone a null item stands for, as the minder's own does.
- */
-export function recordQueryDefaults(labelpath: string, isBehind: () => boolean, deadAt: DeadAt) {
-  return {
-    // The fetch asks the bank's minder, not the network, and the minder answers from its cache while offline.
-    networkMode:       'always',
-    staleTime:         () => (isBehind() ? 0 : Infinity),
-    structuralSharing: (prior: unknown, next: unknown) => newerOrSharedOf(prior, next, labelpath, deadAt),
-  } as const
-}
-
-// TanStack shares structure through this both between a query's records and between what a host's `select` returns from
-// them, so a value that is not a record gets TanStack's own default. When a hook's key changes, it shares the last key's
-// selected value with the new key's, so a record of another box than the query's gets the default too. A select run
-// again over the same revision may return a record-shaped value that differs, so two of one revision get the default as
-// well, and so do two nulls. Between values at different revisions it answers as the minder's own structural sharing
-// does, which it replaces while a hook observes.
-/** Structural sharing for a hook's item of the box at `labelpath`: of two of its records or nulls at different revisions, the newer. Anything else goes to TanStack's default, `replaceEqualDeep`. */
-function newerOrSharedOf(prior: unknown, next: unknown, labelpath: string, deadAt: DeadAt): unknown {
-  function isItemVal(val: unknown): boolean { return (val === null) || (isRecord(val) && (val.labelpath === labelpath)) }
-  if (! (isItemVal(prior) && isItemVal(next))) { return replaceEqualDeep(prior, next) }
-  const isSame = ((prior === null) && (next === null)) || (isRecord(prior) && isRecord(next) && (Thing.cmp(prior, next) === 0))
-  if (isSame) { return replaceEqualDeep(prior, next) }
-  return newerThingOf(prior, next, deadAt)
-}
-
-/** True when `val` carries a Thing's scope and revision, as every record, tombstone and shell does, and null does not. */
-function isRecord(val: unknown): val is ThingCited & Readonly<{ labelpath: string }> {
-  return ThingChecks.scopedCited.safeParse(val).success
-}
-
-// A minder's item never has a sparse record: its soon does. The case is here for a host's own select over a record it
-// found elsewhere, such as a soon.
+// A vault TSQ's item never has a sparse record. The case is here for a host's own select over a record it found
+// elsewhere.
 /** The record a host shows of `thing`: itself while live, null for none stored, a tombstone or the shell, undefined for a sparse record.
  * A null item is nothing stored, or deleted; a sparse record's body is not yet known. It is the default `select` of a box's query. Call it from a `select` of your own to start from what the default shows.
  * @example
@@ -59,7 +24,7 @@ export function liveOf<RecordT extends Sparse<ThingRecord>>(thing: RecordT | Tom
 
 // == [The gate shown]: gateShownOf, liveGateOf, passkeyHeaderOf, wayinHeaderOf
 
-// The gate's hook selects through this, so no hook shows a wrapped bankKey; the minder's own item has the whole gate.
+// The gate's hook selects through this, so no hook shows a wrapped bankKey; the gate's Thing has the whole gate.
 // A gate is never deleted, so the only tombstone is the shell, which has no wayins.
 /** The main gate as a hook shows it: each wayin by its header, without the bankKey it wraps. */
 export function gateShownOf(thing: GateRecord | Tombstone<GateRecord>): GateShown {
@@ -116,22 +81,22 @@ export function formMutationKeyOf({ userid, banklabel, verb }: Readonly<{ userid
 }
 
 // While nobody is signed in, a hook still needs a key: one of no user's, `null` where the userid goes, whose fetch is
-// skipped. It never matches a key the minder caches under.
-/** The React Query key for the record of the box at `labelpath`: the key the bank's minder caches its item under, or one of no user's while `userid` is null. */
+// skipped. It never matches a key the vault TSQ keeps anything under.
+/** The React Query key for the record of the box at `labelpath`: the key the bank's vault TSQ keeps its item under, or one of no user's while `userid` is null. */
 export function boxQueryKeyOf({ userid, banklabel, labelpath }: Readonly<{ userid: Userid | null, banklabel: string, labelpath: string }>): QueryKey {
-  return (userid === null) ? ['sok', null, banklabel, labelpath] : VaultMinder.itemQueryKeyOf({ userid, banklabel, labelpath })
+  return (userid === null) ? ['sok', null, banklabel, labelpath] : VaultTSQ.itemQueryKeyOf({ userid, banklabel, labelpath })
 }
 
 // An item's key is its labelpath's labels and then the mark '!', so the key less its mark starts the key of every box
 // under it, and of none beside it.
 /** The key that starts the React Query key of the box at `labelpath` and of every box under it: for `invalidateQueries`. While `userid` is null, the key that starts every one of no user's. */
 export function boxesQueryKeyUnder({ userid, banklabel, labelpath }: Readonly<{ userid: Userid | null, banklabel: string, labelpath: string }>): QueryKey {
-  return (userid === null) ? ['sok', null, banklabel] : VaultMinder.itemQueryKeyOf({ userid, banklabel, labelpath }).slice(0, -1)
+  return (userid === null) ? ['sok', null, banklabel] : VaultTSQ.itemQueryKeyOf({ userid, banklabel, labelpath }).slice(0, -1)
 }
 
-// The minder's keys put the kind of query before the labels, so no key that starts a box's also starts a listing's.
-/** The React Query key for the listing of the root box's children: the key the bank's minder caches it under, or one of no user's while `userid` is null. */
+// The vault TSQ's keys put the kind of query before the labels, so no key that starts a box's also starts a listing's.
+/** The React Query key for the listing of the root box's children: the key the bank's vault TSQ keeps it under, or one of no user's while `userid` is null. */
 export function boxListQueryKeyOf({ userid, banklabel }: Readonly<{ userid: Userid | null, banklabel: string }>): QueryKey {
-  return (userid === null) ? ['sok', null, banklabel, 'box', '#', 'kids'] : VaultMinder.listQueryKeyOf({ userid, banklabel, labelpath: 'box' })
+  return (userid === null) ? ['sok', null, banklabel, 'box', '#', 'kids'] : VaultTSQ.listQueryKeyOf({ userid, banklabel, labelpath: 'box' })
 }
 // --

@@ -1,11 +1,14 @@
 /** The Things and asks a vaultDB's tests share: a bank's three roots and a box under its root, and the asks that get, list and write them. */
 
-import { type Lifepath, type Revtok, Labelpath, Lifeseq } from '../../src/shapes/primitives'
+import { type Lifepath, type Lifetok, Labelpath, Lifeseq } from '../../src/shapes/primitives'
 import {
-  type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord,
+  type BankRecord, type BoxRecord, type GateRecord, type ThingCited, type ThingRecord,
   Shell, ThingFormat,
 } from '../../src/shapes/shapes-thing'
-import type { Recordkind, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
+import type { SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
+import { itemSeenOf } from '../../src/storage/agerank'
+import { readTcNow } from '../../src/storage/thing-classifier'
+import { PlainThing } from './plain-thing'
 import { WayinChecks } from '../../src/shapes/shapes-wayin'
 import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { FirstLifetok, FirstRevtok, T0, revtokOf } from './models-world'
@@ -47,8 +50,11 @@ export const Life0 = Lifeseq.ofLifenum(0)
 /** The fields every Thing here starts from: revision 0 of life 0, born and written at {@link T0}. */
 const FirstRevision = { am: 'a', revtok: FirstRevtok, revseq: 0, lifeseq: Life0, born_at: T0, written_at: T0 } as const
 
+/** What a track reads of a record, of any life. */
+export type TrackedRecord = Pick<ThingRecord, 'revseq' | 'lifepath'>
+
 /** The track of the bank, main gate and root box `bank`, `gate` and `box`: their revseq and lifepath. */
-export function trackOf(bank: ThingRecord = bankThingOf(), gate: ThingRecord = gateThingOf(), box: ThingRecord = rootBoxOf()): Track {
+export function trackOf(bank: TrackedRecord = bankThingOf(), gate: TrackedRecord = gateThingOf(), box: TrackedRecord = rootBoxOf()): Track {
   return {
     bank: { revseq: bank.revseq, lifepath: bank.lifepath },
     gate: { revseq: gate.revseq, lifepath: gate.lifepath },
@@ -144,13 +150,29 @@ export const BankStaleTrack = trackOf(bankThingOf({ revseq: 3 }), gateThingOf())
 /** The track of a sender with the root box at another revision. */
 export const RootStaleTrack = trackOf(bankThingOf(), gateThingOf(), rootBoxOf({ revseq: 3 }))
 
-/** The `item` notice a watcher gets for `record`, with no agerank: `full` unless `recordkind` says otherwise. */
-export function itemEventOf(record: Sparse<ThingRecord>, recordkind: Exclude<Recordkind, 'void'> = 'full'): VaultItemEvent {
-  const { userid, banklabel, labelpath } = record
-  return { eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: undefined, agerankWas: undefined, recordkind, record }
+/** A UUID version 7, the shape of every `read_tc`. */
+export const ReadTcPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+/** What {@link maskedReadTcsOf} puts in place of each `read_tc`, as an expected notice carries it. */
+export const AnyReadTc = '(any read_tc)'
+
+/** `events`, each with its `read_tc` read as {@link AnyReadTc} where it is a UUID version 7, to compare with expected notices. */
+export function maskedReadTcsOf(events: readonly VaultEvent[]): VaultEvent[] {
+  return events.map((event) => (ReadTcPattern.test(event.read_tc ?? '') ? { ...event, read_tc: AnyReadTc } : event))
 }
 
-/** The revtok of `val`, what a minder's item or soon has, or undefined for none or null. */
-export function itemRevtokOf(val: Sparse<ThingRecord> | null | undefined): Revtok | undefined {
-  return val?.revtok
+/** The Thing a test's SortedVaultDB keeps at each labelpath: a plain one, as a device's is. */
+export function makePlainThing(seen: SeenThing): PlainThing { return PlainThing.make(seen) }
+
+/** The `item` notice a vaultDB's raw watch gets for `record`, at the liveness its record has, with no agerank and no source, at {@link AnyReadTc}, and with no bank lifetok unless given one. */
+export function itemEventOf(record: SeenThing, banktok?: Lifetok): VaultItemEvent {
+  const { userid, banklabel, labelpath } = record
+  const unsorted = { agerank: undefined, agerankWas: undefined, banktok, sourcelabel: undefined, read_tc: AnyReadTc }
+  return { eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), ...unsorted, ...itemSeenOf(record) }
+}
+
+// itemEventOf types its record as of any kind; a Thing of one kind receives only events of its own.
+/** The `item` event a SortedVaultDB hands the Thing of `record` to receive, read now, typed as of `record`'s kind. */
+export function thingEventOf<RecordT extends ThingRecord>(record: SeenThing<RecordT>): VaultItemEvent<RecordT> {
+  return { ...itemEventOf(record), read_tc: readTcNow() } as VaultItemEvent<RecordT>
 }

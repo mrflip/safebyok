@@ -5,14 +5,15 @@ import { Validator } from 'safebyok-big/internals'
 
 // == [Types]: BulletproofOpts, BulletproofFailOpts, BulletproofTellOpts
 
-/** How a bulletproof handler deals with what its handler throws. */
-export type BulletproofOpts = Readonly<Z.infer<typeof Checks.bulletproofOpts>>
+/** How a bulletproof handler deals with what its handler throws, its transformer making an `ErrT`. */
+export type BulletproofOpts<ErrT extends Error = Error> = BulletproofFailOpts | BulletproofTellOpts<ErrT>
 
 /** {@link BulletproofOpts} that rethrow the transformer's `Error`. */
-export type BulletproofFailOpts = Extract<BulletproofOpts, Readonly<{ ifError: 'fail' }>>
+export type BulletproofFailOpts = Extract<Readonly<Z.infer<typeof Checks.bulletproofOpts>>, Readonly<{ ifError: 'fail' }>>
 
-/** {@link BulletproofOpts} that tell `onBadNews` the transformer's `Error`. */
-export type BulletproofTellOpts = Extract<BulletproofOpts, Readonly<{ ifError: 'tell' }>>
+// Written out, not inferred from the check, so that `onBadNews` may take only what the transformer makes: a VaultError, say.
+/** {@link BulletproofOpts} that tell `onBadNews` the transformer's `ErrT`. */
+export type BulletproofTellOpts<ErrT extends Error = Error> = Readonly<{ ifError: 'tell', transformer: (thrown: unknown) => ErrT, onBadNews: (err: ErrT) => void }>
 // --
 
 // == [The wrappers]: bulletproofHandlerOf, bulletproofAsyncHandlerOf
@@ -27,11 +28,11 @@ export type BulletproofTellOpts = Extract<BulletproofOpts, Readonly<{ ifError: '
  *   const whisperOf = bulletproofHandlerOf(hostWhisperOf, { ifError: 'fail', transformer: sanitizeForeignError })
  */
 export function bulletproofHandlerOf<ArgsT extends unknown[], ResultT>(handler: (...args: ArgsT) => ResultT, opts: BulletproofFailOpts): (...args: ArgsT) => ResultT
-export function bulletproofHandlerOf<ArgsT extends unknown[], ResultT>(handler: (...args: ArgsT) => ResultT, opts: BulletproofTellOpts): (...args: ArgsT) => ResultT | undefined
-export function bulletproofHandlerOf<ArgsT extends unknown[], ResultT>(handler: (...args: ArgsT) => ResultT, opts: BulletproofOpts): (...args: ArgsT) => ResultT | undefined {
+export function bulletproofHandlerOf<ArgsT extends unknown[], ResultT, ErrT extends Error>(handler: (...args: ArgsT) => ResultT, opts: BulletproofTellOpts<ErrT>): (...args: ArgsT) => ResultT | undefined
+export function bulletproofHandlerOf<ArgsT extends unknown[], ResultT, ErrT extends Error>(handler: (...args: ArgsT) => ResultT, opts: BulletproofOpts<ErrT>): (...args: ArgsT) => ResultT | undefined {
   Checks.bulletproofArgs.parse({ handler, opts })
-  const { transformer } = opts
   if (opts.ifError === 'fail') {
+    const { transformer } = opts
     return (...args) => {
       try {
         return handler(...args)
@@ -40,7 +41,7 @@ export function bulletproofHandlerOf<ArgsT extends unknown[], ResultT>(handler: 
       }
     }
   }
-  const { onBadNews } = opts
+  const { transformer, onBadNews } = opts
   return (...args) => {
     try {
       return handler(...args)
@@ -57,11 +58,11 @@ export function bulletproofHandlerOf<ArgsT extends unknown[], ResultT>(handler: 
  *   const load = bulletproofAsyncHandlerOf(async () => { await hostChecker.load?.() }, { ifError: 'fail', transformer: loadRefusalOf })
  */
 export function bulletproofAsyncHandlerOf<ArgsT extends unknown[], ResultT>(handler: (...args: ArgsT) => ResultT | PromiseLike<ResultT>, opts: BulletproofFailOpts): (...args: ArgsT) => Promise<ResultT>
-export function bulletproofAsyncHandlerOf<ArgsT extends unknown[], ResultT>(handler: (...args: ArgsT) => ResultT | PromiseLike<ResultT>, opts: BulletproofTellOpts): (...args: ArgsT) => Promise<ResultT | undefined>
-export function bulletproofAsyncHandlerOf<ArgsT extends unknown[], ResultT>(handler: (...args: ArgsT) => ResultT | PromiseLike<ResultT>, opts: BulletproofOpts): (...args: ArgsT) => Promise<ResultT | undefined> {
+export function bulletproofAsyncHandlerOf<ArgsT extends unknown[], ResultT, ErrT extends Error>(handler: (...args: ArgsT) => ResultT | PromiseLike<ResultT>, opts: BulletproofTellOpts<ErrT>): (...args: ArgsT) => Promise<ResultT | undefined>
+export function bulletproofAsyncHandlerOf<ArgsT extends unknown[], ResultT, ErrT extends Error>(handler: (...args: ArgsT) => ResultT | PromiseLike<ResultT>, opts: BulletproofOpts<ErrT>): (...args: ArgsT) => Promise<ResultT | undefined> {
   Checks.bulletproofArgs.parse({ handler, opts })
-  const { transformer } = opts
   if (opts.ifError === 'fail') {
+    const { transformer } = opts
     return async (...args) => {
       try {
         return await handler(...args)
@@ -70,7 +71,7 @@ export function bulletproofAsyncHandlerOf<ArgsT extends unknown[], ResultT>(hand
       }
     }
   }
-  const { onBadNews } = opts
+  const { transformer, onBadNews } = opts
   return async (...args) => {
     try {
       return await handler(...args)

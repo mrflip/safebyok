@@ -25,7 +25,7 @@ describe("createAuth", () => {
 
   it("signing in creates the account on first sight and starts a session", async () => {
     const { auth, dbStorage } = makeWorld()
-    const session = await auth.signIn('margo')
+    const session = await auth.signin('margo')
     expect(session.userlabel).to.eq('margo')
     expect(session.user_id).to.match(/^user_[0-9a-f]{16}$/)
     expect(auth.getSnapshot()).to.eq(session)
@@ -34,16 +34,16 @@ describe("createAuth", () => {
 
   it("stamps a new account with the clock's time, in epoch milliseconds", async () => {
     const { auth, dbStorage } = makeWorld()
-    const session = await auth.signIn('margo')
+    const session = await auth.signin('margo')
     expect(margosAccount(dbStorage)).to.deep.equal({ user_id: session.user_id, userlabel: 'margo', registered_at: Date.UTC(2026, 9, 15, 9, 30) })
   })
 
   it("the same userlabel signs back into the same account, registered when it was made", async () => {
     const { auth, dbStorage, advance } = makeWorld()
-    const first = await auth.signIn('margo')
+    const first = await auth.signin('margo')
     auth.signOut()
     advance(24 * 60 * 60 * 1000)
-    const again = await auth.signIn('margo')
+    const again = await auth.signin('margo')
     expect(again.user_id).to.eq(first.user_id)
     expect(margosAccount(dbStorage)).to.have.property('registered_at', Date.UTC(2026, 9, 15, 9, 30))
   })
@@ -53,7 +53,7 @@ describe("createAuth", () => {
     const auth = createAuth({ banklabel: 'acme', dbStorage, deviceStorage: memoryStorage() })
     vi.useFakeTimers({ now: Date.UTC(2026, 9, 15, 9, 30), toFake: ['Date'] })
     try {
-      await auth.signIn('margo')
+      await auth.signin('margo')
     } finally {
       vi.useRealTimers()
     }
@@ -63,33 +63,33 @@ describe("createAuth", () => {
   it("rounds a clock's fraction down", async () => {
     const dbStorage = memoryStorage()
     const auth = createAuth({ banklabel: 'acme', dbStorage, deviceStorage: memoryStorage(), clock: { now: () => Date.UTC(2026, 9, 15) + 0.75 } })
-    await auth.signIn('margo')
+    await auth.signin('margo')
     expect(margosAccount(dbStorage)).to.have.property('registered_at', Date.UTC(2026, 9, 15))
   })
 
   it("different userlabels are different accounts", async () => {
     const { auth } = makeWorld()
-    const margo = await auth.signIn('margo')
-    const nikos = await auth.signIn('nikos')
+    const margo = await auth.signin('margo')
+    const nikos = await auth.signin('nikos')
     expect(nikos.user_id).to.not.eq(margo.user_id)
   })
 
   it("refuses a userlabel that is not a label", async () => {
     const { auth } = makeWorld()
-    await expect(auth.signIn('not a label')).rejects.toThrow()
+    await expect(auth.signin('not a label')).rejects.toThrow()
     expect(auth.getSnapshot()).to.be.null
   })
 
   it("the session survives a page reload", async () => {
     const { auth, dbStorage, deviceStorage } = makeWorld()
-    const session = await auth.signIn('margo')
+    const session = await auth.signin('margo')
     const reloaded = createAuth({ banklabel: 'acme', dbStorage, deviceStorage })
     expect(reloaded.getSnapshot()).to.deep.equal(session)
   })
 
   it("signing out ends the session on this device but keeps the account", async () => {
     const { auth, dbStorage, deviceStorage } = makeWorld()
-    await auth.signIn('margo')
+    await auth.signin('margo')
     auth.signOut()
     expect(auth.getSnapshot()).to.be.null
     expect(deviceStorage.get('session:acme')).to.be.null
@@ -98,7 +98,7 @@ describe("createAuth", () => {
 
   it("deleting the account removes its row and the session", async () => {
     const { auth, dbStorage } = makeWorld()
-    await auth.signIn('margo')
+    await auth.signin('margo')
     await auth.deleteAccount()
     expect(auth.getSnapshot()).to.be.null
     expect(dbStorage.get('account:acme:margo')).to.be.null
@@ -116,7 +116,7 @@ describe("createAuth", () => {
     const { auth } = makeWorld()
     let heardCount = 0
     auth.subscribe(() => { heardCount += 1 })
-    await auth.signIn('margo')
+    await auth.signin('margo')
     auth.signOut()
     expect(heardCount).to.eq(2)
   })

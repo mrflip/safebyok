@@ -1,5 +1,6 @@
 /** The gate's form verbs, each over real provings and its device's MemoryVaultDB, and the awaited `unlock` gating every verb resolves, through the bank's pass-throughs. */
 
+import { noop } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import { Errors } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
@@ -8,6 +9,8 @@ import { PassphraseProving, Proving } from '../../src/models/proving'
 import type { StrengthChecker } from '../../src/shapes/shapes-gateish'
 import type { GateRecord } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
+import { readTcNow } from '../../src/storage/thing-classifier'
+import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 
 /** A passphrase to replace {@link TH.TestPassphrase} with. */
 const NextPassphrase = 'a different passphrase, just as long'
@@ -17,17 +20,22 @@ function strengthChecker(passphrase: string) { return (passphrase === 'weak' ? {
 
 /** The main gate stored for `bank`, as its vaultDB answers it. */
 async function storedGateOf(bank: Bank): Promise<GateRecord> {
-  const answer = await bank.device.vaultDB.tryGetThing({ ...bank.makeGetAsk({ labelpath: 'gate' }), modelkind: 'gate' })
+  const answer = await bank.device.vaultDB.tryGetThing(bank.device.world.demandSortedVaultDB().makeGetAsk({ labelpath: 'gate' }))
   if (! answer.ok) { throw answer.err }
   return answer.val as GateRecord
 }
 
-/** A {@link TH.buildBornBank} bank, locked, beside a second Bank object over the same stored bank, which writes as another device would. */
+/** A {@link TH.buildBornBank} bank, locked, beside the bank of a second device over the same vaultDB, which writes as another device does.
+ * The vaultDB's watch notifies neither device: a gate change on one is unheard of on the other until an answer carries it.
+ */
 async function bankAndElsewhere(given: TH.BornBankGiven = {}) {
-  const born = await TH.buildBornBank(given)
+  const vaultDB = new MemoryVaultDB()
+  vi.spyOn(vaultDB, 'watch').mockReturnValue(noop)
+  const born = await TH.buildBornBank({ ...given, device: TH.makeDevice({}, { vaultDB }) })
   born.bank.lock()
-  const elsewhere = TH.makeStoredBank(born)
-  return { ...born, elsewhere }
+  const device = TH.makeDevice({}, { vaultDB })
+  await device.signin(TH.WorldScope.userid)
+  return { ...born, elsewhere: device.bank! }
 }
 
 /** A {@link TH.buildBornBank} bank, locked, on a device whose key deriver is watched: `deriveKeyBytes` is called for each derivation from the birth on. */
@@ -170,12 +178,12 @@ describe("bank.gate.replacePassphrase(cleartexts)", () => {
 
   it("unlocks by the new passphrase afterwards, and refuses the old one, under the same bankKey", async () => {
     const { bank } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const box = await bank.device.vault!.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
     bank.lock()
     await TH.expectRefusal(bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase }), 'wrong_passphrase')
     await bank.gate.unlock({ passphraseCleartext: NextPassphrase })
-    expect(await bank.unsealBox(box)).to.deep.include({ whisper: TH.Whisper })
+    expect(await bank.device.vault!.unsealBox(box)).to.deep.include({ whisper: TH.Whisper })
   })
 
   it("refuses the same passphrase, before the strength check or any key derivation, writing nothing", async () => {
@@ -218,13 +226,24 @@ describe("bank.gate.replacePassphrase(cleartexts)", () => {
     await TH.expectRefusal(bank.gate.replacePassphrase({ nextPassphraseCleartext: NextPassphrase }), 'bad_record')
   })
 
-  it("refuses 'stale_write' over a gate changed elsewhere, leaving the bank locked with the gate it had", async () => {
+  it("follows a gate change made on another device, as its vaultDB's watch notifies it", async () => {
+    const born = await TH.buildBornBank()
+    born.bank.lock()
+    const device = TH.makeDevice({}, { vaultDB: born.device.vaultDB })
+    await device.signin(TH.WorldScope.userid)
+    const after = await device.bank!.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
+    await TH.eventually(() => born.bank.gate.revtok === after.revtok)
+    await TH.expectRefusal(born.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase }), 'wrong_passphrase')
+    await born.bank.gate.unlock({ passphraseCleartext: NextPassphrase })
+    expect(born.bank.isUnlocked).to.be.true
+  })
+
+  it("refuses 'stale_write' over a gate changed elsewhere and not yet heard of, leaving the bank locked, its gate then the one stored", async () => {
     const { bank, elsewhere } = await bankAndElsewhere()
     await elsewhere.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
-    const ante = bank.gate.pickle()
     const make = vi.spyOn(Lease, 'make')
     await TH.expectRefusal(bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'a third passphrase, also long' }), 'stale_write')
-    expect(bank.gate.pickle()).to.equal(ante)
+    expect(bank.gate.pickle()).to.deep.equal(elsewhere.gate.pickle())
     expect(make).not.toHaveBeenCalled()
     expect(bank.isLocked).to.be.true
   })
@@ -233,7 +252,7 @@ describe("bank.gate.replacePassphrase(cleartexts)", () => {
     const { bank, device } = await TH.buildBornBank()
     const ante = bank.gate.pickle()
     const refusal = new Errors.VaultError('storage_unavailable', 'the disk is full')
-    vi.spyOn(device.vaultDB, 'tryWriteThing').mockImplementationOnce((ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, dbhas: null, err: refusal }))
+    vi.spyOn(device.vaultDB, 'tryWriteThing').mockImplementationOnce((ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, banktok: null, read_tc: readTcNow(), dbhas: null, err: refusal }))
     const make = vi.spyOn(Lease, 'make')
     expect(await TH.expectRefusal(bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase }))).to.equal(refusal)
     expect(bank.gate.pickle()).to.equal(ante)
@@ -292,13 +311,12 @@ describe("bank.gate.addPasskey(cleartexts)", () => {
     expect(bank.isLocked).to.be.true
   })
 
-  it("refuses 'stale_write' over a gate changed elsewhere, leaving the bank locked with the gate it had", async () => {
+  it("refuses 'stale_write' over a gate changed elsewhere and not yet heard of, leaving the bank locked, its gate then the one stored", async () => {
     const { bank, elsewhere } = await bankAndElsewhere()
     await elsewhere.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
-    const ante = bank.gate.pickle()
     const answer = TH.passkeyAnswerOf()
     await TH.expectRefusal(bank.gate.addPasskey({ passphraseCleartext: TH.TestPassphrase, nextPasskeyCleartext: answer }), 'stale_write')
-    expect(bank.gate.pickle()).to.equal(ante)
+    expect(bank.gate.pickle()).to.deep.equal(elsewhere.gate.pickle())
     expect(TH.isZeroed(answer.prfBytes)).to.be.true
     expect(bank.isLocked).to.be.true
   })
@@ -353,12 +371,11 @@ describe("bank.gate.revokePasskey(cleartexts)", () => {
     expect(bank.isLocked).to.be.true
   })
 
-  it("refuses 'stale_write' over a gate changed elsewhere, leaving the bank locked with the gate it had", async () => {
+  it("refuses 'stale_write' over a gate changed elsewhere and not yet heard of, leaving the bank locked, its gate then the one stored", async () => {
     const { bank, elsewhere } = await bankAndElsewhere({ passkeyCleartext: TH.passkeyAnswerOf() })
     await elsewhere.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
-    const ante = bank.gate.pickle()
     await TH.expectRefusal(bank.gate.revokePasskey({ passphraseCleartext: TH.TestPassphrase }), 'stale_write')
-    expect(bank.gate.pickle()).to.equal(ante)
+    expect(bank.gate.pickle()).to.deep.equal(elsewhere.gate.pickle())
     expect(bank.isLocked).to.be.true
   })
 })

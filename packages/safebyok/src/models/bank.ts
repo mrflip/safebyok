@@ -1,48 +1,44 @@
-import { isEqual } from 'es-toolkit'
-import { Clock, Crypto, type Errors, Outcome, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
-import { Thing } from './thing'
-import { BaseBox } from './base-box'
+import { Clock, Crypto, type Errors, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
+import { type Adoptable, Thing } from './thing'
 import { Device } from './device'
-import { Gate } from './gate'
+import type { Gate } from './gate'
 import type { BirthGating } from './gating'
+import type { World } from './world'
 import type { BirthCleartexts, BirthDna } from '../shapes/shapes-gateish'
-import type { BankAskDraft, BankOpts, BankSnapshot, BankStage, BoxUnsealed, HostedVault } from '../shapes/shapes-bankish'
-import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
+import type { BankOpts, BankSnapshot, HostedVault } from '../shapes/shapes-bankish'
+import type { ShellOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import { type DeviceTok, type Lifetok, Labelpath, Lifeseq } from '../shapes/primitives'
-import { type BankRecord, type BoxRecord, type Modelkind, type ThingRecord, ThingFormat } from '../shapes/shapes-thing'
-import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
-import { type BankRoots, type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../shapes/shapes-asks'
-import * as Phrases from '../phrases'
+import { type BankRecord, type BoxRecord, type Modelkind, ThingFormat } from '../shapes/shapes-thing'
+import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
+import type { PutAskDraft } from '../shapes/shapes-asks'
 import * as Throwers from '../refusals/throwers'
 
-/** The signed-in user's bank on this device: its main gate, which holds the lease while unlocked, and its root box.
- * Boxes are sealed and unsealed under its gate's lease. Its roots, as last heard of, are its world in the device's BankMinder.
+/** The signed-in user's bank on this device: its main gate and its root box.
+ * Its roots, as last heard of, are the Things its device's world keeps.
+ * Over the shell or a tombstone, what needs a live record refuses `absent_thing`: its stamp, its root box and a put.
  */
-export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements BankStamp {
-  // == [Props]: #device, #gate, #vaults, #endCause, #snapshot, #getSnapshot
+export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<BankRecord>> {
+  // == [Props]: #device, #world
 
   readonly #device:   Device
 
-  /** The main gate. */
-  readonly #gate: Gate
-
-  /** The vaults made on this bank, which its sweep sweeps. */
-  readonly #vaults = new Set<HostedVault>()
-
-  /** Why a sweep disabled the bank, or null until then. */
-  #endCause: Errors.VaultError | null = null
-
-  /** The current snapshot, which {@link getSnapshot} returns. */
-  #snapshot: BankSnapshot
-  readonly #getSnapshot = (): BankSnapshot => this.#snapshot
+  /** The device's world, which locks, unlocks and ends this bank. */
+  readonly #world: World
   // --
 
-  // == [Getters]: lifetok, device, device_tok, scope, stamp, gate, rootBox, track, getSnapshot, subscribe
+  // == [Body]: lifetok
 
   // we are under-using the lifetok at the moment
-  /** The token minted when this bank was born, which tells this life of the bank from any other under its banklabel. */
-  get lifetok(): Lifetok { return this.pickle().lifetok }
+  // Read off the record adopted: the shell and a sparse tombstone lack it.
+  /** The token minted when this bank was born, which tells this life of the bank from any other under its banklabel. Undefined over the shell or a sparse tombstone. */
+  get lifetok(): Lifetok | undefined {
+    const record = this.pickle()
+    return ('lifetok' in record) ? record.lifetok : undefined
+  }
+  // --
+
+  // == [Getters]: device, device_tok, scope, stamp, gate, rootBox, getSnapshot, subscribe
 
   /** The device this bank is on. */
   get device(): Device { return this.#device }
@@ -54,60 +50,47 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   get scope(): BankScope { return StampChecks.bankScope.parse(this) }
 
   /** This bank's {@link BankStamp}, which every ctx under it binds first. */
-  get stamp(): BankStamp { return BankChecks.stamp.parse(this) }
+  get stamp(): BankStamp { return BankChecks.stamp.parse(this.#demandLive()) }
 
-  /** The bank's main gate: the wayins a user unlocks with, the form verbs that change them, and the lease. The same object across a gate change. */
-  get gate(): Gate { return this.#gate }
-
-  /** The root box, as last heard of. Every box of this bank is under it. */
-  get rootBox(): BoxRecord { return this.#world.root }
-
-  /** The revseq and lifepath this device last heard of the bank, its main gate and its root box, which every ask it makes tracks. */
-  get track(): Track {
-    const { bank, gate, root } = this.#world
-    return { bank: trackPairOf(bank), [Labelpath.MainGate]: trackPairOf(gate), [Labelpath.RootBox]: trackPairOf(root) }
-  }
-
-  // A bank of a life replaced since reads the world of the life that replaced it: its boxes refuse as of another root box.
-  /** The world of this bank in the device's BankMinder. */
-  get #world(): BankRoots {
-    const world = this.#device.bankMinder.worldAt()
-    if (world === undefined) { throw Throwers.worldNotHeard() }
-    return world
-  }
-
-  /** This bank's snapshot getter, already bound, as `useSyncExternalStore` wants it: the same frozen object until the snapshot changes. */
-  get getSnapshot(): () => BankSnapshot { return this.#getSnapshot }
-
-  /** Subscribe a listener to this bank's snapshot, returning its unsubscribe. Already bound, as `useSyncExternalStore` wants it.
-   * The listener is called with no argument after each change: read the snapshot again. What it throws goes to {@link tellBadNews}.
+  /** The bank's main gate: the wayins a user unlocks with, and the form verbs that change them. The same object across a gate change.
+   * Refuses `absent_thing` until the device's world has heard of it.
    */
-  override get subscribe(): (listener: () => void) => (() => void) { return super.subscribe }
+  get gate(): Gate {
+    const { gate } = this.#world
+    if (gate === null) { throw Throwers.thingNotLive(Labelpath.MainGate) }
+    return gate
+  }
+
+  // A bank of a life replaced since reads the root box of the life that replaced it: its boxes refuse as of another root box.
+  /** The root box, as last heard of. Every box of this bank is under it. */
+  get rootBox(): BoxRecord {
+    this.#demandLive()
+    const root = this.#world.rootBox?.pickle()
+    if (root?.am !== 'a') { throw Throwers.worldNotHeard() }
+    return root
+  }
+
+  /** The snapshot getter of the device's world ({@link World.getSnapshot}), already bound, as `useSyncExternalStore` wants it. */
+  get getSnapshot(): () => BankSnapshot { return this.#world.getSnapshot }
+
+  /** Subscribe a listener to the snapshot of the device's world ({@link World.subscribe}), returning its unsubscribe. Already bound, as `useSyncExternalStore` wants it. */
+  override get subscribe(): (listener: () => void) => (() => void) { return this.#world.subscribe }
   // --
 
   // == [Construction]: make, constructor, mintStamps, makeRecord
 
-  /** Make the bank of `record`, with `opts.gate` as its main gate, on `opts.device`. Nothing is fetched or stored.
-   * The device's BankMinder must hold the world of `record`'s life, its root box live: fetch the world, or birth the bank, first.
-   * It is locked or unlocked as its gate is. The device is not told of it: a device makes its own bank in its `signIn`, and is handed the bank its birth makes.
+  /** Make the bank of `record`, a whole bank record, live or a tombstone, or the bank's shell, on `opts.device`. Nothing is fetched or stored.
+   * It is locked or unlocked as its device's world is, and finds its main gate there. Internal: the device's world makes the bank its SortedVaultDB keeps.
    */
-  static make(record: BankRecord, opts: BankOpts): Bank { return new Bank(record, opts) }
+  static make(record: BankRecord | ShellOf<BankRecord>, opts: BankOpts): Bank { return new Bank(record, opts) }
 
-  private constructor(record: BankRecord, opts: BankOpts) {
-    const { record: bankRecord, opts: { device, gate } } = Checks.bankMakeArgs.parse({ record, opts })
-    Validator.checkedConsistent(StampChecks.bankScope.parse(bankRecord), device.scope, { kind: 'record_conflict' })
-    Validator.checkedConsistent(gate.bankStamp, BankChecks.stamp.parse(bankRecord), { kind: 'record_conflict' })
-    const world = device.bankMinder.worldAt()
-    if (world === undefined) { throw Throwers.worldNotHeard() }
-    Validator.checkedConsistent(BankChecks.stamp.parse(world.bank), BankChecks.stamp.parse(bankRecord), { kind: 'record_conflict' })
-    BoxChecks.live.parse(world.root)
-    super(bankRecord)
+  // A bank models the very record it is handed, never the check's copy.
+  private constructor(record: BankRecord | ShellOf<BankRecord>, opts: BankOpts) {
+    const { opts: { device } } = Checks.bankMakeArgs.parse({ record, opts })
+    Validator.checkedConsistent(StampChecks.bankScope.parse(record), device.scope, { kind: 'record_conflict' })
+    super(record)
     this.#device = device
-    this.#gate = gate
-    this.#snapshot = this.#makeSnapshot()
-    // The bank's sweep sweeps its gate, which then lets go of this listener.
-    this.#gate.subscribe(() => { this.#align() })
-    Object.freeze(this)
+    this.#world  = device.world
   }
 
   /** Fresh stamps for a new bank of `scope` and its main gate, both in their first life.
@@ -131,25 +114,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  // == [Ask builders]: makeGetAsk, makeListAsk, makePutAsk, makeDelAsk, tellBadNews
-  // Each fills in this bank's scope and its `track`, and the modelkind and default flags of `getAskOf` and the rest. The
-  // track is this object's, which may be stale: the answer's `tracked` says so. Nothing is checked here: the verb does that.
-
-  /** The get ask for the Thing at `ask.labelpath` in this bank. */
-  makeGetAsk(ask: BankAskDraft): GetAsk { return getAskOf({ ...ask, ...this.scope, track: this.track }) }
-
-  /** The list ask for the children of the Thing at `ask.labelpath` in this bank. */
-  makeListAsk(ask: BankAskDraft): ListAsk { return listAskOf({ ...ask, ...this.scope, track: this.track }) }
-
-  /** The put ask writing `ask.record` over `ask.cited`, in this bank. */
-  makePutAsk<RecordT extends ThingRecord>(ask: Omit<PutAskDraft<RecordT>, 'track'>): WriteAsk<RecordT> {
-    return { ...putAskOf<RecordT>({ ...ask, track: this.track }), ...this.scope }
-  }
-
-  /** The del ask writing the tombstone `ask.record` over `ask.cited`, in this bank. */
-  makeDelAsk<RecordT extends ThingRecord>(ask: Omit<DelAskDraft<RecordT>, 'track'>): WriteAsk<RecordT> {
-    return { ...delAskOf<RecordT>({ ...ask, track: this.track }), ...this.scope }
-  }
+  // == [Telling the host]: tellBadNews
 
   /** Tell the device's `onBadNews` of failures no caller is waiting on ({@link Device.tellBadNews}). Never throws. */
   tellBadNews(badnews: readonly unknown[]): void { this.#device.tellBadNews(badnews) }
@@ -157,183 +122,84 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Methods]: put
 
-  /** Write `ask.record`, this bank's next revision, over `ask.cited`. Resolves the bank's Thing the store reports writing, and its world shows it. This Bank object is not updated. */
+  /** Write `ask.record`, this bank's next revision, over `ask.cited`. Resolves the bank's Thing the store reports writing, which the bank in the device's world then models. */
   async put(ask: PutAskDraft<BankRecord>): Promise<BankRecord> {
     this.demandEnabled()
-    const answer = await this.#device.bankMinder.tryWrite({ ...this.makePutAsk(ask), labelpath: 'bank', modelkind: 'bank' })
-    if (! answer.ok) { throw answer.err }
-    // The ask's modelkind is the bank's, which the vaultDB checks what it answers against.
-    return answer.val as BankRecord
+    this.#demandLive()
+    return await this.#world.demandSortedVaultDB().putOnce(ask)
   }
   // --
 
   // == [Gate verbs]: birthGating, birth, ensureUnlocked, dismissUnlock, lock
-  // The gate's own, for a host's screen or a vault that wants the bank unlocked whichever way the user gets in. Every other
-  // form verb is on the gate.
+  // The world's own, for a host's screen or a vault that wants the bank unlocked whichever way the user gets in. Every
+  // other form verb is on the gate.
 
-  /** The gating of {@link birth} over `params`, handing `attachBank`, where given, the bank it births. Internal: make a birth's gating with {@link Device.birthGating}.
-   * Without `attachBank`, the bank it births is no device's: `device` does not show it.
-   */
-  static birthGating(device: Device, params: FormData | BirthDna | BirthCleartexts, attachBank?: (bank: Bank) => void): BirthGating { return Gate.birthGating(device, params, attachBank) }
+  /** The gating of {@link birth} over `params` ({@link World.birthGating}). Internal: make a birth's gating with {@link Device.birthGating}. */
+  static birthGating(device: Device, params: FormData | BirthDna | BirthCleartexts): BirthGating { return Checks.device.parse(device).world.birthGating(params) }
 
   /** Birth the bank of `device`'s scope with the user's new passphrase and optional passkey, and resolve it unlocked. The device's bank is then this one.
    * A weak passphrase refuses `weak_passphrase`: show {@link Device.judgeStrength}'s verdict as the user types.
    * Where a live bank is already stored, it refuses `gate_made_elsewhere`, and the passphrase is not set.
-   * Call it once the device's `signIn` shows the stage `'unborn'`.
+   * Call it once the device's `signin` shows the stage `'unborn'`.
    */
   static async birth(device: Device, cleartexts: BirthCleartexts): Promise<Bank> { return await Checks.device.parse(device).birthGating(cleartexts).attempt() }
 
-  /** Resolve this bank once its gate is unlocked ({@link Gate.ensureUnlocked}). While it waits, the snapshot's `isUnlockWanted` is true. */
+  /** Resolve this bank once its device's world is unlocked ({@link World.ensureUnlocked}). While it waits, the snapshot's `isUnlockWanted` is true. */
   async ensureUnlocked(): Promise<this> {
-    await this.#gate.ensureUnlocked()
+    await this.#world.ensureUnlocked()
     return this
   }
 
-  /** Dismiss the awaited `unlock` gating ({@link Gate.dismissUnlock}): every call waiting in {@link ensureUnlocked} rejects `dismissed`. */
+  /** Dismiss the awaited `unlock` gating ({@link World.dismissUnlock}): every call waiting in {@link ensureUnlocked} rejects `dismissed`. */
   dismissUnlock(): this {
-    this.#gate.dismissUnlock()
+    this.#world.dismissUnlock()
     return this
   }
 
-  /** Lock the bank: its gate drops its lease and the keys in it. */
+  /** Lock the bank: its device's world drops its lease and the keys in it ({@link World.lock}). */
   lock(): this {
-    this.#gate.lock()
+    this.#world.lock()
     return this
   }
   // --
 
-  // == [Sweeping]: sweep, end, hostVault
+  // == [Sweeping]: sweep, hostVault
 
-  /** End this bank for good: sweep its gate and each vault made on it. Never throws.
-   * Its subscribers hear of the end, and of nothing after.
-   */
+  /** End this bank for good, with its device's world ({@link World.sweep}). Never throws. */
   sweep(): this {
-    if (this.#endCause !== null) { return this }
-    this.#end(this.#device.endCause ?? Throwers.bankSwept())
+    this.#world.sweep()
     return this
   }
 
-  // Every end of a bank comes here. It shuts first, so that a subscriber told of the end, or a vault as it is swept, finds every call refusing.
-  /** End this bank with `endCause`, sweep its gate and its vaults, and let go of them and its subscribers. */
-  #end(endCause: Errors.VaultError): void {
-    this.#endCause = endCause
-    this.#gate.sweep(endCause)
-    this.#align()
-    for (const vault of this.#vaults) { vault.sweep() }
-    this.#vaults.clear()
-    this.dropSubscribers()
-  }
-
-  /** Sweep `vault` when this bank is swept. Internal.
-   * Refuses once the bank is swept.
-   */
-  hostVault(vault: HostedVault): void {
-    Checks.hostedVault.parse(vault)
-    this.demandEnabled()
-    this.#vaults.add(vault)
-  }
+  /** Sweep `vault` when this bank's world is swept ({@link World.hostVault}). Internal. */
+  hostVault(vault: HostedVault): void { this.#world.hostVault(vault) }
   // --
 
-  // == [Snapshot]: align, makeSnapshot
+  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, demandEnabled, demandLive
 
-  /** Remake the snapshot, and tell each subscriber if it changed. */
-  #align(): void {
-    const next = this.#makeSnapshot()
-    if (isEqual(next, this.#snapshot)) { return }
-    this.#snapshot = next
-    this.tellSubscribers((err) => { this.tellBadNews([err]) })
-  }
+  /** True until this bank's world is swept or its device ends. */
+  get isEnabled(): boolean { return this.#world.isEnabled }
 
-  /** A new snapshot of this bank. */
-  #makeSnapshot(): BankSnapshot {
-    // A sweep is the one way a bank ends, so an ended bank's stage is 'swept'.
-    const { endCause } = this
-    const isEnded  = endCause !== null
-    const isLocked = isEnded || this.#gate.isLocked
-    let stage: BankStage = isLocked ? 'locked' : 'unlocked'
-    if (isEnded) { stage = 'swept' }
-    return Object.freeze({
-      stage,
-      isLocked,
-      isEnded,
-      endCause,
-      leaseEndsAt:  isEnded ? null : this.#gate.leaseEndsAt,
-      lastErr:      null,
-      isUnlockWanted: this.#gate.isUnlockWanted,
-    })
-  }
-  // --
+  /** The refusal every call on this bank meets once its world is swept or its device ends, or null while it is enabled. */
+  get endCause(): Errors.VaultError | null { return this.#world.endCause }
 
-  // == [Boxes]: sealBox, trySealBox, unsealBox, tryUnsealBox
-  // The gate's seal and unseal, for this bank's own boxes: only the bank knows its root box, whose lifeseq begins each box's
-  // lifepath. A vault writes what they seal, refusing a locked bank; only its withWhisper waits for the unlock.
+  /** True while the device's world holds no lease. */
+  get isLocked(): boolean { return this.#world.isLocked }
 
-  /** Seal and return the next revision of the box `donorProps`. Needs the bank unlocked.
-   * The revision applies `publicProps`, and encrypts the whisper of `secretProps`. An unknown key in either refuses.
-   * Pass `donorProps` as you have it: whole or sparse, sealed or unsealed, a tombstone or the shell. It must be a box of this bank.
-   * A whole live box's revision keeps its sidecar unless `publicProps` gives one. Over a sparse box, a tombstone or the shell,
-   * `publicProps` must give the sidecar. After a tombstone or the shell, the revision begins the box's next life.
-   * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live box instead, whose sealed empty whisper authenticates
-   * it, and refuses `secretProps` or any sidecar but `{}`.
-   * Its `written_at` is `publicProps.written_at`, or now.
-   * @example
-   *   const box = await bank.sealBox(donor, { sidecar: { account: 'work' } }, { whisper })
-   */
-  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxTombstonePublicProps): Promise<TombstoneOf<BoxRecord>>
-  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<LiveOf<BoxRecord>>
-  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxRecord>
-  async sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxRecord> {
-    this.demandEnabled()
-    this.#demandOwnBox(donorProps)
-    return await this.#gate.seal(BaseBox, donorProps, publicProps, secretProps)
-  }
-
-  /** {@link sealBox}, resolving an `Outcome` instead of throwing. */
-  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxTombstonePublicProps): Promise<Outcome.Outcome<TombstoneOf<BoxRecord>>>
-  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<Outcome.Outcome<LiveOf<BoxRecord>>>
-  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<Outcome.Outcome<BoxRecord>>
-  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<Outcome.Outcome<BoxRecord>> {
-    return Outcome.outcomeOf(() => this.sealBox(donorProps, publicProps, secretProps))
-  }
-
-  /** Unseal `box`, returning it with its whisper in place of the sealed one. Needs the bank unlocked.
-   * It authenticates the box, all but its sidecar. For a tombstone, that checks its seal.
-   */
-  async unsealBox(box: BoxRecord): Promise<BoxUnsealed> {
-    this.demandEnabled()
-    this.#demandOwnBox(box)
-    return await this.#gate.unseal(BaseBox, box)
-  }
-
-  /** {@link unsealBox}, resolving an `Outcome` instead of throwing. */
-  tryUnsealBox(box: BoxRecord): Promise<Outcome.Outcome<BoxUnsealed>> { return Outcome.outcomeOf(() => this.unsealBox(box)) }
-  // --
-
-  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, demandEnabled, demandOwnBox
-
-  /** True until this bank is swept or its device ends. */
-  get isEnabled(): boolean { return this.endCause === null }
-
-  /** The refusal every call on this bank meets once it is swept or its device ends, or null while it is enabled. */
-  get endCause(): Errors.VaultError | null { return this.#endCause ?? this.#device.endCause }
-
-  /** True while the bank's gate is locked. */
-  get isLocked(): boolean { return this.#gate.isLocked }
-
-  /** True while the bank's gate is unlocked. */
-  get isUnlocked(): boolean { return this.#gate.isUnlocked }
+  /** True while the device's world holds a lease. */
+  get isUnlocked(): boolean { return this.#world.isUnlocked }
 
   /** Throw unless {@link isEnabled}. */
   demandEnabled(): this {
-    const { endCause } = this
-    if (endCause !== null) { throw endCause }
+    this.#world.demandEnabled()
     return this
   }
 
-  /** Demand that `box` is a box of this bank, under its current root box. */
-  #demandOwnBox(box: unknown): void {
-    const { lifepath } = BoxChecks.sealable.parseConsistent(box, this.scope, { kind: 'record_conflict' })
-    if (lifepath.split('/', 1)[0] !== this.rootBox.lifeseq) { throw Throwers.boxOfOtherRoot() }
+  /** The live record this bank models, refusing the shell or a tombstone */
+  #demandLive(): BankRecord {
+    const record = this.pickle()
+    if (record.am !== 'a') { throw Throwers.thingNotLive(this.labelpath) }
+    return record
   }
   // --
 
@@ -344,24 +210,16 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   static override readonly modelkind = 'bank'
 }
 
-// == [Helpers]: trackPairOf
-
-/** The revseq and lifepath of a Thing: the pair a `track` has. */
-function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
-// --
-
 // == [Checks]: Checks
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Bank.make}'s arguments, {@link Bank.birth}'s device, and {@link Bank.hostVault}'s vault. */
+/** The checks of {@link Bank.make}'s arguments, and of the device {@link Bank.birth} and {@link Bank.birthGating} are handed. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
   device:      custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
-  hostedVault: custom<HostedVault>((val) => typeof (val as Partial<HostedVault> | null)?.sweep === 'function', Phrases.HostedVaultExpected),
   bankMakeArgs: obj({
-    record: BankChecks.record,
+    record: BankChecks.recordOrShell,
     opts:   obj({
       device:  custom<Device>(),
-      gate:    custom<Gate>(),
     }),
   }),
 }))

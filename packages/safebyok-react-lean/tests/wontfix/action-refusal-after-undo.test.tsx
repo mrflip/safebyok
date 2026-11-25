@@ -47,7 +47,7 @@ describe("wontfix: a draft's form Action that resolves its refusal as the Action
     render(TH.providerTreeOf(world, <RefusingEditor />, { userid: TH.ProviderUser }))
     const device = await waitFor(() => world._cheat_device())
     await act(async () => {
-      await device.signIn(TH.ProviderUser)
+      await device.signin(TH.ProviderUser)
       await device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase })
     })
     const keyInput = await screen.findByLabelText<HTMLInputElement>('Key')
