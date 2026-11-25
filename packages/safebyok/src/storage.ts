@@ -14,7 +14,7 @@ export type { LiveOf, ShellOf, SparseOf, TombstoneOf } from './shapes/shapes-sea
 export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
 export { type Adoptable, Thing } from './models/thing'
 export {
-  type AnyAsk, type BankRoots, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAskDraft, type GetAsk, type GetWorldAsk, type WorldRoots, type ListAskDraft,
+  type AnyAsk, type BankRoots, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAskDraft, type GetAsk, type GetWorldAsk, type StatsAsk, type WorldRoots, type ListAskDraft,
   type ListAsk, type LoggableAsk, type PutAskDraft, type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WriteAsk, type WriteAskFlags, AskChecks, VoidTrack, delAskOf, getAskOf,
   listAskOf, putAskOf,
 } from './shapes/shapes-asks'
@@ -29,9 +29,12 @@ export { MemoryDeviceDB } from './storage/memory-device-db'
 export { type DevicetokScopepath, type LeaseListener, type LeaseScopepath, DeviceDBChecks } from './shapes/shapes-device-db'
 export {
   type Actual, type ActualBeside, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GetWorldActual, type GetWorldAnswer, type GoodAnswer, type GotActual,
-  type KidEntry, type Kids, type ListThingsActual, type ListThingsAnswer, type ListedBeside, type Received, type WriteThingAnswer, type WroteActual, ActualChecks,
+  type KidEntry, type Kids, type ListThingsActual, type ListThingsAnswer, type ListedBeside, type Received, type StatsActual, type StatsAnswer, type WriteThingAnswer, type WroteActual, ActualChecks,
 } from './shapes/shapes-answers'
 export { type VaultDB, isVaultDB } from './storage/vault-db'
+// A bank's storage stats, as `tryStats` answers them, and how a concrete adapter measures them.
+export { type FiledRaw, type StoreLimits, type ThingkindStats, type VaultStats, StoreLimitCap, StoreLimitFloor, StoreLimitLeastBoxes, VaultStatsChecks, storeLimitsOf } from './shapes/shapes-vault-stats'
+export { rowWeightOf, vaultStatsOf } from './storage/vault-stats'
 // The events a vaultDB's watcher is notified with.
 export {
   type Agekind, type Agerank, type ItemSeen, type Lifekind, type Liveness, type ReadTc, type SeenThing, type VaultAgedEvent, type VaultEvent, type VaultEventOf, type VaultEventkind, type VaultItemEvent, type VaultLifeEvent,
@@ -45,6 +48,7 @@ export type { IfAbsent, IfPresent, PutIfAbsent, RefusedAct } from 'safebyok-big/
 export { VaultError, isVaultError, type Capacity, type RefusalFamily, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'
 export { fetchFailed, identityRevoked, sanitizeForeignError, storageFailed, storageRefusalOf, storageUnavailable, unexpectedError } from 'safebyok-big/storage'
 export { storageIssue } from 'safebyok-big/refusals/throwers'
+export { storeQuotaTooSmall } from './refusals/throwers'
 // An IndexedDB store's own: each call's one transaction, the row at a key within it, and the versioned database.
 export { dbprefixOf, inOneStep, rowAt, versionedShelfOf, type VersionedShelfSpec } from 'safebyok-big/storage'
 export { Checker, Checkers, objCheck, type ConsistencyRefusal, type ObjCheckOpts, type Refusing, type Story } from 'safebyok-big/storage'

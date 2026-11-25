@@ -1,5 +1,5 @@
 import { isEqual, noop } from 'es-toolkit'
-import { Clock, type Errors, Phrases as BigPhrases, SX, Validator, VX } from 'safebyok-big/internals'
+import { Clock, type Errors, Outcome, Phrases as BigPhrases, SX, Validator, VX } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { BaseThing } from './base-thing'
 import { Box } from './box'
@@ -18,6 +18,7 @@ import { type BankStamp, type LeaseLoggable, type LeaseRecord, StampChecks, leas
 import { type BankRecord, type BoxRecord, type BulletproofCallback, type GateRecord, type Sparse, type ThingRecord, type Thingkind, type VoidSentinel, PerKindChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type ReadTc, type SeenThing, type VaultEvent, type VaultItemEvent, SeenChecks } from '../shapes/shapes-vault-event'
+import type { VaultStats } from '../shapes/shapes-vault-stats'
 import { MaxTimerMillis } from '../shapes/shapes-vault-tsq'
 import { type EpochMillis, type Lifetok, Labelpath } from '../shapes/primitives'
 import { peekRoots, stowRoots } from '../minding/root-shelf'
@@ -524,6 +525,24 @@ export class World {
       this.#device.tellBadNews([err])
     }
   }
+  // --
+
+  // == [Stats]: stats, tryStats
+
+  /** The bank's storage stats, read from the vaultDB once: how many boxes and gates it stores, live and in all, their size in bytes, and the store's limits.
+   * Needs no unlock. Nothing refuses a write for being over a limit.
+   * @example
+   *   const { box, gate, max } = await world.stats()
+   *   const isNearlyFull = (box.size + gate.size) > 0.9 * max.size
+   */
+  async stats(): Promise<VaultStats> {
+    this.demandRootsLive()
+    this.demandEnabled()
+    return Outcome.valOf(await this.demandVaultMinder().tryStatsOnce())
+  }
+
+  /** {@link stats}, resolving an `Outcome` instead of throwing. */
+  tryStats(): Promise<Outcome.Outcome<VaultStats>> { return Outcome.outcomeOf(() => this.stats()) }
   // --
 
   // == [Sealing under the lease]: seal, unseal

@@ -16,7 +16,7 @@ import { VaultFunctionNames } from './vault-functions'
 const ThingTables = { bank: 'safebyok_bank_things', gate: 'safebyok_gate_things', box: 'safebyok_box_things' } as const satisfies Record<Thingkind, string>
 // --
 
-// == [Reads]: ancestorSqlOf, GetThingSql, ListThingsSql, GetWorldSql
+// == [Reads]: ancestorSqlOf, GetThingSql, ListThingsSql, GetWorldSql, StatsSql
 
 // A Thing's ancestors are of its own kind, so they are in its table. starts_with compares text as text: a '%' or '_' in a
 // labelpath is no wildcard, as it would be to LIKE.
@@ -75,6 +75,23 @@ function listThingsSqlOf(table: string): string {
 /** A bank's three roots at its scope ($1 userid, $2 banklabel), and how they compare with the track ($3). */
 export const GetWorldSql = `
   SELECT world->'bank' AS bank, world->'maingate' AS gate, root, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM (SELECT
+    ${VaultFunctionNames.world}($1::text, $2::text) AS world, ${VaultFunctionNames.root_box}($1::text, $2::text) AS root) AS fetched
+`
+
+// A row's size is Postgres's own measure of it as a value, pg_column_size: its columns as stored, compressed where Postgres compressed them.
+/** The SQL of a subquery for the stats of a bank's ($1 userid, $2 banklabel) Things in `table`: how many it stores, how many are live, and their size in bytes. */
+function thingkindStatsSqlOf(table: string): string {
+  return `(
+    SELECT jsonb_build_object('count', count(*), 'live_count', count(*) FILTER (WHERE stored.am = 'a'), 'size', COALESCE(sum(pg_column_size(stored)), 0))
+    FROM   ${table} AS stored
+    WHERE  (stored.userid, stored.banklabel) = ($1::text, $2::text)
+  )`
+}
+
+/** The stats of a bank's ($1 userid, $2 banklabel) boxes and gates, its bank's row, and how the bank, main gate and root box compare with the track ($3). */
+export const StatsSql = `
+  SELECT box, gate, world->'bank' AS bank, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM (SELECT
+    ${thingkindStatsSqlOf(ThingTables.box)} AS box, ${thingkindStatsSqlOf(ThingTables.gate)} AS gate,
     ${VaultFunctionNames.world}($1::text, $2::text) AS world, ${VaultFunctionNames.root_box}($1::text, $2::text) AS root) AS fetched
 `
 // --

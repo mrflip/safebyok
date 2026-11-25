@@ -31,6 +31,7 @@ Hand it to the core wherever a `VaultDB` is asked for.
   - a write past the origin's storage quota: `vault_full`
   - an aborted transaction, or a database closed under the page: `storage_unavailable`
   - no IndexedDB at all, or storage the browser withholds: `storage_blocked`
+  - a browser whose quota for the page is under 5,000 bytes, refused at the first call the device makes (the world read at sign-in), before anything is stored: `storage_blocked`
 
 ## What is stored
 

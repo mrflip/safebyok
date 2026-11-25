@@ -7,8 +7,9 @@ import { type ThingRecord, type ThingScope, type VoidSentinel, PerKindChecks } f
 import type { SparseOf, TombstoneOf } from './shapes-sealers'
 import type { BankRoots, LoggableAsk, Tracked, WorldRoots } from './shapes-asks'
 import { type ReadTc, SeenChecks } from './shapes-vault-event'
+import type { VaultStats } from './shapes-vault-stats'
 
-// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer, GetWorldAnswer
+// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer, GetWorldAnswer, StatsAnswer
 // No check reads an answer whole: `AdapterVaultDB` makes each of parts it has checked, and a reader checks each record it
 // keeps where a Thing takes it.
 
@@ -91,9 +92,12 @@ export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
 
 /** The answer to `tryGetWorld`: the bank's three roots ({@link WorldRoots}), under the act `got`. Only a verb that threw refuses it. */
 export type GetWorldAnswer = Answer<WorldRoots, 'got'>
+
+/** The answer to `tryStats`: the bank's storage stats ({@link VaultStats}), under the act `got`. Only a verb that threw refuses it. */
+export type StatsAnswer = Answer<VaultStats, 'got'>
 // --
 
-// == [Pre-image of an answer]: ActualChecks, ActualBeside, Actual, GotActual, WroteActual, ListThingsActual, BirthBankActual, GetWorldActual, Received
+// == [Pre-image of an answer]: ActualChecks, ActualBeside, Actual, GotActual, WroteActual, ListThingsActual, BirthBankActual, GetWorldActual, StatsActual, Received
 // What a concrete adapter reports, carrying the actual values stored: `AdapterVaultDB` makes the answer from it.
 
 // The classifier has checked the bank a banktok is read from, the tracked roots and a listing's Things before they reach
@@ -152,6 +156,9 @@ export type BirthBankActual = ActualBeside & (
 
 /** A concrete adapter's report of a get of the world: the bank's three roots, each the Thing stored or the shell where none is. */
 export type GetWorldActual = ActualBeside & { ok: true, act: 'got', things: WorldRoots }
+
+/** A concrete adapter's report of a bank's storage stats ({@link VaultStats}). */
+export type StatsActual = ActualBeside & { ok: true, act: 'got', stats: VaultStats }
 
 /** A change a concrete adapter's `doWatch` passes to `receive`: the changed Thing, raw, and the `banktok` of its bank as the datastore last read it.
  * Watchers are notified of the Thing alone, with that banktok: a bank that changed is a change of its own.

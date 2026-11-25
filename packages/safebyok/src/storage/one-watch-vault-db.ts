@@ -3,9 +3,9 @@
 import { deepFreeze } from 'es-toolkit'
 import { type Errors, Outcome } from 'safebyok-big/internals'
 import { bulletproofHandlerOf } from '../helpers/bulletproof'
-import type { BirthBankAsk, GetAsk, GetWorldAsk, ListAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
+import type { BirthBankAsk, GetAsk, GetWorldAsk, ListAsk, StatsAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
 import { AskChecks } from '../shapes/shapes-asks'
-import type { BirthBankAnswer, GetThingAnswer, GetWorldAnswer, ListThingsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
+import type { BirthBankAnswer, GetThingAnswer, GetWorldAnswer, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import { ThingChecks } from '../shapes/shapes-thing'
 import { type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import * as Throwers from '../refusals/throwers'
@@ -42,7 +42,7 @@ export class OneWatchVaultDB implements VaultDB {
   }
   // --
 
-  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetWorld, watch, #holdWatch, #whileLocked
+  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetWorld, tryStats, watch, #holdWatch, #whileLocked
 
   /** The wrapped vaultDB's {@link VaultDB.tryGetThing}. */
   tryGetThing(ask: GetAsk): Promise<GetThingAnswer> { return this.#vaultDB.tryGetThing(ask) }
@@ -58,6 +58,9 @@ export class OneWatchVaultDB implements VaultDB {
 
   /** The wrapped vaultDB's {@link VaultDB.tryGetWorld}. */
   tryGetWorld(ask: GetWorldAsk): Promise<GetWorldAnswer> { return this.#vaultDB.tryGetWorld(ask) }
+
+  /** The wrapped vaultDB's {@link VaultDB.tryStats}. */
+  tryStats(ask: StatsAsk): Promise<StatsAnswer> { return this.#vaultDB.tryStats(ask) }
 
   /** Watch a bank's Things ({@link VaultDB.watch}): notified of what the wrapped vaultDB's watch notifies, in whichever tab of the origin runs it.
    * The wrapped vaultDB's watch starts in a tab once it is handed the bank's lock, so a change while the lock changes hands reaches no tab. Bad news reaches only the holder's `onBadNews`.

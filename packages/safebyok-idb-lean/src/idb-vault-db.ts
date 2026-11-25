@@ -3,9 +3,9 @@
 import type { UseStore } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
 import type {
-  ActualBeside, AnyAsk, BirthBankActual, BirthBankAsk, BirthPuts, GetAsk, GetWorldActual, GetWorldAsk, GotActual, ListAsk, ListThingsActual, Received, ThingWatchScope, VaultError, WriteAsk, WroteActual,
+  ActualBeside, AnyAsk, BirthBankActual, BirthBankAsk, BirthPuts, GetAsk, GetWorldActual, GetWorldAsk, GotActual, ListAsk, ListThingsActual, Received, StatsActual, StatsAsk, ThingWatchScope, VaultError, WriteAsk, WroteActual,
 } from 'safebyok/storage'
-import { bellnameOf, childrenIn, shelfOf, thingScopepathOf } from './vault-shelf'
+import { bankThingsIn, bellnameOf, childrenIn, shelfOf, thingScopepathOf } from './vault-shelf'
 
 // == [Options]: IdbVaultDBOpts, idbVaultDBOpts
 
@@ -18,7 +18,7 @@ export type IdbVaultDBOpts = { dbName?: string | undefined }
 const idbVaultDBOpts = DB.objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_record')
 // --
 
-// == [Helpers]: Rung, isHeardBy, rootsFetchedIn, bankFetchedIn, aboveFetchedIn, besideAfterIn
+// == [Helpers]: Rung, isHeardBy, rootsFetchedIn, bankFetchedIn, aboveFetchedIn, besideAfterIn, quotaNow, shelfRefusingSmallQuota
 
 /** The notice of one Thing written, broadcast to every watch on the database. */
 type Rung = { scope: ThingWatchScope, received: Received }
@@ -61,6 +61,29 @@ async function besideAfterIn(store: IDBObjectStore, ask: AnyAsk): Promise<Actual
   const fetched = await bankFetchedIn(store, ask)
   return { banktok: DB.Classifier.banktokOf(ask, fetched.bank), tracked: DB.Classifier.trackedOf(ask, fetched.tracked), read_tc: fetched.read_tc }
 }
+
+/** The bytes this browser lets the page's origin store, all its databases together, or undefined where it gives no estimate. */
+async function quotaNow(): Promise<number | undefined> {
+  const { storage } = globalThis.navigator as Partial<Navigator> | undefined ?? {}
+  if (storage === undefined) { return undefined }
+  const { quota } = await storage.estimate()
+  return quota
+}
+
+/** `shelf`, but its first use refuses `storage_blocked` where the browser's quota is under {@link DB.StoreLimitFloor}. Where the browser gives no estimate, nothing is refused.
+ * The quota is known only asynchronously, so the refusal cannot come from the constructor: it comes at the first call of any kind, which at startup is the world read at sign-in.
+ */
+function shelfRefusingSmallQuota(shelf: UseStore): UseStore {
+  let isQuotaPending = true
+  return async (txMode, callback) => {
+    if (isQuotaPending) {
+      const quota = await quotaNow()
+      if ((quota !== undefined) && (quota < DB.StoreLimitFloor)) { throw DB.storeQuotaTooSmall(quota) }
+      isQuotaPending = false
+    }
+    return await shelf(txMode, callback)
+  }
+}
 // --
 
 /** A vaultDB stored in this browser's IndexedDB. Its watches receive the writes made in every tab. */
@@ -76,12 +99,12 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   constructor(opts: IdbVaultDBOpts = {}) {
     const { dbName } = idbVaultDBOpts.parse(opts, { where: "In IdbVaultDB's options" })
     super()
-    this.#shelf    = shelfOf(dbName)
+    this.#shelf    = shelfRefusingSmallQuota(shelfOf(dbName))
     this.#bellname = bellnameOf(dbName)
   }
   // --
 
-  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doWatch
+  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats, doWatch
 
   // Each call is one IndexedDB transaction. It fetches the Things the ask depends on, classifies the ask against them, and
   // on a write act writes the ask's records and reads them back, with the banktok after, before the transaction ends.
@@ -131,6 +154,16 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
 
   protected async doGetWorld(ask: GetWorldAsk): Promise<GetWorldActual> {
     return await DB.inOneStep(this.#shelf, 'readonly', async (store) => this.classifyGetWorld(ask, await rootsFetchedIn(store, ask)))
+  }
+
+  // IndexedDB ends a transaction at an await on anything else, so the quota is read before it begins. It is the origin's,
+  // all its databases together; IndexedDB sets no limit on how many Things are stored.
+  protected async doStats(ask: StatsAsk): Promise<StatsActual> {
+    const quota = await quotaNow()
+    return await DB.inOneStep(this.#shelf, 'readonly', async (store) => {
+      const [filed, bankFetched] = await Promise.all([bankThingsIn(store, ask), bankFetchedIn(store, ask)])
+      return this.classifyStats(ask, bankFetched, DB.vaultStatsOf(filed, (quota === undefined) ? {} : { size: quota }))
+    })
   }
 
   protected override doWatch(scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: VaultError) => void): () => void {

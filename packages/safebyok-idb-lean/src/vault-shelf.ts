@@ -2,7 +2,7 @@
 
 import { promisifyRequest, type UseStore } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
-import type { Banklabel, Labelpath, ThingScope, Userid } from 'safebyok/storage'
+import type { Banklabel, FiledRaw, Labelpath, ThingScope, ThingWatchScope, Userid } from 'safebyok/storage'
 
 // == [The database]: VaultDBVersion, shelfOf, bellnameOf, databasenameOf
 
@@ -22,7 +22,7 @@ export function bellnameOf(dbName?: string): string { return `${DB.dbprefixOf(db
 export function databasenameOf(dbName?: string): string { return `${DB.dbprefixOf(dbName)}:vault-v${VaultDBVersion}` }
 // --
 
-// == [Scopepaths]: ThingScopepath, thingScopepathOf, descendantsRangeOf, Filed, childrenIn
+// == [Scopepaths]: ThingScopepath, thingScopepathOf, descendantsRangeOf, bankRangeOf, Filed, childrenIn, bankThingsIn
 
 // The scopepath is a stored contract: a Thing is found by it, so changing it orphans what is stored.
 
@@ -38,6 +38,12 @@ function descendantsRangeOf({ userid, banklabel, labelpath }: ThingScope): IDBKe
   return IDBKeyRange.bound([userid, banklabel, `${labelpath}/`], [userid, banklabel, `${labelpath}0`], false, true)
 }
 
+// A scopepath sorts after every array it begins with, and before any longer one with an array where its labelpath is.
+/** The key range of every Thing of the bank at `scope`. */
+function bankRangeOf({ userid, banklabel }: ThingWatchScope): IDBKeyRange {
+  return IDBKeyRange.bound([userid, banklabel], [userid, banklabel, []])
+}
+
 /** A raw Thing stored one label under a parent, at its labelpath. */
 export type Filed = { labelpath: Labelpath, raw: unknown }
 
@@ -49,5 +55,12 @@ export async function childrenIn(store: IDBObjectStore, scope: ThingScope): Prom
   return scopepaths
     .map((scopepath, idx) => ({ labelpath: (scopepath as ThingScopepath)[2], raw: raws[idx] }))
     .filter(({ labelpath }) => (! labelpath.includes('/', under.length)))
+}
+
+/** Every raw Thing of the bank at `scope`, the bank's own included, in labelpath order. */
+export async function bankThingsIn(store: IDBObjectStore, scope: ThingWatchScope): Promise<FiledRaw[]> {
+  const range = bankRangeOf(scope)
+  const [scopepaths, raws] = await Promise.all([promisifyRequest(store.getAllKeys(range)), promisifyRequest<unknown[]>(store.getAll(range))])
+  return scopepaths.map((scopepath, idx) => ({ labelpath: (scopepath as ThingScopepath)[2], raw: raws[idx] }))
 }
 // --

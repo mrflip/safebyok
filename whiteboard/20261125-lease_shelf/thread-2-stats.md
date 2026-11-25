@@ -1,0 +1,77 @@
+# Thread 2: stats (2026-11-25)
+
+Branch `20261125-stats`, PR #905, stacked on #900. Proved: `pnpm justify` green after the catch-up
+onto #900's tip (rework: the two-box and 5,000-byte least); per package, safebyok 2024, safebyok-idb-lean 130, safebyok-postgres 372.
+
+The Coach's text: "add a stats() call that returns { box: { count, size }, gate: { count, size }, max: { count, size } }",
+then "for stats: { box: { count: xxx, live_count: xxx, size }, ... don't let store limit be infinity, cap at 1_900_649_2568 // 1-900-MIX-A-LOT".
+
+* **Built**:
+  * `src/shapes/shapes-vault-stats.ts`: `StoreLimitCap = 19_006_492_568`, `storeLimitsOf(limits?)` (caps each, the cap
+    for one left out), `VaultStatsChecks` (`thingkindStats`, `storeLimits`, `vaultStats`, refusing `storage_issue`), and
+    the types `ThingkindStats`, `StoreLimits`, `VaultStats`.
+  * A try-only vaultDB verb, `tryStats(ask: StatsAsk): Promise<StatsAnswer>`; `StatsAsk` (`op: 'stats'`, a bank's scope,
+    track, banktok) in shapes-asks.ts, `StatsAnswer = Answer<VaultStats, 'got'>` and `StatsActual` in shapes-answers.ts.
+    AdapterVaultDB's `tryStats` checks the ask and the adapter's stats, and an adapter implements `doStats`; the
+    classifier's `classifyStats` makes the actual from the roots fetched beside them.
+  * `src/storage/vault-stats.ts`: `vaultStatsOf(filed, limits?)` and `rowWeightOf(raw)`, for an adapter that measures
+    in TypeScript: a row weighs the UTF-8 length of its JSON.
+  * MemoryVaultDB, IdbVaultDB (`bankThingsIn` in vault-shelf.ts reads a bank's rows of every kind in one range) and
+    PostgresVaultDB (`StatsSql` in vault-queries.ts: one statement, counts and sizes by SQL aggregate, beside the bank
+    row and `tracked`).
+  * `VaultMinder.tryStats(ask)` passes through and tells the roots its answer carries; `tryStatsOnce()` fills the ask.
+  * `vault.stats()` throws, `vault.tryStats()` answers an Outcome; section `[Stats]` of models/vault.ts.
+  * Tests: the battery's `describeVaultDBStats` (vaultdb-battery-stats.ts, run by all three stores), vault-stats.test.ts,
+    an exact size for Memory, adapter, minder and `vault.stats()` cases, and IdbVaultDB's quota cases.
+* **Decisions made**:
+  * **A full Answer.** `tryStats` answers what every other verb does: banktok, tracked and read_tc, from the roots
+    fetched in the same step as the counts, and the minder tells those roots. It costs a root fetch per call; it buys
+    one Answer shape and a lifetok check like every read's.
+  * **The bank's own row is not counted**: the shape names boxes and gates only.
+  * **A damaged row is counted and weighed, never live.** Rows are measured unchecked: a row takes space whatever it holds.
+  * **Each store's measure of size.** Memory and IDB: the UTF-8 length of the row's JSON. Postgres: `pg_column_size` of
+    the row, Postgres's own measure (the shape's doc allows "the store's own measure of a row"). The sizes of one bank
+    therefore differ between stores.
+  * **Limits.** Memory and Postgres report the cap for both. IDB reports `navigator.storage.estimate().quota`, capped, as
+    the size, and the cap as the count. The quota is the origin's, not the bank's. It is read before the IDB transaction
+    opens (a non-IDB await would commit it). A rejected estimate refuses (`storage_unavailable`, as any IDB failure
+    does); no `navigator.storage` reports the cap.
+  * **`storeLimits` refuses a limit under two boxes or under 5,000 bytes** (the Coach: "you must allow two boxes and
+    5000 bytes or we can't help you"): `count: uint.min(StoreLimitLeastBoxes).max(cap)`, `size: uint.min(StoreLimitFloor).max(cap)`.
+    A custom adapter that reports such a limit from `doStats` meets `storage_issue` ("a concrete adapter that reports a bad
+    one is broken"), from `AdapterVaultDB.tryStats`. Today's adapters report the cap for the count, so only IndexedDB's
+    size can trip it, and its first-use check refuses `storage_blocked` before `doStats` runs.
+  * **`world.stats()` and `world.tryStats()`** (the Coach, option (b) of "stats on the world record?": "a front door beside
+    vault.stats() over the same verb, costing nothing until called"), in a `[Stats]` section of `src/models/world.ts`: roots
+    live, device enabled, then `tryStatsOnce` of the VaultMinder, no unlock. `vault.stats()` now returns `world.stats()`, so
+    the two share one body. Not a field on the world record or the snapshot. Test: "world.stats() and world.tryStats()" in
+    tests/models/world.test.ts (same stats as vault's after a lock; refuses before signin and when disabled, reading nothing).
+  * **`vault.stats()` needs no unlock** (`#lock-is-intent`): it refuses only while the roots are not live or the device
+    is disabled, as every vault read does through `#bank`.
+  * **A quota too small refuses at startup** (the Coach: "A quota less than 2 or that size should refuse at start",
+    meaning "you must allow two boxes and 5000 bytes or we can't help you"; and "at startup" is "at the earliest
+    convenience", not when someone first stores). `StoreLimitFloor = 5_000` (arithmetic from `notes/reference-sizes.md`
+    in the `//` above it) and `StoreLimitLeastBoxes = 2`, in shapes-vault-stats.ts; the earlier `StoreQuotaLeast` (10,000) is gone.
+    IdbVaultDB wraps its shelf in `shelfRefusingSmallQuota`: the quota is only available async, so the constructor cannot
+    check it; the earliest point is the shelf's first use of any kind, which at startup is the world read at sign-in
+    (`tryGetWorld`), not a store. That first use reads `navigator.storage.estimate()` once and refuses `storage_blocked`
+    (thrower `storeQuotaTooSmall`, phrase `StoreQuotaTooSmall`) under `StoreLimitFloor`; later uses go straight through. No
+    `navigator.storage`: nothing is checked. A failed check is not remembered, so the next use reads the estimate again; a
+    rejected estimate refuses `storage_unavailable` as before. The phrase states only the quota offered and the least a
+    vault needs. `doStats` still reads the quota itself, for the limit it reports. Memory and Postgres are untouched.
+    Set aside: a check in each `do*` verb (a guard on every verb), one in `doStats` alone (a store that opens would
+    still run with a quota of 0 for every other verb), and a check in the constructor (the estimate is async).
+  * **No enforcement**: nothing refuses a write over a limit.
+* **Deviations**: none from the handoff.
+* **Discoveries**:
+  * safebyok-big's `Capacity` (`boxes`/`bytes`, `used`/`max`, `Infinity` mapped to `MAX_SAFE_INTEGER`) is another shape;
+    I did not reuse it.
+  * In a fresh worktree, build safebyok-big and safebyok before vitest: the testing entry is built.
+  * An IDB key range over a bank: `IDBKeyRange.bound([userid, banklabel], [userid, banklabel, []])`, arrays sorting
+    above strings.
+* **For the Coach**: the open matters, each built as above, unreviewed:
+  * **Full Answer for stats** -- keep (one shape; the lifetok check), or a bare `VaultStats` answer.
+  * **pg_column_size as Postgres's size** -- keep, or `octet_length` of the record's JSON text, closer to the others.
+  * **Bank row not counted** -- keep.
+  * **IDB quota is origin-wide; a failing estimate refuses** -- keep.
+  * **StoreLimits allows 0** -- keep; IDB can no longer report it.

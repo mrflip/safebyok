@@ -3,6 +3,8 @@ import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { readTcNow } from '../../src/storage/agerank'
 import * as Classifier from '../../src/storage/thing-classifier'
 import { Shell } from '../../src/shapes/shapes-thing'
+import { StoreLimitCap, type VaultStats } from '../../src/shapes/shapes-vault-stats'
+import { rowWeightOf } from '../../src/storage/vault-stats'
 import * as TH from '../test-helpers'
 
 TH.describeVaultDBBattery('MemoryVaultDB', {
@@ -78,4 +80,17 @@ describe("Classifier.classifyGetThing(ask, raw, above) and Classifier.classifyWr
       TH.expectSyncRefusal(() => Classifier.classifyWriteThing({ ...TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)), ifAbsent: 'fail' }, null, above), refusalkind)
     })
   }
+})
+
+describe("MemoryVaultDB.tryStats(ask), a store in memory", () => {
+  it("weighs each box and gate stored at the UTF-8 length of its JSON, and reports the cap for each limit", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+    const stats = await TH.expectGood<VaultStats>(vaultDB.tryStats(TH.statsAskOf()))
+    expect(stats).to.deep.equal({
+      box:  { count: 1, live_count: 1, size: rowWeightOf(TH.rootBoxOf()) },
+      gate: { count: 1, live_count: 1, size: rowWeightOf(TH.gateThingOf()) },
+      max:  { count: StoreLimitCap, size: StoreLimitCap },
+    })
+  })
 })

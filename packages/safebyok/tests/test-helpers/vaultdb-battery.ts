@@ -14,6 +14,7 @@ import { describeVaultDBWatch } from './vaultdb-battery-watch'
 import { describeVaultDBBanktok } from './vaultdb-battery-banktok'
 import { describeVaultDBTracked } from './vaultdb-battery-tracked'
 import { describeVaultDBGetWorld } from './vaultdb-battery-getworld'
+import { describeVaultDBStats } from './vaultdb-battery-stats'
 
 // == [The hooks a vaultDB hands the battery]: VaultDBRowCheats, BatteryVaultDB, VaultDBBatteryOpts
 
@@ -110,6 +111,7 @@ export function describeVaultDBBattery<DBT extends BatteryVaultDB>(label: string
     describeVaultDBLists(world)
     describeVaultDBBirths(world)
     describeVaultDBGetWorld(world)
+    describeVaultDBStats(world)
     describeVaultDBBanktok(world)
     describeVaultDBTracked(world)
     if (world.watches) { describeVaultDBWatch(world) }

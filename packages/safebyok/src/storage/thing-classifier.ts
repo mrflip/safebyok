@@ -4,12 +4,13 @@ import { sortBy } from 'es-toolkit'
 import { CX, EX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/internals'
 import { policyRefusalOf } from './policies'
 import { Labelpath, type Lifetok } from '../shapes/primitives'
-import type { BirthBankActual, DamagedThing, GetWorldActual, GotActual, KidEntry, Kids, ListThingsActual, WroteActual } from '../shapes/shapes-answers'
+import type { BirthBankActual, DamagedThing, GetWorldActual, GotActual, KidEntry, Kids, ListThingsActual, StatsActual, WroteActual } from '../shapes/shapes-answers'
+import type { VaultStats } from '../shapes/shapes-vault-stats'
 import type { ReadTc } from '../shapes/shapes-vault-event'
 import { type BoxSparse, type StoredCited, type ThingCited, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
 import { BaseThing } from '../models/base-thing'
-import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type GetWorldAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRoots, type WriteAsk } from '../shapes/shapes-asks'
+import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type GetWorldAsk, type ListAsk, type StatsAsk, type ThingWatchScope, type Track, type Tracked, type WorldRoots, type WriteAsk } from '../shapes/shapes-asks'
 import * as Throwers from '../refusals/throwers'
 
 // == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeMismatch
@@ -254,7 +255,7 @@ function trackedEntryOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>
 }
 // --
 
-// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, listedOf, isChildLabelpath, kidsOf, classifyBirthBank, classifyGetWorld, rootStoredOf
+// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, listedOf, isChildLabelpath, kidsOf, classifyBirthBank, classifyGetWorld, rootStoredOf, classifyStats
 // Each is given the raw bank of the ask's bank, fetched in the same step, and reports its lifetok as the `banktok`, with when it read it;
 // a get and a write are given the nearest Thing stored above the ask's scope; a birth and a get of the world are given the
 // bank's three roots, and a birth, where it is born, reports the banktok its bank's put wrote.
@@ -366,6 +367,11 @@ export function classifyGetWorld(ask: GetWorldAsk, fetched: BankRootsFetched): G
 /** The root stored at `scope`, checked by `check`, or the shell there for none. */
 function rootStoredOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>, scope: ThingScope, raw: unknown): RecordT | VoidSentinel {
   return storedOf(check, scope, raw) ?? Shell.under(scope, null)
+}
+
+/** Report the storage stats a concrete adapter measured, beside the raw bank it fetched in the same step. */
+export function classifyStats(ask: StatsAsk, fetched: BankFetched, stats: VaultStats): StatsActual {
+  return { ok: true, act: 'got', banktok: banktokOf(ask, fetched.bank), tracked: trackedOf(ask, fetched.tracked), read_tc: fetched.read_tc, stats }
 }
 // --
 
