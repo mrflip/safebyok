@@ -3,7 +3,7 @@
 import type * as Z from 'zod'
 import { CX, GX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { type Lifepath, type Lifeseq, Labelpath, VoidLifeseq, Lifeseq as Lifeseqs } from './primitives'
+import { type Lifepath, Labelpath, Lifeseq, VoidLifeseq } from './primitives'
 import type { TombstoneOf } from './shapes-sealers'
 import { PerKindChecks, ThingChecks, ThingFormat, isLabelLast, isParityRight } from './shapes-thing'
 
@@ -62,7 +62,7 @@ export function leaseScopeOf({ userid, banklabel, labelpath }: { userid: string,
 // A lease has no life above its own, but its lifepath keeps one lifeseq for each segment of its labelpath, as a
 // Thing's does: the first is this placeholder, so a lease's life never resets with its gate's or its bank's.
 /** The placeholder lifeseq at the head of every lease's lifepath, life 0's: `0000000000`. */
-export const LeaseLifeRoot: Lifeseq = Lifeseqs.ofLifenum(0)
+export const LeaseLifeRoot: Lifeseq = Lifeseq.ofLifenum(0)
 
 /** The lifepath of a lease of life `lifeseq`: {@link LeaseLifeRoot}, then `lifeseq`. */
 export function leaseLifepathOf(lifeseq: Lifeseq): Lifepath { return `${LeaseLifeRoot}/${lifeseq}` }
