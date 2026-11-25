@@ -226,6 +226,8 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
   // == [The gatings' private verbs]: unlockByProving, buildLease, putGate
 
+  // Scaffolding: until thread 1b has an unlock follow the lease record its deviceDB stores, a lease granted after a lock
+  // follows the shell, and starts the first life again.
   /** Unlock this gate's world under a lease `proved` builds, citing the revision this gate models.
    * A lease the world holds is renewed: the new one is its next revision, and keeps its `born_at`. Otherwise the new one follows the shell.
    */
