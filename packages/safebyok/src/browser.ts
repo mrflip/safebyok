@@ -4,7 +4,8 @@
 
 import { argon2idWebV1Deriver, zxcvbnStrengthChecker, type KeyDeriver } from 'safebyok-big/browser'
 import type { StrengthChecker } from './shapes/shapes-gateish'
-import { type IdbDeviceDB, type IdbDeviceDBOpts, idbDeviceDB, idbDeviceDBOpts } from './storage/idb-device-db'
+import { type IdbDeviceDBOpts, idbDeviceDBOpts } from './shapes/shapes-device-db'
+import { type IdbDeviceDB, idbDeviceDB } from './storage/idb-device-db'
 
 export {
   Argon2idWebV1, MinPassphraseChars, MinZxcvbnScore, PassphraseSaltSize, argon2idWebV1Deriver, makeArgon2idDeriver, parseKeyDeriverSpec,
@@ -12,7 +13,8 @@ export {
 } from 'safebyok-big/browser'
 // Big's browser entry exports its own `StrengthChecker`, `BrowserOpts`, `browserOpts` and device database as well; the ones `Device.make` takes are `safebyok`'s.
 export type { StrengthChecker } from './shapes/shapes-gateish'
-export { IdbDeviceDB, LeaseDBVersion, idbDeviceDB, idbDeviceDBOpts, leaseBellnameOf, leaseDatabasenameOf, type IdbDeviceDBOpts } from './storage/idb-device-db'
+export { IdbDeviceDB, LeaseDBVersion, idbDeviceDB, leaseBellnameOf, leaseDatabasenameOf } from './storage/idb-device-db'
+export { idbDeviceDBOpts, type IdbDeviceDBOpts } from './shapes/shapes-device-db'
 
 // == [The bag]: BrowserOpts, bagsByDbName, browserOpts
 

@@ -1,33 +1,17 @@
 /** The deviceDB in this browser's IndexedDB. */
 
 import type { UseStore } from 'idb-keyval'
-import { dbprefixOf, inOneStep, objCheck, rowAt, versionedShelfOf } from 'safebyok-big/storage'
-import type * as Z from 'zod'
+import { dbprefixOf, inOneStep, rowAt, versionedShelfOf } from 'safebyok-big/storage'
 import type { BankScope, LeaseRow } from '../shapes/shapes-stamps'
-import type { Banklabel, Userid } from '../shapes/primitives'
+import { type IdbDeviceDBOpts, type LeaseScopepath, idbDeviceDBOpts } from '../shapes/shapes-device-db'
 import { DeviceDB } from './device-db'
 
-// == [Options]: IdbDeviceDBOpts, idbDeviceDBOpts
-
-/** What an IdbDeviceDB is made with. */
-export interface IdbDeviceDBOpts {
-  /** Scopes the database's name and its bell's: `safebyok-<dbName>:…`, or `safebyok:…` if left out. */
-  dbName?: string | undefined
-}
-
-/** The check of an IdbDeviceDB's options, which `browserOpts` takes too. */
-export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_record')
-// --
-
-// == [The database]: LeaseDBVersion, LeaseScopepath, leaseShelfOf, leaseDatabasenameOf, leaseBellnameOf, scopepathOf
+// == [The database]: LeaseDBVersion, leaseShelfOf, leaseDatabasenameOf, leaseBellnameOf, scopepathOf
 
 // Zero-padded, so that a database name sorts as its version does. Its stem is not safebyok-big's `device`, whose
 // databases a shelf of the same stem at a newer version would delete.
 /** The layout version of the lease database, in three zero-padded parts. */
 export const LeaseDBVersion = '001-001-001'
-
-/** Where the lease database files a bank's row. */
-type LeaseScopepath = [userid: Userid, banklabel: Banklabel]
 
 /** The shelf of the lease database `safebyok-<dbName>:lease-v<version>`, or `safebyok:lease-v<version>` with no `dbName`. */
 function leaseShelfOf(dbName: string | undefined): UseStore {
@@ -95,5 +79,3 @@ export class IdbDeviceDB extends DeviceDB {
 
 /** A device database in this browser's IndexedDB, for a browser app to pass to `Device.make`. */
 export function idbDeviceDB(opts?: IdbDeviceDBOpts): IdbDeviceDB { return new IdbDeviceDB(opts) }
-
-true satisfies Z.core.util.AssertEqual<IdbDeviceDBOpts, Z.input<typeof idbDeviceDBOpts>>
