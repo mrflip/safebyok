@@ -198,7 +198,7 @@ export interface ProvingOpts {
 export interface LeaseGate {
   /** The stamp of the bank the lease was granted under, fixed for the lease's life. */
   readonly bankStamp: BankStamp
-  /** True until the world is swept or its device ends. */
+  /** True until the world's device ends. */
   readonly isEnabled: boolean
   /** Lock the world, dropping its lease. */
   lock:          () => void

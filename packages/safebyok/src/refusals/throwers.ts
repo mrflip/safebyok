@@ -21,10 +21,7 @@ export * from 'safebyok-big/refusals/throwers'
 export function refusalOfThrown(thrown: unknown): Errors.VaultError { return Errors.isVaultError(thrown) ? thrown : unexpectedError(thrown) }
 // --
 
-// == [Model Throwers]: bankSwept, signinUnanswered, nobodySignedIn, thingNotLive, unlockDismissed, gatingSpent, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, thingSoonestBare
-
-/** A `disabled` refusal: the bank was swept. */
-export function bankSwept(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.BankSwept) }
+// == [Model Throwers]: signinUnanswered, nobodySignedIn, thingNotLive, unlockDismissed, gatingSpent, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, thingSoonestBare
 
 /** A `disabled` refusal: the device's sign-in has not answered yet. */
 export function signinUnanswered(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.SigninUnanswered) }

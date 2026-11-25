@@ -189,6 +189,16 @@ describe("the provider", () => {
     expect([one.container.textContent, other.container.textContent]).to.deep.equal(['unlocked jokes', 'locked jokes'])
   })
 
+  it("keeps its device watching the vaultDB while mounted, and once it unmounts locks the bank and stops the watch", async () => {
+    const { world, result, unmount } = await renderUnder((world) => world.Bank.useWorld((snap) => snap.stage), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current).to.eq('locked') })
+    const device = world._cheat_device()
+    await act(() => device.bank!.gate.unlock({ passphraseCleartext: Passphrase }))
+    expect([result.current, device.world.vaultMinder?.isWatching]).to.deep.equal(['unlocked', true])
+    unmount()
+    expect([device.world.getSnapshot().stage, device.world.vaultMinder?.isWatching, device.isEnabled]).to.deep.equal(['locked', false, true])
+  })
+
   it("leaves the calls that are not hooks refusing once it unmounts, ending nothing", async () => {
     const { world, result, unmount } = await renderUnder((world) => world.Bank.useWorld((snap) => snap.stage), { stored: 'jokes' })
     await waitFor(() => { expect(result.current).to.eq('locked') })
@@ -562,10 +572,10 @@ function expectVacated(params: FormData | Readonly<{ passkeyAnswer?: { prfBytes:
   expect(TH.isZeroed(answer!.prfBytes)).to.be.true
 }
 
-/** `hook` and the bank's stage over a world with the joke service's key stored, rendered once the bank shows `failed`: its vaultDB cannot watch. */
+/** `hook` and the bank's stage over a world with the joke service's key stored, rendered once the bank shows `failed`: its vaultDB cannot get the bank's roots. */
 async function renderFailed<ResultT>(hook: (world: TH.ProviderWorld) => ResultT) {
   const world = await TH.buildProviderWorld({ stored: 'jokes' })
-  vi.spyOn(world.vaultDB, 'watch').mockImplementation(() => { throw new Error('no watching here') })
+  vi.spyOn(world.vaultDB, 'tryGetWorld').mockRejectedValue(new Error('no roots here'))
   function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
   const rendered = renderHook(() => ({ stage: world.Bank.useWorld((snap) => snap.stage), hooked: hook(world) }), { wrapper: Wrapper })
   await waitFor(() => { expect(rendered.result.current.stage).to.eq('failed') })

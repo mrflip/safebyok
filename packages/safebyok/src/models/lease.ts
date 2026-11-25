@@ -22,7 +22,7 @@ const CleartextFieldnames: ReadonlySet<string> = new Set(['whisper'])
  * The bankKey stays wrapped under a non-extractable leaseKey: each seal or unseal unwraps it for that call alone, and nothing hands it out.
  * The sealer passed to each call, such as `BaseBox`, decides what is sealed and how. The lease itself knows only which fieldnames contain secrets.
  * A bankKey that will not unwrap locks the gate, and refuses `damaged_lease`.
- * Once evicted, or once its gate is swept or its device ends, it refuses every seal and unseal, even one in flight.
+ * Once evicted, or once its device ends, it refuses every seal and unseal, even one in flight.
  */
 export class Lease implements LeaseStamp {
   // == [Props]: fmt, userid, banklabel, bank_lifeseq, bank_born_at, bank_lifetok, gate_labelpath, gate_lifeseq, gate_revtok, born_at, proved_at, wayinkind, label, labelpath, scope, am, written_at, #gate, #record, stamp, toJSON, loggable
@@ -103,15 +103,9 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Ending one]: sweep, evict
+  // == [Ending one]: evict
 
-  /** Drop the keys for good, as its gate's sweep does. */
-  sweep(): this {
-    this.evict()
-    return this
-  }
-
-  /** Drop the keys. */
+  /** Drop the keys, for good. */
   evict(): void { this.#record = null }
   // --
 

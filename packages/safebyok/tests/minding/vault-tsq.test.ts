@@ -44,7 +44,7 @@ describe("VaultTSQ.make", () => {
   it("sets its query and mutation defaults under the bank's key, and nothing outside it", async () => {
     const { queryClient } = await tsqWorldOf(new MemoryVaultDB())
     expect(queryClient.getQueryDefaults(BoxKey)).to.include({ networkMode: 'always', retry: false }).and.not.have.property('structuralSharing')
-    expect(queryClient.getQueryDefaults(VaultTSQ.listQueryKeyOf(TH.RootScope))).to.include({ networkMode: 'always', retry: false, staleTime: Infinity, gcTime: Infinity })
+    expect(queryClient.getQueryDefaults(VaultTSQ.listQueryKeyOf(TH.RootScope))).to.include({ networkMode: 'always', retry: false, gcTime: Infinity })
     expect(queryClient.getMutationDefaults(VaultTSQ.bankQueryKeyOf(TH.ThingBank))).to.deep.equal({ networkMode: 'always', retry: false })
     expect(queryClient.getQueryDefaults(VaultTSQ.itemQueryKeyOf({ ...TH.BoxScope, banklabel: 'other' }))).to.deep.equal({})
     expect(queryClient.getQueryDefaults(['todos'])).to.deep.equal({})
@@ -167,13 +167,45 @@ describe("VaultTSQ's writer, on each event the VaultMinder tells", () => {
     world.notify(noticeOf(gateNext))
     expect(world.queryClient.getQueryCache().getAll()).to.deep.equal([])
   })
+})
 
-  it("hears nothing once swept", async () => {
-    const world = await worldWithBox()
-    const item  = world.queryClient.getQueryData(BoxKey)
-    world.vaultTSQ.sweep()
+describe("VaultTSQ.connect and disconnect", () => {
+  it("hears nothing once disconnected, however often, and keeps its items and listings as they were", async () => {
+    const world   = await worldWithBox()
+    const kids    = await world.vaultTSQ.listOnce('box')
+    const item    = world.queryClient.getQueryData(BoxKey)
+    expect(world.vaultTSQ.disconnect().disconnect()).to.eq(world.vaultTSQ)
     world.notify(noticeOf(Box1))
     expect(world.queryClient.getQueryData(BoxKey)).to.eq(item)
+    expect(world.queryClient.getQueryData(VaultTSQ.listQueryKeyOf(TH.RootScope))).to.eq(kids)
+  })
+
+  it("leaves no item or listing fresh while disconnected, or while its VaultMinder is not watching", async () => {
+    const world   = await worldWithBox()
+    const ListKey = VaultTSQ.listQueryKeyOf(TH.RootScope)
+    await world.vaultTSQ.listOnce('box')
+    expect([isObservedStale(world.queryClient, BoxKey), isObservedStale(world.queryClient, ListKey)]).to.deep.equal([false, false])
+    world.vaultTSQ.disconnect()
+    expect([isObservedStale(world.queryClient, BoxKey), isObservedStale(world.queryClient, ListKey)]).to.deep.equal([true, true])
+    world.vaultTSQ.connect()
+    world.sorted.disconnect()
+    expect(world.sorted.carAt(TH.BoxScope)?.agekind).to.eq('here')
+    expect([isObservedStale(world.queryClient, BoxKey), isObservedStale(world.queryClient, ListKey)]).to.deep.equal([true, true])
+  })
+
+  it("hears again once connected, invalidating every item and listing of its bank, and a second connect does nothing more", async () => {
+    const world   = await worldWithBox()
+    const ListKey = VaultTSQ.listQueryKeyOf(TH.RootScope)
+    await world.vaultTSQ.listOnce('box')
+    world.vaultTSQ.disconnect()
+    expect(world.vaultTSQ.connect()).to.eq(world.vaultTSQ)
+    expect([itemQueryAt(world)?.state.isInvalidated, listQueryAt(world)?.state.isInvalidated]).to.deep.equal([true, true])
+    expect([isObservedStale(world.queryClient, BoxKey), isObservedStale(world.queryClient, ListKey)]).to.deep.equal([true, true])
+    world.notify(noticeOf(Box1))
+    expect(world.queryClient.getQueryData(BoxKey)).to.deep.equal(Box1)
+    const invalidating = vi.spyOn(world.queryClient, 'invalidateQueries')
+    world.vaultTSQ.connect()
+    expect(invalidating).not.toHaveBeenCalled()
   })
 })
 

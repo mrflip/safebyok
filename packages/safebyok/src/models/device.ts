@@ -29,7 +29,8 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
 /** This browser, before and after anyone signs in: the host's functions, guarded, its world, and the signed-in user's bank and vault.
  * Make it with `Device.make(record, opts)`, which does no I/O, touches no browser global and subscribes to nothing; call
- * `hello()` to start it, and `signin(userid)` once the host knows who is signed in, which brings up that user's bank
+ * `hello()` to start it, `connect()` to keep it in step with the vaultDB until `disconnect()`, and `signin(userid)` once
+ * the host knows who is signed in, which brings up that user's bank
  * from the roots kept on the host's root shelf. Its world's snapshot shows the stage `'signed_out'` until then, `'starting'` while it
  * starts the user's bank, then `'locked'` for a bank stored, or `'unborn'` for none, which a
  * {@link birthGating} on this device fills.
@@ -68,7 +69,6 @@ export class Device {
   #vault: Vault | null = null
   /** What `signin` resolves, once it has been called. */
   #signinAnswer: Promise<void> | null = null
-  // Nothing ends a device yet: its sweep ends only its banks.
   /** Why the device ended, or null while it is enabled. */
   #endCause:   Errors.VaultError | null = null
 
@@ -119,8 +119,8 @@ export class Device {
 
   /** Make a device of the banklabel and token in `record`, guarding the host's functions in `opts`, with nobody signed in.
    * The signed-in user's boxes are kept in `opts.queryClient`, the host's own, under the bank's key, or in a QueryClient the
-   * device makes: {@link vaultTsqClient}. The signed-in bank's roots are read from `opts.rootShelf` at {@link signin}, and
-   * nothing is fetched from the vaultDB, or watched, until then.
+   * device makes: {@link vaultTsqClient}. The signed-in bank's roots are read from `opts.rootShelf` at {@link signin}.
+   * Nothing is fetched from the vaultDB until then, and nothing is watched until the device is both signed in and {@link connect}ed.
    */
   static make(record: DeviceRecord, opts: DeviceOpts): Device { return new Device(record, opts) }
 
@@ -196,10 +196,11 @@ export class Device {
   // The roots fetched land in the world's Things, which the stage is read from. A root its Thing refuses reaches the host
   // once, as bad news told by the VaultMinder; sign-in then reports only what the roots amount to: all three live, the
   // bank unborn, or broken. A failure to fetch them, once a bank is up from what was restored, is no caller's to hear.
-  // The VaultMinder is made right before the vault TSQ and the world listen to it, with nothing awaited between: its
-  // cars remember what they take, so a record it took with no one listening would reach them later only as a repeat,
-  // which it drops. The world takes the roots shelved before the vaultDB is asked. The vault is made last, on everything
-  // made before it.
+  // The VaultMinder, the vault TSQ, the world's hold on them and the vault are made with nothing awaited between: the
+  // VaultMinder's cars remember what they take, so a record it took with no one listening would reach them later only
+  // as a repeat, which it drops. The vault TSQ listens from the vault's making where the device is connected, and else
+  // from its next connect, which refetches what the vault TSQ caches. The world takes the roots shelved before the
+  // vaultDB is asked. The vault is made last, on everything made before it.
   /** Start the signed-in user's bank over a VaultMinder of it: from the roots shelved, where there are any, and from the three roots the vaultDB answers. */
   async #doSignin(): Promise<void> {
     try {
@@ -222,24 +223,40 @@ export class Device {
   }
   // --
 
-  // == [Locking]: lock
+  // == [Locking and connecting]: lock, connect, disconnect, disable
 
   /** Lock the signed-in user's bank ({@link World.lock}). Never throws. */
   lock(): this {
     this.#world.lock()
     return this
   }
-  // --
 
-  // == [Ending]: sweep
-
-  /** Sweep the signed-in user's bank, if the device has one, and stop watching its vaultDB. Never throws.
-   * The device stays usable: it judges passphrases. Its world's snapshot shows the swept bank.
+  // Call it as a QueryClient's `mount` is called, from an effect whose cleanup calls `disconnect`.
+  /** Keep the device in step with the vaultDB: watch the signed-in user's bank there, from now or from `signin` ({@link World.connect}). Never throws; a second call, or a call once the device is disabled, does nothing.
+   * @example
+   *   useEffect(() => { device.connect(); return () => { device.disconnect() } }, [device])
    */
-  sweep(): this {
-    if (this.bank !== null) { this.#world.sweep() }
-    // The watch's stop is the host's vaultDB code: what it throws is news.
-    try { this.#world.vaultMinder?.sweep() } catch (err) { this.tellBadNews([err]) }
+  connect(): this {
+    this.#world.connect()
+    return this
+  }
+
+  /** Lock the signed-in user's bank, and stop watching the vaultDB, until the next {@link connect} ({@link World.disconnect}). Never throws; calling it twice in a row is the same as once, and each call locks.
+   * The device stays enabled: its verbs still work, and a call waiting for an `unlock` gating still waits.
+   */
+  disconnect(): this {
+    this.#world.disconnect()
+    return this
+  }
+
+  // It shuts first, so that a subscriber told of the lock, or a vault as it disconnects, finds every call refusing.
+  /** End the device for good: lock its bank, reject every call waiting for an `unlock` gating, and disconnect. Never throws; calling it twice in a row is the same as once.
+   * Every call on its bank, gate, vault or world after refuses `disabled`, and its world's snapshot shows the stage `'disabled'`.
+   */
+  disable(): this {
+    if (this.#endCause !== null) { return this }
+    this.#endCause = Throwers.deviceDisabled()
+    this.#world.disable()
     return this
   }
   // --
@@ -252,7 +269,7 @@ export class Device {
    */
   tellBadNews(badnews: readonly unknown[]): void {
     const refusals = badnews.map((news) => Throwers.refusalOfThrown(news))
-    // A thing disabled since is no news: the host swept it, or its bank went away.
+    // A thing disabled since is no news: its bank went away.
     tellBadNewsTo(this.isEnabled ? this.#onBadNews : DefaultOnBadNews, this, refusals.filter((refusal) => refusal.refusalkind !== 'disabled'))
   }
   // --

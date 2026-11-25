@@ -114,36 +114,35 @@ Reasoning for wontfix: every revision is sealed under the lease, so a put needs 
 and a seal keeps none of the cited whisper; carrying it across would mean a new construction or an unseal hidden in a
 write. Ruled by the Coach, 2026-11-20, vault_snapper W2: "A put needs unlock anyway. Document as won't fix".
 
-### A lock, a sweep or a second form verb while a form verb runs
+### A lock, a disconnect or a second form verb while a form verb runs
 
 * current outcome, as built, and promised nowhere:
   - A lock while a form verb's attempt is in flight lands wherever the attempt's steps have reached: an `unlock` gating or a gate
     change that attaches its lease after the lock leaves the bank unlocked.
-  - A sweep while an attempt is in flight: the attempt's write, if it has not yet begun, refuses `disabled`; one already
-    sent lands in storage, and the lease the attempt then builds is evicted and the verb refuses `disabled`.
-  - A `device.sweep()` while a `Bank.birth` on that device is in flight sweeps each bank made on the device then:
-    a birth whose bank is not yet made goes on, and the device holds the bank it makes. A device stays usable after
-    its sweep, so the birth is not refused.
+  - A `device.disconnect()` locks the bank, so it lands as a lock does, and disables nothing: the attempt goes on. A
+    `Bank.birth` on that device still in flight resolves its bank, unlocked, and the device holds it.
   - Two gate changes on one bank at once each cite the gate they proved against: the first to reach the vaultDB is
     written, and the second refuses `stale_write`, changes nothing and unlocks nothing.
 * alternatives:
-  - have a lock or a sweep wait for, or reach into, an attempt in flight, or have an attempt check the lock state between
-    its steps: a lifecycle call reaching across an attempt, or new checks in a primitive's critical path, for a crossing.
+  - have a lock or a disconnect wait for, or reach into, an attempt in flight, or have an attempt check the lock state
+    between its steps: a lifecycle call reaching across an attempt, or new checks in a primitive's critical path, for a
+    crossing.
   - a lock across the form verbs: a lock is a last resort.
   - prove again against the gate a `stale_write`'s answer carries: a retry in the verb's path, which would still not
     let a proof made against one gate write over another.
-* workaround: the host's form submits one verb at a time and awaits it before locking or sweeping the bank; after
-  `stale_write`, the user submits again: the gate then models the revision the refusal carried.
+* workaround: the host's form submits one verb at a time and awaits it before locking the bank or disconnecting the
+  device; after `stale_write`, the user submits again: the gate then models the revision the refusal carried.
 
 Steps to reproduce: call `bank.unlock(...)` and, before it resolves, `bank.lock()`: the bank ends unlocked. Or call
 `bank.replacePassphrase(...)` twice without awaiting the first: the second refuses `stale_write`. Or call
-`Bank.birth(device, ...)` and, while its passphrase is still being stretched, `device.sweep()`: the birth resolves a
-bank, and the device holds it.
+`Bank.birth(device, ...)` and, while its passphrase is still being stretched, `device.disconnect()`: the birth resolves
+an unlocked bank, and the device holds it.
 
 Reasoning for wontfix: each case is two of the host's own calls crossing over one bank, which the host sequences; what
 lands is what the calls amount to in the order they ran, nothing is left inconsistent in storage, and a refused gate
 change never unlocks. Specifying them would mean waits, dismissals or checks reaching across an attempt and the bank's
 lifecycle: new machinery in a primitive's critical path, for crossings the host avoids by awaiting its own calls.
+Disconnect replaced sweep here in lease_shelf thread 0, 2026-11-25.
 
 ### A sparse record that lands while a get waits
 
@@ -249,29 +248,6 @@ Reasoning for wontfix: a lock comes a few times a day, and a get is in flight fo
 separate updates*, `#no-slop-crossings`). Nothing is written, and the refusal shows no whisper. Written by the react_life
 thread 12 worker, rewritten by the thread 15 worker, 2026-11-21, awaiting a ruling.
 
-### A bank's sweep stops its device's vault TSQ, which the device owns
-
-* current outcome: `bank.sweep()` sweeps each vault made on the bank, and `Vault.sweep` sweeps the vault's vault TSQ,
-  which stops hearing the VaultMinder. That vault TSQ is the device's: the device makes it at `signin` and hands it to
-  the vault of its bank, once. After a sweep of the device's bank (`device.sweep()`, or `bank.sweep()` itself), the
-  device stays enabled, but its vault TSQ's items and listings no longer follow what the VaultMinder tells, and a
-  second `device.signin` answers the first and starts nothing.
-* alternatives:
-  - have `Vault.sweep` leave the vault TSQ be, and `device.sweep` stop it: the device then decides when its vault TSQ
-    stops, which is part of the ends work below, not of this note.
-  - have the device make a new vault TSQ after a sweep: a new path through sign-in for a device whose bank was swept,
-    which nothing yet needs.
-* workaround: make a new device after a sweep, as a page reload does.
-
-Steps to reproduce: sign in on a device whose bank is stored, sweep it with `bank.sweep()`, then write a new revision
-of a box from another device: the device's VaultMinder tells of it, and the box's item in `device.vaultTSQ` keeps the
-old one.
-
-Reasoning for wontfix: who stops the vault TSQ belongs to how ownership is apportioned among device, bank and vault,
-which is settled when the ends (vacate, delete, goodbye) are built; moving its sweep now would build half of that design
-ahead of it. Nothing stored changes, and no secret material is involved. Ruled by the Coach, 2026-11-21, react_life's
-E5: "a note, no code, thanks"; then "lgtm".
-
 ### A gate change that lands while another gating unlocks leaves the lease citing the later revision
 
 * current outcome: a gating unlocks the gate under a lease citing the revision the `Gate` object models when the lease
@@ -337,6 +313,28 @@ or a notice tells of the box at a newer revision, sparse.
 Reasoning for wontfix: it is a crossing of a get and a sighting of a newer revision, and cancellation is the library's
 to own. The Coach: "I'm loath to override errors of TSQ to our helpful guess." Ruled by the Coach, 2026-11-24,
 feed_sorter (the redistribution design, section 12); narrowed to an item with no data by thread 20 of feed_sorter.
+
+### A get, a put or a notice that lands across a disconnect or a disable
+
+* current outcome: a `device.disconnect()` locks the bank, has the vault TSQ stop hearing the VaultMinder, and stops the
+  VaultMinder's watch; it waits for nothing in flight. A get or a put already past its checks goes on: its answer lands
+  in the VaultMinder and the vault TSQ's QueryClient as any answer does, and a put lands in storage. A notice the
+  vaultDB delivers after its watch is stopped is told to whoever still listens to the VaultMinder, and the vault TSQ is
+  no longer among them. The next `device.connect()` invalidates the bank's items and listings, so what is shown then is
+  fetched again. A `device.disable()` disconnects, so the same holds of it, and no connect follows: what lands is kept
+  by a device whose every verb refuses.
+* alternatives:
+  - have the disconnect wait for, or cancel, what is in flight: abort machinery in a primitive's critical path.
+  - drop an answer or a notice that lands once disconnected: a token or a state checked on every answer, for a crossing.
+* workaround: none needed: a disconnect leaves nothing stored inconsistent, and a connect fetches again.
+
+Steps to reproduce: hold a vaultDB's get, call `device.disconnect()`, then let the get answer: the box's item in
+`device.vaultTSQ` holds the answer.
+
+Reasoning for wontfix: a disconnect comes when a provider unmounts, and a get is in flight for milliseconds (CLAUDE.md,
+*Hours separate updates*, `#no-slop-crossings`). What lands is what the vaultDB answered, nothing secret is kept past
+the lock, and guarding it would put a token or a wait on every answer. Written by lease_shelf thread 0, 2026-11-25,
+awaiting a ruling.
 
 ## React
 

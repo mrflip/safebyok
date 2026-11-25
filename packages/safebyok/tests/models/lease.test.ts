@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { Crypto, GX } from 'safebyok-big/internals'
+import { Crypto, Errors, GX } from 'safebyok-big/internals'
 import { maskUuid } from '../../src/helpers/mask-uuid'
 import { BaseBox } from '../../src/models/base-box'
 import { Lease, withoutSecrets } from '../../src/models/lease'
@@ -364,6 +364,19 @@ async function bornLeaseWorld() {
   return { bank, device, lease }
 }
 
+/** A fake gate that ends at `end()`: from then on it is not enabled, and its `demandEnabled` throws `endCause`. Nothing in the core ends a gate yet. */
+function endableGateOf() {
+  const endCause = new Errors.VaultError('disabled', "The device ended.")
+  let isEnded = false
+  const gate = {
+    ...TH.fakeLeaseGateOf(),
+    get isEnabled() { return ! isEnded },
+    demandEnabled: () => { if (isEnded) { throw endCause } return gate },
+    end:           () => { isEnded = true },
+  }
+  return { gate, endCause }
+}
+
 describe("lease.isEnabled and lease.demandEnabled(), over its gate", () => {
   it("is enabled while in force on an enabled gate, and not once evicted", async () => {
     const { lease } = await bornLeaseWorld()
@@ -374,34 +387,37 @@ describe("lease.isEnabled and lease.demandEnabled(), over its gate", () => {
     TH.expectSyncRefusal(() => lease.demandEnabled(), 'bank_locked')
   })
 
-  it("is not enabled once its bank is swept, though not evicted, and throws the gate's refusal before 'bank_locked'", async () => {
-    const { bank, lease } = await bornLeaseWorld()
-    bank.sweep()
+  it("is not enabled once its gate ends, though not evicted, and throws the gate's refusal before 'bank_locked'", async () => {
+    const { gate, endCause } = endableGateOf()
+    const { lease } = await TH._cheat_grantedLease(await provingWithWayin(), gate)
+    gate.end()
     expect([lease.isEnabled, lease.isEvicted]).to.deep.equal([false, false])
-    const swept = TH.expectSyncRefusal(() => lease.demandEnabled(), 'disabled')
+    const ended = TH.expectSyncRefusal(() => lease.demandEnabled(), 'disabled')
     lease.evict()
-    const sweptAndEvicted = TH.expectSyncRefusal(() => lease.demandEnabled(), 'disabled')
-    expect([swept, sweptAndEvicted]).to.deep.equal([bank.gate.endCause, bank.gate.endCause])
+    const endedAndEvicted = TH.expectSyncRefusal(() => lease.demandEnabled(), 'disabled')
+    expect([ended, endedAndEvicted]).to.deep.equal([endCause, endCause])
   })
 
-  it("refuses a seal and an unseal with the gate's refusal once the device is swept", async () => {
-    const { bank, device, lease } = await bornLeaseWorld()
+  it("refuses a seal and an unseal with the gate's refusal once its gate ends", async () => {
+    const { gate, endCause } = endableGateOf()
+    const { lease } = await TH._cheat_grantedLease(await provingWithWayin(), gate)
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const shell = TH.boxShellOf()
-    device.sweep()
-    expect(await TH.expectRefusal(lease.seal(BaseBox, shell, PublicProps, Cleartexts), 'disabled')).to.equal(bank.gate.endCause)
-    expect(await TH.expectRefusal(lease.unseal(BaseBox, sealed), 'disabled')).to.equal(bank.gate.endCause)
+    gate.end()
+    expect(await TH.expectRefusal(lease.seal(BaseBox, shell, PublicProps, Cleartexts), 'disabled')).to.equal(endCause)
+    expect(await TH.expectRefusal(lease.unseal(BaseBox, sealed), 'disabled')).to.equal(endCause)
   })
 
-  // As a lock refuses a seal or an unseal under way, so does a sweep.
-  it("refuses a seal and an unseal already under way when the device is swept as they run", async () => {
-    const { bank, device, lease } = await bornLeaseWorld()
+  // As a lock refuses a seal or an unseal under way, so does the end of its gate.
+  it("refuses a seal and an unseal already under way when its gate ends as they run", async () => {
+    const { gate, endCause } = endableGateOf()
+    const { lease } = await TH._cheat_grantedLease(await provingWithWayin(), gate)
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const sealing = TH.expectRefusal(lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts), 'disabled')
     const unsealing = TH.expectRefusal(lease.unseal(BaseBox, sealed), 'disabled')
-    device.sweep()
-    expect(await sealing).to.equal(bank.gate.endCause)
-    expect(await unsealing).to.equal(bank.gate.endCause)
+    gate.end()
+    expect(await sealing).to.equal(endCause)
+    expect(await unsealing).to.equal(endCause)
   })
 })
 

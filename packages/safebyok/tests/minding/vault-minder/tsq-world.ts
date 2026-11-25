@@ -20,13 +20,14 @@ export interface TSQWorld<VaultDBT extends MemoryVaultDB> {
 }
 
 /** The VaultTSQ of `TH.ThingBank` over `vaultDB`, on a fresh QueryClient, with the bank born through its VaultMinder, which so knows the roots at revision 0.
+ * Its VaultMinder watches the vaultDB, and its VaultTSQ hears that VaultMinder.
  * Its VaultMinder's Things are made by `makeThing`, plain ones by default.
  */
 export async function tsqWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT, makeThing: ThingMaker = TH.makePlainThing): Promise<TSQWorld<VaultDBT>> {
   const watching    = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
-  const sorted      = VaultMinder.make(TH.ThingBank, { vaultDB, world: { makeThing } })
+  const sorted      = VaultMinder.make(TH.ThingBank, { vaultDB, world: { makeThing } }).connect()
   const queryClient = new QueryClient()
-  const vaultTSQ    = VaultTSQ.make({ vaultMinder: sorted, queryClient, scope: TH.ThingBank })
+  const vaultTSQ    = VaultTSQ.make({ vaultMinder: sorted, queryClient, scope: TH.ThingBank }).connect()
   await TH.expectGood(sorted.tryBirthBank(TH.birthBankAskOf()))
   function notify(event: VaultItemEvent): void {
     for (const watched of watching.mock.calls) { watched[1](event) }

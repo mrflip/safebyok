@@ -90,12 +90,6 @@ describe("Vault.make(world, vaultTSQ)", () => {
     expect(Object.isFrozen(vault)).to.be.true
   })
 
-  it("refuses a swept world", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    bank.sweep()
-    TH.expectSyncRefusal(() => Vault.make(device.world, device.vaultTSQ), 'disabled')
-  })
-
   const NotWorldCases = [
     [() => null,                                 'null'],
     [(device: Device) => device,                 'the device'],
@@ -115,7 +109,7 @@ describe("Vault.make(world, vaultTSQ)", () => {
     [() => undefined,                            'undefined'],
     [(device: Device) => device.world,           'the world'],
     [(device: Device) => device.vaultTsqClient,  'a QueryClient'],
-    [() => ({ sweep: noop, getOnce: noop }),     'an object with sweep and getOnce alone'],
+    [() => ({ connect: noop, getOnce: noop }),   'an object with connect and getOnce alone'],
   ] as const
 
   for (const [vaultTSQOf, blurb] of NotVaultTSQCases) {
@@ -125,6 +119,12 @@ describe("Vault.make(world, vaultTSQ)", () => {
       expect(err.message).to.include(Phrases.VaultTSQExpected)
     })
   }
+
+  it("refuses a world whose device is disabled", async () => {
+    const { device } = await TH.buildBornBank()
+    device.disable()
+    TH.expectSyncRefusal(() => Vault.make(device.world, device.vaultTSQ), 'disabled')
+  })
 })
 
 /** A vault born on a device whose vaultDB counts the watches stopped, read as `unwatched.calls`. */
@@ -140,28 +140,29 @@ async function buildWatchedVault() {
   return { ...born, unwatched: unwatched.mock }
 }
 
-/** Each way to sweep a born vault's bank, by what is swept, and how many watches of the host's vaultDB it stops. */
-const SweepCases: readonly (readonly [(born: TH.BornVault) => unknown, string, number])[] = [
-  [(born) => born.bank.sweep(),   'its bank',   0],
-  [(born) => born.device.sweep(), 'its device', 1],
-]
+describe("device.disconnect() and device.connect(), over the vaults made on the bank", () => {
+  it("stop each vault hearing at disconnect: the vault TSQ hears no more, and the one watch of the host's vaultDB stops", async () => {
+    const { bank, device, vault, unwatched } = await buildWatchedVault()
+    const first  = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const stored = await vault.sealBox(first, {}, { whisper: TH.Whisper })
+    device.disconnect()
+    rowsOf(bank).set(Openai, stored)
+    await bank.device.world.demandVaultMinder().tryGetOnce(openaiScopeOf(bank))
+    expect(boxAt(vault)).to.include({ revtok: stored.revtok })
+    expect(itemAt(vault)).to.deep.equal(first)
+    expect(unwatched.calls).to.have.lengthOf(1)
+  })
 
-describe("bank.sweep() and device.sweep(), over the vaults made on the bank", () => {
-  for (const [sweepOf, blurb, unwatchCount] of SweepCases) {
-    it(`sweep each vault when ${blurb} is swept: the vault TSQ hears no more`, async () => {
-      const born = await buildWatchedVault()
-      const { bank, vault, unwatched } = born
-      const first  = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-      const stored = await vault.sealBox(first, {}, { whisper: TH.Whisper })
-      sweepOf(born)
-      rowsOf(bank).set(Openai, stored)
-      await bank.device.world.demandVaultMinder().tryGetOnce(openaiScopeOf(bank))
-      expect(boxAt(vault)).to.include({ revtok: stored.revtok })
-      expect(itemAt(vault)).to.deep.equal(first)
-      // The device's VaultMinder has the one watch, which only the device's sweep stops.
-      expect(unwatched.calls).to.have.lengthOf(unwatchCount)
-    })
-  }
+  it("have each vault hear again at connect", async () => {
+    const { bank, device, vault } = await buildWatchedVault()
+    const first  = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const stored = await vault.sealBox(first, {}, { whisper: TH.Whisper })
+    device.disconnect()
+    device.connect()
+    rowsOf(bank).set(Openai, stored)
+    await bank.device.world.demandVaultMinder().tryGetOnce(openaiScopeOf(bank))
+    expect(itemAt(vault)).to.deep.equal(stored)
+  })
 
   it("go on past a watch whose stop throws, telling onBadNews", async () => {
     const vaultDB   = new MemoryVaultDB()
@@ -172,22 +173,63 @@ describe("bank.sweep() and device.sweep(), over the vaults made on the bank", ()
     })
     const onBadNews = vi.fn()
     const { device } = await TH.buildBornVault({ device: TH.makeDevice({}, { vaultDB, onBadNews }) })
-    expect(() => device.sweep()).not.to.throw()
-    expect(device.world.getSnapshot()).to.include({ stage: 'swept' })
+    expect(() => device.disconnect()).not.to.throw()
+    expect(device.world.getSnapshot()).to.include({ stage: 'locked' })
     await TH.eventually(() => onBadNews.mock.calls.length === 1)
     expect(onBadNews.mock.calls.map(([badNews]) => (badNews as BadNews).news.refusalkind)).to.deep.equal(['unexpected_error'])
   })
+})
 
-  it("tell the world's subscribers once, and nothing after", async () => {
+describe("a vault whose device is disabled", () => {
+  it("hears no more: its vault TSQ stops hearing, and the one watch of the host's vaultDB stops", async () => {
+    const { bank, device, vault, unwatched } = await buildWatchedVault()
+    const first  = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const stored = await vault.sealBox(first, {}, { whisper: TH.Whisper })
+    device.disable()
+    device.connect()
+    rowsOf(bank).set(Openai, stored)
+    await bank.device.world.demandVaultMinder().tryGetOnce(openaiScopeOf(bank))
+    expect(itemAt(vault)).to.deep.equal(first)
+    expect(unwatched.calls).to.have.lengthOf(1)
+  })
+
+  it("tells the world's subscribers once, and nothing after", async () => {
     const { bank, device } = await TH.buildBornVault()
     const listener = vi.fn()
-    bank.device.world.subscribe(listener)
-    bank.sweep()
+    device.world.subscribe(listener)
+    device.disable()
     bank.lock()
     bank.dismissUnlock()
     await TH.expectRefusal(bank.ensureUnlocked(), 'disabled')
-    device.sweep()
+    device.disable()
     expect(listener).toHaveBeenCalledOnce()
+  })
+
+  it("refuses a put, and writes nothing", async () => {
+    const { bank, device, vault } = await TH.buildBornVault()
+    const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
+    device.disable()
+    await TH.expectRefusal(vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'disabled')
+    expect(written).not.toHaveBeenCalled()
+  })
+
+  it("refuses withWhisper and withUnlockedWhisper, never calling fn", async () => {
+    const { device, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    device.disable()
+    const fn = vi.fn()
+    await TH.expectRefusal(vault.withWhisper(Openai, fn), 'disabled')
+    await TH.expectRefusal(vault.withUnlockedWhisper(Openai, fn), 'disabled')
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it("refuses at the seal, the tombstone and the unseal", async () => {
+    const { device, vault } = await TH.buildBornVault()
+    const box = await vault.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    device.disable()
+    await TH.expectRefusal(vault.unsealBox(box), 'disabled')
+    await TH.expectRefusal(vault.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'disabled')
+    await TH.expectRefusal(vault.sealBox(box, { am: 'x' }), 'disabled')
   })
 })
 
@@ -374,13 +416,11 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
     expect(written).not.toHaveBeenCalled()
   })
 
-  it("refuses while the bank is locked, or once its bank is swept, and writes nothing", async () => {
+  it("refuses while the bank is locked, and writes nothing", async () => {
     const { bank, vault } = await TH.buildBornVault()
     const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
     bank.lock()
     await TH.expectRefusal(vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bank_locked')
-    bank.sweep()
-    await TH.expectRefusal(vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'disabled')
     expect(written).not.toHaveBeenCalled()
   })
 })
@@ -596,15 +636,6 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     expect(fn).not.toHaveBeenCalled()
   })
 
-  it("refuses once the device is swept, never calling fn", async () => {
-    const { device, vault } = await TH.buildBornVault()
-    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    device.sweep()
-    const fn = vi.fn()
-    await TH.expectRefusal(vault.withWhisper(Openai, fn), 'disabled')
-    expect(fn).not.toHaveBeenCalled()
-  })
-
   it("refuses 'absent_box' for a box never stored, and for one deleted, never calling fn", async () => {
     const { vault } = await TH.buildBornVault()
     const fn = vi.fn()
@@ -683,15 +714,6 @@ describe("vault.withUnlockedWhisper(labelpath, fn)", () => {
     await TH.expectRefusal(vault.withUnlockedWhisper(Openai, fn), 'bank_locked')
     expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.false
     expect(boxGetsOf(asked)).to.equal(0)
-    expect(fn).not.toHaveBeenCalled()
-  })
-
-  it("refuses once the device is swept, never calling fn", async () => {
-    const { device, vault } = await TH.buildBornVault()
-    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    device.sweep()
-    const fn = vi.fn()
-    await TH.expectRefusal(vault.withUnlockedWhisper(Openai, fn), 'disabled')
     expect(fn).not.toHaveBeenCalled()
   })
 
@@ -975,15 +997,6 @@ describe("vault.sealBox(donor, publicProps, secretProps) and vault.unsealBox(box
     await TH.expectRefusal(vault.unsealBox(box), 'bank_locked')
     await TH.expectRefusal(vault.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bank_locked')
     await TH.expectRefusal(vault.sealBox(box, { am: 'x' }), 'bank_locked')
-  })
-
-  it("refuses at the seal, the tombstone and the unseal on a swept device", async () => {
-    const { device, vault } = await TH.buildBornVault()
-    const box = await vault.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    device.sweep()
-    await TH.expectRefusal(vault.unsealBox(box), 'disabled')
-    await TH.expectRefusal(vault.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'disabled')
-    await TH.expectRefusal(vault.sealBox(box, { am: 'x' }), 'disabled')
   })
 
   const DonorCases = [

@@ -165,24 +165,18 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   }
   // --
 
-  // == [Sweeping]: sweep, hostVault
+  // == [Hosting]: hostVault
 
-  /** End this bank for good, with its device's world ({@link World.sweep}). Never throws. */
-  sweep(): this {
-    this.#world.sweep()
-    return this
-  }
-
-  /** Sweep `vault` when this bank's world is swept ({@link World.hostVault}). Internal. */
+  /** Connect and disconnect `vault` with this bank's world ({@link World.hostVault}). Internal. */
   hostVault(vault: HostedVault): void { this.#world.hostVault(vault) }
   // --
 
   // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, demandEnabled
 
-  /** True until this bank's world is swept or its device ends. */
+  /** True until its device ends. */
   get isEnabled(): boolean { return this.#world.isEnabled }
 
-  /** The refusal every call on this bank meets once its world is swept or its device ends, or null while it is enabled. */
+  /** The refusal every call on this bank meets once its device ends, or null while it is enabled. */
   get endCause(): Errors.VaultError | null { return this.#world.endCause }
 
   /** True while the device's world holds no lease. */

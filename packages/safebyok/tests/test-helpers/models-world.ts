@@ -103,13 +103,14 @@ export function provingDeviceOf({ keyDeriver = testDeriver, strengthChecker = an
 /** What a {@link makeDevice} device is made of: its record, and the user it signs in, or null to leave it signed out. */
 export type DeviceGiven = Partial<DeviceRecord & { userid: Userid | null }>
 
-/** A Device of {@link WorldScope}'s banklabel and {@link DeviceTok}, signed in as its user, its sign-in under way, with `given` laid over them:
+/** A Device of {@link WorldScope}'s banklabel and {@link DeviceTok}, connected and signed in as its user, its sign-in under way, with `given` laid over them:
  * over `testDeriver`, a checker that passes everything, a quiet logger and a fresh MemoryVaultDB, with `opts` laid over those.
  * Await `device.signin(device.userid!)` for its bank to come up.
  */
 export function makeDevice(given: DeviceGiven = {}, opts: Partial<DeviceOpts> = {}): Device {
   const { userid = WorldScope.userid, ...record } = given
   const device = Device.make({ banklabel: WorldScope.banklabel, device_tok: DeviceTok, ...record }, { keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, vaultDB: new MemoryVaultDB(), ...opts })
+  device.connect()
   if (userid !== null) { void device.signin(userid) }
   return device
 }

@@ -1,6 +1,5 @@
 /** `VaultMinder`, which answers a vaultDB's verbs over another, and tells one bank's records that are news as an ordered feed. */
 
-import { once } from 'es-toolkit'
 import { type Errors, SX } from 'safebyok-big/internals'
 import { type Lifetok, Labelpath } from '../shapes/primitives'
 import {
@@ -36,7 +35,7 @@ type Told<AnswerT> = Readonly<{ answer: AnswerT, refusal: Errors.VaultError | nu
  * It keeps a car for each labelpath it learns of a record at, for as long as it lives: {@link carAt}. The car's `receive` says what is news,
  * and the car keeps the Thing, what a write over it cites, how far it has been seen, and the refusal it last raised at a record.
  * It builds the bank's asks, and its once verbs send them, each answering only once its records have been told.
- * It watches the wrapped vaultDB from when it is made until its `sweep`. A record it learns of while no one listens is
+ * It watches the wrapped vaultDB from its `connect` to its `disconnect`. A record it learns of while no one listens is
  * taken all the same, and reaches no one, then or later: listen before asking it anything.
  */
 export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> implements Omit<VaultDB, 'watch'> {
@@ -56,13 +55,13 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   readonly #listenings = new Set<Listening>()
   /** The `banktok` of the newest answer that read the bank, for a notice or an event rung that carries the void lifetok: the void lifetok until one has. */
   #newestBanktok: Lifetok = SX.VoidLifeTok
-  /** The stop of the wrapped vaultDB's watch, which runs once. */
-  readonly #unwatchWrapped: () => void
+  /** The stop of the wrapped vaultDB's watch, or null while it is not watched. */
+  #unwatchWrapped: (() => void) | null = null
   // --
 
   // == [Construction]: make, constructor
 
-  /** Wrap `opts.vaultDB` for the bank at `scope`, and start watching it. */
+  /** Wrap `opts.vaultDB` for the bank at `scope`. Nothing is watched until {@link connect}. */
   static make<ThingT extends ReceivingThing>(scope: BankScope, opts: VaultMinderOpts<ThingT>): VaultMinder<ThingT> { return new VaultMinder(scope, opts) }
 
   private constructor(scope: BankScope, opts: VaultMinderOpts<ThingT>) {
@@ -70,7 +69,6 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     this.#vaultDB   = vaultDB
     this.#scope     = Object.freeze({ userid: bankScope.userid, banklabel: bankScope.banklabel })
     this.#world     = opts.world
-    this.#unwatchWrapped = once(vaultDB.watch(bankScope, (notice) => { this.#tellNotice(notice) }, (news) => { this.#tellBadNews(news, null) }))
     Object.freeze(this)
   }
   // --
@@ -317,13 +315,26 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   }
   // --
 
-  // == [Ending]: sweep
+  // == [Watching]: isWatching, connect, disconnect
 
-  /** Stop watching the wrapped vaultDB, for good: what its watch notifies after reaches no one. A second call does nothing.
+  /** True from {@link connect} until {@link disconnect}: what the wrapped vaultDB's watch notifies is told meanwhile. */
+  get isWatching(): boolean { return this.#unwatchWrapped !== null }
+
+  /** Start watching the wrapped vaultDB for this bank's records. A second call does nothing.
+   * What the wrapped vaultDB's `watch` throws is thrown, and nothing is watched.
+   */
+  connect(): this {
+    this.#unwatchWrapped ??= this.#vaultDB.watch(this.#scope, (notice) => { this.#tellNotice(notice) }, (news) => { this.#tellBadNews(news, null) })
+    return this
+  }
+
+  /** Stop watching the wrapped vaultDB: what its watch notifies after reaches no one, until the next {@link connect}. A second call does nothing.
    * Its answers still pass through, and their records are still told. What the wrapped vaultDB's stop throws is thrown.
    */
-  sweep(): this {
-    this.#unwatchWrapped()
+  disconnect(): this {
+    const unwatch = this.#unwatchWrapped
+    this.#unwatchWrapped = null
+    unwatch?.()
     return this
   }
   // --

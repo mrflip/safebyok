@@ -1,4 +1,4 @@
-/** The device: its options, the host's functions it wraps, and its sweep, over its MemoryVaultDB. */
+/** The device: its options, the host's functions it wraps, and its connect and disconnect, over its MemoryVaultDB. */
 
 import { QueryClient } from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
@@ -495,13 +495,15 @@ describe("device.signin(userid)", () => {
     expect(onBadNews.mock.calls.map((call) => (call[0] as BadNews).news.refusalkind)).to.deep.equal(['bad_record'])
   })
 
-  it("shows failed, and does not reject, where its vaultDB cannot watch", async () => {
+  it("tells onBadNews, and brings the bank up all the same, where its vaultDB cannot watch", async () => {
+    const onBadNews = vi.fn()
     const vaultDB = new MemoryVaultDB()
     vi.spyOn(vaultDB, 'watch').mockImplementation(() => { throw new Error('no watching here') })
-    const device = TH.makeDevice({}, { vaultDB })
+    const device = TH.makeDevice({}, { vaultDB, onBadNews })
     await device.signin(TH.WorldScope.userid)
-    expect(device.world.getSnapshot()).to.include({ stage: 'failed' })
-    expect(device.world.getSnapshot().lastErr).to.not.be.null
+    expect(device.world.getSnapshot()).to.include({ stage: 'unborn', lastErr: null })
+    await TH.eventually(() => onBadNews.mock.calls.length > 0)
+    expect(onBadNews.mock.calls.map(([heard]) => (heard as BadNews).news.refusalkind)).to.deep.equal(['unexpected_error'])
   })
 
   it("answers the same promise each time, and keeps the bank born on it since", async () => {
@@ -570,39 +572,95 @@ describe("a device signed in to an unborn bank, of the bank born on another devi
   })
 })
 
-describe("device.sweep()", () => {
-  it("sweeps its bank, the device staying enabled and showing it swept, and never throws", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    expect(device.sweep()).to.equal(device)
-    expect(bank.isEnabled).to.be.false
-    expect(device.isEnabled).to.be.true
-    const swept = device.world.getSnapshot()
-    expect(swept).to.include({ stage: 'swept' })
-    expect(device.sweep()).to.equal(device)
-    expect(device.world.getSnapshot()).to.equal(swept)
+describe("device.connect() and device.disconnect()", () => {
+  it("watches nothing until connected, even once signed in, and watches once however often connected", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const watch = vi.spyOn(vaultDB, 'watch')
+    const device = Device.make({ banklabel: TH.WorldScope.banklabel, device_tok: TH.DeviceTok }, { keyDeriver: TH.testDeriver, logger: TH.quietLogger, vaultDB })
+    await device.signin(TH.WorldScope.userid)
+    expect(watch).not.toHaveBeenCalled()
+    expect(device.connect().connect()).to.equal(device)
+    expect(watch).toHaveBeenCalledOnce()
   })
 
-  it("rejects a call waiting for an `unlock` gating with its bank's end cause", async () => {
+  it("locks its bank and stops the watch, however often disconnected, the device and its bank staying enabled, and watches again at its next connect", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const stop = vi.fn()
+    const watch = vi.spyOn(vaultDB, 'watch').mockReturnValue(stop)
+    const { bank, device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB }) })
+    expect(device.disconnect().disconnect()).to.equal(device)
+    expect([bank.isLocked, bank.isEnabled, device.isEnabled, stop.mock.calls.length]).to.deep.equal([true, true, true, 1])
+    expect(device.world.getSnapshot()).to.include({ stage: 'locked' })
+    device.connect()
+    expect(watch).toHaveBeenCalledTimes(2)
+  })
+
+  it("leaves a call waiting for an `unlock` gating waiting, and the next unlock resolves it", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
     const ensuring = bank.ensureUnlocked()
-    device.sweep()
-    expect(await TH.expectRefusal(ensuring, 'disabled')).to.equal(bank.endCause)
+    device.disconnect()
+    expect(device.world.getSnapshot().isUnlockWanted).to.be.true
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    expect(await ensuring).to.equal(bank)
   })
 
-  it("leaves the device able to judge a passphrase", async () => {
-    const { device } = await TH.buildBornBank()
-    device.sweep()
-    expect(await device.judgeStrength(TH.TestPassphrase)).to.deep.equal({ strong: true })
+  it("never throws, telling onBadNews what the vaultDB's watch throws as it starts or stops", async () => {
+    const onBadNews = vi.fn()
+    const vaultDB = new MemoryVaultDB()
+    const device = Device.make({ banklabel: TH.WorldScope.banklabel, device_tok: TH.DeviceTok }, { keyDeriver: TH.testDeriver, logger: TH.quietLogger, vaultDB, onBadNews })
+    await device.signin(TH.WorldScope.userid)
+    vi.spyOn(vaultDB, 'watch').mockImplementationOnce(() => { throw new Error('no watching here') }).mockReturnValue(() => { throw new Error('no stopping here') })
+    device.connect()
+    device.disconnect()
+    device.connect()
+    device.disconnect()
+    await TH.eventually(() => onBadNews.mock.calls.length === 2)
+    expect(onBadNews.mock.calls.map(([heard]) => (heard as BadNews).news.refusalkind)).to.deep.equal(['unexpected_error', 'unexpected_error'])
   })
 
-  it("does nothing on a device with no bank, which births one after it", async () => {
+  it("leaves the device's verbs working: it judges a passphrase, and births a bank", async () => {
     const device = TH.makeDevice()
     await device.signin(TH.WorldScope.userid)
-    device.sweep()
+    device.disconnect()
+    expect(await device.judgeStrength(TH.TestPassphrase)).to.deep.equal({ strong: true })
     const bank = await device.birthGating({ passphraseCleartext: TH.TestPassphrase }).attempt()
     expect(device.bank).to.equal(bank)
     expect(device.world.getSnapshot()).to.include({ stage: 'unlocked' })
+  })
+})
+
+describe("device.disable()", () => {
+  it("ends the device and its bank for good, once", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const stop = vi.fn()
+    vi.spyOn(vaultDB, 'watch').mockReturnValue(stop)
+    const { bank, device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB }) })
+    expect(device.disable()).to.equal(device)
+    expect([device.isEnabled, bank.isEnabled, bank.isLocked, stop.mock.calls.length]).to.deep.equal([false, false, true, 1])
+    expect(device.endCause).to.include({ refusalkind: 'disabled', message: Phrases.DeviceLetGo })
+    const disabled = device.world.getSnapshot()
+    expect(disabled).to.include({ stage: 'disabled', isEnded: true, endCause: device.endCause })
+    expect(device.disable()).to.equal(device)
+    expect([device.world.getSnapshot(), stop.mock.calls.length]).to.deep.equal([disabled, 1])
+  })
+
+  it("rejects a call waiting for an `unlock` gating with its end cause", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const ensuring = bank.ensureUnlocked()
+    device.disable()
+    expect(await TH.expectRefusal(ensuring, 'disabled')).to.equal(device.endCause)
+  })
+
+  it("watches nothing, and gets nothing, at a connect after it", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB }) })
+    device.disable()
+    const watch = vi.spyOn(vaultDB, 'watch')
+    const tryGetWorld = vi.spyOn(vaultDB, 'tryGetWorld')
+    device.connect()
+    expect([watch.mock.calls.length, tryGetWorld.mock.calls.length]).to.deep.equal([0, 0])
   })
 })
 
@@ -634,10 +692,8 @@ describe("device.lock()", () => {
     expect(bank.isLocked).to.be.true
   })
 
-  it("does nothing on a device with no bank, or a swept one", () => {
+  it("does nothing on a device with no bank", () => {
     const device = TH.makeDevice()
-    expect(device.lock()).to.equal(device)
-    device.sweep()
     expect(device.lock()).to.equal(device)
   })
 })
@@ -728,10 +784,10 @@ describe("device.tellBadNews(badnews)", () => {
     expect(DefaultOnBadNews).to.be.a('function')
   })
 
-  it("tells the host's onBadNews still, once the device is swept", async () => {
+  it("tells the host's onBadNews still, once the device is disconnected", async () => {
     const onBadNews = vi.fn()
     const device = TH.makeDevice({}, { onBadNews })
-    device.sweep()
+    device.disconnect()
     device.tellBadNews([new Errors.VaultError('storage_unavailable', "Down.")])
     await TH.eventually(() => onBadNews.mock.calls.length === 1)
     expect(onBadNews).toHaveBeenCalledOnce()

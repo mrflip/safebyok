@@ -40,7 +40,7 @@ export class Vault {
   // == [Construction]: make, constructor
 
   /** Make the vault of the boxes of `world`'s bank, reading them through `vaultTSQ`, the vault TSQ of the same bank.
-   * The world's sweep sweeps the vault too. Refuses a swept world. Its verbs refuse while the bank is not live.
+   * It connects and disconnects with the world. Refuses a world that has ended. Its verbs refuse while the bank is not live.
    */
   static make(world: World, vaultTSQ: VaultTSQ): Vault {
     const args = VaultChecks.makeArgs.parse({ world, vaultTSQ })
@@ -56,11 +56,17 @@ export class Vault {
   }
   // --
 
-  // == [Ending]: sweep
+  // == [Connecting]: connect, disconnect
 
-  /** Stop the vault TSQ hearing of the bank's boxes ({@link VaultTSQ.sweep}). Never throws. */
-  sweep(): this {
-    this.#vaultTSQ.sweep()
+  /** Have the vault TSQ hear of the bank's boxes ({@link VaultTSQ.connect}). Never throws. */
+  connect(): this {
+    this.#vaultTSQ.connect()
+    return this
+  }
+
+  /** Stop the vault TSQ hearing of the bank's boxes ({@link VaultTSQ.disconnect}). Never throws. */
+  disconnect(): this {
+    this.#vaultTSQ.disconnect()
     return this
   }
   // --
@@ -157,7 +163,7 @@ export class Vault {
   // == [Using whispers]: forceTimelyUnlocked, withWhisper, withUnlockedWhisper, #demandReadableBox
 
   /** Get the box at `labelpath` and wait for the bank to be unlocked, both at once; resolve once the box can be unsealed.
-   * The get runs under `opts.staleTime` where given, else only where this device has seen a newer revision than it holds whole.
+   * The get runs under `opts.staleTime` where given, else only where this device has seen a newer revision than it holds whole, or is not connected.
    * It rejects with the `unlock` gating's refusal where that wait is dismissed or the bank ends ({@link Bank.ensureUnlocked}),
    * else with the get's refusal unchanged, else as {@link withWhisper} would refuse the box: `stale_read` or `absent_box`.
    */
@@ -187,7 +193,7 @@ export class Vault {
 
   /** Call `fn` with the box at `labelpath` unsealed, on an unlocked bank, and resolve what `fn` resolves.
    * It never waits for an `unlock` gating: on a locked bank it refuses `bank_locked`. Call it where the bank shows unlocked, or call {@link withWhisper}.
-   * The box is got only where this device has seen a newer revision than it holds whole, or none. A refused get rejects
+   * The box is got only where this device holds none, has seen a newer revision than it holds whole, or is not connected. A refused get rejects
    * with its refusal, unless it is `storage_unavailable` over a box this device holds, which runs on that box.
    * `fn` gets the whole box, in a revision stored at a moment during the call: its whisper, its sidecar and its record's fields.
    * That box may be behind a revision of the same life heard of since.

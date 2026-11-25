@@ -1,12 +1,12 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, RootShelfExpected, ThingSoonestBare, WorldExpected, ThingExpected, BegunOfOtherKind, WayinExpected, WayinKeyExpected, WayinOfOtherHeader
+// == [Models]: VaultDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, RootShelfExpected, ThingSoonestBare, WorldExpected, ThingExpected, BegunOfOtherKind, WayinExpected, WayinKeyExpected, WayinOfOtherHeader
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
 
 /** What a vault TSQ is made with that lacks one of a VaultMinder's members. */
-export const VaultMinderExpected = 'Expected a VaultMinder: an object with a function for each of its verbs, listen, receive, thingAt and sweep.'
+export const VaultMinderExpected = 'Expected a VaultMinder: an object with a function for each of its verbs, listen, receive, thingAt, connect and disconnect.'
 
 /** A sealer that lacks one of its methods, its tags or its purposes. */
 export const SealerExpected = 'Expected a sealer: its tags, its purposes, and a function for each of its methods.'
@@ -19,9 +19,6 @@ export const BoxOfOtherRoot = "A box's lifepath starts with the lifeseq of its b
 
 /** A vault's box entry point given the root box's labelpath. */
 export const VaultBoxIsRoot = "A vault's boxes are under its bank's root box: give a labelpath such as 'box/openai', never 'box' itself."
-
-/** A call on a bank after its sweep. */
-export const BankSwept = 'This bank was swept, so it answers nothing more: make it again with Bank.make.'
 
 /** A birth on a device whose `signin` has not answered. */
 export const SigninUnanswered = "This device's sign-in has not answered yet: call `signin`, and birth the bank once the stage shows `'unborn'`."
@@ -38,8 +35,8 @@ export const UnlockDismissed = 'The unlock was dismissed, so the bank stayed loc
 /** A gating attempted a second time. */
 export const GatingSpent = 'This gating was attempted already, and a gating is attempted once: make another for the next try.'
 
-/** Something a bank is asked to host that has no sweep. */
-export const HostedVaultExpected = 'Expected a vault: an object with a sweep function.'
+/** Something a bank is asked to host that lacks connect or disconnect. */
+export const HostedVaultExpected = 'Expected a vault: an object with connect and disconnect functions.'
 
 /** A root shelf handed to `Device.make` that has not the three methods of Web Storage it is called through. */
 export const RootShelfExpected = 'Expected a root shelf, such as localStorage: an object with getItem, setItem and removeItem functions.'
@@ -48,7 +45,7 @@ export const RootShelfExpected = 'Expected a root shelf, such as localStorage: a
 export const ThingSoonestBare = 'This device has heard of a newer revision of this record but has not fetched it yet.'
 
 /** What a Thing or a car is made with in place of a device's world. */
-export const WorldExpected = "Expected a device's world: an object with a function for each of its verbs, makeThing, seal, unseal, lock and sweep."
+export const WorldExpected = "Expected a device's world: an object with a function for each of its verbs, makeThing, seal, unseal, lock, connect and disconnect."
 
 /** What a car is made from that is neither a Thing, the shell, nor an item event. */
 export const ThingExpected = 'Expected a Thing, the shell at its labelpath, or an item event of its record.'
@@ -196,7 +193,7 @@ export const AnswerNotMade = "The vaultDB could not make an answer for a failure
 export const QueryClientExpected = 'Expected a TanStack Query QueryClient: an object with setQueryDefaults, setMutationDefaults, getQueryData, setQueryData, query, invalidateQueries and resetQueries.'
 
 /** What a vault is made with that lacks one of a VaultTSQ's members. */
-export const VaultTSQExpected = 'Expected a VaultTSQ: an object with a function for each of its verbs, itemQueryOptions, getOnce, listOnce and sweep.'
+export const VaultTSQExpected = 'Expected a VaultTSQ: an object with a function for each of its verbs, itemQueryOptions, getOnce, listOnce, connect and disconnect.'
 
 /** A listing asked of a VaultTSQ for a Thing other than a box. */
 export const ListOfBoxes = "A VaultTSQ lists only a box's children: the root box's, or a box's under it."
