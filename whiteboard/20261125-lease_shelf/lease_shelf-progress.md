@@ -48,3 +48,11 @@ Curated by the orchestrator. Newer than the plan where they disagree.
   (`--onto origin/<base thread> <old base>`), with both settings updated, before filing. 1a needed this.
 - #900 filed and out of draft; #902 filed (conflict on doc blocks and the wontfix row only), out of draft once CI is
   green; #903 being stacked onto #902.
+
+## Thread 2 `stats` (#905, ready, in review)
+- `tryStats(ask)` on every vaultDB (`doStats` in Memory, IdbVaultDB, PostgresVaultDB); `vault.stats()`/`tryStats()`,
+  no unlock. `StoreLimitCap = 19_006_492_568`. Helpers `vaultStatsOf(rows, limits)`, `rowWeightOf` in
+  `storage/vault-stats.ts`; shapes in `shapes/shapes-vault-stats.ts`; Postgres `StatsSql`.
+- **A new vaultDB implements `doStats`; a VaultDB test stub needs `tryStats`.**
+- **Planning lesson:** 2 compacted twice, nine minutes apart, as 1a did. Any thread touching several adapters, or
+  porting a module with its tests, goes to `thread-worker-400k`.

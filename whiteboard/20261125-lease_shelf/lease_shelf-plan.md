@@ -3,7 +3,7 @@
 Mode: **YOLO**. Issued by the Coach, 2026-11-25. Cap: 3 threads at once.
 Default levels: review `medium`; worker `opus` (thread-worker), reviewer `opus` for threads touching what
 `notes/guarantees-big.md` covers (lease, keys), else its `sonnet` pin; style pass on `style-reviewer`'s pin.
-Status: 0, 1c, 1a filed; 1d lease_thing building (400k), 2 stats and 4 probe building; 1b waits on 1d; Closer Look running at e135f59d4.
+Status: 0, 1c, 1a filed; 2 stats ready (#905), in review; 1d lease_thing and 4 probe building; 1b waits on 1d; Closer Look running.
 
 Sprint doc: https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh (Open Matters bookmark rev 3).
 
