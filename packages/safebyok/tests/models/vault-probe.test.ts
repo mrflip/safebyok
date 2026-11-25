@@ -36,14 +36,15 @@ function getAfterPut(bank: Bank, before: () => unknown): void {
   })
 }
 
-/** Have `bank`'s vaultDB answer the probe's put as stored, then put back what was stored at its labelpath before, as storage that lost the write would. */
+/** Make `bank`'s vaultDB lose the probe's put, though it answers the put ok. */
 function loseProbePut(bank: Bank): void {
   const { vaultDB } = bank.device
   const write = vaultDB.tryWriteThing.bind(vaultDB)
   vi.spyOn(vaultDB, 'tryWriteThing').mockImplementation(async (ask) => {
+    if ((ask.labelpath !== ProbeLabelpath) || (ask.op !== 'put')) { return await write(ask) }
+
     const before = rowsOf(bank).get(ProbeLabelpath)
     const answer = await write(ask)
-    if ((ask.labelpath !== ProbeLabelpath) || (ask.op !== 'put')) { return answer }
     if (before === undefined) { rowsOf(bank).delete(ProbeLabelpath) } else { rowsOf(bank).set(ProbeLabelpath, before) }
     return answer
   })
