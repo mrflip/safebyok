@@ -187,17 +187,13 @@ export class PostgresVaultDB extends AdapterVaultDB {
   protected override doWatch(scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: VaultError) => void): () => void {
     const listen = this.#listen
     if (listen === undefined) { return super.doWatch(scope, receive, onBadNews) }
-    let isListening = true
     const onNotify = (text: string): void => {
       const told = toldOf(scope, text)
-      if ((told === null) || (! isListening)) { return }
-      void this.#receivedOrNull(scope, told, onFetchFailed).then((received) => { if ((received !== null) && isListening) { receive(received) } })
+      if (told === null) { return }
+      void this.#receivedOrNull(scope, told, onFetchFailed).then((received) => { if (received !== null) { receive(received) } })
     }
-    const onListenFailed = (news: VaultError): void => {
-      if (! isListening) { return }
-      isListening = false
-      onBadNews(news)
-    }
+    // A watch a failed fetch has ended is stopped again by its holder, and the host's unlisten is not promised to bear a second call.
+    let isListening = true
     const unwatch = (): void => {
       if (! isListening) { return }
       isListening = false
@@ -205,12 +201,11 @@ export class PostgresVaultDB extends AdapterVaultDB {
     }
     // A notice's fetch that would fail the same way again ends the watch.
     const onFetchFailed = (news: VaultError): void => {
-      if (! isListening) { return }
       unwatch()
       onBadNews(news)
     }
     // Listen last, so a notice heard while `listen` runs finds every handler above.
-    const listening = listenOrNull(listen, thingsChannelOf(scope.userid), onNotify, onListenFailed)
+    const listening = listenOrNull(listen, thingsChannelOf(scope.userid), onNotify, onBadNews)
     return unwatch
   }
   // --

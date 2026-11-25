@@ -573,3 +573,27 @@ the handler hears `softlocked`.
 Reasoning for wontfix: the softlock is the same act in every tab, and `#lock-is-intent` makes it news, never an alarm:
 the default handler logs it at the level for news. Suppressing it in the acting tab would cost a branch on each gate
 verb for a line in the host's log. Ruled by the Coach, 2026-11-25, written by lease_shelf thread 12.
+
+### A Convex or Postgres watch's result, notice or failure that lands after its watch is stopped
+
+* current outcome: `ConvexVaultDB`'s and `PostgresVaultDB`'s watches check nothing once stopped. A result Convex
+  pushes, or a failure it reports, after the stop function has run still reaches the watch's `onNotice` or
+  `onBadNews`. A Postgres notice heard while its UNLISTEN is under way is fetched and notified as any other, and so
+  is one whose fetch was in flight at the stop. A Postgres watch a notice's fetch has ended (one a retry would not
+  mend) tells `onBadNews` of each such failure that lands, so two fetches in flight together that both fail tell it
+  twice.
+* alternatives:
+  - a flag each handler checks before it delivers: a state checked on every notice, for a crossing.
+  - wait for UNLISTEN, or the unsubscribe, before the stop function returns: a stop that waits on the network.
+* workaround: none needed: what lands is what the datastore stored, sealed, and the VaultMinder's next connect fetches
+  again.
+
+Steps to reproduce: watch a bank over `PostgresVaultDB`; have a write's notice arrive, and stop the watch while its
+fetch is in flight: the fetch's Thing is notified after the stop. Or feed two notices whose fetches both fail with a
+missing relation (`42P01`): `onBadNews` is told twice.
+
+Reasoning for wontfix: a stop comes when a device disconnects, a few times a day, and a notice or its fetch is in flight
+for milliseconds (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). Nothing is written to the bankDB, and a
+notice carries only sealed records. The guards that covered it were removed at the Coach's word ("E3 remove the
+guards", 2026-11-25), by adapter_port thread B's rework. See also *A get, a put, … or a notice that lands across a
+disconnect or a disable*, for what the VaultMinder does with such a notice.

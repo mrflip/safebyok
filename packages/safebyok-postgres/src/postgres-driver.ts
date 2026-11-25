@@ -98,7 +98,7 @@ export async function unlistenOnceListening(listening: Promise<(() => unknown) |
   try {
     await unlisten?.()
   } catch {
-    // the watch already ignores notices, so a failed unlisten changes nothing
+    // a failed unlisten is not reported: the host's listen may go on telling notices to the stopped watch
   }
 }
 // --
