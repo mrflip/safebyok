@@ -125,13 +125,16 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
   protected override doWatch(scope: DB.ThingWatchScope, receive: (received: DB.Received) => void, onBadNews: (news: DB.VaultError) => void, onEnded: () => void): () => void {
     const watching: { isOn: boolean, subscription?: { unsubscribe: () => void } } = { isOn: true }
     let heardData: unknown
-    // End once: stop the subscription, and where the watch ended itself, say so, then why.
+    // End once: stop the subscription, and where the watch ended itself, say so, then why. A stream can end inside
+    // subscribe(), before `watch` returns, so the ending is told in a microtask, always after it.
     function end(news: DB.VaultError | null): void {
       watching.isOn = false
       watching.subscription?.unsubscribe()
       if (news === null) { return }
-      onEnded()
-      onBadNews(news)
+      queueMicrotask(() => {
+        onEnded()
+        onBadNews(news)
+      })
     }
     watching.subscription = this.#client.subscription(VaultOperations.watchThings, { scope }).subscribe((result) => {
       if (! watching.isOn) { return }

@@ -1,5 +1,6 @@
 /** The battery every vaultDB runs, against a GraphQLVaultDB whose server answers from a MemoryVaultDB. */
 
+import { describe, expect, it } from 'vitest'
 import { MemoryVaultDB } from 'safebyok/storage'
 import type { GraphQLVaultDB } from '../src/index'
 import * as TH from './test-helpers'
@@ -27,4 +28,13 @@ TH.describeVaultDBBattery('GraphQLVaultDB over a MemoryVaultDB', {
     plant:  (scope, raw) => { memoryOf(vaultDB)._cheat_things(scope).set(scope.labelpath, structuredClone(raw)) },
     remove: (scope) => { memoryOf(vaultDB)._cheat_things(scope).delete(scope.labelpath) },
   }),
+})
+
+describe('GraphQLVaultDB over a MemoryVaultDB', () => {
+  it("stores a bank born over the wire in the server's MemoryVaultDB", async () => {
+    const vaultDB = makeVaultDB()
+    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+    const gate = await TH.expectGood(memoryOf(vaultDB).tryGetThing(TH.getGateAskOf()))
+    expect(gate).to.deep.eq(TH.gateThingOf())
+  })
 })
