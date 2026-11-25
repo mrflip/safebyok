@@ -233,7 +233,7 @@ describe("Device.make(record, opts)", () => {
   }
 
   const RecordCases = [
-    [{ devicetok: TH.Devicetok },         'a devicetok, which its opts take'],
+    [{ devicetok: TH.Devicetok },          'a devicetok, which its opts take'],
     [{ banklabel: '' },                    'an empty banklabel'],
     [{ userid: 'u1' },                     'a userid, which signin takes'],
     [{ gates: ['main'] },                  'a field a device record does not have'],
@@ -728,9 +728,9 @@ describe("device.ensureDevicetok()", () => {
   })
 
   it("with no devicetok from the host, answers the one its deviceDB keeps for its bank: the same at each call, and to each device of that bank given that deviceDB", async () => {
-    const deviceDB   = new MemoryDeviceDB()
+    const deviceDB     = new MemoryDeviceDB()
     const [one, other] = [TH.makeDevice({}, { deviceDB, devicetok: undefined }), TH.makeDevice({}, { deviceDB, devicetok: undefined })]
-    const devicetok  = await one.ensureDevicetok()
+    const devicetok    = await one.ensureDevicetok()
     expect([await one.ensureDevicetok(), await other.ensureDevicetok(), await deviceDB.ensureDevicetok(one.scope)]).to.deep.equal([devicetok, devicetok, devicetok])
   })
 

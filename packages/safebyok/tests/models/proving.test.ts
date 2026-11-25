@@ -629,7 +629,7 @@ const StampCases = [
 ] as const
 
 const HeaderCases = [
-  [{ devicetok: '00000000-0000-4000-8000-0000000000ee' }, 'a header whose devicetok was swapped'],
+  [{ devicetok: '00000000-0000-4000-8000-0000000000ee' },  'a header whose devicetok was swapped'],
   [{ born_at: TH.T0 + 1 },                                 'a header whose born_at moved'],
 ] as const
 

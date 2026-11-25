@@ -275,8 +275,8 @@ export function describeDeviceDBDevicetokBattery<DBT extends DeviceDB>(dbname: s
     })
 
     const DamagedCases = [
-      ['device_one',                                       'a label'],
-      [42,                                                 'a number'],
+      ['device_one',                                          'a label'],
+      [42,                                                    'a number'],
       [{ devicetok: '00000000-0000-4000-8000-0000000000d2' }, 'a devicetok wrapped in an object'],
     ] as const
     for (const [raw, blurb] of DamagedCases) {
