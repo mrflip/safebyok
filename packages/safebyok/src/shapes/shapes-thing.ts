@@ -366,6 +366,11 @@ export const Shell = Object.freeze({
   childCited(parentLifepath: Lifepath): ThingCited {
     return Object.freeze({ ...Shell.Cited, lifepath: `${parentLifepath}/${VoidLifeseq}` })
   },
+  /** The citation for the birth of `seen`'s Thing: the shell, in the lives `seen`'s lifepath names for the Things above it. */
+  citedInParentLivesOf(seen: Readonly<Pick<Sparse<ThingRecord>, 'lifepath'>>): ThingCited {
+    const parentLifepath = Lifeseq.leadingOf(ThingChecks.lifepath.parse(seen.lifepath))
+    return (parentLifepath === '') ? Shell.Cited : Shell.childCited(parentLifepath)
+  },
   /** The shell of the Thing `raw` names: the tombstone that stands for it while none is stored.
    * Name a root by its labelpath alone; any other Thing by its labelpath and lifepath, or by its label under `parent`.
    * Refuses a `raw` that disagrees with `parent`.

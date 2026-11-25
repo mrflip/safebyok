@@ -2,7 +2,7 @@
 
 import { once } from 'es-toolkit'
 import { type Errors, SX } from 'safebyok-big/internals'
-import { type Lifetok, Labelpath, Lifeseq } from '../shapes/primitives'
+import { type Lifetok, Labelpath } from '../shapes/primitives'
 import {
   type AnyAsk, type BirthBankAsk, type CitedOf, type DelAskDraft, type GetAsk, type GetWorldAsk, type ListAsk, type PutAskDraft, type Track, type Tracked, type WriteAsk,
   delAskOf, getAskOf, listAskOf, putAskOf,
@@ -219,10 +219,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   // record's, as the ask's checks demand, so a record of a life after the first refuses there.
   /** The citable of the car kept at `record`'s labelpath, as a write of `record` cites it, or the void revision where none is kept */
   #citableAt<RecordT extends ThingRecord>(record: RecordT): CitedOf<RecordT> {
-    const car = this.carAt(record)
-    if (car !== undefined) { return car.citable as CitedOf<RecordT> }
-    const parentLifepath = Lifeseq.leadingOf(ThingChecks.lifepath.parse(record.lifepath))
-    return ((parentLifepath === '') ? Shell.Cited : Shell.childCited(parentLifepath)) as CitedOf<RecordT>
+    return (this.carAt(record)?.citable ?? Shell.citedInParentLivesOf(record)) as CitedOf<RecordT>
   }
 
   /** The labelpath of `scoped`, refusing a scope of another bank */
