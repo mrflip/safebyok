@@ -127,3 +127,19 @@ what differs from big, in a sentence or two.
   a record of an earlier life of the bank is told apart by whoever peeks it. A revision of a live record that changes
   only its `ends_at` (`Lease.makeNextRecord`, a softlock) keeps its keys and its wrap, which binds the lease's stamp
   alone. Nothing calls the deviceDB yet; thread 1b of lease_shelf has the Device stow and follow it.
+
+* 2026-11-25 (lease_shelf thread 1b, lease_shared), G4 and G9: **The lease is persisted and shared by every tab, and
+  follows what is stored.** The world (`packages/safebyok/src/models/world.ts`) stows each lease it attaches by a grant,
+  a renewal or a softlock (`lease.stow(deviceDB)`, `packages/safebyok/src/models/lease.ts`, which alone reads the
+  record with its keys out of `Lease.#record`), stows the lease's tombstone at `lock()`, at the janitor's autolock past
+  `ends_at`, at `disable()`, and when a lease will not unwrap (`Lease.#bankKey` locks its gate). While connected it
+  peeks the deviceDB on connect, on news of a root and at each ring, and takes up a newer live record not past its
+  `ends_at` and of the main gate's life through `Lease.make`, so a page reload comes up unlocked: G4's "a new page asks
+  the user again" no longer holds where the host gives a deviceDB, and the record's `ends_at`, not `proved_at` plus
+  `leaseMillis` reckoned each time, is the lease's end, enforced by the janitor's best-effort autolock and checked at
+  each take-up. A disconnect drops the lease in its tab alone and stows nothing, so the record stays on disk for the
+  next connect or page (a YOLO decision awaiting the Coach). G9 drifts: the world has a peeked record, leaseKey handle
+  and wrapped bankKey with it, in a local between `deviceDB.peekLease` and `Lease.make`, and hands it to
+  `Proving.buildLease` as the record a grant follows, whose `Lease.nextRevisionOf` keeps its Thing fields alone; no
+  field of the world keeps a record, and `device.deviceDB` hands back the host's deviceDB, inside the trust boundary as
+  G4 says. Without a deviceDB, a device keeps its lease in a `MemoryDeviceDB` of its own, gone with the page, as before.

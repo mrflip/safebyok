@@ -119,8 +119,9 @@ write. Ruled by the Coach, 2026-11-20, vault_snapper W2: "A put needs unlock any
 * current outcome, as built, and promised nowhere:
   - A lock while a form verb's attempt is in flight lands wherever the attempt's steps have reached: an `unlock` gating or a gate
     change that attaches its lease after the lock leaves the bank unlocked.
-  - A `device.disconnect()` locks the bank, so it lands as a lock does, and disables nothing: the attempt goes on. A
-    `Bank.birth` on that device still in flight resolves its bank, unlocked, and the device holds it.
+  - A `device.disconnect()` drops the bank's lease in its tab, so it lands as a lock does there, and disables nothing:
+    the attempt goes on. A `Bank.birth` on that device still in flight resolves its bank, unlocked, and the device holds
+    it. Either attaches its lease and stows it, so every tab sharing the deviceDB takes it up.
   - Two gate changes on one bank at once each cite the gate they proved against: the first to reach the vaultDB is
     written, and the second refuses `stale_write`, changes nothing and unlocks nothing.
 * alternatives:
@@ -142,7 +143,8 @@ Reasoning for wontfix: each case is two of the host's own calls crossing over on
 lands is what the calls amount to in the order they ran, nothing is left inconsistent in storage, and a refused gate
 change never unlocks. Specifying them would mean waits, dismissals or checks reaching across an attempt and the bank's
 lifecycle: new machinery in a primitive's critical path, for crossings the host avoids by awaiting its own calls.
-Disconnect replaced sweep here in lease_shelf thread 0, 2026-11-25.
+Disconnect replaced sweep here in lease_shelf thread 0, 2026-11-25. A lock in another tab sharing the deviceDB lands as this tab's own lock
+does; the lease the attempt attaches follows that lock's tombstone, and starts the next life (lease_shelf thread 1b).
 
 ### A sparse record that lands while a get waits
 
@@ -314,16 +316,19 @@ Reasoning for wontfix: it is a crossing of a get and a sighting of a newer revis
 to own. The Coach: "I'm loath to override errors of TSQ to our helpful guess." Ruled by the Coach, 2026-11-24,
 feed_sorter (the redistribution design, section 12); narrowed to an item with no data by thread 20 of feed_sorter.
 
-### A get, a put, a janitor's re-read of the roots or a notice that lands across a disconnect or a disable
+### A get, a put, a janitor's re-read of the roots, a take-up of the stored lease or a notice that lands across a disconnect or a disable
 
-* current outcome: a `device.disconnect()` locks the bank, has the vault TSQ stop hearing the VaultMinder, and stops the
-  VaultMinder's watch; it waits for nothing in flight. A get or a put already past its checks goes on: its answer lands
+* current outcome: a `device.disconnect()` drops the bank's lease in its tab, has the vault TSQ stop hearing the
+  VaultMinder, and stops the VaultMinder's watch and the deviceDB's listener; it waits for nothing in flight. A get or a put already past its checks goes on: its answer lands
   in the VaultMinder and the vault TSQ's QueryClient as any answer does, and a put lands in storage. A notice the
   vaultDB delivers after its watch is stopped is told to whoever still listens to the VaultMinder, and the vault TSQ is
   no longer among them. The disconnect stops the world's janitor, but a re-read of the roots its last tick began goes
-  on, and its roots land in the VaultMinder as a get's answer does. The next `device.connect()` invalidates the bank's
+  on, and its roots land in the VaultMinder as a get's answer does. A peek of the deviceDB that a connect, a root's news
+  or a ring began goes on too, and where the lease stored is newer it is taken up: the disconnected tab holds it until a
+  lock, a later disconnect or the janitor's autolock past its end. The next `device.connect()` invalidates the bank's
   items and listings, so what is shown then is fetched again. A `device.disable()` disconnects, so the same holds of
-  it, and no connect follows: what lands is kept by a device whose every verb refuses.
+  it, and no connect follows: what lands is kept by a device whose every verb refuses, and a lease taken up is evicted
+  as it is attached.
 * alternatives:
   - have the disconnect wait for, or cancel, what is in flight: abort machinery in a primitive's critical path.
   - drop an answer or a notice that lands once disconnected: a token or a state checked on every answer, for a crossing.
@@ -335,30 +340,38 @@ Steps to reproduce: hold a vaultDB's get, call `device.disconnect()`, then let t
 
 Reasoning for wontfix: a disconnect comes when a provider unmounts, and a get is in flight for milliseconds (CLAUDE.md,
 *Hours separate updates*, `#no-slop-crossings`). What lands is what the vaultDB answered, nothing secret is kept past
-the lock, and guarding it would put a token or a wait on every answer. Written by lease_shelf thread 0, 2026-11-25,
-awaiting a ruling; widened to the janitor's re-read by thread 1c, 2026-11-25.
+the lock, and guarding it would put a token or a wait on every answer. A lease taken up after a disconnect is the one
+every connected tab holds, and nothing is stored. Written by lease_shelf thread 0, 2026-11-25,
+awaiting a ruling; widened to the janitor's re-read by thread 1c, 2026-11-25, and to a take-up of the stored lease by
+thread 1b, 2026-11-25.
 
 ### Two tabs that stow a lease record at once keep only what stow-keeps-newest keeps
 
 * current outcome: each `stowLease` reads the stored record and writes its own in one transaction, and writes only a record
   newer by life, then revision; each answers the record stored afterward. Two tabs that stow at once (a renewal in each,
-  or a renewal in one and a lock's tombstone in the other) keep the newer record, and the tab whose record was not newer gets
-  the other's record as its answer. Two records of the same life and revision keep whichever landed first, though their
-  other fields (`proved_at`, `ends_at`, the keys) may differ.
+  or a renewal in one and a lock's tombstone in the other) keep the newer record, and every tab takes it up as the bell
+  rings. Two records of the same life and revision keep whichever landed first, though their other fields
+  (`proved_at`, `ends_at`, the keys) may differ, and the tab whose record lost keeps its own lease, since a record of the
+  same rank is not newer: both leases unlock the same bank, until the next stow. Every tab that hears a gate change
+  softlocks on it, so N tabs write the same revision of the lease together, each with `ends_at` a softlock from its own
+  now, a few milliseconds apart.
 * alternatives:
   - a lock across tabs (Web Locks) around each stow: a lock where none was needed, in a primitive's critical path.
   - a tiebreak on equal rank, by `written_at` or `revtok`: a second ordering rule beside the Things', for a case the
     answer already tells the caller of.
-* workaround: none needed: the answer is the record stored, which every tab's lease follows, and every tab hears the stow.
+* workaround: none needed: every tab hears the stow and follows the record stored where it is newer, and a lease of the
+  same rank as the record stored unlocks as that record does.
 
 Steps to reproduce: in two tabs of one origin, call `stowLease` with records of the same bank and the same life and
 revision, so that both transactions are queued before either commits.
 
 Reasoning for wontfix: a lease record changes at a gating, a renewal or a lock, minutes apart at the most; two tabs
-stowing in the same few milliseconds is a crossing (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). The
-stow-keeps-newest rule decides, and that is all. Nothing the bankDB stores changes, and no key leaves the device's
+stowing in the same few milliseconds is a crossing (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). The one
+case where they stow together on purpose is a gate change, which every tab softlocks on: a softlock only ever brings
+`ends_at` nearer, so the revisions the tabs write differ by milliseconds of `ends_at` alone, and whichever lands first is
+as good as the rest. The stow-keeps-newest rule decides, and that is all. Nothing the bankDB stores changes, and no key leaves the device's
 database other than by a stow over it. Directed by the lease_shelf handoff (thread 1a), 2026-11-25; written by the
-device_db worker.
+device_db worker; the softlock and the tab whose record lost added by thread 1b, 2026-11-25.
 
 ## React
 
