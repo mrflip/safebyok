@@ -2,7 +2,7 @@
 
 import { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { type ThingScope, type Thingkind, type VaultError, Labelpath, Lifeseq, ThingFormat } from 'safebyok/storage'
+import { type ThingScope, type Thingkind, type VaultError, Labelpath, Lifeseq, ThingFormat, VoidLifeTok, VoidTrack, readAtOf } from 'safebyok/storage'
 import * as VT from 'safebyok/testing'
 import * as Phrases from '../src/phrases'
 import { PostgresVaultDB, thingsChannelOf } from '../src/postgres-vault-db'
@@ -252,6 +252,25 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     expect(badnews).to.deep.equal([])
     expect(stopped).to.deep.equal([])
     unwatch()
+  })
+
+  it("dates each read by the database's clock, each later read in a session later than the one before", async () => {
+    const vaultDB = await makeVaultDB()
+    const db      = await database()
+    const { rows } = await db.query<{ millis: number }>('SELECT (extract(epoch FROM clock_timestamp()) * 1000)::float8 AS millis')
+    const first   = await vaultDB.tryGetThing(VT.getAskAt('box'))
+    const second  = await vaultDB.tryGetThing(VT.getAskAt('box'))
+    // A read_tc compares as text in the order it was made.
+    const isLater = second.read_tc > first.read_tc
+    expect(isLater).to.be.true
+    expect(readAtOf(first.read_tc)).to.be.closeTo(rows[0]!.millis, 1000)
+  })
+
+  it("answers with the read_tc of the row Postgres returns", async () => {
+    const read_tc = '01a211fc-16bf-7000-83c6-d6e7d25156a2'
+    const vaultDB = new PostgresVaultDB({ client: answeringClient({ bank: null, gate: null, root: null, tracked: { bank: null, gate: null, box: null }, read_tc }) })
+    const answer  = await vaultDB.tryGetWorld({ ...VT.ThingBank, op: 'getworld', track: VoidTrack, banktok: VoidLifeTok })
+    expect(answer.read_tc).to.eq(read_tc)
   })
 
   it("refuses a client, listen or opt it cannot use", async () => {

@@ -24,6 +24,10 @@ from one is a `VaultError` to the other.
 run again. Until 1.0 there is no migration: a release that changes the tables says so in its
 changelog, and you drop them and run it again.
 
+`PostgresVaultDB`, the vaultDB of the new `safebyok` core (not yet exported), needs **Postgres 18 or later**: each
+statement it runs dates its read with Postgres's own `uuidv7()`, so the time an answer was read is the database's,
+never the device's.
+
 Each table has a column for each field of a row, and checks each row's shape: its `am`, the columns
 a live row has and a tombstone lacks, and the outline of each `jsonb` field. A row they refuse
 (SQLSTATE `23514`) is one safebyok could not have read back. They do not check `fmt`: a row in a
