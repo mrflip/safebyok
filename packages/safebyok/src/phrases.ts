@@ -241,6 +241,6 @@ export const ProbePutNotGot = "Storage answered the probe's get without the revi
 
 /** An IndexedDB store opened in a browser that lets the page store `quota` bytes, fewer than the `least` it needs. */
 export function StoreQuotaTooSmall(quota: number, least: number): string {
-  return `This browser lets the page store only ${quota} bytes, and a vault needs room for at least ${least}: the browser withholds the storage a vault keeps its Things in, and trying again will not change that.`
+  return `This browser lets the page store only ${String(quota)} bytes, and a vault needs room for at least ${String(least)}: the browser withholds the storage a vault keeps its Things in, and trying again will not change that.`
 }
 // --
