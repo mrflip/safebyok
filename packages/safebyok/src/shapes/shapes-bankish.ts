@@ -109,7 +109,7 @@ export type BadNewsHandler = (badnews: BadNews) => unknown
 /** The kinds of {@link LeaseAnnouncement}. */
 export const leasekindVals = ['lease_taken_up', 'lock_taken_up', 'autolocked', 'softlocked'] as const
 
-/** The kinds of what a device announces to `onLifecycle`, as {@link DeviceAnnouncement} tells them. */
+/** The kinds of {@link DeviceAnnouncement}. */
 export const lifecyclekindVals = [...leasekindVals, 'stage_crossed'] as const
 
 /** One of {@link lifecyclekindVals}. */
@@ -124,7 +124,7 @@ export type Lifecyclekind = typeof lifecyclekindVals[number]
  */
 export type LeaseAnnouncement = Readonly<{ kind: typeof leasekindVals[number] }>
 
-/** The world's stage changed, by whatever cause, and this tab's own calls included: `from` is the stage it was at, and `to` the one it is at now. */
+/** A change of the world's stage, from the stage it was at to the one it is at now. The tab that caused it hears it too. */
 export type StageCrossing = Readonly<{ kind: 'stage_crossed', from: BankStage, to: BankStage }>
 
 /** What a device announces to `onLifecycle`, by its `kind`: a {@link LeaseAnnouncement}, or a {@link StageCrossing}. */
@@ -176,7 +176,7 @@ export interface DeviceOpts {
   gateStaleMinutes?: number | undefined
   /** Hears each refusal no caller waits on. Default: {@link DefaultOnBadNews}, a warning on the device's logger. */
   onBadNews?:        BadNewsHandler | undefined
-  /** Hears what changed the device's lease, other than your own lock, unlock or disable: a lease taken up as the device signs in or connects, a lock or an unlock in another tab, the autolock, a softlock. Your own gate verb (replacing the passphrase, adding or revoking a passkey) announces `softlocked` in its own tab. What it throws or rejects with is reported to the platform. Also hears each crossing from one stage to another, your own calls' included. Default: {@link DefaultOnLifecycle}, which logs each announcement. */
+  /** Hears what changed the device's lease, other than your own lock, unlock or disable: a lease taken up as the device signs in or connects, a lock or an unlock in another tab, the autolock, a softlock. Your own gate verb (replacing the passphrase, adding or revoking a passkey) announces `softlocked` in its own tab. Also hears each crossing from one stage to another as a `stage_crossed`, including those your own lock, unlock or disable cause. What it throws or rejects with is reported to the platform. Default: {@link DefaultOnLifecycle}, which logs each announcement. */
   onLifecycle?:      LifecycleHandler | undefined
   /** The QueryClient the signed-in user's boxes are kept in, under their bank's key: your own, so one client serves your queries and the vault's. Default: one the device makes. */
   queryClient?:      QueryClient | undefined

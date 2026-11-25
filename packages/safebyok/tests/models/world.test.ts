@@ -663,7 +663,7 @@ describe("a lease shared by the tabs of one deviceDB", () => {
   })
 })
 
-/** The kinds `onLifecycle` heard announced on `device`, in order, but the stage's crossings. */
+/** The kinds of lease announcement `onLifecycle` heard on `device`, in order. */
 function kindsHeardOn(onLifecycle: Mock<LifecycleHandler>, device: Device): Lifecyclekind[] {
   return eventsHeardOn(onLifecycle, device).map(({ kind }) => kind).filter((kind) => kind !== 'stage_crossed')
 }
@@ -744,7 +744,7 @@ describe("the host's onLifecycle", () => {
     expect(crossingsHeardOn(onLifecycle, second).slice(3)).to.deep.equal(['unlocked>locked'])
   })
 
-  it("hears the crossing to disabled, and its from and to are the only fields besides the kind and the device", async () => {
+  it("hears the crossing to disabled, with its from and to", async () => {
     const onLifecycle = vi.fn<LifecycleHandler>()
     const { second } = await twoTabs({ onLifecycle })
     onLifecycle.mockClear()
@@ -776,7 +776,7 @@ describe("the host's onLifecycle", () => {
 describe("the default onLifecycle", () => {
   afterEach(() => { vi.unstubAllGlobals() })
 
-  it("logs each crossing of stage and each change of the lease, at the level for news, with no secret material in the story", async () => {
+  it("logs each announcement at the level for news", async () => {
     const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() }
     const { first, second } = await twoTabs({ logger })
     vi.clearAllMocks()

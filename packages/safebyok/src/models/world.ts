@@ -67,7 +67,7 @@ export class World {
 
   /** The current snapshot, which {@link getSnapshot} returns. */
   #snapshot: WorldSnapshot
-  /** The stage the world was last at, as `#setStage` inscribed it, or null before its first. */
+  /** The stage the world was last at, or null before its first. */
   #stage: BankStage | null = null
   /** Each subscriber, beside its bulletproofed form, which is what is called. */
   readonly #subscribers = new Map<() => void, () => void>()
@@ -671,7 +671,7 @@ export class World {
     return ((bank === null) || isLive(bank)) ? 'starting' : 'unborn'
   }
 
-  /** Inscribe `stage` as where the world is now, and announce the crossing where it is not where it was. The first stage is inscribed with no announcement. */
+  /** Record `stage` as the world's stage, announcing the crossing from the one before it. */
   #setStage(stage: BankStage): void {
     const from = this.#stage
     this.#stage = stage

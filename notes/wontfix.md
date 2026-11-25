@@ -557,7 +557,7 @@ Written by lease_shelf thread 4, 2026-11-25, awaiting a ruling.
 
 * current outcome: a gate verb (replacing the passphrase, adding or revoking a passkey) changes the bank's gate, and
   the tab that called it softlocks on the new gate as every other tab does: its `onLifecycle` hears `softlocked`, where
-  an `unlock`, a `lock` or a `disable` called in a tab announces nothing there. The tab's own call has returned, or is
+  an `unlock`, a `lock` or a `disable` called in a tab announces no lease kind there (it hears only the `stage_crossed`). The tab's own call has returned, or is
   about to, when the announcement comes.
 * alternatives:
   - have the tab that acted suppress the announcement: a flag through the softlock for a case the host knows it caused,

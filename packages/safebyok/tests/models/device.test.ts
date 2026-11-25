@@ -926,9 +926,13 @@ describe("device.announce(announcement)", () => {
     expect([logger.warn, logger.error].map((logged) => logged.mock.calls.length)).to.deep.equal([0, 0])
   })
 
-  it("refuses a crossing between stages that do not exist, or one that lacks its stages", () => {
+  it("refuses a crossing to a stage that does not exist", () => {
     const device = TH.makeDevice()
     TH.expectSyncRefusal(() => { device.announce({ kind: 'stage_crossed', from: 'locked', to: 'asleep' } as never) }, 'bad_record')
+  })
+
+  it("refuses a crossing that lacks its stages", () => {
+    const device = TH.makeDevice()
     TH.expectSyncRefusal(() => { device.announce({ kind: 'stage_crossed' } as never) }, 'bad_record')
   })
 
