@@ -9,7 +9,7 @@ import { BaseThing } from './base-thing'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import { guardRootShelf } from '../minding/root-shelf'
 import { VaultTSQ } from '../minding/vault-tsq'
-import { type BadNewsHandler, type DeviceAnnouncement, type DeviceEvent, type DeviceJSON, type DeviceOpts, type DeviceRecord, type LifecycleHandler, type RootShelf, BankishChecks, isRootShelf, lifecyclekindVals } from '../shapes/shapes-bankish'
+import { type BadNewsHandler, type DeviceAnnouncement, type DeviceEvent, type DeviceJSON, type DeviceOpts, type DeviceRecord, type GuardedLifecycleHandler, type LifecycleHandler, type RootShelf, BankishChecks, isRootShelf, lifecyclekindVals } from '../shapes/shapes-bankish'
 import { type MaskedView, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import { isQueryClient } from '../shapes/shapes-vault-tsq'
 import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
@@ -344,7 +344,7 @@ export class Device {
   // --
 }
 
-// == [Host functions]: DefaultOnBadNews, tellBadNewsTo, DefaultOnLifecycle, GuardedLifecycleHandler, guardOnLifecycle
+// == [Host functions]: DefaultOnBadNews, tellBadNewsTo, DefaultOnLifecycle, guardOnLifecycle
 
 /** The default `onBadNews`: warn of each failure on the device's logger. */
 export const DefaultOnBadNews: BadNewsHandler = ({ news, device }) => {
@@ -370,9 +370,6 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 
 /** The default `onLifecycle`: it does nothing, since each announcement is news a host may want, never a failure to report. */
 export const DefaultOnLifecycle: LifecycleHandler = () => undefined
-
-/** `onLifecycle` as a device keeps it, wrapped by {@link guardOnLifecycle}. It never throws. */
-type GuardedLifecycleHandler = (event: DeviceEvent) => Promise<void>
 
 /** Guard the host's `onLifecycle`: anything it throws or rejects with is reported to the platform, never thrown. */
 function guardOnLifecycle(onLifecycle: LifecycleHandler): GuardedLifecycleHandler {

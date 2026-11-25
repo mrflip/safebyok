@@ -79,7 +79,7 @@ function isHostedVault(val: unknown): val is HostedVault {
 }
 // --
 
-// == [The device]: BankishChecks, DefaultBanklabel, DeviceRecord, DeviceJSON, BadNews, BadNewsHandler, lifecyclekindVals, Lifecyclekind, DeviceAnnouncement, DeviceEvent, LifecycleHandler, RootShelf, isRootShelf, RootShelfMethodnames, DeviceOpts
+// == [The device]: BankishChecks, DefaultBanklabel, DeviceRecord, DeviceJSON, BadNews, BadNewsHandler, lifecyclekindVals, Lifecyclekind, DeviceAnnouncement, DeviceEvent, LifecycleHandler, GuardedLifecycleHandler, RootShelf, isRootShelf, RootShelfMethodnames, DeviceOpts
 
 /** The banklabel of the bank a device serves where its record names none. */
 export const DefaultBanklabel = 'main'
@@ -125,6 +125,9 @@ export type DeviceEvent = DeviceAnnouncement & Readonly<{ device: Device }>
 
 /** `Device.make`'s `onLifecycle`: hears what changed the device's lease without a call of the host's own. */
 export type LifecycleHandler = (event: DeviceEvent) => unknown
+
+/** `onLifecycle` as a device keeps it, wrapped by `guardOnLifecycle`. It never throws. */
+export type GuardedLifecycleHandler = (event: DeviceEvent) => Promise<void>
 
 /** Where a device keeps the signed-in bank's three roots between page loads: `localStorage`, or anything with its three methods. */
 export type RootShelf = Readonly<{
