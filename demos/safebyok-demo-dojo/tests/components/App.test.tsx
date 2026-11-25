@@ -21,7 +21,7 @@ describe('Reset', () => {
     await TH.reloadPage()
 
     expect(await vaultRowsNow()).to.deep.equal(Fixture.vault)
-    expect(await cacheRowsNow()).to.have.deep.members(Fixture.cache)
+    expect(cacheRowsNow()).to.have.deep.members(Fixture.cache)
     expect(screen.getByText('Nobody is signed in.')).to.exist
     const inspect = TH.showTab('Inspect', 'Inspect')
     await within(inspect).findByText('-- Bank (2) --')

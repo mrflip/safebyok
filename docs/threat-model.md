@@ -55,8 +55,9 @@ afterwards, and how long it stays reachable.
    input controlled.*
 2. **Errors and logs carry kinds, never contents.** That includes an error a host's own function
    throws, which may have the secret in its message. *Cost: an error says less when debugging.*
-3. **The library empties the `FormData` it is handed.** That object is a copy of the form:
-   emptying it changes nothing the user sees. *Cost: none.*
+3. **What a host hands a form verb is the library's to clear.** It empties the `FormData` and
+   zeroes a passkey's answer at every stage, whether the verb runs or refuses. That object is a
+   copy of the form: emptying it changes nothing the user sees. *Cost: none.*
 4. **The promise is reachability, not erasure.** A JavaScript string cannot be zeroed. The
    library ensures nothing long-lived points at a secret; it cannot say when the memory is
    reused. Bytes can be zeroed, and it zeroes a passkey's answer once a gating is done with it.

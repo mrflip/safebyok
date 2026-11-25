@@ -7,7 +7,7 @@ import type { MaskedRow } from '../shapes/shapes-masked-view'
 import { type ThingRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetOnceOpts, type ItemQueryOptions, type VaultMutationOptions, type VaultTSQOpts, VaultTSQChecks } from '../shapes/shapes-vault-tsq'
-import type { VaultEvent } from '../shapes/shapes-vault-event'
+import type { ReadTc, VaultEvent } from '../shapes/shapes-vault-event'
 import { BaseThing } from '../models/base-thing'
 import type { ReceivingThing } from '../shapes/shapes-vault-minder'
 import type { VaultMinder } from './vault-minder'
@@ -22,8 +22,10 @@ import { bankKeyHeadOf, labelsOf } from './query-keys'
 // The writer, `#hear`, is the only code that changes an item or a listing: the queryFns answer what the Thing holds,
 // and nothing here acts on a query's success.
 /** One bank's vault TSQ: its boxes under the root box, as items, and their listings, in a client it is handed.
- * An item is the box's own frozen record, the same object its Thing holds, or null where none is stored live. It has no
- * data while the box is known only sparse in its newest life. An item is stale while a newer revision is known only sparse.
+ * An item is the box's live record, deep-equal to the one its Thing holds, or null where none is stored live. Across
+ * revisions, a part of the record left unchanged stays the same object. Once the box is known only sparse in a newer life
+ * than the item holds, the item is null; a box known only sparse from the first has no data. An item is stale while a
+ * newer revision is known only sparse.
  * A listing is the kids value a list last answered, kept while nothing observes it, and invalidated once a child's life changes.
  * Its queries never retry, and run whether or not the browser reports itself online.
  */
@@ -55,9 +57,8 @@ export class VaultTSQ {
     queryClient.setQueryDefaults(bankHead, BankDefaults)
     queryClient.setMutationDefaults(bankHead, BankDefaults)
     queryClient.setQueryDefaults([...bankHead, Itemkind], {
-      queryFn:           async ({ queryKey }) => await this.#itemOf(labelpathOfItemKey(queryKey)),
-      staleTime:         ({ queryKey }) => ((this.#vaultMinder.thingAt(this.#scopeOf(labelpathOfItemKey(queryKey)))?.agekind === 'here') ? Infinity : 0),
-      structuralSharing: frozenOrSharedOf,
+      queryFn:   async ({ queryKey }) => await this.#itemOf(labelpathOfItemKey(queryKey)),
+      staleTime: ({ queryKey }) => ((this.#vaultMinder.thingAt(this.#scopeOf(labelpathOfItemKey(queryKey)))?.agekind === 'here') ? Infinity : 0),
     })
     // A listing is kept nowhere but its query, so it stays while no one observes it.
     queryClient.setQueryDefaults([...bankHead, Listkind], {
@@ -106,7 +107,7 @@ export class VaultTSQ {
 
   /** Get the box at `scope` once, unless its item is fresh by `opts.staleTime`: its live record, or null where none is stored live.
    * Refuses `stale_read` where storage answers an earlier life than the box's newest known only sparse. Rejects with the
-   * library's `CancelledError` where the item is reset while the get runs.
+   * library's `CancelledError` where the item, holding no data, is reset while the get runs.
    */
   async getOnce(scope: ThingScope, opts: GetOnceOpts = {}): Promise<ThingRecord | null> {
     const { staleTime } = VaultTSQChecks.getOnceOpts.parse(opts)
@@ -156,14 +157,22 @@ export class VaultTSQ {
     if (! isItemLabelpath(event.labelpath)) { return }
     const queryKey = VaultTSQ.itemQueryKeyOf(this.#scopeOf(event.labelpath))
     if (event.eventkind === 'aged') {
-      // An aged event is never of a Thing seen whole: its agekind is cold or bare.
-      if (event.agekind === 'cold') { void this.#queryClient.invalidateQueries({ queryKey, exact: true }, { cancelRefetch: false }) } else { void this.#queryClient.resetQueries({ queryKey, exact: true }) }
+      // An aged event is never of a Thing seen whole: its agekind is cold or bare. Bare over an item with data, the box
+      // has a life newer than the record the item holds, so it is known to have been deleted since: the item is null, and
+      // stale. An item with no data shows nothing as deleted, and is reset, so that a fetch of it begun before the newer
+      // record was known starts again.
+      if ((event.agekind === 'bare') && (this.#queryClient.getQueryData(queryKey) === undefined)) {
+        void this.#queryClient.resetQueries({ queryKey, exact: true })
+        return
+      }
+      if (event.agekind === 'bare') { this.#queryClient.setQueryData(queryKey, null, setDataOptionsOf(event.read_tc)) }
+      void this.#queryClient.invalidateQueries({ queryKey, exact: true }, { cancelRefetch: false })
       return
     }
     if (event.liveness === 'soon') { return }
-    // The record the Thing holds, not the event's: a revision seen again keeps the object it had.
+    // The record the Thing holds, as the item's queryFn answers it.
     const record = (event.liveness === 'full') ? this.#vaultMinder.thingAt(this.#scopeOf(event.labelpath))?.pickle() : null
-    this.#queryClient.setQueryData(queryKey, record, { ...((event.read_tc !== undefined) && { updatedAt: readAtOf(event.read_tc) }) })
+    this.#queryClient.setQueryData(queryKey, record, setDataOptionsOf(event.read_tc))
   }
 
   // Resetting, not removing, the box's own listing: a removal reaches the cache and not the observers.
@@ -199,7 +208,7 @@ export class VaultTSQ {
 }
 // --
 
-// == [Helpers]: Itemkind, Listkind, LabelsIdx, BankDefaults, frozenOrSharedOf, isItemLabelpath, itemValOf, labelpathOfItemKey, labelpathOfListKey
+// == [Helpers]: Itemkind, Listkind, LabelsIdx, BankDefaults, setDataOptionsOf, isItemLabelpath, itemValOf, labelpathOfItemKey, labelpathOfListKey
 
 /** The kind segment of an item's query key. */
 const Itemkind = 'item'
@@ -213,13 +222,9 @@ const LabelsIdx = 4
 /** The query and mutation defaults under the bank's key. */
 const BankDefaults = Object.freeze({ networkMode: 'always', retry: false } as const)
 
-// TanStack shares structure through this both between an item's values and between what a host's `select` returns from
-// them. An item's value is its Thing's own frozen record, or null, whose identity already changes only with the record;
-// so does a part of it, or a primitive, which a `select` may return. A new object a `select` makes each run is shared
-// with the last, so that an observer is told, and a host's memos run, only when what it selects changes.
-/** Structural sharing for an item: a frozen value or a primitive as it is, anything else shared with `prior` by TanStack's default, `replaceEqualDeep`. */
-function frozenOrSharedOf(prior: unknown, next: unknown): unknown {
-  return Object.isFrozen(next) ? next : TSQ.replaceEqualDeep(prior, next)
+/** The options that date an item set from an event read at `read_tc`, or none where it was not said. */
+function setDataOptionsOf(read_tc: ReadTc | undefined): TSQ.SetDataOptions {
+  return (read_tc === undefined) ? {} : { updatedAt: readAtOf(read_tc) }
 }
 
 /** True for the labelpath of a box under the root box: the Things an item is kept for. */

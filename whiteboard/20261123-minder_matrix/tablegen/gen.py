@@ -50,16 +50,21 @@ def newestOf(c):
 def wantedOf(initial, chain):
   c = dict(initial)
   for p in chain:
+    prior = dict(c)
     if isWhole(p):
       if p[2] > rev(wholeOf(c)):
         if isDeath(p): c["item"] = None; c["dead"] = p
         else: c["item"] = p; c.pop("dead", None)
     elif p[2] > rev(wholeOf(c)) and p[2] > rev(c.get("soon")): c["soon"] = p
     if c.get("soon") and c["soon"][2] <= rev(wholeOf(c)): c.pop("soon")
-    # A record of a later life ends what the cache holds of an earlier life.
+    # A record of a later life ends what the cache holds of an earlier life. A later life's soon over an earlier life's
+    # item or tombstone leaves the item null and out of date, its dead record gone (principle 3); over a box never held,
+    # no item. An earlier life's whole record arriving under a later life's soon changes nothing.
     life = newestOf(c)[1]
     whole = wholeOf(c)
-    if whole is not None and whole[1] < life: c.pop("item", None); c.pop("dead", None)
+    if whole is not None and whole[1] < life:
+      if isWhole(p): c = prior
+      else: c["item"] = None; c.pop("dead", None)
   return c
 
 def seededOf(a): return wantedOf({}, SEEDS[a])

@@ -7,6 +7,8 @@ import { Box } from '../../src/models/box'
 import type { Device } from '../../src/models/device'
 import { Gate } from '../../src/models/gate'
 import { Shell } from '../../src/shapes/shapes-thing'
+import type { SeenThing } from '../../src/shapes/shapes-vault-event'
+import { readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -103,4 +105,32 @@ describe("world.demandRootsLive()", () => {
     const { world } = await signedInDevice()
     TH.expectSyncRefusal(() => world.demandRootsLive(), 'absent_thing')
   })
+})
+
+/** Each order the bank, the main gate and the root box of a bank born elsewhere may arrive in, one at a time. */
+const RootOrderCases = [
+  [["bank", "gate", "box"], 'the order an answer tells them in'],
+  [["box", "bank", "gate"], 'the root box first'],
+  [["gate", "box", "bank"], 'the main gate first, the bank last'],
+  [["bank", "box", "gate"], 'the main gate last'],
+] as const
+
+describe("a world's stage as its roots arrive one at a time", () => {
+  for (const [order, blurb] of RootOrderCases) {
+    it(`shows unborn until the last root lands, then locked, in ${blurb}`, async () => {
+      const born   = await TH.buildBornBank()
+      const minder = born.device.world.demandVaultMinder()
+      const device = TH.makeDevice()
+      await device.signin(TH.WorldScope.userid)
+      expect(device.getSnapshot().bank.stage).to.eq('unborn')
+      const stages: string[] = []
+      device.subscribe(() => { stages.push(device.getSnapshot().bank.stage) })
+      for (const labelpath of order) {
+        const record = minder.thingAt({ ...TH.WorldScope, labelpath })!.pickle() as SeenThing
+        device.world.demandVaultMinder().receive({ ...TH.itemEventOf(record), sourcelabel: 'other_device', read_tc: readTcNow() })
+      }
+      expect(stages).to.deep.equal(['locked'])
+      expect([device.bank, device.vault]).to.not.include(null)
+    })
+  }
 })

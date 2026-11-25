@@ -8,7 +8,7 @@ import { type ReactNode, type SyntheticEvent, createContext, useCallback, useCon
 import {
   type AddPasskeyDna, type Bank, type BankSnapshot, type BankStage, type BirthDna, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type ItemQueryOptions, type KeyDeriver, type Kids, Labelpath,
   type LiveOf, type LivePublicPropsOf, type MaskedView, type PasskeyWayinHeader, type PassphraseVerdict, type PassphraseWayinHeader,
-  type ReplacePassphraseDna, type RevokePasskeyDna, type UnlockDna, EmptyMaskedView, PendingBank, Shell, type Sidecar, SignedOutBank, type Tombstone, type TombstoneOf, type Userid, type Vault, VaultError, type VaultDB, VaultTSQ, type Whisper, bulletproofHandlerOf,
+  type ReplacePassphraseDna, type RevokePasskeyDna, type UnlockDna, EmptyMaskedView, PendingBank, Shell, type Sidecar, SignedOutBank, type Tombstone, type TombstoneOf, type Userid, type Vault, VaultError, type VaultDB, VaultTSQ, type Whisper, bulletproofHandlerOf, vacateHanded,
 } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
@@ -145,15 +145,15 @@ type Shown = Readonly<{ client: QueryClient } & ({ device: Device, bank: null } 
 
 /** What a bank's hooks and calls read of their giver. */
 type BankFriend = Readonly<{
-  banklabel:    string
+  banklabel:            string
   /** The device of the provider mounted, or null while there is none or nobody is signed in: for the calls a host may make outside the provider. */
-  signedIn:     () => Device | null
+  signedIn:             () => Device | null
   /** The QueryClient of the provider mounted, or the giver's own while none is: for the calls a host may make outside the provider. */
-  clientNow:    () => QueryClient
-  demandDevice: () => Device
-  demandBank:   () => Bank
-  demandVault:  () => Vault
-  useShown:     () => Shown
+  clientNow:            () => QueryClient
+  demandDeviceOrVacate: (params: unknown) => Device
+  demandBankOrVacate:   (params: unknown) => Bank
+  demandVault:          () => Vault
+  useShown:             () => Shown
 }>
 // --
 
@@ -190,11 +190,31 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     return device
   }
 
+  /** The signed-in user's device, for the birth form verb handed `params`: where it refuses, as {@link demandDevice} does, what the verb was handed is cleared first. */
+  function demandDeviceOrVacate(params: unknown): Device {
+    try {
+      return demandDevice()
+    } catch (err) {
+      vacateHanded(params)
+      throw err
+    }
+  }
+
   /** The signed-in user's bank. Refuses `absent_vault` while nobody is signed in, while the bank is unborn, until the device's sign-in answers, or where it failed to come up. */
   function demandBank(): Bank {
     const signedIn = demandDevice()
     if (signedIn.bank === null) { throw bankAbsentOf(signedIn) }
     return signedIn.bank
+  }
+
+  /** The signed-in user's bank, for a gate form verb handed `params`: where it refuses, as {@link demandBank} does, what the verb was handed is cleared first. */
+  function demandBankOrVacate(params: unknown): Bank {
+    try {
+      return demandBank()
+    } catch (err) {
+      vacateHanded(params)
+      throw err
+    }
   }
 
   /** The vault of the signed-in user's bank. Refuses as {@link demandBank} does. */
@@ -268,7 +288,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
   }
 
   const { bankGiver, boxQueryOf } = makeBankGiver({
-    banklabel, signedIn: signedInDevice, clientNow: () => mounted?.vaultTsqClient ?? outsideClient, demandDevice, demandBank, demandVault, useShown,
+    banklabel, signedIn: signedInDevice, clientNow: () => mounted?.vaultTsqClient ?? outsideClient, demandDeviceOrVacate, demandBankOrVacate, demandVault, useShown,
   })
 
   /** The query factories of the signed-in user's bank, by banklabel, for the host's own `useQuery` and its kin, with the QueryClient they run in.
@@ -324,7 +344,7 @@ function shownOf(device: Device | null, userid: string | null | undefined, clien
 
 /** The hooks and calls of the bank `friend` serves. */
 function makeBankGiver(friend: BankFriend) {
-  const { banklabel, signedIn, clientNow, demandDevice, demandBank, demandVault, useShown } = friend
+  const { banklabel, signedIn, clientNow, demandDeviceOrVacate, demandBankOrVacate, demandVault, useShown } = friend
 
   /** The bank's snapshot. Synchronous: it never waits and never suspends.
    * Switch a screen on its `stage`.
@@ -366,7 +386,7 @@ function makeBankGiver(friend: BankFriend) {
   }
 
   // Left with no queryFn, a query of the box's item fetches by the vault TSQ's default under the bank's key, which gets the
-  // box and answers what its Thing then holds. Its staleness, retries and structural sharing are the vault TSQ's defaults too.
+  // box and answers what its Thing then holds. Its staleness and retries are the vault TSQ's defaults too, and its structural sharing TanStack's.
   /** {@link boxQueryOf}, less its `select`. */
   function boxQueryBaseOf(device: Device | null, labelpath: string, isFetchable: boolean): Pick<UseQueryOptions<BoxShown>, 'queryKey' | 'queryFn' | 'initialData' | 'initialDataUpdatedAt'> {
     const boxLabelpath = boxLabelpathOf(labelpath)
@@ -402,7 +422,7 @@ function makeBankGiver(friend: BankFriend) {
   /** The box's stored record, through React Query, its whisper still sealed.
    * `data` is the record, null when none is stored or it was deleted, and undefined while pending or until the device's sign-in answers.
    * A record overtaken by a newer revision of the same life shows, stale, until the newer one arrives. Once the box is known
-   * to have a newer life, deleted and written again elsewhere, and nothing of that life has arrived whole, `data` is undefined and pending while it fetches the box again.
+   * to have a newer life, deleted and written again elsewhere, and nothing of that life has arrived whole, `data` is null, stale, while it fetches the box again.
    * `opts` are React Query's options that shape what this one hook shows. A `select` given there is handed the whole record, or
    * null where none is stored or it was deleted: {@link liveOf} is the default. A `select` that returns a record should return it, or the item's own null,
    * never a null of its own: the hook reads null as nothing stored.
@@ -525,19 +545,14 @@ function makeBankGiver(friend: BankFriend) {
 
   /** {@link putBoxOnce} of the box at `boxLabelpath`. */
   async function putBoxOnceAt(boxLabelpath: BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<LiveOf<BoxRecord>> {
-    const box = await demandVault().putBoxOnce(boxLabelpath, patch, secrets)
-    // The box a put answers holds a live box.
-    return box.pickle() as LiveOf<BoxRecord>
+    return await demandVault().putBoxOnce(boxLabelpath, patch, secrets)
   }
 
   /** Delete the box `boxNamed` names, resolving its stored tombstone. It tries once, over the newest revision this device has heard of.
    * A {@link useBox} showing the box then answers null.
    */
   async function delBoxOnce(boxNamed: BoxNamed): Promise<TombstoneOf<BoxRecord>> {
-    const boxLabelpath = boxLabelpathOfNamed(boxNamed)
-    const box = await demandVault().delBoxOnce(boxLabelpath)
-    // The box a delete answers holds a tombstone.
-    return box.pickle() as TombstoneOf<BoxRecord>
+    return await demandVault().delBoxOnce(boxLabelpathOfNamed(boxNamed))
   }
 
   // React shows the form's FormData to the components inside it, through `useFormStatus().data`, until the action settles.
@@ -654,7 +669,7 @@ function makeBankGiver(friend: BankFriend) {
   /** Birth the bank under the new passphrase in `params`, a form or a dna, with no hook: for a submit handler or a `mutationFn` of your own.
    * A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once. Hand a mutation of your own nothing of the form.
    */
-  async function gatingBirthAttempt(params: FormData | BirthDna): Promise<void> { await demandDevice().gatingBirthAttempt(params) }
+  async function gatingBirthAttempt(params: FormData | BirthDna): Promise<void> { await demandDeviceOrVacate(params).gatingBirthAttempt(params) }
 
   /** The mutation that births the bank, at stage `unborn`, leaving it unlocked: hand its `attempt` the form, whose new passphrase is the field `passphrase`.
    * Disable the submit until the giver's `useStrengthVerdict` judges the passphrase strong.
@@ -662,48 +677,76 @@ function makeBankGiver(friend: BankFriend) {
    *   const birth = Knock.useBirth()
    *   <form action={birth.attempt} onReset={birth.keepTextIfRefused}>
    */
-  function useBirth(): FormMutationResult<FormData | BirthDna> { return useFormMutation('birth', (params: FormData | BirthDna) => demandDevice().birthGating(params)) }
+  function useBirth(): FormMutationResult<FormData | BirthDna> { return useFormMutation('birth', (params: FormData | BirthDna) => demandDeviceOrVacate(params).birthGating(params)) }
 
   /** Unlock the bank by the passphrase or the passkey's answer in `params`, a form or a dna, with no hook: for a submit handler or a `mutationFn` of your own.
-   * A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once. Hand a mutation of your own nothing of the form.
+   * Whether it runs or refuses, what it is handed is the package's to clear: a `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once, and a passkey answer's PRF bytes are zeroed.
+   * Hand a mutation of your own nothing of the form.
    */
-  async function gatingUnlockAttempt(params: FormData | UnlockDna): Promise<void> { await demandBank().gate.gatingUnlockAttempt(params) }
+  async function gatingUnlockAttempt(params: FormData | UnlockDna): Promise<void> { await unlockGatingOf(params).attempt() }
 
   /** The mutation that unlocks the bank by its passphrase or its passkey: hand its `attempt` the form, whose passphrase is the field `passphrase`, or `{ passkeyAnswer }`.
    * Every {@link withWhisper} waiting resumes. A wrong passphrase or passkey refuses, and the bank stays locked.
+   * Whether it runs or refuses, what `attempt` is handed is the package's to clear: a form loses its secret fields, and a passkey answer's PRF bytes are zeroed.
    * @example
    *   const unlock = Knock.useUnlock()
    *   <form action={unlock.attempt} onReset={unlock.keepTextIfRefused}>
    */
-  function useUnlock(): FormMutationResult<FormData | UnlockDna> { return useFormMutation('unlock', (params: FormData | UnlockDna) => demandBank().gate.unlockGating(params)) }
+  function useUnlock(): FormMutationResult<FormData | UnlockDna> { return useFormMutation('unlock', unlockGatingOf) }
+
+  /** The gating of an unlock over `params`, at the main gate. */
+  function unlockGatingOf(params: FormData | UnlockDna): Gating {
+    return demandBankOrVacate(params).gate.unlockGating(params)
+  }
 
   /** Replace the passphrase by the `nextPassphrase` in `params`, a form or a dna, proved by its `passphrase` or passkey answer, with no hook: for a submit handler or a `mutationFn` of your own.
-   * A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once. Hand a mutation of your own nothing of the form.
+   * Whether it runs or refuses, what it is handed is the package's to clear: a `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once, and a passkey answer's PRF bytes are zeroed.
+   * Hand a mutation of your own nothing of the form.
    */
-  async function gatingReplacePassphraseAttempt(params: FormData | ReplacePassphraseDna): Promise<void> { await demandBank().gate.gatingReplacePassphraseAttempt(params) }
+  async function gatingReplacePassphraseAttempt(params: FormData | ReplacePassphraseDna): Promise<void> { await replacePassphraseGatingOf(params).attempt() }
 
   /** The mutation that replaces the passphrase, proved by the current passphrase or the passkey, leaving the bank unlocked: hand its `attempt` the form, with the fields `passphrase` and `nextPassphrase`.
    * Disable the submit until the giver's `useStrengthVerdict` judges the new passphrase strong.
+   * Whether it runs or refuses, what `attempt` is handed is the package's to clear: a form loses its secret fields, and a passkey answer's PRF bytes are zeroed.
    */
-  function useReplacePassphrase(): FormMutationResult<FormData | ReplacePassphraseDna> {
-    return useFormMutation('replacePassphrase', (params: FormData | ReplacePassphraseDna) => demandBank().gate.replacePassphraseGating(params))
+  function useReplacePassphrase(): FormMutationResult<FormData | ReplacePassphraseDna> { return useFormMutation('replacePassphrase', replacePassphraseGatingOf) }
+
+  /** The gating of a passphrase's replacement over `params`, at the main gate. */
+  function replacePassphraseGatingOf(params: FormData | ReplacePassphraseDna): Gating {
+    return demandBankOrVacate(params).gate.replacePassphraseGating(params)
   }
 
-  /** Add the passkey whose answer is the `nextPasskeyAnswer` in `params`, proved by its `passphrase`, with no hook: for a submit handler or a `mutationFn` of your own. */
-  async function gatingAddPasskeyAttempt(params: AddPasskeyDna): Promise<void> { await demandBank().gate.gatingAddPasskeyAttempt(params) }
+  /** Add the passkey whose answer is the `nextPasskeyAnswer` in `params`, proved by its `passphrase`, with no hook: for a submit handler or a `mutationFn` of your own.
+   * Whether it runs or refuses, what it is handed is the package's to clear: the passkey answer's PRF bytes are zeroed.
+   */
+  async function gatingAddPasskeyAttempt(params: AddPasskeyDna): Promise<void> { await addPasskeyGatingOf(params).attempt() }
 
   /** The mutation that adds a passkey, proved by the passphrase, leaving the bank unlocked: hand its `attempt` `{ passphrase, nextPasskeyAnswer }`, as a form cannot carry the answer.
    * Run the WebAuthn ceremony in the click handler, before anything slow (the browser requires it).
+   * Whether it runs or refuses, what `attempt` is handed is the package's to clear: the passkey answer's PRF bytes are zeroed.
    */
-  function useAddPasskey(): FormMutationResult<AddPasskeyDna> { return useFormMutation('addPasskey', (params: AddPasskeyDna) => demandBank().gate.addPasskeyGating(params)) }
+  function useAddPasskey(): FormMutationResult<AddPasskeyDna> { return useFormMutation('addPasskey', addPasskeyGatingOf) }
+
+  /** The gating of a passkey's addition over `params`, at the main gate. */
+  function addPasskeyGatingOf(params: AddPasskeyDna): Gating {
+    return demandBankOrVacate(params).gate.addPasskeyGating(params)
+  }
 
   /** Revoke the passkey, proved by the `passphrase` or the passkey's answer in `params`, a form or a dna, with no hook: for a submit handler or a `mutationFn` of your own.
-   * A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once. Hand a mutation of your own nothing of the form.
+   * Whether it runs or refuses, what it is handed is the package's to clear: a `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once, and a passkey answer's PRF bytes are zeroed.
+   * Hand a mutation of your own nothing of the form.
    */
-  async function gatingRevokePasskeyAttempt(params: FormData | RevokePasskeyDna): Promise<void> { await demandBank().gate.gatingRevokePasskeyAttempt(params) }
+  async function gatingRevokePasskeyAttempt(params: FormData | RevokePasskeyDna): Promise<void> { await revokePasskeyGatingOf(params).attempt() }
 
-  /** The mutation that revokes the passkey, proved by the passphrase or the passkey, leaving the bank unlocked: hand its `attempt` the form, whose passphrase is the field `passphrase`. */
-  function useRevokePasskey(): FormMutationResult<FormData | RevokePasskeyDna> { return useFormMutation('revokePasskey', (params: FormData | RevokePasskeyDna) => demandBank().gate.revokePasskeyGating(params)) }
+  /** The mutation that revokes the passkey, proved by the passphrase or the passkey, leaving the bank unlocked: hand its `attempt` the form, whose passphrase is the field `passphrase`.
+   * Whether it runs or refuses, what `attempt` is handed is the package's to clear: a form loses its secret fields, and a passkey answer's PRF bytes are zeroed.
+   */
+  function useRevokePasskey(): FormMutationResult<FormData | RevokePasskeyDna> { return useFormMutation('revokePasskey', revokePasskeyGatingOf) }
+
+  /** The gating of the passkey's revocation over `params`, at the main gate. */
+  function revokePasskeyGatingOf(params: FormData | RevokePasskeyDna): Gating {
+    return demandBankOrVacate(params).gate.revokePasskeyGating(params)
+  }
 
   const useDraft = makeUseDraft({ useBank, useBox, withWhisper, demandVault })
 

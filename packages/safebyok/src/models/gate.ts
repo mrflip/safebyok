@@ -52,11 +52,11 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   get device(): Device { return this.#device }
 
   /** The passphrase wayin, a new Wayin on each read. */
-  get main(): Wayin { return Wayin.make(this.#demandLive().wayins.main) }
+  get main(): Wayin { return Wayin.make(this.demandLive().wayins.main) }
 
   /** The passkey wayin, a new Wayin on each read, or null if the gate has none. */
   get passkey0(): Wayin | null {
-    const { passkey0 } = this.#demandLive().wayins
+    const { passkey0 } = this.demandLive().wayins
     return (passkey0 === null) ? null : Wayin.make(passkey0)
   }
 
@@ -64,7 +64,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   get scope(): ThingScope { return ThingChecks.thingScope.parse(this) }
 
   /** This gate's stamp, fixed for its life. A wayin's wrapped bankKey is bound to it. */
-  get stamp(): GateStamp { return GateChecks.stamp.parse(this.#demandLive()) }
+  get stamp(): GateStamp { return GateChecks.stamp.parse(this.demandLive()) }
 
   /** The stamp of this gate's bank, from its world. A wayin's wrapped bankKey is bound to it, and to the gate's own `stamp`, and every ctx under the gate's lease binds it first. */
   get bankStamp(): BankStamp { return this.#world.bankStamp }
@@ -290,7 +290,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   }
   // --
 
-  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, demandEnabled, demandPasskeyAddable, demandLive
+  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, isUnlockWanted, demandEnabled, demandPasskeyAddable
 
   /** True until this gate's world is swept or its device ends. */
   get isEnabled(): boolean { return this.#world.isEnabled }
@@ -315,14 +315,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
   /** Demand that this gate has no passkey wayin yet. */
   demandPasskeyAddable(): void {
-    if (this.#demandLive().wayins.passkey0 !== null) { throw Throwers.passkeyAlreadyAdded() }
-  }
-
-  /** The live record this gate models, refusing the shell or a tombstone */
-  #demandLive(): GateRecord {
-    const record = this.pickle()
-    if (record.am !== 'a') { throw Throwers.thingNotLive(this.labelpath) }
-    return record
+    if (this.demandLive().wayins.passkey0 !== null) { throw Throwers.passkeyAlreadyAdded() }
   }
   // --
 

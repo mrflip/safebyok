@@ -21,7 +21,7 @@ import type { Vault } from '../../src/models/vault'
 import type { VaultTSQ } from '../../src/minding/vault-tsq'
 import { PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
 import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
-import type { DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
+import type { DeviceOpts, DeviceRecord, RootShelf } from '../../src/shapes/shapes-bankish'
 import type { LiveOf, ShellOf } from '../../src/shapes/shapes-sealers'
 import type { BankRecord, BoxRecord, GateRecord, Wayins } from '../../src/shapes/shapes-thing'
 import { type GateRevisionedStamp, type GatingCleartexts, type LeaseGate, type ProvingDevice, type StrengthChecker, GatingChecks } from '../../src/shapes/shapes-gateish'
@@ -80,7 +80,7 @@ export const WorldGateStamp: GateStamp = Object.freeze({ ...WorldScope, labelpat
 export const WorldGate: GateRevisionedStamp = Object.freeze({ ...WorldGateStamp, revtok: revtokOf('gate1') })
 // --
 
-// == [Devices]: TestPassphrase, DeviceTok, ProvingDeviceGiven, provingDeviceOf, DeviceGiven, makeDevice, passkeyAnswerOf
+// == [Devices]: TestPassphrase, DeviceTok, ProvingDeviceGiven, provingDeviceOf, DeviceGiven, makeDevice, MemoryShelf, passkeyAnswerOf
 
 /** An obvious fake passphrase, never a real one. */
 export const TestPassphrase = GX.passphraseCleartext.parse('correct horse battery staple')
@@ -112,6 +112,21 @@ export function makeDevice(given: DeviceGiven = {}, opts: Partial<DeviceOpts> = 
   const device = Device.make({ banklabel: WorldScope.banklabel, device_tok: DeviceTok, ...record }, { keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, vaultDB: new MemoryVaultDB(), ...opts })
   if (userid !== null) { void device.signin(userid) }
   return device
+}
+
+/** A root shelf in memory, as `localStorage` is across a page reload: hand one to a device, then to a second over the same vaultDB. */
+export class MemoryShelf implements RootShelf {
+  /** Each value set, by its key. */
+  readonly items = new Map<string, string>()
+
+  /** The value at `ckey`, or null for none. */
+  getItem(ckey: string): string | null { return this.items.get(ckey) ?? null }
+
+  /** Set `val` at `ckey`. */
+  setItem(ckey: string, val: string): void { this.items.set(ckey, val) }
+
+  /** Remove the value at `ckey`. */
+  removeItem(ckey: string): void { this.items.delete(ckey) }
 }
 
 /** A fresh passkey answer: a fake credential id, a fresh salt of the right length, and 32 random PRF bytes. */
@@ -286,7 +301,7 @@ export function fakeLeaseGateOf(overrides: Partial<BankStamp> = {}): FakeLeaseGa
 /** A test cheat: a lease `proving` builds, granted to `gate` and citing `cited`, beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */
 export async function _cheat_grantedLease(proving: Proving, gate: LeaseGate, cited: GateRevisionedStamp = WorldGate): Promise<{ lease: Lease, record: LeaseRecord }> {
   const make = vi.spyOn(Lease, 'make')
-  const lease = await proving.buildLease(gate, cited)
+  const lease = await proving.buildLease(gate, cited, null)
   const [record] = make.mock.calls.at(-1)!
   make.mockRestore()
   return { lease, record: record as LeaseRecord }

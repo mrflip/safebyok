@@ -7,7 +7,6 @@ import type { Bank } from '../models/bank'
 import type { DefaultOnBadNews, Device } from '../models/device'
 import type { World } from '../models/world'
 import type { VaultDB } from '../storage/vault-db'
-import type { DevicePersisters } from '../storage/persister'
 import type { StrengthChecker } from './shapes-gateish'
 import type { BoxCleartexts, UnsealedOf } from './shapes-sealers'
 import type { BoxRecord } from './shapes-thing'
@@ -57,7 +56,7 @@ export const WorldChecks = Validator.Checkers('bad_record', ({ custom }) => ({
 }))
 // --
 
-// == [The device]: BankishChecks, DefaultBanklabel, DeviceRecord, DeviceJSON, BadNews, BadNewsHandler, DeviceOpts
+// == [The device]: BankishChecks, DefaultBanklabel, DeviceRecord, DeviceJSON, BadNews, BadNewsHandler, RootShelf, isRootShelf, RootShelfMethodnames, DeviceOpts
 
 /** The banklabel of the bank a device serves where its record names none. */
 export const DefaultBanklabel = 'main'
@@ -83,6 +82,23 @@ export interface BadNews {
 /** `Device.make`'s `onBadNews`: hears each refusal no caller waits on. */
 export type BadNewsHandler = (badnews: BadNews) => unknown
 
+/** Where a device keeps the signed-in bank's three roots between page loads: `localStorage`, or anything with its three methods. */
+export type RootShelf = Readonly<{
+  getItem:    (ckey: string) => string | null
+  setItem:    (ckey: string, val: string) => void
+  removeItem: (ckey: string) => void
+}>
+
+/** True for an object with a function for each of a {@link RootShelf}'s three methods. */
+export function isRootShelf(val: unknown): val is RootShelf {
+  if ((typeof val !== 'object') || (val === null)) { return false }
+  const members: Partial<Record<string, unknown>> = val
+  return RootShelfMethodnames.every((methodname) => typeof members[methodname] === 'function')
+}
+
+/** The methods of a {@link RootShelf}. */
+const RootShelfMethodnames = ['getItem', 'setItem', 'removeItem'] as const
+
 /** The options of {@link Device.make}, beside the device's record. */
 export interface DeviceOpts {
   /** Where this device's banks are stored: each bank made on it is given this vaultDB. */
@@ -99,8 +115,8 @@ export interface DeviceOpts {
   onBadNews?:       BadNewsHandler | undefined
   /** The QueryClient the signed-in user's boxes are kept in, under their bank's key: your own, so one client serves your queries and the vault's. Default: one the device makes. */
   queryClient?:     QueryClient | undefined
-  /** Where the device keeps the signed-in bank's caches between page loads, restored at `signin` before the vaultDB is asked anything. Without them, each page load starts with its caches empty. */
-  persisters?:      DevicePersisters | undefined
+  /** Where the device keeps the signed-in bank's three roots between page loads: hand it `localStorage`. Without one, nothing is kept, and each page load waits on the vaultDB for the bank. */
+  rootShelf?:       RootShelf | undefined
   /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
   deviceDB?:        unknown
 }

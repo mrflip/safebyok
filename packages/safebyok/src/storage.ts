@@ -30,8 +30,6 @@ export {
   type Agekind, type Agerank, type ItemSeen, type Lifekind, type Liveness, type ReadTc, type SeenThing, type VaultAgedEvent, type VaultEvent, type VaultEventOf, type VaultEventkind, type VaultItemEvent, type VaultLifeEvent,
   agekindVals, lifekindVals, livenessVals, vaultEventkindVals,
 } from './shapes/shapes-vault-event'
-// What a host's persister is written against: TanStack Query's own interface, as a device takes it.
-export { type DevicePersisters, type PersistedClient, type Persister, type PersisterOfBank, MemoryPersister, isPersister } from './storage/persister'
 
 // From safebyok-big: what an adapter's `do*` methods answer and are named with, its throwers, and the checkers it checks its
 // own options and rows with.

@@ -15,11 +15,9 @@ import type { BoxRecord, ScopeAt, ThingScope } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 import { VaultChecks } from '../shapes/shapes-vault'
 import type { VaultMinder } from '../minding/vault-minder'
-import type { WriteThingAnswer } from '../shapes/shapes-answers'
 
 /** One bank's boxes in this tab: the verbs to seal and write them, and to use their whispers.
- * Each seal is made under the bank's lease, so it needs the bank unlocked. A box a verb answers is the {@link Box} the
- * device's world holds for its labelpath, the newest revision seen: read its fields as a record's, or call `pickle()` for the record itself.
+ * Each seal is made under the bank's lease, so it needs the bank unlocked. A write answers the record stored.
  */
 export class Vault {
   // == [Props]: #bank, #world, #vaultTSQ
@@ -66,38 +64,46 @@ export class Vault {
 
   // == [Writing boxes]: tryPutBoxOnce, putBoxOnce, tryDelBoxOnce, delBoxOnce
 
-  /** Seal and write the next revision of the box `cited`, applying `patch` and encrypting `secrets`. Resolves an `Outcome` of the box, once it holds what was stored.
+  /** Seal and write the next revision of the box `cited`, applying `patch` and encrypting `secrets`. Resolves an `Outcome` of the record stored.
    * Given a labelpath, it writes over the newest revision this device has seen of the box, getting the box first where it has seen none.
    * It tries once. Where another revision is stored, it refuses `stale_write`, and the box then holds that revision.
    * Over a sparse box, a tombstone or no box, `patch` must give the sidecar. Misuse is a bad outcome too.
    * @example
    *   const { ok, val: box, err } = await vault.tryPutBoxOnce('box/openai', { sidecar: { account: 'work' } }, { whisper })
    */
-  async tryPutBoxOnce(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<Outcome.Outcome<Box>> {
+  async tryPutBoxOnce(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<Outcome.Outcome<LiveOf<BoxRecord>>> {
     const sealed = await Outcome.outcomeOf(async () => await this.#sealedWriteOf(cited, patch, secrets))
     if (! sealed.ok) { return sealed }
-    return this.#boxOutcomeOf(await this.#vaultMinder.tryPutOnce(sealed.val))
+    const answer = await this.#vaultMinder.tryPutOnce(sealed.val)
+    if (! answer.ok) { return answer }
+    // A record told that fails its checks leaves no box: it went to onBadNews.
+    if ((this.#boxAt(answer.val) === undefined) || ! BaseBox.isLive(answer.val)) { return Outcome.bad(Throwers.storageIssue()) }
+    return Outcome.good(answer.val)
   }
 
-  /** {@link tryPutBoxOnce}, throwing its refusal instead of answering it: the box, on success.
+  /** {@link tryPutBoxOnce}, throwing its refusal instead of answering it: the record stored, on success.
    * @example
    *   const box = await vault.putBoxOnce('box/openai', { sidecar: { account: 'work' } }, { whisper })
    */
-  async putBoxOnce(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<Box> {
+  async putBoxOnce(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<LiveOf<BoxRecord>> {
     return Outcome.valOf(await this.tryPutBoxOnce(cited, patch, secrets))
   }
 
-  /** Delete the box at `labelpath`, resolving an `Outcome` of the box, once it holds the tombstone stored.
+  /** Delete the box at `labelpath`, resolving an `Outcome` of the tombstone stored.
    * It writes over the newest revision this device has seen of the box, getting the box first where it has seen none. Misuse is a bad outcome too.
    */
-  async tryDelBoxOnce(labelpath: BoxLabelpath): Promise<Outcome.Outcome<Box>> {
+  async tryDelBoxOnce(labelpath: BoxLabelpath): Promise<Outcome.Outcome<TombstoneOf<BoxRecord>>> {
     const sealed = await Outcome.outcomeOf(async () => await this.#sealedWriteOf(labelpath, { am: 'x' }))
     if (! sealed.ok) { return sealed }
-    return this.#boxOutcomeOf(await this.#vaultMinder.tryDelOnce(sealed.val))
+    const answer = await this.#vaultMinder.tryDelOnce(sealed.val)
+    if (! answer.ok) { return answer }
+    // A record told that fails its checks leaves no box: it went to onBadNews.
+    if ((this.#boxAt(answer.val) === undefined) || ! BaseBox.isGone(answer.val)) { return Outcome.bad(Throwers.storageIssue()) }
+    return Outcome.good(answer.val)
   }
 
-  /** {@link tryDelBoxOnce}, throwing its refusal instead of answering it: the box, holding its tombstone, on success. */
-  async delBoxOnce(labelpath: BoxLabelpath): Promise<Box> {
+  /** {@link tryDelBoxOnce}, throwing its refusal instead of answering it: the tombstone stored, on success. */
+  async delBoxOnce(labelpath: BoxLabelpath): Promise<TombstoneOf<BoxRecord>> {
     return Outcome.valOf(await this.tryDelBoxOnce(labelpath))
   }
   // --
@@ -215,7 +221,7 @@ export class Vault {
   }
   // --
 
-  // == [Helpers]: #vaultMinder, #sealedWriteOf, #donorAt, #boxOutcomeOf, #boxAt, #scopeAt, #demandOwnBox
+  // == [Helpers]: #vaultMinder, #sealedWriteOf, #donorAt, #boxAt, #scopeAt, #demandOwnBox
 
   /** The bank's VaultMinder, which holds its Things and sends its writes */
   get #vaultMinder(): VaultMinder { return this.#world.demandVaultMinder() }
@@ -234,14 +240,6 @@ export class Vault {
     const box = this.#boxAt(scope)
     if (box === undefined) { throw Throwers.storageIssue() }
     return (box.agekind === 'here') ? box.pickle() : box.citable
-  }
-
-  /** The good outcome of the box `answer` wrote, or its refusal */
-  #boxOutcomeOf(answer: WriteThingAnswer): Outcome.Outcome<Box> {
-    if (! answer.ok) { return answer }
-    const box = this.#boxAt(answer.val)
-    // A record told that fails its checks leaves no Thing: it went to onBadNews.
-    return (box === undefined) ? Outcome.bad(Throwers.storageIssue()) : Outcome.good(box)
   }
 
   /** The box at `scope`, or undefined where this device has seen no record of it */

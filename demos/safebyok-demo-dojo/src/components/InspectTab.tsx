@@ -1,10 +1,9 @@
 import { type QueryClient, notifyManager, useQueryClient } from '@tanstack/react-query'
 import type { MaskedView } from 'safebyok-react-lean'
 import { useEffect, useState } from 'react'
-import type { PersistedClient } from 'safebyok/storage'
 import { maskUuid } from 'safebyok/utils'
 import { SOK } from '../lib/dojo'
-import type { StoredRow } from '../lib/fixture'
+import type { ShelvedRow, StoredRow } from '../lib/fixture'
 import { cacheRowsNow, vaultRowsNow } from '../lib/stores'
 
 /** One row as the panel shows it: what it is filed under, and its stored fields. */
@@ -22,20 +21,20 @@ const MutationGroups = ['mutation'] as const
 /** Fields the tables leave out: a Thing's scope, which comes before its `label`, and what a row's ckey or its group says already. */
 const OmittedFieldnames: ReadonlySet<string> = new Set(['scope', 'userid', 'banklabel', 'labelpath', 'modelkind'])
 
-/** How often the panel reads the two stores, and the device's two TSQs, again while it shows. */
+/** How often the panel reads the vault database and the root shelf, and the device's two TSQs, again while it shows. */
 const RereadMillis = 1000
 
-/** The rows of the two stores, read through the dojo's own connections, of the device's bank TSQ and vault TSQ, read through the library's back door, and of the host's mutations, read live: a table for each, grouped by modelkind, decrypting nothing. */
+/** The rows of the vault database and the root shelf, read through the dojo's own connections, of the device's bank TSQ and vault TSQ, read through the library's back door, and of the host's mutations, read live: a table for each, grouped by modelkind, decrypting nothing. */
 export function InspectTab({ isShown }: Readonly<{ isShown: boolean }>) {
   const [stored, setStored] = useState<Readonly<{ vault: Shown[], cache: Shown[], tsq: Shown[] }> | null>(null)
   const mutationRows = useMutationRows(useQueryClient())
 
   useEffect(() => {
     if (! isShown) { return }
-    /** Read both stores, and show what they hold. */
+    /** Read the vault database and the root shelf, and show what they hold. */
     async function reread() {
-      const [vault, cache] = await Promise.all([vaultRowsNow(), cacheRowsNow()])
-      setStored({ vault: vault.map((row) => shownOfThing(row)), cache: cache.flatMap((row) => shownOfSnapshot(row)), tsq: shownOfMaskedView(SOK.maskedView()) })
+      const vault = await vaultRowsNow()
+      setStored({ vault: vault.map((row) => shownOfThing(row)), cache: cacheRowsNow().flatMap((row) => shownOfShelved(row)), tsq: shownOfMaskedView(SOK.maskedView()) })
     }
     void reread()
     const timer = setInterval(() => { void reread() }, RereadMillis)
@@ -46,7 +45,7 @@ export function InspectTab({ isShown }: Readonly<{ isShown: boolean }>) {
     <section aria-labelledby="inspect-title" className="card">
       <h2 id="inspect-title">Inspect</h2>
       <Panel title="VaultDB: what the backend stores (IndexedDB, read directly)" groups={Modelkinds} rows={stored?.vault} />
-      <Panel title="Device cache: the snapshots kept here between page loads, in place of a DeviceDB: the new core has none" groups={Modelkinds} rows={stored?.cache} />
+      <Panel title="Root shelf: each bank's roots kept here between page loads (localStorage, read directly)" groups={Modelkinds} rows={stored?.cache} />
       <Panel title={"TSQ: the device's bank TSQ (its bank, main gate and root box), its vault TSQ (its boxes and their listings), and its lease"} groups={DeviceGroups} rows={stored?.tsq}
         note="Read through the library's back door, maskedView, for experimenting: the bank TSQ and the vault TSQ each cut every ciphertext to its last 2 characters and its length before it leaves the library, and the lease shows its loggable, never its keys." />
       <Panel title={"Mutations: the host's QueryClient"} groups={MutationGroups} rows={mutationRows} />
@@ -137,11 +136,10 @@ function shownOfThing([ckey, val]: StoredRow): Shown {
   return { ckey: JSON.stringify(ckey), modelkind: labelpath.split('/', 1)[0] ?? '', val }
 }
 
-/** Each query of a snapshot the persist database keeps at its recordlabel. */
-function shownOfSnapshot([recordlabel, persisted]: StoredRow): Shown[] {
-  return (persisted as PersistedClient).clientState.queries.map((dehydrated) => ({
-    ckey: `${recordlabel as string} ${JSON.stringify(dehydrated.queryKey)}`, modelkind: modelkindOfQueryKey(dehydrated.queryKey), val: dehydrated.state.data,
-  }))
+/** Each root the root shelf keeps at `ckey`: the value is its version, then the bank's, the main gate's and the root box's records. */
+function shownOfShelved([ckey, shelved]: ShelvedRow): Shown[] {
+  const [, ...roots] = JSON.parse(shelved) as [version: string, ...roots: { labelpath: string }[]]
+  return roots.map((root) => ({ ckey: `${ckey} ${root.labelpath}`, modelkind: root.labelpath.split('/', 1)[0] ?? '', val: root }))
 }
 
 /** Each row of the device's bank TSQ and vault TSQ, its ckey led by `bankTSQ` or `vaultTSQ`; then its lease. */

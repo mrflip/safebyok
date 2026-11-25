@@ -8,7 +8,7 @@ export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, typ
 export { BaseBox } from './models/base-box'
 export { Box } from './models/box'
 export { Gate } from './models/gate'
-export { type WorldThing, World } from './models/world'
+export { type SomeThing, World } from './models/world'
 export { type Adoptable, Thing } from './models/thing'
 export { Lease, withoutSecrets } from './models/lease'
 export type { Novel, PasskeyProving, PassphraseProving, Proving } from './models/proving'
@@ -23,6 +23,7 @@ export {
 export { Wayin } from './models/wayin'
 export { type PasskeyWayinHeader, type PasskeyWayinRecord, type PassphraseWayinHeader, type PassphraseWayinRecord, type WayinHeader, type WayinRecord, WayinChecks } from './shapes/shapes-wayin'
 export type { AddPasskeyGating, BirthGating, Gating, ReplacePassphraseGating, RevokePasskeyGating, UnlockGating } from './models/gating'
+export { vacateHanded } from './models/gating'
 export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
   type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside,
@@ -30,11 +31,10 @@ export {
 } from './shapes/shapes-answers'
 export { type VaultDB, isVaultDB } from './storage/vault-db'
 export type { Agerank, ItemSeen, Liveness, ReadTc, VaultAgedEvent, VaultEvent, VaultEventOf, VaultEventkind, VaultItemEvent, VaultLifeEvent } from './shapes/shapes-vault-event'
-export { type DevicePersisters, type PersistedClient, type Persister, type PersisterOfBank, MemoryPersister, isPersister } from './storage/persister'
 export {
   type BadNews, type BadNewsHandler, type BankAskDraft, type BankOpts, type BankSnapshot, type BankStage, type BoxUnsealed, type DeviceJSON, type DeviceOpts, type DeviceRecord,
-  type DeviceSnapshot, type HostedVault, type RefusalSnapshot, type WorldOpts,
-  BankishChecks, DefaultBanklabel, PendingBank, SignedOutBank, bankStageVals,
+  type DeviceSnapshot, type HostedVault, type RefusalSnapshot, type RootShelf, type WorldOpts,
+  BankishChecks, DefaultBanklabel, PendingBank, SignedOutBank, bankStageVals, isRootShelf,
 } from './shapes/shapes-bankish'
 export {
   type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateGatingFriend, type GateOpts, type GateRevisionedStamp, type GatingCleartexts, type GuardedKeyDeriver,

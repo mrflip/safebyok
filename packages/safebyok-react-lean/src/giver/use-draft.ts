@@ -205,9 +205,7 @@ export function makeUseDraft(bank: DraftFriend) {
         const draftSidecar = sidecarSet ?? ((pinned === undefined) ? unsealed.sidecar : baseSidecar)
         const patch = { sidecar: sidecarOf ? sidecarOf(nextWhisper, draftSidecar) : draftSidecar }
         const vault = bank.demandVault()
-        const written = await vault.putBoxOnce(citedOf(vault, pinned, unsealed), patch, { whisper: nextWhisper })
-        // The box a put answers holds a live box.
-        return written.pickle() as LiveOf<BoxRecord>
+        return await vault.putBoxOnce(citedOf(vault, pinned, unsealed), patch, { whisper: nextWhisper })
       })
       discard()
       return box

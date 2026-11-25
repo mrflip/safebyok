@@ -14,7 +14,7 @@ pnpm --filter safebyok-demo-dojo fixture     # writes src/fixture/fixture.json a
 
 * **The header**: who is signed in and the bank's stage; Lock or Unlock (the kit's `UnlockForm` in a `ModalDialog`);
   Sign out; Reset; and Hero, Thierry and Nolo, each with its passphrase printed beside it.
-  * **Hero** has a bank stored there, and its caches kept here: it comes up `locked` from the cache.
+  * **Hero** has a bank stored there, and its roots kept here: it comes up `locked` from them before the vaultDB answers.
   * **Thierry** has a bank stored there, and nothing here.
   * **Nolo** has nothing anywhere: its bank is `unborn`.
 * **Login**: one form that creates the signed-in user's vault: a username, a new passphrase and its confirmation, the
@@ -49,7 +49,7 @@ pnpm --filter safebyok-demo-dojo fixture     # writes src/fixture/fixture.json a
   press; and `method="post"` on a form that submits from `onSubmit`. The key checker and the slow save of the debounce
   and test cards are made up (`src/lib/made-up-service.ts`): they call nothing. The cards that save write boxes of their
   own (`practice_…`): sign in as Hero or Thierry and unlock.
-* **Inspect**: the vault database's rows (there), the persisted caches' rows (here, where the old core had a DeviceDB),
+* **Inspect**: the vault database's rows (there), the root shelf's roots (here, in localStorage),
   the device's bank TSQ (its bank, main gate and root box) and vault TSQ (its boxes and their listings), through the
   library's back door, `SOK.maskedView()`, which cuts each ciphertext to its last 2 characters and its length, and its
   lease, by its loggable and when it ends (Lock and Unlock change it), and the host's mutations. Each is a table, grouped by modelkind: a group's first row names it,
@@ -85,8 +85,8 @@ submits the one form. Each arrangement lasts until that outcome lands.
 ## The stores
 
 * **There**: an `IdbVaultDB` in the database `safebyok-dojo:vault-v001-001-001`, standing in for a backend.
-* **Here**: the device's two caches, each an `IdbPersister` record in `safebyok-dojo:persist-v001-001-001`.
-* **Reset** signs out and reloads the page, which empties both databases and writes the fixture's rows into them before
+* **Here**: the root shelf, `localStorage`: each bank's roots (its bank, main gate and root box) under `safebyok:roots:dojo:<userid>`. No box is kept here.
+* **Reset** signs out and reloads the page, which empties both stores and writes the fixture's rows into them before
   it makes a device (`src/lib/session.ts`, `src/lib/stores.ts`). The first visit to a browser loads the fixture too.
 * **Switching users** reloads the page: a device serves its first user for its life.
 

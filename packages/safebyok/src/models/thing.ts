@@ -2,10 +2,11 @@ import { deepFreeze, isEqual, pick } from 'es-toolkit'
 import { Helpers, VX } from 'safebyok-big/internals'
 import { BaseThing } from './base-thing'
 import type { EpochMillis } from '../shapes/primitives'
-import type { ShellOf } from '../shapes/shapes-sealers'
-import { type Sparse, type ThingCited, type ThingRecord, type Tombstone, Shell } from '../shapes/shapes-thing'
-import { type Agekind, type Agerank, type SeenThing, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
+import type { LiveOf, ShellOf } from '../shapes/shapes-sealers'
+import type { Sparse, ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
+import { type Agekind, type Agerank, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { agekindOf, eventsOf, nextAgerankOf, readAtOf } from '../storage/agerank'
+import * as Throwers from '../refusals/throwers'
 
 // == [Adoptable]: Adoptable
 
@@ -46,16 +47,13 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
 
   // == [Construction]: constructor, adopt
 
-  // A sparse live record is cited, not adopted: the shell stands in for its record until a whole one comes.
-  /** A Thing begun from `begun`, which it adopts where that is whole, a tombstone or the void sentinel.
-   * Begun from a sparse live record, it adopts the shell under the lives that record names above it, and cites the record.
-   */
-  protected constructor(begun: SeenThing<RecordT>) {
+  /** A Thing that adopts `begun`: a whole record, a tombstone or the void sentinel. */
+  protected constructor(begun: Adoptable<RecordT>) {
     super()
     const { userid, banklabel, labelpath } = begun
     Helpers.tattoo(this, { userid, banklabel, labelpath }, { configurable: false })
     this.#citable = citedOf(begun)
-    this.adopt((BaseThing.isSparse(begun) ? Shell.inParentLivesOf(begun) : begun) as Adoptable<RecordT>)
+    this.adopt(begun)
   }
 
   // The scope fields are the constructor's: `receive` refuses a record of another scope before it adopts one.
@@ -125,8 +123,19 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   /** This Thing's stamp: the fields fixed for its life, which every ctx under it binds. */
   abstract get stamp(): StampT
 
-  /** The record this Thing models, frozen: the last it adopted, which is the shell for a Thing begun from a sparse record until a whole one comes. */
+  /** The record this Thing models, frozen: the last it adopted. */
   pickle(): PickleT { return this.#record as PickleT }
+  // --
+
+  // == [Guards]: demandLive
+
+  // TypeScript cannot narrow a record of the type parameter by its `am`.
+  /** The live record this Thing models, refusing the shell or a tombstone. */
+  protected demandLive(): LiveOf<RecordT> {
+    const record = this.#record
+    if (record?.am !== 'a') { throw Throwers.thingNotLive(this.labelpath) }
+    return record as LiveOf<RecordT>
+  }
   // --
 
   // == [Subscribers]: subscribe, tellSubscribers, dropSubscribers

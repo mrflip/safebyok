@@ -1,8 +1,7 @@
-/** The app's giver and its one bank, over a vaultDB in IndexedDB standing in for a backend, with the device's caches kept in IndexedDB between page loads. */
+/** The app's giver and its one bank, over a vaultDB in IndexedDB standing in for a backend, with the bank's roots kept in localStorage between page loads. */
 
 import { QueryClient } from '@tanstack/react-query'
 import { Argon2idWebV1, makeArgon2idDeriver } from 'safebyok/browser'
-import { IdbPersister } from 'safebyok-idb-lean'
 import { reactGiver } from 'safebyok-react-lean'
 import { RefusingVaultDB } from './refusing-vault-db'
 import { switchableChecker } from './switchable-checker'
@@ -13,7 +12,7 @@ import { switchableChecker } from './switchable-checker'
 /** The banklabel of the app's one bank. */
 export const Banklabel = 'dojo'
 
-/** The `dbName` of both IndexedDB databases: the vault's, standing in for the backend, and the device's caches. */
+/** The `dbName` of the vault's IndexedDB database, standing in for the backend. */
 export const DojoDBName = 'dojo'
 
 /** The labelpath of the box the New Box form writes. */
@@ -26,17 +25,14 @@ export const dojoDeriver = makeArgon2idDeriver({ ...Argon2idWebV1, key_deriver_l
 /** The app's vaultDB, which a scenario button can tell to refuse the next write. */
 export const vaultDB = new RefusingVaultDB({ dbName: DojoDBName })
 
-// throttleMs 0, so the Inspect tab shows each change to the caches as it lands. A refusal nobody waits on goes to the
-// device's logger, the console.
+// The dojo renders only in a browser, so localStorage is there. A refusal nobody waits on goes to the device's logger,
+// the console.
 /** The giver: the provider, the strength hook, and the bank's hooks. */
 export const SOK = reactGiver({
   banks:           { dojo: { vaultDB } },
   keyDeriver:      dojoDeriver,
   strengthChecker: switchableChecker,
-  persisters: {
-    roots: ({ userid, banklabel }) => new IdbPersister({ recordlabel: `roots:${userid}:${banklabel}`, dbName: DojoDBName, throttleMs: 0 }),
-    boxes: ({ userid, banklabel }) => new IdbPersister({ recordlabel: `boxes:${userid}:${banklabel}`, dbName: DojoDBName, throttleMs: 0 }),
-  },
+  rootShelf:       localStorage,
 })
 
 // PascalCase, so the rules-of-hooks lint checks Dojo.useBank() as a hook.
