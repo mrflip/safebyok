@@ -1,7 +1,7 @@
 # Thread 32: valedictory (2026-11-25)
 
-Branch `20261125-valedictory`, PR #PRNUM, on `main`. **Blocked on V2 step 3**, parked on the local branch
-`20261125-valedictory-step3` (not pushed, not in the PR). Proved: PROVED.
+Branch `20261125-valedictory`, PR [#904](https://github.com/mrflip/safebyok/pull/904), on `main`. **Blocked on V2 step 3**, parked on the local branch
+`20261125-valedictory-step3` (not pushed, not in the PR). Proved: `pnpm justify` green in full, nothing skipped: safebyok 2,006 (1,992 + 14), react-lean 338, idb-lean 115, postgres 365, convex 334, graphql 448, fastkey 43, big 2,950, indexeddb 215, react 277, dojo 111, knockknock 26, envman 24, demo-react 99, e2e 576, root scripts 331.
 
 Built by hand (no /sprint), from the orchestrator's brief. The last thread of the feed_sorter line.
 
