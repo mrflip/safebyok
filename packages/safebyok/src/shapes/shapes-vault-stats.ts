@@ -2,6 +2,7 @@
 
 import type * as Z from 'zod'
 import { Validator } from 'safebyok-big/internals'
+import type { Labelpath } from './primitives'
 
 // == [Limits]: StoreLimitCap, storeLimitsOf
 
@@ -16,7 +17,7 @@ export function storeLimitsOf(limits: Partial<StoreLimits> = {}): StoreLimits {
 }
 // --
 
-// == [Stats]: VaultStatsChecks, ThingkindStats, StoreLimits, VaultStats
+// == [Stats]: VaultStatsChecks, ThingkindStats, StoreLimits, VaultStats, FiledRaw
 
 /** The checks of a bank's storage stats. Each refuses `storage_issue`: a concrete adapter that reports a bad one is broken. */
 export const VaultStatsChecks = Validator.Checkers('storage_issue', ({ obj, uint }) => {
@@ -41,4 +42,7 @@ export type StoreLimits = Readonly<Z.infer<typeof VaultStatsChecks.storeLimits>>
 
 /** A bank's storage stats: its boxes and its gates as stored, and the store's limits under `max`. Nothing refuses a write for being over a limit. */
 export type VaultStats = Readonly<{ box: ThingkindStats, gate: ThingkindStats, max: StoreLimits }>
+
+/** A raw row as stored, under its labelpath. */
+export type FiledRaw = Readonly<{ labelpath: Labelpath, raw: unknown }>
 // --

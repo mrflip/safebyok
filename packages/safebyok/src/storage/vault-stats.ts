@@ -2,12 +2,9 @@
 
 import { CX } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
-import { type StoreLimits, type VaultStats, storeLimitsOf } from '../shapes/shapes-vault-stats'
+import { type FiledRaw, type StoreLimits, type VaultStats, storeLimitsOf } from '../shapes/shapes-vault-stats'
 
-// == [Measuring]: FiledRaw, vaultStatsOf, rowWeightOf
-
-/** A raw row as stored, under its labelpath. */
-export type FiledRaw = Readonly<{ labelpath: Labelpath, raw: unknown }>
+// == [Measuring]: vaultStatsOf, rowWeightOf
 
 // A row is measured as stored, unchecked: a damaged row takes space too, and counts as no live Thing.
 /** The stats of a bank's boxes and gates from each of its raw rows, with `limits` capped ({@link storeLimitsOf}). The bank's own row is not counted. */

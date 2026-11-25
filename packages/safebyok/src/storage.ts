@@ -33,8 +33,8 @@ export {
 } from './shapes/shapes-answers'
 export { type VaultDB, isVaultDB } from './storage/vault-db'
 // A bank's storage stats, as `tryStats` answers them, and how a concrete adapter measures them.
-export { type StoreLimits, type ThingkindStats, type VaultStats, StoreLimitCap, VaultStatsChecks, storeLimitsOf } from './shapes/shapes-vault-stats'
-export { type FiledRaw, rowWeightOf, vaultStatsOf } from './storage/vault-stats'
+export { type FiledRaw, type StoreLimits, type ThingkindStats, type VaultStats, StoreLimitCap, VaultStatsChecks, storeLimitsOf } from './shapes/shapes-vault-stats'
+export { rowWeightOf, vaultStatsOf } from './storage/vault-stats'
 // The events a vaultDB's watcher is notified with.
 export {
   type Agekind, type Agerank, type ItemSeen, type Lifekind, type Liveness, type ReadTc, type SeenThing, type VaultAgedEvent, type VaultEvent, type VaultEventOf, type VaultEventkind, type VaultItemEvent, type VaultLifeEvent,
