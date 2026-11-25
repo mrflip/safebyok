@@ -232,7 +232,7 @@ export class Device {
   }
 
   // Call it as a QueryClient's `mount` is called, from an effect whose cleanup calls `disconnect`.
-  /** Keep the device in step with the vaultDB: watch the signed-in user's bank there, from now or from `signin`, getting its bank, main gate and root box again where it is signed in ({@link World.connect}). Never throws, and a second call does nothing.
+  /** Keep the device in step with the vaultDB: watch the signed-in user's bank there, from now or from `signin` ({@link World.connect}). Never throws, and a second call does nothing.
    * @example
    *   useEffect(() => { device.connect(); return () => { device.disconnect() } }, [device])
    */

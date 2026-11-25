@@ -1,8 +1,8 @@
 # Thread 0: connect() and disconnect() replace sweep (2026-11-25)
 
 Branch `20261125-connect`, PR #900, a draft on `main` (stacked on #899, now merged). Proved after the rework:
-`safebyok` 2000 tests, `safebyok-react-lean` 339, the knockknock (26) and envman (24) demos, typecheck and lint clean
-in each. The first build was proved with `pnpm justify` after the catch-up.
+`safebyok` 1998 tests, `safebyok-react-lean` 339, typecheck and lint clean in each (the knockknock and envman demos
+were proved before the last rework, which touches neither). The first build was proved with `pnpm justify` after the catch-up.
 
 * **Built**:
   - `VaultMinder.connect()`/`disconnect()`/`isWatching` (`src/minding/vault-minder.ts`): the constructor no longer
@@ -19,14 +19,9 @@ in each. The first build was proved with `pnpm justify` after the catch-up.
   - `Device.connect()`/`disconnect()` forward to the World and return the device. `Vault.connect`/`disconnect` forward
     to its vault TSQ. `HostedVault` is `{ connect, disconnect }`.
   - The giver's provider (`safebyok-react-lean/src/giver/react-giver.tsx`) adds the effect the Coach gave.
-  - **Rework, the review's finding**: a `World.connect` after sign-in, where the world was not connected, gets the three
-    roots again (`#refreshRoots`, through `vaultMinder.tryGetWorldOnce()`), what it throws or refuses going to
-    `tellBadNews`. Test: device test "gets its bank's roots again as it connects after a disconnect, following a gate
-    changed meanwhile on another device, with no notice heard" (the watch muted, a second device replaces the
-    passphrase). A second `connect()` gets nothing: the refresh runs only on the move from disconnected.
   - **Rework, the Coach's directive**: `Device.disable()` ends the device for good: it sets `#endCause` to big's
     `deviceDisabled()`, then `World.disable()` (internal) rejects the `ensureUnlocked` wait with it and disconnects
-    (which locks). Idempotent, never throws. `World.connect` does nothing once disabled, so no watch or refresh restarts.
+    (which locks). Idempotent, never throws. `World.connect` does nothing once disabled, so no watch restarts.
     The stage is `'disabled'`, renamed from `'swept'` (core, both demos, VOCABULARY's stage row). The disabled-path tests
     return on `disable()`: World (snapshot, subscribers), Bank (end cause, put refused before the vaultDB, hostVault
     refused), Gate (end cause, unseal refused), the `ensureUnlocked` waiter rejections, Vault (make refused, put,
@@ -53,6 +48,10 @@ in each. The first build was proved with `pnpm justify` after the catch-up.
     differently named thrower.
   - `VaultTSQ.connect` invalidates the bank's items and listings, so what was cached while unminded is fetched again on
     reconnect. A second connect does nothing. This is an addition the handoff did not name.
+
+* **Set aside**: a connect that gets the bank's three roots again (`#refreshRoots` through `tryGetWorldOnce`) was built
+  and removed on the Coach's ruling (2026-11-25): freshness after a reconnect is by read time, a janitorial concern (thread
+  1c), not startup or concurrency machinery. `connect()` starts what the device keeps running and fetches nothing.
 
 * **Deviations**:
   - **Freshness through staleTime, not agekind.** The handoff's words: "a Thing that is no longer watched is no longer
