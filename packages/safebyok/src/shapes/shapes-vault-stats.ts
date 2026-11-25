@@ -19,7 +19,6 @@ export const StoreLimitLeastBoxes = 2
 /** The fewest bytes a store may allow: below this it cannot hold even a bank's first few Things. */
 export const StoreLimitFloor = 5000
 
-
 /** The limits a store reports: each of `limits` given, capped at {@link StoreLimitCap}, and the cap for each left out. */
 export function storeLimitsOf(limits: Partial<StoreLimits> = {}): StoreLimits {
   const { count = StoreLimitCap, size = StoreLimitCap } = limits
