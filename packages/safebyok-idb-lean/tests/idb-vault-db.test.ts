@@ -110,7 +110,7 @@ describe("IdbVaultDB's quota at open", () => {
     expect(refusal.message).to.match(/withholds/)
   })
 
-  it("refuses a quota of 0, as a stats call would otherwise report it", async () => {
+  it("refuses a quota of 0", async () => {
     vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: 0 }) } })
     await TH.expectBad(TH.makeIdbVaultDB().tryStats(TH.statsAskOf()), 'storage_blocked')
   })

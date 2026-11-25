@@ -72,12 +72,12 @@ async function quotaNow(): Promise<number | undefined> {
 
 /** `shelf`, but its first use refuses `storage_blocked` where the browser's quota is under {@link DB.StoreQuotaLeast}. Where the browser gives no estimate, nothing is refused. */
 function shelfRefusingSmallQuota(shelf: UseStore): UseStore {
-  let quotaIsEnough = false
+  let isQuotaPending = true
   return async (txMode, callback) => {
-    if (! quotaIsEnough) {
+    if (isQuotaPending) {
       const quota = await quotaNow()
       if ((quota !== undefined) && (quota < DB.StoreQuotaLeast)) { throw DB.storeQuotaTooSmall(quota) }
-      quotaIsEnough = true
+      isQuotaPending = false
     }
     return await shelf(txMode, callback)
   }
