@@ -1,7 +1,7 @@
 /** `VaultError`, its refusalkinds and their families, and the guards that tell a refusal. */
 
 // The rules for a refusal, its thrower and its phrase are at the top of refusals/throwers.ts. A new refusalkind goes in
-// `refusalkindVals` and in `RefusalFamilyForKind`; if the core throws it inside the Convex component, in safebyok-convex's
+// `refusalkindVals` and in `RefusalFamilyForKind`; if the core throws it inside the Convex component, in safebyok-convex-big's
 // `safebyokErrorKindVals` too. GraphQL's schema builds its enum from `refusalkindVals`.
 
 import { IsVaultError, brandOf } from '../helpers/consts'

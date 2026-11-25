@@ -21,8 +21,8 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "safebyok-big": "workspace:*",
-    "safebyok-indexeddb": "workspace:*",
-    "safebyok-react": "workspace:*"
+    "safebyok-indexeddb-big": "workspace:*",
+    "safebyok-react-big": "workspace:*"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

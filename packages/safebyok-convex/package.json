@@ -2,7 +2,7 @@
   "name": "safebyok-convex",
   "private": false,
   "version": "0.5.0",
-  "description": "Convex storage for safebyok: a Convex component keeping bank, vault and box rows as ciphertext, and the BankDB adapter that speaks to it.",
+  "description": "Convex storage for safebyok: a Convex component keeping a bank's Things as ciphertext, and the vaultDB that speaks to it, each call one Convex query or mutation.",
   "keywords": [
     "safebyok",
     "convex",
@@ -53,7 +53,6 @@
     "@vitest/coverage-v8": "^5.1.0",
     "@vitest/eslint-plugin": "^1.6.28",
     "convex": "^1.49.0",
-    "convex-helpers": "^0.1.135",
     "convex-test": "^0.0.69",
     "eslint": "^10.14.0",
     "eslint-import-resolver-typescript": "^4.4.5",
@@ -64,7 +63,7 @@
     "eslint-plugin-sonarjs": "^4.2.2",
     "eslint-plugin-unicorn": "^80.0.0",
     "publint": "^0.3.25",
-    "safebyok-big": "workspace:*",
+    "safebyok": "workspace:*",
     "tsdown": "^0.23.7",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.72.2",
@@ -74,9 +73,7 @@
   },
   "peerDependencies": {
     "convex": "^1.49.0",
-    "convex-helpers": "^0.1.135",
-    "safebyok-big": "workspace:^",
-    "zod": "^4.6.7"
+    "safebyok": "workspace:^"
   },
   "exports": {
     ".": {

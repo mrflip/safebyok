@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { WhisperInput } from 'safebyok-react-lean/parts'
+import { WhisperInput } from 'safebyok-react/parts'
 import { isKeyAccepted } from '../../lib/made-up-service'
 import { Example, PracticeCard } from './PracticeCard'
 

@@ -1,4 +1,4 @@
-import { DevBoxInspector, DevDeviceDBInspector } from 'safebyok-react/devmode'
+import { DevBoxInspector, DevDeviceDBInspector } from 'safebyok-react-big/devmode'
 import { DemoShell } from '../components/DemoShell'
 import { KnockKnockWidget } from '../components/KnockKnockWidget'
 import { KnockKnockToolkit } from '../components/KnockKnockToolkit'

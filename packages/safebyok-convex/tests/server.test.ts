@@ -1,57 +1,40 @@
-/** SafebyokBankComponent: each of the host's functions serves the user its call names, and no one else. */
+/** SafebyokVaultComponent: each of the host's functions serves the user its call names, and no one else. */
 
 import { describe, expect, it } from 'vitest'
-import type { UserID } from 'safebyok-big'
-import { SafebyokBankComponent } from '../src/server'
+import { type Userid, Shell } from 'safebyok/storage'
+import { SafebyokVaultComponent } from '../src/server'
 import * as TH from './test-helpers'
 
-const { BW } = TH
-const { api, createTest } = TH.bankHostWith(TH.bySubject)
-const fns = api.safebyokBank
+const { api, createTest } = TH.vaultHostWith(TH.bySubject)
+const fns = api.safebyokVault
 
 type Backend = ReturnType<typeof createTest>
 type Caller = ReturnType<Backend['withIdentity']>
 
-const bank = BW.bankAt()
-const gate = BW.gateAt()
-const vault = BW.vaultAt()
-const box = BW.boxAt()
-const otherBox = BW.boxAt(0, 'bank1', 'life1', { boxlabel: 'other' })
-const withPasskey = { main: BW.mainWayin, passkey0: BW.passkey0Wayin }
-
-/** Make a backend where u1 has a bank, a vault and one box, all written as u1. */
+/** Make a backend where u1 has a bank, written as u1. */
 async function seeded(): Promise<Backend> {
   const backend = createTest()
-  const asOwner = backend.withIdentity({ subject: 'u1' })
-  await asOwner.mutation(fns.buildBank, { ask: BW.bankBuildAskOf() })
-  await asOwner.mutation(fns.putVault, { ask: BW.vaultPutAskOf(vault) })
-  await asOwner.mutation(fns.putBox, { ask: BW.boxPutAskOf(box) })
+  await backend.withIdentity({ subject: 'u1' }).mutation(fns.birthBank, { ask: TH.birthBankAskOf() })
   return backend
 }
 
 /** One call to each of the host's functions, each naming u1. */
 const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
-  ['ensureBank', (caller) => caller.query(fns.ensureBank, { ask: BW.bankEnsureAsk })],
-  ['buildBank',  (caller) => caller.mutation(fns.buildBank, { ask: BW.bankBuildAskOf(BW.bankAt(1, 'bank2'), BW.gateAt(0, 'bank2'), bank) })],
-  ['putGate',    (caller) => caller.mutation(fns.putGate, { ask: BW.gatePutAskOf('add_passkey', gate, withPasskey) })],
-  ['delBank',    (caller) => caller.mutation(fns.delBank, { ask: BW.bankDelAskOf(bank) })],
-  ['getVault',   (caller) => caller.query(fns.getVault, { ask: BW.vaultGetAskOf() })],
-  ['putVault',   (caller) => caller.mutation(fns.putVault, { ask: BW.vaultPutAskOf(vault) })],
-  ['delVault',   (caller) => caller.mutation(fns.delVault, { ask: BW.vaultDelAskOf(vault) })],
-  ['listBoxes',  (caller) => caller.query(fns.listBoxes, { ask: BW.boxListAsk })],
-  ['getBox',     (caller) => caller.query(fns.getBox, { ask: BW.boxGetAskOf() })],
-  ['putBox',     (caller) => caller.mutation(fns.putBox, { ask: BW.boxPutAskOf(otherBox) })],
-  ['delBox',     (caller) => caller.mutation(fns.delBox, { ask: BW.boxDelAskOf(box) })],
-  ['tidyGone',   (caller) => caller.mutation(fns.tidyGone, { ask: BW.boxTidyAsk })],
-  ['watchRows',  (caller) => caller.query(fns.watchRows, { scope: BW.bankScope })],
+  ['getThing',    (caller) => caller.query(fns.getThing, { ask: TH.getGateAskOf() })],
+  ['writeThing',  (caller) => caller.mutation(fns.writeThing, { ask: TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)) })],
+  ['listThings',  (caller) => caller.query(fns.listThings, { ask: TH.listAskAt('box') })],
+  ['birthBank',   (caller) => caller.mutation(fns.birthBank, { ask: TH.birthBankAskOf() })],
+  ['getWorld',    (caller) => caller.query(fns.getWorld, { ask: TH.getWorldAskOf() })],
+  ['stats',       (caller) => caller.query(fns.stats, { ask: TH.statsAskOf() })],
+  ['watchThings', (caller) => caller.query(fns.watchThings, { scope: TH.ThingBank })],
 ]
 
-/** List what u1 has put, as the component itself reports it. */
+/** Every Thing u1 has stored, as the component itself reports it. */
 async function storedIn(backend: Backend) {
-  return await backend.withIdentity({ subject: 'u1' }).query(fns.watchRows, { scope: BW.bankScope })
+  return await backend.withIdentity({ subject: 'u1' }).query(fns.watchThings, { scope: TH.ThingBank })
 }
 
-describe("SafebyokBankComponent.api, for the user a call names", () => {
+describe("SafebyokVaultComponent.api, for the user a call names", () => {
   for (const [fnname, call] of EveryCall) {
     it(`serves ${fnname}`, async () => {
       const backend = await seeded()
@@ -61,24 +44,25 @@ describe("SafebyokBankComponent.api, for the user a call names", () => {
 
   it("hands back the component's answers as they came", async () => {
     const backend = await seeded()
-    const asOwner = backend.withIdentity({ subject: 'u1' })
-    expect(await asOwner.query(fns.getBox, { ask: BW.boxGetAskOf() })).to.deep.equal({ parent: vault, box })
+    const fetched = await backend.withIdentity({ subject: 'u1' }).query(fns.getThing, { ask: TH.getGateAskOf() })
+    expect(fetched).to.deep.include({ thing: TH.gateThingOf(), bank: TH.bankThingOf() })
   })
 })
 
-describe("SafebyokBankComponent.api, for an ask naming another user", () => {
+describe("SafebyokVaultComponent.api, for an ask naming another user", () => {
   it("refuses it as identity_revoked, before the core's checker sees it", async () => {
     const backend = await seeded()
     const before = await storedIn(backend)
-    const theirs = { ...BW.bankBuildAskOf(), user_id: 'u2' }
-    expect(await TH.convexRefusalOf(backend.withIdentity({ subject: 'u1' }).mutation(fns.buildBank, { ask: theirs }))).to.deep.equal({ kind: 'identity_revoked' })
-    const misfit = { ...theirs, record: { ...theirs.record, revision_seq: 5 } }
-    expect(await TH.convexRefusalOf(backend.withIdentity({ subject: 'u1' }).mutation(fns.buildBank, { ask: misfit }))).to.deep.equal({ kind: 'identity_revoked' })
+    const asOwner = backend.withIdentity({ subject: 'u1' })
+    const theirs = { ...TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)), userid: 'u2' }
+    expect(await TH.convexRefusalOf(asOwner.mutation(fns.writeThing, { ask: theirs }))).to.deep.equal({ kind: 'identity_revoked' })
+    const misfit = { ...theirs, record: { ...theirs.record, revseq: 5 } }
+    expect(await TH.convexRefusalOf(asOwner.mutation(fns.writeThing, { ask: misfit }))).to.deep.equal({ kind: 'identity_revoked' })
     expect(await storedIn(backend)).to.deep.equal(before)
   })
 })
 
-describe("SafebyokBankComponent.api, for anyone else", () => {
+describe("SafebyokVaultComponent.api, for anyone else", () => {
   for (const [fnname, call] of EveryCall) {
     it(`refuses ${fnname} when no one is signed in`, async () => {
       const backend = await seeded()
@@ -98,49 +82,49 @@ describe("SafebyokBankComponent.api, for anyone else", () => {
 
   it("says nothing in a refusal but its kind, so it names no user", async () => {
     const backend = await seeded()
-    const refusal = await TH.convexRefusalOf(backend.withIdentity({ subject: 'u2' }).query(fns.getVault, { ask: BW.vaultGetAskOf() }))
+    const refusal = await TH.convexRefusalOf(backend.withIdentity({ subject: 'u2' }).query(fns.getThing, { ask: TH.getGateAskOf() }))
     expect(refusal).to.deep.equal({ kind: 'identity_revoked' })
   })
 })
 
-describe("SafebyokBankComponent.api, with the host's getUserId", () => {
+describe("SafebyokVaultComponent.api, with the host's getUserId", () => {
   const SignedOutCases = [
-    [() => Promise.resolve(null),      'treats a null user id as no one'],
-    [() => Promise.resolve(undefined), 'treats an undefined user id as no one'],
-    [() => Promise.resolve(''),        'treats an empty user id as no one'],
+    [() => Promise.resolve(null),      'treats a null userid as no one'],
+    [() => Promise.resolve(undefined), 'treats an undefined userid as no one'],
+    [() => Promise.resolve(''),        'treats an empty userid as no one'],
     [() => null,                       'accepts a getUserId that answers synchronously'],
   ] as const
 
   for (const [getUserId, blurb] of SignedOutCases) {
     it(blurb, async () => {
-      const host = TH.bankHostWith(getUserId)
+      const host = TH.vaultHostWith(getUserId)
       const caller = host.createTest().withIdentity({ subject: 'u1' })
-      const refusal = await TH.convexRefusalOf(caller.query(host.api.safebyokBank.getVault, { ask: BW.vaultGetAskOf() }))
+      const refusal = await TH.convexRefusalOf(caller.query(host.api.safebyokVault.getThing, { ask: TH.getGateAskOf() }))
       expect(refusal).to.deep.equal({ kind: 'identity_revoked' })
     })
   }
 
-  it("lets the host map identities to user ids its own way", async () => {
-    const host = TH.bankHostWith(async (ctx) => {
+  it("lets the host map identities to userids its own way", async () => {
+    const host = TH.vaultHostWith(async (ctx) => {
       const identity = await ctx.auth.getUserIdentity()
       return identity ? `user|${identity.subject}` : null
     })
     const caller = host.createTest().withIdentity({ subject: 'u1' })
-    const ask = BW.bankEnsureAsk
-    expect(await caller.query(host.api.safebyokBank.ensureBank, { ask: { ...ask, user_id: 'user|u1' } })).to.deep.include({ bank: null })
-    const refusal = await TH.convexRefusalOf(caller.query(host.api.safebyokBank.ensureBank, { ask }))
+    const ask = TH.getWorldAskOf()
+    expect(await caller.query(host.api.safebyokVault.getWorld, { ask: { ...ask, userid: 'user|u1' } })).to.deep.include({ bank: null })
+    const refusal = await TH.convexRefusalOf(caller.query(host.api.safebyokVault.getWorld, { ask }))
     expect(refusal).to.deep.equal({ kind: 'identity_revoked' })
   })
 
   it("calls getUserId as a method, keeping its this", async () => {
-    const { app, component } = TH.installedBankComponent()
-    const host = app.defineModules({ safebyokBank: component.api(new SignedInAs('u1')) })
-    expect(await host.createTest().query(host.api.safebyokBank.ensureBank, { ask: BW.bankEnsureAsk })).to.deep.include({ bank: null })
+    const { app, component } = TH.installedVaultComponent()
+    const host = app.defineModules({ safebyokVault: component.api(new SignedInAs('u1')) })
+    expect(await host.createTest().query(host.api.safebyokVault.getWorld, { ask: TH.getWorldAskOf() })).to.deep.include({ bank: null })
   })
 })
 
-describe("SafebyokBankComponent, at setup", () => {
-  const { component } = TH.installedBankComponent()
+describe("SafebyokVaultComponent, at setup", () => {
+  const { component } = TH.installedVaultComponent()
 
   const BadOptsCases = [
     [undefined,                        'no options at all'],
@@ -158,7 +142,7 @@ describe("SafebyokBankComponent, at setup", () => {
 
   for (const [forgotten, blurb] of [[undefined, 'undefined'], [null, 'null'], ['safebyok', 'text']] as const) {
     it(`refuses ${blurb} for the component, saying how to install it`, () => {
-      const refusal = TH.expectSyncRefusal(() => new SafebyokBankComponent(forgotten as never), 'bad_record')
+      const refusal = TH.expectSyncRefusal(() => new SafebyokVaultComponent(forgotten as never), 'bad_record')
       expect(refusal.message).to.include('app.use(safebyok)')
     })
   }
@@ -166,9 +150,9 @@ describe("SafebyokBankComponent, at setup", () => {
 
 /** An options object whose `getUserId` reads from `this`, so it fails if called detached from the object. */
 class SignedInAs {
-  readonly #user_id: UserID
+  readonly #userid: Userid
 
-  constructor(user_id: UserID) { this.#user_id = user_id }
+  constructor(userid: Userid) { this.#userid = userid }
 
-  getUserId() { return this.#user_id }
+  getUserId() { return this.#userid }
 }

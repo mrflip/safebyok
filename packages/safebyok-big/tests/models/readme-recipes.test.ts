@@ -1,4 +1,4 @@
-/** The READMEs' three recipes for showing a whisper, each run in its order on real seals: the core's script, safebyok-react's raw field, and the core's React with the hook played by hand. */
+/** The READMEs' three recipes for showing a whisper, each run in its order on real seals: the core's script, safebyok-react-big's raw field, and the core's React with the hook played by hand. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { BoxFields } from '../../src/dom/box-fields'
@@ -59,7 +59,7 @@ describe("the README's script", () => {
   })
 })
 
-describe("safebyok-react's README's raw field", () => {
+describe("safebyok-react-big's README's raw field", () => {
   it("runs as written", async () => {
     const { vault, box } = await makeRecipeBox()
     const hook = hookOf(box.subscribe, box.getSnapshot)

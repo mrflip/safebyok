@@ -1,8 +1,8 @@
 import { useMutation } from '@tanstack/react-query'
 import { useActionState } from 'react'
 import type { Whisper } from 'safebyok'
-import { mask } from 'safebyok-react-lean'
-import { SubmitButton, WhisperInput, WhisperMask, WhisperText } from 'safebyok-react-lean/parts'
+import { mask } from 'safebyok-react'
+import { SubmitButton, WhisperInput, WhisperMask, WhisperText } from 'safebyok-react/parts'
 import { formTextOf } from '../lib/form-text'
 import { KeyLabelpath, Knock } from '../lib/sok'
 

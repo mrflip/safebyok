@@ -1,0 +1,126 @@
+{
+  "name": "safebyok-graphql-big",
+  "private": true,
+  "version": "0.5.0",
+  "description": "GraphQL storage for safebyok: the schema and resolvers that carry a server's bankDB to the browser, and the bankDB over an urql Client that calls them.",
+  "keywords": [
+    "safebyok",
+    "graphql",
+    "urql",
+    "vault",
+    "e2ee"
+  ],
+  "license": "Apache-2.0",
+  "author": "Philip (flip) Kromer <flip@mrflip.com>",
+  "homepage": "https://github.com/mrflip/safebyok#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrflip/safebyok.git",
+    "directory": "packages/safebyok-graphql-big"
+  },
+  "bugs": {
+    "url": "https://github.com/mrflip/safebyok/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "prebuild": "pnpm build:deps",
+    "build:watch": "tsdown --watch",
+    "build:deps": "[ \"$SAFEBYOK_SKIP_BUILD_DEPS\" = 1 ] || SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok-graphql-big^...' build",
+    "lint": "eslint --cache --cache-strategy content --cache-location .eslintcache .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "pretest": "pnpm build:deps",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "pretest:coverage": "pnpm build:deps",
+    "justify": "pnpm install && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "prepublishOnly": "node ../../scripts/require-pnpm.ts && pnpm justify"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/core": "^0.18.5",
+    "@electric-sql/pglite": "^0.5.16",
+    "@eslint/js": "^10.0.1",
+    "@graphql-tools/schema": "^11.0.9",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "^24.19.2",
+    "@urql/core": "^6.0.3",
+    "@urql/exchange-execute": "^3.0.0",
+    "@vitest/coverage-v8": "^5.1.0",
+    "@vitest/eslint-plugin": "^1.6.28",
+    "eslint": "^10.14.0",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-chai-expect": "^4.1.1",
+    "eslint-plugin-chai-friendly": "^1.2.1",
+    "eslint-plugin-import-x": "^4.18.1",
+    "eslint-plugin-jsdoc": "^65.4.5",
+    "eslint-plugin-sonarjs": "^4.2.2",
+    "eslint-plugin-unicorn": "^80.0.0",
+    "graphql": "^17.1.0",
+    "graphql-yoga": "^6.0.1",
+    "publint": "^0.3.25",
+    "safebyok-big": "workspace:*",
+    "safebyok-postgres-big": "workspace:*",
+    "tsdown": "^0.23.7",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^5.1.0",
+    "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "@urql/core": "^6.0.0",
+    "graphql": "^17.0.0",
+    "safebyok-big": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@urql/core": {
+      "optional": true
+    },
+    "graphql": {
+      "optional": true
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "@safebyok/source": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./server": {
+      "@safebyok/source": "./src/server.ts",
+      "import": "./dist/server.js",
+      "require": "./dist/server.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "server": [
+        "./dist/server.d.cts"
+      ]
+    }
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./server": {
+        "import": "./dist/server.js",
+        "require": "./dist/server.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}

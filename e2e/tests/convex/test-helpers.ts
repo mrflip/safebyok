@@ -2,10 +2,10 @@ import { anyApi, defineSchema } from 'convex/server'
 import { convexTest, defineTestApp } from 'convex-test'
 import * as DB from 'safebyok-big/storage'
 import { BW } from 'safebyok-big/testing'
-import type { SafebyokBankApi } from 'safebyok-convex'
-import { SafebyokBankComponent } from 'safebyok-convex/server'
-import type { GetUserId } from 'safebyok-convex/server'
-import { modules, register, schema } from 'safebyok-convex/test'
+import type { SafebyokBankApi } from 'safebyok-convex-big'
+import { SafebyokBankComponent } from 'safebyok-convex-big/server'
+import type { GetUserId } from 'safebyok-convex-big/server'
+import { modules, register, schema } from 'safebyok-convex-big/test'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
 export * from 'safebyok-big/testing'
@@ -16,7 +16,7 @@ export const componentHost = () => ({ api: anyApi, createTest: () => convexTest(
 /** The component's bankDB functions at the root, as a client calls them: no host wrapper, no auth. */
 export const rootBankApi = anyApi['banks'] as unknown as SafebyokBankApi
 
-/** A host app as the README has it, built from `safebyok-convex`'s published entries: its bankDB functions served from `convex/safebyokBank.ts` through `getUserId`. */
+/** A host app as the README has it, built from `safebyok-convex-big`'s published entries: its bankDB functions served from `convex/safebyokBank.ts` through `getUserId`. */
 export function bankHostWith(getUserId: GetUserId) {
   const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register } } })
   return app.defineModules({ safebyokBank: new SafebyokBankComponent(app.components.safebyok).api({ getUserId }) })

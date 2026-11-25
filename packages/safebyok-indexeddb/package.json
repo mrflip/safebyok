@@ -2,7 +2,7 @@
   "name": "safebyok-indexeddb",
   "private": false,
   "version": "0.5.0",
-  "description": "IndexedDB storage for safebyok: a bankDB that keeps a bank's rows as ciphertext in this browser, each call one IndexedDB transaction.",
+  "description": "IndexedDB storage for safebyok: a vaultDB that keeps a bank's Things as ciphertext in this browser, each call one IndexedDB transaction.",
   "keywords": [
     "safebyok",
     "indexeddb",
@@ -40,7 +40,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "pretest:coverage": "pnpm build:deps",
-    "justify": "pnpm install && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "justify": "pnpm install && pnpm lint && pnpm typecheck && pnpm test && SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm build",
     "prepublishOnly": "node ../../scripts/require-pnpm.ts && pnpm justify"
   },
   "dependencies": {
@@ -50,9 +50,11 @@
     "@arethetypeswrong/core": "^0.18.5",
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "^5.10.0",
+    "@tanstack/query-core": "^5.107.1",
     "@types/node": "^24.19.2",
     "@vitest/coverage-v8": "^5.1.0",
     "@vitest/eslint-plugin": "^1.6.28",
+    "es-toolkit": "^1.53.2",
     "eslint": "^10.14.0",
     "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-plugin-chai-expect": "^4.1.1",
@@ -63,14 +65,15 @@
     "eslint-plugin-unicorn": "^80.0.0",
     "fake-indexeddb": "^6.2.8",
     "publint": "^0.3.25",
-    "safebyok-big": "workspace:*",
+    "safebyok": "workspace:*",
     "tsdown": "^0.23.7",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.72.2",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "zod": "^4.6.7"
   },
   "peerDependencies": {
-    "safebyok-big": "workspace:^"
+    "safebyok": "workspace:^"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { BoxFields } from 'safebyok-big/dom'
-import { BoxWhisperField, useBox, useDevice, useVault } from 'safebyok-react'
+import { BoxWhisperField, useBox, useDevice, useVault } from 'safebyok-react-big'
 import { useIsShowing } from '../hooks/useIsShowing'
 import { isQuietRefusal } from '../lib/refusals'
 import { ApiKeyVaultlabel, DomApiKeyBoxlabel, ensureApiKeyBoxExposed, extractApiKey } from '../lib/api-key'

@@ -24,7 +24,7 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "safebyok": "workspace:*",
-    "safebyok-react-lean": "workspace:*",
+    "safebyok-react": "workspace:*",
     "use-effect-event": "^2.0.4"
   },
   "devDependencies": {

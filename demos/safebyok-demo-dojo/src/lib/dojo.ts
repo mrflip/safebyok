@@ -2,7 +2,7 @@
 
 import { QueryClient } from '@tanstack/react-query'
 import { Argon2idWebV1, makeArgon2idDeriver } from 'safebyok/browser'
-import { reactGiver } from 'safebyok-react-lean'
+import { reactGiver } from 'safebyok-react'
 import { RefusingVaultDB } from './refusing-vault-db'
 import { switchableChecker } from './switchable-checker'
 

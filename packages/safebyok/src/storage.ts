@@ -15,8 +15,8 @@ export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, typ
 export { type Adoptable, Thing } from './models/thing'
 export {
   type AnyAsk, type BankRoots, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAskDraft, type GetAsk, type GetWorldAsk, type StatsAsk, type WorldRoots, type ListAskDraft,
-  type ListAsk, type LoggableAsk, type PutAskDraft, type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WriteAsk, type WriteAskFlags, AskChecks, VoidTrack, delAskOf, getAskOf,
-  listAskOf, putAskOf,
+  type ListAsk, type LoggableAsk, type PutAskDraft, type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WriteAsk, type WriteAskFlags, AskChecks, VoidTrack, birthPutsOf, checkedBirthBankAsk,
+  checkedWriteAsk, delAskOf, getAskOf, listAskOf, putAskOf,
 } from './shapes/shapes-asks'
 export * as Classifier from './storage/thing-classifier'
 export { VacantAgerank, readAtOf, readTcNow } from './storage/agerank'
@@ -48,7 +48,7 @@ export type { IfAbsent, IfPresent, PutIfAbsent, RefusedAct } from 'safebyok-big/
 export { VaultError, isVaultError, type Capacity, type RefusalFamily, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'
 export { fetchFailed, identityRevoked, sanitizeForeignError, storageFailed, storageRefusalOf, storageUnavailable, unexpectedError } from 'safebyok-big/storage'
 export { storageIssue } from 'safebyok-big/refusals/throwers'
-export { storeQuotaTooSmall } from './refusals/throwers'
+export { storageCallRefused, storeQuotaTooSmall } from './refusals/throwers'
 // An IndexedDB store's own: each call's one transaction, the row at a key within it, and the versioned database.
 export { dbprefixOf, inOneStep, rowAt, versionedShelfOf, type VersionedShelfSpec } from 'safebyok-big/storage'
-export { Checker, Checkers, objCheck, type ConsistencyRefusal, type ObjCheckOpts, type Refusing, type Story } from 'safebyok-big/storage'
+export { Checker, Checkers, objCheck, type AssertEqual, type CheckerInput, type ConsistencyRefusal, type ObjCheckOpts, type Refusing, type Story } from 'safebyok-big/storage'

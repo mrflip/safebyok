@@ -3,7 +3,7 @@
 
 import { expect, it } from 'vitest'
 import * as DB from 'safebyok-big/storage'
-import type { PostgresBankDB } from 'safebyok-postgres'
+import type { PostgresBankDB } from 'safebyok-postgres-big'
 import * as TH from './test-helpers'
 
 const { BW } = TH

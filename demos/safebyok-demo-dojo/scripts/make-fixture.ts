@@ -16,7 +16,7 @@ import { writeFileSync } from 'node:fs'
 import { createStore, entries } from 'idb-keyval'
 import { Device, type RootShelf } from 'safebyok'
 import { Argon2idWebV1, makeArgon2idDeriver, zxcvbnStrengthChecker } from 'safebyok/browser'
-import { IdbVaultDB } from 'safebyok-idb-lean'
+import { IdbVaultDB } from 'safebyok-indexeddb'
 
 /** The dojo's three users, with their fixture passphrases, printed on the page. */
 const Users = [

@@ -2,7 +2,7 @@
   "name": "safebyok-react",
   "private": false,
   "version": "0.5.0",
-  "description": "React binding for safebyok: a provider that follows the signed-in user, snapshot hooks, and the ask-for-the-passphrase-on-demand guard.",
+  "description": "React binding for safebyok: the giver, the provider, and the parts and kit of forms built on them.",
   "keywords": [
     "safebyok",
     "react",
@@ -43,6 +43,9 @@
     "justify": "pnpm install && pnpm lint && pnpm typecheck && pnpm test && SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm build",
     "prepublishOnly": "node ../../scripts/require-pnpm.ts && pnpm justify"
   },
+  "dependencies": {
+    "es-toolkit": "^1.53.2"
+  },
   "devDependencies": {
     "@arethetypeswrong/core": "^0.18.5",
     "@eslint/js": "^10.0.1",
@@ -69,22 +72,20 @@
     "publint": "^0.3.25",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "safebyok-big": "workspace:*",
+    "safebyok": "workspace:*",
     "tsdown": "^0.23.7",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.72.2",
+    "use-effect-event": "^2.0.4",
     "vitest": "^5.1.0"
   },
   "peerDependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "safebyok-big": "workspace:^",
-    "@tanstack/react-query": "^5.107.1"
-  },
-  "peerDependenciesMeta": {
-    "@tanstack/react-query": {
-      "optional": true
-    }
+    "@tanstack/react-query": "^5.107.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "safebyok": "workspace:^",
+    "use-effect-event": "^2.0.4",
+    "vitest": "^5.0.0"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -95,19 +96,22 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./devmode": {
-      "@safebyok/source": "./src/devmode/index.ts",
-      "import": "./dist/devmode/index.js",
-      "require": "./dist/devmode/index.cjs"
+    "./kit": {
+      "@safebyok/source": "./src/kit/index.ts",
+      "import": "./dist/kit/index.js",
+      "require": "./dist/kit/index.cjs"
+    },
+    "./parts": {
+      "@safebyok/source": "./src/parts/index.ts",
+      "import": "./dist/parts/index.js",
+      "require": "./dist/parts/index.cjs"
+    },
+    "./testing": {
+      "@safebyok/source": "./tests/testing.ts",
+      "import": "./dist/testing.js",
+      "require": "./dist/testing.cjs"
     },
     "./package.json": "./package.json"
-  },
-  "typesVersions": {
-    "*": {
-      "devmode": [
-        "./dist/devmode/index.d.cts"
-      ]
-    }
   },
   "publishConfig": {
     "exports": {
@@ -115,11 +119,37 @@
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
       },
-      "./devmode": {
-        "import": "./dist/devmode/index.js",
-        "require": "./dist/devmode/index.cjs"
+      "./kit": {
+        "import": "./dist/kit/index.js",
+        "require": "./dist/kit/index.cjs"
+      },
+      "./parts": {
+        "import": "./dist/parts/index.js",
+        "require": "./dist/parts/index.cjs"
+      },
+      "./testing": {
+        "import": "./dist/testing.js",
+        "require": "./dist/testing.cjs"
       },
       "./package.json": "./package.json"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "parts": [
+        "./dist/parts/index.d.cts"
+      ],
+      "kit": [
+        "./dist/kit/index.d.cts"
+      ],
+      "testing": [
+        "./dist/testing.d.cts"
+      ]
+    }
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
     }
   }
 }

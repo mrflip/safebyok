@@ -17,19 +17,18 @@ This repository is a pnpm workspace. Its packages:
 * [`safebyok`](packages/safebyok): Class instances and a sync/async listing that offers durable live-updating objects that make it both safer and more straightforward to use the library
   - storage operations that offer merging of stored secret records retry with backoff
   - instances move to a safe state when it is deleted, or the bank locks, is swept from the page, etc
-* [`safebyok-react`](packages/safebyok-react) -- the React binding: a provider, snapshot hooks,
-  and the dialogs that ask the user for a passphrase or passkey when one is needed.
-* [`safebyok-convex`](packages/safebyok-convex) -- Convex storage: a Convex component, and the
-  `BankDB` adapter that calls it.
+* [`safebyok-react`](packages/safebyok-react) -- the React binding: a giver whose hooks read a bank's records
+  through your TanStack Query client, form fields, and ready-made forms built from them.
 * [`safebyok-postgres`](packages/safebyok-postgres) -- Postgres storage: the tables, and the
-  server-side `BankDB` over them, through the driver your app already has.
-* [`safebyok-graphql`](packages/safebyok-graphql) -- GraphQL storage: the schema and resolvers
-  your server runs over a bankDB such as the Postgres one, and the bankDB over an urql
-  Client that calls them from the browser.
+  server-side vaultDB over them, through the driver your app already has.
 * [`safebyok-fastkey`](packages/safebyok-fastkey) -- Argon2id through WebAssembly: a
   key deriver several times faster than the core's, deriving the same bytes under the same specs.
-* [`safebyok-indexeddb`](packages/safebyok-indexeddb) -- IndexedDB storage: a bank stored in this
-  browser, each call in one transaction, and a template for a key-value backend of your own.
+* [`safebyok-indexeddb`](packages/safebyok-indexeddb) -- IndexedDB storage: a bank's Things stored in this browser.
+* [`safebyok-convex`](packages/safebyok-convex) -- Convex storage: a component that keeps a bank's Things, and the
+  vaultDB that reaches it through your app's Convex client.
+* `safebyok-convex-big`, `safebyok-graphql-big`, `safebyok-indexeddb-big`, `safebyok-postgres-big` and
+  `safebyok-react-big`, under [`packages/`](packages) -- the adapters and binding on safebyok-big, private and frozen
+  until a port to the new core replaces each.
 * [`safebyok-demo-react`](demos/safebyok-demo-react) -- a playground app; never published.
 * [`safebyok-e2e`](e2e) -- the tests that pair an adapter with a framework's client; never published.
 

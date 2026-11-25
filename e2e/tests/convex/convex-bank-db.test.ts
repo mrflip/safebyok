@@ -1,14 +1,14 @@
 /** ConvexBankDB over a ConvexReactClient: the battery every BankDB runs, and what that client does its own way. */
 
-// The battery's hooks are copies of those in `packages/safebyok-convex/tests/convex-bank-db.test.ts`,
+// The battery's hooks are copies of those in `packages/safebyok-convex-big/tests/convex-bank-db.test.ts`,
 // which run over a ConvexClient so that package's suite stands alone: a change to one is made in both.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConvexReactClient } from 'convex/react'
 import type { BankScope, BX, VaultScope } from 'safebyok-big/storage'
-import { ConvexBankDB } from 'safebyok-convex'
-import type { ConvexBankDBOpts } from 'safebyok-convex'
-import { fakeDeployment } from 'safebyok-convex/testing'
-import type { FakeDeployment, FakeHost } from 'safebyok-convex/testing'
+import { ConvexBankDB } from 'safebyok-convex-big'
+import type { ConvexBankDBOpts } from 'safebyok-convex-big'
+import { fakeDeployment } from 'safebyok-convex-big/testing'
+import type { FakeDeployment, FakeHost } from 'safebyok-convex-big/testing'
 import * as TH from './test-helpers'
 
 const { BW } = TH

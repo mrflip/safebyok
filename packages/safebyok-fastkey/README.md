@@ -20,16 +20,19 @@ pnpm add safebyok safebyok-fastkey
 
 ## Use
 
-Pass the deriver as `keyDeriver`:
+Pass the deriver as `keyDeriver`, where you would pass the core's: to `reactGiver` from `safebyok-react`, or in the
+options of `Device.make`.
 
 ```ts
-import { Device } from 'safebyok'
+import { zxcvbnStrengthChecker } from 'safebyok/browser'
+import { reactGiver } from 'safebyok-react'
 import { argon2idWasmWebV1Deriver } from 'safebyok-fastkey'
 
-const device = Device.make({ user_id: session.user_id, banklabel: 'acme', gates: ['main'], bankDB, deviceDB, strengthChecker, requestCleartext, keyDeriver: argon2idWasmWebV1Deriver })
-const bank = await device.ensureBank()
-await bank.ensureUnlocked()  // asks the user for the passphrase, and derives the key through WebAssembly
-const vault = await bank.ensureVault({ vaultlabel: 'main' })
+export const SOK = reactGiver({
+  banks:           { acme: { vaultDB } },
+  keyDeriver:      argon2idWasmWebV1Deriver,  // each unlock derives the key through WebAssembly
+  strengthChecker: zxcvbnStrengthChecker,
+})
 ```
 
 A bank's passphrase wayin records only its deriver's label, and this deriver derives exactly what the core's does

@@ -6,7 +6,7 @@ import { type ThingScope, type Thingkind, type VaultError, Labelpath, Lifeseq, T
 import * as VT from 'safebyok/testing'
 import * as Phrases from '../src/phrases'
 import { PostgresVaultDB, thingsChannelOf } from '../src/postgres-vault-db'
-import type { PostgresListen } from '../src/postgres-bank-db'
+import type { PostgresListen } from '../src/postgres-driver'
 import { TableVersion, VaultFunctionNames, VaultFunctionsSql } from '../src/vault-functions'
 import { GetThingSql } from '../src/vault-queries'
 import { VaultTablesSql } from '../src/vault-tables'
@@ -225,10 +225,20 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     vaultDB.watch(VT.ThingBank, () => undefined, (news) => { badnews.push(news) })
     await vi.waitFor(() => { expect(onNotifies).to.have.lengthOf(1) })
     onNotifies[0]?.(BareNotice)
+    await vi.waitFor(() => { expect(stopped).to.have.lengthOf(1) })
+    expect(badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+  })
+
+  it("unlistens once where its holder stops a watch a failed fetch has ended", async () => {
+    const { listen, onNotifies, stopped } = capturingListen()
+    const vaultDB = new PostgresVaultDB({ client: throwingClient(coded('relation "safebyok_box_things" does not exist', '42P01')), listen })
+    const unwatch = vaultDB.watch(VT.ThingBank, () => undefined, () => undefined)
+    await vi.waitFor(() => { expect(onNotifies).to.have.lengthOf(1) })
     onNotifies[0]?.(BareNotice)
     await vi.waitFor(() => { expect(stopped).to.have.lengthOf(1) })
+    unwatch()
     await VT.aWhile()
-    expect(badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+    expect(stopped).to.have.lengthOf(1)
   })
 
   it("hears a notice told while its listen is still starting", async () => {

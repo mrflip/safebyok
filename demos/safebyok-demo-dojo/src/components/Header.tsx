@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { ModalDialog, UnlockForm } from 'safebyok-react-lean/kit'
+import { ModalDialog, UnlockForm } from 'safebyok-react/kit'
 import { Dojo } from '../lib/dojo'
 import { Fixture } from '../lib/fixture'
 import { resetStores, signinAs, signOut } from '../lib/session'

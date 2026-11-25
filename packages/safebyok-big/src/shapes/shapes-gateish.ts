@@ -82,7 +82,7 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
   prfBytes:      bytes(PrfAnswerSize).refine((prfBytes) => prfBytes.reduce((seen, byte) => seen | byte, 0) !== 0, Phrases.PasskeyAnswerUsed),
 }), { refusalkind: 'bad_record', extras: 'strip' }, [CX])
 
-/** A passkey's answer when asked for a vault's PRF: the cleartext a gating accepts for a passkey. `safebyok-react`'s `askPasskey` makes one.
+/** A passkey's answer when asked for a vault's PRF: the cleartext a gating accepts for a passkey. `safebyok-react-big`'s `askPasskey` makes one.
  * An `unlock_bank` gating accepts it as `passkeyClear` in `attempt`, in place of the passphrase.
  * A `build_bank` gating accepts it there beside the passphrase.
  *
@@ -90,7 +90,7 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
  */
 export type PasskeyAnswer = Z.infer<typeof passkeyAnswer>
 
-/** The check of a new passkey's answer, as `safebyok-react`'s `createPasskey` gives it: a {@link passkeyAnswer} over a fresh salt of {@link PasskeySaltSize} bytes.
+/** The check of a new passkey's answer, as `safebyok-react-big`'s `createPasskey` gives it: a {@link passkeyAnswer} over a fresh salt of {@link PasskeySaltSize} bytes.
  * A passkey wayin sealed over another salt would read as damaged whenever it is used to unlock the bank.
  *
  * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })  // throws

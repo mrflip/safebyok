@@ -1,5 +1,5 @@
 import type { BankStage } from 'safebyok'
-import { CreateVaultForm, PasskeyUnlockButton, UnlockDialog, UnlockForm } from 'safebyok-react-lean/kit'
+import { CreateVaultForm, PasskeyUnlockButton, UnlockDialog, UnlockForm } from 'safebyok-react/kit'
 import { Knock } from '../lib/sok'
 import { KeyPanel } from './KeyPanel'
 import { KnockForm } from './KnockForm'

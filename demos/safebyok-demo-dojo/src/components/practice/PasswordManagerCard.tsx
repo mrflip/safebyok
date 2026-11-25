@@ -1,5 +1,5 @@
-import { UnlockForm } from 'safebyok-react-lean/kit'
-import { WhisperInput } from 'safebyok-react-lean/parts'
+import { UnlockForm } from 'safebyok-react/kit'
+import { WhisperInput } from 'safebyok-react/parts'
 import { WhisperFieldAttributes } from 'safebyok/utils'
 import { Dojo } from '../../lib/dojo'
 import { Example, PracticeCard } from './PracticeCard'

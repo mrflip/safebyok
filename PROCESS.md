@@ -183,10 +183,12 @@ do with a Dependabot PR that fails, and what pushing to its branch costs, is
 ## Packages
 
 The published packages live in `packages/`: `safebyok`, the core, and its companions, each named
-for what it plugs in. A storage adapter is `safebyok-<store>` (`safebyok-convex`,
-`safebyok-indexeddb`, `safebyok-postgres`, `safebyok-graphql`), a framework binding
-`safebyok-<framework>` (`safebyok-react`), and anything else is named for what it supplies
-(`safebyok-fastkey`, a key deriver). A new one copies an existing package's packaging: its own
+for what it plugs in. A storage adapter is `safebyok-<store>` (`safebyok-indexeddb`,
+`safebyok-postgres`), a framework binding `safebyok-<framework>` (`safebyok-react`), and anything
+else is named for what it supplies (`safebyok-fastkey`, a key deriver). Scaffolding, until each is
+ported to the new core: a package still on safebyok-big is named for its successor with `-big`
+after (`safebyok-convex-big`, `safebyok-graphql-big`, `safebyok-indexeddb-big`,
+`safebyok-postgres-big`, `safebyok-react-big`), private, frozen, and out of the `fixed` group. A new one copies an existing package's packaging: its own
 `eslint.config.mjs` cut from the core's, a README, and a changeset. It has `safebyok` as a peer
 dependency, so that `VaultError` is one class across the packages, and it joins the `fixed` group
 in `.changeset/config.json` (a test refuses a public package left out of it).

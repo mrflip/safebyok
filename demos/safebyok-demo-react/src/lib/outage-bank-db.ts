@@ -1,4 +1,4 @@
-import { IdbBankDB } from 'safebyok-indexeddb'
+import { IdbBankDB } from 'safebyok-indexeddb-big'
 import { storageUnavailable } from 'safebyok-big/storage'
 import type { BoxTidyAsk, BX } from 'safebyok-big/storage'
 

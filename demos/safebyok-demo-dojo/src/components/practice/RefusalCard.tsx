@@ -1,6 +1,6 @@
 import { useActionState, useEffect, useId, useRef } from 'react'
 import { isVaultError } from 'safebyok'
-import { SubmitButton, WhisperInput } from 'safebyok-react-lean/parts'
+import { SubmitButton, WhisperInput } from 'safebyok-react/parts'
 import { mask } from 'safebyok/utils'
 import { Dojo } from '../../lib/dojo'
 import { formTextOf } from '../../lib/form-text'

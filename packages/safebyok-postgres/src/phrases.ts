@@ -1,4 +1,4 @@
-// The messages of the refusals this package makes itself. The rest are `safebyok-big`'s and `safebyok`'s, through their Throwers.
+// The messages of the refusals this package makes itself. The rest are `safebyok`'s, through its throwers.
 
 // == [Answers]: StoredNothing
 

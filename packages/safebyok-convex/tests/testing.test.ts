@@ -7,20 +7,19 @@ import type { FakeDeploymentOpts } from '../src/testing'
 
 const deployments: ReturnType<typeof fakeDeployment>[] = []
 function deploy(opts?: FakeDeploymentOpts) {
-  const deployment = fakeDeployment(TH.bankHostWith(TH.bySubject), opts)
+  const deployment = fakeDeployment(TH.vaultHostWith(TH.bySubject), opts)
   deployments.push(deployment)
   return deployment
 }
 
-const { BW } = TH
-const bank = BW.bankAt()
-const buildBankArgs = { ask: BW.bankBuildAskOf(bank) }
-const bankAsked = { ask: BW.bankEnsureAsk }
-const watchRowsArgs = { scope: BW.bankScope }
+const bank = TH.bankThingOf()
+const birthBankArgs = { ask: TH.birthBankAskOf() }
+const worldAsked = { ask: TH.getWorldAskOf() }
+const watchThingsArgs = { scope: TH.ThingBank }
 
 /** Send a mutation from a client signed in as no one, which the host refuses as `identity_revoked`. */
 function refusedMutation(deployment: ReturnType<typeof deploy>) {
-  return deployment.client(null).mutation(deployment.api.safebyokBank.buildBank, buildBankArgs)
+  return deployment.client(null).mutation(deployment.api.safebyokVault.birthBank, birthBankArgs)
 }
 afterEach(async () => {
   await Promise.all(deployments.splice(0).map((deployment) => deployment.close()))
@@ -36,19 +35,24 @@ describe("fakeDeployment", () => {
   it("serves a ConvexClient's query and mutation, signed in as the subject it was given", async () => {
     const deployment = deploy()
     const client = deployment.client('u1')
-    await client.mutation(deployment.api.safebyokBank.buildBank, buildBankArgs)
-    expect(await client.query(deployment.api.safebyokBank.ensureBank, bankAsked)).to.deep.include({ bank })
+    await client.mutation(deployment.api.safebyokVault.birthBank, birthBankArgs)
+    expect(await client.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.include({ bank })
   })
 
-  it("connects a client of any other kind that its caller constructs, and closes it with the rest", async () => {
+  it("connects a client of any other kind that its caller constructs", async () => {
     const deployment = deploy()
-    const closed = vi.fn()
     const made = deployment.connectWith('u1', (address, opts) => {
       const inner = new ConvexClient(address, opts)
-      return { inner, close: async () => { closed(); await inner.close() } }
+      return { inner, close: () => inner.close() }
     })
-    await made.inner.mutation(deployment.api.safebyokBank.buildBank, buildBankArgs)
-    expect(await made.inner.query(deployment.api.safebyokBank.ensureBank, bankAsked)).to.deep.include({ bank })
+    await made.inner.mutation(deployment.api.safebyokVault.birthBank, birthBankArgs)
+    expect(await made.inner.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.include({ bank })
+  })
+
+  it("closes a client its caller constructed with the rest", async () => {
+    const deployment = deploy()
+    const closed = vi.fn()
+    deployment.connectWith('u1', () => ({ close: () => { closed(); return Promise.resolve() } }))
     await deployment.close()
     expect(closed).toHaveBeenCalledOnce()
   })
@@ -62,15 +66,20 @@ describe("fakeDeployment", () => {
     expect(closed).toHaveBeenCalledOnce()
   })
 
-  it("by default drops a client's log, and sends its refused mutation to console.error", async () => {
+  it("by default sends a client's refused mutation to console.error", async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
+    const deployment = deploy()
+    await TH.convexRefusalOf(refusedMutation(deployment))
+    expect(consoleError).toHaveBeenCalledOnce()
+    expect(String(consoleError.mock.calls[0]?.[0])).to.match(/\[CONVEX M\(safebyokVault:birthBank\)\]/)
+  })
+
+  it("by default drops a client's other log lines", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => { /* kept out of the test output */ })
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => { /* kept out of the test output */ })
     const deployment = deploy()
-    const refusal = await TH.convexRefusalOf(refusedMutation(deployment))
-    expect(refusal.kind).to.eq('identity_revoked')
-    expect(consoleError).toHaveBeenCalledOnce()
-    expect(String(consoleError.mock.calls[0]?.[0])).to.match(/\[CONVEX M\(safebyokBank:buildBank\)\]/)
+    await TH.convexRefusalOf(refusedMutation(deployment))
     expect(consoleWarn).toHaveBeenCalledTimes(0)
     expect(consoleLog).toHaveBeenCalledTimes(0)
   })
@@ -81,7 +90,7 @@ describe("fakeDeployment", () => {
     const refusal = await TH.convexRefusalOf(refusedMutation(deployment))
     expect(refusal.kind).to.eq('identity_revoked')
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
-    expect(spy.calls[0]?.message).to.match(/\[CONVEX M\(safebyokBank:buildBank\)\]/)
+    expect(spy.calls[0]?.message).to.match(/\[CONVEX M\(safebyokVault:birthBank\)\]/)
   })
 
   it("hands the logger on in the options connectWith gives its maker", () => {
@@ -116,7 +125,7 @@ describe("fakeDeployment", () => {
   })
 
   it("refuses a host or options it cannot run, quoting none of what it was given", () => {
-    const host = TH.bankHostWith(TH.bySubject)
+    const host = TH.vaultHostWith(TH.bySubject)
     function refuse(attempt: () => unknown) { return TH.thrownText(TH.expectSyncRefusal(attempt, 'bad_record')) }
     refuse(() => fakeDeployment({ api: host.api } as never))
     refuse(() => fakeDeployment({ createTest: host.createTest } as never))
@@ -128,43 +137,53 @@ describe("fakeDeployment", () => {
     expect(quoted).to.not.include('fake-secret-value')
   })
 
-  it("runs the backend directly as a subject, or as no one, to arrange or inspect what is stored", async () => {
+  it("runs the backend directly as a subject", async () => {
     const deployment = deploy()
-    await deployment.as('u1').mutation(deployment.api.safebyokBank.buildBank, buildBankArgs)
-    expect(await deployment.as('u1').query(deployment.api.safebyokBank.ensureBank, bankAsked)).to.deep.include({ bank })
-    const refusal = await TH.convexRefusalOf(deployment.as(null).query(deployment.api.safebyokBank.ensureBank, bankAsked))
+    await deployment._cheat_backendAs('u1').mutation(deployment.api.safebyokVault.birthBank, birthBankArgs)
+    expect(await deployment._cheat_backendAs('u1').query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.include({ bank })
+  })
+
+  it("runs the backend directly as no one", async () => {
+    const deployment = deploy()
+    const refusal = await TH.convexRefusalOf(deployment._cheat_backendAs(null).query(deployment.api.safebyokVault.getWorld, worldAsked))
     expect(refusal.kind).to.eq('identity_revoked')
   })
 
-  it("lists the functions its sockets watch, and pushes a changed result to a watcher after a mutation through any socket", async () => {
+  it("lists the functions its sockets watch", async () => {
     const deployment = deploy()
-    const client = deployment.client('u1')
-    const heard = vi.fn()
-    client.onUpdate(deployment.api.safebyokBank.watchRows, watchRowsArgs, heard)
+    deployment.client('u1').onUpdate(deployment.api.safebyokVault.watchThings, watchThingsArgs, () => undefined)
     await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
+    expect(deployment.watching()[0]).to.match(/safebyokVault:watchThings/)
+  })
+
+  it("pushes a changed result to a watcher after a mutation through another socket", async () => {
+    const deployment = deploy()
+    const heard = vi.fn()
+    deployment.client('u1').onUpdate(deployment.api.safebyokVault.watchThings, watchThingsArgs, heard)
     await vi.waitFor(() => { expect(heard).toHaveBeenCalledTimes(1) })
-    await deployment.client('u1').mutation(deployment.api.safebyokBank.buildBank, buildBankArgs)
+    await deployment.client('u1').mutation(deployment.api.safebyokVault.birthBank, birthBankArgs)
     await vi.waitFor(() => { expect(heard.mock.calls.length).to.be.greaterThan(1) })
   })
 
   it("refuses a watched safebyok query once every socket is signed out", async () => {
     const deployment = deploy()
     const failed = vi.fn()
-    deployment.client('u1').onUpdate(deployment.api.safebyokBank.watchRows, watchRowsArgs, () => undefined, failed)
+    deployment.client('u1').onUpdate(deployment.api.safebyokVault.watchThings, watchThingsArgs, () => undefined, failed)
     await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
     deployment.signOut()
     await vi.waitFor(() => { expect(failed).toHaveBeenCalled() })
   })
-  it("has pushed a backend change to every watcher and cache by the time arrange returns", async () => {
+
+  it("has pushed a backend change to every watcher and cache by the time _cheat_arrange returns", async () => {
     const deployment = deploy()
     const client = deployment.client('u1')
     const heard = vi.fn()
-    client.onUpdate(deployment.api.safebyokBank.watchRows, watchRowsArgs, heard)
+    client.onUpdate(deployment.api.safebyokVault.watchThings, watchThingsArgs, heard)
     await vi.waitFor(() => { expect(heard).toHaveBeenCalledTimes(1) })
-    expect(await client.query(deployment.api.safebyokBank.ensureBank, bankAsked)).to.deep.include({ bank: null })
-    const answer = await deployment.arrange((backend) => backend.withIdentity({ subject: 'u1' }).mutation(deployment.api.safebyokBank.buildBank, buildBankArgs))
+    expect(await client.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.include({ bank: null })
+    const answer = await deployment._cheat_arrange((backend) => backend.withIdentity({ subject: 'u1' }).mutation(deployment.api.safebyokVault.birthBank, birthBankArgs))
     expect(answer).to.deep.nested.include({ bank: null, 'written.bank': bank })
-    expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ bank })
-    expect(await client.query(deployment.api.safebyokBank.ensureBank, bankAsked)).to.deep.include({ bank })
+    expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ labelpath: 'bank', raw: bank })
+    expect(await client.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.include({ bank })
   })
 })

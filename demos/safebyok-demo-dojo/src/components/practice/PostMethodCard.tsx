@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { WhisperInput } from 'safebyok-react-lean/parts'
+import { WhisperInput } from 'safebyok-react/parts'
 import { Example, PracticeCard } from './PracticeCard'
 
 /** Give a form that submits from `onSubmit` the attribute `method="post"`, so a submit before React attaches puts nothing in the URL. */

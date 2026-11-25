@@ -1,6 +1,6 @@
 /** The dojo's vaultDB: the IndexedDB one, which can be told to refuse the next write, as a backend that is down would. */
 
-import { IdbVaultDB } from 'safebyok-idb-lean'
+import { IdbVaultDB } from 'safebyok-indexeddb'
 import { type Actual, type BirthBankActual, type BirthBankAsk, type BirthPuts, type DelAct, type PutAct, VaultError, type WriteAsk } from 'safebyok/storage'
 
 /** The message of the refusal a {@link RefusingVaultDB} answers when told to. */

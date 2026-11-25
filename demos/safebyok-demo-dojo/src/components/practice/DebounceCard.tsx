@@ -1,6 +1,6 @@
 import { debounce } from 'es-toolkit'
 import { type SubmitEvent, useMemo, useState } from 'react'
-import { WhisperInput } from 'safebyok-react-lean/parts'
+import { WhisperInput } from 'safebyok-react/parts'
 import { isKeyAccepted, saveMadeUp } from '../../lib/made-up-service'
 import { Example, PracticeCard } from './PracticeCard'
 

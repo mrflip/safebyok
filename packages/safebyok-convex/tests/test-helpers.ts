@@ -1,32 +1,37 @@
 import { anyApi, defineSchema } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
-import { SafebyokBankComponent } from '../src/server'
-import type { GetUserId, SafebyokBankApi, SafebyokRefusal } from '../src/server'
+import { SafebyokVaultComponent } from '../src/server'
+import type { GetUserId, SafebyokRefusal, SafebyokVaultApi } from '../src/server'
 import { modules, register, schema } from '../src/test'
 
 // Re-export the core's test helpers, so a test here can star-import this one module as TH.
-export * from 'safebyok-big/testing'
+export * from 'safebyok/testing'
 
-/** The component's bankDB functions typed as a client calls them (`SafebyokBankApi`), at the root: no host wrapper and no auth. */
-export const rootBankApi = anyApi['banks'] as unknown as SafebyokBankApi
+/** The component's vaultDB functions typed as a client calls them (`SafebyokVaultApi`), at the root: no host wrapper and no auth. */
+export const rootVaultApi = anyApi['things'] as unknown as SafebyokVaultApi
 
-/** Make a fresh in-memory backend with only the component, its functions at the root. Pass true to enforce Convex's transaction limits. */
-export function componentTest(transactionLimits = false) { return convexTest({ schema, modules, transactionLimits }) }
+/** Make a fresh in-memory backend with only the component, its functions at the root. */
+export function componentTest() { return convexTest({ schema, modules }) }
 
 /** Make a host with only the component, its functions at the root, for a fake deployment whose clients may write as any user. */
 export function componentHost() { return { api: anyApi, createTest: () => componentTest() } }
 
-/** Make a host app with the component installed as `safebyok`, and the SafebyokBankComponent that wraps it. */
-export function installedBankComponent() {
-  const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register } } })
-  return { app, component: new SafebyokBankComponent(app.components.safebyok) }
+/** Make a host like {@link componentHost} whose backend refuses a function that writes more than `documentsWritten` documents. */
+export function componentHostWritingAtMost(documentsWritten: number) {
+  return { api: anyApi, createTest: () => convexTest({ schema, modules, transactionLimits: { documentsWritten } }) }
 }
 
-/** Make a host app set up as the README shows for the bankDB: the component installed as `safebyok`, and its bankDB functions served from `convex/safebyokBank.ts` using `getUserId`. */
-export function bankHostWith(getUserId: GetUserId) {
-  const { app, component } = installedBankComponent()
-  return app.defineModules({ safebyokBank: component.api({ getUserId }) })
+/** Make a host app with the component installed as `safebyok`, and the SafebyokVaultComponent that wraps it. */
+export function installedVaultComponent() {
+  const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register } } })
+  return { app, component: new SafebyokVaultComponent(app.components.safebyok) }
+}
+
+/** Make a host app set up as the README shows: the component installed as `safebyok`, and its vaultDB functions served from `convex/safebyokVault.ts` using `getUserId`. */
+export function vaultHostWith(getUserId: GetUserId) {
+  const { app, component } = installedVaultComponent()
+  return app.defineModules({ safebyokVault: component.api({ getUserId }) })
 }
 
 /** Return the `data` of the ConvexError that `operation` rejects with. Fails the test if `operation` resolves. */

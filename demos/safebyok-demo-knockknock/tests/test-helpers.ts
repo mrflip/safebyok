@@ -1,9 +1,9 @@
-/** The demo's test helpers: a fake of Anthropic's messages endpoint, the core's testing helpers, and the secret search and fake authenticator of safebyok-react-lean. Star-import this file as `TH`. */
+/** The demo's test helpers: a fake of Anthropic's messages endpoint, the core's testing helpers, and the secret search and fake authenticator of safebyok-react. Star-import this file as `TH`. */
 
 import { JokeModel } from '../src/lib/anthropic'
 
 export * from 'safebyok/testing'
-export { expectTextUnheld, holdsText, installFakeAuthenticator } from 'safebyok-react-lean/testing'
+export { expectTextUnheld, holdsText, installFakeAuthenticator } from 'safebyok-react/testing'
 
 /** One request recorded by {@link fakeAnthropic}: its URL, the API key it carried (the SDK sends it as a bearer token), and its body. */
 export type AnthropicRequest = {

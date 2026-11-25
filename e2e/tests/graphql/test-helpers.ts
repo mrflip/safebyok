@@ -1,14 +1,14 @@
-/** Yoga servers over a real Postgres, reached over real sockets, and the browsers that post to them: safebyok-graphql's README recipe, both halves. */
+/** Yoga servers over a real Postgres, reached over real sockets, and the browsers that post to them: safebyok-graphql-big's README recipe, both halves. */
 
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { afterEach } from 'vitest'
 import { Client, fetchExchange } from '@urql/core'
 import { createSchema, createYoga } from 'graphql-yoga'
-import { GraphQLBankDB } from 'safebyok-graphql'
-import { BankSchemaSdl, bankResolvers } from 'safebyok-graphql/server'
-import { PostgresBankDB, pgClientOf } from 'safebyok-postgres'
-import type { PostgresListen } from 'safebyok-postgres'
+import { GraphQLBankDB } from 'safebyok-graphql-big'
+import { BankSchemaSdl, bankResolvers } from 'safebyok-graphql-big/server'
+import { PostgresBankDB, pgClientOf } from 'safebyok-postgres-big'
+import type { PostgresListen } from 'safebyok-postgres-big'
 import * as TH from '../postgres/test-helpers'
 
 // Everything the Postgres tests use too, so a test here star-imports this one module as TH.

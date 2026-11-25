@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BankLockControl, CreateVaultButton, useBank, useDevice, useVault } from 'safebyok-react'
+import { BankLockControl, CreateVaultButton, useBank, useDevice, useVault } from 'safebyok-react-big'
 import type { Auth, Session } from '../lib/auth'
 import { isQuietRefusal } from '../lib/refusals'
 import { WaysIn } from './WaysIn'

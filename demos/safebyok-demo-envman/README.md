@@ -1,6 +1,6 @@
 # safebyok-demo-envman
 
-Envman, a doppler-lite on the new core (`safebyok`) and its React layer (`safebyok-react-lean`). Never published.
+Envman, a doppler-lite on the new core (`safebyok`) and its React layer (`safebyok-react`). Never published.
 
 You sign in with any username (there is no password), create a vault with a passphrase, and add secrets: each has a
 title, a description, a rotation period and the day it was last rotated, stored readable beside it, and a value, stored

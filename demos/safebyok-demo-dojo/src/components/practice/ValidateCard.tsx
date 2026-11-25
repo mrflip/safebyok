@@ -1,6 +1,6 @@
 import { type ReactNode, type SubmitEvent, type SyntheticEvent, useActionState, useId, useState } from 'react'
-import { popField } from 'safebyok-react-lean'
-import { SubmitButton, WhisperInput } from 'safebyok-react-lean/parts'
+import { popField } from 'safebyok-react'
+import { SubmitButton, WhisperInput } from 'safebyok-react/parts'
 import { mask } from 'safebyok/utils'
 import { z } from 'zod'
 import { Dojo } from '../../lib/dojo'

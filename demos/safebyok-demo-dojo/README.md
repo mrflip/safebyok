@@ -1,8 +1,8 @@
 # safebyok-demo-dojo
 
 The dojo: a page for producing, on demand, each outcome of the forms around a vault, and looking at what the form and the
-stores behind it hold afterwards. It runs on the new core (`safebyok`), its React layer (`safebyok-react-lean`) and its
-IndexedDB storage (`safebyok-idb-lean`). It shows what the library does today; it decides nothing. Never published.
+stores behind it hold afterwards. It runs on the new core (`safebyok`), its React layer (`safebyok-react`) and its
+IndexedDB storage (`safebyok-indexeddb`). It shows what the library does today; it decides nothing. Never published.
 
 ```sh
 pnpm --filter safebyok-demo-dojo build:deps  # builds what the dojo needs

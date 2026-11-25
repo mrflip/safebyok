@@ -1,3 +1,2 @@
-/** safebyok-indexeddb: safebyok's bankDB in this browser's IndexedDB, for an app with no backend. */
-export { IdbBankDB, idbBankDB } from './idb-bank-db'
-export type { IdbBankDBOpts } from './idb-bank-db'
+/** safebyok-indexeddb: a vaultDB in this browser's IndexedDB. */
+export { IdbVaultDB, type IdbVaultDBOpts } from './idb-vault-db'

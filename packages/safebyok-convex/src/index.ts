@@ -1,5 +1,5 @@
-/** `safebyok-convex`: a BankDB that keeps its rows in the host's Convex deployment. */
+/** `safebyok-convex`: a vaultDB that keeps its Things in the host's Convex deployment. */
 
-export { ConvexBankDB } from './convex-bank-db'
-export type { ConvexBankClient, ConvexBankDBOpts, ConvexCalls, ConvexReactWatchingClient, ConvexWatchingClient } from './convex-bank-db'
-export type { SafebyokBankApi } from './server'
+export { ConvexVaultDB } from './convex-vault-db'
+export type { ConvexCalls, ConvexReactWatchingClient, ConvexVaultClient, ConvexVaultDBOpts, ConvexWatchingClient } from './convex-vault-db'
+export type { SafebyokVaultApi } from './server'

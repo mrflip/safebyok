@@ -5,7 +5,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { Device, MemoryDeviceDB, type BankSnapshot, type VaultSnapshot } from 'safebyok-big'
 import { MemoryBankDB } from 'safebyok-big/storage'
 import { Passphrase, anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testing'
-import { BankProvider, useBank, useBankSnapshot, useVault, useVaultSnapshot } from 'safebyok-react'
+import { BankProvider, useBank, useBankSnapshot, useVault, useVaultSnapshot } from 'safebyok-react-big'
 import { SessionBar } from '../src/components/SessionBar'
 import { useSession } from '../src/hooks/useSession'
 import { JokeModel } from '../src/lib/anthropic'

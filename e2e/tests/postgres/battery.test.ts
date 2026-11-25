@@ -4,7 +4,7 @@
 import { expect, it, onTestFinished, vi } from 'vitest'
 import type * as DB from 'safebyok-big/storage'
 import { BX } from 'safebyok-big/storage'
-import type { PostgresBankDB } from 'safebyok-postgres'
+import type { PostgresBankDB } from 'safebyok-postgres-big'
 import * as TH from './test-helpers'
 
 const { BW } = TH

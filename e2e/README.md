@@ -7,7 +7,7 @@ pairings, one for each adapter and framework, have one place to live. Heavyweigh
 (Playwright and the like) would live here too.
 
 An adapter's own tests stay in its package, so a contributor can run that suite without the
-workspace's other packages: `safebyok-convex` runs its battery over `ConvexClient` there. This
+workspace's other packages: `safebyok-convex-big` runs its battery over `ConvexClient` there. This
 package runs the same tests over the clients that need a framework.
 
 ```sh
@@ -16,17 +16,17 @@ pnpm justify    # from e2e/: install, lint, typecheck, test (it builds the packa
 
 ## What is here
 
-* [tests/convex/](tests/convex) -- `safebyok-convex` with `ConvexReactClient`, over the fake
-  deployment `safebyok-convex/testing` ships:
+* [tests/convex/](tests/convex) -- `safebyok-convex-big` with `ConvexReactClient`, over the fake
+  deployment `safebyok-convex-big/testing` ships:
   * [convex-bank-db.test.ts](tests/convex/convex-bank-db.test.ts) -- the `BankDB` battery over
     `ConvexBankDB`, and a host's own functions serving the user signed in, refusing anyone else,
     and notifying a second watch on the same client. Its battery hooks are copies of the ones in
-    `packages/safebyok-convex/tests/convex-bank-db.test.ts`, which run over `ConvexClient`: a
+    `packages/safebyok-convex-big/tests/convex-bank-db.test.ts`, which run over `ConvexClient`: a
     change to one is made in both.
-  * [test-helpers.ts](tests/convex/test-helpers.ts) -- a host app built from `safebyok-convex`'s
+  * [test-helpers.ts](tests/convex/test-helpers.ts) -- a host app built from `safebyok-convex-big`'s
     published entries alone, as a host's own tests would.
 
-* [tests/postgres/](tests/postgres) -- `safebyok-postgres` over a real Postgres through `pg`, with a
+* [tests/postgres/](tests/postgres) -- `safebyok-postgres-big` over a real Postgres through `pg`, with a
   pool and a listening connection for each device, so the statements in a race run at the same
   moment on separate connections. PGlite, which every test in the adapter's package uses, runs one
   statement at a time and cannot show that. Each file makes a database of its own and drops it.
@@ -38,10 +38,10 @@ pnpm justify    # from e2e/: install, lint, typecheck, test (it builds the packa
     full. A box written into a vault life being deleted is never listed, and `tidyGone` deletes it.
   * [test-helpers.ts](tests/postgres/test-helpers.ts) -- the file databases, the devices, and
     **`OnRealPostgres`, the list of suites that run against the server**. The rest of the
-    Postgres tests stay in `packages/safebyok-postgres`, over a PGlite. To run one more suite on the
+    Postgres tests stay in `packages/safebyok-postgres-big`, over a PGlite. To run one more suite on the
     server, add it to the list. A file database has the bankDB's tables and functions.
 
-* [tests/graphql/](tests/graphql) -- `safebyok-graphql`'s README recipe, both halves, over real
+* [tests/graphql/](tests/graphql) -- `safebyok-graphql-big`'s README recipe, both halves, over real
   sockets: `GraphQLBankDB` over an urql Client posting to Yoga servers, each on its own port and
   hosting a `PostgresBankDB` over the real Postgres above. It runs where the Postgres tests do, as
   `graphql` in `OnRealPostgres`.
@@ -53,7 +53,7 @@ pnpm justify    # from e2e/: install, lint, typecheck, test (it builds the packa
     databases and `PostgresBankDB`s that the Postgres directory's helpers make.
 
 The packages are read as a consumer reads them: through their built `dist/`, which the `test`
-script builds first, except `safebyok-convex/test`, which ships as source.
+script builds first, except `safebyok-convex-big/test`, which ships as source.
 
 ## Adding a pairing
 

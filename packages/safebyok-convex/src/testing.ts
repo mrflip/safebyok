@@ -4,7 +4,7 @@ import { makeFunctionReference } from 'convex/server'
 import type { FunctionReference } from 'convex/server'
 import { Base64, ConvexError, convexToJson, jsonToConvex } from 'convex/values'
 import type { JSONValue, Value } from 'convex/values'
-import { Checkers } from 'safebyok-big/storage'
+import { Checkers } from 'safebyok/storage'
 
 // The fake replaces the network and the server, so it tests neither. Calls run one at a time, in
 // arrival order. Every watched query reruns after each mutation. Each socket is signed in as one
@@ -47,7 +47,7 @@ type Session = {
   socket:  FakeSocket
   subject: string | null
   version: { querySet: number, ts: number, identity: number }
-  watched: Map<number, { udfPath: string, args: Record<string, Value>, said: string }>
+  watched: Map<number, { udfpath: string, args: Record<string, Value>, said: string }>
 }
 
 type ClientMessage =
@@ -127,14 +127,14 @@ export class FakeDeployment<Host extends FakeHost> {
   }
 
   /** Return the backend, acting as `subject`, to set up or inspect stored rows directly.
-   * A change made this way is not pushed to watchers: use `arrange` for that.
+   * A change made this way is not pushed to watchers: use `_cheat_arrange` for that.
    */
-  as(subject: string | null): ReturnType<Host['createTest']> {
+  _cheat_backendAs(subject: string | null): ReturnType<Host['createTest']> { // eslint-disable-line unicorn/prefer-private-class-fields
     return this.backendAs(subject) as ReturnType<Host['createTest']>
   }
 
   /** Run `change` on the backend, then push every watched query whose result changed. */
-  async arrange<T>(change: (backend: ReturnType<Host['createTest']>) => Promise<T>): Promise<T> {
+  async _cheat_arrange<T>(change: (backend: ReturnType<Host['createTest']>) => Promise<T>): Promise<T> { // eslint-disable-line unicorn/prefer-private-class-fields
     const answer = await this.enqueue(async () => {
       const changed = await change(this.backend as ReturnType<Host['createTest']>)
       this.ts += 1
@@ -148,7 +148,7 @@ export class FakeDeployment<Host extends FakeHost> {
 
   /** List the function path of every query a connected socket is watching right now. */
   watching(): string[] {
-    return Array.from(this.sessions.values(), (session) => Array.from(session.watched.values(), (watch) => watch.udfPath)).flat()
+    return Array.from(this.sessions.values(), (session) => Array.from(session.watched.values(), (watch) => watch.udfpath)).flat()
   }
 
   /** Sign every connected socket out, then push every watched query whose result changed. */
@@ -211,7 +211,7 @@ export class FakeDeployment<Host extends FakeHost> {
         }
         const args = jsonToConvex(modification.args[0] ?? {}) as Record<string, Value>
         const result = await this.run(session, modification.udfPath, args, modification.queryId)
-        session.watched.set(modification.queryId, { udfPath: modification.udfPath, args, said: JSON.stringify(result) })
+        session.watched.set(modification.queryId, { udfpath: modification.udfPath, args, said: JSON.stringify(result) })
         changes.push(result)
       }
       this.transition(session, changes, message.newVersion)
@@ -240,7 +240,7 @@ export class FakeDeployment<Host extends FakeHost> {
     for (const other of this.sessions.values()) {
       const changes: QueryModification[] = []
       for (const [queryId, watch] of other.watched) {
-        const result = await this.run(other, watch.udfPath, watch.args, queryId)
+        const result = await this.run(other, watch.udfpath, watch.args, queryId)
         const said = JSON.stringify(result)
         if (said === watch.said) {
           continue
@@ -253,9 +253,9 @@ export class FakeDeployment<Host extends FakeHost> {
     }
   }
 
-  private async run(session: Session, udfPath: string, args: Record<string, Value>, queryId: number): Promise<QueryModification> {
+  private async run(session: Session, udfpath: string, args: Record<string, Value>, queryId: number): Promise<QueryModification> {
     try {
-      const result: unknown = await this.backendAs(session.subject).query(makeFunctionReference<'query'>(udfPath), args)
+      const result: unknown = await this.backendAs(session.subject).query(makeFunctionReference<'query'>(udfpath), args)
       return { type: 'QueryUpdated', queryId, value: convexToJson(result as Value), logLines: [], journal: null }
     } catch (err) {
       const { result: errorMessage, errorData } = failureOf(err)
