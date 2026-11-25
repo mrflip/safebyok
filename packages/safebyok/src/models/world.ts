@@ -216,11 +216,11 @@ export class World {
   // --
 
   // == [The awaited `unlock` gating]: ensureUnlocked, dismissUnlock, settleUnlockWait
-  // One wait is shared by every caller, opened by the first and settled once: by any unlock, or a dismissal.
+  // One wait is shared by every caller, opened by the first and settled once: by any unlock, a dismissal or the device's disable.
 
   /** Resolve this world once it is unlocked: at once, or when an `unlock` gating or a gate change lands.
    * While it waits, {@link isUnlockWanted} is true: render the unlock form, and call the gate's `unlock` from it.
-   * Rejects `dismissed` when {@link dismissUnlock} is called. A {@link disconnect} leaves it waiting.
+   * Rejects `dismissed` when {@link dismissUnlock} is called, and with the device's end cause when it is disabled. A {@link disconnect} leaves it waiting.
    */
   async ensureUnlocked(): Promise<this> {
     this.demandEnabled()
@@ -278,7 +278,7 @@ export class World {
   }
   // --
 
-  // == [Locking and connecting]: lock, connect, disconnect, hostVault, #connectMinder, #refreshRoots
+  // == [Locking and connecting]: lock, connect, disconnect, disable, hostVault, #connectMinder, #refreshRoots
 
   /** Lock the world: drop its lease and the keys in it. */
   lock(): this {
@@ -291,11 +291,12 @@ export class World {
   // The watch starts before the vaults hear it, so that what a vault refetches as it connects is fetched under the watch,
   // and so is the bank's three roots, got again where someone has signed in: what was written while no watch ran told
   // this world nothing.
-  /** Start what this world keeps running: its VaultMinder's watch of the vaultDB, once someone signs in, and each vault it hosts hearing the VaultMinder. Never throws, and a second call does nothing.
+  /** Start what this world keeps running: its VaultMinder's watch of the vaultDB, once someone signs in, and each vault it hosts hearing the VaultMinder. Never throws; a second call, or a call once the device is disabled, does nothing.
    * Where someone has signed in, the bank, its main gate and its root box are got again, so they match the vaultDB after a disconnect of any length.
    * What the host's vaultDB throws or refuses goes to the device's `onBadNews`.
    */
   connect(): this {
+    if (! this.isEnabled) { return this }
     const wasConnected = this.#isConnected
     this.#isConnected = true
     this.#connectMinder()
@@ -314,6 +315,12 @@ export class World {
     for (const vault of this.#vaults) { vault.disconnect() }
     try { this.#vaultMinder?.disconnect() } catch (err) { this.#device.tellBadNews([err]) }
     return this
+  }
+
+  /** Reject every call waiting in {@link ensureUnlocked} with the device's end cause, and {@link disconnect}. Internal: call `device.disable`, which ends the device first. */
+  disable(): this {
+    this.#settleUnlockWait(this.endCause)
+    return this.disconnect()
   }
 
   /** Connect and disconnect `vault` with this world, from now on: at once, where this world is connected. Internal.
@@ -440,10 +447,9 @@ export class World {
     for (const told of this.#subscribers.values()) { told() }
   }
 
-  // An ended bank's stage is 'swept'.
   /** The stage the snapshot shows, the first that holds. */
   #stageOf(): BankStage {
-    if (this.endCause !== null)       { return 'swept' }
+    if (this.endCause !== null)       { return 'disabled' }
     if (this.#device.userid === null) { return 'signed_out' }
     if (this.areRootsLive)            { return this.isLocked ? 'locked' : 'unlocked' }
     if (this.#lastErr !== null)       { return 'failed' }

@@ -147,14 +147,14 @@ export interface DeviceOpts {
 // == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, WorldSnapshot, PendingWorld, SignedOutWorld
 
 /** The stages of a bank, each described at {@link BankStage}. */
-export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'swept', 'failed'] as const
+export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'disabled', 'failed'] as const
 /** Where the user stands with their bank, for a host's screen to switch on:
  * - `'signed_out'` -- nobody is signed in, or the bank was vacated or signed out of
  * - `'starting'`   -- signed in, and the device's sign-in has not answered
  * - `'unborn'`     -- no bank is stored for this user, or it was deleted
  * - `'locked'`     -- the bank is stored, and needs the passphrase or passkey before a whisper can be read
  * - `'unlocked'`   -- the bank has a lease, and whispers can be read and written
- * - `'swept'`      -- everything was unloaded, and nothing follows until the host acts
+ * - `'disabled'`   -- the device was disabled: everything was unloaded, and nothing follows until the host acts
  * - `'failed'`     -- bringing the bank up failed, as `lastErr` says
  */
 export type BankStage = typeof bankStageVals[number]

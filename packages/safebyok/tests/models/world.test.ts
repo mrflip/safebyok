@@ -182,13 +182,39 @@ describe("world.getSnapshot() and world.subscribe(listener)", () => {
     expect(JSON.stringify(snapshots)).not.to.include(passphraseCleartext)
   })
 
+  it("shows the bank disabled once its device is disabled, telling its subscribers once", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const { world } = device
+    const counter = TH.countCalls(world.subscribe)
+    device.disable()
+    expect(counter.calls).to.eq(1)
+    expect(world.getSnapshot()).to.deep.equal({ stage: 'disabled', isLocked: true, isEnded: true, endCause: bank.endCause, leaseEndsAt: null, lastErr: null, isUnlockWanted: false })
+    expect(world.getSnapshot().endCause).to.equal(device.endCause).and.include({ refusalkind: 'disabled' })
+  })
+
+  it("leaves its snapshot unchanged once disabled, telling no subscriber of a lock, a connect, a disconnect or a second disable", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const { world } = device
+    device.disable()
+    const disabled = world.getSnapshot()
+    const counter = TH.countCalls(world.subscribe)
+    bank.lock()
+    device.connect()
+    device.disconnect()
+    device.disable()
+    expect(counter.calls).to.eq(0)
+    expect(world.getSnapshot()).to.equal(disabled)
+  })
+
   it("shows only stages that bankStageVals lists", async () => {
     const { bank } = await TH.buildBornBank()
     const { world } = bank.device
     const snapshots = [world.getSnapshot()]
     bank.lock()
     snapshots.push(world.getSnapshot())
-    expect(snapshots.map(({ stage }) => stage)).to.deep.equal(['unlocked', 'locked'])
+    bank.device.disable()
+    snapshots.push(world.getSnapshot())
+    expect(snapshots.map(({ stage }) => stage)).to.deep.equal(['unlocked', 'locked', 'disabled'])
     expect(bankStageVals).to.include.members(snapshots.map(({ stage }) => stage))
   })
 

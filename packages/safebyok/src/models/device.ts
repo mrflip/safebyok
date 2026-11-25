@@ -223,7 +223,7 @@ export class Device {
   }
   // --
 
-  // == [Locking and connecting]: lock, connect, disconnect
+  // == [Locking and connecting]: lock, connect, disconnect, disable
 
   /** Lock the signed-in user's bank ({@link World.lock}). Never throws. */
   lock(): this {
@@ -246,6 +246,17 @@ export class Device {
    */
   disconnect(): this {
     this.#world.disconnect()
+    return this
+  }
+
+  // It shuts first, so that a subscriber told of the lock, or a vault as it disconnects, finds every call refusing.
+  /** End the device for good: lock its bank, reject every call waiting for an `unlock` gating, and disconnect. Never throws; calling it twice in a row is the same as once.
+   * Every call on its bank, gate, vault or world after refuses `disabled`, and its world's snapshot shows the stage `'disabled'`.
+   */
+  disable(): this {
+    if (this.#endCause !== null) { return this }
+    this.#endCause = Throwers.deviceDisabled()
+    this.#world.disable()
     return this
   }
   // --

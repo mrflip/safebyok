@@ -658,6 +658,40 @@ describe("device.connect() and device.disconnect()", () => {
   })
 })
 
+describe("device.disable()", () => {
+  it("ends the device and its bank for good, locked and showing the stage 'disabled', stopping the watch; never throws, and a second call does nothing", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const stop = vi.fn()
+    vi.spyOn(vaultDB, 'watch').mockReturnValue(stop)
+    const { bank, device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB }) })
+    expect(device.disable()).to.equal(device)
+    expect([device.isEnabled, bank.isEnabled, bank.isLocked, stop.mock.calls.length]).to.deep.equal([false, false, true, 1])
+    expect(device.endCause).to.include({ refusalkind: 'disabled', message: Phrases.DeviceLetGo })
+    const disabled = device.world.getSnapshot()
+    expect(disabled).to.include({ stage: 'disabled', isEnded: true, endCause: device.endCause })
+    expect(device.disable()).to.equal(device)
+    expect([device.world.getSnapshot(), stop.mock.calls.length]).to.deep.equal([disabled, 1])
+  })
+
+  it("rejects a call waiting for an `unlock` gating with its end cause", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const ensuring = bank.ensureUnlocked()
+    device.disable()
+    expect(await TH.expectRefusal(ensuring, 'disabled')).to.equal(device.endCause)
+  })
+
+  it("watches nothing, and gets nothing, at a connect after it", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB }) })
+    device.disable()
+    const watch = vi.spyOn(vaultDB, 'watch')
+    const tryGetWorld = vi.spyOn(vaultDB, 'tryGetWorld')
+    device.connect()
+    expect([watch.mock.calls.length, tryGetWorld.mock.calls.length]).to.deep.equal([0, 0])
+  })
+})
+
 describe("device.judgeStrength(passphraseCleartext)", () => {
   it("returns the verdict of the device's strength checker, given the device's scope", async () => {
     const strengthChecker = vi.fn((passphrase: string) => (passphrase === 'weak' ? { strong: false as const, reason: 'too short' } : { strong: true as const }))

@@ -119,6 +119,12 @@ describe("Vault.make(world, vaultTSQ)", () => {
       expect(err.message).to.include(Phrases.VaultTSQExpected)
     })
   }
+
+  it("refuses a world whose device is disabled", async () => {
+    const { device } = await TH.buildBornBank()
+    device.disable()
+    TH.expectSyncRefusal(() => Vault.make(device.world, device.vaultTSQ), 'disabled')
+  })
 })
 
 /** A vault born on a device whose vaultDB counts the watches stopped, read as `unwatched.calls`. */
@@ -171,6 +177,59 @@ describe("device.disconnect() and device.connect(), over the vaults made on the 
     expect(device.world.getSnapshot()).to.include({ stage: 'locked' })
     await TH.eventually(() => onBadNews.mock.calls.length === 1)
     expect(onBadNews.mock.calls.map(([badNews]) => (badNews as BadNews).news.refusalkind)).to.deep.equal(['unexpected_error'])
+  })
+})
+
+describe("a vault whose device is disabled", () => {
+  it("hears no more: its vault TSQ stops hearing, and the one watch of the host's vaultDB stops", async () => {
+    const { bank, device, vault, unwatched } = await buildWatchedVault()
+    const first  = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const stored = await vault.sealBox(first, {}, { whisper: TH.Whisper })
+    device.disable()
+    device.connect()
+    rowsOf(bank).set(Openai, stored)
+    await bank.device.world.demandVaultMinder().tryGetOnce(openaiScopeOf(bank))
+    expect(itemAt(vault)).to.deep.equal(first)
+    expect(unwatched.calls).to.have.lengthOf(1)
+  })
+
+  it("tells the world's subscribers once, and nothing after", async () => {
+    const { bank, device } = await TH.buildBornVault()
+    const listener = vi.fn()
+    device.world.subscribe(listener)
+    device.disable()
+    bank.lock()
+    bank.dismissUnlock()
+    await TH.expectRefusal(bank.ensureUnlocked(), 'disabled')
+    device.disable()
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
+  it("refuses a put, and writes nothing", async () => {
+    const { bank, device, vault } = await TH.buildBornVault()
+    const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
+    device.disable()
+    await TH.expectRefusal(vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'disabled')
+    expect(written).not.toHaveBeenCalled()
+  })
+
+  it("refuses withWhisper and withUnlockedWhisper, never calling fn", async () => {
+    const { device, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    device.disable()
+    const fn = vi.fn()
+    await TH.expectRefusal(vault.withWhisper(Openai, fn), 'disabled')
+    await TH.expectRefusal(vault.withUnlockedWhisper(Openai, fn), 'disabled')
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it("refuses at the seal, the tombstone and the unseal", async () => {
+    const { device, vault } = await TH.buildBornVault()
+    const box = await vault.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    device.disable()
+    await TH.expectRefusal(vault.unsealBox(box), 'disabled')
+    await TH.expectRefusal(vault.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'disabled')
+    await TH.expectRefusal(vault.sealBox(box, { am: 'x' }), 'disabled')
   })
 })
 

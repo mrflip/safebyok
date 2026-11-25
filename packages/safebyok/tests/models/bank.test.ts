@@ -288,6 +288,38 @@ describe("bank.lock() and bank.hostVault(vault)", () => {
     bank.hostVault(hosted)
     expect(hosted.connect).not.toHaveBeenCalled()
   })
+
+  it("disconnects each vault it hosts once as its device is disabled, and hosts no vault after", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const hosted = { connect: vi.fn(), disconnect: vi.fn(() => { expect(bank.isEnabled).to.be.false }) }
+    bank.hostVault(hosted)
+    device.disable()
+    device.disable()
+    expect(hosted.disconnect).toHaveBeenCalledOnce()
+    TH.expectSyncRefusal(() => { bank.hostVault({ connect: vi.fn(), disconnect: vi.fn() }) }, 'disabled')
+  })
+})
+
+describe("a bank whose device is disabled", () => {
+  it("is locked and disabled for good, with its device's end cause, evicting its lease once", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const evict = vi.spyOn(Lease.prototype, 'evict')
+    device.disable()
+    device.disable()
+    expect(evict).toHaveBeenCalledTimes(1)
+    expect([bank.isLocked, bank.isEnabled, device.isEnabled]).to.deep.equal([true, false, false])
+    expect(bank.endCause).to.equal(device.endCause).and.include({ refusalkind: 'disabled' })
+    expect(TH.expectSyncRefusal(() => bank.demandEnabled(), 'disabled')).to.equal(bank.endCause)
+  })
+
+  it("refuses a put with its end cause, before it reaches the vaultDB", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const tryWriteThing = vi.spyOn(device.vaultDB, 'tryWriteThing')
+    device.disable()
+    const err = await TH.expectRefusal(bank.put({ cited: bank.pickle(), record: nextBankThingOf(bank) }), 'disabled')
+    expect(err).to.equal(bank.endCause)
+    expect(tryWriteThing).not.toHaveBeenCalled()
+  })
 })
 
 /** The revision of `bank`'s Thing after the one in hand, written a millisecond later. */

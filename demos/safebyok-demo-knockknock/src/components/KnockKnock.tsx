@@ -25,7 +25,7 @@ function screenOf(stage: BankStage, username: string | undefined, failure: strin
   case 'locked': {     return <Opened isLocked username={username} /> }
   case 'unlocked': {   return <Opened isLocked={false} username={username} /> }
   case 'failed': {     return <p role="alert" className="gripe">Your vault could not be opened: {failure}</p> }
-  case 'swept': {      return <p className="quiet">Reload the page to start again.</p> }
+  case 'disabled': {   return <p className="quiet">Reload the page to start again.</p> }
   }
 }
 

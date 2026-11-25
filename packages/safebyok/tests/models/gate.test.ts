@@ -361,12 +361,24 @@ describe("gate.seal(sealer, donor, publicProps, secretProps) and gate.unseal(sea
     expect(await bank.device.vault!.unsealBox(box)).to.deep.include({ whisper: TH.Whisper })
   })
 
-  it("refuse 'bank_locked' while the gate is locked", async () => {
+  it("refuse 'bank_locked' while the gate is locked, and its end cause once its device is disabled", async () => {
     const { bank } = await TH.buildBornBank()
     const box = await bank.gate.seal(BaseBox, TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     bank.gate.lock()
     await TH.expectRefusal(bank.gate.seal(BaseBox, TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bank_locked')
     await TH.expectRefusal(bank.gate.unseal(BaseBox, box), 'bank_locked')
+    bank.device.disable()
+    expect(await TH.expectRefusal(bank.gate.unseal(BaseBox, box), 'disabled')).to.equal(bank.gate.endCause)
+  })
+})
+
+describe("a gate whose device is disabled", () => {
+  it("is locked and disabled for good, with its device's end cause, as its bank is", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    device.disable()
+    expect([bank.gate.isEnabled, bank.gate.isLocked]).to.deep.equal([false, true])
+    expect(bank.gate.endCause).to.equal(device.endCause).and.equal(bank.endCause)
+    expect(TH.expectSyncRefusal(() => bank.gate.demandEnabled(), 'disabled')).to.equal(bank.gate.endCause)
   })
 })
 

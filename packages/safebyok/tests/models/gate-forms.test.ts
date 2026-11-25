@@ -132,6 +132,16 @@ describe("bank.gate.unlock(cleartexts)", () => {
     expect(err.cause).to.be.undefined
     expect(TH.thrownText(err)).to.not.include(TH.TestPassphrase)
   })
+
+  it("refuses once its device is disabled, deriving no key, and zeroes a passkey answer", async () => {
+    const { bank, deriveKeyBytes } = await bankDerivingWatched()
+    bank.device.disable()
+    await TH.expectRefusal(bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase }), 'disabled')
+    expect(deriveKeyBytes).not.toHaveBeenCalled()
+    const answer = TH.passkeyAnswerOf()
+    await TH.expectRefusal(bank.gate.unlock({ passkeyCleartext: answer }), 'disabled')
+    expect(TH.isZeroed(answer.prfBytes)).to.be.true
+  })
 })
 
 describe("bank.gate.replacePassphrase(cleartexts)", () => {
@@ -461,5 +471,28 @@ describe("bank.ensureUnlocked()", () => {
     expect([settled.isSettled, bank.device.world.getSnapshot().isUnlockWanted]).to.deep.equal([false, true])
     await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await Promise.all(ensurings)).to.deep.equal([bank, bank])
+  })
+
+  it("rejects every waiter with the device's end cause, synchronously, when the device is disabled", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const ensurings = [bank.ensureUnlocked(), bank.ensureUnlocked()]
+    device.disable()
+    expect(bank.device.world.getSnapshot()).to.include({ isUnlockWanted: false, stage: 'disabled' })
+    for (const ensuring of ensurings) { expect(await TH.expectRefusal(ensuring, 'disabled')).to.equal(device.endCause) }
+  })
+
+  it("rejects with the device's end cause when a subscriber disables the device as it hears an `unlock` gating is wanted", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    device.world.subscribe(() => { if (device.world.getSnapshot().isUnlockWanted) { device.disable() } })
+    expect(await TH.expectRefusal(bank.ensureUnlocked(), 'disabled')).to.equal(device.endCause)
+  })
+
+  it("refuses once its device is disabled, wanting no unlock", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    device.disable()
+    await TH.expectRefusal(bank.ensureUnlocked(), 'disabled')
+    expect(device.world.getSnapshot().isUnlockWanted).to.be.false
   })
 })
