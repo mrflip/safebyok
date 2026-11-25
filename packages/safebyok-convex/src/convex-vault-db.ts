@@ -90,8 +90,12 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
     const read_tc = DB.readTcNow()
     const { thing, written, ...above } = await runOrRefuse('writeThing', () => this.#client.mutation(this.#api.writeThing, { ask }))
     const actual = this.classifyWriteThing(ask, thing, { ...above, read_tc })
-    if (! (actual.ok && DB.Classifier.isWriteAct(actual.act))) { return unwrittenOf(actual, written) }
-    const after = writtenOf(written)
+    if (! (actual.ok && DB.Classifier.isWriteAct(actual.act))) {
+      demandUnwritten(written)
+      return actual
+    }
+
+    const after = checkedWritten(written)
     return { ...actual, banktok: DB.Classifier.banktokOf(ask, after.bank), tracked: DB.Classifier.trackedOf(ask, after.tracked), record: DB.Classifier.writtenThingOf(ask, after.thing) }
   }
 
@@ -105,8 +109,12 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
     const read_tc = DB.readTcNow()
     const { written, ...fetched } = await runOrRefuse('birthBank', () => this.#client.mutation(this.#api.birthBank, { ask }))
     const actual = this.classifyBirthBank(puts, { ...fetched, read_tc })
-    if (! (actual.ok && (actual.act === 'born'))) { return unwrittenOf(actual, written) }
-    const after = writtenOf(written)
+    if (! (actual.ok && (actual.act === 'born'))) {
+      demandUnwritten(written)
+      return actual
+    }
+
+    const after = checkedWritten(written)
     return { ...actual, banktok: DB.Classifier.banktokOf(ask, after.bank), tracked: DB.Classifier.trackedOf(ask, after.tracked), things: DB.Classifier.writtenRootsOf(puts, after) }
   }
 
@@ -163,7 +171,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 }
 // --
 
-// == [Helpers]: runOrRefuse, refusalOf, refusalOfCrossed, storedOutOfStep, unwrittenOf, writtenOf, serializedOf, changesOf, latestOf
+// == [Helpers]: runOrRefuse, refusalOf, refusalOfCrossed, storedOutOfStep, demandUnwritten, checkedWritten, serializedOf, changesOf, latestOf
 
 // Accepts a thunk because ConvexReactClient.query can throw synchronously, before it returns a promise.
 /** Run `thunk`, converting anything it throws into a safebyok refusal. */
@@ -194,14 +202,13 @@ function refusalOfCrossed(crossed: SafebyokRefusal): VaultError {
 /** The `unexpected_error` for a component that wrote where the classifier found no write, or wrote nothing where it found one. */
 function storedOutOfStep(): VaultError { return DB.unexpectedError(new Error(Phrases.StoredOutOfStep)) }
 
-/** Return `actual`, whose act writes nothing, demanding that the component wrote nothing. */
-function unwrittenOf<ActualT>(actual: ActualT, written: unknown): ActualT {
+/** Throw unless the component wrote nothing. */
+function demandUnwritten(written: unknown): void {
   if (written !== null) { throw storedOutOfStep() }
-  return actual
 }
 
-/** Return what the component wrote, demanding that it wrote. */
-function writtenOf<WrittenT>(written: WrittenT | null): WrittenT {
+/** What the component wrote, refused if it wrote nothing. */
+function checkedWritten<WrittenT>(written: WrittenT | null): WrittenT {
   if (written === null) { throw storedOutOfStep() }
   return written
 }
