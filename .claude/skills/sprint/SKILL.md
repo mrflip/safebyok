@@ -251,6 +251,10 @@ Default rules, absent other guidance:
 
 * **Continue** past a `filed` thread with a `clean` or `fixed` review. Minor questions, and
   minor findings the reviewer left, are recorded in the PR and the documents.
+* **A finding is a report, not a bug.** A review that comes back with three findings means the reviewer filed
+  three reports, not that it found three bugs. Weigh each against the reviewer's brief and *Time scales*
+  (`.claude/agents/thread-reviewer.md`) before acting, and ask whether the fix would add a fetch, a guard or a state
+  to a lifecycle path: if so, it is the Coach's.
 * **A `flagged` review** -- a significant finding the reviewer may not act on -- is handled like
   a worker's blocking question. If the fix is a two-way door and you are in YOLO, hand it to a
   fresh worker with the rework handoff (§2); it builds on the branch as it now stands, and

@@ -79,7 +79,7 @@ function isHostedVault(val: unknown): val is HostedVault {
 }
 // --
 
-// == [The device]: BankishChecks, DefaultBanklabel, DeviceRecord, DeviceJSON, BadNews, BadNewsHandler, lifecyclekindVals, Lifecyclekind, DeviceAnnouncement, DeviceEvent, LifecycleHandler, GuardedLifecycleHandler, RootShelf, isRootShelf, RootShelfMethodnames, DeviceOpts
+// == [The device]: BankishChecks, DefaultBanklabel, DeviceRecord, DeviceJSON, BadNews, BadNewsHandler, leasekindVals, lifecyclekindVals, Lifecyclekind, LeaseAnnouncement, StageCrossing, DeviceAnnouncement, DeviceEvent, LifecycleHandler, GuardedLifecycleHandler, RootShelf, isRootShelf, RootShelfMethodnames, DeviceOpts
 
 /** The banklabel of the bank a device serves where its record names none. */
 export const DefaultBanklabel = 'main'
@@ -106,8 +106,11 @@ export interface BadNews {
 /** `Device.make`'s `onBadNews`: hears each refusal no caller waits on. */
 export type BadNewsHandler = (badnews: BadNews) => unknown
 
-/** The kinds of what a device announces to `onLifecycle`, as {@link DeviceAnnouncement} tells them. */
-export const lifecyclekindVals = ['lease_taken_up', 'lock_taken_up', 'autolocked', 'softlocked'] as const
+/** The kinds of {@link LeaseAnnouncement}. */
+export const leasekindVals = ['lease_taken_up', 'lock_taken_up', 'autolocked', 'softlocked'] as const
+
+/** The kinds of {@link DeviceAnnouncement}. */
+export const lifecyclekindVals = [...leasekindVals, 'stage_crossed'] as const
 
 /** One of {@link lifecyclekindVals}. */
 export type Lifecyclekind = typeof lifecyclekindVals[number]
@@ -119,7 +122,13 @@ export type Lifecyclekind = typeof lifecyclekindVals[number]
  * - `'autolocked'`     -- this tab's janitor locked the lease past its end, in every tab
  * - `'softlocked'`     -- the bank's gate changed, so this tab brought its lease's end to `softlockMinutes` from now
  */
-export type DeviceAnnouncement = Readonly<{ kind: Lifecyclekind }>
+export type LeaseAnnouncement = Readonly<{ kind: typeof leasekindVals[number] }>
+
+/** A change of the world's stage, from the stage it was at to the one it is at now. The tab that caused it hears it too. */
+export type StageCrossing = Readonly<{ kind: 'stage_crossed', from: BankStage, to: BankStage }>
+
+/** What a device announces to `onLifecycle`, by its `kind`: a {@link LeaseAnnouncement}, or a {@link StageCrossing}. */
+export type DeviceAnnouncement = LeaseAnnouncement | StageCrossing
 
 /** What `onLifecycle` hears: a {@link DeviceAnnouncement}, and the device it happened to. */
 export type DeviceEvent = DeviceAnnouncement & Readonly<{ device: Device }>
@@ -167,7 +176,7 @@ export interface DeviceOpts {
   gateStaleMinutes?: number | undefined
   /** Hears each refusal no caller waits on. Default: {@link DefaultOnBadNews}, a warning on the device's logger. */
   onBadNews?:        BadNewsHandler | undefined
-  /** Hears what changed the device's lease, other than your own lock, unlock or disable: a lease taken up as the device signs in or connects, a lock or an unlock in another tab, the autolock, a softlock. Your own gate verb (replacing the passphrase, adding or revoking a passkey) announces `softlocked` in its own tab. What it throws or rejects with is reported to the platform. Default: {@link DefaultOnLifecycle}, which does nothing. */
+  /** Hears what changed the device's lease, other than your own lock, unlock or disable: a lease taken up as the device signs in or connects, a lock or an unlock in another tab, the autolock, a softlock. Your own gate verb (replacing the passphrase, adding or revoking a passkey) announces `softlocked` in its own tab. Also hears each crossing from one stage to another as a `stage_crossed`, including those your own lock, unlock or disable cause. What it throws or rejects with is reported to the platform. Default: {@link DefaultOnLifecycle}, which logs each announcement. */
   onLifecycle?:      LifecycleHandler | undefined
   /** The QueryClient the signed-in user's boxes are kept in, under their bank's key: your own, so one client serves your queries and the vault's. Default: one the device makes. */
   queryClient?:      QueryClient | undefined

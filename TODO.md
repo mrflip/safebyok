@@ -121,3 +121,22 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   an item event, so that no read time is invented for a record. Let them take a bare record too, `Thing.make(record, {
   world })`: the "constructor does not assume this weird way of doing it". Open: a bare record has no `read_tc`, and the
   car's `VacantReadTc`, which sorts below every read, is the honest one for it (the Coach, 2026-11-25, who builds it).
+
+* **A store for which measuring each record's size is costly records it at write time.** `stats()` sums each stored
+  record's weight; where the datastore cannot measure that cheaply, it stores the size in a field of its own, written
+  with the record. A Thing record's size can be worked out once the labelpath's and the body's sizes are known: every
+  other field has a fixed or bounded width (the Coach, 2026-11-25, on thread 2).
+* **A check on `scopepathOf`.** `scopepathOf` (from `safebyok/browser`) is exported without parsing its argument.
+  Give it a check at the entrypoint and a test of its own, in a thread that may rename exports (the Coach, 2026-11-25,
+  on #907; the `leaseLabelpathOf` half was done by `LeaseLabelpath.of`, #927).
+* **A watch that ends on its own says so.** `VaultDB.watch`'s `onEnded` (#926) lets a vaultDB say its watch ended
+  before its stop, so the minder stops counting itself watching and the janitor restarts it. Today only
+  `OneWatchVaultDB` calls it, for a start that fails. `AdapterVaultDB` should call it when a datastore's subscription
+  drops after it started, and `OneWatchVaultDB`'s holder should pass its own `onEnded` through to the wrapped watch
+  (resolve the hold, close the channel, call `onEnded`). From #926's review.
+* **A hidden watch-holding tab on iOS Safari.** `OneWatchVaultDB` hands the watch to the tab holding a Web Lock.
+  Chrome does not freeze a page holding a lock others wait on, and Firefox does not freeze pages, but WebKit suspends a
+  background tab soon after it goes quiet, and nothing found says a held lock exempts it. If it does not, a hidden
+  holder starves a visible tab of events. Try it on a real iOS device (Playwright's WebKit is desktop WebKit, and does
+  not reproduce iOS's background suspension); the remedy, if needed, releases the lock when the page is hidden and asks
+  again when it is shown (the Coach, 2026-11-25, on #915).

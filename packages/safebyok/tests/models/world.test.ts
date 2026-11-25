@@ -10,7 +10,7 @@ import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import * as Throwers from '../../src/refusals/throwers'
 import { Lifeseq } from '../../src/shapes/primitives'
-import { type BadNews, type DeviceOpts, type LifecycleHandler, type Lifecyclekind, type WorldSnapshot, PendingWorld, bankStageVals } from '../../src/shapes/shapes-bankish'
+import { type BadNews, type DeviceEvent, type DeviceOpts, type LifecycleHandler, type Lifecyclekind, type WorldSnapshot, PendingWorld, bankStageVals } from '../../src/shapes/shapes-bankish'
 import type { LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import type { LiveOf } from '../../src/shapes/shapes-sealers'
@@ -663,9 +663,19 @@ describe("a lease shared by the tabs of one deviceDB", () => {
   })
 })
 
-/** The kinds `onLifecycle` heard announced on `device`, in order. */
+/** The kinds of lease announcement `onLifecycle` heard on `device`, in order. */
 function kindsHeardOn(onLifecycle: Mock<LifecycleHandler>, device: Device): Lifecyclekind[] {
-  return onLifecycle.mock.calls.filter(([event]) => event.device === device).map(([event]) => event.kind)
+  return eventsHeardOn(onLifecycle, device).map(({ kind }) => kind).filter((kind) => kind !== 'stage_crossed')
+}
+
+/** The events `onLifecycle` heard on `device`, in order. */
+function eventsHeardOn(onLifecycle: Mock<LifecycleHandler>, device: Device): DeviceEvent[] {
+  return onLifecycle.mock.calls.map(([event]) => event).filter((event) => event.device === device)
+}
+
+/** The crossings of stage `onLifecycle` heard on `device`, in order, each as `'from>to'`. */
+function crossingsHeardOn(onLifecycle: Mock<LifecycleHandler>, device: Device): string[] {
+  return eventsHeardOn(onLifecycle, device).filter((event): event is Extract<DeviceEvent, { kind: 'stage_crossed' }> => event.kind === 'stage_crossed').map(({ from, to }) => `${from}>${to}`)
 }
 
 describe("the host's onLifecycle", () => {
@@ -723,6 +733,33 @@ describe("the host's onLifecycle", () => {
     expect(kindsHeardOn(onLifecycle, device)).to.deep.equal(['softlocked'])
   })
 
+  it("hears each crossing of stage, in the tab that crossed it and in the tab that followed", async () => {
+    const onLifecycle = vi.fn<LifecycleHandler>()
+    const { first, second } = await twoTabs({ onLifecycle })
+    expect(crossingsHeardOn(onLifecycle, first.device)).to.deep.equal(['signed_out>starting', 'starting>unborn', 'unborn>locked', 'locked>unlocked'])
+    expect(crossingsHeardOn(onLifecycle, second)).to.deep.equal(['signed_out>starting', 'starting>locked', 'locked>unlocked'])
+    first.device.lock()
+    await settle()
+    expect(crossingsHeardOn(onLifecycle, first.device).slice(4)).to.deep.equal(['unlocked>locked'])
+    expect(crossingsHeardOn(onLifecycle, second).slice(3)).to.deep.equal(['unlocked>locked'])
+  })
+
+  it("hears the crossing to disabled, with its from and to", async () => {
+    const onLifecycle = vi.fn<LifecycleHandler>()
+    const { second } = await twoTabs({ onLifecycle })
+    onLifecycle.mockClear()
+    second.disable()
+    expect(eventsHeardOn(onLifecycle, second)).to.deep.equal([{ kind: 'stage_crossed', from: 'unlocked', to: 'disabled', device: second }])
+  })
+
+  it("hears no crossing where a root's news leaves the stage as it was", async () => {
+    const onLifecycle = vi.fn<LifecycleHandler>()
+    const { second } = await twoTabs({ onLifecycle })
+    onLifecycle.mockClear()
+    second.world.align()
+    expect(eventsHeardOn(onLifecycle, second)).to.deep.equal([])
+  })
+
   it("may throw, and the tab still follows the stored lease", async () => {
     vi.stubGlobal('reportError', vi.fn())
     const onLifecycle = vi.fn<LifecycleHandler>(() => { throw new Error("The handler is broken.") })
@@ -733,6 +770,26 @@ describe("the host's onLifecycle", () => {
     await first.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     await settle()
     expect(second.world.isUnlocked).to.be.true
+  })
+})
+
+describe("the default onLifecycle", () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
+  it("logs each announcement at the level for news", async () => {
+    const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    const { first, second } = await twoTabs({ logger })
+    vi.clearAllMocks()
+    first.device.lock()
+    await settle()
+    const lines = logger.log.mock.calls as [string, Record<string, unknown>][]
+    expect(lines.map(([message]) => message)).to.have.members([
+      "The bank's stage went from 'unlocked' to 'locked'.", "The bank's stage went from 'unlocked' to 'locked'.", "The device's lease changed: lock_taken_up.",
+    ])
+    expect(lines.map(([, story]) => story)).to.deep.include({ oplabel: 'Device.onLifecycle', kind: 'stage_crossed', from: 'unlocked', to: 'locked' })
+    expect(lines.map(([, story]) => story)).to.deep.include({ oplabel: 'Device.onLifecycle', kind: 'lock_taken_up' })
+    expect([logger.warn, logger.error].map((logged) => logged.mock.calls.length)).to.deep.equal([0, 0])
+    expect(second.world.isLocked).to.be.true
   })
 })
 

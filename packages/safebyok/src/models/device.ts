@@ -9,7 +9,7 @@ import { BaseThing } from './base-thing'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import { guardRootShelf } from '../minding/root-shelf'
 import { VaultTSQ } from '../minding/vault-tsq'
-import { type BadNewsHandler, type DeviceAnnouncement, type DeviceEvent, type DeviceJSON, type DeviceOpts, type DeviceRecord, type GuardedLifecycleHandler, type LifecycleHandler, type RootShelf, BankishChecks, isRootShelf, lifecyclekindVals } from '../shapes/shapes-bankish'
+import { type BadNewsHandler, type DeviceAnnouncement, type DeviceEvent, type DeviceJSON, type DeviceOpts, type DeviceRecord, type GuardedLifecycleHandler, type LifecycleHandler, type RootShelf, BankishChecks, bankStageVals, isRootShelf, leasekindVals } from '../shapes/shapes-bankish'
 import { type MaskedView, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import { isQueryClient } from '../shapes/shapes-vault-tsq'
 import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
@@ -385,8 +385,15 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
   }
 }
 
-/** The default `onLifecycle`: it does nothing, since each announcement is news a host may want, never a failure to report. */
-export const DefaultOnLifecycle: LifecycleHandler = () => undefined
+/** The default `onLifecycle`: log each announcement on the device's logger, at the level for news and not for trouble. */
+export const DefaultOnLifecycle: LifecycleHandler = ({ device, ...announcement }) => {
+  // The story names each field it logs, so a field added to an announcement is logged only by a decision.
+  if (announcement.kind === 'stage_crossed') {
+    device.logger.log(Phrases.StageCrossed(announcement.from, announcement.to), { oplabel: 'Device.onLifecycle', kind: announcement.kind, from: announcement.from, to: announcement.to })
+  } else {
+    device.logger.log(Phrases.LeaseAnnounced(announcement.kind), { oplabel: 'Device.onLifecycle', kind: announcement.kind })
+  }
+}
 
 /** Guard the host's `onLifecycle`: anything it throws or rejects with is reported to the platform, never thrown. */
 function guardOnLifecycle(onLifecycle: LifecycleHandler): GuardedLifecycleHandler {
@@ -426,7 +433,7 @@ function isUnbornIn({ bank, gate, root }: WorldRoots): boolean { return (bank.am
 // == [Checks]: Checks
 
 /** The checks of {@link Device.make}'s arguments, {@link Device.signin}'s, {@link Device.announce}'s and {@link tellBadNewsTo}'s. */
-const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom, oneof }) => ({
+const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom, oneof, lit, union }) => ({
   userid:        BankishChecks.userid,
   deviceMakeArgs: obj({
     record: BankishChecks.deviceRecord,
@@ -447,7 +454,10 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom, oneof }
       devicetok:        BankishChecks.devicetok.optional(),
     }), { refusalkind: 'bad_record' }),
   }),
-  announcement:  obj({ kind: oneof(lifecyclekindVals) }).strict(),
+  announcement:  union([
+    obj({ kind: oneof(leasekindVals) }).strict(),
+    obj({ kind: lit('stage_crossed'), from: oneof(bankStageVals), to: oneof(bankStageVals) }).strict(),
+  ]),
   tellBadNewsToArgs: obj({
     onBadNews: fn<BadNewsHandler>(),
     device:    custom<Device>(),

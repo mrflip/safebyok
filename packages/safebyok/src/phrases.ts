@@ -226,6 +226,15 @@ export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of mil
 export const ChildrenStoredDamaged = "Some of the Things this list found are stored damaged, so it left them out: the refusal's meta.labelpaths names each one. They were left as they are in storage."
 // --
 
+// == [Telling the host]: LeaseAnnounced, StageCrossed
+
+/** The default `onLifecycle`'s line for a change of a device's lease, by the announcement's `kind`. */
+export function LeaseAnnounced(kind: string): string { return `The device's lease changed: ${kind}.` }
+
+/** The default `onLifecycle`'s line for the bank's stage changing. */
+export function StageCrossed(from: string, to: string): string { return `The bank's stage went from '${from}' to '${to}'.` }
+// --
+
 // == [Probing]: probeStepRefused, ProbePutNotGot
 
 /** A step of `Vault.probe` refused, its own refusal kept as the cause. */

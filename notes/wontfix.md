@@ -552,3 +552,23 @@ Steps to reproduce: start `vault.probe()` on two devices of one bank; hold the f
 Reasoning for wontfix: a probe is a self-test a host runs at startup or on demand, and its refusal is an honest
 report of what storage answered. A fixed default labelpath means a failed probe's box is written over by the next one.
 Written by lease_shelf thread 4, 2026-11-25, awaiting a ruling.
+
+### A tab that replaces its own passphrase hears its own `softlocked`
+
+* current outcome: a gate verb (replacing the passphrase, adding or revoking a passkey) changes the bank's gate, and
+  the tab that called it softlocks on the new gate as every other tab does: its `onLifecycle` hears `softlocked`, where
+  an `unlock`, a `lock` or a `disable` called in a tab announces no lease kind there (it hears only the `stage_crossed`). The tab's own call has returned, or is
+  about to, when the announcement comes.
+* alternatives:
+  - have the tab that acted suppress the announcement: a flag through the softlock for a case the host knows it caused,
+    and a branch on every gate verb.
+  - announce a gate change as a kind of its own: a second kind for the same softlock, with its own branch in the world.
+* workaround: none needed: a host that called the verb knows it did, and a handler that cares compares the `softlocked`
+  it hears with the verb it has under way.
+
+Steps to reproduce: `onLifecycle` on a device whose bank is unlocked; call `gate.replacePassphrase` in that tab, and
+the handler hears `softlocked`.
+
+Reasoning for wontfix: the softlock is the same act in every tab, and `#lock-is-intent` makes it news, never an alarm:
+the default handler logs it at the level for news. Suppressing it in the acting tab would cost a branch on each gate
+verb for a line in the host's log. Ruled by the Coach, 2026-11-25, written by lease_shelf thread 12.

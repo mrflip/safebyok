@@ -67,6 +67,8 @@ export class World {
 
   /** The current snapshot, which {@link getSnapshot} returns. */
   #snapshot: WorldSnapshot
+  /** The stage the world was last at, or null before its first. */
+  #stage: BankStage | null = null
   /** Each subscriber, beside its bulletproofed form, which is what is called. */
   readonly #subscribers = new Map<() => void, () => void>()
   readonly #getSnapshot = (): WorldSnapshot => this.#snapshot
@@ -144,6 +146,7 @@ export class World {
   private constructor(device: Device) {
     this.#device   = device
     this.#snapshot = this.#makeSnapshot()
+    this.#setStage(this.#snapshot.stage)
     Object.freeze(this)
   }
 
@@ -636,7 +639,7 @@ export class World {
   #thingAt(labelpath: Labelpath): unknown { return this.#vaultMinder?.thingAt({ ...this.#device.scope, labelpath }) }
   // --
 
-  // == [Snapshot]: hearRoot, align, stageOf, makeSnapshot
+  // == [Snapshot]: hearRoot, align, stageOf, setStage, makeSnapshot
 
   // The three roots may arrive in any order, one at a time: a set of them partly live is never shown as a stage of its
   // own. The last of them to land live brings `'locked'`, so a birth shows no stage between `'unborn'` and `'locked'`.
@@ -654,6 +657,7 @@ export class World {
     const next = this.#makeSnapshot()
     if (isEqual(next, this.#snapshot)) { return }
     this.#snapshot = next
+    this.#setStage(next.stage)
     for (const told of this.#subscribers.values()) { told() }
   }
 
@@ -665,6 +669,13 @@ export class World {
     if (this.#lastErr !== null)       { return 'failed' }
     const { bank } = this
     return ((bank === null) || isLive(bank)) ? 'starting' : 'unborn'
+  }
+
+  /** Record `stage` as the world's stage, announcing the crossing from the one before it. */
+  #setStage(stage: BankStage): void {
+    const from = this.#stage
+    this.#stage = stage
+    if ((from !== null) && (from !== stage)) { this.#device.announce({ kind: 'stage_crossed', from, to: stage }) }
   }
 
   /** A new snapshot of this world. */

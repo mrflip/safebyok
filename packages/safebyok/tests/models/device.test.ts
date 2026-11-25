@@ -9,7 +9,7 @@ import { Consts, Errors, Phrases, SX } from 'safebyok-big/internals'
 import { browserOpts } from '../../src/browser'
 import { maskUuid } from '../../src/helpers/mask-uuid'
 import { Bank } from '../../src/models/bank'
-import { DefaultGateStaleMillis, DefaultJanitorMillis, DefaultLeaseMillis, DefaultOnBadNews, DefaultSoftlockMillis, Device, tellBadNewsTo } from '../../src/models/device'
+import { DefaultGateStaleMillis, DefaultJanitorMillis, DefaultLeaseMillis, DefaultOnBadNews, DefaultOnLifecycle, DefaultSoftlockMillis, Device, tellBadNewsTo } from '../../src/models/device'
 import { BirthGating } from '../../src/models/gating'
 import { VaultTSQ } from '../../src/minding/vault-tsq'
 import { Vault } from '../../src/models/vault'
@@ -897,6 +897,7 @@ describe("device.announce(announcement)", () => {
   it("tells the host's onLifecycle the announcement and its device, awaiting nothing", () => {
     const onLifecycle = vi.fn(() => new Promise(noop))
     const device = TH.makeDevice({}, { onLifecycle })
+    onLifecycle.mockClear()
     device.announce({ kind: 'softlocked' })
     expect(onLifecycle.mock.calls).to.deep.equal([[{ kind: 'softlocked', device }]])
   })
@@ -904,25 +905,49 @@ describe("device.announce(announcement)", () => {
   it("reports a handler's throw, or its promise's rejection, to the platform, and throws nothing", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
-    const throwing = TH.makeDevice({}, { onLifecycle: () => { throw new Error("The handler is broken.") } })
-    const rejecting = TH.makeDevice({}, { onLifecycle: () => Promise.reject(new Error("Rejected.")) })
+    const throwing = TH.makeDevice({}, { onLifecycle: ({ kind }) => { if (kind === 'autolocked') { throw new Error("The handler is broken.") } } })
+    const rejecting = TH.makeDevice({}, { onLifecycle: ({ kind }) => (kind === 'autolocked') ? Promise.reject(new Error("Rejected.")) : undefined })
     throwing.announce({ kind: 'autolocked' })
     rejecting.announce({ kind: 'autolocked' })
     await TH.eventually(() => reported.mock.calls.length === 2)
     expect(reported.mock.calls.map(([err]) => (err as Error).message)).to.have.members(["The handler is broken.", "Rejected."])
   })
 
-  it("logs nothing by default", () => {
+  it("logs each announcement by default, as news and not as trouble", () => {
     const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() }
     const device = TH.makeDevice({}, { logger })
     vi.clearAllMocks()
     device.announce({ kind: 'lock_taken_up' })
-    expect([logger.log, logger.warn, logger.error].map((logged) => logged.mock.calls.length)).to.deep.equal([0, 0, 0])
+    device.announce({ kind: 'stage_crossed', from: 'locked', to: 'unlocked' })
+    expect((logger.log.mock.calls as [string, unknown][]).map(([message, story]) => [message, story])).to.deep.equal([
+      ["The device's lease changed: lock_taken_up.", { oplabel: 'Device.onLifecycle', kind: 'lock_taken_up' }],
+      ["The bank's stage went from 'locked' to 'unlocked'.", { oplabel: 'Device.onLifecycle', kind: 'stage_crossed', from: 'locked', to: 'unlocked' }],
+    ])
+    expect([logger.warn, logger.error].map((logged) => logged.mock.calls.length)).to.deep.equal([0, 0])
+  })
+
+  it("logs only the fields it names, whatever else an announcement carries", () => {
+    const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    const device = TH.makeDevice({}, { logger })
+    vi.clearAllMocks()
+    DefaultOnLifecycle({ device, kind: 'softlocked', extra: 'not logged' } as never)
+    expect(logger.log.mock.calls[0]?.slice(0, 2)).to.deep.equal(["The device's lease changed: softlocked.", { oplabel: 'Device.onLifecycle', kind: 'softlocked' }])
+  })
+
+  it("refuses a crossing to a stage that does not exist", () => {
+    const device = TH.makeDevice()
+    TH.expectSyncRefusal(() => { device.announce({ kind: 'stage_crossed', from: 'locked', to: 'asleep' } as never) }, 'bad_record')
+  })
+
+  it("refuses a crossing that lacks its stages", () => {
+    const device = TH.makeDevice()
+    TH.expectSyncRefusal(() => { device.announce({ kind: 'stage_crossed' } as never) }, 'bad_record')
   })
 
   it("refuses a kind it does not announce", () => {
     const onLifecycle = vi.fn()
     const device = TH.makeDevice({}, { onLifecycle })
+    onLifecycle.mockClear()
     TH.expectSyncRefusal(() => { device.announce({ kind: 'vacated' } as never) }, 'bad_record')
     expect(onLifecycle).not.toHaveBeenCalled()
   })
