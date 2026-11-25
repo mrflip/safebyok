@@ -10,7 +10,7 @@ import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import * as Throwers from '../../src/refusals/throwers'
 import { Lifeseq } from '../../src/shapes/primitives'
-import { type BadNews, type DeviceEvent, type DeviceOpts, type LifecycleHandler, type Lifecyclekind, type WorldSnapshot, PendingWorld, bankStageVals } from '../../src/shapes/shapes-bankish'
+import { type BadNews, type DeviceEvent, type DeviceOpts, type LifecycleHandler, type Lifecyclekind, type WorldSnapshot, PendingWorld, bankStageVals, leasekindVals } from '../../src/shapes/shapes-bankish'
 import type { LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import type { LiveOf } from '../../src/shapes/shapes-sealers'
@@ -665,7 +665,7 @@ describe("a lease shared by the tabs of one deviceDB", () => {
 
 /** The kinds of lease announcement `onLifecycle` heard on `device`, in order. */
 function kindsHeardOn(onLifecycle: Mock<LifecycleHandler>, device: Device): Lifecyclekind[] {
-  return eventsHeardOn(onLifecycle, device).map(({ kind }) => kind).filter((kind) => kind !== 'stage_crossed')
+  return eventsHeardOn(onLifecycle, device).map(({ kind }) => kind).filter((kind) => (leasekindVals as readonly Lifecyclekind[]).includes(kind))
 }
 
 /** The events `onLifecycle` heard on `device`, in order. */
@@ -676,6 +676,11 @@ function eventsHeardOn(onLifecycle: Mock<LifecycleHandler>, device: Device): Dev
 /** The crossings of stage `onLifecycle` heard on `device`, in order, each as `'from>to'`. */
 function crossingsHeardOn(onLifecycle: Mock<LifecycleHandler>, device: Device): string[] {
   return eventsHeardOn(onLifecycle, device).filter((event): event is Extract<DeviceEvent, { kind: 'stage_crossed' }> => event.kind === 'stage_crossed').map(({ from, to }) => `${from}>${to}`)
+}
+
+/** How many times `onLifecycle` heard on `device` that its watch ended. */
+function endingsHeardOn(onLifecycle: Mock<LifecycleHandler>, device: Device): number {
+  return eventsHeardOn(onLifecycle, device).filter(({ kind }) => kind === 'watch_ended').length
 }
 
 describe("the host's onLifecycle", () => {
@@ -758,6 +763,19 @@ describe("the host's onLifecycle", () => {
     onLifecycle.mockClear()
     second.world.align()
     expect(eventsHeardOn(onLifecycle, second)).to.deep.equal([])
+  })
+
+  it("hears once that the watch ended, where a OneWatchVaultDB's wrapped watch threw as it started, and nothing as the janitor starts it again", async () => {
+    vi.stubGlobal('navigator', { locks: TH.fakeLockManager() })
+    const memory = new MemoryVaultDB()
+    vi.spyOn(memory, 'watch').mockImplementationOnce(() => { throw new Error('the socket is down') })
+    const onLifecycle = vi.fn<LifecycleHandler>()
+    const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB: oneWatchVaultDB(memory), onBadNews: noop, onLifecycle, janitorMinutes: 10 }) })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(endingsHeardOn(onLifecycle, device)).to.eq(1)
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
+    expect([device.world.demandVaultMinder().isWatching, endingsHeardOn(onLifecycle, device)]).to.deep.equal([true, 1])
+    device.world.demandVaultMinder().disconnect()
   })
 
   it("may throw, and the tab still follows the stored lease", async () => {

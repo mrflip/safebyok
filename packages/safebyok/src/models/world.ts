@@ -383,10 +383,10 @@ export class World {
     if (this.#isConnected) { vault.connect() }
   }
 
-  /** Start the VaultMinder's watch, where someone has signed in, telling the device's `onBadNews` what the host's vaultDB throws */
+  /** Start the VaultMinder's watch, where someone has signed in, telling the device's `onBadNews` what the host's vaultDB throws, and announcing the watch's end where it ends of itself */
   #startWatch(): void {
     if (this.#vaultMinder === null) { return }
-    try { this.#vaultMinder.connect() } catch (err) { this.#device.tellBadNews([err]) }
+    try { this.#vaultMinder.connect(() => { this.#device.announce({ kind: 'watch_ended' }) }) } catch (err) { this.#device.tellBadNews([err]) }
   }
 
   /** Follow the lease the deviceDB stores each time any tab stows one, where the listener is not running already, telling the device's `onBadNews` what the deviceDB throws */

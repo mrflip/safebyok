@@ -192,6 +192,31 @@ describe("VaultMinder, what only a wrapper can show", () => {
     expect([inner.watch.mock.calls.length, vaultDB.isWatching]).to.deep.equal([2, true])
   })
 
+  it("calls the onEnded handed to connect once the wrapped watch ends of itself, already watching nothing", () => {
+    const inner = stubVaultDBOf(vi.fn())
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
+    const watchingWhenEnded: boolean[] = []
+    vaultDB.connect(() => { watchingWhenEnded.push(vaultDB.isWatching) })
+    inner.watch.mock.calls[0]![3]!()
+    expect(watchingWhenEnded).to.deep.equal([false])
+  })
+
+  it("never calls the onEnded of a connect made while watching", () => {
+    const inner = stubVaultDBOf(vi.fn())
+    const first = vi.fn()
+    const second = vi.fn()
+    VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld }).connect(first).connect(second)
+    inner.watch.mock.calls[0]![3]!()
+    expect([first.mock.calls.length, second.mock.calls.length, inner.watch.mock.calls.length]).to.deep.equal([1, 0, 1])
+  })
+
+  it("refuses an onEnded that is not a function, and watches nothing", () => {
+    const inner = stubVaultDBOf(vi.fn())
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
+    TH.expectSyncRefusal(() => { vaultDB.connect('tell me' as never) }, 'bad_record')
+    expect([inner.watch.mock.calls.length, vaultDB.isWatching]).to.deep.equal([0, false])
+  })
+
   it("watches nothing when the wrapped watch throws as it connects, and throws that", () => {
     const inner = stubVaultDBOf(vi.fn())
     const thrown = new Error('watch refused')

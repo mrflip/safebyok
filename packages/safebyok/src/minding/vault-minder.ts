@@ -333,15 +333,20 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   /** True from {@link connect} until {@link disconnect}, or until the wrapped vaultDB's watch ends of itself: what that watch notifies is told meanwhile. */
   get isWatching(): boolean { return this.#unwatchWrapped !== null }
 
-  /** Start watching the wrapped vaultDB for this bank's records. A second call does nothing while watching.
-   * What the wrapped vaultDB's `watch` throws is thrown, and nothing is watched. Where that watch ends of itself, nothing is watched until the next call.
+  /** Start watching the wrapped vaultDB for this bank's records. A second call does nothing while watching, and its `onEnded` is never called.
+   * What the wrapped vaultDB's `watch` throws is thrown, and nothing is watched. Where that watch ends of itself, nothing is watched until the next call,
+   * and `onEnded` is called once, with {@link isWatching} already false, before the bad news that says why.
    */
-  connect(): this {
+  connect(onEnded?: () => void): this {
+    VaultMinderChecks.connectArgs.parse({ onEnded })
     this.#unwatchWrapped ??= this.#vaultDB.watch(
       this.#scope,
       (notice) => { this.#tellNotice(notice) },
       (news) => { this.#tellBadNews(news, null) },
-      () => { this.#unwatchWrapped = null },
+      () => {
+        this.#unwatchWrapped = null
+        onEnded?.()
+      },
     )
     return this
   }
