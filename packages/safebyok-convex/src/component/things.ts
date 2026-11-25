@@ -60,7 +60,9 @@ export const writeThing = mutation({
   handler: async (ctx, { ask: sent }) => {
     const ask = askFor(() => DB.checkedWriteAsk(sent))
     const [thing, above] = await Promise.all([rawAt(ctx.db, ask), aboveIn(ctx.db, ask)])
-    if (! wouldWrite(() => DB.Classifier.classifyWriteThing(ask, thing, { ...above, read_tc: DB.readTcNow() }))) { return { thing, ...above, written: null } }
+    const isWrite = wouldWrite(() => DB.Classifier.classifyWriteThing(ask, thing, { ...above, read_tc: DB.readTcNow() }))
+    if (! isWrite) { return { thing, ...above, written: null } }
+
     const thingWritten = await writeAt(ctx.db, ask, ask.record)
     const { bank, tracked } = await rootsIn(ctx.db, ask)
     return { thing, ...above, written: { thing: thingWritten, bank, tracked } }
@@ -75,7 +77,9 @@ export const birthBank = mutation({
     const ask = askFor(() => DB.checkedBirthBankAsk(sent))
     const puts = DB.birthPutsOf(ask)
     const fetched = await rootsIn(ctx.db, ask)
-    if (! wouldWrite(() => DB.Classifier.classifyBirthBank(puts, { ...fetched, read_tc: DB.readTcNow() }))) { return { ...fetched, written: null } }
+    const isBorn = wouldWrite(() => DB.Classifier.classifyBirthBank(puts, { ...fetched, read_tc: DB.readTcNow() }))
+    if (! isBorn) { return { ...fetched, written: null } }
+
     for (const put of puts) { await writeAt(ctx.db, put, put.record) }
     return { ...fetched, written: await rootsIn(ctx.db, ask) }
   },
