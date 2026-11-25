@@ -28,7 +28,8 @@ function titleOf(sidecar: Readonly<Record<string, unknown>>): string {
  */
 export function ApiKeyForm() {
   const [put, putAction, isPutting] = useActionState(async (prior: (PutBoxActionResult & { at: number }) | null, form: FormData) => {
-    return { ...await savePut(prior, form), at: Date.now() }
+    const saved = await savePut(prior, form)
+    return { ...saved, at: Date.now() }
   }, null)
   const stored = Dojo.useBox(ApiKeyLabelpath).data
   return (

@@ -17,7 +17,8 @@ const savePut = Dojo.putBoxAction(Labelpath, {
 /** A form Action through `putBoxAction` that cancels React's reset of the form when the save was refused, so every field keeps what was typed. */
 export function ActionKeptRow({ title, userid, secretType }: RowProps) {
   const [put, putAction, isPutting] = useActionState(async (prior: (PutBoxActionResult & { at: number }) | null, form: FormData) => {
-    return { ...await savePut(prior, form), at: Date.now() }
+    const saved = await savePut(prior, form)
+    return { ...saved, at: Date.now() }
   }, null)
   return (
     <form className="formrow" aria-label={title} action={putAction} onReset={(event) => { if (put?.err) { event.preventDefault() } }}>

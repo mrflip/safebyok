@@ -45,7 +45,8 @@ function SaveForm({ title, save, isGuarded }: Readonly<{ title: string, save: Re
   /** What the form keeps of its saves: the last one's result, and how many have ended. */
   type Saves = PutBoxActionResult & Readonly<{ endedCount: number }>
   const [saves, saveAction] = useActionState(async (prior: Saves | null, form: FormData): Promise<Saves> => {
-    return { ...await save(prior, form), endedCount: (prior?.endedCount ?? 0) + 1 }
+    const saved = await save(prior, form)
+    return { ...saved, endedCount: (prior?.endedCount ?? 0) + 1 }
   }, null)
   return (
     <form aria-label={title} action={saveAction}>

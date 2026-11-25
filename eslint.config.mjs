@@ -265,6 +265,9 @@ export default defineConfig([
       '@typescript-eslint/consistent-type-definitions': 'off',
       // STYLE.md: "Use `err`, never `error`". The rule's own default is the forbidden name.
       'unicorn/catch-error-name': ['error', { name: 'err' }],
+      // A request first and its `opts` last is the house signature (`putExposed(patch, opts)`); the
+      // rule wants every optional parameter folded into one bag.
+      'unicorn/prefer-options-parameter': 'off',
       // STYLE.md endorses the guard clause, and asks that visual weight match didactic weight: a
       // guard is not a choice between two values, and should not have to read like one.
       'unicorn/prefer-ternary': 'off',

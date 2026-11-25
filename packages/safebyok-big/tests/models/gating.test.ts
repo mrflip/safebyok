@@ -269,7 +269,7 @@ describe("a birth through a gating", () => {
     const tryBuildBank = bankDB.tryBuildBank.bind(bankDB)
     vi.spyOn(bankDB, 'tryBuildBank').mockImplementationOnce(async (ask) => {
       const answer = await tryBuildBank(ask)
-      layRows({ ...theirs, bank: { ...theirs.bank as BankRecord, revision_tok: 'rev-of-the-new-life', revision_seq: ask.record.revision_seq + 2 } })
+      layRows({ ...theirs, bank: { ...(theirs.bank as BankRecord), revision_tok: 'rev-of-the-new-life', revision_seq: ask.record.revision_seq + 2 } })
       await device.ensureBank()
       return answer
     })
@@ -423,7 +423,8 @@ describe("gating.attempt", () => {
     const gating = await gatingAt<'build_bank'>()
     const prfBytes = runInNewContext('new Uint8Array(32).fill(7)') as Uint8Array
     expect(prfBytes).to.not.be.instanceOf(Uint8Array)
-    await TH.expectGood(gating.attempt({ passphraseClear, passkeyClear: { ...await TH.passkeyOf('laptop'), prfBytes } }))
+    const laptopPasskey = await TH.passkeyOf('laptop')
+    await TH.expectGood(gating.attempt({ passphraseClear, passkeyClear: { ...laptopPasskey, prfBytes } }))
     await launched
     expect(prfBytes.every((byte) => byte === 0)).to.be.true
   })
@@ -508,7 +509,8 @@ describe("unlocking through a gating", () => {
     const { bank, gatingAt } = await lockedBank()
     const unlocking = TH.expectRefusal(bank.ensureUnlocked())
     const gating = await gatingAt<'unlock_bank'>()
-    const passkeyClear = { ...await TH.passkeyOf('laptop'), get prfBytes(): Uint8Array { throw new Error(Passphrase) } }
+    const laptopPasskey = await TH.passkeyOf('laptop')
+    const passkeyClear = { ...laptopPasskey, get prfBytes(): Uint8Array { throw new Error(Passphrase) } }
     const err = await TH.expectBad(gating.attempt({ passkeyClear }))
     await unlocking
     expect(gating.isOpen).to.be.false

@@ -365,7 +365,7 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
   it("is not deleted by tryDelBox", async () => {
     const { openNextSession, boxrows, badnews } = await makeWorldWithBox()
     boxrows.set('rubble', { garbage: true })
-    boxrows.set('revised', { ...boxrows.get(boxlabel) as object, boxlabel: 'revised', whisper_ciphered: 'garbled' })
+    boxrows.set('revised', { ...(boxrows.get(boxlabel) as object), boxlabel: 'revised', whisper_ciphered: 'garbled' })
     const next = await openNextSession()
     await next.beginWatch()
     await TH.expectBad(next.tryDelBox('rubble'), 'damaged_row')

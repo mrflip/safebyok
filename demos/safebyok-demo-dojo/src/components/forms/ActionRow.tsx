@@ -17,7 +17,8 @@ const savePut = Dojo.putBoxAction(Labelpath, {
 /** A form Action through `putBoxAction`, the way its docs show: React resets every field once the action ends, and the username comes back from the result's `texts`. */
 export function ActionRow({ title, userid, secretType }: RowProps) {
   const [put, putAction, isPutting] = useActionState(async (prior: (PutBoxActionResult & { at: number }) | null, form: FormData) => {
-    return { ...await savePut(prior, form), at: Date.now() }
+    const saved = await savePut(prior, form)
+    return { ...saved, at: Date.now() }
   }, null)
   return (
     <form className="formrow" aria-label={title} action={putAction}>
