@@ -373,8 +373,12 @@ blocking it.
 
 *Recommend (c).* Our client is the wire's one reader, and it runs the core's own checks on everything that
 crosses. Every typed field is a second schema to keep in step, with a drift test. Big paid for its typing with
-the `passkey0` fix, `__typename` stripping and a `'main'` that could not sit in a union. The new asks key `track`
-and `tracked` by `gate/main` and `box/root`, which are not GraphQL field names, so even (b) needs JSON there.
+the `passkey0` fix, `__typename` stripping and a `'main'` that could not sit in a union.
+
+The new asks' `track` and `tracked` are keyed `bank`, `gate` and `box`, all legal GraphQL field names, so they could
+be typed. The reason to keep them JSON is their values. Each `tracked` value is a record or the string `'same'`, and
+the whole is `'unread'` on a verb that threw. GraphQL types that only with a union per root, over records the design
+already sends as JSON. A typed `track` input alone would leave the ask half-typed, so (b) gains little over (c).
 
 The typed envelope keeps what typing is worth here: GraphQL tooling and logs show `ok`, `act` and `err`, and the
 schema itself bounds what a refusal can carry. Big's argument for typed scope arguments was that logs see whose
@@ -388,6 +392,8 @@ reduced). It mirrors the published contract, the resolver is a straight map, and
 The Actual shape (`record`, `kids`, `things`) would save the client a small mapping table. It would put a
 protected, internal shape on a public wire.
 
+*The Coach's ruling (2026-11-25): answer-shaped.*
+
 **Q3. Does `err` cross on every bad answer, or only on a thrown one?** *Recommend every bad answer*, mirroring the
 Answer. A host's network log then shows the refusal's kind and message without the act tables. The client reads it
 only when `tracked` is `'unread'`. On a refusal by act, the base class rebuilds the same error from the act, so the
@@ -396,14 +402,20 @@ crossed one is redundant there.
 The alternative: send `err` only on a throw, and let its presence be the discriminator. Every field that crosses
 would then be read, at the cost of a log showing `act: 'stale'` with a null `err`.
 
+*The Coach's ruling (2026-11-25): every bad answer. "Transparently carry the answer across."*
+
 **Q4. One `safebyokWriteThing`, or `safebyokPutThing` and `safebyokDelThing`?** *Recommend one*, mirroring
 `tryWriteThing`. The ask's `op` already says which, and the server hands the ask to one verb. Two mutations would
 add an `op` consistency check at the resolver for nothing. The gloss's "put, del" reads as the verb's two ops.
+
+*The Coach's ruling (2026-11-25): one mutation.*
 
 **Q5. Is a watch ended by `identity_revoked` reported?** Big swallowed it, ending the watch silently. *Recommend
 reporting it to `onBadNews`.* A server that revokes a user the device still thinks is signed in is news to the
 device, not intent of its own (`#lock-is-intent` covers what the device did). The janitor and the host should hear
 why the watch stopped, rather than retry a dead one.
+
+*The Coach's ruling (2026-11-25): report it.*
 
 **Q6. What does a failed check of what crossed refuse, and whose clock dates a thrown refusal?** *Recommend
 `storage_issue`*, the refusal `ActualChecks` and the classifier already give a datastore's bad report. To this
@@ -414,9 +426,13 @@ On the clock: *recommend accepting the device's `read_tc` on a thrown refusal.* 
 carrying the server's date through would mean a new path into the base class, for an answer that carries no record
 to order.
 
+*The Coach's ruling (2026-11-25): `storage_issue`.* "Ok but don't catch errors just to rethrow: it will make debugging harder if everything has turned into mystery meat storage issue." So only a failed check of what crossed refuses `storage_issue`. Nothing catches an error to relabel it.
+
 **Q7. `GraphqlVaultDB` or `GraphQLVaultDB`?** The plan says `GraphqlVaultDB`. Big, graphql-js (`GraphQLError`,
 `GraphQLScalarType`) and urql all spell it `GraphQL`. *Recommend `GraphQLVaultDB`* (and `GraphQLVaultClient`), so a
 host reads one spelling across its imports. The rest of this design uses the plan's spelling until this is ruled.
+
+*The Coach's ruling (2026-11-25): `GraphQLVaultDB`.*
 
 **Q8. Does the crossed-refusal check live in the core?** *Recommend yes* (`safebyok/storage`). The allowlist of
 what may cross is a security decision, and one copy of it should serve every adapter whose server answers across

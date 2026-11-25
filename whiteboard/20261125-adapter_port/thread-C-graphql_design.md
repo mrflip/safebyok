@@ -22,8 +22,10 @@ The design is [graphql_vault-design.md](graphql_vault-design.md). Read its *Open
     the client, the server is its storage. Three such checks are private today (`shellAt`, `listedThingOf`,
     `rootStoredOf`), so D exports them from the classifier.
   * **Records, asks, `tracked` and the listing lists cross as `SafebyokJson`, under a typed envelope**
-    (`ok`, `act`, `banktok`, `read_tc`, `err`). `track` and `tracked` are keyed by `gate/main` and `box/root`,
-    which are not GraphQL field names.
+    (`ok`, `act`, `banktok`, `read_tc`, `err`). `track` and `tracked` could be typed (their keys are
+    `bank`, `gate` and `box`), but each `tracked` value is a record or `'same'`, and the whole is `'unread'` on a verb
+    that threw: GraphQL types that only with a union per root, over records already sent as JSON, so a typed `track`
+    alone would leave the ask half-typed.
 * **Deviations**:
   * The design proposes porting big's `crossedErr` and `vaultErrorOfCrossed` into the new core, rather than
     leaving them in the adapter, so that Convex (thread B) can share one allowlist.
@@ -45,6 +47,10 @@ The design is [graphql_vault-design.md](graphql_vault-design.md). Read its *Open
     runs the core's checks anyway.
   * **An Actual-shaped wire.** It would put an internal shape on a public surface.
   * **A wire version.** Nothing binds backward before 1.0.0.
-* **For the Coach**: eight open questions, Q1–Q8, in the design. The ones that shape the wire most are Q1 (how
-  typed), Q2 (answer-shaped), Q3 (`err` on every bad answer) and Q7 (`GraphqlVaultDB` against `GraphQLVaultDB`).
+* **Rulings (the Coach, 2026-11-25)**: Q2 answer-shaped; Q3 every bad answer ("transparently carry the answer
+  across"); Q4 one mutation; Q5 report it; Q6 `storage_issue`, and "don't catch errors just to rethrow" (only a
+  failed check of what crossed refuses; no catch-and-relabel); Q7 `GraphQLVaultDB`. Q1 stays open. The design
+  records each beside its question; its body still writes `GraphqlVaultDB` until D builds.
+* **For the Coach**: eight open questions, Q1–Q8, in the design; Q2–Q7 are ruled (above), so Q1 (how typed) and Q8
+  (the crossed-refusal check in the core) remain.
   D waits on the Coach's yes, on A, and on #905 and #911 reaching the line.
