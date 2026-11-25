@@ -78,7 +78,7 @@ describe("world.bank, world.gate, world.rootBox and world.bankStamp", () => {
     expect([TH.makeDevice({ userid: null }).world.bank, TH.makeDevice({ userid: null }).world.gate]).to.deep.equal([null, null])
     const { world } = await signedInDevice()
     expect(world.bank!.pickle()).to.deep.equal(TH.bankShellOf())
-    expect(world.gate).to.be.null
+    expect(world.gate!.pickle()).to.deep.equal(TH.gateShellOf())
     TH.expectSyncRefusal(() => world.bankStamp, 'absent_thing')
     TH.expectSyncRefusal(() => world.makeThing(TH.gateThingOf()).bankStamp, 'absent_thing')
   })

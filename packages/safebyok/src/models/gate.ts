@@ -198,7 +198,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   #gatingFriend(): GateGatingFriend {
     return {
       unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
-      putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
+      putGate:         (ask: Omit<PutAskDraft<GateRecord>, 'track' | 'banktok'>) => this.#putGate(ask),
     }
   }
   // --
@@ -235,7 +235,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   }
 
   /** Write `ask.record`, this gate's next revision, over `ask.cited`. Resolves this gate, which then models the revision written. */
-  async #putGate(ask: PutAskDraft<GateRecord>): Promise<this> {
+  async #putGate(ask: Omit<PutAskDraft<GateRecord>, 'track' | 'banktok'>): Promise<this> {
     this.demandEnabled()
     await this.#world.demandVaultMinder().putOnce(ask)
     return this

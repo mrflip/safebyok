@@ -15,7 +15,7 @@ import { VaultFunctionNames } from './vault-functions'
 const ThingTables = { bank: 'safebyok_bank_things', gate: 'safebyok_gate_things', box: 'safebyok_box_things' } as const satisfies Record<Thingkind, string>
 // --
 
-// == [Reads]: ancestorSqlOf, GetThingSql, ListThingsSql
+// == [Reads]: ancestorSqlOf, GetThingSql, ListThingsSql, GetWorldSql
 
 // A Thing's ancestors are of its own kind, so they are in its table. starts_with compares text as text: a '%' or '_' in a
 // labelpath is no wildcard, as it would be to LIKE.
@@ -70,6 +70,12 @@ function listThingsSqlOf(table: string): string {
   ), '[]'::jsonb) AS children, ${VaultFunctionNames.world}($1::text, $2::text) AS world, ${VaultFunctionNames.root_box}($1::text, $2::text) AS root) AS fetched
 `
 }
+
+/** A bank's three roots at its scope ($1 userid, $2 banklabel), and how they compare with the track ($3). */
+export const GetWorldSql = `
+  SELECT world, root, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM (SELECT
+    ${VaultFunctionNames.world}($1::text, $2::text) AS world, ${VaultFunctionNames.root_box}($1::text, $2::text) AS root) AS fetched
+`
 // --
 
 // == [Writes]: recordAncestorSqlOf, WriteThingSql, BirthRootsSql

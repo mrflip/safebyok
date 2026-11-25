@@ -2,7 +2,7 @@
 
 import { noop } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
-import { Errors } from 'safebyok-big/internals'
+import { Errors, SX } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
 import { Lease } from '../../src/models/lease'
 import { PassphraseProving, Proving } from '../../src/models/proving'
@@ -252,7 +252,7 @@ describe("bank.gate.replacePassphrase(cleartexts)", () => {
     const { bank, device } = await TH.buildBornBank()
     const ante = bank.gate.pickle()
     const refusal = new Errors.VaultError('storage_unavailable', 'the disk is full')
-    vi.spyOn(device.vaultDB, 'tryWriteThing').mockImplementationOnce((ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, banktok: null, read_tc: readTcNow(), dbhas: null, err: refusal }))
+    vi.spyOn(device.vaultDB, 'tryWriteThing').mockImplementationOnce((ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, banktok: SX.VoidLifeTok, tracked: 'unread', read_tc: readTcNow(), dbhas: null, err: refusal }))
     const make = vi.spyOn(Lease, 'make')
     expect(await TH.expectRefusal(bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase }))).to.equal(refusal)
     expect(bank.gate.pickle()).to.equal(ante)

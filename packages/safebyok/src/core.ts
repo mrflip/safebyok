@@ -26,7 +26,7 @@ export type { AddPasskeyGating, BirthGating, Gating, ReplacePassphraseGating, Re
 export { vacateHanded } from './models/gating'
 export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
-  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside,
+  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GetWorldAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside,
   type WriteThingAnswer,
 } from './shapes/shapes-answers'
 export { type VaultDB, isVaultDB } from './storage/vault-db'
@@ -43,8 +43,8 @@ export {
   FormSecretFieldnames, GateishChecks, GatingChecks,
 } from './shapes/shapes-gateish'
 export {
-  type BankRoots, type BankWriteAsk, type BirthBankAsk, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAsk, type ListAsk, type LoggableAsk, type PutAskDraft,
-  type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk, type WriteAskFlags, AskChecks,
+  type BankRoots, type BankWriteAsk, type BirthBankAsk, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAsk, type GetWorldAsk, type ListAsk, type LoggableAsk, type PutAskDraft, type WorldRoots,
+  type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk, type WriteAskFlags, AskChecks, VoidTrack,
 } from './shapes/shapes-asks'
 export {
   type AnyThingRecord, type BankRecord, type BoxRecord, type BoxSparse, type GateRecord, type Modelkind, type Sparse, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind, type Tombstone,

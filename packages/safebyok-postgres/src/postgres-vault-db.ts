@@ -2,11 +2,11 @@
 
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- a devDependency while PostgresVaultDB is not exported
 import {
-  type AnyAsk, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetAsk, type GotActual, type ListThingsActual, type ListAsk,
-  type Received, type ThingWatchScope, type VaultError, type WriteAct, type WriteAsk, type WroteActual, AdapterVaultDB, Classifier, Shell, getAskOf, isVaultError, objCheck, readTcNow,
+  type AnyAsk, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldActual, type GetWorldAsk, type GotActual, type ListThingsActual, type ListAsk,
+  type Received, type ThingWatchScope, type VaultError, type WriteAct, type WriteAsk, type WroteActual, AdapterVaultDB, Classifier, Shell, VoidLifeTok, VoidTrack, getAskOf, isVaultError, objCheck, readTcNow,
 } from 'safebyok/storage'
 import { type PostgresListen, type PostgresQueryable, jsonOrNull, listenOrNull, refusalOf, storedNothing, unlistenOnceListening } from './postgres-bank-db'
-import { BirthRootsSql, GetThingSql, ListThingsSql, WriteThingSql } from './vault-queries'
+import { BirthRootsSql, GetThingSql, GetWorldSql, ListThingsSql, WriteThingSql } from './vault-queries'
 
 // == [The driver]: PostgresVaultDBOpts, isPostgresQueryable
 
@@ -63,8 +63,8 @@ type FetchedThing = { thing: unknown, world: WorldRow, ancestor: unknown, tracke
 /** The raw bank and main gate a statement returns. */
 type WorldRow = Pick<Classifier.WorldFetched, 'bank' | 'maingate'>
 
-/** The parameter that carries what `ask` tracks: its JSON, or null for none. */
-function trackParam({ track }: AnyAsk): string | null { return (track === undefined) ? null : JSON.stringify(track) }
+/** The parameter that carries what `ask` tracks: its JSON. */
+function trackParam({ track }: AnyAsk): string { return JSON.stringify(track) }
 
 // The classifier finds a write only where the Thing stored is the one cited, so only the flag for the cited Thing can let the ask write.
 /** True when the ask's flags let it write over the Thing it cites: a del over a live Thing; a put by `ifPresent` over a live one, by `ifAbsent` over a tombstone or the shell. */
@@ -122,7 +122,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
   }
   // --
 
-  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doWatch
+  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doWatch
 
   protected async doGetThing(ask: GetAsk): Promise<GotActual> {
     const { thing, ...above } = await this.#fetchThing(ask)
@@ -178,6 +178,13 @@ export class PostgresVaultDB extends AdapterVaultDB {
     return unwritten
   }
 
+  protected async doGetWorld(ask: GetWorldAsk): Promise<GetWorldActual> {
+    const { userid, banklabel } = ask
+    const read_tc = readTcNow()
+    const { world, root, tracked } = await this.#firstRow<{ world: WorldRow, root: unknown, tracked: Classifier.TrackedFetched }>(GetWorldSql, [userid, banklabel, trackParam(ask)])
+    return this.classifyGetWorld(ask, { bank: world.bank, gate: world.maingate, root, tracked, read_tc })
+  }
+
   // The order and timing of an *adapter*'s notifications relative to reads, writes, or other notifications is unspecified, even for datastores that provide assurance.
   protected override doWatch(scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: VaultError) => void): () => void {
     const listen = this.#listen
@@ -218,7 +225,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
   async #receivedOrNull(scope: ThingWatchScope, { labelpath, thing, world }: Told, onFailed: (news: VaultError) => void): Promise<Received | null> {
     if ((thing !== undefined) && (world !== undefined)) { return { record: thing, world: Classifier.worldOf(scope, world as WorldRow) } }
     try {
-      const fetched = await this.#fetchThing(getAskOf({ ...scope, labelpath }))
+      const fetched = await this.#fetchThing(getAskOf({ ...scope, labelpath, track: VoidTrack, banktok: VoidLifeTok }))
       return (fetched.thing === null) ? null : { record: fetched.thing, world: Classifier.worldOf(scope, fetched) }
     } catch (err) {
       // A notice is only a hint: if its Thing cannot be fetched for now, drop it.

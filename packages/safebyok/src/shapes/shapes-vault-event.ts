@@ -8,7 +8,7 @@ import { type ThingRecord, type Thingkind, type Tombstone, ThingChecks, isLifepa
 import { BaseThing } from '../models/base-thing'
 import { itemSeenOf } from '../storage/agerank'
 
-// == [Kinds]: livenessVals, Liveness, lifekindVals, Lifekind, agekindVals, Agekind, vaultEventkindVals, VaultEventkind
+// == [Kinds]: livenessVals, Liveness, lifekindVals, Lifekind, agekindVals, Agekind, vaultEventkindVals, VaultEventkind, VaultDBSourcelabel
 
 /** Liveness of a record seen:
  * - `soon` -- a live box's sparse form
@@ -32,8 +32,9 @@ export type Lifekind = typeof lifekindVals[number]
  * - `here` -- it has
  * - `bare` -- no whole record of its life has been seen
  * - `cold` -- only an older whole record has been seen
+ * - `vacant` -- nothing has been received
  */
-export const agekindVals = ['here', 'bare', 'cold'] as const
+export const agekindVals = ['here', 'bare', 'cold', 'vacant'] as const
 /** Whether the newest revision seen of a Thing has been seen whole: one of {@link agekindVals}. */
 export type Agekind = typeof agekindVals[number]
 
@@ -45,6 +46,9 @@ export type Agekind = typeof agekindVals[number]
 export const vaultEventkindVals = ['item', 'life', 'aged'] as const
 /** A {@link VaultEvent}'s kind: one of {@link vaultEventkindVals}. */
 export type VaultEventkind = typeof vaultEventkindVals[number]
+
+/** The `sourcelabel` of an event a vaultDB dispatched: a notice of its watch, or a record its answer carried. */
+export const VaultDBSourcelabel = 'vault_db'
 // --
 
 // == [Agerank]: Agerank, SeenThing
@@ -74,16 +78,16 @@ export type VaultEventOf<EventkindT extends VaultEventkind> = Readonly<{
   labelpath:  Labelpath
   /** The kind of Thing at `labelpath`. */
   modelkind:  Thingkind
-  /** The Thing's agerank with this event's record seen, or undefined where no ageranks are kept, as in a vaultDB's watch. */
-  agerank:    Agerank | undefined
-  /** The Thing's agerank before this event's record, or undefined for none. */
-  agerankWas: Agerank | undefined
-  /** The lifetok of the bank's life, where the event's source knew it: from a `VaultMinder`, the answer's `banktok`, or the one the notice or the event rung carried, else the bank's as last read. Undefined in a vaultDB's raw watch where the datastore did not hand over the bank. */
-  banktok:    Lifetok | undefined
-  /** Who dispatched this event's record: a `VaultMinder` names the vaultDB it wraps, or the device database that rang what its `receive` was handed. Undefined in a vaultDB's raw watch. */
-  sourcelabel: string | undefined
-  /** When this event's record was read, shared by every event of one dispatch. Undefined only where a vaultDB's watch does not say. */
-  read_tc:    ReadTc | undefined
+  /** The Thing's agerank with this event's record seen, or the vacant agerank where no ageranks are kept, as in a vaultDB's watch. */
+  agerank:    Agerank
+  /** The Thing's agerank before this event's record: the vacant agerank where it had received none, or where no ageranks are kept. */
+  agerankWas: Agerank
+  /** The lifetok of the bank's life, where the event's source knew it: from a `VaultMinder`, the answer's `banktok`, or the one the notice or the event rung carried, else the bank's as last read. The void lifetok where none was known, as in a vaultDB's raw watch where the datastore did not hand over the bank. */
+  banktok:    Lifetok
+  /** Who dispatched this event's record: {@link VaultDBSourcelabel} for a vaultDB, wrapped by a `VaultMinder` or not, or the device database that rang what a `VaultMinder`'s `receive` was handed. */
+  sourcelabel: string
+  /** When this event's record was read, shared by every event of one dispatch. */
+  read_tc:    ReadTc
 }>
 
 /** A record of the Thing. Where ageranks are kept, the record left the Thing's agerank greater than it was. Narrow it on `liveness` to know what `val` holds.
@@ -111,9 +115,9 @@ export type VaultLifeEvent = VaultEventOf<'life'> & Readonly<{
 
 /** The newest revision seen of the Thing has not been seen whole: its `agekind` is `bare` or `cold`. */
 export type VaultAgedEvent = VaultEventOf<'aged'> & Readonly<{
-  agekind:    Exclude<Agekind, 'here'>
-  /** The agekind before this event's record, or undefined for none. */
-  agekindWas: Agekind | undefined
+  agekind:    Exclude<Agekind, 'here' | 'vacant'>
+  /** The agekind before this event's record: `vacant` where the Thing had received none. */
+  agekindWas: Agekind
   agerank:    Agerank
 }>
 // --

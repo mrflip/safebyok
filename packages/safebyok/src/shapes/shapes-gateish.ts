@@ -129,7 +129,7 @@ export interface GateGatingFriend {
   /** Unlock the gate under a lease `proved` builds, citing the revision it models. */
   unlockByProving: (proved: Proving) => Promise<Gate>
   /** Write the gate's next revision, and model the revision written. */
-  putGate:         (ask: PutAskDraft<GateRecord>) => Promise<Gate>
+  putGate:         (ask: Omit<PutAskDraft<GateRecord>, 'track' | 'banktok'>) => Promise<Gate>
 }
 
 /** A world's lease verbs, for each gate it makes to call. Internal. */

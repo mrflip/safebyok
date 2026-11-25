@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { noop } from 'es-toolkit'
 import { Bank } from '../../src/models/bank'
 import { Box } from '../../src/models/box'
 import { Vault } from '../../src/models/vault'
@@ -61,6 +62,13 @@ async function bumpApicalls(vault: Vault): Promise<LiveOf<BoxRecord>> {
   return vault.putBoxOnce(newest ?? Openai, { sidecar: { account: 'work' } }, { whisper: { ...TH.Whisper, apicalls } })
 }
 
+/** Have `bank`'s vaultDB answer each write with a `read_tc` that is no time code, which the box's Thing refuses as it is told. */
+function answerWritesUntimed(bank: Bank): void {
+  const { vaultDB } = bank.device
+  const write = vaultDB.tryWriteThing.bind(vaultDB)
+  vi.spyOn(vaultDB, 'tryWriteThing').mockImplementation(async (ask) => ({ ...(await write(ask)), read_tc: crypto.randomUUID() }))
+}
+
 /** The vault of a second device signed in to `bank`'s bank over the same vaultDB, unlocked, which has seen no box. */
 async function buildVaultBeside(bank: Bank): Promise<Vault> {
   const device = TH.makeDevice({}, { vaultDB: bank.device.vaultDB })
@@ -69,18 +77,18 @@ async function buildVaultBeside(bank: Bank): Promise<Vault> {
   return device.vault!
 }
 
-describe("Vault.make(bank, vaultTSQ)", () => {
-  it("makes the vault of the bank's boxes, over the vault TSQ given", async () => {
+describe("Vault.make(world, vaultTSQ)", () => {
+  it("makes the vault of the boxes of the world's bank, over the vault TSQ given", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const vault = Vault.make(bank, device.vaultTSQ)
+    const vault = Vault.make(device.world, device.vaultTSQ)
     expect(vault.bank).to.equal(bank)
     expect(Object.isFrozen(vault)).to.be.true
   })
 
-  it("refuses a swept bank", async () => {
+  it("refuses a swept world", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.sweep()
-    TH.expectSyncRefusal(() => Vault.make(bank, device.vaultTSQ), 'disabled')
+    TH.expectSyncRefusal(() => Vault.make(device.world, device.vaultTSQ), 'disabled')
   })
 })
 
@@ -220,6 +228,14 @@ describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
     expect(answer).to.have.nested.property('dbhas.revtok', stored.revtok)
   })
 
+  it("answers the refusal its box raises at the record its answer carries, though stored", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    answerWritesUntimed(bank)
+    await TH.expectBad(vault.tryPutBoxOnce(Openai, {}, { whisper: TH.Whisper }), 'bad_record')
+    expect(rowsOf(bank).get(Openai)).to.include({ revseq: 1 })
+  })
+
   it("answers a refusal met before the write, and writes nothing", async () => {
     const { bank, vault } = await TH.buildBornVault()
     const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
@@ -350,6 +366,14 @@ describe("vault.tryDelBoxOnce(labelpath)", () => {
     const tombstone = await TH.expectGood(vault.tryDelBoxOnce(Openai))
     expect(written).toHaveBeenCalledTimes(1)
     expect(written.mock.calls[0]![0]).to.deep.include({ ...bank.scope, op: 'del', labelpath: Openai, modelkind: 'box', cited: Thing.sparseOf(box), record: tombstone, track: TH.trackOf(bank.pickle(), bank.gate.pickle(), bank.rootBox) })
+  })
+
+  it("answers the refusal its box raises at the tombstone its answer carries, though stored", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    answerWritesUntimed(bank)
+    await TH.expectBad(vault.tryDelBoxOnce(Openai), 'bad_record')
+    expect(rowsOf(bank).get(Openai)).to.include({ am: 'x' })
   })
 
   it("answers a refusal for a box never stored, and writes nothing", async () => {
@@ -729,14 +753,29 @@ describe("vault.forceTimelyUnlocked(labelpath, opts)", () => {
   })
 })
 
-describe("a vault of a bank over the shell", () => {
+describe("a vault of a bank not stored", () => {
   it("refuses a seal and an unseal, and its try forms resolve the refusal", async () => {
-    const { device } = await TH.buildBornBank()
-    const vault = Vault.make(Bank.make(TH.bankShellOf(), { device }), device.vaultTSQ)
+    const device = TH.makeDevice({})
+    await device.signin(TH.WorldScope.userid)
+    const vault = device.vault!
+    expect(device.world.getSnapshot().stage).to.eq('unborn')
     await TH.expectRefusal(vault.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'absent_thing')
     await TH.expectRefusal(vault.unsealBox(TH.boxThingOf()), 'absent_thing')
     expect(await vault.trySealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })).to.deep.include({ ok: false })
     expect(await vault.tryUnsealBox(TH.boxThingOf())).to.deep.include({ ok: false })
+  })
+
+  it("refuses absent_thing to each verb that reads a box, before any wait for an unlock, and answers its bank absent", async () => {
+    const device = TH.makeDevice({})
+    await device.signin(TH.WorldScope.userid)
+    const vault = device.vault!
+    TH.expectSyncRefusal(() => vault.bank, 'absent_thing')
+    await TH.expectRefusal(vault.withWhisper('box/openai', noop), 'absent_thing')
+    await TH.expectRefusal(vault.withUnlockedWhisper('box/openai', noop), 'absent_thing')
+    await TH.expectRefusal(vault.forceTimelyUnlocked('box/openai'), 'absent_thing')
+    expect(await vault.tryPutBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })).to.deep.include({ ok: false })
+    await TH.expectRefusal(vault.delBoxOnce('box/openai'), 'absent_thing')
+    expect(device.world.getSnapshot().isUnlockWanted).to.be.false
   })
 })
 

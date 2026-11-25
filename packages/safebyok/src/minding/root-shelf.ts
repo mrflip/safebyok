@@ -6,10 +6,15 @@ import type { Adoptable } from '../models/thing'
 import type { World } from '../models/world'
 import type { RootShelf } from '../shapes/shapes-bankish'
 import type { BankScope } from '../shapes/shapes-stamps'
-import { type BankRecord, type BoxRecord, type GateRecord, ThingFormat } from '../shapes/shapes-thing'
-import { Labelpath } from '../shapes/primitives'
+import { type ThingRecord, ThingFormat } from '../shapes/shapes-thing'
+import type { ReadTc } from '../shapes/shapes-vault-event'
+import { VacantReadTc } from '../storage/agerank'
+import type { Bank } from '../models/bank'
+import type { Box } from '../models/box'
+import type { Gate } from '../models/gate'
+import type { VaultMinder } from './vault-minder'
 
-// == [The shelf]: guardRootShelf, peekRoots, stowRoots, isRootLabelpath
+// == [The shelf]: guardRootShelf, peekRoots, stowRoots
 
 /** `shelf`, each method wrapped so that what it throws is told to `onBadNews` as a refusal, and a get that throws answers null. */
 export function guardRootShelf(shelf: RootShelf, onBadNews: (news: Errors.VaultError) => void): RootShelf {
@@ -22,7 +27,7 @@ export function guardRootShelf(shelf: RootShelf, onBadNews: (news: Errors.VaultE
   })
 }
 
-/** The roots `shelf` keeps of the bank at `scope`, unchecked, or none. A value that does not read as today's is removed. */
+/** The roots `shelf` keeps of the bank at `scope`, each beside when it was read, unchecked, or none. A value that does not read as today's is removed. */
 export function peekRoots(shelf: RootShelf, scope: BankScope): readonly unknown[] {
   const shelved = shelf.getItem(shelfCkeyOf(scope))
   if (shelved === null) { return [] }
@@ -31,32 +36,37 @@ export function peekRoots(shelf: RootShelf, scope: BankScope): readonly unknown[
   return roots ?? []
 }
 
-/** Put `world`'s three roots on `shelf`, as the bank at `scope`'s, where each is live, or remove what it keeps of the bank otherwise. */
+/** Put `world`'s three roots on `shelf`, as the bank at `scope`'s, each beside when it was read, where each is live, or remove what it keeps of the bank otherwise. */
 export function stowRoots(shelf: RootShelf, scope: BankScope, world: World): void {
-  const { bank, gate, rootBox } = world
-  if ((bank === null) || (gate === null) || (rootBox === null) || (! world.areRootsLive)) {
+  const { bank, gate, rootBox, vaultMinder } = world
+  if ((bank === null) || (gate === null) || (rootBox === null) || (vaultMinder === null) || (! world.areRootsLive)) {
     shelf.removeItem(shelfCkeyOf(scope))
     return
   }
-  shelf.setItem(shelfCkeyOf(scope), shelvedOf([bank.pickle(), gate.pickle(), rootBox.pickle()]))
+  shelf.setItem(shelfCkeyOf(scope), shelvedOf([shelvedRootOf(bank, vaultMinder), shelvedRootOf(gate, vaultMinder), shelvedRootOf(rootBox, vaultMinder)]))
 }
-
-/** True for the labelpath of one of a bank's three roots. */
-export function isRootLabelpath(labelpath: Labelpath): boolean { return RootLabelpaths.includes(labelpath) }
 // --
 
-// == [The value]: ShelvedRoots, ShelvedVersion, shelvedOf, rootsOfShelved, shelfCkeyOf, RootLabelpaths
+// == [The value]: ShelvedRoot, ShelvedRoots, ShelvedVersion, shelvedRootOf, shelvedOf, rootsOfShelved, shelfCkeyOf
 
-/** The bank's three records, as the vaultDB stores them: the bank, its main gate and its root box. */
-type ShelvedRoots = readonly [bank: Adoptable<BankRecord>, gate: Adoptable<GateRecord>, rootBox: Adoptable<BoxRecord>]
+/** One root, as the vaultDB stores it, beside when it was read. */
+type ShelvedRoot = Readonly<{ record: Adoptable<ThingRecord>, read_tc: ReadTc }>
+
+/** The bank's three roots: the bank, its main gate and its root box. */
+type ShelvedRoots = readonly [bank: ShelvedRoot, gate: ShelvedRoot, rootBox: ShelvedRoot]
 
 /** The version a shelved value begins with: a value of any other reads as nothing kept. */
-const ShelvedVersion = `roots-${ThingFormat}`
+const ShelvedVersion = `roots-tc-${ThingFormat}`
 
-/** The text `roots` are shelved as: the version, then the three records whole. */
+/** The root `thing` holds, beside when `vaultMinder` last read news of it */
+function shelvedRootOf(thing: Bank | Gate | Box, vaultMinder: VaultMinder): ShelvedRoot {
+  return { record: thing.pickle(), read_tc: vaultMinder.carAt(thing)?.read_tc ?? VacantReadTc }
+}
+
+/** The text `roots` are shelved as: the version, then each root, its record whole beside its `read_tc`. */
 function shelvedOf(roots: ShelvedRoots): string { return JSON.stringify([ShelvedVersion, ...roots]) }
 
-/** The three records in `shelved`, unchecked, or null where it is no value of today's version. */
+/** The three roots in `shelved`, unchecked, or null where it is no value of today's version. */
 function rootsOfShelved(shelved: string): readonly unknown[] | null {
   let parsed: unknown
   try {
@@ -72,7 +82,4 @@ function rootsOfShelved(shelved: string): readonly unknown[] | null {
 // The banklabel is a label, with no colon, so the userid after it is all the rest.
 /** The shelf's key for the roots of the bank at `scope`. */
 function shelfCkeyOf({ userid, banklabel }: BankScope): string { return `safebyok:roots:${banklabel}:${userid}` }
-
-/** The labelpaths of a bank's roots, in the order they are shelved. */
-const RootLabelpaths: readonly Labelpath[] = Object.freeze(['bank', Labelpath.MainGate, Labelpath.RootBox])
 // --

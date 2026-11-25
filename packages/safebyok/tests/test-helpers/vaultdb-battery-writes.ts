@@ -5,8 +5,8 @@ import * as Phrases from '../../src/phrases'
 import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import { type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import {
-  BankScope, GateScope, Life0, MainWayin, OtherMainWayin, Passkey0Wayin, RootScope, ThingBank, WithPasskey, bankThingOf, birthAskOf, boxRebornOf, boxThingOf, boxTombOf,
-  delAskFor, gateThingOf, getAskAt, getGateAskOf, nextGateOf, nextOf, replaceAskOf, rootBoxOf,
+  BankScope, GateScope, Life0, MainWayin, OtherMainWayin, Passkey0Wayin, RootScope, SenderKnows, ThingBank, WithPasskey, bankThingOf, birthAskOf, boxRebornOf, boxThingOf, boxTombOf,
+  delAskFor, gateThingOf, getAskAt, getGateAskOf, nextGateOf, nextOf, replaceAskOf, rootBoxOf, trackOf,
 } from './vaultdb-world'
 import { FirstRevtok, OtherLifetok, OtherRevtok, T0, revtokOf } from './models-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
@@ -299,11 +299,12 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       })
     }
 
+    // Each of these asks tracks the damaged row at its revision, so the answer's tracked is 'same' there, and never the damaged row.
     it("carries a bank damaged outside its lifetok forward, under a put that keeps the lifetok", async () => {
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant(BankScope, { ...stored, auth: { stray: true } })
       const next = nextOf(stored)
-      expect(await vaultDB.tryWriteThing(replaceAskOf(stored, next))).to.deep.include({ ok: true, act: 'replaced', val: next })
+      expect(await vaultDB.tryWriteThing({ ...replaceAskOf(stored, next), track: trackOf(stored, Shell.Cited, Shell.Cited) })).to.deep.include({ ok: true, act: 'replaced', val: next })
       expect(await gotAt(vaultDB, 'bank')).to.deep.equal(next)
     })
 
@@ -311,7 +312,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant(BankScope, { ...gone, lifetok: 'not-a-uuid' })
       const reborn = nextOf(gone, { am: 'a', lifeseq: life2, lifepath: life2, born_at: gone.written_at + 1 })
-      const ask = putAskOf({ cited: gone, record: reborn, ifAbsent: 'add' })
+      const ask = putAskOf({ cited: gone, record: reborn, ifAbsent: 'add', ...SenderKnows, track: trackOf(gone, Shell.Cited, Shell.Cited) })
       expect(await vaultDB.tryWriteThing(ask)).to.deep.include({ ok: true, act: 'reborn', val: reborn })
     })
 
@@ -319,7 +320,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant(BankScope, gone)
       const reborn = nextOf(gone, { am: 'a', lifeseq: life2, lifepath: life2, born_at: gone.written_at + 1, lifetok: OtherLifetok })
-      const ask = putAskOf({ cited: gone, record: reborn, ifAbsent: 'add' })
+      const ask = putAskOf({ cited: gone, record: reborn, ifAbsent: 'add', ...SenderKnows })
       expect(await vaultDB.tryWriteThing(ask)).to.deep.include({ ok: true, act: 'reborn', val: reborn })
     })
   })
@@ -338,7 +339,8 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       const stored = gateThingOf()
       await rowsOf(vaultDB).plant(GateScope, { ...stored, auth: { stray: true } })
       const next = nextGateOf(stored, { wayins: { main: OtherMainWayin, passkey0: null } })
-      const ask  = replaceAskOf(stored, next, { policies: ['replace_passphrase'] })
+      // The ask tracks the damaged gate at its revision, so the answer's tracked is 'same' there, and never the damaged row.
+      const ask  = { ...replaceAskOf(stored, next, { policies: ['replace_passphrase'] }), track: trackOf(Shell.Cited, stored, Shell.Cited) }
       expect(await vaultDB.tryWriteThing(ask)).to.deep.include({ ok: true, act: 'replaced', val: next })
       expect(await gotAt(vaultDB, 'gate')).to.deep.equal(next)
     })
@@ -432,7 +434,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       const val = await expectGood(answer) as BoxRecord
       expect(val.sidecar).to.deep.equal({ account: 'work' })
       expect([Object.isFrozen(val), Object.isFrozen(val.sidecar), Object.isFrozen(answer.world?.maingate)]).to.deep.equal([true, true, true])
-      const listed = await vaultDB.tryListThings(listAskOf(RootScope))
+      const listed = await vaultDB.tryListThings(listAskOf({ ...RootScope, ...SenderKnows }))
       const kids = await expectGood(listed)
       expect([Object.isFrozen(kids.items), Object.isFrozen(listed.deltas[0])]).to.deep.equal([true, true])
     })
@@ -451,12 +453,12 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     it("build asks its verbs accept", async () => {
       const vaultDB = await bornBank()
       const box = boxThingOf()
-      const putAsk = putAskOf({ cited: Shell.childCited(Life0), record: box })
+      const putAsk = putAskOf({ cited: Shell.childCited(Life0), record: box, ...SenderKnows })
       expect(await vaultDB.tryWriteThing(putAsk)).to.deep.include({ ok: true, act: 'born' })
-      expect(await vaultDB.tryGetThing(getAskOf(box))).to.deep.include({ ok: true, act: 'gotlive', val: box })
-      const delAsk = delAskOf({ cited: box, record: boxTombOf(box) })
+      expect(await vaultDB.tryGetThing(getAskOf({ ...box, ...SenderKnows }))).to.deep.include({ ok: true, act: 'gotlive', val: box })
+      const delAsk = delAskOf({ cited: box, record: boxTombOf(box), ...SenderKnows })
       expect(await vaultDB.tryWriteThing(delAsk)).to.deep.include({ ok: true, act: 'deleted' })
-      expect(await vaultDB.tryListThings(listAskOf(RootScope))).to.deep.include({ ok: true, deltas: [boxTombOf(box)] })
+      expect(await vaultDB.tryListThings(listAskOf({ ...RootScope, ...SenderKnows }))).to.deep.include({ ok: true, deltas: [boxTombOf(box)] })
     })
 
     it("leave every refusal to the verb, which answers it", async () => {

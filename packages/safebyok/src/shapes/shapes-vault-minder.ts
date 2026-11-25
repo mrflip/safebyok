@@ -3,26 +3,39 @@
 import { type Errors, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { type CitedOf, type DelAskDraft, type PutAskDraft, AskChecks } from './shapes-asks'
+import type { EpochMillis, Labelpath } from './primitives'
 import { type ThingRecord, type VoidSentinel, ThingChecks, isLifepathDeep, isParityRight } from './shapes-thing'
-import { type SeenThing, type VaultEvent, SeenChecks, isSeenForm, livenessVals, vaultEventkindVals } from './shapes-vault-event'
+import { type ReadTc, type SeenThing, type VaultEvent, SeenChecks, isSeenForm, livenessVals, vaultEventkindVals } from './shapes-vault-event'
 import { BaseThing } from '../models/base-thing'
 import type { Adoptable, Thing } from '../models/thing'
 import type { VaultMinder } from '../minding/vault-minder'
 import type { VaultDB } from '../storage/vault-db'
 
-// == [Shapes]: ReceivingThing, ThingMaker, VaultMinderOpts, VaultMinderListener, PutOnceArgs, DelOnceArgs
+// == [Shapes]: ReceivingThing, ThingMaker, ThingCar, VaultMinderOpts, VaultMinderListener, PutOnceArgs, DelOnceArgs
 
 /** What a {@link VaultMinder} reads of each Thing it keeps. */
 export type ReceivingThing = Pick<Thing<ThingRecord, unknown, unknown, Adoptable<ThingRecord>>, 'receive' | 'agerank' | 'agekind' | 'citable' | 'read_at' | 'pickle'>
 
-/** Make the Thing a {@link VaultMinder} keeps at a labelpath, from `seen`, the first record it learns of there. */
-export type ThingMaker<ThingT extends ReceivingThing = ReceivingThing> = (seen: SeenThing) => ThingT
+/** Make the Thing a {@link VaultMinder} keeps at `shell`'s labelpath, holding `shell`: it then receives the first record learned of there. */
+export type ThingMaker<ThingT extends ReceivingThing = ReceivingThing> = (shell: VoidSentinel) => ThingT
+
+/** The Thing a {@link VaultMinder} keeps at a labelpath, the refusal it last raised at a record, and when its last news was read. It changes no answer. */
+export type ThingCar<ThingT extends ReceivingThing = ReceivingThing> = Readonly<{
+  /** The Thing, the same object for as long as the VaultMinder lives. */
+  thing:    ThingT
+  /** The refusal the Thing raised at the last record it was handed, or null where it took that record. */
+  lastErr:  Errors.VaultError | null
+  /** When the Thing last refused a record, or null where it has refused none. */
+  erred_at: EpochMillis | null
+  /** When the last record the Thing took as news was read: the `VacantReadTc`, before any record, until it takes one. */
+  read_tc:  ReadTc
+}>
 
 /** Options for `VaultMinder.make`. */
 export interface VaultMinderOpts<ThingT extends ReceivingThing = ReceivingThing> {
   /** The vaultDB to wrap. */
   vaultDB: VaultDB
-  /** Makes the Thing kept at each labelpath, once, from the first record learned of there: a device's world's `makeThing`. */
+  /** Makes the Thing kept at each labelpath, once, holding the shell there: a device's world's `makeThing`. */
   makeThing: ThingMaker<ThingT>
 }
 
@@ -30,8 +43,8 @@ export interface VaultMinderOpts<ThingT extends ReceivingThing = ReceivingThing>
 export type VaultMinderListener = Readonly<{
   /** Hear `event`, of a record that is news. */
   hear: (event: VaultEvent) => void
-  /** Be told of `news`, trouble no caller is waiting on: a record that fails its checks, or what `hear` threw. */
-  onBadNews: (news: Errors.VaultError) => void
+  /** Be told of `news`, trouble no caller is waiting on: a record that fails its checks, or what `hear` threw. `labelpath` is the record's, or null where the trouble is of no one record. */
+  onBadNews: (news: Errors.VaultError, labelpath: Labelpath | null) => void
 }>
 
 /** What `VaultMinder.putOnce` writes: a put ask's draft, whose `cited` defaults to the citable of the Thing at the record's labelpath. */
@@ -47,13 +60,13 @@ export type DelOnceArgs<RecordT extends ThingRecord = ThingRecord> = Readonly<Om
 export const VaultMinderChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn }) => ({
   makeArgs:  obj({ scope: ThingChecks.bankScope, opts: obj({ vaultDB: ThingChecks.vaultDBShape, makeThing: fn<ThingMaker>() }) }),
   listener:  obj({ hear: fn(), onBadNews: fn() }),
-  /** An event rung: its kind and scope, who dispatched it, when it was read, and its bank's lifetok if any. Its `val` is checked apart, and the rest is not read. */
+  /** An event rung: its kind and scope, who dispatched it, when it was read, and its bank's lifetok, the void one where its source knew none. Its `val` is checked apart, and the rest is not read. */
   rungEvent: obj({
     ...ThingChecks.thingScope.shape,
     eventkind:   oneof(vaultEventkindVals),
     sourcelabel: ThingChecks.label,
     read_tc:     SeenChecks.readTc,
-    banktok:     AskChecks.loggableAsk.shape.banktok,
+    banktok:     AskChecks.anyBanktok,
   }),
   /** The liveness of an `item` event rung, which says which check its `val` gets. */
   rungItem:  obj({ liveness: oneof(livenessVals) }),
@@ -71,8 +84,8 @@ export const VaultMinderChecks = Validator.Checkers('bad_record', ({ obj, oneof,
 
 /** The members of {@link VaultMinder} that are functions. */
 const VaultMinderMembernames = [
-  'tryGetThing', 'tryWriteThing', 'tryListThings', 'tryBirthBank', 'listen', 'receive', 'thingAt', 'sweep',
-  'tryGetOnce', 'getOnce', 'tryListOnce', 'listOnce', 'tryPutOnce', 'putOnce', 'tryDelOnce', 'delOnce', 'makeGetAsk', 'makeListAsk', 'makePutAsk', 'makeDelAsk',
+  'tryGetThing', 'tryWriteThing', 'tryListThings', 'tryBirthBank', 'tryGetWorld', 'listen', 'receive', 'thingAt', 'carAt', 'sweep',
+  'tryGetWorldOnce', 'tryGetOnce', 'getOnce', 'tryListOnce', 'listOnce', 'tryPutOnce', 'putOnce', 'tryDelOnce', 'delOnce', 'makeGetAsk', 'makeListAsk', 'makePutAsk', 'makeDelAsk',
 ] as const satisfies readonly (keyof VaultMinder)[]
 
 /** True for an object with a function for each member of {@link VaultMinder}. */

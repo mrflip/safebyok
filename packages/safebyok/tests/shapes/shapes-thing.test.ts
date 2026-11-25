@@ -6,7 +6,7 @@ import {
 } from '../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
 import { Thing } from '../../src/models/thing'
-import { type Tracked, type WriteAsk, AskChecks, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../../src/shapes/shapes-asks'
+import { type Tracked, type WriteAsk, AskChecks, VoidTrack, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { Labelpath, Lifeseq } from '../../src/shapes/primitives'
 import type { LiveOf, ShellOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
 import * as Phrases from '../../src/phrases'
@@ -89,7 +89,7 @@ describe("Shell.of(scoped, parent?)", () => {
   })
 
   it("reads only the scope, labelpath, label and lifepath of an ask or a record", () => {
-    const ask = getAskOf({ ...TH.BoxScope, track: TH.trackOf() })
+    const ask = getAskOf({ ...TH.BoxScope, ...TH.SenderKnows, track: TH.trackOf() })
     expect(Shell.of(ask, TH.rootBoxOf())).to.deep.equal(boxShell)
   })
 
@@ -430,40 +430,36 @@ describe("the ask builders", () => {
   const box = TH.boxThingOf()
 
   it("fill in a get's ifAbsent 'nil', and drop what is not a scope", () => {
-    expect(getAskOf(box)).to.deep.equal(TH.getAskAt('box/openai', 'nil'))
-    expect(listAskOf(TH.RootScope)).to.deep.equal(TH.listAskAt('box'))
-    expect(getAskOf({ ...TH.GateScope, ifAbsent: 'fail' })).to.deep.equal(TH.getGateAskOf('fail'))
+    expect(getAskOf({ ...box, ...TH.SenderKnows })).to.deep.equal(TH.getAskAt('box/openai', 'nil'))
+    expect(listAskOf({ ...TH.RootScope, ...TH.SenderKnows })).to.deep.equal(TH.listAskAt('box'))
+    expect(getAskOf({ ...TH.GateScope, ifAbsent: 'fail', ...TH.SenderKnows })).to.deep.equal(TH.getGateAskOf('fail'))
   })
 
   it("fill in a put's ifAbsent 'add' and ifPresent 'repl', leaving its policies as given, at its record's scope", () => {
     const next = TH.nextGateOf(TH.gateThingOf())
-    const ask  = putAskOf({ cited: TH.gateThingOf(), record: next, options: { policies: ['add_passkey'] } })
-    expect(ask).to.deep.equal({ ...TH.GateScope, op: 'put', modelkind: 'gate', cited: TH.gateThingOf(), record: next, ifAbsent: 'add', ifPresent: 'repl', options: { policies: ['add_passkey'] } })
-    expect(putAskOf({ cited: Shell.childCited(Life0), record: box, ifPresent: 'fail' })).to.deep.include({ ...TH.BoxScope, modelkind: 'box', ifAbsent: 'add', ifPresent: 'fail' })
+    const ask  = putAskOf({ cited: TH.gateThingOf(), record: next, options: { policies: ['add_passkey'] }, ...TH.SenderKnows })
+    expect(ask).to.deep.equal({ ...TH.GateScope, op: 'put', modelkind: 'gate', cited: TH.gateThingOf(), record: next, ifAbsent: 'add', ifPresent: 'repl', options: { policies: ['add_passkey'] }, ...TH.SenderKnows })
+    expect(putAskOf({ cited: Shell.childCited(Life0), record: box, ifPresent: 'fail', ...TH.SenderKnows })).to.deep.include({ ...TH.BoxScope, modelkind: 'box', ifAbsent: 'add', ifPresent: 'fail' })
   })
 
-  it("carry a banktok given, and none when none is given", () => {
-    const tomb = TH.boxTombOf(box)
-    const banktok = TH.FirstLifetok
-    expect(getAskOf({ ...TH.BoxScope, banktok })).to.deep.equal({ ...TH.getAskAt('box/openai', 'nil'), banktok })
-    expect(listAskOf({ ...TH.RootScope, banktok })).to.deep.equal({ ...TH.listAskAt('box'), banktok })
-    expect(putAskOf({ cited: Shell.childCited(Life0), record: box, banktok })).to.deep.include({ banktok })
-    expect(delAskOf({ cited: box, record: tomb, banktok })).to.deep.equal({ ...TH.delAskFor(box, tomb), banktok })
-    expect(getAskOf(TH.BoxScope)).to.not.have.property('banktok')
-    expect(listAskOf(TH.RootScope)).to.not.have.property('banktok')
-    expect(putAskOf({ cited: Shell.childCited(Life0), record: box })).to.not.have.property('banktok')
-    expect(delAskOf({ cited: box, record: tomb })).to.not.have.property('banktok')
+  it("carry the track and banktok given", () => {
+    const tomb  = TH.boxTombOf(box)
+    const given = { track: TH.trackOf(), banktok: TH.FirstLifetok }
+    expect(getAskOf({ ...TH.BoxScope, ...given })).to.deep.equal({ ...TH.getAskAt('box/openai', 'nil'), ...given })
+    expect(listAskOf({ ...TH.RootScope, ...given })).to.deep.equal({ ...TH.listAskAt('box'), ...given })
+    expect(putAskOf({ cited: Shell.childCited(Life0), record: box, ...given })).to.deep.include(given)
+    expect(delAskOf({ cited: box, record: tomb, ...given })).to.deep.equal({ ...TH.delAskFor(box, tomb), ...given })
   })
 
   it("fix a del's flags", () => {
     const tomb = TH.boxTombOf(box)
-    expect(delAskOf({ cited: box, record: tomb })).to.deep.equal(TH.delAskFor(box, tomb))
-    expect(checkedWriteAsk(delAskOf({ cited: box, record: tomb }))).to.deep.equal(TH.delAskFor(box, tomb))
+    expect(delAskOf({ cited: box, record: tomb, ...TH.SenderKnows })).to.deep.equal(TH.delAskFor(box, tomb))
+    expect(checkedWriteAsk(delAskOf({ cited: box, record: tomb, ...TH.SenderKnows }))).to.deep.equal(TH.delAskFor(box, tomb))
   })
 
   it("write a del's fixed flags over any given", () => {
     const tomb = TH.boxTombOf(box)
-    expect(delAskOf({ cited: box, record: tomb, ifAbsent: 'add' } as never)).to.deep.include({ ifAbsent: 'fail', ifPresent: 'repl' })
+    expect(delAskOf({ cited: box, record: tomb, ifAbsent: 'add', ...TH.SenderKnows } as never)).to.deep.include({ ifAbsent: 'fail', ifPresent: 'repl' })
   })
 
   it("pass through what they do not accept, for the verb's checks to refuse", () => {
@@ -478,6 +474,35 @@ describe("the ask builders", () => {
     TH.expectSyncRefusal(() => checkedWriteAsk(noScope), 'bad_record')
     expect(putAskOf(null as never)).to.eq(null)
     expect(listAskOf(7 as never)).to.eq(7)
+  })
+})
+
+describe("an ask's track and banktok", () => {
+  const box = TH.boxThingOf()
+  const unknown = { track: VoidTrack, banktok: SX.VoidLifeTok }
+
+  it("may track each root at the void revision", () => {
+    expect(AskChecks.getAsk.parse(TH.getAskAt('box/openai'))).to.deep.include({ track: VoidTrack })
+  })
+
+  it("is a get's to leave as the void lifetok, where its sender knows no bank", () => {
+    expect(AskChecks.getAsk.parse({ ...TH.getAskAt('box/openai'), ...unknown })).to.deep.include(unknown)
+  })
+
+  it("is the bank's lifetok on a list, a write and a birth", () => {
+    for (const parse of [
+      () => AskChecks.listAsk.parse({ ...TH.listAskAt('box'), ...unknown }),
+      () => checkedWriteAsk({ ...TH.birthAskOf(box, Shell.childCited(Life0)), ...unknown }),
+      () => checkedBirthBankAsk(TH.birthBankAskOf(unknown)),
+    ]) {
+      const err = TH.expectSyncRefusal(parse, 'bad_record')
+      expect(err.message).to.include(Phrases.BanktokVoid)
+    }
+  })
+
+  it("is never left out", () => {
+    TH.expectSyncRefusal(() => AskChecks.getAsk.parse(TH.omitting(TH.getAskAt('box/openai'), 'track')), 'bad_record')
+    TH.expectSyncRefusal(() => AskChecks.getAsk.parse(TH.omitting(TH.getAskAt('box/openai'), 'banktok')), 'bad_record')
   })
 })
 

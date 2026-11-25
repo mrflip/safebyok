@@ -1,9 +1,10 @@
 /** The battery's cases of the world each answer carries: its bank and main gate. */
 import { describe, expect, it } from 'vitest'
+import { expectBad } from 'safebyok-big/testing'
 import type { GateRecord } from '../../src/shapes/shapes-thing'
 import type { WorldRecord } from '../../src/shapes/shapes-asks'
 import {
-  GateScope, RootScope, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf,
+  GateScope, RootScope, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf, trackOf,
 } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 import { OtherRevtok } from './models-world'
@@ -61,11 +62,12 @@ export function describeVaultDBWorld({ fresh, bornBank, withGate, boxesBorn, row
       expect(await vaultDB.tryGetThing(getAskAt('gate'))).to.deep.include({ ok: true, world: worldWith() })
     })
 
-    it("is null where the main gate fails its checks, and the answer stands", async () => {
+    it("is null where the main gate fails its checks, and the answer stands to an ask that tracks the gate at its revision, and refuses damaged_row to one that tracks the void revision", async () => {
       const vaultDB = await bornBank()
       await rowsOf(vaultDB).plant(GateScope, { ...gateThingOf(), wayins: { main: {}, passkey0: null } })
-      expect(await vaultDB.tryGetThing(getAskAt('box'))).to.deep.include({ ok: true, act: 'gotlive', val: rootBoxOf(), world: null })
-      expect(await vaultDB.tryListThings(listAskAt('box'))).to.deep.include({ ok: true, deltas: [], world: null })
+      expect(await vaultDB.tryGetThing({ ...getAskAt('box'), track: trackOf() })).to.deep.include({ ok: true, act: 'gotlive', val: rootBoxOf(), world: null })
+      expect(await vaultDB.tryListThings({ ...listAskAt('box'), track: trackOf() })).to.deep.include({ ok: true, deltas: [], world: null })
+      await expectBad(vaultDB.tryGetThing(getAskAt('box')), 'damaged_row')
     })
   })
 }

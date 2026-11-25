@@ -194,6 +194,36 @@ describe("VaultTSQ's items", () => {
     expect(Thing.isGone(boxHeldIn(world))).to.eq(true)
   })
 
+  it("show the refusal a newer record raises at the box's Thing as the item's error, its data kept", async () => {
+    const world = await tsqWorldOf(new MemoryVaultDB(), (shell) => TH.RefusingThing.make(shell))
+    const box2  = TH.nextOf(Box1)
+    cheatStored(world.vaultDB, box2)
+    expect(await world.vaultTSQ.getOnce(TH.BoxScope)).to.deep.equal(box2)
+    cheatStored(world.vaultDB, TH.nextOf(box2))
+    const err = await TH.expectRefusal(world.vaultTSQ.getOnce(TH.BoxScope, { staleTime: 0 }), 'unexpected_error')
+    expect(itemQueryAt(world)?.state).to.deep.include({ status: 'error', error: err, data: box2 })
+  })
+
+  it("refetch an observed item once where a notice brings a record its Thing refuses, showing the refusal as its error beside its data", async () => {
+    const world    = await tsqWorldOf(new MemoryVaultDB(), (shell) => TH.RefusingThing.make(shell))
+    const box2     = TH.nextOf(Box1)
+    cheatStored(world.vaultDB, box2)
+    const observer = new QueryObserver(world.queryClient, { queryKey: BoxKey })
+    const stop     = observer.subscribe(noop)
+    await TH.eventually(() => observer.getCurrentResult().data !== undefined)
+    const asked    = vi.spyOn(world.vaultDB, 'tryGetThing')
+    const box3     = TH.nextOf(box2)
+    cheatStored(world.vaultDB, box3)
+    world.notify(noticeOf(box3))
+    await TH.eventually(() => observer.getCurrentResult().status === 'error')
+    expect(observer.getCurrentResult()).to.deep.include({ data: box2, fetchStatus: 'idle' })
+    expect(observer.getCurrentResult().error).to.include({ refusalkind: 'unexpected_error' })
+    // The refetch's own refusal asks for no fetch beyond itself.
+    await new Promise((resolve) => { setTimeout(resolve, 20) })
+    expect(asked.mock.calls.length).to.eq(1)
+    stop()
+  })
+
   it("refuse stale_read where storage answers an earlier life than one known only sparse, and show an observer null", async () => {
     const world = await worldWithBox()
     world.notify(noticeOf(TH.boxSparseOf(Reborn)))

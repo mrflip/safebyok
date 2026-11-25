@@ -1,27 +1,24 @@
 import { QueryClient } from '@tanstack/query-core'
-import { noop } from 'es-toolkit'
 import { Consts, Deriver, Errors, type GX, Helpers, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
 import type { BirthGating } from './gating'
 import { Proving, guardKeyDeriver } from './proving'
 import { Vault } from './vault'
 import { World } from './world'
+import { BaseThing } from './base-thing'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
-import { guardRootShelf, isRootLabelpath, peekRoots, stowRoots } from '../minding/root-shelf'
+import { guardRootShelf } from '../minding/root-shelf'
 import { VaultTSQ } from '../minding/vault-tsq'
 import { type BadNewsHandler, type DeviceJSON, type DeviceOpts, type DeviceRecord, type RootShelf, BankishChecks, isRootShelf } from '../shapes/shapes-bankish'
 import { type MaskedView, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import { isQueryClient } from '../shapes/shapes-vault-tsq'
 import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
 import type { BankScope } from '../shapes/shapes-stamps'
-import type { Banklabel, DeviceTok, Lifetok, Userid } from '../shapes/primitives'
+import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
+import type { WorldRoots } from '../shapes/shapes-asks'
 import { VaultMinder } from '../minding/vault-minder'
-import { itemSeenOf, readTcNow } from '../storage/agerank'
-import { Labelpath } from '../shapes/primitives'
-import type { ReadTc, SeenThing, VaultEvent } from '../shapes/shapes-vault-event'
-import { type Modelkind, PerKindChecks, ThingChecks } from '../shapes/shapes-thing'
-import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
+import { type Modelkind, ThingChecks } from '../shapes/shapes-thing'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
@@ -67,7 +64,7 @@ export class Device {
   #userid: Userid | null = null
   /** The vault TSQ of the signed-in user's boxes, made as `signin` starts the bank. */
   #vaultTSQ: VaultTSQ | null = null
-  /** The vault of the bank's boxes, made at the first read of {@link vault} once the bank is live. */
+  /** The vault of the bank's boxes, made as `signin` starts the bank. */
   #vault: Vault | null = null
   /** What `signin` resolves, once it has been called. */
   #signinAnswer: Promise<void> | null = null
@@ -112,13 +109,10 @@ export class Device {
   /** The signed-in user's bank, or null until its world has it live, with its main gate and root box: found stored, or born on this device. */
   get bank(): Bank | null { return this.#world.areRootsLive ? this.#world.bank : null }
 
-  /** The vault of this device's bank's boxes, or null while the device has no bank. The same one from its first read on. */
-  get vault(): Vault | null {
-    const { bank } = this
-    if (bank === null) { return null }
-    this.#vault ??= Vault.make(bank, this.vaultTSQ)
-    return this.#vault
-  }
+  /** The vault of this device's bank's boxes, or null until `signin` starts the bank. The same one from then on.
+   * Its verbs refuse `absent_thing` while {@link bank} is null.
+   */
+  get vault(): Vault | null { return this.#vault }
   // --
 
   // == [Construction]: make, constructor
@@ -153,7 +147,7 @@ export class Device {
   async judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> { return await Proving.judgeStrength(this, this.scope, passphraseCleartext) }
   // --
 
-  // == [Starting]: hello, #receiveShelved, signin, birthGating, gatingBirthAttempt, #doSignin
+  // == [Starting]: hello, signin, birthGating, gatingBirthAttempt, #doSignin
 
   /** Start the device. It resolves at once, and never rejects.
    * Refuses `insecure_context` outside a secure context, where WebCrypto is missing.
@@ -161,28 +155,6 @@ export class Device {
   hello(): Promise<void> {
     checkSecureContext()
     return Promise.resolve()
-  }
-
-  // Each root is told apart, so a damaged one is news, and the rest still reach their Things.
-  /** Hand `vaultMinder` each root the host's root shelf keeps of the signed-in bank. */
-  #receiveShelved(vaultMinder: VaultMinder): void {
-    if (this.#rootShelf === null) { return }
-    const read_tc = readTcNow()
-    const roots   = peekRoots(this.#rootShelf, this.scope)
-    const banktok = banktokOf(roots[0])
-    for (const root of roots) {
-      try { vaultMinder.receive(shelvedEventOf(Checks.shelvedRoot.parse(root), read_tc, banktok)) } catch (err) { this.tellBadNews([err]) }
-    }
-  }
-
-  // The world's Things hear each root first, so the roots put are the ones the world shows.
-  /** Put the world's roots to the host's root shelf at each root `vaultMinder` tells of, or remove them while they are not all live. */
-  #listenShelf(vaultMinder: VaultMinder): void {
-    const shelf = this.#rootShelf
-    if (shelf === null) { return }
-    const hear = this.#world.bulletproofCallback((event: VaultEvent) => { if ((event.eventkind === 'item') && isRootLabelpath(event.labelpath)) { stowRoots(shelf, this.scope, this.#world) } })
-    // The onBadNews of the vault TSQ, listening beside it, tells the device of the same record refused.
-    vaultMinder.listen({ hear, onBadNews: noop })
   }
 
   /** Tell the device who is signed in, and start that user's bank: resolves once the snapshot shows `'locked'`, `'unborn'` or `'failed'` (with `lastErr`). Never rejects.
@@ -221,32 +193,23 @@ export class Device {
    */
   async gatingBirthAttempt(params: FormData | BirthDna): Promise<Bank> { return await this.birthGating(params).attempt() }
 
-  // The world fetched lands in the world's Things, which the stage is read from; a failure to fetch it, once a bank is up
-  // from what was restored, is no caller's to hear.
-  // The VaultMinder is made right before the vault TSQ, the root shelf and the world listen to it, with nothing awaited
-  // between: its Things remember what they take, so a record it took with no one listening would reach them later only as
-  // a repeat, which it drops. The roots shelved are received before the root shelf listens, which would put them back
-  // unchanged; the world reads its Things at its signin.
-  /** Start the signed-in user's bank over a VaultMinder of it: from the roots shelved, where there are any, and from the world the vaultDB answers. */
+  // The roots fetched land in the world's Things, which the stage is read from. A root its Thing refuses reaches the host
+  // once, as bad news told by the VaultMinder; sign-in then reports only what the roots amount to: all three live, the
+  // bank unborn, or broken. A failure to fetch them, once a bank is up from what was restored, is no caller's to hear.
+  // The VaultMinder is made right before the vault TSQ and the world listen to it, with nothing awaited between: its
+  // Things remember what they take, so a record it took with no one listening would reach them later only as a repeat,
+  // which it drops. The world takes the roots shelved before the vaultDB is asked. The vault is made last, on everything
+  // made before it.
+  /** Start the signed-in user's bank over a VaultMinder of it: from the roots shelved, where there are any, and from the three roots the vaultDB answers. */
   async #doSignin(): Promise<void> {
     try {
-      const vaultMinder = VaultMinder.make(this.scope, { vaultDB: this.vaultDB, makeThing: (seen) => this.#world.makeThing(seen) })
+      const vaultMinder = VaultMinder.make(this.scope, { vaultDB: this.vaultDB, makeThing: (shell) => this.#world.makeThing(shell) })
       this.#vaultTSQ = VaultTSQ.make({ vaultMinder, queryClient: this.#vaultTsqClient, scope: this.scope, onBadNews: (news) => { this.tellBadNews([news]) } })
-      this.#receiveShelved(vaultMinder)
-      this.#listenShelf(vaultMinder)
-      this.#world.signin(vaultMinder)
-      // Scaffolding until sign-in is one get of the roots: a get of the root box, whose answer's world brings the bank and
-      // main gate. Where none is stored, the bank is asked for, and its shell or tombstone shows the stage `'unborn'`; a
-      // bank stored live without the others is broken.
-      const rootAnswer = await vaultMinder.tryGetOnce({ ...this.scope, labelpath: Labelpath.RootBox })
-      if (! rootAnswer.ok) { throw rootAnswer.err }
-      if ((rootAnswer.act === 'gotvoid') && (rootAnswer.world === null)) {
-        const bankAnswer = await vaultMinder.tryGetOnce({ ...this.scope, labelpath: 'bank' })
-        if (! bankAnswer.ok) { throw bankAnswer.err }
-        if (bankAnswer.act !== 'gotlive') { return }
-      }
-      // Roots answered that are not all live in the world are broken: reported as the sign-in's refusal.
-      if (! this.#world.areRootsLive) { throw Throwers.bankRootsMissing() }
+      this.#world.signin(vaultMinder, this.#rootShelf)
+      this.#vault = Vault.make(this.#world, this.#vaultTSQ)
+      const answer = await vaultMinder.tryGetWorldOnce()
+      if (! answer.ok) { throw answer.err }
+      if (! (this.#world.areRootsLive || isUnbornIn(answer.val))) { throw Throwers.bankRootsMissing() }
     } catch (err) {
       if (this.bank !== null) {
         this.tellBadNews([err])
@@ -320,7 +283,7 @@ export class Device {
     if (this.#userid === null) { return EmptyMaskedView }
     const { bank, gate, rootBox } = this.#world
     return {
-      bankTSQ:  [bank, gate, rootBox].filter((thing) => thing !== null).map((thing) => thing.inspectable()),
+      bankTSQ:  [bank, gate, rootBox].filter((thing) => thing !== null).map((thing) => ({ ...thing.inspectable(), lastRefusalkind: this.#world.vaultMinder?.carAt(thing)?.lastErr?.refusalkind ?? null })),
       vaultTSQ: this.#vaultTSQ?.inspectable() ?? [],
       lease:    this.#world.inspectable(),
     }
@@ -353,7 +316,7 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 }
 // --
 
-// == [Helpers]: millisOf, checkSecureContext, ShelvedSourcelabel, banktokOf, shelvedEventOf
+// == [Helpers]: millisOf, checkSecureContext, isUnbornIn
 
 // A host's Infinity minutes, for never, becomes ForeverMillis: past the entrypoint, nothing is infinite.
 /** `minutes` in milliseconds, capped at `ForeverMillis`, or `fallback` for none. */
@@ -364,29 +327,16 @@ function checkSecureContext(): void {
   if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw Throwers.insecureContext() }
 }
 
-/** The `sourcelabel` of the events of the roots a device read from its root shelf. */
-const ShelvedSourcelabel = 'root_shelf'
+// A bank's tombstone alone is unborn too: a root stored beside a bank not live is broken.
+/** True where `roots` keep no live bank, and no main gate or root box: the bank is unborn. */
+function isUnbornIn({ bank, gate, root }: WorldRoots): boolean { return (bank.am !== 'a') && BaseThing.isVoidSentinel(gate) && BaseThing.isVoidSentinel(root) }
 
-/** The lifetok of `root`, where it is a live bank's record, as the events of the roots shelved carry it */
-function banktokOf(root: unknown): Lifetok | undefined {
-  const report = PerKindChecks.bankThing.safeParse(root)
-  return (report.success && (report.data.am === 'a')) ? report.data.lifetok : undefined
-}
-
-/** The `item` event of `record`, a root read from a root shelf, read at `read_tc` in the bank of `banktok` */
-function shelvedEventOf(record: SeenThing, read_tc: ReadTc, banktok: Lifetok | undefined): VaultEvent {
-  const { userid, banklabel, labelpath } = record
-  return {
-    eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: undefined, agerankWas: undefined,
-    sourcelabel: ShelvedSourcelabel, read_tc, banktok, ...itemSeenOf(record),
-  }
-}
 // --
 
 // == [Checks]: Checks
 
-/** The checks of {@link Device.make}'s arguments, {@link Device.signin}'s, a root read from a root shelf, and {@link tellBadNewsTo}'s. */
-const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom, union }) => ({
+/** The checks of {@link Device.make}'s arguments, {@link Device.signin}'s, and {@link tellBadNewsTo}'s. */
+const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
   userid:        BankishChecks.userid,
   deviceMakeArgs: obj({
     record: BankishChecks.deviceRecord,
@@ -403,8 +353,6 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom, union }
       deviceDB:        custom<unknown>().optional(),
     }), { refusalkind: 'bad_record' }),
   }),
-  // The shelf keeps the roots only while all three are live, each whole.
-  shelvedRoot:   union([BankChecks.record, GateChecks.record, BoxChecks.record]),
   tellBadNewsToArgs: obj({
     onBadNews: fn<BadNewsHandler>(),
     device:    custom<Device>(),

@@ -337,7 +337,7 @@ describe("bank.put(args)", () => {
     const { bank, device } = await TH.buildBornBank()
     const record = nextBankThingOf(bank)
     expect(await bank.put({ cited: bank.pickle(), record })).to.deep.equal(record)
-    const got = await device.vaultDB.tryGetThing(getAskOf({ ...bank.scope, labelpath: 'bank' }))
+    const got = await device.vaultDB.tryGetThing(getAskOf({ ...bank.scope, labelpath: 'bank', ...TH.SenderKnows }))
     expect(got).to.deep.include({ ok: true, val: record })
   })
 
@@ -358,7 +358,7 @@ describe("bank.put(args)", () => {
     const { bank, device } = await TH.buildBornBank()
     const record = { ...nextBankThingOf(bank), banklabel: 'work' }
     await TH.expectRefusal(bank.put({ cited: { ...bank.pickle(), banklabel: 'work' }, record }))
-    const got = await device.vaultDB.tryGetThing(getAskOf({ ...bank.scope, labelpath: 'bank' }))
+    const got = await device.vaultDB.tryGetThing(getAskOf({ ...bank.scope, labelpath: 'bank', ...TH.SenderKnows }))
     expect(got).to.deep.include({ ok: true, val: bank.pickle() })
   })
 
@@ -367,7 +367,7 @@ describe("bank.put(args)", () => {
     const record = nextBankThingOf(bank)
     await bank.put({ cited: bank.pickle(), record })
     const vaultMinder = device.world.demandVaultMinder()
-    expect(vaultMinder.makeGetAsk({ labelpath: 'bank' }).track?.bank).to.deep.equal({ revseq: 1, lifepath: record.lifepath })
+    expect(vaultMinder.makeGetAsk({ labelpath: 'bank' }).track.bank).to.deep.equal({ revseq: 1, lifepath: record.lifepath })
     const answer = await device.vaultDB.tryGetThing(vaultMinder.makeGetAsk({ labelpath: 'bank' }))
     expect(answer).to.deep.include({ ok: true, tracked: { bank: 'same', gate: 'same', box: 'same' } })
   })

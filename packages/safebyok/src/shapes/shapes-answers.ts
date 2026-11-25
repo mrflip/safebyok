@@ -5,29 +5,29 @@ import { CX, type EX, type Errors, Validator } from 'safebyok-big/internals'
 import type { Labelpath, Lifepath, Lifeseq, Lifetok } from './primitives'
 import type { ThingRecord, ThingScope, VoidSentinel } from './shapes-thing'
 import type { SparseOf, TombstoneOf } from './shapes-sealers'
-import type { BankRoots, LoggableAsk, Tracked, WorldRecord } from './shapes-asks'
+import type { BankRoots, LoggableAsk, Tracked, WorldRecord, WorldRoots } from './shapes-asks'
 import { type ReadTc, SeenChecks } from './shapes-vault-event'
 
-// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer
+// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer, GetWorldAnswer
 // No check reads an answer whole: `AdapterVaultDB` makes each of parts it has checked, and a reader checks each record it
 // keeps where a Thing takes it.
 
 /** A vaultDB verb's good answer: its `val`, the `act` that says what the datastore did, its bank's `world`, the loggable part of its `ask`, and when its step read the datastore (`read_tc`).
  * `world` is the bank and its main gate as the step left them, read in that step. It is null if either is missing or fails its checks.
- * `banktok` is the lifetok of the bank in `world`, or null where `world` is null.
- * `tracked`, only for an ask that tracks, says for each of the bank, its main gate and its root box whether it is still at the revision the ask tracks ({@link Tracked}).
+ * `banktok` is the lifetok of the bank in `world`, or the void lifetok where `world` is null.
+ * `tracked` says for each of the bank, its main gate and its root box whether it is still at the revision the ask tracks ({@link Tracked}).
  */
-export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, world: WorldRecord | null, banktok: Lifetok | null, tracked?: Tracked, read_tc: ReadTc, val: ValT }
+export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, world: WorldRecord | null, banktok: Lifetok, tracked: Tracked, read_tc: ReadTc, val: ValT }
 
 /** A refused answer's act: big's, or `policied` for a replacement that a storage policy or a changed born_at refuses. */
 export type BadAct = EX.BadAct | 'policied'
 
 /** A vaultDB verb's refused answer: its `err` and `act`, the Thing found stored (`dbhas`), its bank's `world`, the loggable part of its `ask`, and when its step read the datastore (`read_tc`).
  * Where nothing is stored at the ask's scope, `dbhas` is the shell there, under the nearest Thing stored above it (see {@link GetThingAnswer}).
- * `banktok` is the lifetok of the bank in `world`, or null where `world` is null.
- * If the verb threw, `world` and `banktok` are null, `read_tc` is when it was refused, and `dbhas` is the Thing the refusal names, or null where it names none.
+ * `banktok` is the lifetok of the bank in `world`, or the void lifetok where `world` is null.
+ * If the verb threw, `world` is null, `banktok` the void lifetok, `tracked` is `'unread'`, `read_tc` is when it was refused, and `dbhas` is the Thing the refusal names, or null where it names none.
  */
-export type BadAnswer<DbhasT = ThingRecord | VoidSentinel | null> = { ok: false, ask: LoggableAsk, act: BadAct, world: WorldRecord | null, banktok: Lifetok | null, tracked?: Tracked, read_tc: ReadTc, dbhas: DbhasT, err: Errors.VaultError }
+export type BadAnswer<DbhasT = ThingRecord | VoidSentinel | null> = { ok: false, ask: LoggableAsk, act: BadAct, world: WorldRecord | null, banktok: Lifetok, tracked: Tracked | 'unread', read_tc: ReadTc, dbhas: DbhasT, err: Errors.VaultError }
 
 /** A vaultDB verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. Never thrown. */
 export type Answer<ValT, ActT extends EX.GoodAct> = GoodAnswer<ValT, ActT> | BadAnswer
@@ -89,9 +89,12 @@ export type ListThingsAnswer<RecordT extends ThingRecord = ThingRecord> =
 
 /** The answer to `tryBirthBank`: the three roots written (`born`), or found already stored (`passed`). Refused, its `dbhas` is the root stored that refused it. */
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
+
+/** The answer to `tryGetWorld`: the bank's three roots ({@link WorldRoots}), under the act `got`. Only a verb that threw refuses it. */
+export type GetWorldAnswer = Answer<WorldRoots, 'got'>
 // --
 
-// == [Pre-image of an answer]: ActualChecks, ActualBeside, Actual, GotActual, WroteActual, ListThingsActual, BirthBankActual, Received
+// == [Pre-image of an answer]: ActualChecks, ActualBeside, Actual, GotActual, WroteActual, ListThingsActual, BirthBankActual, GetWorldActual, Received
 // What a concrete adapter reports, carrying the actual values stored: `AdapterVaultDB` makes the answer from it.
 
 /** True for null or a plain object */
@@ -104,7 +107,7 @@ export const ActualChecks = Validator.Checkers('storage_issue', ({ obj, custom }
   /** Pick what every report carries: its `world`, `tracked` and `read_tc`. */
   beside: obj({
     world:   custom<WorldRecord | null>(isBagOrNull),
-    tracked: custom<Tracked | null>(isBagOrNull),
+    tracked: custom<Tracked>(CX.isPlainBag),
     read_tc: SeenChecks.readTc,
   }),
   /** Pick what a listing's report carries beside that: its `parentage`, `deltas` and `damaged_rows`. */
@@ -117,7 +120,7 @@ export const ActualChecks = Validator.Checkers('storage_issue', ({ obj, custom }
 
 /** What every concrete adapter's report carries beside its act:
  * - `world`   -- the bank and its main gate as the step left them, or null if either is missing or fails its checks
- * - `tracked` -- how the bank, main gate and root box compare with what the ask tracks, or null for an ask that tracks nothing
+ * - `tracked` -- how the bank, main gate and root box compare with what the ask tracks
  * - `read_tc` -- when the step read the datastore: `readTcNow()` in the step, or the datastore's own UUID version 7
  */
 export type ActualBeside = Readonly<Z.infer<typeof ActualChecks.beside>>
@@ -150,6 +153,9 @@ export type BirthBankActual = ActualBeside & (
   | { ok: true,  act: 'born' | 'passed', things: BankRoots }
   | { ok: false, act: EX.RefusedAct,     record: ThingRecord | VoidSentinel }
 )
+
+/** A concrete adapter's report of a get of the world: the bank's three roots, each the Thing stored or the shell where none is. */
+export type GetWorldActual = ActualBeside & { ok: true, act: 'got', things: WorldRoots }
 
 /** A change a concrete adapter's `doWatch` passes to `receive`: the changed Thing, raw, and its bank's world as the datastore last read it.
  * Watchers are notified of the Thing alone, with the world's lifetok: a bank or main gate that changed is a change of its own.
