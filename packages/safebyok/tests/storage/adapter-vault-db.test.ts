@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { type EX, Errors, SX } from 'safebyok-big/internals'
 import { AnswerNotMade } from '../../src/phrases'
 import { AdapterVaultDB } from '../../src/storage/adapter-vault-db'
-import type { Actual, BirthBankActual, GetWorldActual, GotActual, ListThingsActual, Received } from '../../src/shapes/shapes-answers'
-import type { BirthBankAsk, GetAsk, GetWorldAsk, ListAsk, ThingWatchScope, WriteAsk } from '../../src/shapes/shapes-asks'
+import type { Actual, BirthBankActual, GetWorldActual, GotActual, ListThingsActual, Received, StatsActual } from '../../src/shapes/shapes-answers'
+import type { BirthBankAsk, GetAsk, GetWorldAsk, ListAsk, StatsAsk, ThingWatchScope, WriteAsk } from '../../src/shapes/shapes-asks'
+import { StoreLimitCap } from '../../src/shapes/shapes-vault-stats'
 import { Thing } from '../../src/models/thing'
 import { Shell } from '../../src/shapes/shapes-thing'
 import type { VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
@@ -29,6 +30,7 @@ class ScriptedVaultDB extends AdapterVaultDB {
   protected doListThings(_ask: ListAsk): ListThingsActual { return this.#report() as ListThingsActual }
   protected doBirthBank(_ask: BirthBankAsk): BirthBankActual { return this.#report() as BirthBankActual }
   protected doGetWorld(_ask: GetWorldAsk): GetWorldActual { return this.#report() as GetWorldActual }
+  protected doStats(_ask: StatsAsk): StatsActual { return this.#report() as StatsActual }
   protected override doWatch(_scope: ThingWatchScope, receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void {
     this.receive = receive
     return () => { this.receive = null }
@@ -122,6 +124,24 @@ describe("AdapterVaultDB.tryWriteThing(ask), a store that reports oddly", () => 
   it("refuses a good write that reports no Thing as a broken store", async () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'born', record: null }))
     await TH.expectBad(vaultDB.tryWriteThing(TH.birthAskOf()), 'storage_issue')
+  })
+})
+
+describe("AdapterVaultDB.tryStats(ask), a store that reports oddly", () => {
+  const Counted = { count: 2, live_count: 1, size: 300 }
+  const statsOf = (overrides: object) => ({ box: Counted, gate: Counted, max: { count: StoreLimitCap, size: StoreLimitCap }, ...overrides })
+
+  it("answers the stats a concrete adapter reports", async () => {
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'got', stats: statsOf({}) }))
+    expect(await vaultDB.tryStats(TH.statsAskOf())).to.deep.include({ ok: true, act: 'got', val: statsOf({}) })
+  })
+
+  it("refuses, as a broken store, stats with a field missing, a count that is no whole number, or a limit of Infinity or past the cap", async () => {
+    for (const stats of [statsOf({ gate: undefined }), statsOf({ box: { ...Counted, size: 1.5 } }), statsOf({ box: { ...Counted, live_count: -1 } }),
+      statsOf({ max: { count: Infinity, size: StoreLimitCap } }), statsOf({ max: { count: StoreLimitCap, size: StoreLimitCap + 1 } }), statsOf({ extra: 1 })]) {
+      const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'got', stats }))
+      await TH.expectBad(vaultDB.tryStats(TH.statsAskOf()), 'storage_issue')
+    }
   })
 })
 

@@ -3,7 +3,7 @@
 import { type Errors, SX } from 'safebyok-big/internals'
 import { type Lifetok, Labelpath } from '../shapes/primitives'
 import {
-  type AnyAsk, type BirthBankAsk, type CitedOf, type DelAskDraft, type GetAsk, type GetWorldAsk, type ListAsk, type PutAskDraft, type Track, type Tracked, type WriteAsk,
+  type AnyAsk, type BirthBankAsk, type CitedOf, type DelAskDraft, type GetAsk, type GetWorldAsk, type ListAsk, type PutAskDraft, type StatsAsk, type Track, type Tracked, type WriteAsk,
   delAskOf, getAskOf, listAskOf, putAskOf,
 } from '../shapes/shapes-asks'
 import type { BankAskDraft } from '../shapes/shapes-bankish'
@@ -16,7 +16,7 @@ import { BaseThing } from '../models/base-thing'
 import { itemEventOf } from '../storage/agerank'
 import { refusedAnswerOf } from '../storage/refused-answer'
 import { ThingCar } from './thing-car'
-import type { BadAnswer, BirthBankAnswer, GetThingAnswer, GetWorldAnswer, Kids, ListThingsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
+import type { BadAnswer, BirthBankAnswer, GetThingAnswer, GetWorldAnswer, Kids, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import type { VaultDB } from '../storage/vault-db'
 
 // == [VaultMinder]: Dispatch, Listening, Told, VaultMinder
@@ -73,7 +73,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   }
   // --
 
-  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetWorld
+  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetWorld, tryStats
   // Each verb refuses an ask of another bank, by its userid and banklabel, and hands any other to the wrapped vaultDB, which
   // checks the rest, its banktok among it, and answers a refusal rather than throwing. Each returns that answer unchanged.
   // The records it carries are told first, out to in, at the answer's read_tc.
@@ -130,11 +130,19 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return answer
   }
 
+  /** {@link VaultDB.tryStats}: the roots its `tracked` reports are told, and nothing else. */
+  async tryStats(ask: StatsAsk): Promise<StatsAnswer> {
+    try { this.#checkOwnAsk(ask) } catch (err) { return refusedAnswerOf(ask, err) }
+    const answer = await this.#vaultDB.tryStats(ask)
+    this.#tellAnswer(answer, rootsOf(answer), [])
+    return answer
+  }
+
   /** Refuse an ask of another bank than this vaultDB's */
   #checkOwnAsk(ask: AnyAsk): void { ThingChecks.bankScope.parseConsistent(ask, this.#scope) }
   // --
 
-  // == [Once verbs]: tryGetWorldOnce, tryGetOnce, getOnce, tryListOnce, listOnce, tryPutOnce, putOnce, tryDelOnce, delOnce
+  // == [Once verbs]: tryGetWorldOnce, tryStatsOnce, tryGetOnce, getOnce, tryListOnce, listOnce, tryPutOnce, putOnce, tryDelOnce, delOnce
   // Each sends the wrapped vaultDB one ask of this bank's, and answers once the records the answer carries are told. Each
   // `try` form answers the vaultDB's whole answer, a refusal included, unless the record it carries at the ask's labelpath
   // is refused as it is told: then it answers that refusal. The other form throws the refusal, and `getOnce` refuses too
@@ -144,6 +152,11 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   /** Get this bank's three roots once, in one step. */
   async tryGetWorldOnce(): Promise<GetWorldAnswer> {
     return await this.tryGetWorld({ ...this.#scope, op: 'getworld', ...this.#bankFields() })
+  }
+
+  /** Get this bank's storage stats once, in one step. */
+  async tryStatsOnce(): Promise<StatsAnswer> {
+    return await this.tryStats({ ...this.#scope, op: 'stats', ...this.#bankFields() })
   }
 
   /** Get the Thing at `scoped`, of this bank, once. */

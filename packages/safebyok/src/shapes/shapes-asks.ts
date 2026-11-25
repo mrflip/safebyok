@@ -10,7 +10,7 @@ import {
 } from './shapes-thing'
 import * as Throwers from '../refusals/throwers'
 
-// == [Asks]: RawChecks, loggableAsk, AskChecks, Track, VoidTrack, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, GetWorldAsk, WorldRoots, ThingWatchScope, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
+// == [Asks]: RawChecks, loggableAsk, AskChecks, Track, VoidTrack, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, GetWorldAsk, WorldRoots, StatsAsk, ThingWatchScope, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
 type Kinded   = { modelkind: Thingkind, labelpath: Labelpath }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
@@ -59,6 +59,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof,
       .refine(isPolicyOwn,    Phrases.PolicyNotOwn),
     birthBankAsk:    obj({ userid: user_id, banklabel: label, op: lit('birth'), bank: unk, gate: unk, root: unk, track, banktok }).strict(),
     getWorldAsk:     obj({ userid: user_id, banklabel: label, op: lit('getworld'), track, banktok: anyBanktok }).strict(),
+    statsAsk:        obj({ userid: user_id, banklabel: label, op: lit('stats'), track, banktok: anyBanktok }).strict(),
     thingWatchScope,
     watchArgs:       obj({ scope: thingWatchScope, onNotice: fn(), onBadNews: fn() }),
   }
@@ -71,7 +72,7 @@ const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => 
   const citedFields = ThingChecks.thingCited.partial()
   const trackFields = obj({ revseq: ThingChecks.thingCited.shape.revseq, lifepath: ThingChecks.thingCited.shape.lifepath }).partial()
   return {
-    op:        oneof(['get', 'list', 'put', 'del', 'birth', 'getworld']).optional(),
+    op:        oneof(['get', 'list', 'put', 'del', 'birth', 'getworld', 'stats']).optional(),
     modelkind: oneof(ThingChecks.thingkindVals).optional(),
     userid:    user_id.optional(),
     banklabel: label.optional(),
@@ -91,7 +92,7 @@ const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => 
 
 /** The checks of a vaultDB ask, its records aside, of a watch's scope and handlers, and of the part of an ask that is safe to log.
  * A write or birth ask's records are checked by {@link checkedWriteAsk} and {@link checkedBirthBankAsk}.
- * Every ask carries `banktok`, the lifetok its sender has of the bank's life: a vaultDB checks it, and nothing more. Only a get, of a Thing or of the world, may carry the void lifetok.
+ * Every ask carries `banktok`, the lifetok its sender has of the bank's life: a vaultDB checks it, and nothing more. Only a get, of a Thing or of the world, and an ask for stats may carry the void lifetok.
  */
 export const AskChecks = Object.freeze({ ...RawChecks, loggableAsk })
 
@@ -131,8 +132,10 @@ export type BirthBankAsk    = Readonly<Omit<Z.infer<typeof AskChecks.birthBankAs
 export type GetWorldAsk     = Readonly<Z.infer<typeof AskChecks.getWorldAsk>>
 /** A bank's three roots as one step read them: each the whole record stored, live or a tombstone, or the shell where none is stored. */
 export type WorldRoots      = Readonly<{ bank: BankRecord | VoidSentinel, gate: GateRecord | VoidSentinel, root: BoxRecord | VoidSentinel }>
-/** Any ask a vaultDB answers: a get, a list, a put or del, a birth, or a get of the world. */
-export type AnyAsk          = GetAsk | ListAsk | WriteAsk | BirthBankAsk | GetWorldAsk
+/** An ask for a bank's storage stats, read in one step. */
+export type StatsAsk        = Readonly<Z.infer<typeof AskChecks.statsAsk>>
+/** Any ask a vaultDB answers: a get, a list, a put or del, a birth, a get of the world, or an ask for stats. */
+export type AnyAsk          = GetAsk | ListAsk | WriteAsk | BirthBankAsk | GetWorldAsk | StatsAsk
 /** The three puts of a bank's birth, one for each root. */
 export type BirthPuts       = readonly [BankWriteAsk, GateWriteAsk, BoxWriteAsk]
 /** The scope of a watch: a bank. */

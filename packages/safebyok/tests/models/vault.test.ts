@@ -10,6 +10,7 @@ import type { LiveOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
 import { type BoxLabelpath, Lifeseq } from '../../src/shapes/primitives'
 import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
+import { StoreLimitCap } from '../../src/shapes/shapes-vault-stats'
 import { Thing } from '../../src/models/thing'
 import type { ThingCar } from '../../src/minding/thing-car'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -1160,3 +1161,39 @@ function boxGetsOf(asked: { mock: { calls: [GetAsk][] } }): number {
 function refuseGets(bank: Bank, refusal = Throwers.storageUnavailable(new Error('connection refused'))) {
   return vi.spyOn(bank.device.vaultDB, 'tryGetThing').mockImplementation((ask) => Promise.resolve(refusedAnswerOf(ask, refusal)))
 }
+
+describe("vault.stats() and vault.tryStats()", () => {
+  it("answer the bank's storage stats, read from its vaultDB: its boxes, its main gate, and the cap for each limit of a store in memory", async () => {
+    const { vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const stats = await vault.stats()
+    expect(stats.box).to.deep.include({ count: 2, live_count: 2 })
+    expect(stats.gate).to.deep.include({ count: 1, live_count: 1 })
+    expect(stats.max).to.deep.equal({ count: StoreLimitCap, size: StoreLimitCap })
+    expect(await vault.tryStats()).to.deep.equal({ ok: true, val: stats })
+  })
+
+  it("need no unlock", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    bank.lock()
+    const { box } = await vault.stats()
+    expect(box).to.deep.include({ count: 1, live_count: 1 })
+  })
+
+  it("refuse a disabled device, reading nothing", async () => {
+    const { bank, device, vault } = await TH.buildBornVault()
+    const read = vi.spyOn(bank.device.vaultDB, 'tryStats')
+    device.disable()
+    await TH.expectRefusal(vault.stats(), 'disabled')
+    expect(await vault.tryStats()).to.deep.include({ ok: false })
+    expect(read).not.toHaveBeenCalled()
+  })
+
+  it("refuse with the vaultDB's refusal: stats throws it, and tryStats answers it", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    const refusal = Throwers.storageIssue()
+    vi.spyOn(bank.device.vaultDB, 'tryStats').mockImplementation((ask) => Promise.resolve(refusedAnswerOf(ask, refusal)))
+    await expect(vault.stats()).rejects.toBe(refusal)
+    expect(await vault.tryStats()).to.deep.equal({ ok: false, err: refusal })
+  })
+})

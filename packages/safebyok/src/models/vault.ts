@@ -16,6 +16,7 @@ import type { BoxRecord, ScopeAt, ThingScope } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 import { VaultChecks } from '../shapes/shapes-vault'
 import { type ProbeArgs, ProbeChecks, type ProbeLabelpath, type ProbeReport, type ProbeStep, type ProbeStepkind } from '../shapes/shapes-vault-probe'
+import type { VaultStats } from '../shapes/shapes-vault-stats'
 import type { VaultMinder } from '../minding/vault-minder'
 import type { ThingCar } from '../minding/thing-car'
 
@@ -115,6 +116,23 @@ export class Vault {
   async delBoxOnce(labelpath: BoxLabelpath): Promise<TombstoneOf<BoxRecord>> {
     return Outcome.valOf(await this.tryDelBoxOnce(labelpath))
   }
+  // --
+
+  // == [Stats]: stats, tryStats
+
+  /** The bank's storage stats, read from the vaultDB once: how many boxes and gates it stores, live and in all, their size in bytes, and the store's limits.
+   * Needs no unlock. Nothing refuses a write for being over a limit.
+   * @example
+   *   const { box, max } = await vault.stats()
+   *   const isNearlyFull = box.size > 0.9 * max.size
+   */
+  async stats(): Promise<VaultStats> {
+    this.#bank.demandEnabled()
+    return Outcome.valOf(await this.#vaultMinder.tryStatsOnce())
+  }
+
+  /** {@link stats}, resolving an `Outcome` instead of throwing. */
+  tryStats(): Promise<Outcome.Outcome<VaultStats>> { return Outcome.outcomeOf(() => this.stats()) }
   // --
 
   // == [Sealing boxes]: sealBox, trySealBox, unsealBox, tryUnsealBox

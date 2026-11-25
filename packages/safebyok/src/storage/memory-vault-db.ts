@@ -3,12 +3,13 @@
 import { type Errors, Helpers, Outcome } from 'safebyok-big/internals'
 import { AdapterVaultDB } from './adapter-vault-db'
 import { readTcNow } from './agerank'
-import type { ActualBeside, BirthBankActual, GetWorldActual, GotActual, ListThingsActual, Received, WroteActual } from '../shapes/shapes-answers'
+import type { ActualBeside, BirthBankActual, GetWorldActual, GotActual, ListThingsActual, Received, StatsActual, WroteActual } from '../shapes/shapes-answers'
 import { Labelpath, type Lifetok } from '../shapes/primitives'
 import { type ThingRecord } from '../shapes/shapes-thing'
-import { type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldAsk, type ListAsk, type ThingWatchScope, type WriteAsk } from '../shapes/shapes-asks'
+import { type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldAsk, type ListAsk, type StatsAsk, type ThingWatchScope, type WriteAsk } from '../shapes/shapes-asks'
 import type { AboveFetched, BankFetched, BankRootsFetched } from './thing-classifier'
 import * as Classifier from './thing-classifier'
+import { vaultStatsOf } from './vault-stats'
 
 /** A watch: the bank it follows, the function called with each change, and the one called with any trouble. */
 export type Watcher = { scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: Errors.VaultError) => void }
@@ -86,7 +87,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
   }
   // --
 
-  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doWatch
+  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats, doWatch
 
   protected doGetThing(ask: GetAsk): GotActual {
     const things = this.#thingsOf(ask)
@@ -124,6 +125,12 @@ export class MemoryVaultDB extends AdapterVaultDB {
   }
 
   protected doGetWorld(ask: GetWorldAsk): GetWorldActual { return this.classifyGetWorld(ask, this.#rootsOf(ask)) }
+
+  // Memory sets no limit of its own, so each is the cap.
+  protected doStats(ask: StatsAsk): StatsActual {
+    const filed = [...this.#thingsOf(ask)].map(([labelpath, raw]) => ({ labelpath, raw }))
+    return this.classifyStats(ask, this.#bankFetchedOf(ask), vaultStatsOf(filed))
+  }
 
   protected override doWatch(scope: ThingWatchScope, receive: Watcher['receive'], onBadNews: Watcher['onBadNews']): () => void {
     const watcher = { scope, receive, onBadNews }

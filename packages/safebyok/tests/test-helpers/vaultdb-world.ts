@@ -14,7 +14,7 @@ import { PlainThing } from './plain-thing'
 import type { ShellOf } from '../../src/shapes/shapes-sealers'
 import type { CarWorld } from '../../src/shapes/shapes-vault-minder'
 import { WayinChecks } from '../../src/shapes/shapes-wayin'
-import { type BirthBankAsk, type CitedOf, type GetAsk, type GetWorldAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, VoidTrack, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
+import { type BirthBankAsk, type CitedOf, type GetAsk, type GetWorldAsk, type ListAsk, type PutAskDraft, type StatsAsk, type Track, type WriteAsk, VoidTrack, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { FirstLifetok, FirstRevtok, T0, revtokOf } from './models-world'
 
 /** The bank the Things stand in. */
@@ -156,6 +156,11 @@ export function birthBankAskOf(overrides: Partial<BirthBankAsk> = {}): BirthBank
 /** The ask that gets {@link ThingBank}'s three roots, with `overrides` laid over it. */
 export function getWorldAskOf(overrides: Partial<GetWorldAsk> = {}): GetWorldAsk {
   return { ...ThingBank, op: 'getworld', ...SenderKnows, ...overrides }
+}
+
+/** An ask for the test bank's storage stats, from a sender that knows nothing of it, with `overrides`. */
+export function statsAskOf(overrides: Partial<StatsAsk> = {}): StatsAsk {
+  return { ...ThingBank, op: 'stats', ...SenderKnows, ...overrides }
 }
 
 /** The track of a sender with the main gate of another life. */

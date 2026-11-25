@@ -44,6 +44,7 @@ function stubVaultDBOf(stop: () => void) {
     tryListThings: vi.fn<VaultDB['tryListThings']>(() => Promise.resolve(stubAnswerOf('listed'))),
     tryBirthBank:  vi.fn<VaultDB['tryBirthBank']>(() => Promise.resolve(stubAnswerOf('born'))),
     tryGetWorld:   vi.fn<VaultDB['tryGetWorld']>(() => Promise.resolve(stubAnswerOf('world'))),
+    tryStats:      vi.fn<VaultDB['tryStats']>(() => Promise.resolve(stubAnswerOf('stats'))),
     watch:         vi.fn<VaultDB['watch']>(() => stop),
   } satisfies VaultDB
 }
@@ -122,17 +123,19 @@ describe("VaultMinder, what only a wrapper can show", () => {
   it("hands each verb's ask to the vaultDB it wraps, and answers that vaultDB's own answer", async () => {
     const inner = stubVaultDBOf(() => undefined)
     const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
-    const asks = { get: TH.getGateAskOf(), write: TH.birthAskOf(), list: TH.listAskAt('box'), birth: TH.birthBankAskOf(), world: TH.getWorldAskOf() }
+    const asks = { get: TH.getGateAskOf(), write: TH.birthAskOf(), list: TH.listAskAt('box'), birth: TH.birthBankAskOf(), world: TH.getWorldAskOf(), stats: TH.statsAskOf() }
     expect(await vaultDB.tryGetThing(asks.get)).to.equal(await inner.tryGetThing.mock.results[0]!.value)
     expect(await vaultDB.tryWriteThing(asks.write)).to.equal(await inner.tryWriteThing.mock.results[0]!.value)
     expect(await vaultDB.tryListThings(asks.list)).to.equal(await inner.tryListThings.mock.results[0]!.value)
     expect(await vaultDB.tryBirthBank(asks.birth)).to.equal(await inner.tryBirthBank.mock.results[0]!.value)
     expect(await vaultDB.tryGetWorld(asks.world)).to.equal(await inner.tryGetWorld.mock.results[0]!.value)
+    expect(await vaultDB.tryStats(asks.stats)).to.equal(await inner.tryStats.mock.results[0]!.value)
     expect(inner.tryGetThing.mock.calls[0]![0]).to.equal(asks.get)
     expect(inner.tryWriteThing.mock.calls[0]![0]).to.equal(asks.write)
     expect(inner.tryListThings.mock.calls[0]![0]).to.equal(asks.list)
     expect(inner.tryBirthBank.mock.calls[0]![0]).to.equal(asks.birth)
     expect(inner.tryGetWorld.mock.calls[0]![0]).to.equal(asks.world)
+    expect(inner.tryStats.mock.calls[0]![0]).to.equal(asks.stats)
   })
 
   it("watches nothing until connected", () => {
