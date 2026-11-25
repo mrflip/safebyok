@@ -247,17 +247,17 @@ export class Vault {
     const scope = this.#scopeAt(labelpath as BoxLabelpath)
     this.#bank.demandEnabled()
     if (this.#bank.isLocked) { throw Throwers.needUnlocked() }
-    const put    = await timedStepOf('put', () => this.putBoxOnce(scope.labelpath, { sidecar }, { whisper }))
+    const put    = await timeStep('put', () => this.putBoxOnce(scope.labelpath, { sidecar }, { whisper }))
     // The vault TSQ's get may answer from its item even under a staleTime of 0, since storage's clock dates the item: the minder's get always asks storage.
-    const got    = await timedStepOf('get', async () => {
+    const got    = await timeStep('get', async () => {
       await this.#vaultMinder.getOnce(scope)
       return this.#demandReadableBox(scope)
     })
-    const unseal = await timedStepOf('unseal', async () => {
+    const unseal = await timeStep('unseal', async () => {
       const unsealed = await this.unsealBox(got.val)
       return isEqual(unsealed.whisper, whisper)
     })
-    const del    = await timedStepOf('del', () => this.delBoxOnce(scope.labelpath))
+    const del    = await timeStep('del', () => this.delBoxOnce(scope.labelpath))
     return {
       labelpath:      scope.labelpath,
       whisperMatched: unseal.val,
@@ -315,10 +315,10 @@ export class Vault {
 function isBoxCar(car: ThingCar | undefined): car is ThingCar<Box> { return car?.thing instanceof Box }
 // --
 
-// == [Probing helpers]: timedStepOf
+// == [Probing helpers]: timeStep
 
-/** What `fn`, the probe's step `stepkind`, resolves, and how long it took; what it throws, as the probe's refusal at that step. */
-async function timedStepOf<ValT>(stepkind: ProbeStepkind, fn: () => Promise<ValT>): Promise<{ val: ValT, step: ProbeStep }> {
+/** Run `fn`, the probe's step `stepkind`, and time it, rethrowing its refusal as the probe's at that step */
+async function timeStep<ValT>(stepkind: ProbeStepkind, fn: () => Promise<ValT>): Promise<{ val: ValT, step: ProbeStep }> {
   const startedAt = Clock.nowMillis()
   try {
     const val = await fn()
