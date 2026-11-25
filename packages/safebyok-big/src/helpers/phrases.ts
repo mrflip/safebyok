@@ -98,7 +98,7 @@ export const PassphraseUnjudged = "This passphrase can't be checked just now: th
 // == [Passkeys]: PasskeyAnswerUsed, prfSaltShape
 
 /** A passkey's answer whose PRF bytes are all zero, as a gating leaves an answer it has used. */
-export const PasskeyAnswerUsed = "This passkey's answer was used already, and its bytes zeroed: ask the passkey again, as safebyok-react's askPasskey does, and hand in its fresh answer"
+export const PasskeyAnswerUsed = "This passkey's answer was used already, and its bytes zeroed: ask the passkey again, as safebyok-react-big's askPasskey does, and hand in its fresh answer"
 
 /** A passkey's salt that is not `count` bytes of base64url text. */
 export function prfSaltShape(count: number): string { return `A passkey's salt is base64url text of ${String(count)} bytes` }
@@ -496,7 +496,7 @@ export const StorageWithheld = "The browser withholds IndexedDB from this page (
 export const BrowserDatastoreFailed = "IndexedDB failed while the vault was reading or writing its rows: try again shortly. IndexedDB's own error is this error's cause."
 
 /** A GraphQL server whose answer lacks the field asked for. */
-export const SchemaNotServed = "The GraphQL server answered without what was asked of it: is it serving safebyok-graphql's BankSchemaSdl?"
+export const SchemaNotServed = "The GraphQL server answered without what was asked of it: is it serving safebyok-graphql-big's BankSchemaSdl?"
 
 /** A request to a GraphQL server that failed, named by what it threw, its HTTP status and its code, where each is known. */
 export function fetchFailed(thrownName: string, status: number | null, code: string | null): string {

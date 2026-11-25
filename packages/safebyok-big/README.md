@@ -188,7 +188,7 @@ vault's `maxBoxes`.
 `box.expose()` keeps a whisper on the box until `box.unexpose()`, a sweep, a vacate or a delete, and
 `box.whisper` returns it. While the whisper is hidden, `box.whisper` returns a frozen bag with no
 fields, and a put of that bag is refused. `box.exposure` says whether it is shown, and if not, why:
-`'unexposed'`, `'locked'`, `'veiled'` or `'showing'` (`useBoxExposure` in safebyok-react). `box.isShowing` and
+`'unexposed'`, `'locked'`, `'veiled'` or `'showing'` (`useBoxExposure` in safebyok-react-big). `box.isShowing` and
 `box.isVeiled` are the two booleans, and `isWhisperedBag(val)` is true for one of those bags and
 false for a whisper. Don't compare `box.whisper` with a bag or read its mark: a second copy of
 safebyok has bags of its own. A veiled box stays veiled while its bank is locked: `box.isVeiled`
@@ -246,7 +246,7 @@ replace the whisper object or edit it in place here: call `box.patchWhisper`, wh
 object and notifies the hook. It merges deeply, except that an array replaces the old one.
 
 A form that edits a whisper safely takes more care than this. The
-[safebyok-react README](../safebyok-react/README.md) has the helpers for it, and the React versions they support.
+[safebyok-react-big README](../safebyok-react-big/README.md) has the helpers for it, and the React versions they support.
 
 ## Entry points
 
@@ -254,8 +254,8 @@ The `safebyok` entry point exports `Device`, `Bank`,
 `Box`, `Vault`, the `Gating` type, their snapshot types and `VaultError`, `safebyok/dom` exports `BoxFields`, and
 `safebyok/testing` adds a cheap `testDeriver` and an `anyStrengthChecker`. `safebyok/browser` exports the Argon2id derivers,
 `idbDeviceDB`, the device database in IndexedDB, `zxcvbnStrengthChecker`, and `browserOpts`, which returns all three as one options object.
-`safebyok/storage` is what a storage adapter is written against: `AdapterBankDB` and `MemoryBankDB`. `safebyok-indexeddb`, `safebyok-postgres`, `safebyok-convex`
-and `safebyok-graphql` are the adapters.
+`safebyok/storage` is what a storage adapter is written against: `AdapterBankDB` and `MemoryBankDB`. `safebyok-indexeddb-big`, `safebyok-postgres-big`, `safebyok-convex-big`
+and `safebyok-graphql-big` are the adapters.
 
 ## Next
 
