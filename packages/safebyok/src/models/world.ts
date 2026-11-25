@@ -177,7 +177,7 @@ export class World {
       this.#seedFromShelf(vaultMinder, shelf)
       this.#keepOnShelf(vaultMinder, shelf)
     }
-    if (this.#isConnected) { this.#connectSignedIn() }
+    if (this.#isConnected) { this.#startWatch() }
     this.#startJanitor()
     this.align()
   }
@@ -285,7 +285,7 @@ export class World {
   }
   // --
 
-  // == [Locking and connecting]: lock, connect, disconnect, disable, hostVault, #connectSignedIn
+  // == [Locking and connecting]: lock, connect, disconnect, disable, hostVault, #startWatch
 
   // #lock-is-intent: a lock asks the user again at the next promptable action, and is not an alarm. A seal under way
   // finishes; an unseal under way returns no cleartext.
@@ -304,7 +304,7 @@ export class World {
   connect(): this {
     if (! this.isEnabled) { return this }
     this.#isConnected = true
-    this.#connectSignedIn()
+    this.#startWatch()
     for (const vault of this.#vaults) { vault.connect() }
     return this
   }
@@ -339,7 +339,7 @@ export class World {
   }
 
   /** Start the VaultMinder's watch, where someone has signed in, telling the device's `onBadNews` what the host's vaultDB throws */
-  #connectSignedIn(): void {
+  #startWatch(): void {
     if (this.#vaultMinder === null) { return }
     try { this.#vaultMinder.connect() } catch (err) { this.#device.tellBadNews([err]) }
   }
@@ -364,7 +364,7 @@ export class World {
   #tidy(): void {
     try {
       this.#lockPastLeaseEnd()
-      if (this.#isConnected) { this.#tidyConnected(this.demandVaultMinder()) }
+      if (this.#isConnected) { this.#tidyConnected() }
     } catch (err) {
       this.#device.tellBadNews([err])
     }
@@ -379,9 +379,9 @@ export class World {
     if ((leaseEndsAt !== null) && (Clock.nowMillis() >= leaseEndsAt)) { this.lock() }
   }
 
-  /** Start `vaultMinder`'s watch where it is not running, and read the roots again where the gate is stale */
-  #tidyConnected(vaultMinder: VaultMinder): void {
-    if (! vaultMinder.isWatching) { this.#connectSignedIn() }
+  /** Start the VaultMinder's watch where it is not running, and read the roots again where the gate is stale */
+  #tidyConnected(): void {
+    if (! this.demandVaultMinder().isWatching) { this.#startWatch() }
     if (this.#isGateStale()) { void this.#refreshRoots() }
   }
 
