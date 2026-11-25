@@ -1,15 +1,14 @@
 /** Classify a vaultDB ask against the Thing stored, by big's act tables in `notes/answer-contract.md`. */
 
 import { sortBy } from 'es-toolkit'
-import { v7 as uuidv7 } from 'uuid'
 import { CX, EX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/internals'
 import { policyRefusalOf } from './policies'
-import { type EpochMillis, Labelpath } from '../shapes/primitives'
+import { Labelpath } from '../shapes/primitives'
 import type { BirthBankActual, DamagedThing, GotActual, KidEntry, Kids, ListThingsActual, WroteActual } from '../shapes/shapes-answers'
 import type { ReadTc } from '../shapes/shapes-vault-event'
 import { type Sparse, type StoredCited, type ThingCited, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
-import { Thing } from '../models/thing'
+import { BaseThing } from '../models/base-thing'
 import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
 import * as Throwers from '../refusals/throwers'
 
@@ -176,11 +175,11 @@ export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): ThingR
   return writtenThingOf(scopeReport.data, raw)
 }
 
-/** The raw bank, main gate and root box a concrete adapter fetched for a bank's birth, each null for none, its {@link TrackedFetched}, and when it read them ({@link readTcNow}). */
+/** The raw bank, main gate and root box a concrete adapter fetched for a bank's birth, each null for none, its {@link TrackedFetched}, and when it read them (`readTcNow`). */
 export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: unknown, tracked: TrackedFetched, read_tc: ReadTc }>
 
 // Every step reads its bank's world, so when it read the world is the step's `read_tc`.
-/** The raw bank and main gate a concrete adapter fetched for an ask's bank, each null for none, its {@link TrackedFetched}, and when it read them ({@link readTcNow}). */
+/** The raw bank and main gate a concrete adapter fetched for an ask's bank, each null for none, its {@link TrackedFetched}, and when it read them (`readTcNow`). */
 export type WorldFetched = Readonly<{ bank: unknown, maingate: unknown, tracked: TrackedFetched, read_tc: ReadTc }>
 
 /** What a concrete adapter fetched for a get or a write beside the Thing at its scope: the raw world ({@link WorldFetched}), and `ancestor`, the raw nearest Thing stored above that scope.
@@ -256,7 +255,7 @@ function trackedEntryOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>
 }
 // --
 
-// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, isChildLabelpath, kidsOf, readTcNow, readAtOf, classifyBirthBank
+// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, isChildLabelpath, kidsOf, classifyBirthBank
 // Each is given the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`, with when it read them;
 // a get and a write are given the nearest Thing stored above the ask's scope; a birth is given the bank's three roots, and,
 // where it is born, reports the world its puts wrote.
@@ -298,7 +297,7 @@ export type ThingsFetched = Readonly<{ parent: unknown, children: readonly Reado
 export function classifyListThings(ask: ListAsk, { parent: rawParent, children }: ThingsFetched, worldFetched: WorldFetched): ListThingsActual {
   const stored    = storedThingOf(ask, rawParent)
   const act       = getActOf(ask, stored)
-  const parentage = (stored === null) ? [] : [Thing.sparseOf(stored)]
+  const parentage = (stored === null) ? [] : [BaseThing.sparseOf(stored)]
   const beside    = { world: worldOf(ask, worldFetched), tracked: trackedOf(ask, worldFetched.tracked), read_tc: worldFetched.read_tc }
   if (isRefusedAct(act))  { return { ok: false, act, parentage, deltas: [], damaged_rows: [], ...beside } }
   // A tombstone or none has no children.
@@ -313,7 +312,7 @@ export function classifyListThings(ask: ListAsk, { parent: rawParent, children }
     const child = listedThingOf({ userid, banklabel, labelpath }, raw)
     if (child === null) { damaged_rows.push({ userid, banklabel, labelpath, am: 'd' }) } else if (child.lifepath.startsWith(lifepathUnder)) { living.push(child) }
   }
-  const deltas = sortBy(living, [(thing) => thing.labelpath]).map((thing) => Thing.sparseOf(thing))
+  const deltas = sortBy(living, [(thing) => thing.labelpath]).map((thing) => BaseThing.sparseOf(thing))
   return { ok: true, act, kids: kidsOf(ask, stored, deltas), parentage, deltas, damaged_rows, ...beside }
 }
 
@@ -335,14 +334,6 @@ function kidsOf(ask: ListAsk, parent: ThingRecord | null, deltas: readonly Spars
     gones:      Object.fromEntries(deltas.filter((delta) => delta.am !== 'a').map((delta) => entryOf(delta))),
   }
 }
-
-// A concrete adapter with a clock of its own in the statement that reads may report its own UUID version 7 in place of this one.
-/** A {@link ReadTc} made now, for a concrete adapter to report as the `read_tc` of the world it fetches in the same step. */
-export function readTcNow(): ReadTc { return uuidv7() }
-
-// A UUID version 7 begins with its Unix time in milliseconds, 48 bits: the first eight hexadecimal digits and the four after the dash.
-/** When `read_tc` was read, in epoch milliseconds. */
-export function readAtOf(read_tc: ReadTc): EpochMillis { return Number.parseInt(`${read_tc.slice(0, 8)}${read_tc.slice(9, 13)}`, 16) }
 
 /** Classify a bank's birth, by its three `puts`, against the raw roots a concrete adapter fetched.
  * Under `born`, `things` and `world` are made of the puts' records, for the concrete adapter to write in one step, and `tracked` is null.

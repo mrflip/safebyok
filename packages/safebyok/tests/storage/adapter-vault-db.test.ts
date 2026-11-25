@@ -8,7 +8,7 @@ import { Thing } from '../../src/models/thing'
 import { Shell } from '../../src/shapes/shapes-thing'
 import type { VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
 import * as Throwers from '../../src/refusals/throwers'
-import { readTcNow } from '../../src/storage/thing-classifier'
+import { readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
 
 /** A concrete adapter whose every step does what the test hands it: throws, or reports what it is given, with a null `tracked` and a `read_tc` made now unless it gives them. */

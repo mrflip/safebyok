@@ -1,11 +1,12 @@
 /** The agerank rule: how far a Thing has been seen, whether a record seen is news, and the events a record that is news returns. */
 
+import { v7 as uuidv7 } from 'uuid'
 import { BaseThing } from '../models/base-thing'
-import { type Lifepath, Lifeseq, Revseq } from '../shapes/primitives'
+import { type EpochMillis, type Lifepath, Lifeseq, Revseq } from '../shapes/primitives'
 import type { ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
 import type { Agekind, Agerank, ItemSeen, ReadTc, SeenThing, VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
 
-// == [Agerank]: TcchunkDigits, NoRevseq, AgerankFields, tcchunkOf, nextAgerankOf, lifeAgerankOf, tcchunkAfter, laterOf, itemSeenOf, eventsOf, agekindOf, fieldsOf, isOfLife
+// == [Agerank]: TcchunkDigits, NoRevseq, AgerankFields, readTcNow, readAtOf, tcchunkOf, nextAgerankOf, lifeAgerankOf, tcchunkAfter, laterOf, itemSeenOf, eventsOf, agekindOf, fieldsOf, isOfLife
 
 // Eight digits make a span of 65.536 seconds: a record seen again at its revision a minute or two later is news, which
 // sits well with TanStack Query's five minutes before it collects a query.
@@ -17,6 +18,14 @@ const NoRevseq = Revseq.padded(-1)
 
 /** An agerank's four fields, as it spells them: its lifepath, the newest revseq seen in that life, the newest whole one, and the tcchunk the newest was last read in. */
 type AgerankFields = readonly [lifepath: Lifepath, highRevseq: string, itemRevseq: string, tcchunk: string]
+
+// A concrete adapter with a clock of its own in the statement that reads may report its own UUID version 7 in place of this one.
+/** A {@link ReadTc} made now, for a concrete adapter to report as the `read_tc` of the world it fetches in the same step. */
+export function readTcNow(): ReadTc { return uuidv7() }
+
+// A UUID version 7 begins with its Unix time in milliseconds, 48 bits: the first eight hexadecimal digits and the four after the dash.
+/** When `read_tc` was read, in epoch milliseconds. */
+export function readAtOf(read_tc: ReadTc): EpochMillis { return Number.parseInt(`${read_tc.slice(0, 8)}${read_tc.slice(9, 13)}`, 16) }
 
 /** The tcchunk of `read_tc`: its first eight hexadecimal digits, which compare as text. */
 export function tcchunkOf(read_tc: ReadTc): string { return read_tc.slice(0, TcchunkDigits) }

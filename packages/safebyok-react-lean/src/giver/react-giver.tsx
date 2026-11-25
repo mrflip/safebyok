@@ -3,7 +3,7 @@
  */
 
 import { type DataTag, type QueryKey, type UseMutationOptions, type UseMutationResult, type UseQueryOptions, type UseQueryResult, QueryClient, mutationOptions, queryOptions, skipToken, useMutation, useQuery } from '@tanstack/react-query'
-import { pick } from 'es-toolkit'
+import { noop, pick } from 'es-toolkit'
 import { type ReactNode, type SyntheticEvent, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   type AddPasskeyDna, type Bank, type BankSnapshot, type BankStage, type BirthDna, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type ItemQueryOptions, type KeyDeriver, type Kids, Labelpath,
@@ -615,7 +615,7 @@ function makeBankGiver(friend: BankFriend) {
   // Each form verb below resolves nothing: the bank's snapshot says what changed. Its error is the verb's refusal, to
   // branch on by `family`: a `condition` is the user's to correct, at the field or in a banner, with the form left open.
   // Each verb refuses `absent_vault` at a stage it has no bank for: show each form only at its own stage.
-  // The birth refuses `disabled` at `'starting'`, until the device's `hello` answers.
+  // The birth refuses `disabled` at `'starting'`, until the device's sign-in answers.
   // A verb comes as its hook, whose `attempt` takes a form or a dna, and as a plain call, for a handler of the host's own.
   // The hook keys its mutation by the user the provider shows.
 
@@ -732,9 +732,10 @@ function isFetchStage(bank: BankSnapshot): boolean {
 function listenToGate(device: Device, onChange: () => void): () => void {
   const { vaultMinder } = device.world
   if (vaultMinder === null) { return unsubscribeFromNothing }
+  // The vault TSQ, listening beside it, tells the device of a record refused.
   return vaultMinder.listen({
     hear:      (event) => { if (event.labelpath === Labelpath.MainGate) { onChange() } },
-    onBadNews: (news) => { device.tellBadNews([news]) },
+    onBadNews: noop,
   })
 }
 

@@ -2,7 +2,7 @@
 
 import * as Throwers from '../refusals/throwers'
 import { loggableAskOf } from '../shapes/shapes-asks'
-import { readTcNow } from './thing-classifier'
+import { readTcNow } from './agerank'
 import type { BadAnswer } from '../shapes/shapes-answers'
 
 /** The refused answer to `ask`, for a call that threw `thrown` before the vaultDB answered.

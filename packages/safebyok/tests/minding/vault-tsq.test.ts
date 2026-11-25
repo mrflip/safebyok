@@ -6,7 +6,7 @@ import { VaultTSQ } from '../../src/minding/vault-tsq'
 import { Thing } from '../../src/models/thing'
 import { Shell } from '../../src/shapes/shapes-thing'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { readAtOf, readTcNow } from '../../src/storage/thing-classifier'
+import { readAtOf, readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
 import { type TSQWorld, cheatStored, isObservedStale, itemQueryAt, listQueryAt, noticeOf, readTcSpanAfter, tsqWorldOf } from './vault-minder/tsq-world'
 

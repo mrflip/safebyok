@@ -9,7 +9,7 @@ import { PassphraseProving, Proving } from '../../src/models/proving'
 import type { StrengthChecker } from '../../src/shapes/shapes-gateish'
 import type { GateRecord } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
-import { readTcNow } from '../../src/storage/thing-classifier'
+import { readTcNow } from '../../src/storage/agerank'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 
 /** A passphrase to replace {@link TH.TestPassphrase} with. */

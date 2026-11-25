@@ -5,8 +5,7 @@ import type { EpochMillis } from '../shapes/primitives'
 import type { ShellOf } from '../shapes/shapes-sealers'
 import { type Sparse, type ThingCited, type ThingRecord, type Tombstone, Shell } from '../shapes/shapes-thing'
 import { type Agekind, type Agerank, type SeenThing, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
-import { agekindOf, eventsOf, nextAgerankOf } from '../storage/agerank'
-import { readAtOf } from '../storage/thing-classifier'
+import { agekindOf, eventsOf, nextAgerankOf, readAtOf } from '../storage/agerank'
 
 // == [Adoptable]: Adoptable
 

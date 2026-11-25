@@ -3,7 +3,7 @@ import { type Adoptable, Thing } from '../../src/models/thing'
 import { type Lifepath, Lifeseq, Revseq, VoidLifeseq } from '../../src/shapes/primitives'
 import { type ThingRecord, type ThingScope, Shell } from '../../src/shapes/shapes-thing'
 import type { Agekind, Agerank, Lifekind, Liveness, ReadTc, SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
-import { readAtOf, readTcNow } from '../../src/storage/thing-classifier'
+import { readAtOf, readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
 
 // == [Shorthand]: Life, Seen, Shorthand, FeedCase, the starts

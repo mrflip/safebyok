@@ -14,7 +14,7 @@ import {
   type Actual, type ActualBeside, type Answer, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type GetThingAnswer, type GotActual, type ListThingsActual, type ListThingsAnswer, type Received, type WriteThingAnswer,
   type WroteActual, ActualChecks,
 } from '../shapes/shapes-answers'
-import { itemSeenOf } from './agerank'
+import { itemSeenOf, readTcNow } from './agerank'
 import type { AboveFetched, BankRootsFetched, ThingsFetched, WorldFetched } from './thing-classifier'
 import * as Classifier from './thing-classifier'
 import type { VaultDB } from './vault-db'
@@ -72,7 +72,7 @@ function banktokOf(world: WorldRecord | null): Lifetok | null { return world?.li
 function itemEventOf(record: ThingRecord, world: WorldRecord | null): VaultItemEvent {
   const { userid, banklabel, labelpath } = record
   const banktok = ('lifetok' in record) ? record.lifetok : world?.lifetok
-  const unsorted = { agerank: undefined, agerankWas: undefined, banktok, sourcelabel: undefined, read_tc: Classifier.readTcNow() }
+  const unsorted = { agerank: undefined, agerankWas: undefined, banktok, sourcelabel: undefined, read_tc: readTcNow() }
   return Object.freeze({ eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), ...unsorted, ...itemSeenOf(record) })
 }
 // --
@@ -187,9 +187,9 @@ export abstract class AdapterVaultDB implements VaultDB {
       Object.assign(err, { meta: { ...err.meta, oplabel, ask: loggableAsk } })
       // Only the classifier sets rows.dbhas, to a Thing it has checked.
       const dbhas = (Errors.rowsOfRefusal(err).dbhas ?? null) as ThingRecord | null
-      return frozenAnswerOf({ ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', world: null, banktok: null, read_tc: Classifier.readTcNow(), dbhas, err })
+      return frozenAnswerOf({ ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', world: null, banktok: null, read_tc: readTcNow(), dbhas, err })
     } catch {
-      return { ok: false, ask: {}, act: 'unclassified_storing', world: null, banktok: null, read_tc: Classifier.readTcNow(), dbhas: null, err: Throwers.answerNotMade() }
+      return { ok: false, ask: {}, act: 'unclassified_storing', world: null, banktok: null, read_tc: readTcNow(), dbhas: null, err: Throwers.answerNotMade() }
     }
   }
   // --

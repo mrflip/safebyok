@@ -31,7 +31,7 @@ function isHeardBy(watched: ThingWatchScope, scope: ThingWatchScope): boolean {
 /** The roots of `ask`'s bank, fetched raw in `store`'s transaction, and when they were read. */
 async function rootsFetchedIn(store: IDBObjectStore, ask: AnyAsk): Promise<DB.Classifier.BankRootsFetched> {
   const { userid, banklabel } = ask
-  const read_tc = DB.Classifier.readTcNow()
+  const read_tc = DB.readTcNow()
   const [bank, gate, root] = await Promise.all([
     DB.rowAt(store, thingScopepathOf({ userid, banklabel, labelpath: 'bank' })),
     DB.rowAt(store, thingScopepathOf({ userid, banklabel, labelpath: DB.Labelpath.MainGate })),

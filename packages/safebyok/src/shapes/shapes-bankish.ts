@@ -2,7 +2,7 @@
 
 import type { QueryClient } from '@tanstack/query-core'
 import type * as Z from 'zod'
-import { CX, type Deriver, type EX, type Errors, type Logger, Validator } from 'safebyok-big/internals'
+import { CX, type Deriver, type EX, Errors, type Logger, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
 import type { DefaultOnBadNews, Device } from '../models/device'
 import type { World } from '../models/world'
@@ -13,6 +13,7 @@ import type { BoxCleartexts, UnsealedOf } from './shapes-sealers'
 import type { BoxRecord } from './shapes-thing'
 import type { GetAsk, ListAsk } from './shapes-asks'
 import type { Banklabel, DeviceTok, EpochMillis, Labelpath, Userid } from './primitives'
+import * as Phrases from '../phrases'
 
 // == [The bank's forms]: BoxUnsealed
 
@@ -28,7 +29,7 @@ export type BoxUnsealed = UnsealedOf<BoxRecord, BoxCleartexts>
 export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent }>
 // --
 
-// == [The bank's making]: BankOpts, WorldOpts, HostedVault
+// == [The bank's making]: BankOpts, WorldOpts, HostedVault, WorldChecks
 
 /** The options of {@link Bank.make}, beside its record. */
 export interface BankOpts {
@@ -48,6 +49,12 @@ export interface HostedVault {
   /** End the vault, as its world ends. */
   sweep(): unknown
 }
+
+/** The checks of the end cause `World.sweep` is handed, and of the vault `World.hostVault` is. */
+export const WorldChecks = Validator.Checkers('bad_record', ({ custom }) => ({
+  endCause:    custom<Errors.VaultError>(Errors.isVaultError, BigPhrases.VaultErrorExpected).nullable(),
+  hostedVault: custom<HostedVault>((val) => typeof (val as Partial<HostedVault> | null)?.sweep === 'function', Phrases.HostedVaultExpected),
+}))
 // --
 
 // == [The device]: BankishChecks, DefaultBanklabel, DeviceRecord, DeviceJSON, BadNews, BadNewsHandler, DeviceOpts

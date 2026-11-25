@@ -2,6 +2,7 @@
 
 import { type Errors, Helpers, Outcome } from 'safebyok-big/internals'
 import { AdapterVaultDB } from './adapter-vault-db'
+import { readTcNow } from './agerank'
 import type { ActualBeside, BirthBankActual, GotActual, ListThingsActual, Received, WroteActual } from '../shapes/shapes-answers'
 import { Labelpath } from '../shapes/primitives'
 import { type ThingRecord } from '../shapes/shapes-thing'
@@ -55,7 +56,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const things  = this.#thingsOf(ask)
     const fetched = structuredClone({ bank: things.get('bank') ?? null, maingate: things.get(Labelpath.MainGate) ?? null })
     const rows    = { bank: fetched.bank, [Labelpath.MainGate]: fetched.maingate, [Labelpath.RootBox]: structuredClone(things.get(Labelpath.RootBox) ?? null) }
-    return { ...fetched, tracked: Classifier.trackedFetchedOf(ask, rows), read_tc: Classifier.readTcNow() }
+    return { ...fetched, tracked: Classifier.trackedFetchedOf(ask, rows), read_tc: readTcNow() }
   }
 
   /** The raw world of `ask`'s bank, and the nearest Thing stored above its scope, each a copy, or null for none. */

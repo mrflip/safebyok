@@ -1,8 +1,8 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { noop } from 'es-toolkit'
 import { type ReactNode, useEffect, useLayoutEffect } from 'react'
-import { type BoxRecord, type GateRecord, type PasskeyWayinHeader, type PersistedClient, type Persister, MemoryPersister, VaultMinder, VaultTSQ } from 'safebyok'
-import { Classifier, storageUnavailable } from 'safebyok/storage'
+import { type BadNewsHandler, type BoxRecord, type GateRecord, type PasskeyWayinHeader, type PersistedClient, type Persister, MemoryPersister, VaultMinder, VaultTSQ } from 'safebyok'
+import { readTcNow, storageUnavailable } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { type BoxSelected, passkeyHeaderOf } from '../../src/index'
@@ -196,7 +196,7 @@ describe("useBox over the vault TSQ's own items", () => {
     const gets = { count: 0 }
     world.vaultDB.tryGetThing = (ask) => {
       gets.count += 1
-      return Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, banktok: null, read_tc: Classifier.readTcNow(), dbhas: null, err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
+      return Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, banktok: null, read_tc: readTcNow(), dbhas: null, err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
     }
     await act(async () => { await expect(vaultTSQ.getOnce(JokesScope, { staleTime: 0 })).rejects.toHaveProperty('refusalkind', 'storage_unavailable') })
     await waitFor(() => { expect(seen.current?.isError).to.eq(true) })
@@ -304,7 +304,7 @@ describe("useBoxList over the vault TSQ's own listing", () => {
 
   it("shows a list refused as its error", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
-    world.vaultDB.tryListThings = (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, banktok: null, read_tc: Classifier.readTcNow(), dbhas: null, parentage: [], deltas: [], damaged_rows: [], err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
+    world.vaultDB.tryListThings = (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, banktok: null, read_tc: readTcNow(), dbhas: null, parentage: [], deltas: [], damaged_rows: [], err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
     function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
     const { result } = renderHook(() => world.Bank.useBoxList(), { wrapper: Wrapper })
     await waitFor(() => { expect(result.current.isError).to.eq(true) })
@@ -337,6 +337,23 @@ describe("useGate over the world's gate Thing", () => {
     // The gate's Thing has the whole gate, by design; the giver's client and the page have none of it.
     const stored = world.vaultDB._cheat_things(LeanTH.WorldScope).get('gate') as GateRecord
     TH.expectTextUnheld(stored.wayins.passkey0!.bank_key_wayin_wrapped.ciphertext_b64, container, world.client)
+  })
+})
+
+describe("useGate, mounted twice", () => {
+  it("tells the host's onBadNews of one trouble in storage once", async () => {
+    const onBadNews = vi.fn<BadNewsHandler>()
+    const world = await TH.buildProviderWorld({ stored: 'jokes', onBadNews })
+    function GateProbe() { return <p>{world.Bank.useGate().data === undefined ? 'unfetched' : 'gate'}</p> }
+    render(TH.providerTreeOf(world, <><StageShown world={world} /><GateProbe /><GateProbe /></>, { userid: TH.ProviderUser }))
+    await screen.findByText('locked')
+    await waitFor(() => { expect(screen.getAllByText('gate')).to.have.lengthOf(2) })
+    world.vaultDB._cheat_things(LeanTH.WorldScope).set('box/bad', { ...LeanTH.boxThingOf('bad'), revseq: -2 })
+    await act(async () => { await world._cheat_device().world.demandVaultMinder().tryListOnce('box') })
+    await waitFor(() => { expect(onBadNews).toHaveBeenCalled() })
+    // The host's handler is called on a later turn: give a second report one to land.
+    await new Promise((resolve) => { setTimeout(resolve, 0) })
+    expect(onBadNews.mock.calls.map(([{ news }]) => [news.refusalkind, news.meta?.labelpaths])).to.deep.equal([['damaged_row', ['box/bad']]])
   })
 })
 

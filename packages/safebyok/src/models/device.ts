@@ -17,8 +17,7 @@ import type { BankScope } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Lifetok, Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
 import { VaultMinder } from '../minding/vault-minder'
-import { itemSeenOf } from '../storage/agerank'
-import { readTcNow } from '../storage/thing-classifier'
+import { itemSeenOf, readTcNow } from '../storage/agerank'
 import { Labelpath } from '../shapes/primitives'
 import type { ReadTc, VaultEvent } from '../shapes/shapes-vault-event'
 import type { DevicePersisters, PersisterOfBank } from '../storage/persister'
@@ -264,13 +263,14 @@ export class Device {
       this.#unlistenScaffold = scaffold.listen(vaultMinder)
       this.#world.signin(vaultMinder)
       // Scaffolding until sign-in is one get of the roots: a get of the root box, whose answer's world brings the bank and
-      // main gate. Where none is stored, the bank is asked for, and its shell shows the stage `'unborn'`.
+      // main gate. Where none is stored, the bank is asked for, and its shell or tombstone shows the stage `'unborn'`; a
+      // bank stored live without the others is broken.
       const rootAnswer = await vaultMinder.tryGetOnce({ ...this.scope, labelpath: Labelpath.RootBox })
       if (! rootAnswer.ok) { throw rootAnswer.err }
       if ((rootAnswer.act === 'gotvoid') && (rootAnswer.world === null)) {
         const bankAnswer = await vaultMinder.tryGetOnce({ ...this.scope, labelpath: 'bank' })
         if (! bankAnswer.ok) { throw bankAnswer.err }
-        return
+        if (bankAnswer.act !== 'gotlive') { return }
       }
       // Roots answered that are not all live in the world are broken: reported as the sign-in's refusal.
       if (! this.#world.areRootsLive) { throw Throwers.bankRootsMissing() }
@@ -358,7 +358,7 @@ export class Device {
    * default handler is called instead of the host's.
    */
   tellBadNews(badnews: readonly unknown[]): void {
-    const refusals = badnews.map((news) => (Errors.isVaultError(news) ? news : Throwers.unexpectedError(news)))
+    const refusals = badnews.map((news) => Throwers.refusalOfThrown(news))
     // A thing disabled since is no news: the host swept it, or its bank went away.
     tellBadNewsTo(this.isEnabled ? this.#onBadNews : DefaultOnBadNews, this, refusals.filter((refusal) => refusal.refusalkind !== 'disabled'))
   }
