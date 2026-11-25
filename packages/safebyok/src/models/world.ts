@@ -237,7 +237,7 @@ export class World {
     return this
   }
 
-  /** Dismiss the awaited `unlock` gating: every call waiting in {@link ensureUnlocked} rejects `dismissed`, and the world stays locked.
+  /** Dismiss the awaited `unlock` gating: every call waiting in {@link ensureUnlocked} rejects `dismissed`, and the world stays as it was, locked or near its lease's end.
    * Call it when the user closes the unlock form.
    */
   dismissUnlock(): this {
