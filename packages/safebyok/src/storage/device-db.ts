@@ -87,5 +87,4 @@ function isReplaced(raw: unknown, row: LeaseRow): boolean {
 function refusalOf(thrown: unknown, oplabel: string): Errors.VaultError {
   return (Errors.isVaultError(thrown) ? thrown : Throwers.deviceDBFailed(oplabel, thrown))
 }
-
 // --
