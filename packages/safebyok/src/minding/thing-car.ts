@@ -78,7 +78,7 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
   /** When the newest revision the Thing took as news was last read: the `VacantReadTc` until it takes one. */
   get read_tc(): ReadTc { return this.#readTc }
 
-  /** When the newest revision the Thing took as news was last read, in epoch milliseconds: the {@link read_tc}'s time, zero until it takes one. */
+  /** The time of {@link read_tc}, in epoch milliseconds, or zero until the Thing takes a record. */
   get read_at(): EpochMillis { return readAtOf(this.#readTc) }
   // --
 
