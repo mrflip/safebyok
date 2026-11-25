@@ -1,6 +1,6 @@
 /** The `OneWatchVaultDB` wrapper: one tab of the origin runs a vaultDB's watch of a bank, and tells the others. */
 
-import { deepFreeze } from 'es-toolkit'
+import { deepFreeze, noop } from 'es-toolkit'
 import { type Errors, Outcome } from 'safebyok-big/internals'
 import { bulletproofHandlerOf } from '../helpers/bulletproof'
 import type { BirthBankAsk, GetAsk, GetWorldAsk, ListAsk, StatsAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
@@ -13,8 +13,9 @@ import type { VaultDB } from './vault-db'
 
 // == [Names]: watchnameOf, lockManagerOf
 
-/** The name of the Web Lock, and of the BroadcastChannel, of the watch of the bank at `scope`. */
-export function watchnameOf({ userid, banklabel }: ThingWatchScope): string { return `safebyok:watch:${JSON.stringify([userid, banklabel])}` }
+// A userid and a banklabel never hold a `/`, so the name reads back into its parts.
+/** The name of the Web Lock and of the BroadcastChannel for the watch of the bank at `scope`: `safebyok/<userid>/<banklabel>/bank`. */
+export function watchnameOf({ userid, banklabel }: ThingWatchScope): string { return `safebyok/${userid}/${banklabel}/bank` }
 
 /** This page's Web Locks manager, or undefined where the platform has none */
 function lockManagerOf(): LockManager | undefined {
@@ -65,11 +66,12 @@ export class OneWatchVaultDB implements VaultDB {
   /** Watch a bank's Things ({@link VaultDB.watch}): notified of what the wrapped vaultDB's watch notifies, in whichever tab of the origin runs it.
    * The wrapped vaultDB's watch starts in a tab once it is handed the bank's lock, so a change while the lock changes hands reaches no tab. Bad news reaches only the holder's `onBadNews`.
    * Of what another tab posts, only an `item` event that passes its checks is notified, deeply frozen, with the `read_tc` the holder heard it at.
+   * Where this tab's watch cannot start, as where the wrapped vaultDB's watch throws as it starts, it ends. Its `onEnded` is called, then its `onBadNews` says why, and nothing is notified after.
    */
-  watch(scope: ThingWatchScope, onNotice: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
-    const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews })
+  watch(scope: ThingWatchScope, onNotice: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void, onEnded: () => void = noop): () => void {
+    const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews, onEnded })
     const locks = lockManagerOf()
-    if (locks === undefined) { return this.#vaultDB.watch(bankScope, onNotice, onBadNews) }
+    if (locks === undefined) { return this.#vaultDB.watch(bankScope, onNotice, onBadNews, onEnded) }
     // A notice handler that throws is a bug in the host's code, not trouble in storage.
     const notify  = bulletproofHandlerOf(onNotice, { ifError: 'tell', transformer: Throwers.refusalOfThrown, onBadNews })
     const channel = new BroadcastChannel(watchnameOf(bankScope))
@@ -77,7 +79,11 @@ export class OneWatchVaultDB implements VaultDB {
       const heardReport = SeenChecks.itemEvent.safeParse(data)
       if (heardReport.success) { notify(deepFreeze(heardReport.data as VaultEvent)) }
     })
-    const release = this.#holdWatch(locks, bankScope, channel, notify, onBadNews)
+    const release = this.#holdWatch(locks, bankScope, channel, notify, onBadNews, (err) => {
+      channel.close()
+      onEnded()
+      onBadNews(Outcome.storageRefusalOf(err))
+    })
     return () => {
       release()
       channel.close()
@@ -85,10 +91,13 @@ export class OneWatchVaultDB implements VaultDB {
   }
 
   /** Ask for the bank's lock, and while this tab holds it, run the wrapped vaultDB's watch, posting each notice on `channel`; answers the function that lets the lock go */
-  #holdWatch(locks: LockManager, bankScope: ThingWatchScope, channel: BroadcastChannel, notify: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
+  #holdWatch(
+    locks: LockManager, bankScope: ThingWatchScope, channel: BroadcastChannel,
+    notify: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void, onFailed: (err: unknown) => void,
+  ): () => void {
     let isReleased = false
     let release = () => { isReleased = true }
-    void this.#whileLocked(locks, bankScope, onBadNews, () => new Promise<void>((resolve) => {
+    void this.#whileLocked(locks, bankScope, onFailed, () => new Promise<void>((resolve) => {
       // A watch stopped while it waited for the lock starts nothing.
       if (isReleased) { resolve(); return }
       const unwatch = this.#vaultDB.watch(bankScope, (event) => {
@@ -103,12 +112,12 @@ export class OneWatchVaultDB implements VaultDB {
     return () => { release() }
   }
 
-  /** Call `hold` once this tab is handed the bank's lock, and keep the lock until the promise it answers settles; what `hold` throws goes to `onBadNews` */
-  async #whileLocked(locks: LockManager, bankScope: ThingWatchScope, onBadNews: (news: Errors.VaultError) => void, hold: () => Promise<void>): Promise<void> {
+  /** Call `hold` once this tab is handed the bank's lock, and keep the lock until the promise it answers settles; what `hold` throws, or the lock request itself, goes to `onFailed` */
+  async #whileLocked(locks: LockManager, bankScope: ThingWatchScope, onFailed: (err: unknown) => void, hold: () => Promise<void>): Promise<void> {
     try {
       await locks.request(watchnameOf(bankScope), hold)
     } catch (err) {
-      onBadNews(Outcome.storageRefusalOf(err))
+      onFailed(err)
     }
   }
   // --
