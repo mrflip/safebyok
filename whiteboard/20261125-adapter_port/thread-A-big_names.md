@@ -78,3 +78,7 @@ root scripts 331; lint, typecheck and build clean.
 * **Second rebase onto main (2026-11-25)**: onto e3196fcdb (#919, unicorn 80). One conflict, `pnpm-lock.yaml` at the
   lockfile commit, resolved by taking main's lockfile and running `pnpm install`; no other conflict, no lint fixes needed.
   `pnpm justify` green.
+* **Third rebase onto main (2026-11-25)**: onto 58d6e428d (#926 watch_recovery, #927 lease_names, #928 sprint_docs, #901).
+  No conflict. #926's edit to `react-giver.test.tsx` (`oneDevice.scope.userid`) arrived at
+  `packages/safebyok-react/tests/giver/`; its `idb-device-db` edits were under `packages/safebyok`, so nothing
+  to move for `safebyok-indexeddb`. `pnpm install --frozen-lockfile` clean; `pnpm justify` green.
