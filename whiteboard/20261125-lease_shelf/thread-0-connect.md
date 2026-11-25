@@ -1,6 +1,6 @@
 # Thread 0: connect() and disconnect() replace sweep (2026-11-25)
 
-Branch `20261125-connect`, PR #900 (stacked on #899, now merged; based on `main`). Proved: `safebyok` 1978 tests,
+Branch `20261125-connect`, PR #900, a draft on `main` (stacked on #899, now merged). Proved: `safebyok` 1978 tests,
 `safebyok-react-lean` 339, the knockknock (26) and envman (24) demos, typecheck and lint clean in each; `pnpm justify`
 after the catch-up, per the PR's **Tests:** line.
 
