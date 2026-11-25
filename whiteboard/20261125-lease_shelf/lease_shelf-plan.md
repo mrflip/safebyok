@@ -5,6 +5,8 @@ Default levels: review `medium`; worker `opus` (thread-worker), reviewer `opus` 
 `notes/guarantees-big.md` covers (lease, keys), else its `sonnet` pin; style pass on `style-reviewer`'s pin.
 Status: 0 in review (#900); 1a and 1c building; the rest waiting.
 
+Sprint doc: https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh (Open Matters bookmark rev 3).
+
 The design for threads 0 to 1b, with the rulings behind it: `lease_shelf-design.md` beside this file.
 
 ## Read first
