@@ -113,8 +113,8 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
       [(live: LiveLeaseRecord) => ({ ...live, lifeseq: leaseTombstoneOf().lifeseq, lifepath: leaseTombstoneOf().lifepath }), 'a live lease on an odd life'],
       [(live: LiveLeaseRecord) => ({ ...live, lifepath: `${live.lifeseq}/${live.lifeseq}` }), 'a lease with a life above its own'],
       [(live: LiveLeaseRecord) => ({ ...live, labelpath: 'gate', label: 'gate' }),         "a lease at a gate's labelpath"],
-      [(live: LiveLeaseRecord) => ({ ...live, labelpath: 'lease/passkeys', label: 'passkeys' }), 'a live lease whose labelpath is not its gate\'s'],
-      [(live: LiveLeaseRecord) => ({ ...live, label: 'passkeys' }),                        'a lease whose label is not its labelpath\'s last'],
+      [(live: LiveLeaseRecord) => ({ ...live, labelpath: 'lease/passkeys', label: 'passkeys' }), "a live lease whose labelpath is not its gate's"],
+      [(live: LiveLeaseRecord) => ({ ...live, label: 'passkeys' }),                        "a lease whose label is not its labelpath's last"],
       [(live: LiveLeaseRecord) => ({ ...live, note: 'hi' }),                     'a lease with a field this version does not know'],
     ] as const
     for (const [damagedOf, blurb] of DamagedCases) {
