@@ -3,7 +3,7 @@
 Mode: **YOLO**. Issued by the Coach, 2026-11-25. Cap: 3 threads at once.
 Default levels: review `medium`; worker `opus` (thread-worker), reviewer `opus` for threads touching what
 `notes/guarantees-big.md` covers (lease, keys), else its `sonnet` pin; style pass on `style-reviewer`'s pin.
-Status: 0 filed (#900); 1c filing (conflict being resolved); 1a reviewed (fixed), files onto 1c once it lands; 2 stats building. Line: 0 -> 1c -> 1a -> 1b.
+Status: 0 (#900) and 1c (#902) filed, out of draft; 1a (#903) filed onto 1c, out of draft once CI is green; 2 stats and 4 probe building; 1b held for the Coach's ruling on 'row' in the lease row's names; Closer Look running at e135f59d4.
 
 Sprint doc: https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh (Open Matters bookmark rev 3).
 
