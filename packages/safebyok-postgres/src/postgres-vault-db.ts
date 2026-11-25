@@ -2,11 +2,11 @@
 
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- a devDependency while PostgresVaultDB is not exported
 import {
-  type AnyAsk, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldActual, type GetWorldAsk, type GotActual, type ListThingsActual, type ListAsk,
-  type Received, type ThingWatchScope, type VaultError, type WriteAct, type WriteAsk, type WroteActual, AdapterVaultDB, Classifier, Shell, VoidLifeTok, VoidTrack, getAskOf, isVaultError, objCheck, readTcNow,
+  type AnyAsk, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldActual, type GetWorldAsk, type GotActual, type ListThingsActual, type ListAsk, type StatsActual, type StatsAsk, type ThingkindStats,
+  type Received, type ThingWatchScope, type VaultError, type WriteAct, type WriteAsk, type WroteActual, AdapterVaultDB, Classifier, Shell, VoidLifeTok, VoidTrack, getAskOf, isVaultError, objCheck, readTcNow, storeLimitsOf,
 } from 'safebyok/storage'
 import { type PostgresListen, type PostgresQueryable, jsonOrNull, listenOrNull, refusalOf, storedNothing, unlistenOnceListening } from './postgres-bank-db'
-import { BirthRootsSql, GetThingSql, GetWorldSql, ListThingsSql, WriteThingSql } from './vault-queries'
+import { BirthRootsSql, GetThingSql, GetWorldSql, ListThingsSql, StatsSql, WriteThingSql } from './vault-queries'
 
 // == [The driver]: PostgresVaultDBOpts, isPostgresQueryable
 
@@ -119,7 +119,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
   }
   // --
 
-  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doWatch
+  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats, doWatch
 
   protected async doGetThing(ask: GetAsk): Promise<GotActual> {
     const { thing, ...above } = await this.#fetchThing(ask)
@@ -180,6 +180,14 @@ export class PostgresVaultDB extends AdapterVaultDB {
     const read_tc = readTcNow()
     const fetched = await this.#firstRow<Omit<Classifier.BankRootsFetched, 'read_tc'>>(GetWorldSql, [userid, banklabel, trackParam(ask)])
     return this.classifyGetWorld(ask, { ...fetched, read_tc })
+  }
+
+  // Postgres sets no limit of its own a client can read, so each is the cap.
+  protected async doStats(ask: StatsAsk): Promise<StatsActual> {
+    const { userid, banklabel } = ask
+    const read_tc = readTcNow()
+    const { box, gate, ...fetched } = await this.#firstRow<Omit<Classifier.BankFetched, 'read_tc'> & Record<'box' | 'gate', ThingkindStats>>(StatsSql, [userid, banklabel, trackParam(ask)])
+    return this.classifyStats(ask, { ...fetched, read_tc }, { box, gate, max: storeLimitsOf() })
   }
 
   // The order and timing of an *adapter*'s notifications relative to reads, writes, or other notifications is unspecified, even for datastores that provide assurance.
