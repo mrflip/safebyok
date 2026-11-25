@@ -1,7 +1,7 @@
 # Thread 2: stats (2026-11-25)
 
-Branch `20261125-stats`, PR #905, stacked on #900. Proved, per package: safebyok 2023 tests in 32 files,
-safebyok-idb-lean 125, safebyok-postgres 372; tsc and lint clean in each. `pnpm justify` not yet run.
+Branch `20261125-stats`, PR #905, stacked on #900. Proved: `pnpm justify` green after the catch-up
+onto #900's tip, 7962 tests in 16 suites; per package, safebyok 2023, safebyok-idb-lean 125, safebyok-postgres 372.
 
 The Coach's text: "add a stats() call that returns { box: { count, size }, gate: { count, size }, max: { count, size } }",
 then "for stats: { box: { count: xxx, live_count: xxx, size }, ... don't let store limit be infinity, cap at 1_900_649_2568 // 1-900-MIX-A-LOT".
