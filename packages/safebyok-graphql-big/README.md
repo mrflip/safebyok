@@ -1,12 +1,14 @@
-# safebyok-graphql
+# safebyok-graphql-big
+
+Frozen, on safebyok-big, until its port replaces it as `safebyok-graphql`.
 
 safebyok's bankDB over [GraphQL](https://graphql.org), in two halves:
 
-* **On your server**, `safebyok-graphql/server`: **`BankSchemaSdl`**, the schema as SDL, and
+* **On your server**, `safebyok-graphql-big/server`: **`BankSchemaSdl`**, the schema as SDL, and
   **`bankResolvers({ bankDB, getUserId })`**. Each operation is one of the bankDB's own verbs,
-  called on the bankDB your server hosts ([`safebyok-postgres`](../safebyok-postgres)'s, or your
+  called on the bankDB your server hosts ([`safebyok-postgres-big`](../safebyok-postgres-big)'s, or your
   own), and returns that verb's answer, for the signed-in user's bank only.
-* **In the browser**, `safebyok-graphql`: **`new GraphQLBankDB({ client })`**, the bankDB over
+* **In the browser**, `safebyok-graphql-big`: **`new GraphQLBankDB({ client })`**, the bankDB over
   your app's [urql](https://commerce.nearform.com/open-source/urql/) Client.
   It is given the Client alone. Limits such as `maxBoxes` and `maxRecordSizeEst` are set on the bankDB
   your server hosts and hands to `bankResolvers`. The browser half sets none.
@@ -21,7 +23,7 @@ Neither ever sees a whisper, a passphrase, or a key that could decipher one.
 ## Install
 
 ```sh
-pnpm add safebyok safebyok-graphql safebyok-postgres
+pnpm add safebyok safebyok-graphql-big safebyok-postgres-big
 pnpm add @urql/core graphql      # if your app has neither already
 ```
 
@@ -43,9 +45,9 @@ The route, `app/api/graphql/route.ts`:
 ```ts
 import { createSchema, createYoga } from 'graphql-yoga'
 import { Pool } from 'pg'
-import { PostgresBankDB, pgClientOf } from 'safebyok-postgres'
-import { BankSchemaSdl, bankResolvers } from 'safebyok-graphql/server'
-import { listen } from './listen'                  // safebyok-postgres's README, "Hearing other writes"
+import { PostgresBankDB, pgClientOf } from 'safebyok-postgres-big'
+import { BankSchemaSdl, bankResolvers } from 'safebyok-graphql-big/server'
+import { listen } from './listen'                  // safebyok-postgres-big's README, "Hearing other writes"
 import { signedInUserId } from '@/auth'            // your own: the session's user, or null
 
 type BankContext = { user_id: string | null }
@@ -72,7 +74,7 @@ The browser:
 
 ```ts
 import { Client, fetchExchange } from '@urql/core'
-import { GraphQLBankDB } from 'safebyok-graphql'
+import { GraphQLBankDB } from 'safebyok-graphql-big'
 
 const client = new Client({ url: '/api/graphql', exchanges: [fetchExchange], fetchSubscriptions: true })
 const bankDB = new GraphQLBankDB({ client })
@@ -158,4 +160,4 @@ The tests run in-process, with no database or GraphQL server to stand up. The ba
 [PGlite](https://pglite.dev), with a second Client as another device. It runs again through Yoga
 over fetch, as in the recipe. A drift test checks every type the schema sends or receives against the core check
 that reads it. Before running `vitest` by hand, run `pnpm build:deps`: the tests read
-the core and `safebyok-postgres` from their `dist/`.
+the core and `safebyok-postgres-big` from their `dist/`.

@@ -4,7 +4,7 @@ import { defineComponent } from 'convex/server'
  *
  * @example
  *   import { defineApp } from 'convex/server'
- *   import safebyok from 'safebyok-convex/convex.config'
+ *   import safebyok from 'safebyok-convex-big/convex.config'
  *
  *   const app = defineApp()
  *   app.use(safebyok)

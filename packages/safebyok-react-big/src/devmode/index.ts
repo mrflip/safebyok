@@ -1,4 +1,4 @@
-// These panels show raw rows and whispers, so the main entry (`safebyok-react`) does not export them.
+// These panels show raw rows and whispers, so the main entry (`safebyok-react-big`) does not export them.
 // An app has to import them from this entry by name.
 export { DevBoxInspector } from './dev-box-inspector'
 export type { DevBoxInspectorProps } from '../shapes'

@@ -84,7 +84,7 @@ export default defineConfig([
   // src/, through the `@safebyok/source` condition the tsconfig asks for too (tsconfig.base.json),
   // so lint never depends on a dist/ that may be missing or stale.
   {
-    name: 'safebyok-convex/type-aware',
+    name: 'safebyok-convex-big/type-aware',
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -102,7 +102,7 @@ export default defineConfig([
 
   // == [3a. House style] ==
   {
-    name: 'safebyok-convex/house-style',
+    name: 'safebyok-convex-big/house-style',
     files: SourceFiles,
     plugins: { '@stylistic': stylistic },
     rules: {
@@ -200,7 +200,7 @@ export default defineConfig([
   // decides what may be logged. A stray debug line is how a key ends up in someone's log drain.
   // Randomness is the platform's CSPRNG (`crypto.getRandomValues`), never Math.random.
   {
-    name: 'safebyok-convex/secret-keeping',
+    name: 'safebyok-convex-big/secret-keeping',
     files: ['src/**/*.ts'],
     rules: {
       'no-console':              'error',
@@ -218,7 +218,7 @@ export default defineConfig([
   // src/ is platform-neutral: no Node module, and none of Node's globals. The tests and configs run
   // under Node, so the TS project types Node's globals for them, and only this rule keeps src/ clean.
   {
-    name: 'safebyok-convex/platform-neutral',
+    name: 'safebyok-convex-big/platform-neutral',
     files: ['src/**/*.ts'],
     rules: {
       'import-x/no-nodejs-modules': 'error',
@@ -233,7 +233,7 @@ export default defineConfig([
   // Each of these is a reasonable default that STYLE.md rules out explicitly. Turned off here
   // rather than disabled at every call site.
   {
-    name: 'safebyok-convex/house-overrides',
+    name: 'safebyok-convex-big/house-overrides',
     files: SourceFiles,
     rules: {
       // STYLE.md sanctions the one-line doc block: `/** Brief statement, if that's truly enough */`.
@@ -297,12 +297,12 @@ export default defineConfig([
   // registered, not declared (`export const getBox = query({...})`), so the const has a verb name:
   // it is the function clients call as `api.vaults.getBox`.
   {
-    name: 'safebyok-convex/convex-definitions',
+    name: 'safebyok-convex-big/convex-definitions',
     files: ['src/component/schema.ts', 'src/component/convex.config.ts'],
     rules: { 'unicorn/no-top-level-side-effects': 'off' },
   },
   {
-    name: 'safebyok-convex/convex-functions',
+    name: 'safebyok-convex-big/convex-functions',
     files: ['src/component/**/*.ts'],
     rules: { 'unicorn/no-non-function-verb-prefix': 'off' },
   },
@@ -311,7 +311,7 @@ export default defineConfig([
   // variable, a parameter, a destructured name -- never a property, so `{ name: 'AES-GCM' }`, as
   // WebCrypto spells its algorithms, stays legal.
   {
-    name: 'safebyok-convex/forbidden-names',
+    name: 'safebyok-convex-big/forbidden-names',
     files: SourceFiles,
     rules: {
       'no-restricted-syntax': ['error', ...[
@@ -330,7 +330,7 @@ export default defineConfig([
   // A config file's whole job is the call it exports. The package itself is `sideEffects: false`,
   // so the rule stays on everywhere else.
   {
-    name: 'safebyok-convex/config-files',
+    name: 'safebyok-convex-big/config-files',
     files: ['*.config.{ts,mts,mjs}', 'eslint.config.mjs'],
     rules: {
       'unicorn/no-top-level-side-effects': 'off',
@@ -341,7 +341,7 @@ export default defineConfig([
   // etc can send the coach-coder development loop into a tailspin.
   // Use them judiciously, and ALWAYS report it in chat.
   {
-    name: 'safebyok-convex/can-we-be-adults-yes-we-can',
+    name: 'safebyok-convex-big/can-we-be-adults-yes-we-can',
     files: SourceFiles,
     rules: {
       '@typescript-eslint/ban-ts-comment':                'off',
@@ -354,7 +354,7 @@ export default defineConfig([
   // STYLE.md *Comments and doc blocks*: only rules that remove content or fix the shape; no count caps. Every rule is at
   // warn until the documentarian sweep has brought the code up to them.
   {
-    name: 'safebyok-convex/doc-blocks',
+    name: 'safebyok-convex-big/doc-blocks',
     files: ['src/**/*.ts'],
     plugins: { jsdoc },
     rules: {
@@ -413,14 +413,14 @@ export default defineConfig([
   // This file and any other loose script sit outside the TS project, so the
   // type-aware rules above cannot run on them. Last, so it wins.
   {
-    name: 'safebyok-convex/untyped-config-files',
+    name: 'safebyok-convex-big/untyped-config-files',
     files: ['**/*.mjs', '**/*.js', '**/*.cjs'],
     extends: [tseslint.configs.disableTypeChecked],
   },
 
   // == [Tests] ==
   {
-    name: 'safebyok-convex/tests',
+    name: 'safebyok-convex-big/tests',
     files: ['tests/**/*.ts'],
     extends: [vitest.configs.recommended],
     rules: {
@@ -455,7 +455,7 @@ export default defineConfig([
   // no-unused-expressions lets an expect chain stand as a statement, and still reports any other
   // expression that does nothing.
   {
-    name: 'safebyok-convex/tests-chai',
+    name: 'safebyok-convex-big/tests-chai',
     files: ['tests/**/*.ts'],
     plugins: { 'chai-expect': chaiExpect, 'chai-friendly': chaiFriendly },
     rules: {

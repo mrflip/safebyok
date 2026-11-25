@@ -3,7 +3,7 @@ import type { AnyGating, BadNewsHandler, Boxlabel, Box, DeviceDB, DeviceOpts, Ga
 import { Checker, Checkers, deviceOpts, type AssertEqual, type CheckerInput, type LeaseQuery, type LeaseScopepath } from 'safebyok-big/storage'
 import { fromB64, type WhisperFieldAttributes } from 'safebyok-big/utils'
 
-// The types and checkers of safebyok-react, grouped by area. This file imports nothing from a component or
+// The types and checkers of safebyok-react-big, grouped by area. This file imports nothing from a component or
 // hook, so it cannot be part of an import cycle at run time.
 
 // == [Provider]: BankProviderProps, bankProviderProps, ProviderDeviceOpts, Handlers, GatingModalProps, BoundaryProps, BoundarySource

@@ -72,7 +72,7 @@ describe("boundaryRefusalOf", () => {
     expect(reported).to.have.lengthOf(1)
     const told = reported[0] as VaultError
     expect(told).to.be.instanceOf(VaultError).and.to.include({ refusalkind: 'bad_record' })
-    expect(told.message).to.match(/^A bad option\. \(safebyok-react's PassphraseModal left this error's cause out of its report to React/)
+    expect(told.message).to.match(/^A bad option\. \(safebyok-react-big's PassphraseModal left this error's cause out of its report to React/)
     expect(told.meta).to.deep.equal(meta)
     expect(told.cause).to.be.undefined
   })
@@ -99,6 +99,6 @@ describe("boundaryRefusalOf", () => {
 
   it("names the component a foreign throw came from", () => {
     const { message } = boundaryRefusalOf(new TypeError('fell over'), 'RevokePasskeyModal')
-    expect(message).to.include("safebyok-react's RevokePasskeyModal")
+    expect(message).to.include("safebyok-react-big's RevokePasskeyModal")
   })
 })

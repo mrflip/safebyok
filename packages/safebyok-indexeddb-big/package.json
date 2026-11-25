@@ -1,6 +1,6 @@
 {
-  "name": "safebyok-indexeddb",
-  "private": false,
+  "name": "safebyok-indexeddb-big",
+  "private": true,
   "version": "0.5.0",
   "description": "IndexedDB storage for safebyok: a bankDB that keeps a bank's rows as ciphertext in this browser, each call one IndexedDB transaction.",
   "keywords": [
@@ -15,7 +15,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mrflip/safebyok.git",
-    "directory": "packages/safebyok-indexeddb"
+    "directory": "packages/safebyok-indexeddb-big"
   },
   "bugs": {
     "url": "https://github.com/mrflip/safebyok/issues"
@@ -32,7 +32,7 @@
     "build": "tsdown",
     "prebuild": "pnpm build:deps",
     "build:watch": "tsdown --watch",
-    "build:deps": "[ \"$SAFEBYOK_SKIP_BUILD_DEPS\" = 1 ] || SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok-indexeddb^...' build",
+    "build:deps": "[ \"$SAFEBYOK_SKIP_BUILD_DEPS\" = 1 ] || SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok-indexeddb-big^...' build",
     "lint": "eslint --cache --cache-strategy content --cache-location .eslintcache .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

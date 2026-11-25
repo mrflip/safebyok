@@ -1,4 +1,4 @@
-/** The messages and advice of safebyok-convex's own checks. */
+/** The messages and advice of safebyok-convex-big's own checks. */
 
 // Gathered here so their wording can be reviewed in one place.
 

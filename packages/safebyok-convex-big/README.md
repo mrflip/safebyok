@@ -1,4 +1,6 @@
-# safebyok-convex
+# safebyok-convex-big
+
+Frozen, on safebyok-big, until its port replaces it as `safebyok-convex`.
 
 safebyok's bankDB on [Convex](https://convex.dev): a Convex **component** that keeps bank, gate,
 vault and box rows in tables of its own, and **`ConvexBankDB`**, which writes through it from your
@@ -8,7 +10,7 @@ by. It never sees a whisper, a passphrase, or a key that could decipher one.
 ## Install
 
 ```sh
-pnpm add safebyok safebyok-convex convex convex-helpers
+pnpm add safebyok safebyok-convex-big convex convex-helpers
 ```
 
 `safebyok`, `convex` and `convex-helpers` are peer dependencies, so the adapter and your app share
@@ -22,7 +24,7 @@ In `convex/convex.config.ts`:
 
 ```ts
 import { defineApp } from 'convex/server'
-import safebyok from 'safebyok-convex/convex.config'
+import safebyok from 'safebyok-convex-big/convex.config'
 
 const app = defineApp()
 app.use(safebyok)
@@ -34,7 +36,7 @@ export default app
 From a module of your own, `convex/safebyokBank.ts`, under these names:
 
 ```ts
-import { SafebyokBankComponent } from 'safebyok-convex/server'
+import { SafebyokBankComponent } from 'safebyok-convex-big/server'
 import { components } from './_generated/api'
 
 export const { ensureBank, buildBank, putGate, delBank, getVault, putVault, delVault, listBoxes, getBox, putBox, delBox, tidyGone, watchRows } =
@@ -65,7 +67,7 @@ client's copy of safebyok. A write answers the rows stored.
 
 ```ts
 import { ConvexClient } from 'convex/browser'
-import { ConvexBankDB } from 'safebyok-convex'
+import { ConvexBankDB } from 'safebyok-convex-big'
 import { api } from '../convex/_generated/api'
 
 const convex = new ConvexClient(import.meta.env.VITE_CONVEX_URL)
@@ -77,7 +79,7 @@ Hand `bankDB` to the core, as its README's *A host* shows.
 
 * **`client`** is the Convex client your app already has: a `ConvexClient`, or in a React app the
   `ConvexReactClient` you give `ConvexProvider`, so the bank shares its socket and its signed-in
-  user. `safebyok-convex` imports nothing of React's.
+  user. `safebyok-convex-big` imports nothing of React's.
 * **`api`** is `api.safebyokBank`, the functions above.
 * **`maxBoxes`** (optional, default 100) caps the box rows of one vault life, including the tombstones of deleted
   boxes, and never exceeds the component's own limit. A put of a new boxlabel past it refuses as `vault_full`, so
@@ -152,15 +154,15 @@ it go quiet; `tidyGone` needs room for its batch beside them, and fails past abo
 
 ## Testing your own functions
 
-`safebyok-convex/test` installs the component into a
+`safebyok-convex-big/test` installs the component into a
 [`convex-test`](https://docs.convex.dev/testing/convex-test) app. It loads the component's modules
 with `import.meta.glob`, so it assumes vitest or another runner on Vite.
 
 ```ts
 import { defineSchema } from 'convex/server'
 import { defineTestApp } from 'convex-test'
-import { SafebyokBankComponent } from 'safebyok-convex/server'
-import { register } from 'safebyok-convex/test'
+import { SafebyokBankComponent } from 'safebyok-convex-big/server'
+import { register } from 'safebyok-convex-big/test'
 
 const app = defineTestApp({ schema: defineSchema({}), components: { safebyok: { register } } })
 const host = app.defineModules({ safebyokBank: new SafebyokBankComponent(app.components.safebyok).api({
@@ -170,12 +172,12 @@ const host = app.defineModules({ safebyokBank: new SafebyokBankComponent(app.com
 
 ## Testing your own client code
 
-`safebyok-convex/testing` is a Convex deployment in memory that the real Convex clients reach over
+`safebyok-convex-big/testing` is a Convex deployment in memory that the real Convex clients reach over
 a fake WebSocket. `fakeDeployment(host)` accepts a host like the one above.
 
 ```ts
-import { ConvexBankDB } from 'safebyok-convex'
-import { fakeDeployment } from 'safebyok-convex/testing'
+import { ConvexBankDB } from 'safebyok-convex-big'
+import { fakeDeployment } from 'safebyok-convex-big/testing'
 
 const deployment = fakeDeployment(host)
 const bankDB = new ConvexBankDB({ client: deployment.client('u1'), api: deployment.api.safebyokBank })
@@ -198,7 +200,7 @@ lists no framework among its dev dependencies.
 
 The build follows Convex's component template: ESM only and unbundled, each of the component's
 modules its own file under `dist/component/` beside `convex.config.js` and `_generated/`, for a
-host's Convex CLI to bundle at deploy. `safebyok-convex/test` alone ships as source, since its
+host's Convex CLI to bundle at deploy. `safebyok-convex-big/test` alone ships as source, since its
 `import.meta.glob` must find the component's `.ts` modules. `src/component/_generated/` is Convex's
 codegen output and never edited by hand. The component's typed API, `ComponentApi`, is derived from
 its functions in `src/component-api.ts`.

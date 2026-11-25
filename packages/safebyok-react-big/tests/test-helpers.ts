@@ -1,4 +1,4 @@
-/** safebyok-react's test helpers. This file re-exports everything in `safebyok-big/testing`, and adds helpers for
+/** safebyok-react-big's test helpers. This file re-exports everything in `safebyok-big/testing`, and adds helpers for
  * rendering, open gatings, typing in the dialogs, and a fake authenticator.
  * Helpers that need JSX are in `test-helpers-react.tsx`, re-exported here. Star-import this file as `TH` (`import * as TH from './test-helpers'`).
  */

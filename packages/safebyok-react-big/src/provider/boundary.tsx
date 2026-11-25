@@ -23,9 +23,9 @@ const LeftOut = "It is left out of this report, as it may quote what the user ty
  */
 export const boundaryRefusalOf = (err: unknown, source: BoundarySource): VaultError => {
   if (! isVaultError(err)) {
-    return HostErrorSanitizer.refusalFor(err, 'unexpected_error', `Something inside safebyok-react's ${source} failed with an error that was not the vault's own. ${LeftOut}.`)
+    return HostErrorSanitizer.refusalFor(err, 'unexpected_error', `Something inside safebyok-react-big's ${source} failed with an error that was not the vault's own. ${LeftOut}.`)
   }
   if (err.cause === undefined) { return err }
-  const message = `${err.message} (safebyok-react's ${source} left this error's cause out of its report to React: it may quote what the user typed.)`
+  const message = `${err.message} (safebyok-react-big's ${source} left this error's cause out of its report to React: it may quote what the user typed.)`
   return new VaultError(err.refusalkind, message, err.meta === undefined ? undefined : { meta: err.meta })
 }

@@ -1,4 +1,4 @@
-// All the text safebyok-react shows to a user is in this file. A sentence with a variable part is one template
+// All the text safebyok-react-big shows to a user is in this file. A sentence with a variable part is one template
 // function, so a translation can reorder it. Messages meant for developers stay next to the code that uses them.
 
 import type { Banklabel, Gatingkind, UserID } from 'safebyok-big'

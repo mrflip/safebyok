@@ -10,8 +10,8 @@ import type { GraphQLSchema } from 'graphql'
 import type { AdapterBankDB, BankScope, Boxscope, BX, VaultScope } from 'safebyok-big/storage'
 import type { BankTok, Boxlabel, UserID, VaultTok } from 'safebyok-big'
 import * as TH from 'safebyok-big/testing'
-import { BankFunctionsSql, BankTablesSql, PostgresBankDB, bankChannelOf } from 'safebyok-postgres'
-import type { PostgresBankDBOpts, PostgresListen } from 'safebyok-postgres'
+import { BankFunctionsSql, BankTablesSql, PostgresBankDB, bankChannelOf } from 'safebyok-postgres-big'
+import type { PostgresBankDBOpts, PostgresListen } from 'safebyok-postgres-big'
 import { GraphQLBankDB } from '../src/index'
 import { BankSchemaSdl, bankResolvers } from '../src/server'
 
@@ -73,7 +73,7 @@ export async function writeOtherwise(): Promise<void> {
 
 const listenersOf = new Map<string, Set<(text: string) => void>>()
 
-/** Start listening on `channel` the first time it is asked for, and never stop, like safebyok-postgres's README recipe. Returns the channel's set of callbacks. */
+/** Start listening on `channel` the first time it is asked for, and never stop, like safebyok-postgres-big's README recipe. Returns the channel's set of callbacks. */
 async function listenOn(db: PGlite, channel: string): Promise<Set<(text: string) => void>> {
   const listeners = listenersOf.get(channel)
   if (listeners !== undefined) { return listeners }
@@ -201,7 +201,7 @@ function recordOf(row: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(row).filter(([, val]) => val !== null))
 }
 
-// The same SQL as safebyok-postgres's own tests. A bank row is planted by an upsert, never a delete and an insert, so the rows under it stay.
+// The same SQL as safebyok-postgres-big's own tests. A bank row is planted by an upsert, never a delete and an insert, so the rows under it stay.
 const PlantBankSql = `
   INSERT INTO safebyok_banks
   SELECT * FROM jsonb_populate_record(NULL::safebyok_banks, $3::text::jsonb || jsonb_build_object('user_id', $1::text, 'banklabel', $2::text))

@@ -1,4 +1,6 @@
-# safebyok-react
+# safebyok-react-big
+
+Frozen, on safebyok-big, until its port replaces it: `safebyok-react` is the React binding of the new core.
 
 React bindings for safebyok's bank and vaults: a provider, hooks, and dialogs. A full guide is coming.
 
@@ -81,6 +83,6 @@ the hooks make, and the device's other lifecycle events. `onBadNews` receives th
 
 ## React version
 
-safebyok-react needs React 19.2 or later, for `useEffectEvent`. `BoxFields`, from `safebyok/dom`, gives React a `ref` function that returns a cleanup. React 19 runs that
+safebyok-react-big needs React 19.2 or later, for `useEffectEvent`. `BoxFields`, from `safebyok/dom`, gives React a `ref` function that returns a cleanup. React 19 runs that
 cleanup when the field leaves the page; React 18 ignores it. On React 18 the field is never let go, and the box never
 unexposes.

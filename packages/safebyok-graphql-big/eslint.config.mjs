@@ -79,7 +79,7 @@ export default defineConfig([
   // src/, through the `@safebyok/source` condition the tsconfig asks for too (tsconfig.base.json),
   // so lint never depends on a dist/ that may be missing or stale.
   {
-    name: 'safebyok-graphql/type-aware',
+    name: 'safebyok-graphql-big/type-aware',
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -97,7 +97,7 @@ export default defineConfig([
 
   // == [3a. House style] ==
   {
-    name: 'safebyok-graphql/house-style',
+    name: 'safebyok-graphql-big/house-style',
     files: SourceFiles,
     plugins: { '@stylistic': stylistic },
     rules: {
@@ -195,7 +195,7 @@ export default defineConfig([
   // decides what may be logged. A stray debug line is how a key ends up in someone's log drain.
   // Randomness is the platform's CSPRNG (`crypto.getRandomValues`), never Math.random.
   {
-    name: 'safebyok-graphql/secret-keeping',
+    name: 'safebyok-graphql-big/secret-keeping',
     files: ['src/**/*.ts'],
     rules: {
       'no-console':              'error',
@@ -213,7 +213,7 @@ export default defineConfig([
   // src/ is platform-neutral: no Node module, and none of Node's globals. The tests and configs run
   // under Node, so the TS project types Node's globals for them, and only this rule keeps src/ clean.
   {
-    name: 'safebyok-graphql/platform-neutral',
+    name: 'safebyok-graphql-big/platform-neutral',
     files: ['src/**/*.ts'],
     rules: {
       'import-x/no-nodejs-modules': 'error',
@@ -228,7 +228,7 @@ export default defineConfig([
   // so a host bundles one Zod. `zod/mini` would add a second copy, about 7 kB gzipped. Named and
   // star imports tree-shake equally well.
   {
-    name: 'safebyok-graphql/zod-size',
+    name: 'safebyok-graphql-big/zod-size',
     files: ['src/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', {
@@ -245,7 +245,7 @@ export default defineConfig([
   // Each of these is a reasonable default that STYLE.md rules out explicitly. Turned off here
   // rather than disabled at every call site.
   {
-    name: 'safebyok-graphql/house-overrides',
+    name: 'safebyok-graphql-big/house-overrides',
     files: SourceFiles,
     rules: {
       // STYLE.md sanctions the one-line doc block: `/** Brief statement, if that's truly enough */`.
@@ -311,7 +311,7 @@ export default defineConfig([
   // variable, a parameter, a destructured name -- never a property, so `{ name: 'AES-GCM' }`, as
   // WebCrypto spells its algorithms, stays legal.
   {
-    name: 'safebyok-graphql/forbidden-names',
+    name: 'safebyok-graphql-big/forbidden-names',
     files: SourceFiles,
     rules: {
       'no-restricted-syntax': ['error', ...[
@@ -330,7 +330,7 @@ export default defineConfig([
   // A config file's whole job is the call it exports. The package itself is `sideEffects: false`,
   // so the rule stays on everywhere else.
   {
-    name: 'safebyok-graphql/config-files',
+    name: 'safebyok-graphql-big/config-files',
     files: ['*.config.{ts,mts,mjs}', 'eslint.config.mjs'],
     rules: {
       'unicorn/no-top-level-side-effects': 'off',
@@ -341,7 +341,7 @@ export default defineConfig([
   // etc can send the coach-coder development loop into a tailspin.
   // Use them judiciously, and ALWAYS report it in chat.
   {
-    name: 'safebyok-graphql/can-we-be-adults-yes-we-can',
+    name: 'safebyok-graphql-big/can-we-be-adults-yes-we-can',
     files: SourceFiles,
     rules: {
       '@typescript-eslint/ban-ts-comment':                'off',
@@ -354,7 +354,7 @@ export default defineConfig([
   // STYLE.md *Comments and doc blocks*: only rules that remove content or fix the shape; no count caps. Every rule is at
   // warn until the documentarian sweep has brought the code up to them.
   {
-    name: 'safebyok-graphql/doc-blocks',
+    name: 'safebyok-graphql-big/doc-blocks',
     files: ['src/**/*.ts'],
     plugins: { jsdoc },
     rules: {
@@ -413,14 +413,14 @@ export default defineConfig([
   // This file and any other loose script sit outside the TS project, so the
   // type-aware rules above cannot run on them. Last, so it wins.
   {
-    name: 'safebyok-graphql/untyped-config-files',
+    name: 'safebyok-graphql-big/untyped-config-files',
     files: ['**/*.mjs', '**/*.js', '**/*.cjs'],
     extends: [tseslint.configs.disableTypeChecked],
   },
 
   // == [Tests] ==
   {
-    name: 'safebyok-graphql/tests',
+    name: 'safebyok-graphql-big/tests',
     files: ['tests/**/*.ts'],
     extends: [vitest.configs.recommended],
     rules: {
@@ -455,7 +455,7 @@ export default defineConfig([
   // no-unused-expressions lets an expect chain stand as a statement, and still reports any other
   // expression that does nothing.
   {
-    name: 'safebyok-graphql/tests-chai',
+    name: 'safebyok-graphql-big/tests-chai',
     files: ['tests/**/*.ts'],
     plugins: { 'chai-expect': chaiExpect, 'chai-friendly': chaiFriendly },
     rules: {

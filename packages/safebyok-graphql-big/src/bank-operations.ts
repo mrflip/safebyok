@@ -71,7 +71,7 @@ const gateAnswerFragments = [gateAnswer, gateFragments].join('\n')
 const vaultAnswerFragments = [vaultAnswer, askedFragments].join('\n')
 const boxAnswerFragments = [boxAnswer, boxRow, ciphered, ask, err].join('\n')
 
-/** The GraphQL documents a client sends to `safebyok-graphql/server`: one per bankDB verb, and one for the watch subscription. */
+/** The GraphQL documents a client sends to `safebyok-graphql-big/server`: one per bankDB verb, and one for the watch subscription. */
 export const BankOperations = {
   ensureBank: `query SafebyokEnsureBank($user_id: String!, $banklabel: String!) {
   safebyokEnsureBank(user_id: $user_id, banklabel: $banklabel) {

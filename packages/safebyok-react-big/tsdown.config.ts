@@ -6,7 +6,7 @@ import { defineConfig } from 'tsdown'
 // so they stay external and this package uses the host's single copy of each. The entry also gets the
 // core's `@safebyok/source` condition, for the workspace's tsconfigs.
 //
-// `safebyok-react/devmode` is a separate entry. Its inspection panels show raw rows and whispers, so only
+// `safebyok-react-big/devmode` is a separate entry. Its inspection panels show raw rows and whispers, so only
 // a host that imports that entry by name gets them. The main entry never includes them.
 export default defineConfig({
   entry:      ['src/index.ts', 'src/devmode/index.ts'],

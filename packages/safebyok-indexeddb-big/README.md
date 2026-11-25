@@ -1,4 +1,6 @@
-# safebyok-indexeddb
+# safebyok-indexeddb-big
+
+Frozen, on safebyok-big, until its port replaces it: `safebyok-indexeddb` is the same store on the new core.
 
 A `BankDB` for safebyok that keeps a bank's rows in this browser's
 [IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API): storage for an app with no
@@ -8,7 +10,7 @@ nothing in them unlocks a vault without its passphrase or passkey.
 ## Install
 
 ```sh
-pnpm add safebyok safebyok-indexeddb
+pnpm add safebyok safebyok-indexeddb-big
 ```
 
 `safebyok` is a peer dependency, so the adapter and your app share one copy, and a `VaultError`
@@ -18,7 +20,7 @@ from one is a `VaultError` to the other. Its only dependency is
 ## Use
 
 ```ts
-import { idbBankDB } from 'safebyok-indexeddb'
+import { idbBankDB } from 'safebyok-indexeddb-big'
 
 const bankDB = idbBankDB({ dbName: 'acme' })
 ```
@@ -80,5 +82,5 @@ copy it:
 ## Developing this package
 
 ```sh
-pnpm --filter safebyok-indexeddb test   # under Node, against fake-indexeddb
+pnpm --filter safebyok-indexeddb-big test   # under Node, against fake-indexeddb
 ```
