@@ -1,8 +1,7 @@
 # Thread 1b: lease_shared (2026-11-25)
 
 Branch `20261125-lease_shared`, PR #909, stacked on #908 (8, on #907 1d, #903 1a, #902 1c, #900 0). Proved:
-`pnpm justify` green after the catch-up (before the Coach's three rulings); since the rulings,
-`pnpm --filter safebyok test` 2147 passed, typecheck and lint clean; justify again before `ready`.
+`pnpm justify` green after the catch-up, with the Coach's three rulings built: 8400 tests, `safebyok` 2147.
 
 * **The Coach's rulings (2026-11-25, through the orchestrator), each built:**
   1. **E1 confirmed, narrowed**: "It should not, it's just for unmount. Vacate delete and lock cause lock". A
