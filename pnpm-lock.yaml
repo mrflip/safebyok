@@ -749,6 +749,9 @@ importers:
       es-toolkit:
         specifier: ^1.53.2
         version: 1.53.2
+      idb-keyval:
+        specifier: ^6.3.0
+        version: 6.3.0
       safebyok-big:
         specifier: workspace:*
         version: link:../safebyok-big
