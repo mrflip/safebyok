@@ -98,6 +98,9 @@ export const LifepathDepth = "A Thing's lifepath has one lifeseq for each segmen
 /** A Thing whose am and lifeseq disagree. */
 export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tombstone (am: 'x')."
 
+/** A lease row whose lifepath is more than its lifeseq. */
+export const LeaseLifepathOwn = "A lease row's lifepath is its lifeseq alone: no life is above a lease's own."
+
 /** A read_tc that is not a UUID version 7. */
 export const ReadTcShape = "A read_tc is a UUID version 7, in lowercase hex."
 

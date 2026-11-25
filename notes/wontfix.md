@@ -338,6 +338,28 @@ Reasoning for wontfix: a disconnect comes when a provider unmounts, and a get is
 the lock, and guarding it would put a token or a wait on every answer. Written by lease_shelf thread 0, 2026-11-25,
 awaiting a ruling; widened to the janitor's re-read by thread 1c, 2026-11-25.
 
+### Two tabs that stow a lease row at once keep only what stow-keeps-newest keeps
+
+* current outcome: each `stowLease` reads the stored row and writes its own in one transaction, and writes only a row
+  newer by life, then revision; each answers the row stored afterward. Two tabs that stow at once (a renewal in each,
+  or a renewal in one and a lock's tombstone in the other) keep the newer row, and the tab whose row was not newer gets
+  the other's row as its answer. Two rows of the same life and revision keep whichever landed first, though their
+  other fields (`proved_at`, `ends_at`, the keys) may differ.
+* alternatives:
+  - a lock across tabs (Web Locks) around each stow: a lock where none was needed, in a primitive's critical path.
+  - a tiebreak on equal rank, by `written_at` or `revtok`: a second ordering rule beside the Things', for a case the
+    answer already tells the caller of.
+* workaround: none needed: the answer is the row stored, which every tab's lease follows, and every tab hears the stow.
+
+Steps to reproduce: in two tabs of one origin, call `stowLease` with rows of the same bank and the same life and
+revision, so that both transactions are queued before either commits.
+
+Reasoning for wontfix: a lease row changes at a gating, a renewal or a lock, minutes apart at the most; two tabs
+stowing in the same few milliseconds is a crossing (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). The
+stow-keeps-newest rule decides, and that is all. Nothing the bankDB stores changes, and no key leaves the device's
+database other than by a stow over it. Directed by the lease_shelf handoff (thread 1a), 2026-11-25; written by the
+device_db worker.
+
 ## React
 
 Cases in the React layer, `packages/safebyok-react-lean`, and in an app built on it.
