@@ -69,17 +69,20 @@ Reasoning for wontfix: storage is the ground truth, and the cache a copy. The st
 refuses a write that cites another, so a conflict is found where it can be settled, not in the cache. Ruled by the Coach,
 2026-11-15, vault_minder.
 
-### The value in `tracked` of a missing or damaged record
+### The value in `tracked`, and the `banktok`, of a missing or damaged record
 
-The return value in `tracked` of a missing or damaged record is unspecified behavior.
+The answer to an ask that tracks a root stored missing or damaged is unspecified behavior.
 
-* current outcome: unspecified. No store, adapter or caller checks for it, and none may: no guard, no null, no refusal,
-  and no test of the value.
+* current outcome: unspecified. As the code stands, an ask that tracks a root at another revision than the row stored is
+  refused: `damaged_row` where the row fails its checks, `storage_issue` where none is stored. An ask that tracks the
+  damaged row's own revision is told `'same'` for it, and the step's answer stands; where that row is the bank, the
+  answer's `banktok` is the void lifetok. No caller checks for either case, and none may: no guard, no null, no refusal
+  of its own, and no test of the value in `tracked`.
 * alternatives:
   - a sentinel for either case (null, a refusal kind, a left-out key): it extends the contract, so every caller must
     then handle it, and the handling cascades into code that second-guesses the store.
-  - report it from `tracked`: a damaged row should already have refused, with `storage_issue` or a heavier error,
-    where it was read; a missing one is not this field's to report.
+  - refuse every ask over a damaged root, whatever it tracks: every step would check rows it does not otherwise read,
+    for a case storage should never produce.
 * workaround: reload the page, or restart the system.
 
 Steps to reproduce: a device's ask carries `track` for the bank and its main gate, whose revisions it was sent, after
@@ -88,7 +91,9 @@ the datastore has lost or damaged either row.
 Reasoning for wontfix: the device was sent revisions of both rows, so either case means storage has gone wrong
 underneath it: work stops until the page reloads, or until a developer catches the error and restarts the system.
 Pinned by a type-level test that each `tracked` entry is exactly its record or `'same'`, and by a `//` comment at the
-`tracked` type and at `VaultMinder`'s `rootsOf` pointing here. Ruled by the Coach, 2026-11-15, lean_buttonup T1.
+`tracked` type, at `VaultMinder`'s `rootsOf` and at the classifier's `banktokOf` pointing here. Ruled by the Coach,
+2026-11-15, lean_buttonup T1; kept 2026-11-25 ("damaged_rows are mostly impossible hallucinations so stay with my
+ruling").
 
 ### Changing only a box's sidecar needs the bank unlocked and the whisper in hand
 

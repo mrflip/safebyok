@@ -18,7 +18,7 @@ export type IdbVaultDBOpts = { dbName?: string | undefined }
 const idbVaultDBOpts = DB.objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_record')
 // --
 
-// == [Helpers]: Rung, isHeardBy, rootsFetchedIn, worldFetchedIn, aboveFetchedIn, worldAfterIn
+// == [Helpers]: Rung, isHeardBy, rootsFetchedIn, bankFetchedIn, aboveFetchedIn, besideAfterIn
 
 /** The notice of one Thing written, broadcast to every watch on the database. */
 type Rung = { scope: ThingWatchScope, received: Received }
@@ -28,7 +28,7 @@ function isHeardBy(watched: ThingWatchScope, scope: ThingWatchScope): boolean {
   return (watched.userid === scope.userid) && (watched.banklabel === scope.banklabel)
 }
 
-/** The roots of `ask`'s bank, fetched raw in `store`'s transaction, and when they were read. */
+/** The roots of `ask`'s bank, fetched raw in `store`'s transaction, how they compare with what `ask` tracks, and when they were read. */
 async function rootsFetchedIn(store: IDBObjectStore, ask: AnyAsk): Promise<DB.Classifier.BankRootsFetched> {
   const { userid, banklabel } = ask
   const read_tc = DB.readTcNow()
@@ -40,26 +40,26 @@ async function rootsFetchedIn(store: IDBObjectStore, ask: AnyAsk): Promise<DB.Cl
   return { bank, gate, root, tracked: DB.Classifier.trackedFetchedOf(ask, { bank, [DB.Labelpath.MainGate]: gate, [DB.Labelpath.RootBox]: root }), read_tc }
 }
 
-/** The bank and main gate of `ask`'s bank, fetched raw in `store`'s transaction, and when they were read. */
-async function worldFetchedIn(store: IDBObjectStore, ask: AnyAsk): Promise<DB.Classifier.WorldFetched> {
-  const { gate: maingate, root: _root, ...fetched } = await rootsFetchedIn(store, ask)
-  return { ...fetched, maingate }
+/** The bank of `ask`'s bank, fetched raw in `store`'s transaction, how its roots compare with what `ask` tracks, and when they were read. */
+async function bankFetchedIn(store: IDBObjectStore, ask: AnyAsk): Promise<DB.Classifier.BankFetched> {
+  const { bank, tracked, read_tc } = await rootsFetchedIn(store, ask)
+  return { bank, tracked, read_tc }
 }
 
-/** The world of `ask`'s bank and the nearest Thing stored above its scope, fetched raw in `store`'s transaction. */
+/** The bank of `ask`'s bank and the nearest Thing stored above its scope, fetched raw in `store`'s transaction. */
 async function aboveFetchedIn(store: IDBObjectStore, ask: GetAsk | WriteAsk): Promise<DB.Classifier.AboveFetched> {
   const { userid, banklabel } = ask
-  const [world, ...ancestors] = await Promise.all([
-    worldFetchedIn(store, ask),
+  const [bankFetched, ...ancestors] = await Promise.all([
+    bankFetchedIn(store, ask),
     ...DB.Labelpath.ancestorsOf(ask.labelpath).map((labelpath) => DB.rowAt(store, thingScopepathOf({ userid, banklabel, labelpath }))),
   ])
-  return { ...world, ancestor: ancestors.find((raw) => raw !== null) ?? null }
+  return { ...bankFetched, ancestor: ancestors.find((raw) => raw !== null) ?? null }
 }
 
-/** The world of `ask`'s bank as `store`'s transaction now has it, its `tracked` if `ask` tracks the roots, and when they were read. */
-async function worldAfterIn(store: IDBObjectStore, ask: AnyAsk): Promise<ActualBeside> {
-  const fetched = await worldFetchedIn(store, ask)
-  return { world: DB.Classifier.worldOf(ask, fetched), tracked: DB.Classifier.trackedOf(ask, fetched.tracked), read_tc: fetched.read_tc }
+/** The banktok of `ask`'s bank as `store`'s transaction now has it, its `tracked` for what `ask` tracks, and when they were read. */
+async function besideAfterIn(store: IDBObjectStore, ask: AnyAsk): Promise<ActualBeside> {
+  const fetched = await bankFetchedIn(store, ask)
+  return { banktok: DB.Classifier.banktokOf(ask, fetched.bank), tracked: DB.Classifier.trackedOf(ask, fetched.tracked), read_tc: fetched.read_tc }
 }
 // --
 
@@ -84,7 +84,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doWatch
 
   // Each call is one IndexedDB transaction. It fetches the Things the ask depends on, classifies the ask against them, and
-  // on a write act writes the ask's records and reads them back, with the world after, before the transaction ends.
+  // on a write act writes the ask's records and reads them back, with the banktok after, before the transaction ends.
   protected async doGetThing(ask: GetAsk): Promise<GotActual> {
     return await DB.inOneStep(this.#shelf, 'readonly', async (store) => {
       const [raw, above] = await Promise.all([DB.rowAt(store, thingScopepathOf(ask)), aboveFetchedIn(store, ask)])
@@ -98,19 +98,19 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
       const actual = this.classifyWriteThing(ask, raw, above)
       if (! (actual.ok && DB.Classifier.isWriteAct(actual.act))) { return actual }
       store.put(ask.record, thingScopepathOf(ask))
-      const [written, after] = await Promise.all([DB.rowAt(store, thingScopepathOf(ask)), worldAfterIn(store, ask)])
+      const [written, after] = await Promise.all([DB.rowAt(store, thingScopepathOf(ask)), besideAfterIn(store, ask)])
       return { ...actual, ...after, record: DB.Classifier.writtenThingOf(ask, written) }
     })
     if (actual.ok && DB.Classifier.isWriteAct(actual.act)) {
-      this.#ring([{ scope: ask, received: { record: actual.record, world: actual.world } }])
+      this.#ring([{ scope: ask, received: { record: actual.record, banktok: actual.banktok } }])
     }
     return actual
   }
 
   protected async doListThings(ask: ListAsk): Promise<ListThingsActual> {
     return await DB.inOneStep(this.#shelf, 'readonly', async (store) => {
-      const [parent, children, world] = await Promise.all([DB.rowAt(store, thingScopepathOf(ask)), childrenIn(store, ask), worldFetchedIn(store, ask)])
-      return this.classifyListThings(ask, { parent, children }, world)
+      const [parent, children, bankFetched] = await Promise.all([DB.rowAt(store, thingScopepathOf(ask)), childrenIn(store, ask), bankFetchedIn(store, ask)])
+      return this.classifyListThings(ask, { parent, children }, bankFetched)
     })
   }
 
@@ -120,11 +120,11 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
       if (! (actual.ok && (actual.act === 'born'))) { return actual }
       for (const put of puts) { store.put(put.record, thingScopepathOf(put)) }
       const things = DB.Classifier.writtenRootsOf(puts, await rootsFetchedIn(store, ask))
-      return { ...actual, ...(await worldAfterIn(store, ask)), things }
+      return { ...actual, ...(await besideAfterIn(store, ask)), things }
     })
     if (actual.ok && (actual.act === 'born')) {
-      const { world } = actual
-      this.#ring(Object.values(actual.things).map((record) => ({ scope: ask, received: { record, world } })))
+      const { banktok } = actual
+      this.#ring(Object.values(actual.things).map((record) => ({ scope: ask, received: { record, banktok } })))
     }
     return actual
   }

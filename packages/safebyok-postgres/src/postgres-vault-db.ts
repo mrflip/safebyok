@@ -35,33 +35,30 @@ const postgresVaultDBOpts = objCheck(({ custom, fn }) => ({
 export function thingsChannelOf(userid: string): string { return `safebyok_things_${userid}` }
 
 // Each notice comes from the `tell_thing` function in `vault-functions.ts`: a JSON object with the Thing's scope under `at`,
-// the Thing under `thing` and the raw world under `world`, whichever fit.
+// the Thing under `thing` and the raw bank row under `bank`, whichever fit.
 
-/** A parsed notice: the labelpath of the Thing stored, and the Thing and raw world, where they fit. */
-type Told = { labelpath: string, thing?: unknown, world?: unknown }
+/** A parsed notice: the labelpath of the Thing stored, and the Thing and raw bank row, where they fit. */
+type Told = { labelpath: string, thing?: unknown, bank?: unknown }
 
 const toldCheck = objCheck(({ obj, str, unk }) => ({
   at:    obj({ userid: str, banklabel: str, labelpath: str }),
   thing: unk.optional(),
-  world: unk.optional(),
+  bank:  unk.optional(),
 }), { refusalkind: 'bad_record', extras: 'strip' })
 
 /** The notice in `text` of a Thing in `scope`'s bank, or null for anything else. */
 function toldOf({ userid, banklabel }: ThingWatchScope, text: string): Told | null {
   const toldReport = toldCheck.safeParse(jsonOrNull(text))
   if ((! toldReport.success) || (toldReport.data.at.userid !== userid) || (toldReport.data.at.banklabel !== banklabel)) { return null }
-  const { at: { labelpath }, thing, world } = toldReport.data
-  return { labelpath, thing, world }
+  const { at: { labelpath }, thing, bank } = toldReport.data
+  return { labelpath, thing, bank }
 }
 // --
 
 // == [What the database returns]: FetchedThing, trackParam, mayWrite, writtenActOf
 
-/** A get's row, unchecked: the Thing, null for none, the raw world, the nearest Thing stored above it, and how the world and root box compare with the ask's track. */
-type FetchedThing = { thing: unknown, world: WorldRow, ancestor: unknown, tracked: Classifier.TrackedFetched }
-
-/** The raw bank and main gate a statement returns. */
-type WorldRow = Pick<Classifier.WorldFetched, 'bank' | 'maingate'>
+/** A get's row, unchecked: the Thing, null for none, the raw bank, the nearest Thing stored above it, and how the bank, main gate and root box compare with the ask's track. */
+type FetchedThing = { thing: unknown, bank: unknown, ancestor: unknown, tracked: Classifier.TrackedFetched }
 
 /** The parameter that carries what `ask` tracks: its JSON. */
 function trackParam({ track }: AnyAsk): string { return JSON.stringify(track) }
@@ -113,12 +110,12 @@ export class PostgresVaultDB extends AdapterVaultDB {
   }
 
   // Made before the statement, whose snapshot is no earlier: Postgres before 18 has no UUID version 7 of its own.
-  /** The raw Thing at `ask`'s scope, null for none, its bank's raw world, the nearest Thing stored above it, and how the world and root box compare with what `ask` tracks, and when they were read. */
+  /** The raw Thing at `ask`'s scope, null for none, its bank's raw row, the nearest Thing stored above it, how the bank, main gate and root box compare with what `ask` tracks, and when they were read. */
   async #fetchThing(ask: GetAsk | WriteAsk): Promise<Classifier.AboveFetched & { thing: unknown }> {
     const { userid, banklabel, labelpath, modelkind } = ask
     const read_tc = readTcNow()
-    const { thing, world, ancestor, tracked } = await this.#firstRow<FetchedThing>(GetThingSql[modelkind], [userid, banklabel, labelpath, trackParam(ask)])
-    return { thing, ...world, ancestor, tracked, read_tc }
+    const { thing, bank, ancestor, tracked } = await this.#firstRow<FetchedThing>(GetThingSql[modelkind], [userid, banklabel, labelpath, trackParam(ask)])
+    return { thing, bank, ancestor, tracked, read_tc }
   }
   // --
 
@@ -136,18 +133,18 @@ export class PostgresVaultDB extends AdapterVaultDB {
     }
     const policies = (ask.modelkind === 'gate') ? [ask.options?.policies ?? []] : []
     const params   = [JSON.stringify(ask.record), JSON.stringify(ask.cited), trackParam(ask), ...policies]
-    // Whether it stored the record, the Thing as it now stands, the raw world, the nearest Thing stored above it, how the world compares with the track, and the verdicts
+    // Whether it stored the record, the Thing as it now stands, the raw bank, the nearest Thing stored above it, how the roots compare with the track, and the verdicts
     // of the checks the act tables cannot name: the stored born_at kept, the stored lifetok kept (the bank's alone), and the
     // storage policies met (the gate's alone). Each verdict is true where its check does not apply.
     const read_tc  = readTcNow()
     const written  = await this.#firstRow<FetchedThing & { ok: boolean, born_at_ok: boolean, lifetok_ok: boolean, policies_ok: boolean }>(WriteThingSql[ask.modelkind], params)
     if (written.ok) {
-      return { ok: true, act: writtenActOf(ask), world: Classifier.worldOf(ask, written.world), tracked: Classifier.trackedOf(ask, written.tracked), read_tc, record: Classifier.writtenThingOf(ask, written.thing) }
+      return { ok: true, act: writtenActOf(ask), banktok: Classifier.banktokOf(ask, written.bank), tracked: Classifier.trackedOf(ask, written.tracked), read_tc, record: Classifier.writtenThingOf(ask, written.thing) }
     }
     // Postgres wrote nothing. The act tables say why, of the revision cited; where they find a write, a verdict names the check it failed.
     const stored = Classifier.storedCitedOf(ask, written.thing)
     const act    = Classifier.writeActOf(ask, stored)
-    if (! Classifier.isWriteAct(act))  { return Classifier.unwrittenWriteOf(written.thing, { ask, act, above: { ...written.world, ancestor: written.ancestor, tracked: written.tracked, read_tc } }) }
+    if (! Classifier.isWriteAct(act))  { return Classifier.unwrittenWriteOf(written.thing, { ask, act, above: { bank: written.bank, ancestor: written.ancestor, tracked: written.tracked, read_tc } }) }
     if (! written.born_at_ok)          { Classifier.demandBornAtKept(ask, written.thing) }
     if (! written.lifetok_ok)          { Classifier.demandLifetokKept(ask, written.thing) }
     if (! written.policies_ok)         { Classifier.demandPolicies(ask, written.thing) }
@@ -159,8 +156,8 @@ export class PostgresVaultDB extends AdapterVaultDB {
     const { userid, banklabel, labelpath, modelkind } = ask
     const params = [userid, banklabel, labelpath, trackParam(ask)]
     const read_tc = readTcNow()
-    const { parent, children, world, tracked } = await this.#firstRow<Classifier.ThingsFetched & { world: WorldRow, tracked: Classifier.TrackedFetched }>(ListThingsSql[modelkind], params)
-    return this.classifyListThings(ask, { parent, children }, { ...world, tracked, read_tc })
+    const { parent, children, bank, tracked } = await this.#firstRow<Classifier.ThingsFetched & Omit<Classifier.BankFetched, 'read_tc'>>(ListThingsSql[modelkind], params)
+    return this.classifyListThings(ask, { parent, children }, { bank, tracked, read_tc })
   }
 
   protected async doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthBankActual> {
@@ -170,7 +167,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
     const written = await this.#firstRow<Omit<Classifier.BankRootsFetched, 'read_tc'> & { ok: boolean }>(BirthRootsSql, params)
     if (written.ok) {
       const things = Classifier.writtenRootsOf(puts, written)
-      return { ok: true, act: 'born', world: { ...things.bank, maingate: things.gate }, tracked: Classifier.trackedOf(ask, written.tracked), read_tc, things }
+      return { ok: true, act: 'born', banktok: things.bank.lifetok, tracked: Classifier.trackedOf(ask, written.tracked), read_tc, things }
     }
     // Postgres refused. The act tables name why: a live bank, or a root the birth would write over. Every other check is one a validated ask cannot fail.
     const unwritten = Classifier.unwrittenBirthOf(puts, { ...written, read_tc })
@@ -181,8 +178,8 @@ export class PostgresVaultDB extends AdapterVaultDB {
   protected async doGetWorld(ask: GetWorldAsk): Promise<GetWorldActual> {
     const { userid, banklabel } = ask
     const read_tc = readTcNow()
-    const { world, root, tracked } = await this.#firstRow<{ world: WorldRow, root: unknown, tracked: Classifier.TrackedFetched }>(GetWorldSql, [userid, banklabel, trackParam(ask)])
-    return this.classifyGetWorld(ask, { bank: world.bank, gate: world.maingate, root, tracked, read_tc })
+    const fetched = await this.#firstRow<Omit<Classifier.BankRootsFetched, 'read_tc'>>(GetWorldSql, [userid, banklabel, trackParam(ask)])
+    return this.classifyGetWorld(ask, { ...fetched, read_tc })
   }
 
   // The order and timing of an *adapter*'s notifications relative to reads, writes, or other notifications is unspecified, even for datastores that provide assurance.
@@ -219,14 +216,14 @@ export class PostgresVaultDB extends AdapterVaultDB {
 
   // == [Hearing]: #receivedOrNull
 
-  /** The Thing and world a notice carried, or fetched now if it carried less. Null if that fetch finds no Thing, or fails.
+  /** The Thing and banktok a notice carried, or fetched now if it carried less. Null if that fetch finds no Thing, or fails.
    * A failure a retry would not mend also hands `onFailed` its refusal.
    */
-  async #receivedOrNull(scope: ThingWatchScope, { labelpath, thing, world }: Told, onFailed: (news: VaultError) => void): Promise<Received | null> {
-    if ((thing !== undefined) && (world !== undefined)) { return { record: thing, world: Classifier.worldOf(scope, world as WorldRow) } }
+  async #receivedOrNull(scope: ThingWatchScope, { labelpath, thing, bank }: Told, onFailed: (news: VaultError) => void): Promise<Received | null> {
+    if ((thing !== undefined) && (bank !== undefined)) { return { record: thing, banktok: Classifier.banktokOf(scope, bank) } }
     try {
       const fetched = await this.#fetchThing(getAskOf({ ...scope, labelpath, track: VoidTrack, banktok: VoidLifeTok }))
-      return (fetched.thing === null) ? null : { record: fetched.thing, world: Classifier.worldOf(scope, fetched) }
+      return (fetched.thing === null) ? null : { record: fetched.thing, banktok: Classifier.banktokOf(scope, fetched.bank) }
     } catch (err) {
       // A notice is only a hint: if its Thing cannot be fetched for now, drop it.
       const refusal = refusalOf(err)

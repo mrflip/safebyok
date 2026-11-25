@@ -33,7 +33,7 @@ TH.describeVaultDBBattery('VaultMinder over a MemoryVaultDB', {
 })
 
 /** A refused answer carrying no record, named for the verb that answers it. */
-function stubAnswerOf(verbname: string): never { return { ok: false, ask: {}, verbname, world: null, dbhas: null, parentage: [], deltas: [], read_tc: readTcNow(), banktok: SX.VoidLifeTok, tracked: 'unread' } as never }
+function stubAnswerOf(verbname: string): never { return { ok: false, ask: {}, verbname, dbhas: null, parentage: [], deltas: [], read_tc: readTcNow(), banktok: SX.VoidLifeTok, tracked: 'unread' } as never }
 
 /** A vaultDB whose every verb answers {@link stubAnswerOf} its own name, and whose watch answers `stop`. */
 function stubVaultDBOf(stop: () => void) {
@@ -52,6 +52,9 @@ function sortedOverMemory(): { vaultDB: VaultMinder<TH.PlainThing>, inner: Memor
   const inner = new MemoryVaultDB()
   return { vaultDB: VaultMinder.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing }), inner }
 }
+
+/** The track of a sender that knows only the root box, at its revision. */
+const RootOnlyTrack = TH.trackOf(TH.bankShellOf(), TH.gateShellOf())
 
 /** A box's revisions: `two`, which a {@link TH.RefusingThing} takes, and `three` after it, which it refuses. */
 const Revs = (() => {
@@ -216,7 +219,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     await inner.tryBirthBank(TH.birthBankAskOf())
     for (const label of ['openai', 'anthropic']) { await inner.tryWriteThing(TH.birthAskOf(TH.boxThingOf(label), Shell.childCited(TH.Life0))) }
     const { events } = heardOf(vaultDB)
-    await vaultDB.tryListThings({ ...TH.listAskAt('box'), track: TH.trackOf() })
+    await vaultDB.tryListThings({ ...TH.listAskAt('box'), track: RootOnlyTrack })
     expect(shorthandsOf(events)).to.deep.equal([
       ...firstSeen('bank'), ...firstSeen('gate'), ...firstSeenSparse('box'), ...firstSeenSparse('box/anthropic'), ...firstSeenSparse('box/openai'),
     ])
@@ -301,7 +304,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await inner.tryBirthBank(TH.birthBankAskOf())
     const { events } = heardOf(vaultDB)
-    expect(await vaultDB.tryGetThing({ ...TH.getAskAt('box/openai'), track: TH.trackOf() })).to.deep.include({ act: 'gotvoid' })
+    expect(await vaultDB.tryGetThing({ ...TH.getAskAt('box/openai'), track: RootOnlyTrack })).to.deep.include({ act: 'gotvoid' })
     expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ['item', 'box/openai', 'void'], ['life', 'box/openai', 'died']])
     const unborn = sortedOverMemory()
     const unbornEvents = heardOf(unborn.vaultDB).events
@@ -355,7 +358,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
   })
 
   it("tells every listener's onBadNews of a record of an answer it refuses, and answers unchanged", async () => {
-    const theirs = { ok: true, act: 'born', ask: TH.ThingBank, world: null, banktok: SX.VoidLifeTok, tracked: { bank: 'same', gate: 'same', box: 'same' }, read_tc: readTcNow(), val: TH.gateThingOf({ lifepath: 'not a lifepath' }) }
+    const theirs = { ok: true, act: 'born', ask: TH.ThingBank, banktok: SX.VoidLifeTok, tracked: { bank: 'same', gate: 'same', box: 'same' }, read_tc: readTcNow(), val: TH.gateThingOf({ lifepath: 'not a lifepath' }) }
     const inner  = { ...stubVaultDBOf(noop), tryWriteThing: vi.fn<VaultDB['tryWriteThing']>(() => Promise.resolve(theirs as never)) }
     const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing })
     const listeners = [heardOf(vaultDB), heardOf(vaultDB)]
@@ -379,7 +382,7 @@ describe("VaultMinder's listeners, where each event came from and when it was re
     expect(VaultMinder.VaultDBSourcelabel).to.eq('vault_db')
   })
 
-  it("stamps an answer's events with its own banktok, never its ask's, and a received event's with its own, else the newest world's", async () => {
+  it("stamps an answer's events with its own banktok, never its ask's, and a received event's with its own, else the newest banktok heard", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     const { events } = heardOf(vaultDB)
     const { lifetok } = TH.bankThingOf()
@@ -556,6 +559,18 @@ describe("VaultMinder's listeners, of bad news", () => {
     vaultDB.receive(rungOf(Revs.two))
     expect(told.every(([, labelpath]) => labelpath === null)).to.equal(true)
     expect(told.length).to.be.greaterThan(0)
+  })
+  it("are told once of a root its Thing refuses, carried in an answer's tracked", async () => {
+    const { vaultDB, inner } = refusingOverQuietMemory()
+    await inner.tryBirthBank(TH.birthBankAskOf())
+    const gateTwo = TH.nextGateOf(TH.nextGateOf(TH.gateThingOf()))
+    const gate    = TH.nextGateOf(gateTwo)
+    cheatStored(inner, gate)
+    const told: [string, string | null][] = []
+    vaultDB.listen({ hear: noop, onBadNews: (news, labelpath) => { told.push([news.refusalkind, labelpath]) } })
+    await TH.expectGood(vaultDB.tryGetThing(TH.getAskAt('box')))
+    expect(gate.revseq).to.eq(TH.RefusingThing.RefusedRevseq)
+    expect(told).to.deep.equal([['unexpected_error', 'gate']])
   })
 })
 

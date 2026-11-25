@@ -11,7 +11,7 @@ import { describeVaultDBWrites } from './vaultdb-battery-writes'
 import { describeVaultDBLists } from './vaultdb-battery-lists'
 import { describeVaultDBBirths } from './vaultdb-battery-births'
 import { describeVaultDBWatch } from './vaultdb-battery-watch'
-import { describeVaultDBWorld } from './vaultdb-battery-world'
+import { describeVaultDBBanktok } from './vaultdb-battery-banktok'
 import { describeVaultDBTracked } from './vaultdb-battery-tracked'
 import { describeVaultDBGetWorld } from './vaultdb-battery-getworld'
 
@@ -110,7 +110,7 @@ export function describeVaultDBBattery<DBT extends BatteryVaultDB>(label: string
     describeVaultDBLists(world)
     describeVaultDBBirths(world)
     describeVaultDBGetWorld(world)
-    describeVaultDBWorld(world)
+    describeVaultDBBanktok(world)
     describeVaultDBTracked(world)
     if (world.watches) { describeVaultDBWatch(world) }
   })

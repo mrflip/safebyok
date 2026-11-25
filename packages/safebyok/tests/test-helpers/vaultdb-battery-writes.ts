@@ -1,5 +1,6 @@
 /** The battery's cases of tryGetThing and tryWriteThing, over the bank, the main gate and the boxes. */
 import { describe, expect, it } from 'vitest'
+import { SX } from 'safebyok-big/internals'
 import { expectBad, expectGood } from 'safebyok-big/testing'
 import * as Phrases from '../../src/phrases'
 import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
@@ -32,7 +33,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     it("answers gotvoid, with null and the root's shell as its dbhas, where none is stored at a root", async () => {
       const vaultDB = await fresh()
       const answer = await vaultDB.tryGetThing(getGateAskOf('nil'))
-      expect(answer).to.deep.include({ ok: true, act: 'gotvoid', val: null, dbhas: Shell.of(GateScope), world: null })
+      expect(answer).to.deep.include({ ok: true, act: 'gotvoid', val: null, dbhas: Shell.of(GateScope), banktok: SX.VoidLifeTok })
       expect(Shell.of(GateScope)).to.deep.include({ lifepath: Shell.VoidLifeseq })
     })
 
@@ -91,7 +92,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
   describe("tryWriteThing(ask), the plain path", () => {
     it("births the main gate over the shell, answering with the Thing written", async () => {
       const vaultDB = await fresh()
-      expect(await vaultDB.tryWriteThing(birthAskOf())).to.deep.include({ ok: true, act: 'born', val: gateThingOf(), world: null })
+      expect(await vaultDB.tryWriteThing(birthAskOf())).to.deep.include({ ok: true, act: 'born', val: gateThingOf(), banktok: SX.VoidLifeTok })
       expect(await gotAt(vaultDB, 'gate')).to.deep.equal(gateThingOf())
     })
 
@@ -427,13 +428,13 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
   })
 
   describe("the records its answers carry", () => {
-    it("are deeply frozen, a box's sidecar and the world's main gate among them", async () => {
+    it("are deeply frozen, a box's sidecar among them", async () => {
       const vaultDB = await bornBank()
       const [box] = await boxesBorn(vaultDB, boxThingOf('openai', { sidecar: { account: 'work' } }))
       const answer = await vaultDB.tryGetThing(getAskAt(box!.labelpath))
       const val = await expectGood(answer) as BoxRecord
       expect(val.sidecar).to.deep.equal({ account: 'work' })
-      expect([Object.isFrozen(val), Object.isFrozen(val.sidecar), Object.isFrozen(answer.world?.maingate)]).to.deep.equal([true, true, true])
+      expect([Object.isFrozen(val), Object.isFrozen(val.sidecar)]).to.deep.equal([true, true])
       const listed = await vaultDB.tryListThings(listAskOf({ ...RootScope, ...SenderKnows }))
       const kids = await expectGood(listed)
       expect([Object.isFrozen(kids.items), Object.isFrozen(listed.deltas[0])]).to.deep.equal([true, true])

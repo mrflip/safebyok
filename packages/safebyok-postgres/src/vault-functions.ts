@@ -94,7 +94,7 @@ BEGIN
     -- Another write may land between, so at worst these read newer rows, which a receiver orders by their revisions.
     world := ${VaultFunctionNames.world}(proposed.userid, proposed.banklabel);
     root  := ${VaultFunctionNames.root_box}(proposed.userid, proposed.banklabel);
-    PERFORM ${VaultFunctionNames.tell_thing}(thing, world);
+    PERFORM ${VaultFunctionNames.tell_thing}(thing, world->'bank');
     RETURN NEXT;  RETURN;
   END IF;
 
@@ -170,8 +170,7 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 -- How the bank and main gate in world, and the root box row root, compare with track, the revseq and lifepath an ask
--- tracks of each: under bank, gate and box, the JSON string 'same' where the row has both, else the row. Null where
--- track is null: the ask tracks nothing.
+-- tracks of each: under bank, gate and box, the JSON string 'same' where the row has both, else the row.
 CREATE OR REPLACE FUNCTION ${VaultFunctionNames.tracked}(world jsonb, root jsonb, track jsonb) RETURNS jsonb
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT jsonb_build_object(
@@ -182,18 +181,17 @@ LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
     'box',  CASE WHEN ((root->'revseq', root->'lifepath') = (track->'box'->'revseq', track->'box'->'lifepath'))
                  THEN '"same"'::jsonb ELSE root END
   )
-  WHERE track IS NOT NULL
 $$;
 
--- Notify the user's channel, safebyok_things_<userid>, of a Thing just stored, with its bank's world.
--- The notice is a JSON object with the Thing's scope under at, the Thing under thing, and the world under world.
--- Postgres refuses a notice of 8000 bytes or more. A notice that is too large drops the world first, then the Thing.
--- A listener that gets only a scope fetches the Thing and the world itself.
-CREATE OR REPLACE FUNCTION ${VaultFunctionNames.tell_thing}(thing jsonb, world jsonb) RETURNS void
+-- Notify the user's channel, safebyok_things_<userid>, of a Thing just stored, with its bank's row, null for none.
+-- The notice is a JSON object with the Thing's scope under at, the Thing under thing, and the bank row under bank.
+-- Postgres refuses a notice of 8000 bytes or more. A notice that is too large drops the bank row first, then the Thing.
+-- A listener that gets only a scope fetches the Thing and the bank row itself.
+CREATE OR REPLACE FUNCTION ${VaultFunctionNames.tell_thing}(thing jsonb, bank jsonb) RETURNS void
 LANGUAGE plpgsql AS $$
 DECLARE
   at     jsonb := jsonb_build_object('userid', thing->'userid', 'banklabel', thing->'banklabel', 'labelpath', thing->'labelpath');
-  notice text  := jsonb_build_object('at', at, 'thing', thing, 'world', world)::text;
+  notice text  := jsonb_build_object('at', at, 'thing', thing, 'bank', bank)::text;
 BEGIN
   IF octet_length(notice) >= 8000 THEN notice := jsonb_build_object('at', at, 'thing', thing)::text; END IF;
   IF octet_length(notice) >= 8000 THEN notice := jsonb_build_object('at', at)::text; END IF;
