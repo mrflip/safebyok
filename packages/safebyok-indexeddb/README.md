@@ -1,15 +1,15 @@
-# safebyok-idb-lean
+# safebyok-indexeddb
 
-A `VaultDB` for the new safebyok core that keeps a bank's Things in this browser's
+A `VaultDB` for safebyok that keeps a bank's Things in this browser's
 [IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API). The Things are what any backend would have, ciphertext and a few unencrypted fields; nothing in them unlocks a
 bank without its passphrase or passkey.
 
-Private, at 0.0.0, until it replaces `safebyok-indexeddb`.
+It replaces the IndexedDB store built on safebyok-big, now the private `safebyok-indexeddb-big`. Its database has another name, so it reads nothing that store wrote.
 
 ## Use
 
 ```ts
-import { IdbVaultDB } from 'safebyok-idb-lean'
+import { IdbVaultDB } from 'safebyok-indexeddb'
 
 const vaultDB = new IdbVaultDB({ dbName: 'acme' })
 ```
@@ -41,5 +41,5 @@ children of a Thing. A deleted Thing stays as its tombstone.
 ## Developing this package
 
 ```sh
-pnpm --filter safebyok-idb-lean test   # under Node, against fake-indexeddb
+pnpm --filter safebyok-indexeddb test   # under Node, against fake-indexeddb
 ```

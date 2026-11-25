@@ -1,9 +1,25 @@
 {
-  "name": "safebyok-idb-lean",
-  "private": true,
-  "version": "0.0.0",
-  "description": "IndexedDB storage for the new safebyok core: a vaultDB that keeps a bank's Things as ciphertext in this browser. Private until it replaces safebyok-indexeddb.",
+  "name": "safebyok-indexeddb",
+  "private": false,
+  "version": "0.5.0",
+  "description": "IndexedDB storage for safebyok: a vaultDB that keeps a bank's Things as ciphertext in this browser, each call one IndexedDB transaction.",
+  "keywords": [
+    "safebyok",
+    "indexeddb",
+    "vault",
+    "e2ee"
+  ],
   "license": "Apache-2.0",
+  "author": "Philip (flip) Kromer <flip@mrflip.com>",
+  "homepage": "https://github.com/mrflip/safebyok#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrflip/safebyok.git",
+    "directory": "packages/safebyok-indexeddb"
+  },
+  "bugs": {
+    "url": "https://github.com/mrflip/safebyok/issues"
+  },
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -16,7 +32,7 @@
     "build": "tsdown",
     "prebuild": "pnpm build:deps",
     "build:watch": "tsdown --watch",
-    "build:deps": "[ \"$SAFEBYOK_SKIP_BUILD_DEPS\" = 1 ] || SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok-idb-lean^...' build",
+    "build:deps": "[ \"$SAFEBYOK_SKIP_BUILD_DEPS\" = 1 ] || SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok-indexeddb^...' build",
     "lint": "eslint --cache --cache-strategy content --cache-location .eslintcache .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -24,11 +40,11 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "pretest:coverage": "pnpm build:deps",
-    "justify": "pnpm install && pnpm lint && pnpm typecheck && pnpm test && SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm build"
+    "justify": "pnpm install && pnpm lint && pnpm typecheck && pnpm test && SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm build",
+    "prepublishOnly": "node ../../scripts/require-pnpm.ts && pnpm justify"
   },
   "dependencies": {
-    "idb-keyval": "^6.3.0",
-    "safebyok": "workspace:*"
+    "idb-keyval": "^6.3.0"
   },
   "devDependencies": {
     "@arethetypeswrong/core": "^0.18.5",
@@ -49,11 +65,15 @@
     "eslint-plugin-unicorn": "^80.0.0",
     "fake-indexeddb": "^6.2.8",
     "publint": "^0.3.25",
+    "safebyok": "workspace:*",
     "tsdown": "^0.23.7",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.72.2",
     "vitest": "^5.1.0",
     "zod": "^4.6.7"
+  },
+  "peerDependencies": {
+    "safebyok": "workspace:^"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

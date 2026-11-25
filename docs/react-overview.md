@@ -1,6 +1,6 @@
 # React overview
 
-`safebyok-react-lean` is the React layer over `safebyok`'s core engine, with React and TanStack
+`safebyok-react` is the React layer over `safebyok`'s core engine, with React and TanStack
 Query v5 as peer dependencies. Each audience under *Supported Use Cases* has a guide: a pencil
 sketch of the target interface.
 
@@ -16,18 +16,18 @@ sketch of the target interface.
 The package has three layers, each built on the one before. A host stops at whichever suits it:
 the hooks alone for full control, the kit for a working screen in an afternoon.
 
-* **`hooks`** (`safebyok-react-lean`, in `src/giver/`): the low-level hooks, over the host's own
+* **`hooks`** (`safebyok-react`, in `src/giver/`): the low-level hooks, over the host's own
   React Query. `reactGiver(config)` is made once at module scope; its `Provider` says who is signed
   in. Beneath it: `useWorld` for the stage a screen switches on, `useBox`, `useBoxList` and `useGate`
   for stored records, `withWhisper` for the one place a secret is read, `putBoxOnce`, `delBoxOnce`
   and `putBoxAction` for writes, `useDraft` for an editor, and a mutation for each form verb
   (`useUnlock`, `useBirth`, `useReplacePassphrase`, `useAddPasskey`, `useRevokePasskey`).
-* **`parts`** (`safebyok-react-lean/parts`): best-practice components for one field each, with no
+* **`parts`** (`safebyok-react/parts`): best-practice components for one field each, with no
   opinion on layout. `PassphraseInput` and `WhisperInput` are uncontrolled inputs with Show / Hide;
   `WhisperText` reveals a field of a whisper on request; `WhisperMask` shows its mask, with the
   tail while unlocked; `SubmitButton` disables itself while its form's action runs. A part writes
   a secret into the page, never into React's state.
-* **`kit`** (`safebyok-react-lean/kit`): prefabricated forms for a fast start, assembled from the
+* **`kit`** (`safebyok-react/kit`): prefabricated forms for a fast start, assembled from the
   parts over the hooks. `CreateVaultForm`, `UnlockForm` and `UnlockDialog`, `ReplacePassphraseForm`,
   `AddPasskeyForm`, `RevokePasskeyForm` and `PasskeyUnlockButton`, with `useNewPassphrase`, the
   passkey helpers and `ModalDialog` for a host's own forms.
@@ -62,5 +62,5 @@ The hooks read records through TanStack Query, so a host on another data library
 by side: it adds a `QueryClientProvider`, and safebyok's records stay out of its own cache. Reading
 a box through SWR, Apollo's cache or a Redux store is not supported. A host whose backend speaks
 GraphQL stores its vault through that API with the GraphQL adapter,
-[`safebyok-graphql`](../packages/safebyok-graphql), which carries the storage interface over an
+[`safebyok-graphql-big`](../packages/safebyok-graphql-big), which carries the storage interface over an
 urql Client. It is built on `safebyok-big` today, and is not yet ported to the new core.
