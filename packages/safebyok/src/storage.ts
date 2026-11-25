@@ -1,6 +1,7 @@
 // safebyok/storage: what a storage adapter is written against. The vaultDB, where every kind is a Thing, its memory
-// store, the asks it is given and the answers it gives, and from safebyok-big the acts, throwers and checkers an adapter's
-// own code reaches for, re-exported so that each stays one binding across both packages.
+// store, the asks it is given and the answers it gives; the deviceDB, which keeps each bank's lease row, and its memory
+// store; and from safebyok-big the acts, throwers and checkers an adapter's own code reaches for, re-exported so that
+// each stays one binding across both packages.
 export { AdapterVaultDB } from './storage/adapter-vault-db'
 export { type Watcher, MemoryVaultDB } from './storage/memory-vault-db'
 export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
@@ -19,7 +20,13 @@ export {
 } from './shapes/shapes-asks'
 export * as Classifier from './storage/thing-classifier'
 export { VacantAgerank, readAtOf, readTcNow } from './storage/agerank'
-export { type BankScope, type BankStamp, type BoxStamp, type GateStamp, StampChecks } from './shapes/shapes-stamps'
+export {
+  type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseRecord, type LeaseRow, type LeaseStamp, type LeaseTombstone, type LiveLeaseRow, LeaseFormat, StampChecks,
+} from './shapes/shapes-stamps'
+// The deviceDB, which keeps each bank's lease row on this device, and its memory store. The IndexedDB store is on `safebyok/browser`.
+export { DeviceDB } from './storage/device-db'
+export { MemoryDeviceDB } from './storage/memory-device-db'
+export { type LeaseListener, DeviceDBChecks } from './shapes/shapes-device-db'
 export {
   type Actual, type ActualBeside, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GetWorldActual, type GetWorldAnswer, type GoodAnswer, type GotActual,
   type KidEntry, type Kids, type ListThingsActual, type ListThingsAnswer, type ListedBeside, type Received, type WriteThingAnswer, type WroteActual, ActualChecks,

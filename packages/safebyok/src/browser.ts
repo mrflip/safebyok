@@ -1,16 +1,20 @@
 // Kept off the front door (`safebyok`) so an app that derives, writes or judges some other way never ships the Argon2id code,
 // idb-keyval or zxcvbn (notes/good_bank_opts_are_in_browser.md).
-/** `safebyok/browser`: the key derivers and strength checker a browser app gives to `Device.make`, and the rest of `safebyok-big/browser`. */
+/** `safebyok/browser`: the key deriver, device database and strength checker a browser app gives to `Device.make`, and the rest of `safebyok-big/browser`. */
 
-import { browserOpts as bigBrowserOpts, type IdbDeviceDB, type IdbDeviceDBOpts, type KeyDeriver } from 'safebyok-big/browser'
+import { argon2idWebV1Deriver, zxcvbnStrengthChecker, type KeyDeriver } from 'safebyok-big/browser'
 import type { StrengthChecker } from './shapes/shapes-gateish'
+import { type IdbDeviceDB, type IdbDeviceDBOpts, idbDeviceDB, idbDeviceDBOpts } from './storage/idb-device-db'
 
 export {
-  Argon2idWebV1, IdbDeviceDB, MinPassphraseChars, MinZxcvbnScore, PassphraseSaltSize, argon2idWebV1Deriver, idbDeviceDB, makeArgon2idDeriver, parseKeyDeriverSpec,
-  zxcvbnStrengthChecker, type Argon2idKeyDeriver, type IdbDeviceDBOpts, type KeyDeriver, type KeyDeriverSpec,
+  Argon2idWebV1, MinPassphraseChars, MinZxcvbnScore, PassphraseSaltSize, argon2idWebV1Deriver, makeArgon2idDeriver, parseKeyDeriverSpec,
+  zxcvbnStrengthChecker, type Argon2idKeyDeriver, type KeyDeriver, type KeyDeriverSpec,
 } from 'safebyok-big/browser'
-// Big's browser entry exports its own `StrengthChecker` and `BrowserOpts` as well; the ones `Device.make` takes are `safebyok`'s.
+// Big's browser entry exports its own `StrengthChecker`, `BrowserOpts`, `browserOpts` and device database as well; the ones `Device.make` takes are `safebyok`'s.
 export type { StrengthChecker } from './shapes/shapes-gateish'
+export { IdbDeviceDB, LeaseDBVersion, idbDeviceDB, idbDeviceDBOpts, leaseBellnameOf, leaseDatabasenameOf, type IdbDeviceDBOpts } from './storage/idb-device-db'
+
+// == [The bag]: BrowserOpts, bagsByDbName, browserOpts
 
 /** The `Device.make` options {@link browserOpts} answers, to spread in beside your own. `Device.make` ignores the `deviceDB`. */
 export interface BrowserOpts {
@@ -22,9 +26,20 @@ export interface BrowserOpts {
   readonly strengthChecker: StrengthChecker
 }
 
-// safebyok-big's own, typed with this package's strength checker: big types the bag's checker with big's scope, which names
-// the user `user_id`, but the checker in it, zxcvbnStrengthChecker, takes this package's scope as well (tests/browser.test.ts).
+// One bag per dbName, so a React host may call browserOpts() during render: a provider that reopens its bank whenever an
+// option changes identity would loop on a fresh deviceDB each render.
+/** The bag answered for each dbName so far. */
+const bagsByDbName = new Map<string | undefined, BrowserOpts>()
+
 /** The browser's `keyDeriver`, `deviceDB` and `strengthChecker` in a frozen bag, to spread into `Device.make`.
  * The same `dbName` gets the same bag, so a React host may call it during render.
  */
-export const browserOpts = bigBrowserOpts as unknown as (opts?: IdbDeviceDBOpts) => BrowserOpts
+export function browserOpts(opts: IdbDeviceDBOpts = {}): BrowserOpts {
+  const { dbName } = idbDeviceDBOpts.parse(opts, { where: "In browserOpts's options" })
+  const kept = bagsByDbName.get(dbName)
+  if (kept !== undefined) { return kept }
+  const bag: BrowserOpts = Object.freeze({ keyDeriver: argon2idWebV1Deriver, deviceDB: idbDeviceDB({ dbName }), strengthChecker: zxcvbnStrengthChecker })
+  bagsByDbName.set(dbName, bag)
+  return bag
+}
+// --
