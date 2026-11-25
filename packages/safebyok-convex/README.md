@@ -91,6 +91,10 @@ its tombstone.
 **How big a bank can be.** `watchThings` reads every Thing of the bank each time one changes, within a Convex query's
 limits (16 MiB read), so a bank past that makes its watch go quiet.
 
+**What a sidecar may hold.** Convex refuses an object key, anywhere in a stored Thing, that starts with `$`, holds a
+character outside printable ASCII, or runs past 1024 characters. A box whose sidecar has such a key is never stored:
+its put refuses `storage_unavailable`, every time.
+
 **Upgrading.** Until 1.0 there is no migration. A release that changes the table says so in its changelog. Coming from
 `safebyok-convex-big`, the old component's tables (`safebyok_banks`, `safebyok_gates`, `safebyok_vaults`,
 `safebyok_boxes`, `safebyok_tallies`) are not read: export what you need, then clear them on the dashboard's Data page
