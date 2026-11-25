@@ -8,10 +8,11 @@ TH.describeDeviceDBLeaseBattery('MemoryDeviceDB', {
   plant:        (deviceDB, scope, raw) => { deviceDB._cheat_rows().set(MemoryDeviceDB.ckeyOf(scope), raw) },
 })
 
-/** A MemoryDeviceDB whose every peek and stow throws an error that quotes a lease row. */
+/** A MemoryDeviceDB whose every peek, stow and listen throws an error that quotes a lease row. */
 class FailingDeviceDB extends MemoryDeviceDB {
   protected override doPeekLease(): never { throw new TypeError('lease_key quoted here') }
   protected override doStowLease(): never { throw new TypeError('lease_key quoted here') }
+  protected override doListen(): never { throw new TypeError('lease_key quoted here') }
 }
 
 describe("MemoryDeviceDB, what only a store in memory can show", () => {
@@ -47,4 +48,9 @@ describe("DeviceDB, what a store throws", () => {
       expect(refusal.message).to.include(oplabel).and.include('TypeError').and.not.include('lease_key')
     })
   }
+
+  it("refuses a listen that throws as storage_unavailable, keeping only the name", () => {
+    const refusal = TH.expectSyncRefusal(() => new FailingDeviceDB().listen(() => undefined), 'storage_unavailable')
+    expect(refusal.message).to.include('listen').and.include('TypeError').and.not.include('lease_key')
+  })
 })

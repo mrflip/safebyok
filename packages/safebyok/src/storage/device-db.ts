@@ -44,10 +44,12 @@ export abstract class DeviceDB {
    */
   listen(listener: LeaseListener): () => void {
     const { listener: heard } = DeviceDBChecks.listenArgs.parse({ listener })
-    return this.doListen((rung) => {
-      const scopeReport = StampChecks.bankScope.safeParse(rung)
-      if (scopeReport.success) { heard(scopeReport.data) }
-    })
+    try {
+      return this.doListen((rung) => {
+        const scopeReport = StampChecks.bankScope.safeParse(rung)
+        if (scopeReport.success) { heard(scopeReport.data) }
+      })
+    } catch (err) { throw refusalOf(err, 'listen') }
   }
   // --
 
