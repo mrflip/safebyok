@@ -14,7 +14,6 @@ import { PendingWorld, SignedOutWorld, WorldChecks, isRootShelf } from '../shape
 import type { BirthCleartexts, BirthDna, BirthGatingFriend, GateRevisionedStamp, LeaseGate, LeaseShellScope, WorldGateFriend } from '../shapes/shapes-gateish'
 import { type MaskedViewLease, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import type * as Sealers from '../shapes/shapes-sealers'
-import type { LiveOf } from '../shapes/shapes-sealers'
 import { type BankStamp, type LeaseLoggable, type LeaseRecord, StampChecks, leaseScopeOf } from '../shapes/shapes-stamps'
 import { type BankRecord, type BoxRecord, type BulletproofCallback, type GateRecord, type Sparse, type ThingRecord, type Thingkind, type VoidSentinel, PerKindChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
@@ -419,7 +418,7 @@ export class World {
 
   /** Attach the Lease of `stored` where it can unlock the bank, or else drop this world's lease where it has one, announcing either */
   #takeUp(stored: LeaseRecord): void {
-    if (this.#canUnlock(stored)) {
+    if ((stored.am === 'a') && this.#canUnlock(stored)) {
       this.#attachLease(Lease.make(stored, { gate: this.#leaseGateOf(this.bankStamp) }))
       this.#device.announce({ kind: 'lease_taken_up' })
     } else if (this.isUnlocked) {
@@ -429,7 +428,7 @@ export class World {
   }
 
   /** True of a live lease record not past its end, granted under the main gate's life */
-  #canUnlock(stored: LeaseRecord): stored is LiveOf<LeaseRecord> {
+  #canUnlock(stored: LeaseRecord): boolean {
     const { gate } = this
     return (stored.am === 'a') && (Clock.nowMillis() < stored.ends_at) && (stored.gate_labelpath === gate?.labelpath) && (stored.gate_lifeseq === gate.lifeseq)
   }
