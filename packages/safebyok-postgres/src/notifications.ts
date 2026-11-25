@@ -19,7 +19,7 @@ export function thingsChannelOf(userid: string): string { return `safebyok_thing
 /** A notification of a write: the labelpath of the Thing written, when Postgres read it, and the Thing and its bank's raw row where they fit. */
 export type ThingNotification = { labelpath: string, read_tc?: unknown, thing?: unknown, bank?: unknown }
 
-const thingNotificationCheck = objCheck(({ obj, str, unk }) => ({
+const thingNotification = objCheck(({ obj, str, unk }) => ({
   at:      obj({ userid: str, banklabel: str, labelpath: str }),
   read_tc: unk.optional(),
   thing:   unk.optional(),
@@ -28,7 +28,7 @@ const thingNotificationCheck = objCheck(({ obj, str, unk }) => ({
 
 /** The notification in `text` of a write in `scope`'s bank, or null for a write in another bank or a text that is no notification. */
 export function thingNotificationOf({ userid, banklabel }: ThingWatchScope, text: string): ThingNotification | null {
-  const notificationReport = thingNotificationCheck.safeParse(jsonOrNull(text))
+  const notificationReport = thingNotification.safeParse(jsonOrNull(text))
   if (! notificationReport.success) { return null }
   const { at, ...carried } = notificationReport.data
   if ((at.userid !== userid) || (at.banklabel !== banklabel)) { return null }
