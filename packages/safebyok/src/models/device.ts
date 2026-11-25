@@ -197,7 +197,7 @@ export class Device {
   // once, as bad news told by the VaultMinder; sign-in then reports only what the roots amount to: all three live, the
   // bank unborn, or broken. A failure to fetch them, once a bank is up from what was restored, is no caller's to hear.
   // The VaultMinder is made right before the vault TSQ and the world listen to it, with nothing awaited between: its
-  // Things remember what they take, so a record it took with no one listening would reach them later only as a repeat,
+  // cars remember what they take, so a record it took with no one listening would reach them later only as a repeat,
   // which it drops. The world takes the roots shelved before the vaultDB is asked. The vault is made last, on everything
   // made before it.
   /** Start the signed-in user's bank over a VaultMinder of it: from the roots shelved, where there are any, and from the three roots the vaultDB answers. */
@@ -209,6 +209,8 @@ export class Device {
       this.#vault = Vault.make(this.#world, this.#vaultTSQ)
       const answer = await vaultMinder.tryGetWorldOnce()
       if (! answer.ok) { throw answer.err }
+      // A root void at signin is no newer than the shell its Thing holds, so no subscriber hears it: the world is told here.
+      this.#world.align()
       if (! (this.#world.areRootsLive || isUnbornIn(answer.val))) { throw Throwers.bankRootsMissing() }
     } catch (err) {
       if (this.bank !== null) {
@@ -283,7 +285,7 @@ export class Device {
     if (this.#userid === null) { return EmptyMaskedView }
     const { bank, gate, rootBox } = this.#world
     return {
-      bankTSQ:  [bank, gate, rootBox].filter((thing) => thing !== null).map((thing) => ({ ...thing.inspectable(), lastRefusalkind: this.#world.vaultMinder?.carAt(thing)?.lastErr?.refusalkind ?? null })),
+      bankTSQ:  [bank, gate, rootBox].filter((thing) => thing !== null).flatMap((thing) => this.#world.vaultMinder?.carAt(thing)?.inspectable() ?? []),
       vaultTSQ: this.#vaultTSQ?.inspectable() ?? [],
       lease:    this.#world.inspectable(),
     }

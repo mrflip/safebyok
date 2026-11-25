@@ -223,14 +223,14 @@ function lifeOf(cache: CachePrecis): number | 'vacant' {
 
 /** The précis of what `world` shows of the box, from its Thing and its item, and whether the root box's listing is invalidated or reset. */
 function cachePrecisOf(world: TSQWorld<MemoryVaultDB>): CachePrecis {
-  const thing   = world.sorted.thingAt(TH.BoxScope)
+  const car     = world.sorted.carAt(TH.BoxScope)
   const item    = itemQueryAt(world)?.state.data as ThingRecord | null | undefined
-  const held    = thing?.pickle()
+  const held    = car?.thing.pickle()
   const listing = listQueryAt(world)?.state
   return {
     ...((item !== undefined) && { item: (item === null) ? null : precisOf(item) }),
-    ...((thing !== undefined) && (thing.agekind !== 'here') && { soon: precisOf(thing.citable) }),
-    ...((item === null) && (thing?.agekind === 'here') && (held !== undefined) && Thing.isGone(held) && { dead: precisOf(held) }),
+    ...((car !== undefined) && (car.agekind !== 'here') && { soon: precisOf(car.citable) }),
+    ...((item === null) && (car?.agekind === 'here') && (held !== undefined) && Thing.isGone(held) && { dead: precisOf(held) }),
     ...((listing !== undefined) && (listing.isInvalidated || (listing.data === undefined)) && { isListingStale: true }),
   }
 }
@@ -238,15 +238,15 @@ function cachePrecisOf(world: TSQWorld<MemoryVaultDB>): CachePrecis {
 // An item's staleness depends on its route only through `isInvalidated`, which a fetch clears: an observer's word is the rule's.
 /** Each way `world`'s item breaks the rules an item with data keeps: it deeply equals its Thing's record, and is stale just while the Thing is not here. */
 function endFaultsOf(world: TSQWorld<MemoryVaultDB>): string[] {
-  const thing = world.sorted.thingAt(TH.BoxScope)
-  const item  = itemQueryAt(world)?.state.data
-  if ((item === undefined) || (thing === undefined)) { return [] }
+  const car  = world.sorted.carAt(TH.BoxScope)
+  const item = itemQueryAt(world)?.state.data
+  if ((item === undefined) || (car === undefined)) { return [] }
   const isStale  = isObservedStale(world.queryClient, BoxKey)
-  const isHeld   = (item === null) || isEqual(item, thing.pickle())
-  const isRuled  = isStale === (thing.agekind !== 'here')
+  const isHeld   = (item === null) || isEqual(item, car.thing.pickle())
+  const isRuled  = isStale === (car.agekind !== 'here')
   return [
     ...(isHeld ? [] : ["the item differs from its Thing's record"]),
-    ...(isRuled ? [] : [`the item is ${isStale ? 'stale' : 'fresh'} while its Thing is ${thing.agekind}`]),
+    ...(isRuled ? [] : [`the item is ${isStale ? 'stale' : 'fresh'} while its Thing is ${car.agekind}`]),
   ]
 }
 

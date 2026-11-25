@@ -14,8 +14,8 @@ import type { VaultDB } from '../storage/vault-db'
 
 // == [Shapes]: ReceivingThing, ThingMaker, CarWorld, ThingCarOpts, VaultMinderOpts, VaultMinderListener, PutOnceArgs, DelOnceArgs
 
-/** What a {@link VaultMinder} reads of each Thing it keeps. */
-export type ReceivingThing = Pick<Thing<ThingRecord, unknown, unknown, Adoptable<ThingRecord>>, 'receive' | 'agerank' | 'agekind' | 'citable' | 'read_at' | 'pickle'>
+/** What a {@link ThingCar} asks of the Thing it carries. */
+export type ReceivingThing = Pick<Thing<ThingRecord, unknown, unknown, Adoptable<ThingRecord>>, 'receive' | 'take' | 'publish' | 'pickle' | 'userid' | 'banklabel' | 'labelpath'>
 
 /** Make the Thing at `shell`'s labelpath, holding `shell`, which has received nothing. */
 export type ThingMaker<ThingT extends ReceivingThing = ReceivingThing> = (shell: VoidSentinel) => ThingT

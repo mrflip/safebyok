@@ -122,7 +122,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   /** The record of the revision after `cited`, written now, with `wayins` in place of its own. */
   static makeNextRecord(cited: GateRecord, wayins: GateDna['wayins']): GateRecord {
     const { cited: citedRecord, wayins: nextWayins } = Checks.nextRecordArgs.parse({ cited, wayins })
-    return GateChecks.record.parse({ ...citedRecord, revtok: Crypto.randomId(), revseq: citedRecord.revseq + 1, written_at: Clock.nowMillis(), wayins: wayinsOf(nextWayins) })
+    return GateChecks.record.parse({ ...citedRecord, ...super.revisionAfter(citedRecord, Clock.nowMillis()), wayins: wayinsOf(nextWayins) })
   }
   // --
 

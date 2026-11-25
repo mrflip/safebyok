@@ -117,4 +117,7 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
 * **A host's query defaults can override the vault TSQ's.** TanStack merges defaults in registration order, so a host's
   `setQueryDefaults(['sok'], …)` made after the device wins over the items' `queryFn`, `staleTime` and `retry: false`.
 * **Pass-throughs to drop?** Gate's and Bank's to the world; `Bank.hostVault`, no caller; `Device.#endCause`, never set.
-
+* **A bare-record form of `make`.** `ThingCar.make`, `world.makeThing` and each kind's `make` take a Thing, a shell or
+  an item event, so that no read time is invented for a record. Let them take a bare record too, `Thing.make(record, {
+  world })`: the "constructor does not assume this weird way of doing it". Open: a bare record has no `read_tc`, and the
+  car's `VacantReadTc`, which sorts below every read, is the honest one for it (the Coach, 2026-11-25, who builds it).

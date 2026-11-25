@@ -247,7 +247,6 @@ describe("a gate over the shell or a tombstone", () => {
     expect(Object.hasOwn(gate, 'wayins')).to.be.false
     expect(gate.wayins).to.be.undefined
     expect(gate.scope).to.deep.equal(TH.GateScope)
-    expect(gate.citable).to.deep.equal(Thing.sparseOf(TH.gateShellOf()))
     expect(gate.modelkind).to.eq('gate')
   })
 
@@ -276,7 +275,7 @@ describe("a gate over the shell or a tombstone", () => {
   it("receives a whole record over the shell, and then answers its wayins, frozen", async () => {
     const gate = makeGate(TH.gateShellOf())
     const record = await gateRecordOf(true)
-    expect(gate.receive(TH.thingEventOf(record)).length).to.be.greaterThan(0)
+    expect(gate.receive(TH.thingEventOf(record))).to.eq(true)
     expect(gate.stamp).to.deep.equal(TH.WorldGateStamp)
     expect(gate.main.pickle()).to.deep.equal(record.wayins.main)
     expect(gate.passkey0!.pickle()).to.deep.equal(record.wayins.passkey0)

@@ -20,7 +20,7 @@ import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type ReadTc, type SeenThing, type VaultEvent, type VaultItemEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { type EpochMillis, type Lifetok, Labelpath } from '../shapes/primitives'
 import { peekRoots, stowRoots } from '../minding/root-shelf'
-import { VacantAgerank, itemSeenOf } from '../storage/agerank'
+import { itemEventOf } from '../storage/agerank'
 import type { VaultMinder } from '../minding/vault-minder'
 import { type ReceivingThing, isVaultMinder } from '../shapes/shapes-vault-minder'
 import * as Phrases from '../phrases'
@@ -476,11 +476,7 @@ function banktokOf(shelved: unknown): Lifetok {
 
 /** The `item` event of `record`, a root read from a root shelf, read at its `read_tc` in the bank of `banktok`, with the vacant agerank */
 function shelvedEventOf({ record, read_tc }: Readonly<{ record: SeenThing, read_tc: ReadTc }>, banktok: Lifetok): VaultEvent {
-  const { userid, banklabel, labelpath } = record
-  return {
-    eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: VacantAgerank, agerankWas: VacantAgerank,
-    sourcelabel: ShelvedSourcelabel, read_tc, banktok, ...itemSeenOf(record),
-  }
+  return itemEventOf(record, { sourcelabel: ShelvedSourcelabel, read_tc, banktok })
 }
 
 /** The class a world makes a Thing of one kind from, as {@link World.makeThing} calls it. */

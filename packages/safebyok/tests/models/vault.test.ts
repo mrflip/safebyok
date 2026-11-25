@@ -11,6 +11,7 @@ import { type BoxLabelpath, Lifeseq } from '../../src/shapes/primitives'
 import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
 import { Thing } from '../../src/models/thing'
+import type { ThingCar } from '../../src/minding/thing-car'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { GetAsk } from '../../src/shapes/shapes-asks'
 import { refusedAnswerOf } from '../../src/storage/refused-answer'
@@ -40,6 +41,9 @@ function boxAt(vault: Vault): Box | undefined {
   const thing = vault.bank.device.world.demandVaultMinder().thingAt(openaiScopeOf(vault.bank))
   return (thing instanceof Box) ? thing : undefined
 }
+
+/** The car `vault`'s device's world keeps at {@link Openai}, or undefined for none. */
+function carAt(vault: Vault): ThingCar | undefined { return vault.bank.device.world.demandVaultMinder().carAt(openaiScopeOf(vault.bank)) }
 
 /** What `vault`'s device's QueryClient keeps in the item of {@link Openai}. */
 function itemAt(vault: Vault): unknown {
@@ -324,7 +328,7 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
     const stored = await vault.sealBox(first, {}, { whisper: TH.Whisper })
     rowsOf(bank).set(Openai, stored)
     await vaultTSQ.listOnce('box')
-    expect(boxAt(vault)!.citable).to.include({ revtok: stored.revtok })
+    expect(carAt(vault)!.citable).to.include({ revtok: stored.revtok })
     await TH.expectRefusal(vault.putBoxOnce(Openai, {}, { whisper: TH.Whisper }), 'bad_record')
     expect(await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })).to.include({ revseq: 2 })
   })
@@ -457,7 +461,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const stored = await vault.sealBox(first, {}, { whisper: { apiKey: 'sk-test-1111' } })
     rowsOf(bank).set(Openai, stored)
     await vaultTSQ.listOnce('box')
-    expect(boxAt(vault)!.citable).to.include({ revtok: stored.revtok })
+    expect(carAt(vault)!.citable).to.include({ revtok: stored.revtok })
     expect(await vault.withWhisper(Openai, ({ whisper, revtok }) => ({ whisper, revtok }))).to.deep.equal({ whisper: { apiKey: 'sk-test-1111' }, revtok: stored.revtok })
   })
 
@@ -466,7 +470,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const other = await buildVaultBeside(bank)
     await other.bank.device.vaultTSQ.listOnce('box')
-    expect(boxAt(other)).to.include({ agekind: 'bare' })
+    expect(carAt(other)?.agekind).to.eq('bare')
     expect(await other.withWhisper(Openai, ({ whisper }) => whisper)).to.deep.equal(TH.Whisper)
   })
 
@@ -478,7 +482,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     await vaultTSQ.listOnce('box')
     rowsOf(bank).set(Openai, first)
     expect(await vault.withWhisper(Openai, ({ whisper, revtok }) => ({ whisper, revtok }))).to.deep.equal({ whisper: TH.Whisper, revtok: first.revtok })
-    expect(boxAt(vault)!.citable).to.include({ revtok: stored.revtok })
+    expect(carAt(vault)!.citable).to.include({ revtok: stored.revtok })
   })
 
   it("unseals the revision it holds where its get is refused", async () => {
@@ -507,7 +511,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     rowsOf(bank).set(Openai, stored)
     await vaultTSQ.listOnce('box')
     refuseGets(bank)
-    expect(boxAt(vault)).to.include({ agekind: 'bare' })
+    expect(carAt(vault)?.agekind).to.eq('bare')
     const fn = vi.fn()
     await TH.expectRefusal(vault.withWhisper(Openai, fn), 'stale_read')
     expect(fn).not.toHaveBeenCalled()
@@ -523,7 +527,8 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     rowsOf(bank).set(Openai, tombstone)
     const fn = vi.fn()
     await TH.expectRefusal(vault.withWhisper(Openai, fn), 'stale_read')
-    expect(boxAt(vault)).to.include({ agekind: 'bare', revtok: tombstone.revtok })
+    expect(boxAt(vault)).to.include({ revtok: tombstone.revtok })
+    expect(carAt(vault)?.agekind).to.eq('bare')
     const itemKey = VaultTSQ.itemQueryKeyOf(openaiScopeOf(bank))
     expect([itemAt(vault), bank.device.vaultTsqClient.getQueryState(itemKey)?.isInvalidated]).to.deep.equal([null, true])
     expect(fn).not.toHaveBeenCalled()

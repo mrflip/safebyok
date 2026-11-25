@@ -3,7 +3,7 @@
 import { deepFreeze, noop } from 'es-toolkit'
 import { type EX, Errors, Outcome, SX, type Helpers } from 'safebyok-big/internals'
 import { bulletproofHandlerOf } from '../helpers/bulletproof'
-import { Labelpath, type Lifetok } from '../shapes/primitives'
+import type { Lifetok } from '../shapes/primitives'
 import type { ThingRecord, VoidSentinel } from '../shapes/shapes-thing'
 import type { TombstoneOf } from '../shapes/shapes-sealers'
 import { type VaultEvent, type VaultItemEvent, VaultDBSourcelabel } from '../shapes/shapes-vault-event'
@@ -14,13 +14,13 @@ import {
   type Actual, type ActualBeside, type Answer, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type GetThingAnswer, type GetWorldActual, type GetWorldAnswer, type GotActual, type ListThingsActual, type ListThingsAnswer,
   type Received, type WriteThingAnswer, type WroteActual, ActualChecks,
 } from '../shapes/shapes-answers'
-import { VacantAgerank, itemSeenOf, readTcNow } from './agerank'
+import { itemEventOf, readTcNow } from './agerank'
 import type { AboveFetched, BankFetched, BankRootsFetched, ThingsFetched } from './thing-classifier'
 import * as Classifier from './thing-classifier'
 import type { VaultDB } from './vault-db'
 import * as Throwers from '../refusals/throwers'
 
-// == [Answers]: besideOf, answerOf, frozenAnswerOf, itemEventOf
+// == [Answers]: besideOf, answerOf, frozenAnswerOf, noticeOf
 
 // A concrete adapter's report is the module's entry: what the answer carries of it beside the record is read through its check.
 /** What the answer to `actual` carries beside its `val` or `dbhas`: its `banktok`, its `tracked` and its `read_tc`.
@@ -62,11 +62,9 @@ function frozenAnswerOf<AnswerT extends { ask: unknown, err?: unknown }>(answer:
 }
 
 /** The `item` notice for `record`, read now, from this vaultDB, with the vacant agerank, and the lifetok of `record` where it is the bank, else `received` */
-function itemEventOf(record: ThingRecord, received: Lifetok): VaultItemEvent {
-  const { userid, banklabel, labelpath } = record
+function noticeOf(record: ThingRecord, received: Lifetok): VaultItemEvent {
   const banktok = ('lifetok' in record) ? record.lifetok : received
-  const unsorted = { agerank: VacantAgerank, agerankWas: VacantAgerank, banktok, sourcelabel: VaultDBSourcelabel, read_tc: readTcNow() }
-  return Object.freeze({ eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), ...unsorted, ...itemSeenOf(record) })
+  return itemEventOf(record, { sourcelabel: VaultDBSourcelabel, read_tc: readTcNow(), banktok })
 }
 // --
 
@@ -169,7 +167,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     return this.doWatch(bankScope, ({ record, banktok }) => {
       let event: VaultItemEvent
       try {
-        event = itemEventOf(deepFreeze(Classifier.watchedThingOf(bankScope, record)), banktok)
+        event = noticeOf(deepFreeze(Classifier.watchedThingOf(bankScope, record)), banktok)
       } catch (err) {
         onBadNews(Outcome.storageRefusalOf(err))
         return

@@ -70,6 +70,18 @@ describe("Shell.Cited and Shell.childCited(parentLifepath)", () => {
   })
 })
 
+describe("Shell.citedInParentLivesOf(seen)", () => {
+  it("cites a root's shell for a root's record, and a child's shell in its parent's life for a child's", () => {
+    expect(Shell.citedInParentLivesOf(TH.rootBoxOf())).to.equal(Shell.Cited)
+    const box = TH.boxThingOf('openai', { lifepath: `${Lifeseq.ofLifenum(2)}/${Life0}` })
+    expect(Shell.citedInParentLivesOf(box)).to.deep.equal(Shell.childCited(Lifeseq.ofLifenum(2)))
+  })
+
+  it("refuses a lifepath that is none", () => {
+    TH.expectSyncRefusal(() => Shell.citedInParentLivesOf({ lifepath: 'box' }), 'bad_record')
+  })
+})
+
 describe("Shell.of(scoped, parent?)", () => {
   const Void = { revtok: Shell.Cited.revtok, revseq: -1, am: 'x', lifeseq: Shell.VoidLifeseq, born_at: SX.VoidTime, written_at: SX.VoidTime } as const
   const rootShell = { ...TH.RootScope, label: 'box', fmt: ThingFormat, ...Void, lifepath: Shell.VoidLifeseq } as const

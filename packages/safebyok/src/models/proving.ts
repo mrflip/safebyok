@@ -1,3 +1,4 @@
+import { isEqual } from 'es-toolkit'
 import type { Deriver } from 'safebyok-big/internals'
 import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { Lease } from './lease'
@@ -326,7 +327,12 @@ async function passphraseKeyOf(keyDeriver: GuardedKeyDeriver, passphrase: GX.Pas
 }
 // --
 
-// == [Checks]: Checks
+// == [Checks]: isStoredOfHeader, Checks
+
+/** True when `stored` is null, for a new wayin, or a wayin whose header is `header`, and so of its kind. */
+function isStoredOfHeader({ header, stored }: { header: WayinHeader, stored: Wayin | null }): boolean {
+  return stored === null || isEqual(stored.toJSON(), header)
+}
 
 // Defined here, not with the shapes: they name a model class.
 // The builders' checks are big's, over the lean core's stamps and the lean core's strength checker.
@@ -335,8 +341,8 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => {
   // A wayin's header has a check of its own kind, so each kind's parts are checked apart.
   const provingParts = obj({ bankStamp: BankChecks.stamp, gateStamp: GateChecks.stamp, stored: custom<Wayin>((val) => val instanceof Wayin, Phrases.WayinExpected).nullable() })
   return {
-    passphraseMakeArgs:   obj({ parts: provingParts.extend({ header: WayinChecks.passphraseWayinHeader.strict() }).strict(), opts: GateishChecks.provingOpts }),
-    passkeyMakeArgs:      obj({ parts: provingParts.extend({ header: WayinChecks.passkeyWayinHeader.strict() }).strict(), opts: GateishChecks.provingOpts }),
+    passphraseMakeArgs:   obj({ parts: provingParts.extend({ header: WayinChecks.passphraseWayinHeader.strict() }).strict().refine(isStoredOfHeader, Phrases.WayinOfOtherHeader), opts: GateishChecks.provingOpts }),
+    passkeyMakeArgs:      obj({ parts: provingParts.extend({ header: WayinChecks.passkeyWayinHeader.strict() }).strict().refine(isStoredOfHeader, Phrases.WayinOfOtherHeader), opts: GateishChecks.provingOpts }),
     provingLeaseArgs:     obj({ gate: GateishChecks.leaseGate, cited: GateishChecks.gateRevisionedStamp, renewed: Stamps.StampChecks.leaseStamp.pick({ born_at: true }).nullable() }),
     passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: BankChecks.stamp, gateStamp: GateChecks.stamp, device: GateishChecks.provingDevice }),
     passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: BankChecks.stamp, gateStamp: GateChecks.stamp, device: GateishChecks.provingDevice }),
