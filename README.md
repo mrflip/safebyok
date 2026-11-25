@@ -24,6 +24,8 @@ This repository is a pnpm workspace. Its packages:
 * [`safebyok-fastkey`](packages/safebyok-fastkey) -- Argon2id through WebAssembly: a
   key deriver several times faster than the core's, deriving the same bytes under the same specs.
 * [`safebyok-indexeddb`](packages/safebyok-indexeddb) -- IndexedDB storage: a bank's Things stored in this browser.
+* [`safebyok-convex`](packages/safebyok-convex) -- Convex storage: a component that keeps a bank's Things, and the
+  vaultDB that reaches it through your app's Convex client.
 * `safebyok-convex-big`, `safebyok-graphql-big`, `safebyok-indexeddb-big`, `safebyok-postgres-big` and
   `safebyok-react-big`, under [`packages/`](packages) -- the adapters and binding on safebyok-big, private and frozen
   until a port to the new core replaces each.
