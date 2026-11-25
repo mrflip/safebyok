@@ -1,8 +1,8 @@
 /** PostgresVaultDB on PGlite: the battery every vaultDB runs, plus what only Postgres can show. */
 
 import { PGlite } from '@electric-sql/pglite'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { type ThingScope, type Thingkind, type VaultError, Labelpath, Lifeseq, ThingFormat } from 'safebyok/storage'
+import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { type ThingScope, type Thingkind, type VaultError, Labelpath, Lifeseq, ThingFormat, VoidLifeTok, VoidTrack, readAtOf } from 'safebyok/storage'
 import * as VT from 'safebyok/testing'
 import * as Phrases from '../src/phrases'
 import { PostgresVaultDB, thingsChannelOf } from '../src/postgres-vault-db'
@@ -252,6 +252,39 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     expect(badnews).to.deep.equal([])
     expect(stopped).to.deep.equal([])
     unwatch()
+  })
+
+  it("dates each read in a session by the database's clock, in order", async () => {
+    const vaultDB = await makeVaultDB()
+    const db      = await database()
+    const { rows } = await db.query<{ millis: number }>('SELECT (extract(epoch FROM clock_timestamp()) * 1000)::float8 AS millis')
+    const first   = await vaultDB.tryGetThing(VT.getAskAt('box'))
+    const second  = await vaultDB.tryGetThing(VT.getAskAt('box'))
+    // A read_tc compares as text in the order it was made.
+    const isLater = second.read_tc > first.read_tc
+    expect(isLater).to.be.true
+    expect(readAtOf(first.read_tc)).to.be.closeTo(rows[0]!.millis, 1000)
+  })
+
+  it("notifies with the read_tc Postgres made for the notice", async () => {
+    const vaultDB = await makeVaultDB()
+    const notices: string[] = []
+    const onNotify = (text: string) => { notices.push(text) }
+    onNotifies.add(onNotify)
+    onTestFinished(() => { onNotifies.delete(onNotify) })
+    const read_tcs: string[] = []
+    onTestFinished(vaultDB.watch(VT.ThingBank, (event) => { read_tcs.push(event.read_tc) }, () => undefined))
+    await vaultDB.tryWriteThing(VT.birthAskOf())
+    await vi.waitFor(() => { expect(read_tcs).to.have.lengthOf(1) })
+    expect(notices).to.have.lengthOf(1)
+    expect(read_tcs[0]).to.eq((JSON.parse(notices[0]!) as { read_tc: string }).read_tc)
+  })
+
+  it("answers with the read_tc of the row Postgres returns", async () => {
+    const read_tc = '01a211fc-16bf-7000-83c6-d6e7d25156a2'
+    const vaultDB = new PostgresVaultDB({ client: answeringClient({ bank: null, gate: null, root: null, tracked: { bank: null, gate: null, box: null }, read_tc }) })
+    const answer  = await vaultDB.tryGetWorld({ ...VT.ThingBank, op: 'getworld', track: VoidTrack, banktok: VoidLifeTok })
+    expect(answer.read_tc).to.eq(read_tc)
   })
 
   it("refuses a client, listen or opt it cannot use", async () => {

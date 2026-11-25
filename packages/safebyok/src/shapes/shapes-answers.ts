@@ -116,6 +116,10 @@ export const ActualChecks = Validator.Checkers('storage_issue', ({ obj, custom }
     deltas:       custom<ListedBeside['deltas']>(Array.isArray),
     damaged_rows: custom<readonly DamagedThing[]>(Array.isArray),
   }),
+  /** Pick what a watch's {@link Received} carries beside its record: the `read_tc` its datastore made, where it made one. */
+  received: obj({
+    read_tc: SeenChecks.readTc.optional(),
+  }),
 }))
 
 /** What every concrete adapter's report carries beside its act:
@@ -160,8 +164,9 @@ export type GetWorldActual = ActualBeside & { ok: true, act: 'got', things: Worl
 /** A concrete adapter's report of a bank's storage stats ({@link VaultStats}). */
 export type StatsActual = ActualBeside & { ok: true, act: 'got', stats: VaultStats }
 
-/** A change a concrete adapter's `doWatch` passes to `receive`: the changed Thing, raw, and the `banktok` of its bank as the datastore last read it.
+/** A change a concrete adapter's `doWatch` passes to `receive`: the changed Thing, raw, with the `banktok` of its bank as the datastore last read it.
  * Watchers are notified of the Thing alone, with that banktok: a bank that changed is a change of its own.
+ * `read_tc` is the datastore's raw UUID version 7 of when it read the Thing. A datastore that makes none leaves it out, and the notice is read when it arrives.
  */
-export type Received = Pick<ActualBeside, 'banktok'> & { record: unknown }
+export type Received = Pick<ActualBeside, 'banktok'> & { record: unknown, read_tc?: unknown }
 // --

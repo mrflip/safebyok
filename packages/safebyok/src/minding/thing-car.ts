@@ -57,7 +57,7 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
   }
   // --
 
-  // == [Bookkeeping]: lastErr, erred_at, citable, agerank, agekind, read_tc
+  // == [Bookkeeping]: lastErr, erred_at, citable, agerank, agekind, read_tc, read_at
 
   /** The refusal the Thing raised at the last record it was handed, or null where it took that record. For a devtool, never for an app's own logic. */
   get lastErr(): Errors.VaultError | null { return this.#lastErr }
@@ -77,6 +77,9 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
 
   /** When the newest revision the Thing took as news was last read: the `VacantReadTc` until it takes one. */
   get read_tc(): ReadTc { return this.#readTc }
+
+  /** The time of {@link read_tc}, in epoch milliseconds, or zero until the Thing takes a record. */
+  get read_at(): EpochMillis { return readAtOf(this.#readTc) }
   // --
 
   // == [Receiving]: receive, #take, #readTcAfter
@@ -142,7 +145,7 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
       queryKey:        [...VaultTSQ.itemQueryKeyOf(this.thing)],
       status:          'success',
       fetchStatus:     'idle',
-      dataUpdatedAt:   readAtOf(this.#readTc),
+      dataUpdatedAt:   this.read_at,
       isInvalidated:   false,
       lastRefusalkind: this.#lastErr?.refusalkind ?? null,
       val:             maskedOf(this.thing.pickle()),

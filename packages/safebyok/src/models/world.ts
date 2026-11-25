@@ -22,7 +22,7 @@ import type { VaultStats } from '../shapes/shapes-vault-stats'
 import { MaxTimerMillis } from '../shapes/shapes-vault-tsq'
 import { type EpochMillis, type Lifetok, Labelpath } from '../shapes/primitives'
 import { peekRoots, stowRoots } from '../minding/root-shelf'
-import { itemEventOf, readAtOf } from '../storage/agerank'
+import { itemEventOf } from '../storage/agerank'
 import type { VaultMinder } from '../minding/vault-minder'
 import { type ReceivingThing, isVaultMinder } from '../shapes/shapes-vault-minder'
 import * as Phrases from '../phrases'
@@ -513,7 +513,7 @@ export class World {
   /** True where the main gate was last read more than the device's `gateStaleMillis` ago */
   #isGateStale(): boolean {
     const car = this.#vaultMinder?.carAt({ ...this.#device.scope, labelpath: Labelpath.MainGate })
-    return (car !== undefined) && (Clock.nowMillis() - readAtOf(car.read_tc) > this.#device.gateStaleMillis)
+    return (car !== undefined) && (Clock.nowMillis() - car.read_at > this.#device.gateStaleMillis)
   }
 
   /** Get the bank, the main gate and the root box from the vaultDB, past anything kept here, telling the device's `onBadNews` of a refusal */

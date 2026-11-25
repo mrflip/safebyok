@@ -8,11 +8,10 @@ import type { MaskedRow } from '../shapes/shapes-masked-view'
 import { type ThingRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetOnceOpts, type ItemQueryOptions, type VaultMutationOptions, type VaultTSQOpts, VaultTSQChecks } from '../shapes/shapes-vault-tsq'
-import type { ReadTc, VaultEvent } from '../shapes/shapes-vault-event'
+import type { VaultEvent } from '../shapes/shapes-vault-event'
 import { BaseThing } from '../models/base-thing'
 import type { ThingCar } from './thing-car'
 import type { VaultMinder } from './vault-minder'
-import { readAtOf } from '../storage/agerank'
 import type { Kids } from '../shapes/shapes-answers'
 import * as Throwers from '../refusals/throwers'
 import { maskedOf } from '../helpers/mask-ciphertexts'
@@ -106,7 +105,7 @@ export class VaultTSQ {
     const queryKey  = VaultTSQ.itemQueryKeyOf(itemScope)
     const seed      = car && itemValOf(car)
     if ((seed === undefined) || (car === undefined) || (car.agekind === 'vacant')) { return { queryKey } }
-    return { queryKey, initialData: seed, initialDataUpdatedAt: readAtOf(car.read_tc) }
+    return { queryKey, initialData: seed, initialDataUpdatedAt: car.read_at }
   }
 
   /** Get the box at `scope` once, unless its item is fresh by `opts.staleTime`: its live record, or null where none is stored live.
@@ -173,7 +172,9 @@ export class VaultTSQ {
   #hear(event: VaultEvent): void {
     if (event.eventkind === 'life') { this.#hearLife(event.labelpath); return }
     if (! isItemLabelpath(event.labelpath)) { return }
-    const queryKey = VaultTSQ.itemQueryKeyOf(this.#scopeOf(event.labelpath))
+    const scope    = this.#scopeOf(event.labelpath)
+    const queryKey = VaultTSQ.itemQueryKeyOf(scope)
+    const car      = this.#vaultMinder.carAt(scope)!
     if (event.eventkind === 'aged') {
       // An aged event is never of a Thing seen whole: its agekind is cold or bare. Bare over an item with data, the box
       // has a life newer than the record the item holds, so it is known to have been deleted since: the item is null, and
@@ -183,14 +184,14 @@ export class VaultTSQ {
         void this.#queryClient.resetQueries({ queryKey, exact: true })
         return
       }
-      if (event.agekind === 'bare') { this.#queryClient.setQueryData(queryKey, null, setDataOptionsOf(event.read_tc)) }
+      if (event.agekind === 'bare') { this.#queryClient.setQueryData(queryKey, null, { updatedAt: car.read_at }) }
       void this.#queryClient.invalidateQueries({ queryKey, exact: true }, { cancelRefetch: false })
       return
     }
     if (event.liveness === 'soon') { return }
     // The record the Thing holds, as the item's queryFn answers it.
-    const record = (event.liveness === 'full') ? this.#vaultMinder.thingAt(this.#scopeOf(event.labelpath))?.pickle() : null
-    this.#queryClient.setQueryData(queryKey, record, setDataOptionsOf(event.read_tc))
+    const record = (event.liveness === 'full') ? car.thing.pickle() : null
+    this.#queryClient.setQueryData(queryKey, record, { updatedAt: car.read_at })
   }
 
   // Resetting, not removing, the box's own listing: a removal reaches the cache and not the observers.
@@ -257,7 +258,7 @@ export class VaultTSQ {
 }
 // --
 
-// == [Helpers]: Itemkind, Listkind, LabelsIdx, BankDefaults, setDataOptionsOf, isItemLabelpath, itemValOf, labelpathOfItemKey, labelpathOfListKey
+// == [Helpers]: Itemkind, Listkind, LabelsIdx, BankDefaults, isItemLabelpath, itemValOf, labelpathOfItemKey, labelpathOfListKey
 
 /** The kind segment of an item's query key. */
 const Itemkind = 'item'
@@ -270,11 +271,6 @@ const LabelsIdx = 4
 // its caller. A retry would put a whizbang in the critical path of a primitive operation (CLAUDE.md).
 /** The query and mutation defaults under the bank's key. */
 const BankDefaults = Object.freeze({ networkMode: 'always', retry: false } as const)
-
-/** The options that date an item set from an event read at `read_tc`, or none where it was not said. */
-function setDataOptionsOf(read_tc: ReadTc | undefined): TSQ.SetDataOptions {
-  return (read_tc === undefined) ? {} : { updatedAt: readAtOf(read_tc) }
-}
 
 /** True for the labelpath of a box under the root box: the Things an item is kept for. */
 function isItemLabelpath(labelpath: Labelpath): boolean { return Labelpath.isBox(labelpath) && (labelpath !== Labelpath.RootBox) }
