@@ -1,8 +1,8 @@
 # Thread 1d: lease_thing (2026-11-25)
 
-Branch `20261125-lease_thing`, PR #907, stacked on #903 (line #900 -> #902 -> #903). Proved: `pnpm --filter safebyok
-lint` and `typecheck` clean; the package's whole suite 2114 tests in 33 files (lease 102, proving, ctx-bytes, both
-deviceDB batteries green).
+Branch `20261125-lease_thing`, PR #907, stacked on #903 (line #900 -> #902 -> #903). Proved: `pnpm justify` green after the catch-up onto #903, 8367 tests (a
+first run failed on a react-lean teardown flake, `window is not defined` after `use-draft.test.tsx`; it passed alone
+twice and on the rerun). `safebyok` alone: 2114 tests in 33 files.
 
 * **Built**:
   - `src/shapes/shapes-stamps.ts`: `LeaseRecord` is `discrim('am', [live, tombstone])`. Live: every Thing sparse field
