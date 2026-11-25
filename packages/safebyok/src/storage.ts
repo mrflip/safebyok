@@ -15,8 +15,8 @@ export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, typ
 export { type Adoptable, Thing } from './models/thing'
 export {
   type AnyAsk, type BankRoots, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAskDraft, type GetAsk, type GetWorldAsk, type StatsAsk, type WorldRoots, type ListAskDraft,
-  type ListAsk, type LoggableAsk, type PutAskDraft, type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WriteAsk, type WriteAskFlags, AskChecks, VoidTrack, delAskOf, getAskOf,
-  listAskOf, putAskOf,
+  type ListAsk, type LoggableAsk, type PutAskDraft, type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WriteAsk, type WriteAskFlags, AskChecks, VoidTrack, birthPutsOf, checkedBirthBankAsk,
+  checkedWriteAsk, delAskOf, getAskOf, listAskOf, putAskOf,
 } from './shapes/shapes-asks'
 export * as Classifier from './storage/thing-classifier'
 export { VacantAgerank, readAtOf, readTcNow } from './storage/agerank'
