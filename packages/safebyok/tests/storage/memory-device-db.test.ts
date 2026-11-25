@@ -39,8 +39,8 @@ describe("MemoryDeviceDB, what only a store in memory can show", () => {
 
 describe("DeviceDB, what a store throws", () => {
   const VerbCases = [
-    [(deviceDB: MemoryDeviceDB) => deviceDB.peekLease(TH.WorldScope), 'peekLease', 'refuses a peek that throws as storage_unavailable, keeping only the name'],
-    [async (deviceDB: MemoryDeviceDB) => deviceDB.stowLease(await TH.liveLeaseRowOf()), 'stowLease', 'refuses a stow that throws as storage_unavailable, keeping only the name'],
+    [(deviceDB: MemoryDeviceDB) => deviceDB.peekLease(TH.WorldScope), 'peekLease', 'refuses a peek that throws as storage_unavailable, naming only what it threw'],
+    [async (deviceDB: MemoryDeviceDB) => deviceDB.stowLease(await TH.liveLeaseRowOf()), 'stowLease', 'refuses a stow that throws as storage_unavailable, naming only what it threw'],
   ] as const
   for (const [verbOf, oplabel, blurb] of VerbCases) {
     it(blurb, async () => {
@@ -49,7 +49,7 @@ describe("DeviceDB, what a store throws", () => {
     })
   }
 
-  it("refuses a listen that throws as storage_unavailable, keeping only the name", () => {
+  it("refuses a listen that throws as storage_unavailable, naming only what it threw", () => {
     const refusal = TH.expectSyncRefusal(() => new FailingDeviceDB().listen(() => undefined), 'storage_unavailable')
     expect(refusal.message).to.include('listen').and.include('TypeError').and.not.include('lease_key')
   })

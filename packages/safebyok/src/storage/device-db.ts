@@ -1,4 +1,4 @@
-/** The deviceDB, which keeps the lease row of each bank on this device, shared by every tab. A subclass writes the `do*` calls. */
+/** The deviceDB, which has the lease row of each bank on this device, shared by every tab. A subclass writes the `do*` calls. */
 
 import { Errors, type Helpers } from 'safebyok-big/internals'
 import { BaseThing } from '../models/base-thing'
@@ -9,7 +9,7 @@ import { DeviceDBChecks, type LeaseListener } from '../shapes/shapes-device-db'
 // == [The deviceDB]: DeviceDB
 
 /** The base class of a device database: a subclass writes the `do*` calls, each one atomic step.
- * Anything but a refusal that a subclass throws reaches the caller as `storage_unavailable`, keeping only the thrown `name`,
+ * Anything but a refusal that a subclass throws reaches the caller as `storage_unavailable`, with nothing of the throw but its `name`,
  * since what it threw may quote a lease row (G8).
  */
 export abstract class DeviceDB {
@@ -24,7 +24,7 @@ export abstract class DeviceDB {
     } catch (err) { throw refusalOf(err, 'peekLease') }
   }
 
-  /** Store `row` for its bank if it is newer than the row stored there, and answer the row stored afterward.
+  /** Stow `row` for its bank if it is newer than the row stored there, and answer the row stored afterward.
    * - Newer means a later life, or a later revision of the same life: a row of the same life and revision is not newer, and is not stored.
    * - A row stored that fails its checks is replaced by any row.
    * - Every listener of this database, in this tab or another, hears of each row stored.
@@ -85,7 +85,7 @@ function isReplaced(raw: unknown, row: LeaseRow): boolean {
   return (! storedReport.success) || (BaseThing.cmp(storedReport.data, row) > 0)
 }
 
-/** The refusal for a verb's throw: a refusal as it is, anything else as `storage_unavailable`, keeping only its `name`. */
+/** The refusal for a verb's throw: a refusal as it is, anything else as `storage_unavailable`, with nothing of it but its `name`. */
 function refusalOf(thrown: unknown, oplabel: string): Errors.VaultError {
   return (Errors.isVaultError(thrown) ? thrown : Throwers.deviceDBFailed(oplabel, thrown))
 }

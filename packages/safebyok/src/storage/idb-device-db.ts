@@ -28,7 +28,7 @@ export function leaseBellnameOf(dbName?: string): string { return `${dbprefixOf(
 export function scopepathOf({ userid, banklabel }: BankScope): LeaseScopepath { return [userid, banklabel] }
 // --
 
-/** A device database that keeps each bank's lease row in this browser's IndexedDB, shared by every tab of its origin.
+/** A device database of each bank's lease row, in this browser's IndexedDB, shared by every tab of its origin.
  * A row's leaseKey is stored as its `CryptoKey` handle, by structured clone, and never as bytes (G4).
  */
 export class IdbDeviceDB extends DeviceDB {

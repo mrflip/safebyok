@@ -51,14 +51,14 @@ describe("IdbDeviceDB's options", () => {
 })
 
 describe("IdbDeviceDB's database and bell", () => {
-  it("keeps a row across connections, as a reload does", async () => {
+  it("peeks a row stowed on another connection, as after a reload", async () => {
     const deviceDB = makeIdbDeviceDB()
     const row      = await TH.liveLeaseRowOf()
     await deviceDB.stowLease(row)
     expect(await makeTwin(deviceDB).peekLease(TH.WorldScope)).to.have.property('revtok', row.revtok)
   })
 
-  it("keeps each dbName's rows and bell apart", async () => {
+  it("parts each dbName's rows and bell from another's", async () => {
     const deviceDB = makeIdbDeviceDB()
     const other    = makeIdbDeviceDB()
     const heard: string[] = []

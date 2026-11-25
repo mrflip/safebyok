@@ -74,10 +74,10 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
     }
 
     const NotNewerCases = [
-      [{ lifenum: 0, revseq: 2 }, { lifenum: 0, revseq: 1 },                     'keeps a later revision over an earlier one'],
-      [{ lifenum: 0, revseq: 1 }, { lifenum: 0, revseq: 1, ends_at: 2e12 },      'keeps the row stored over one of the same life and revision'],
-      [{ lifenum: 2, revseq: 0 }, { lifenum: 0, revseq: 7 },                     'keeps a later life over an earlier one at any revision'],
-      [{ lifenum: 1, revseq: 0 }, { lifenum: 0, revseq: 4 },                     'keeps a tombstone over a late live row of the life it ended'],
+      [{ lifenum: 0, revseq: 2 }, { lifenum: 0, revseq: 1 },                     'leaves a later revision in place over an earlier one'],
+      [{ lifenum: 0, revseq: 1 }, { lifenum: 0, revseq: 1, ends_at: 2e12 },      'leaves the row stored in place over one of the same life and revision'],
+      [{ lifenum: 2, revseq: 0 }, { lifenum: 0, revseq: 7 },                     'leaves a later life in place over an earlier one at any revision'],
+      [{ lifenum: 1, revseq: 0 }, { lifenum: 0, revseq: 4 },                     'leaves a tombstone in place over a late live row of the life it ended'],
     ] as const
     for (const [stored, stowed, blurb] of NotNewerCases) {
       it(blurb, async () => {
