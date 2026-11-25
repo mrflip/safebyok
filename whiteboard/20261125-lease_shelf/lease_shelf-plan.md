@@ -3,7 +3,7 @@
 Mode: **YOLO**. Issued by the Coach, 2026-11-25. Cap: 3 threads at once.
 Default levels: review `medium`; worker `opus` (thread-worker), reviewer `opus` for threads touching what
 `notes/guarantees-big.md` covers (lease, keys), else its `sonnet` pin; style pass on `style-reviewer`'s pin.
-Status: #904, #900, #902 merged; the line restacked onto main (2026-11-25): #903 -> #907 -> #908 -> #909 -> #912 -> #915 -> #910 -> #906 -> #905 -> #911 -> #924 -> #901. 10 car_read_at (#924) ready, in review; 11 lease_names, 12 set_stage, 13 watch_recovery building, each cut from 10.
+Status: done (2026-11-25). Merged: #904, #900, #902, #903, #907, #908, #909, #912, #915, #910, #906, #905, #911, #924. The last line: main -> #927 (11 lease_names) -> #926 (13 watch_recovery) -> #925 (12 set_stage) -> #928 (docs) -> #901 (this plan, the top). Done note: human/20261125-sprint_lease_shelf_done.md.
 
 Sprint doc: https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh (Open Matters bookmark rev 3).
 
