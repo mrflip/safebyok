@@ -125,7 +125,7 @@ describe("ConvexVaultDB's refusals", () => {
     expect(TH.thrownText(refusal)).not.to.include('sk-live-0000')
   })
 
-  it("hand on a bad_record the component sends, with its sentence", async () => {
+  it("hand on the component's refusal of an ask, with its sentence", async () => {
     const convexVaultDB = makeConvexVaultDB()
     failNextCallWith(convexVaultDB, new ConvexError({ kind: 'bad_record', message: 'The ask is not one the component reads.' }))
     const refusal = await TH.expectBad(convexVaultDB.tryWriteThing(TH.birthAskOf()), 'bad_record')
@@ -174,7 +174,7 @@ describe("ConvexVaultDB's component", () => {
     expect(gate).to.deep.equal(TH.gateThingOf())
   })
 
-  it("hands the client bad_record, with the core's sentence, for an ask that fails its checks", async () => {
+  it("refuses an ask that fails the core's checks, with the core's sentence", async () => {
     const refusal = await TH.convexRefusalOf(TH.componentTest().query(TH.rootVaultApi.getThing, { ask: { ...TH.getGateAskOf(), banklabel: '' } }))
     expect(refusal.kind).to.eq('bad_record')
     expect(refusal).to.have.property('message').that.is.a('string')
