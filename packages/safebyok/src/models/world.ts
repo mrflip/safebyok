@@ -348,7 +348,7 @@ export class World {
   // == [The janitor]: #startJanitor, #stopJanitor, #tidy, #lockPastLeaseEnd, #tidyConnected, #isGateStale, #refreshRoots
   // It runs from sign-in until the device is disabled, connected or not: a lease unlocked while disconnected still ends.
 
-  /** Tidy every `janitorMillis` of the device, from now on, unless the device is disabled; a second call does nothing */
+  /** Start the janitor, which tidies every `janitorMillis` of the device, unless the device is disabled; a second call does nothing */
   #startJanitor(): void {
     if ((this.#janitor !== null) || ! this.isEnabled) { return }
     this.#janitor = setInterval(() => { this.#tidy() }, Math.min(this.#device.janitorMillis, MaxTimerMillis))
