@@ -349,11 +349,14 @@ describe("lease.evict() and isEvicted", () => {
     expect(lease.isEvicted).to.be.true
   })
 
-  it("refuses 'bank_locked' for a seal already under way when it lands", async () => {
+  it("lets a seal already under way when it lands finish, and refuses an unseal under way 'bank_locked'", async () => {
     const { lease } = await leaseWorld()
+    const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const sealing = lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    const unsealing = TH.expectRefusal(lease.unseal(BaseBox, sealed), 'bank_locked')
     lease.evict()
-    await TH.expectRefusal(sealing, 'bank_locked')
+    expect((await sealing).whisper_sealed).to.have.all.keys('key_wrapped', 'ciphered', 'codectag', 'schematag')
+    await unsealing
   })
 })
 
@@ -408,15 +411,15 @@ describe("lease.isEnabled and lease.demandEnabled(), over its gate", () => {
     expect(await TH.expectRefusal(lease.unseal(BaseBox, sealed), 'disabled')).to.equal(endCause)
   })
 
-  // As a lock refuses a seal or an unseal under way, so does the end of its gate.
-  it("refuses a seal and an unseal already under way when its gate ends as they run", async () => {
+  // As with a lock, a seal under way finishes and an unseal under way refuses.
+  it("lets a seal already under way when its gate ends finish, and refuses an unseal under way with the gate's refusal", async () => {
     const { gate, endCause } = endableGateOf()
     const { lease } = await TH._cheat_grantedLease(await provingWithWayin(), gate)
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
-    const sealing = TH.expectRefusal(lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts), 'disabled')
+    const sealing = lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const unsealing = TH.expectRefusal(lease.unseal(BaseBox, sealed), 'disabled')
     gate.end()
-    expect(await sealing).to.equal(endCause)
+    expect((await sealing).whisper_sealed).to.have.all.keys('key_wrapped', 'ciphered', 'codectag', 'schematag')
     expect(await unsealing).to.equal(endCause)
   })
 })
