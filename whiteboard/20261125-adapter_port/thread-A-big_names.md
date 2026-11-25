@@ -59,3 +59,9 @@ scripts 327; lint clean. `pnpm justify` after the catch-up rebase: see the PR's 
   * Confirm that pgClientOf leaves safebyok-postgres.
   * Decide whether the 42 changesets that name convex and graphql stay as they are until B and D land (my
     recommendation), or are rewritten.
+
+* **Review rework (2026-11-25)**: safebyok-big's README, the `PasskeyAnswerUsed` and `SchemaNotServed` phrases, `shapes-gateish.ts`'s
+  doc blocks, `refusals/errors.ts`'s comment and `readme-recipes.test.ts`'s title now name the `-big` packages (the Coach's
+  one-commit allowance; no test matched a phrase's text). `notes/wontfix.md` and `notes/react_lib_principles.md` say
+  `safebyok-react`, with the "To reproduce" paths fixed; the tests' `RowChanged` strings quote row headings, so they stayed.
+  The review's rework is wholly in two commits, and `safebyok-big` tests pass (2950).
