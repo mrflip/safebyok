@@ -16,6 +16,10 @@ The design for threads 0 to 1b, with the rulings behind it: `lease_shelf-design.
 ## Ground rules
 - **Reviewers review for decoupling.** The Coach: "It is **exceptionally** important that you keep your reviewers
   focused on **decoupling** the infrastructure, not on finding crossings." Every reviewer handoff quotes it.
+- **Readability and simplicity first** (the Coach): shallow branching; short call chains across few files; plain
+  names, never `held`, `kept`, `entry`, `row`, `checked`; no over-DRY indirection; important methods and clauses on
+  their own lines, named for their purpose. Reviewers check exactly this (`.claude/agents/thread-reviewer.md`, *What
+  to look for*); every worker handoff quotes it.
 - **Freshness is the janitor's.** The Coach: "All that matters is when it was read. This is not a startup concern,
   it's a janitorial concern." No fetch, guard or state on connect, disconnect or another lifecycle path.
 - **"A disable, a disconnect or a lock is intent, not a crisis"** (CLAUDE.md `#lock-is-intent`). An operation
