@@ -1,5 +1,5 @@
 import type { BankStage } from 'safebyok'
-import { CreateVaultForm, UnlockDialog, UnlockForm } from 'safebyok-react-lean/kit'
+import { CreateVaultForm, UnlockDialog, UnlockForm } from 'safebyok-react/kit'
 import { Envman } from '../lib/sok'
 import { AddEnvForm } from './AddEnvForm'
 import { EnvList } from './EnvList'

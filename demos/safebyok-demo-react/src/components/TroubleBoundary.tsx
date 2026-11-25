@@ -1,6 +1,6 @@
 import { Component, type ReactNode } from 'react'
 
-/** The demo's error boundary, wrapped around the provider and the page as safebyok-react's README advises.
+/** The demo's error boundary, wrapped around the provider and the page as safebyok-react-big's README advises.
  * Misuse (a bad label or option, or a bug in the demo's own code) throws while rendering. The boundary then shows
  * a calm message and a Reload button in place of the page. Key it on the signed-in user, so a new sign-in starts fresh.
  *

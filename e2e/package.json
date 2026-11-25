@@ -42,9 +42,9 @@
     "pg": "^8.23.1",
     "react": "^19.3.1",
     "safebyok-big": "workspace:*",
-    "safebyok-convex": "workspace:*",
-    "safebyok-graphql": "workspace:*",
-    "safebyok-postgres": "workspace:*",
+    "safebyok-convex-big": "workspace:*",
+    "safebyok-graphql-big": "workspace:*",
+    "safebyok-postgres-big": "workspace:*",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.72.2",
     "vitest": "^5.1.0"

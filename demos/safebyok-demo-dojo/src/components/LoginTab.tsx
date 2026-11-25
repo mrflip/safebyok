@@ -1,6 +1,6 @@
 import { startTransition, useRef, useState } from 'react'
-import { useNewPassphrase } from 'safebyok-react-lean/kit'
-import { PassphraseInput } from 'safebyok-react-lean/parts'
+import { useNewPassphrase } from 'safebyok-react/kit'
+import { PassphraseInput } from 'safebyok-react/parts'
 import { Dojo, SOK } from '../lib/dojo'
 import { messageOf, refusalkindOf } from '../lib/messages'
 import { type Arrangement, arrange, disarm } from '../lib/scenarios'

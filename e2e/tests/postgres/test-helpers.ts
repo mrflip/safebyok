@@ -1,11 +1,11 @@
-/** A real Postgres for this directory's tests and safebyok-graphql's: a database to a file, the PostgresBankDBs over it, and the battery's backdoor to its rows. */
+/** A real Postgres for this directory's tests and safebyok-graphql-big's: a database to a file, the PostgresBankDBs over it, and the battery's backdoor to its rows. */
 
 import { afterAll, afterEach, beforeAll, describe } from 'vitest'
 import { Client, Pool, escapeIdentifier } from 'pg'
 import type { BankScope, Boxscope, VaultScope } from 'safebyok-big/storage'
 import * as TH from 'safebyok-big/testing'
-import { BankFunctionsSql, BankTablesSql, PostgresBankDB, bankChannelOf, pgClientOf } from 'safebyok-postgres'
-import type { PostgresBankDBOpts, PostgresListen } from 'safebyok-postgres'
+import { BankFunctionsSql, BankTablesSql, PostgresBankDB, bankChannelOf, pgClientOf } from 'safebyok-postgres-big'
+import type { PostgresBankDBOpts, PostgresListen } from 'safebyok-postgres-big'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
 export * from 'safebyok-big/testing'

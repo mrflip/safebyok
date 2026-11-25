@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { PassphraseInput, WhisperInput } from 'safebyok-react-lean/parts'
+import { PassphraseInput, WhisperInput } from 'safebyok-react/parts'
 import { Example, PracticeCard } from './PracticeCard'
 
 /** Turn off a browser's typing helpers on a field that can be revealed: a hand-made Show button beside the library's parts, which do it already. */

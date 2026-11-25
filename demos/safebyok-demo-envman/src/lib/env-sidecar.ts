@@ -1,7 +1,7 @@
 /** What envman stores beside each secret, readable while the vault is locked: its title, description, rotation period and when it was last rotated. */
 
 import type { Sidecar } from 'safebyok'
-import { mask } from 'safebyok-react-lean'
+import { mask } from 'safebyok-react'
 
 /** One day, in milliseconds. */
 export const DayMs = 24 * 60 * 60 * 1000

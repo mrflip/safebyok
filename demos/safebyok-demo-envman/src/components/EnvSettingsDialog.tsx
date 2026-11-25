@@ -1,5 +1,5 @@
 import { type SyntheticEvent, useId, useState } from 'react'
-import { ModalDialog } from 'safebyok-react-lean/kit'
+import { ModalDialog } from 'safebyok-react/kit'
 import { type EnvFields, envFieldsOf } from '../lib/env-form'
 import { DayMs, type EnvSidecar, dayValueOf } from '../lib/env-sidecar'
 

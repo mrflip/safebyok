@@ -4,7 +4,7 @@ import { clear, createStore, entries, setMany, type UseStore } from 'idb-keyval'
 import { DojoDBName } from './dojo'
 import { Fixture, type ShelvedRow, type StoredRow } from './fixture'
 
-// safebyok-idb-lean exports none of these names. Its README gives the vault database's name and its object store,
+// safebyok-indexeddb exports none of these names. Its README gives the vault database's name and its object store,
 // `things`; the root shelf's key, `safebyok:roots:<banklabel>:<userid>`, is read from the core's source
 // (src/minding/root-shelf.ts).
 /** The vault database: what the backend would store. */

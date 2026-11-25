@@ -1,5 +1,5 @@
 import { useActionState } from 'react'
-import type { PutBoxActionResult } from 'safebyok-react-lean'
+import type { PutBoxActionResult } from 'safebyok-react'
 import { Dojo } from '../../lib/dojo'
 import { formTextOf } from '../../lib/form-text'
 import { MirrorCell, OutcomeButtons, ResultCell, type RowProps, VariablesCell } from './RowParts'

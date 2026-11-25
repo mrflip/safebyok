@@ -1,10 +1,10 @@
 import { useId, useState, type SyntheticEvent } from 'react'
-import { useBox, useDevice, useVault, WhisperField } from 'safebyok-react'
+import { useBox, useDevice, useVault, WhisperField } from 'safebyok-react-big'
 import { isQuietRefusal } from '../lib/refusals'
 import { ApiKeyVaultlabel, WidgetApiKeyBoxlabel, extractApiKey } from '../lib/api-key'
 import { KnockForm } from './KnockForm'
 
-/** The widget form: a knock-knock machine built from safebyok-react's ready-made pieces.
+/** The widget form: a knock-knock machine built from safebyok-react-big's ready-made pieces.
  * Its API key is typed in and sealed, and never exposed. The form reads it back only to tell a joke.
  */
 export const KnockKnockWidget = () => {
@@ -42,7 +42,7 @@ export const KnockKnockWidget = () => {
   return (
     <section className="flow knock-knock" aria-labelledby={`${fieldId}-title`}>
       <h2 id={`${fieldId}-title`}>Widget form</h2>
-      <p className="quiet">Preassembled pieces from safebyok-react, landed in place. Your key goes in, and comes out only to knock.</p>
+      <p className="quiet">Preassembled pieces from safebyok-react-big, landed in place. Your key goes in, and comes out only to knock.</p>
       <form className="api-key-slot" onSubmit={(evt) => { void putApiKey(evt) }}>
         <label htmlFor={fieldId}>Anthropic API key</label>
         <WhisperField id={fieldId} placeholder="sk-ant-…" />

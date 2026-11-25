@@ -1,6 +1,6 @@
 # safebyok-demo-knockknock
 
-The Knock-Knock Machine on the new core (`safebyok`) and its React layer (`safebyok-react-lean`). Never published.
+The Knock-Knock Machine on the new core (`safebyok`) and its React layer (`safebyok-react`). Never published.
 
 You sign in with any username (there is no password), create a vault with a passphrase, and save an Anthropic API key
 in it. Type who's there, and Claude finishes the joke: the key goes from the vault straight to Anthropic's API, from your

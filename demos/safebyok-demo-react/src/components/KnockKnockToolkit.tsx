@@ -1,11 +1,11 @@
 import { useEffect, useId, useState } from 'react'
-import { useBox, useDevice, useVault, useWhisper } from 'safebyok-react'
+import { useBox, useDevice, useVault, useWhisper } from 'safebyok-react-big'
 import { useIsShowing } from '../hooks/useIsShowing'
 import { isQuietRefusal } from '../lib/refusals'
 import { ApiKeyVaultlabel, ToolkitApiKeyBoxlabel, ensureApiKeyBoxExposed, extractApiKey } from '../lib/api-key'
 import { KnockForm } from './KnockForm'
 
-/** The toolkit form: a knock-knock machine assembled by hand from safebyok-react's hooks.
+/** The toolkit form: a knock-knock machine assembled by hand from safebyok-react-big's hooks.
  * Its API key is an exposed whisper: safebyok keeps the working copy, and the form only displays it.
  */
 export const KnockKnockToolkit = () => {

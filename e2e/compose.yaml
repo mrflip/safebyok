@@ -12,7 +12,7 @@
 name: safebyok-e2e
 
 services:
-  # Postgres 17, for the bankDB battery and the races of `safebyok-postgres`: SAFEBYOK_PG_URL for
+  # Postgres 17, for the bankDB battery and the races of `safebyok-postgres-big`: SAFEBYOK_PG_URL for
   # tests/postgres/ is postgres://postgres@127.0.0.1:54320/postgres. The role is a superuser, as
   # the tests make a database of their own for each file.
   postgres:
@@ -28,7 +28,7 @@ services:
       retries: 30
 
   # Slots, one service each as the tests for them are written (none is built yet):
-  #   convex     Convex's local backend, for safebyok-convex against a real deployment.
+  #   convex     Convex's local backend, for safebyok-convex-big against a real deployment.
   #   mysql, ... any later storage adapter's database.
   # A browser is a different animal and gets its own e2e job when the Playwright specs are built,
   # not a service here.

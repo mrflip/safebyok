@@ -4,7 +4,7 @@
 import { expect, it, onTestFinished, vi } from 'vitest'
 import type * as DB from 'safebyok-big/storage'
 import type { BX } from 'safebyok-big/storage'
-import type { GraphQLBankDB } from 'safebyok-graphql'
+import type { GraphQLBankDB } from 'safebyok-graphql-big'
 import * as TH from './test-helpers'
 
 const { BW } = TH

@@ -1,5 +1,5 @@
 import { Device } from 'safebyok'
-import { IdbVaultDB } from 'safebyok-idb-lean'
+import { IdbVaultDB } from 'safebyok-indexeddb'
 import { describe, expect, it } from 'vitest'
 import { Banklabel, DojoDBName, dojoDeriver } from '../../src/lib/dojo'
 import { Fixture } from '../../src/lib/fixture'

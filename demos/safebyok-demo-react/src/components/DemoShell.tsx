@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { BankProvider } from 'safebyok-react'
+import { BankProvider } from 'safebyok-react-big'
 import { useSession } from '../hooks/useSession'
 import { createAuth } from '../lib/auth'
 import { Banklabel, bankOpts, dbStorage, deviceStorage } from '../lib/storage'

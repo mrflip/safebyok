@@ -1,5 +1,5 @@
 import { type QueryClient, notifyManager, useQueryClient } from '@tanstack/react-query'
-import type { MaskedView } from 'safebyok-react-lean'
+import type { MaskedView } from 'safebyok-react'
 import { useEffect, useState } from 'react'
 import { maskUuid } from 'safebyok/utils'
 import { SOK } from '../lib/dojo'

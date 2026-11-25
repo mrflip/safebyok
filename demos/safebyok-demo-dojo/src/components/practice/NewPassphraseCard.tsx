@@ -1,5 +1,5 @@
-import { useNewPassphrase } from 'safebyok-react-lean/kit'
-import { PassphraseInput } from 'safebyok-react-lean/parts'
+import { useNewPassphrase } from 'safebyok-react/kit'
+import { PassphraseInput } from 'safebyok-react/parts'
 import { SOK } from '../../lib/dojo'
 import { Example, PracticeCard } from './PracticeCard'
 

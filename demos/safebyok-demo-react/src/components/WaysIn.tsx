@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore } from 'react'
 import type { Gate, Outcome } from 'safebyok-big'
-import { passkeysAvailable, useBank } from 'safebyok-react'
+import { passkeysAvailable, useBank } from 'safebyok-react-big'
 import { isQuietRefusal } from '../lib/refusals'
 
 function unsubscribeFromNothing(): void { /* nothing to unsubscribe from */ }

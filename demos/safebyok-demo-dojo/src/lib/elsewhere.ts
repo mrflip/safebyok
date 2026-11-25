@@ -1,7 +1,7 @@
 /** Another device of the signed-in user, as another browser would be: its own device over its own connection to the vault database, unlocked with the fixture's passphrase. */
 
 import { Device } from 'safebyok'
-import { IdbVaultDB } from 'safebyok-idb-lean'
+import { IdbVaultDB } from 'safebyok-indexeddb'
 import { Banklabel, DojoDBName, dojoDeriver } from './dojo'
 import { Fixture } from './fixture'
 import { switchableChecker } from './switchable-checker'

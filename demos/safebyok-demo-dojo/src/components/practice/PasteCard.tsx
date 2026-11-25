@@ -1,6 +1,6 @@
 import { useActionState } from 'react'
-import type { PutBoxActionResult } from 'safebyok-react-lean'
-import { SubmitButton, WhisperInput } from 'safebyok-react-lean/parts'
+import type { PutBoxActionResult } from 'safebyok-react'
+import { SubmitButton, WhisperInput } from 'safebyok-react/parts'
 import { mask } from 'safebyok/utils'
 import { Dojo } from '../../lib/dojo'
 import { formTextOf } from '../../lib/form-text'

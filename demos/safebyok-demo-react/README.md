@@ -13,7 +13,7 @@ pnpm justify                 # from demos/safebyok-demo-react: lint, typecheck, 
 Whispers are encrypted on this device before anything reaches storage. The page uses the
 browser defaults, `browserOpts` from `safebyok/browser`: Argon2id to derive keys, zxcvbn to check a
 new passphrase's strength, and the device's leases in this browser's IndexedDB. The vault's rows
-are in IndexedDB too, in their own database (through `safebyok-indexeddb`), which stands in for a
+are in IndexedDB too, in their own database (through `safebyok-indexeddb-big`), which stands in for a
 backend. Only the fake sign-in's rows are in localStorage. The `device_tok` each user's bank records
 is kept with the leases, because the device asks the deviceDB for it.
 
@@ -59,7 +59,7 @@ this aside.
 | Layer | Where |
 |---|---|
 | the library | the `safebyok-big` workspace package (`packages/safebyok-big/src/`) |
-| React plumbing | the `safebyok-react` workspace package (provider, hooks, controls, the dialogs) |
+| React plumbing | the `safebyok-react-big` workspace package (provider, hooks, controls, the dialogs) |
 | app scaffolding a host replaces | [src/lib/auth.ts](src/lib/auth.ts) (fake sign-in over localStorage; a real app brings its own auth and passes `user_id` to the provider), [src/lib/storage.ts](src/lib/storage.ts) (the bank's options: this browser's IndexedDB standing in for a backend) |
 | developer tools | [src/lib/outage-bank-db.ts](src/lib/outage-bank-db.ts), [src/components/OutageSwitch.tsx](src/components/OutageSwitch.tsx) |
 | the app itself | [src/components/](src/components/), [src/lib/anthropic.ts](src/lib/anthropic.ts) |

@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 import { isVaultError } from 'safebyok'
-import { WhisperMask } from 'safebyok-react-lean/parts'
+import { WhisperMask } from 'safebyok-react/parts'
 import type { EnvFields } from '../lib/env-form'
 import { DayMs, dayValueOf, envSidecarOf, isOverdueAt, valMaskOf } from '../lib/env-sidecar'
 import { Envman } from '../lib/sok'

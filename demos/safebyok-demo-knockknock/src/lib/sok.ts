@@ -2,7 +2,7 @@
 
 import { QueryClient } from '@tanstack/react-query'
 import { argon2idWebV1Deriver, zxcvbnStrengthChecker } from 'safebyok/browser'
-import { reactGiver } from 'safebyok-react-lean'
+import { reactGiver } from 'safebyok-react'
 import { LocalStorageVaultDB } from './local-vault-db'
 
 /** The giver: the provider, the strength hook, and the bank's hooks. Its vaultDB keeps the vault in this browser's localStorage. */

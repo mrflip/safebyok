@@ -1,5 +1,5 @@
-import { passkeyHeaderOf } from 'safebyok-react-lean'
-import { AddPasskeyForm, ReplacePassphraseForm, RevokePasskeyForm, passkeysAvailable } from 'safebyok-react-lean/kit'
+import { passkeyHeaderOf } from 'safebyok-react'
+import { AddPasskeyForm, ReplacePassphraseForm, RevokePasskeyForm, passkeysAvailable } from 'safebyok-react/kit'
 import { Knock } from '../lib/sok'
 
 /** The ways into the vault: replace the passphrase, and add a passkey or remove the one there is. */

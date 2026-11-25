@@ -1,6 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
-import { UnlockDialog } from 'safebyok-react-lean/kit'
+import { UnlockDialog } from 'safebyok-react/kit'
 import { SOK, hostQueryClient } from '../lib/dojo'
 import { sessionUserid } from '../lib/session'
 import { FormsTab } from './forms/FormsTab'
