@@ -1,0 +1,92 @@
+# lease_shelf: progress
+
+Curated by the orchestrator. Newer than the plan where they disagree.
+
+## Thread 0 `connect` (#900, ready, in review)
+- The watch runs while the device is both connected and signed in, from `#connectMinder`, reached from either
+  `World.connect` or `signin`. **The janitor (1c) and the device-database listener (1b) start there and are cleared
+  in `World.disconnect`, next to the minder.**
+- Disconnect order: `lock()` (evicts the lease), then the vaults' vault TSQ stops listening, then the minder stops
+  watching. It never throws, disables nothing, and leaves `ensureUnlocked` waiters waiting.
+- Freshness while disconnected goes through the vault TSQ's `staleTime` (0 unless minded and `'here'`), not
+  `agekind`: `'here'` also means whole for a put (`Vault #donorAt`). `VaultTSQ.connect` invalidates the bank's
+  queries.
+- Nothing can disable a world now: `World.endCause` returns the device's `#endCause`, which is never set. The
+  `'swept'` stage has no way in.
+- A watch that throws at sign-in is now bad news, not stage `'failed'` (awaiting the Coach).
+- *Orchestrator:* a review flagged that a reconnect did not refresh the roots; I fixed it under YOLO, and the Coach
+  overruled: "All that matters is when it was read ... it's a janitorial concern. That is concurrency machinery and
+  does not belong." The second rework takes the fetch back out. Freshness is 1c's janitor, by read time.
+- `device.disable()` ends a device for good (vacate will call it); the stage is `'disabled'`. It throws big's
+  `deviceDisabled()`, whose phrase still says "sweep or vacate".
+- While not connected, the vault TSQ does not hear the device's own `putBoxOnce`/`delBoxOnce`: a non-React host
+  must call `connect()`.
+
+## Thread 1c `softlock` (#902, ready, in review)
+- Options kept as `device.softlockMillis`, `janitorMillis`, `gateStaleMillis`; softlock capped at `floor(leaseMillis/20)`.
+- `isSoftlocked` on World, Bank, Gate; `ensureUnlocked` consults it.
+- The janitor starts in `#connectSignedIn` (renamed from `#connectMinder`) and is cleared in disconnect. It locks
+  past the lease's end, and re-reads the roots through `tryGetWorldOnce` when the gate's read is older than
+  `gateStaleMinutes`.
+- **Every read of the lease's end goes through `world.leaseEndsAt`: 1b repoints that one getter.**
+- `read_tc` is uuid v7, monotonic: tests set the clock past every read_tc (`setClockPastEveryReadTc`).
+
+## Thread 1a `device_db` (#903, ready, in review)
+- `safebyok/storage`: abstract `DeviceDB` (`peekLease(scope)`, `stowLease(row)` answering the row stored after,
+  `listen(listener)` answering an unlisten; a listener hears a `BankScope` only), `MemoryDeviceDB`, and the row types
+  `LeaseRow`, `LiveLeaseRow`, `LeaseTombstone`, `LeaseRecord`. `safebyok/browser`: `IdbDeviceDB`/`idbDeviceDB`;
+  `browserOpts()` hands the new one. The IndexedDB database is named `lease`.
+- Test builders `liveLeaseRowOf`, `leaseTombstoneOf` in `tests/test-helpers/devicedb-world.ts`.
+- No `isDeviceDB` duck check: 1b adds one only if the Device needs it.
+- Refusals: damaged row `damaged_lease`; failing store `storage_unavailable` (`Throwers.deviceDBFailed`, name only, G8).
+- **Planning lesson:** 1a compacted twice, ten minutes apart. 1b is larger: it goes to `thread-worker-400k`, and its
+  handoff quotes only what it needs.
+
+## Filing notes (*Orchestrator:*)
+- `scripts/file-thread` checks first whether the recorded `sprintbase` is on main; if it is, it rebases onto main and
+  never reads `sprintbasebranch`. A thread cut from main that must stack on another thread is rebased by hand
+  (`--onto origin/<base thread> <old base>`), with both settings updated, before filing. 1a needed this.
+- #900, #902, #903 filed and out of draft, a line bottom to top. #903 was refiled onto #902 by hand at e135f59d4.
+
+## Thread 2 `stats` (#905, ready, in review)
+- `tryStats(ask)` on every vaultDB (`doStats` in Memory, IdbVaultDB, PostgresVaultDB); `vault.stats()`/`tryStats()`,
+  no unlock. `StoreLimitCap = 19_006_492_568`. Helpers `vaultStatsOf(rows, limits)`, `rowWeightOf` in
+  `storage/vault-stats.ts`; shapes in `shapes/shapes-vault-stats.ts`; Postgres `StatsSql`.
+- **A new vaultDB implements `doStats`; a VaultDB test stub needs `tryStats`.**
+- **Planning lesson:** 2 compacted twice, nine minutes apart, as 1a did. Any thread touching several adapters, or
+  porting a module with its tests, goes to `thread-worker-400k`.
+
+## Thread 4 `probe` (#906, ready, in review)
+- `vault.probe(asked)`/`tryProbe(asked)` in vault.ts's `[Probing]` section: put, get (through the minder's `getOnce`,
+  which always asks storage), unseal and compare (es-toolkit `isEqual`), del, each timed. Locked bank refuses
+  `bank_locked` up front, no unlock asked. Default labelpath `box/safebyok_probe`, unreserved.
+- A failed step keeps its own refusalkind, adds `meta.stepkind` (big's `RefusalMeta` broadened), cause attached.
+- **Discovery:** `VaultTSQ.getOnce(scope, { staleTime: 0 })` can answer from cache: items are dated by storage's
+  `read_tc`, which can run ahead of the tab's clock (the Closer Look's E3, again). A verb that must ask storage goes
+  through the minder.
+
+## For the wrap-up (*Orchestrator:*)
+- World.connect's doc block says a second call "does nothing"; it should say a call after a failed watch retries it
+  (VaultMinder's `#unwatchWrapped ??=` stays null when watch throws). For the documentarian pass, or 1b's first commit.
+
+## The Closer Look (*Orchestrator:*)
+- The tab is in the sprint doc. *Coach (2026-11-25):* "Not concerned about other closer look stuff". Ruled: E1 (a
+  disconnect drops this tab's copy, YOLO in 1b, a row); E3 (read_tc stays storage's: "what matters is when the ground
+  truth was consulted"); E9 (`MaxTimerMillis`: "Maxmillis of 24.5 days is correct one", imported in thread 8). The
+  rest (E2 lazy expiry, E4 janitor object, E5 VaultTSQ reach, E6 softlock and the kit, E7, E8, E10–E12) is dropped.
+
+## Thread 1b `lease_shared` (#909, reviewed, filing)
+- Every tab follows the stored lease: a grant, renewal or softlock stows it; `lock()` and the janitor's autolock stow its
+  tombstone; a disconnect and `disable()` drop this tab's copy only (the Coach: "Vacate delete and lock cause lock").
+- A connected World peeks the device database on `connect`, on each root's news, and at each ring; a newer record
+  replaces this tab's lease (`#followStored` → `#takeUp`). A gate change softlocks (`#softlockPastGate`).
+- Leases are filed under the lease's own scope, `LeaseScope` = `{ userid, banklabel, labelpath: 'lease/<gate label>' }`
+  (`leaseScopeOf(gateScope)`); lifepath `0000000000/<lifeseq>` (`LeaseLifeRoot`, `leaseLifepathOf`).
+- Keys are read only in `Lease.make`, `Lease#nextEndingAt`, `Lease#stow` (G4/G9 drift recorded).
+- **For thread 6:** hook a line each in `#takeUp` (an unlock or lock taken up from another tab), `#softlockPastGate`,
+  and the janitor's `#lockPastLeaseEnd`. **For thread 5:** `device.deviceDB` is always set.
+- **Owed to 1b, in thread 6's first commit:** an expired stored lease is followed as its tombstone
+  (`#leaseFollowed` follows `Lease.tombstoneOf(stored)` where the stored record cannot unlock), so the unlock starts a
+  new life; `Lease.stow`'s local `checked` gets a plain name.
+- **Planning lesson:** the forked `/code-review` checked the reviewer's own worktree branch back out under it; a reviewer
+  re-checks HEAD after `/code-review` returns. (Brief reviewers with it.)

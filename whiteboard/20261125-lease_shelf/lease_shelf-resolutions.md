@@ -1,0 +1,82 @@
+# lease_shelf: resolutions (2026-11-25)
+
+## The Coach's rulings
+
+Newest first. Each bullet is the Resolved row as it stood, with the Coach's answer word for word.
+
+- **Stage crossings reach the host's onLifecycle**: thread 12 sends `stage_crossed` (from, to) through `onLifecycle`, so a host's handler hears crossings too, its own `lock()` included; the alternative was a separate `onStage`. Rec: keep it in `onLifecycle`. Coach (2026-11-25): (empty: took the Rec). Asked in thread 12 (#925). Work: none; kept as built.
+- **Old record dated by a newer read**: VaultTSQ dates a still-new item by the newest read's time, the honest answer to when the ground truth was last consulted. Rec: keep. Coach (2026-11-25): (empty: took the Rec). Asked in thread 10 (#924). Work: none; kept as built.
+- **renewal() hands the gate the Lease itself**: the world's gate friend answers the world's Lease object, typed as its Thing fields; the two fields a Lease keeps private are lease_key and bank_key_lease_wrapped, the lease record's secret material, and putting them on its public face would break guarantee G4. Rec: keep. Coach (2026-11-25): "I see, yes". Asked in thread 1d (#907). Work: none; kept as built.
+- **One-watch lock loss**: Through the one-watch wrapper, if tab A's watch throws and tab B's throws too, nobody holds the lock and nobody watches, and the janitor never retries because both minders still count themselves watching. The fix is that the wrapper tells its minder a start failed, so isWatching goes false and the janitor's retry asks for the lock again. Coach (in chat, 2026-11-25): "yes do your fix for the lock loss". Asked in thread 7 (#915). Work: thread 13, `watch_recovery`, building.
+- **A stored lease citing a newer gate revision does not refresh the gate.** Rec: leave it out. Coach: "it can't overwrite, though, yes? -- is there a test for that?" 2026-11-25, #909. Answer: it can't. Taking up the lease touches only the lease (#takeUp attaches it and announces; nothing writes the gate), but no test pins that the gate is unchanged. A stale stow can't overwrite a newer stored lease (the device database battery's NotNewerCases, memory and IndexedDB), and an older ring can't make a tab drop a newer lease ("keeps its own lease where an older lease record rings"). Work: thread 11 adds the missing test that taking up such a lease leaves the gate as it was.
+- **The watch's lock and channel are named per bank, with no prefix.** Rec: a prefix only when needed. Coach: "it should be named for safebyok, userid and bank's labelpath". 2026-11-25, #915. Work: thread 11.
+- **For coach: a hidden watch-holding tab on iOS Safari.** Rec: try it on a device first. Coach: "add to todo. can playwright show this?" 2026-11-25, #915. Work: a TODO entry; Playwright's WebKit is desktop WebKit and does not reproduce iOS's background suspension, so a device (or BrowserStack's real iOS) is the test.
+- **A host's own passphrase change announces softlocked in its own tab.** Rec: keep and document it. Coach: "if it works out in the end add to wontfix". 2026-11-25, #912. Work: thread 11 (a wontfix row).
+- **The tab that takes over the watch doesn't refresh the world (YOLO).** Rec: keep. Coach: "keep in mind that the `track` mechanism refreshes the world on each request if newer". 2026-11-25, thread 7. No work; noted for later reviewers.
+- **An expired lease still attached is renewed by an unlock in that tab.** Rec: leave it. Coach: "yes just extend it". 2026-11-25, #912. No work.
+- **The default lifecycle handler is silent.** Rec: silent. Coach: "let's have it log each of the stage crossings with a #setStage method that inscribes and announces". 2026-11-25, #912. Work: thread 11.
+- **Another tab's softlock is heard as lease_taken_up.** Rec: keep. Coach: (empty: took the Rec). 2026-11-25, #912. No work.
+- **A reload or reconnect announces lease_taken_up to its own host.** Rec: keep. Coach: (empty: took the Rec). 2026-11-25, #912. No work.
+- **One devicetok per bank, not per browser (YOLO).** Rec: keep per bank. Coach: "We'd prefer it to be per user+browser, there is already a banktok". 2026-11-25, #910. Work: thread 11 (one devicetok per user per device database).
+- **A lease is filed under its own scope, `lease/<gate label>`.** Rec: keep. Coach: "everything lease-y should be at lease/label (where label happens to match the gate), referencing it own label". 2026-11-25, #909. Work: thread 11.
+- **The vault TSQ decodes read_tc a second time.** Rec: read the decoded time in one place. Coach: (empty: took the Rec); and in chat: "would you make it read_at for consistency, and yes let's put the bookkeeping together". 2026-11-25, #908. Work: thread 10 `car_read_at` (a read_at getter on the car).
+- **Renaming device_tok to devicetok changes the wayin's ctx bytes.** Rec: rename it everywhere, ctx included; old gates read as corrupt. Coach (in chat): "Yes (my recommendation): rename it everywhere, c" (cut off; it quotes the Rec). 2026-11-25, thread 5 (#910). Work: thread 5 resumed; big gains a devicetok checker beside device_tok (my call).
+- **A disconnect drops only this tab's copy of the lease (E1).** Rec: keep. Coach: "It should not, it's just for unmount. Vacate delete and lock cause lock". 2026-11-25, thread 1b. Work: thread 1b, with disable() narrowed to drop this tab's copy only.
+- **leaseLabelpathOf is exported unchecked.** Rec: LeaseLabelpath.of, checking its argument, in a later thread. Coach: (empty: took the Rec). 2026-11-25, #907. Work: a TODO entry.
+- **No readAt getter on the car.** Rec: add it when something needs it. Coach: "I'm surprised nothing is checking that, can you have a little sonnet look for places people are doing time math with the read_ tc?" 2026-11-25, #908. Work: a sonnet search; its findings come back in chat.
+- **A custom store reporting a limit under the floor refuses storage_issue.** Rec: keep. Coach: (empty: took the Rec). 2026-11-25, #905. No work.
+- **A lease's revseq counts across lives.** Rec: keep. Coach: (empty: took the Rec). 2026-11-25, #907. No work.
+- **One lease slot per bank.** Rec: leave it until a second gate. Coach: "File it by gate so it doesn't change later. A gate might have different authorizations you'd escalate into". 2026-11-25, #907. Work: thread 1b (the device database files a lease by gate).
+- **A lease's lifepath is its own lifeseq alone.** Rec: keep. Coach: "Put in a dummy 0000000 to keep the invariant segments count matches shape." 2026-11-25, #907. Work: thread 1b (a two-segment lifepath, a zero first segment).
+- **A failed probe step keeps its own refusal.** Rec: keep, with meta.stepkind and the cause, over a probe_failed kind. Coach: (empty: took the Rec). 2026-11-25, #906. No work.
+- **The probe's box path is not reserved.** Rec: leave box/safebyok_probe unreserved. Coach: (empty: took the Rec). 2026-11-25, #906. No work.
+- **stats lives on the Vault; on the world record?** Options: (a) a stats field on the world record, a scan on every world read; (b) world.stats(), beside vault.stats(), costing nothing until called. Rec: (b). Coach (in chat): "ok for (b)." 2026-11-25, thread 2. Work: the #905 amendment adds world.stats().
+- **Items invalidated on reconnect?** Rec: keep invalidating items, since the listing carries lifeseqs only. Coach: "> the one listing carries lifeseqs only — doesn't it have every sparse record in its delta? We will later have something trigger the listing, which invalidates only the boxes that need listing. LMK if I'm in error. — Remember how slowly everything changes vs. time from mount to unmount". 2026-11-25, #900. The Coach is right: the listing answer carries each box's sparse record, and VaultMinder already hands each to its Thing, which goes cold and invalidates its item when the revision moved (only the VaultTSQ's kept listing holds lifeseqs). Work: thread 8 `janitor`: VaultTSQ.connect invalidates listings and roots, not items.
+- **The probe's whisperMatched can no longer come out false from storage.** Rec: keep the field. Coach: (empty: took the Rec). 2026-11-25, #906. No work.
+- **The vault TSQ's cache dates items by storage's clock.** Rec: date items by the tab's clock, with E3. Coach: "no what matters is when the ground truth was consulted. You don't have control over the device clock. read_tc is set by the backing store and carried thru after". 2026-11-25, #906. Rec declined; read_tc stays storage's; also answers the Closer Look's E3. No work.
+- **Two probes at once trip each other.** Rec: keep the wontfix row. Coach: (empty: took the Rec). 2026-11-25, #906. No work.
+- **A whisper that comes back different is reported, not thrown.** Rec: keep. Coach: (empty: took the Rec). 2026-11-25, #906. No work.
+- **IndexedDB's max size is the origin's quota.** Rec: keep. Coach: (empty: took the Rec). 2026-11-25, #905. No work.
+- **stats leaves out the bank's own record.** Rec: keep. Coach: (empty: took the Rec). 2026-11-25, #905. No work.
+- **Postgres measures size its own way.** Rec: keep. Coach: (empty: took the Rec). 2026-11-25, #905. No work.
+- **stats answers the full Answer.** Rec: keep one Answer shape. Coach: "correct!". 2026-11-25, #905. No work.
+- **The janitor runs only on its timer.** Rec: keep it private. Coach: (empty: took the Rec). 2026-11-25, #902. No work.
+- **The World decodes the minder's read times.** Rec: a readAt getter on the car, later. Coach: "car and thing can provide a readAt getter". 2026-11-25, #902. Work: thread 8 `janitor`.
+- **Autolock runs only while connected.** Rec: start the janitor at sign-in, and have it re-read the gate only while connected. Coach: (empty: took the Rec). 2026-11-25, #902. Work: thread 8 `janitor`.
+- **The lease database is named 'lease'.** Rec: keep until big goes. Coach: (empty: took the Rec). 2026-11-25, #903. No work.
+- **A stow writes over a damaged row.** Rec: keep. Coach: (empty: took the Rec). 2026-11-25, #903. No work.
+- **The lease row's shape.** Rec: keep. Coach: (empty: took the Rec). 2026-11-25, #903. Superseded in form by thread 1d (Thing-shaped LeaseRecord); no work.
+- **Lease doc wording.** Rec: keep the new wording. Coach: (empty: took the Rec). 2026-11-25, #902. No work.
+- **A clock stepped back hides a stale gate.** Rec: leave it. Coach: (empty: took the Rec). 2026-11-25, #902. No work.
+- **Autolock lands within 10 minutes.** Rec: confirm the default. Coach: "yes. Add comment there confirming that autolock is a best-effort quota not a hard boundary". 2026-11-25, #902. Work: thread 8 `janitor`.
+- **devicetok leaves Device.make's record.** Rec: drop it from the record. Coach: "the host may want to set it, if given one use it". 2026-11-25, thread 5. Work: thread 5's gloss: an optional devicetok on DeviceOpts wins over the stored or made one.
+- **Device verbs after disable.** Rec: leave until vacate. Coach: (empty: took the Rec). 2026-11-25, #900. Waits on vacate.
+- **disable()'s refusal says sweep.** Rec: a new-core phrase saying "disabled" when vacate lands. Coach: (empty: took the Rec). 2026-11-25, #900. Waits on vacate (out of sprint).
+- **'swept' renamed 'disabled' (YOLO).** Rec: keep. Coach: (empty: took the Rec). 2026-11-25, #900. No work.
+- **Own box writes unheard while disconnected.** Rec: keep; documented. Coach: (empty: took the Rec). 2026-11-25, #900. No work.
+- **stats reports, nothing enforces.** Rec: report only this sprint. Coach: "right". 2026-11-25, thread 2. No work.
+- **Freshness through staleTime, not agekind.** Rec: keep. Coach: (empty: took the Rec). 2026-11-25, #900. No work.
+- **A broken watch no longer fails sign-in.** Rec: keep it; watch is idempotent at VaultMinder, and a failed watch retries on the next connect(). Coach: "ok you can also have the janitor check watches". 2026-11-25, #900. Work: thread 8 `janitor` (the janitor retries a watch that is not running).
+- **A store limit may be 0.** The check took any whole number from 0 to the cap, since a browser may report a quota of 0. Rec: keep. Coach: "continuing to operate with a limit of 0 is surprising behavior. In the notes/sizings file, take the size of a single medium box, plus the world record, add 50% again and round up to the nearest 1000 bytes. A quota less than 2 or that size should refuse at start." 2026-11-25, #905. My calls (YOLO): notes/reference-sizes.md sizes no bank record, so medium box 1,087 + gate 1,029 + root box 566 = 2,682, ×1.5 → 5,000 bytes; "less than 2 or that size" read as below twice that, 10,000 bytes; "at start" read as when IdbVaultDB first opens its database, refusing storage_blocked. Work: a rework of #905 after its review.
+- **big's Capacity is not reused.** Its shape differs (boxes/bytes, used/max, Infinity mapped to MAX_SAFE_INTEGER), so stats has its own. Rec: no action. Coach: (empty: took the Rec). 2026-11-25, #905. No work.
+- **'lease row' names the stored lease.** Thread 1a named it LeaseRow, LiveLeaseRow and storedRowOf. Coach: "What would it cost us to make it Thing-shaped enough for Record<Lease> and Tombstone<Lease | LeaseRecord> to work? It's being stored, after all." and "Either way Lease, LeaseRecord and LeaseTombstone are apposite; peekLease and stowLease, etc". 2026-11-25, #903. Thread 1d (lease_thing) makes the stored LeaseRecord Thing-shaped, with those names.
+- **Roots refresh on reconnect (YOLO).** Coach: "This is handled already by the many caches. All that matters is when it was read. This is not a startup concern, it's a janitorial concern. That is concurrency machinery and does not belong." 2026-11-25, #900. Removed by a second rework; the janitor (#902) refreshes by read time.
+- **safebyok-convex is still on safebyok-big.** Coach: "yes convex and other adapters will be soon." 2026-11-25, thread 7. Noted in the plan.
+- **device_tok leaves Device.make's record.** Coach: "device_tok should be devicetok". 2026-11-25, thread 5. Renamed in the plan; the record question is re-asked.
+- **stats: size and max are bytes in total.** Coach: "don't let store limit be infinity, cap at 1_900_649_2568 // 1-900-MIX-A-LOT". 2026-11-25, thread 2. In the plan.
+- **stats: count includes tombstones.** Coach: "for stats: { box: { count: xxx, live_count: xxx, size }, ...". 2026-11-25, thread 2. In the plan.
+- **connect() refetches the cache.** Coach: "invalidate listings and roots, not items. (there's only one listing)". 2026-11-25, #900. Items: my pushback is a new row.
+- **New wontfix row: what lands across a disconnect.** Coach: "wontfix -- yes". 2026-11-25, #900. Kept.
+- **Deleted tests for the disabled path.** Same ruling. 2026-11-25, #900. Restored on disable(), G2 zeroing included.
+- **The 'swept' stage has no way in.** Coach: "vacate will / add a disable() method to keep the tests". 2026-11-25, #900. device.disable() added; the stage is now 'disabled'.
+- **tidy_gone: which rows?** Only box tombstones could be purged, changing what other devices learn of a delete. Coach: "skip tidy_gone; it becomes relevant when delete bank or nested boxes become a thing". 2026-11-25, thread 3. Dropped from the plan.
+
+## The orchestrator's calls
+
+These are the orchestrator's calls from the Cleanup tab's *Your calls* table, not the Coach's rulings. Each is a matter, my call, and where it lands.
+
+- **Per-bank devicetok rows an earlier build left in IndexedDB** (the orchestrator's call, not the Coach's). My call: Leave them: no migrations before 1.0, and nothing reads them; the changeset says a host sees a fresh devicetok once per user. Lands in: #927.
+- **The stats reviewer fixed a file outside the thread's diff: isVaultMinder's member list lacked the two stats verbs the thread added. (#905)** (the orchestrator's call, not the Coach's). My call: Keep 0051f2dc7: it only completes the thread's own addition. Lands in: #905, as is.
+- **#901's CLAUDE.md commit** (the orchestrator's call, not the Coach's). My call: re-place #lock-is-intent at the restack once your memory-sweep CLAUDE.md is on main. Lands in: wrap-up restack.
+- **#903 doc blocks, scopepathOf export** (the orchestrator's call, not the Coach's). My call: documentarian over device-db.ts and StampChecks after 1b; 1b exports scopepathOf and LeaseScopepath. Lands in: 1b's handoff; Finally.
+- **Line order** (the orchestrator's call, not the Coach's). My call: 0 → 1c → 1a → 1b: #903 files onto #902 once it lands, so no restack is needed before 1b. Lands in: the plan.
