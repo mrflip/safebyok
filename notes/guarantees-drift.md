@@ -120,5 +120,7 @@ what differs from big, in a sentence or two.
   device's IndexedDB only when a stow writes over them: a tombstone, the next life's row, or any row over a row that
   fails its check (big's exception, a damaged row kept until a later stow, now has no other way out). G4 holds in
   substance: the leaseKey is made non-extractable and kept only as its `CryptoKey` handle, by structured clone, and a
-  tombstone holds no keys. What drifts is that a lock no longer deletes the row. Nothing calls the deviceDB yet;
-  thread 1b of lease_shelf has the Device stow and follow it.
+  tombstone has no keys. What drifts is that a lock no longer deletes the row, and that a row is no longer read only by
+  a query that names its bank's life: it is filed and peeked by its bank's scope alone, a live row cites its bank's
+  life (`bank_lifeseq`, `bank_lifetok`) and a tombstone none, so a row of an earlier life of the bank is told apart by
+  whoever peeks it. Nothing calls the deviceDB yet; thread 1b of lease_shelf has the Device stow and follow it.
