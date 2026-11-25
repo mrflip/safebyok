@@ -1,7 +1,7 @@
 # Thread 32: valedictory (2026-11-25)
 
-Branch `20261125-valedictory`, PR [#904](https://github.com/mrflip/safebyok/pull/904), on `main`. **Blocked on V2 step 3**, parked on the local branch
-`20261125-valedictory-step3` (not pushed, not in the PR). Proved: `pnpm justify` green in full, nothing skipped: safebyok 2,006 (1,992 + 14), react-lean 338, idb-lean 115, postgres 365, convex 334, graphql 448, fastkey 43, big 2,950, indexeddb 215, react 277, dojo 111, knockknock 26, envman 24, demo-react 99, e2e 576, root scripts 331.
+Branch `20261125-valedictory`, PR [#904](https://github.com/mrflip/safebyok/pull/904), on `main`. **V2 step 3 is in the PR**: the worker
+parked it on the root voids at signin (below), and the orchestrator finished it with remedy (C), on its own reading, for the Coach to confirm. Proved at the tip with step 3: `pnpm justify` green in full, nothing skipped: safebyok 2,034 (1,992 + 42), react-lean 338, idb-lean 115, postgres 365, convex 334, graphql 448, fastkey 43, big 2,950, indexeddb 215, react 277, dojo 111, knockknock 26, envman 24, demo-react 99, e2e 576, root scripts 331.
 
 Built by hand (no /sprint), from the orchestrator's brief. The last thread of the feed_sorter line.
 
@@ -28,7 +28,9 @@ Built by hand (no /sprint), from the orchestrator's brief. The last thread of th
   * **V5** (`09bbca6da`, sonnet subagent): an `amended` line under thread 31's proving entry (its "Not checked: ...
     that a stored wayin agrees with the header" no longer holds), and a new entry: an answer carries no `world`.
 
-* **Parked: V2 step 3** (`20261125-valedictory-step3`, two commits over this PR's tip, green at 2,034 with the second):
+* **V2 step 3, parked by the worker and then finished** (its two commits replayed onto the PR's tip as `38e6e7d54` and
+  `212e25d42`, with remedy (C); the two `notes/wontfix.md` entries reworded in `1333e0340`). What follows is the worker's
+  account as it parked it, kept for the question it raises:
   the car keeps `agerank` and `agekind`, decides news and returns the events; `Thing.receive` adopts a whole record,
   tombstone or void sentinel newer than the held one (`BaseThing.cmp(held, val) > 0`), tells subscribers only then, and
   answers a boolean; `heldAgerankOf` (agerank.ts) starts a car of a Thing holding a record; `ReceivingThing` is
@@ -59,7 +61,7 @@ Built by hand (no /sprint), from the orchestrator's brief. The last thread of th
     `dispatchedItemEventOf`.
 
 * **Deviations**:
-  * Step 3 not in the PR (above).
+  * Step 3 went in after the worker's report, with remedy (C), not yet confirmed by the Coach (above).
   * In step 3, the Thing adopts and tells before the car moves its agerank, `read_tc` and `citable`, so that a record
     the Thing refuses leaves the car as it was: a subscriber reading the car finds it as before the record. No reader
     does today.
