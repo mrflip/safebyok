@@ -314,8 +314,7 @@ export class World {
   disconnect(): this {
     this.#isConnected = false
     this.lock()
-    if (this.#janitor !== null) { clearInterval(this.#janitor) }
-    this.#janitor = null
+    this.#stopJanitor()
     for (const vault of this.#vaults) { vault.disconnect() }
     try { this.#vaultMinder?.disconnect() } catch (err) { this.#device.tellBadNews([err]) }
     return this
@@ -337,18 +336,27 @@ export class World {
     if (this.#isConnected) { vault.connect() }
   }
 
-  /** Start the VaultMinder's watch, telling the device's `onBadNews` what the host's vaultDB throws, and the janitor, where someone has signed in */
+  /** Start the VaultMinder's watch and the janitor, where someone has signed in, telling the device's `onBadNews` what the host's vaultDB throws */
   #connectSignedIn(): void {
     if (this.#vaultMinder === null) { return }
     try { this.#vaultMinder.connect() } catch (err) { this.#device.tellBadNews([err]) }
-    this.#janitor ??= setInterval(() => { this.#tidy() }, Math.min(this.#device.janitorMillis, MaxTimerMillis))
+    this.#startJanitor()
   }
   // --
 
-  // == [The janitor]: #tidy, #isGateStale, #refreshRoots
+  // == [The janitor]: #startJanitor, #stopJanitor, #tidy, #isGateStale, #refreshRoots
   // #lock-is-intent: autolock is a best-effort time, not a deadline. A lease past its end still seals and unseals until
   // the next tick, which may come a janitor period late, or later while the page sleeps. Meanwhile isSoftlocked holds,
   // so a call to ensureUnlocked asks the user first.
+
+  /** Tidy every `janitorMillis` of the device, from now on; a second call does nothing */
+  #startJanitor(): void { this.#janitor ??= setInterval(() => { this.#tidy() }, Math.min(this.#device.janitorMillis, MaxTimerMillis)) }
+
+  /** Stop the janitor, where it runs */
+  #stopJanitor(): void {
+    if (this.#janitor !== null) { clearInterval(this.#janitor) }
+    this.#janitor = null
+  }
 
   /** Lock this world once its lease has passed its end, and read its roots again once the gate was last read longer ago than the device's `gateStaleMillis`. Never throws: a refusal goes to the device's `onBadNews`. */
   #tidy(): void {
