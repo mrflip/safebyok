@@ -3,7 +3,7 @@
 Mode: **YOLO**. Issued by the Coach, 2026-11-25. Cap: 3 threads at once.
 Default levels: review `medium`; worker `opus` (thread-worker), reviewer `opus` for threads touching what
 `notes/guarantees-big.md` covers (lease, keys), else its `sonnet` pin; style pass on `style-reviewer`'s pin.
-Status: 0, 1c, 1a, 4 out of draft (#900, #902, #903, #906); 2 stats (#905) refiled after the quota and world.stats() amendment, CI running; 1d (#907) reviewed (fixed), filing; 8 janitor (#908) ready, in review; 1b waits on 1d and 8 (8 restacked onto 1d first) and on the Closer Look's E1.
+Status: 0, 1c, 1a, 4, 2, 1d out of draft (#900, #902, #903, #906, #905, #907); 8 janitor (#908) filed on #907, CI; 1b (#909) ready, in review (`high` on opus); 5 devicetok building (from 1b); 6 waits on 1b's review; 7 last. Closer Look triaged (E1, E3, E9 ruled; rest dropped).
 
 Sprint doc: https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh (Open Matters bookmark rev 3).
 
@@ -92,7 +92,7 @@ opus; review `high` on opus. Depends on 1a. PR #907. Reviewed; filing.
 Gloss: design 2 to 4, 9, 10. `Device.make` takes the device database. The lease is stowed on attach, tombstoned on
 lock, and taken up or evicted from what other tabs write. A gate change softlocks it. `ends_at` moves into the row.
 A refused stow or peek is told as bad news, and the tab keeps its in-memory lease. The listener starts and stops
-with connect/disconnect. Levels: review `high` on `opus`; worker `thread-worker-400k`. Depends on 1d (on 1a, on 1c). Look-ahead: 5 and 6 build on its device wiring.
+with connect/disconnect. Levels: review `high` on `opus`; worker `thread-worker-400k`. Depends on 1d (on 1a, on 1c). Cut from 8. PR #909, ready; in review. *Coach:* a disconnect "should not [lock], it's just for unmount. Vacate delete and lock cause lock" (disable() drops this tab's copy too); "File it by gate" (keyed by the lease's own scope, `lease/<gate label>`); lifepath `0000000000/<lifeseq>`. Look-ahead: 5 and 6 build on its device wiring.
 
 ### 2. `stats`: storage stats
 > "add a stats() call that returns { box: { count, size }, gate: { count, size }, max: { count, size } }"
@@ -131,7 +131,7 @@ to labelpaths. Depends on 0. Size: small. Branch `20261125-probe`, PR #906, cut 
 Gloss: today the provider makes `device_tok: crypto.randomUUID()` on every mount, and each wayin records it. The
 device keeps one token in the device database, made once, read at connect or sign-in. *Coach:* "device_tok should
 be devicetok": the field is renamed throughout the new core, stored wayins included. `Device.make`'s record drops it
-(a YOLO decision, recorded). Without a device database, a fresh one per Device. *Coach (2026-11-25):* "the host may want to set it, if given one use it": an optional `devicetok` on DeviceOpts wins over the stored or made one. Depends on 1b.
+(a YOLO decision, recorded). Without a device database, a fresh one per Device. Cut from 1b (`thread-worker-400k`); building. *Coach (2026-11-25):* "the host may want to set it, if given one use it": an optional `devicetok` on DeviceOpts wins over the stored or made one. Depends on 1b.
 
 ### 6. `lifecycle`: lifecycle announcements
 > "probe and lifecycle announcements seem reasonable"
