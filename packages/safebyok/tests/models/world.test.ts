@@ -7,11 +7,13 @@ import { Bank } from '../../src/models/bank'
 import { Box } from '../../src/models/box'
 import type { Device } from '../../src/models/device'
 import { Gate } from '../../src/models/gate'
+import { Lease } from '../../src/models/lease'
 import * as Throwers from '../../src/refusals/throwers'
 import { Lifeseq } from '../../src/shapes/primitives'
 import { type BadNews, type DeviceOpts, type LifecycleHandler, type Lifecyclekind, type WorldSnapshot, PendingWorld, bankStageVals } from '../../src/shapes/shapes-bankish'
 import type { LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
+import type { LiveOf } from '../../src/shapes/shapes-sealers'
 import type { SeenThing } from '../../src/shapes/shapes-vault-event'
 import { readAtOf, readTcNow } from '../../src/storage/agerank'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
@@ -576,6 +578,17 @@ describe("a lease shared by the tabs of one deviceDB", () => {
     await later.signin(TH.WorldScope.userid)
     await settle()
     expect([later.world.isUnlocked, later.world.leaseEndsAt]).to.deep.equal([true, Clock.nowMillis() + later.softlockMillis])
+  })
+
+  it("leaves the gate stored as it is where a lease it takes up cites a newer revision of the gate", async () => {
+    const { second, deviceDB, vaultDB } = await twoTabs()
+    const gateStored = structuredClone(vaultDB._cheat_things(TH.WorldScope).get('gate'))
+    const [stored, loggableBefore] = [await storedLeaseOf(deviceDB) as LiveOf<LeaseRecord>, second.world.leaseLoggable]
+    await deviceDB.stowLease({ ...stored, ...Lease.nextRevisionOf(stored), gate_revseq: stored.gate_revseq + 1, gate_revtok: TH.OtherRevtok })
+    await settle()
+    expect(vaultDB._cheat_things(TH.WorldScope).get('gate')).to.deep.equal(gateStored)
+    expect(second.world.leaseLoggable).to.not.deep.equal(loggableBefore)
+    expect([second.world.isUnlocked, second.world.isSoftlocked]).to.deep.equal([true, false])
   })
 
   it("drops the lease in a tab that disconnects alone, and takes it up again as it connects", async () => {

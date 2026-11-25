@@ -176,13 +176,13 @@ export class Device {
   // == [The devicetok]: ensureDevicetok
 
   // As a refused lease stow is (World.#stowLease), a refused devicetok is bad news: the wayin is still built.
-  /** The token each wayin this device builds records: the host's `devicetok`, or the one the deviceDB keeps for the bank at `scope`, made at its first use.
+  /** The token each wayin this device builds records: the host's `devicetok`, or the one the deviceDB keeps for the user `userid`, made at its first use.
    * Where the deviceDB refuses, it tells `onBadNews`, and answers a fresh token for this call alone.
    */
-  async ensureDevicetok(scope: BankScope): Promise<Devicetok> {
+  async ensureDevicetok(userid: Userid): Promise<Devicetok> {
     if (this.#devicetok !== null) { return this.#devicetok }
     try {
-      return await this.deviceDB.ensureDevicetok(scope)
+      return await this.deviceDB.ensureDevicetok(userid)
     } catch (err) {
       this.tellBadNews([err])
       return Crypto.randomId()

@@ -2,8 +2,8 @@
 
 import type { UseStore } from 'idb-keyval'
 import { dbprefixOf, inOneStep, rowAt, versionedShelfOf } from 'safebyok-big/storage'
-import type { BankScope, LeaseRecord, LeaseScope } from '../shapes/shapes-stamps'
-import type { Devicetok } from '../shapes/primitives'
+import type { LeaseRecord, LeaseScope } from '../shapes/shapes-stamps'
+import type { Devicetok, Userid } from '../shapes/primitives'
 import { type DevicetokScopepath, type IdbDeviceDBOpts, type LeaseScopepath, idbDeviceDBOpts } from '../shapes/shapes-device-db'
 import { DeviceDB } from './device-db'
 
@@ -28,12 +28,12 @@ export function leaseBellnameOf(dbName?: string): string { return `${dbprefixOf(
 /** Where the lease record at `scope` is filed: one for each gate. */
 export function scopepathOf({ userid, banklabel, labelpath }: LeaseScope): LeaseScopepath { return [userid, banklabel, labelpath] }
 
-// It never meets a lease record's scopepath, whose last part is a lease's labelpath, always `lease/` and a gate's label.
-/** Where the devicetok of the bank at `scope` is filed, in the same store as the lease records: one for each bank. */
-export function devicetokScopepathOf({ userid, banklabel }: BankScope): DevicetokScopepath { return [userid, banklabel, 'devicetok'] }
+// It never meets a lease record's scopepath, which has three parts.
+/** Where the devicetok of the user `userid` is filed, in the same store as the lease records: one for each user. */
+export function devicetokScopepathOf(userid: Userid): DevicetokScopepath { return [userid, 'devicetok'] }
 // --
 
-/** A device database of each bank's devicetok and each gate's lease record, in this browser's IndexedDB, shared by every tab of its origin.
+/** A device database of each user's devicetok and each gate's lease record, in this browser's IndexedDB, shared by every tab of its origin.
  * A live record's leaseKey is stored as its `CryptoKey` handle, by structured clone, and never as bytes (G4).
  */
 export class IdbDeviceDB extends DeviceDB {
@@ -80,10 +80,10 @@ export class IdbDeviceDB extends DeviceDB {
     return () => { channel.close() }
   }
 
-  protected async doStowDevicetok(scope: BankScope, devicetok: Devicetok, isReplaced: (raw: unknown) => boolean): Promise<unknown> {
+  protected async doStowDevicetok(userid: Userid, devicetok: Devicetok, isReplaced: (raw: unknown) => boolean): Promise<unknown> {
     return await inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const before = await rowAt(store, devicetokScopepathOf(scope))
-      if (isReplaced(before)) { store.put(devicetok, devicetokScopepathOf(scope)) }
+      const before = await rowAt(store, devicetokScopepathOf(userid))
+      if (isReplaced(before)) { store.put(devicetok, devicetokScopepathOf(userid)) }
       return before
     })
   }

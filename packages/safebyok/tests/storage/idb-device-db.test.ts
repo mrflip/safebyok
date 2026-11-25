@@ -37,9 +37,9 @@ TH.describeDeviceDBLeaseBattery('IdbDeviceDB', {
 TH.describeDeviceDBDevicetokBattery('IdbDeviceDB', {
   makeDeviceDB:   () => makeIdbDeviceDB(),
   makeTwin,
-  plantDevicetok: async (deviceDB, scope, raw) => {
+  plantDevicetok: async (deviceDB, userid, raw) => {
     const shelf = createStore(leaseDatabasenameOf(DbNameForDeviceDB.get(deviceDB)), 'leases')
-    await inOneStep(shelf, 'readwrite', (store) => { store.put(raw, devicetokScopepathOf(scope)) })
+    await inOneStep(shelf, 'readwrite', (store) => { store.put(raw, devicetokScopepathOf(userid)) })
   },
 })
 

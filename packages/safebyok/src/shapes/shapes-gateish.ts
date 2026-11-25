@@ -16,7 +16,7 @@ import { BankChecks, GateChecks } from './shapes-thingkinds'
 import { type GateRecord, type Sparse, ThingChecks } from './shapes-thing'
 import type { PutAskDraft } from './shapes-asks'
 import type { WayinHeader } from './shapes-wayin'
-import type { Devicetok } from './primitives'
+import type { Devicetok, Userid } from './primitives'
 
 // == [The form verbs' cleartexts]: CleartextChecks, BirthCleartexts, UnlockCleartexts, PassphraseReplaceCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, ProvedCleartexts, GatingCleartexts
 
@@ -160,7 +160,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, fn, bool, uint, custo
   leaseGate:           obj({ bankStamp: BankChecks.stamp, leaseMillis: uint, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }),
   // A gate's stamp is fixed for its life; the lease pins one revision of the gate too.
   gateRevisionedStamp: GateChecks.stamp.extend(ThingChecks.sparse.pick({ revtok: true, revseq: true }).shape),
-  provingDevice:       GX.provingDevice.omit({ device_tok: true }).extend({ strengthChecker: custom<GuardedStrengthChecker>(Consts.isGuarded, BigPhrases.GuardedExpected), ensureDevicetok: fn<(scope: BankScope) => Promise<Devicetok>>() }),
+  provingDevice:       GX.provingDevice.omit({ device_tok: true }).extend({ strengthChecker: custom<GuardedStrengthChecker>(Consts.isGuarded, BigPhrases.GuardedExpected), ensureDevicetok: fn<(userid: Userid) => Promise<Devicetok>>() }),
   provingOpts:         obj({ wayinKey: custom<CryptoKey>(isWayinKey, Phrases.WayinKeyExpected) }).strict(),
 }))
 
