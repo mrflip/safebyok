@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { refusalkindVals } from 'safebyok/core'
-import { safebyokErrorKindVals, isSafebyokRefusal } from '../src/refusals'
+import { safebyokErrorkindVals, isSafebyokRefusal } from '../src/refusals'
 
 const RefusalCases = [
   [{ kind: "identity_revoked" },                     true,   'an identity_revoked refusal'],
@@ -23,8 +23,8 @@ describe("isSafebyokRefusal", () => {
   }
 })
 
-describe("safebyokErrorKindVals", () => {
+describe("safebyokErrorkindVals", () => {
   it("names only kinds the core's refusalkindVals lists", () => {
-    for (const kind of safebyokErrorKindVals) { expect(refusalkindVals).to.include(kind) }
+    for (const kind of safebyokErrorkindVals) { expect(refusalkindVals).to.include(kind) }
   })
 })

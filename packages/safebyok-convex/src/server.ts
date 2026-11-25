@@ -11,8 +11,8 @@ import * as Phrases from './phrases'
 import type { SafebyokRefusal } from './refusals'
 
 export type { ComponentApi } from './component-api'
-export { safebyokErrorKindVals, safebyokRefusal, isSafebyokRefusal } from './refusals'
-export type { SafebyokRefusal, SafebyokErrorKind } from './refusals'
+export { safebyokErrorkindVals, safebyokRefusal, isSafebyokRefusal } from './refusals'
+export type { SafebyokRefusal, SafebyokErrorkind } from './refusals'
 
 // == [Options]: GetUserId, SafebyokApiOpts
 
