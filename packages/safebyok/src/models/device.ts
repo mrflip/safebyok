@@ -16,7 +16,7 @@ import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthCheck
 import type { BankScope } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Lifetok, Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
-import { SortedVaultDB } from '../storage/sorted-vault-db'
+import { VaultMinder } from '../minding/vault-minder'
 import { itemSeenOf } from '../storage/agerank'
 import { readTcNow } from '../storage/thing-classifier'
 import { Labelpath } from '../shapes/primitives'
@@ -69,7 +69,7 @@ export class Device {
   #userid: Userid | null = null
   /** Scaffolding until the LocalBridge: the records the persisters restore and save, made as `signin` starts. */
   #persistScaffold: PersistScaffold | null = null
-  /** Scaffolding until the LocalBridge: ends the scaffold's listen to the SortedVaultDB. */
+  /** Scaffolding until the LocalBridge: ends the scaffold's listen to the VaultMinder. */
   #unlistenScaffold: () => void = noop
   /** The vault TSQ of the signed-in user's boxes, made as `signin` starts the bank. */
   #vaultTSQ: VaultTSQ | null = null
@@ -198,14 +198,14 @@ export class Device {
 
   // Scaffolding until the LocalBridge restores the Things. Each record is told apart, so a damaged one is news, and the
   // rest still reach their Things.
-  /** Hand `sortedVaultDB` each record `scaffold` restored, the roots first. */
-  #receiveRestored(sortedVaultDB: SortedVaultDB, scaffold: PersistScaffold): void {
+  /** Hand `vaultMinder` each record `scaffold` restored, the roots first. */
+  #receiveRestored(vaultMinder: VaultMinder, scaffold: PersistScaffold): void {
     const read_tc = readTcNow()
     const records = scaffold.records()
     const bank    = records.find((record): record is BankRecord => record.labelpath === 'bank')
     const banktok = ((bank !== undefined) && BaseThing.isLive(bank)) ? bank.lifetok : undefined
     for (const record of records) {
-      try { sortedVaultDB.receive(restoredEventOf(record, read_tc, banktok)) } catch (err) { this.tellBadNews([err]) }
+      try { vaultMinder.receive(restoredEventOf(record, read_tc, banktok)) } catch (err) { this.tellBadNews([err]) }
     }
   }
 
@@ -247,28 +247,28 @@ export class Device {
 
   // The world fetched lands in the world's Things, which the stage is read from; a failure to fetch it, once a bank is up
   // from what was restored, is no caller's to hear.
-  // The SortedVaultDB is made right before the vault TSQ, the scaffold and the world listen to it, with nothing awaited
+  // The VaultMinder is made right before the vault TSQ, the scaffold and the world listen to it, with nothing awaited
   // between: its Things remember what they take, so a record it took with no one listening would reach them later only as
   // a repeat, which it drops. The vault TSQ listens before the records restored are received, so each box's is in the
   // tree before the vaultDB answers; the scaffold has them already, and the world reads its Things at its signin.
-  /** Start the signed-in user's bank over a SortedVaultDB of it: from the records restored, where there are any, and from the world the vaultDB answers. */
+  /** Start the signed-in user's bank over a VaultMinder of it: from the records restored, where there are any, and from the world the vaultDB answers. */
   async #doSignin(): Promise<void> {
     try {
       const scaffold = PersistScaffold.make(this.scope)
       this.#persistScaffold = scaffold
       await this.#restore(scaffold, 'roots', this.#persisters?.roots)
       await this.#restore(scaffold, 'boxes', this.#persisters?.boxes)
-      const sortedVaultDB = SortedVaultDB.make(this.scope, { vaultDB: this.vaultDB, makeThing: (seen) => this.#world.makeThing(seen) })
-      this.#vaultTSQ = VaultTSQ.make({ vaultMinder: sortedVaultDB, queryClient: this.#vaultTsqClient, scope: this.scope, onBadNews: (news) => { this.tellBadNews([news]) } })
-      this.#receiveRestored(sortedVaultDB, scaffold)
-      this.#unlistenScaffold = scaffold.listen(sortedVaultDB)
-      this.#world.signin(sortedVaultDB)
+      const vaultMinder = VaultMinder.make(this.scope, { vaultDB: this.vaultDB, makeThing: (seen) => this.#world.makeThing(seen) })
+      this.#vaultTSQ = VaultTSQ.make({ vaultMinder, queryClient: this.#vaultTsqClient, scope: this.scope, onBadNews: (news) => { this.tellBadNews([news]) } })
+      this.#receiveRestored(vaultMinder, scaffold)
+      this.#unlistenScaffold = scaffold.listen(vaultMinder)
+      this.#world.signin(vaultMinder)
       // Scaffolding until sign-in is one get of the roots: a get of the root box, whose answer's world brings the bank and
       // main gate. Where none is stored, the bank is asked for, and its shell shows the stage `'unborn'`.
-      const rootAnswer = await sortedVaultDB.tryGetOnce({ ...this.scope, labelpath: Labelpath.RootBox })
+      const rootAnswer = await vaultMinder.tryGetOnce({ ...this.scope, labelpath: Labelpath.RootBox })
       if (! rootAnswer.ok) { throw rootAnswer.err }
       if ((rootAnswer.act === 'gotvoid') && (rootAnswer.world === null)) {
-        const bankAnswer = await sortedVaultDB.tryGetOnce({ ...this.scope, labelpath: 'bank' })
+        const bankAnswer = await vaultMinder.tryGetOnce({ ...this.scope, labelpath: 'bank' })
         if (! bankAnswer.ok) { throw bankAnswer.err }
         return
       }
@@ -301,7 +301,7 @@ export class Device {
   sweep(): this {
     if (this.bank !== null) { this.#world.sweep() }
     // The watch's stop is the host's vaultDB code: what it throws is news.
-    try { this.#world.sortedVaultDB?.sweep() } catch (err) { this.tellBadNews([err]) }
+    try { this.#world.vaultMinder?.sweep() } catch (err) { this.tellBadNews([err]) }
     return this
   }
   // --

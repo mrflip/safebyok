@@ -1,4 +1,4 @@
-/** `SortedVaultDB`, which answers a vaultDB's verbs over another, and tells one bank's records that are news as an ordered feed. */
+/** `VaultMinder`, which answers a vaultDB's verbs over another, and tells one bank's records that are news as an ordered feed. */
 
 import { once } from 'es-toolkit'
 import { Errors, Validator } from 'safebyok-big/internals'
@@ -10,24 +10,24 @@ import {
 import type { BankAskDraft } from '../shapes/shapes-bankish'
 import { type BankRecord, type ThingRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
 import type { BankScope } from '../shapes/shapes-stamps'
-import { type DelOnceArgs, type PutOnceArgs, type ReceivingThing, type SortedVaultDBListener, type SortedVaultDBOpts, type ThingMaker, SortedVaultDBChecks } from '../shapes/shapes-sorted-vault-db'
+import { type DelOnceArgs, type PutOnceArgs, type ReceivingThing, type VaultMinderListener, type VaultMinderOpts, type ThingMaker, VaultMinderChecks } from '../shapes/shapes-vault-minder'
 import { type ReadTc, type SeenThing, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { BaseThing } from '../models/base-thing'
 import type { Adoptable } from '../models/thing'
 import * as Throwers from '../refusals/throwers'
-import { itemSeenOf } from './agerank'
-import { refusedAnswerOf } from './refused-answer'
-import { readTcNow } from './thing-classifier'
+import { itemSeenOf } from '../storage/agerank'
+import { refusedAnswerOf } from '../storage/refused-answer'
+import { readTcNow } from '../storage/thing-classifier'
 import type { BirthBankAnswer, GetThingAnswer, Kids, ListThingsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
-import type { VaultDB } from './vault-db'
+import type { VaultDB } from '../storage/vault-db'
 
-// == [SortedVaultDB]: Stamp, Listening, SortedVaultDB
+// == [VaultMinder]: Stamp, Listening, VaultMinder
 
 /** Who dispatched a record, when it was read, and its bank's lifetok where known: every event of it carries all three. */
 type Stamp = Readonly<{ sourcelabel: string, read_tc: ReadTc, banktok: Lifetok | undefined }>
 
 /** One call of `listen`, holding its listener: a listener that listens twice is told twice, and each end stops one. */
-type Listening = Readonly<{ listener: SortedVaultDBListener }>
+type Listening = Readonly<{ listener: VaultMinderListener }>
 
 /** A vaultDB's four verbs over another vaultDB, for one bank, telling its listeners each record it learns of that is news, in order.
  * It learns of the records each answer carries, of what the wrapped vaultDB's watch notifies, and of the events a device database rings, handed to its `receive`.
@@ -36,7 +36,7 @@ type Listening = Readonly<{ listener: SortedVaultDBListener }>
  * It watches the wrapped vaultDB from when it is made until its `sweep`. A record it learns of while no one listens is
  * taken all the same, and reaches no one, then or later: listen before asking it anything.
  */
-export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> implements Omit<VaultDB, 'watch'> {
+export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> implements Omit<VaultDB, 'watch'> {
   // == [Props]: VaultDBSourcelabel, #vaultDB, #scope, #makeThing, #things, #listenings, #newestBanktok, #unwatchWrapped
 
   /** The `sourcelabel` of each event of a record from the wrapped vaultDB, from an answer or its watch. */
@@ -59,10 +59,10 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
   // == [Construction]: make, constructor
 
   /** Wrap `opts.vaultDB` for the bank at `scope`, and start watching it. */
-  static make<ThingT extends ReceivingThing>(scope: BankScope, opts: SortedVaultDBOpts<ThingT>): SortedVaultDB<ThingT> { return new SortedVaultDB(scope, opts) }
+  static make<ThingT extends ReceivingThing>(scope: BankScope, opts: VaultMinderOpts<ThingT>): VaultMinder<ThingT> { return new VaultMinder(scope, opts) }
 
-  private constructor(scope: BankScope, opts: SortedVaultDBOpts<ThingT>) {
-    const { scope: bankScope, opts: { vaultDB } } = SortedVaultDBChecks.makeArgs.parse({ scope, opts })
+  private constructor(scope: BankScope, opts: VaultMinderOpts<ThingT>) {
+    const { scope: bankScope, opts: { vaultDB } } = VaultMinderChecks.makeArgs.parse({ scope, opts })
     this.#vaultDB   = vaultDB
     this.#scope     = Object.freeze({ userid: bankScope.userid, banklabel: bankScope.banklabel })
     this.#makeThing = opts.makeThing
@@ -129,7 +129,7 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
     // A record told that fails its checks leaves no Thing: it went to onBadNews.
     const thing = this.thingAt(scoped)
     if (thing === undefined) { throw Throwers.storageIssue() }
-    if (thing.agekind === 'bare') { throw Throwers.boxSoonestBare(this.#labelpathOf(scoped)) }
+    if (thing.agekind === 'bare') { throw Throwers.thingSoonestBare(this.#labelpathOf(scoped)) }
     return thing.pickle() as ReturnType<ThingT['pickle']>
   }
 
@@ -240,8 +240,8 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
    *   later span of 65.536 seconds than that revision was last seen in.
    * - What `hear` throws goes to the listener's own `onBadNews`.
    */
-  listen(listener: SortedVaultDBListener): () => void {
-    SortedVaultDBChecks.listener.parse(listener)
+  listen(listener: VaultMinderListener): () => void {
+    VaultMinderChecks.listener.parse(listener)
     const listening: Listening = Object.freeze({ listener })
     this.#listenings.add(listening)
     return () => { this.#listenings.delete(listening) }
@@ -256,11 +256,11 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
    * Refuses an event of another bank.
    */
   receive(event: VaultEvent): void {
-    const rung = SortedVaultDBChecks.rungEvent.parse(event)
+    const rung = VaultMinderChecks.rungEvent.parse(event)
     Validator.demandConsistent(rung, this.#scope)
     if (event.eventkind !== 'item') { return }
-    const { liveness } = SortedVaultDBChecks.rungItem.parse(event)
-    if (liveness === 'void') { SortedVaultDBChecks.rungVoid.parseConsistent(event.val, rung) } else { SortedVaultDBChecks.rungThing.parseConsistent(event.val, rung) }
+    const { liveness } = VaultMinderChecks.rungItem.parse(event)
+    if (liveness === 'void') { VaultMinderChecks.rungVoid.parseConsistent(event.val, rung) } else { VaultMinderChecks.rungThing.parseConsistent(event.val, rung) }
     this.#tell([event.val], { sourcelabel: rung.sourcelabel, read_tc: rung.read_tc, banktok: rung.banktok ?? this.#newestBanktok })
   }
   // --
@@ -296,14 +296,14 @@ export class SortedVaultDB<ThingT extends ReceivingThing = ReceivingThing> imple
   #tellAnswer(answer: { banktok: Lifetok | null, read_tc: ReadTc }, seens: readonly SeenThing[]): void {
     const banktok = answer.banktok ?? undefined
     if (banktok !== undefined) { this.#newestBanktok = banktok }
-    this.#tell(seens, { sourcelabel: SortedVaultDB.VaultDBSourcelabel, read_tc: answer.read_tc, banktok })
+    this.#tell(seens, { sourcelabel: VaultMinder.VaultDBSourcelabel, read_tc: answer.read_tc, banktok })
   }
 
   /** Tell every listener the events of the record in `notice`, a notice of the wrapped vaultDB's watch. */
   #tellNotice(notice: VaultEvent): void {
     if (notice.eventkind !== 'item') { return }
     // The wrapped vaultDB stamps its notices when it classifies their records; one that does not is read now.
-    this.#tell([notice.val], { sourcelabel: SortedVaultDB.VaultDBSourcelabel, read_tc: notice.read_tc ?? readTcNow(), banktok: notice.banktok ?? this.#newestBanktok })
+    this.#tell([notice.val], { sourcelabel: VaultMinder.VaultDBSourcelabel, read_tc: notice.read_tc ?? readTcNow(), banktok: notice.banktok ?? this.#newestBanktok })
   }
 
   /** Tell every listener each event the Things return for `seens`, in order, each carrying `stamp`. A record refused goes to every listener's `onBadNews`. */

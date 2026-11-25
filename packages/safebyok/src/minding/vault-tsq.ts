@@ -1,4 +1,4 @@
-/** `VaultTSQ`, which keeps one bank's boxes and their listings in a TanStack Query client it is handed, from what a SortedVaultDB tells. */
+/** `VaultTSQ`, which keeps one bank's boxes and their listings in a TanStack Query client it is handed, from what a VaultMinder tells. */
 
 import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
@@ -9,8 +9,8 @@ import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetOnceOpts, type ItemQueryOptions, type VaultMutationOptions, type VaultTSQOpts, VaultTSQChecks } from '../shapes/shapes-vault-tsq'
 import type { VaultEvent } from '../shapes/shapes-vault-event'
 import { BaseThing } from '../models/base-thing'
-import type { ReceivingThing } from '../shapes/shapes-sorted-vault-db'
-import type { SortedVaultDB } from '../storage/sorted-vault-db'
+import type { ReceivingThing } from '../shapes/shapes-vault-minder'
+import type { VaultMinder } from './vault-minder'
 import { readAtOf } from '../storage/thing-classifier'
 import type { Kids } from '../shapes/shapes-answers'
 import * as Throwers from '../refusals/throwers'
@@ -30,11 +30,11 @@ import { bankKeyHeadOf, labelsOf } from './query-keys'
 export class VaultTSQ {
   // == [Props]: #vaultMinder, #queryClient, #scope, #unlisten
 
-  readonly #vaultMinder: SortedVaultDB
+  readonly #vaultMinder: VaultMinder
   readonly #queryClient: TSQ.QueryClient
   /** The bank. */
   readonly #scope:       BankScope
-  /** Ends the listen to the SortedVaultDB. */
+  /** Ends the listen to the VaultMinder. */
   readonly #unlisten:    () => void
   // --
 
@@ -65,7 +65,7 @@ export class VaultTSQ {
       staleTime: Infinity,
       gcTime:    Infinity,
     })
-    // Synchronous on purpose: the SortedVaultDB tells an answer's records before its verb resolves.
+    // Synchronous on purpose: the VaultMinder tells an answer's records before its verb resolves.
     this.#unlisten = vaultMinder.listen({ hear: (event) => { this.#hear(event) }, onBadNews })
     Object.freeze(this)
   }
@@ -141,7 +141,7 @@ export class VaultTSQ {
 
   // == [Ending]: sweep
 
-  /** Stop hearing the SortedVaultDB, for good: the items and listings stay as they are. */
+  /** Stop hearing the VaultMinder, for good: the items and listings stay as they are. */
   sweep(): this {
     this.#unlisten()
     return this

@@ -1,12 +1,12 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, SortedVaultDBExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, BoxSoonestBare
+// == [Models]: VaultDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, ThingSoonestBare
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
 
-/** What a vault TSQ is made with that lacks one of a SortedVaultDB's members. */
-export const SortedVaultDBExpected = 'Expected a SortedVaultDB: an object with a function for each of its verbs, listen, receive, thingAt and sweep.'
+/** What a vault TSQ is made with that lacks one of a VaultMinder's members. */
+export const VaultMinderExpected = 'Expected a VaultMinder: an object with a function for each of its verbs, listen, receive, thingAt and sweep.'
 
 /** A sealer that lacks one of its methods, its tags or its purposes. */
 export const SealerExpected = 'Expected a sealer: its tags, its purposes, and a function for each of its methods.'
@@ -42,7 +42,7 @@ export const GatingSpent = 'This gating was attempted already, and a gating is a
 export const HostedVaultExpected = 'Expected a vault: an object with a sweep function.'
 
 /** A box the device has heard a newer revision of, with no whole record of its newest life to unseal. */
-export const BoxSoonestBare = 'This device has heard of a newer revision of the box but has not fetched it yet.'
+export const ThingSoonestBare = 'This device has heard of a newer revision of this record but has not fetched it yet.'
 // --
 
 // == [Things]: the sentences of a Thing's checks, of a shell's, and of a vaultDB's asks

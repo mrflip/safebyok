@@ -161,7 +161,7 @@ export function maskedReadTcsOf(events: readonly VaultEvent[]): VaultEvent[] {
   return events.map((event) => (ReadTcPattern.test(event.read_tc ?? '') ? { ...event, read_tc: AnyReadTc } : event))
 }
 
-/** The Thing a test's SortedVaultDB keeps at each labelpath: a plain one, as a device's is. */
+/** The Thing a test's VaultMinder keeps at each labelpath: a plain one, as a device's is. */
 export function makePlainThing(seen: SeenThing): PlainThing { return PlainThing.make(seen) }
 
 /** The `item` notice a vaultDB's raw watch gets for `record`, at the liveness its record has, with no agerank and no source, at {@link AnyReadTc}, and with no bank lifetok unless given one. */
@@ -172,7 +172,7 @@ export function itemEventOf(record: SeenThing, banktok?: Lifetok): VaultItemEven
 }
 
 // itemEventOf types its record as of any kind; a Thing of one kind receives only events of its own.
-/** The `item` event a SortedVaultDB hands the Thing of `record` to receive, read now, typed as of `record`'s kind. */
+/** The `item` event a VaultMinder hands the Thing of `record` to receive, read now, typed as of `record`'s kind. */
 export function thingEventOf<RecordT extends ThingRecord>(record: SeenThing<RecordT>): VaultItemEvent<RecordT> {
   return { ...itemEventOf(record), read_tc: readTcNow() } as VaultItemEvent<RecordT>
 }

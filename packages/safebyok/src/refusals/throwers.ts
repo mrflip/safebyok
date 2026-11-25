@@ -21,7 +21,7 @@ export * from 'safebyok-big/refusals/throwers'
 export function refusalOfThrown(thrown: unknown): Errors.VaultError { return Errors.isVaultError(thrown) ? thrown : unexpectedError(thrown) }
 // --
 
-// == [Model Throwers]: bankSwept, signinUnanswered, nobodySignedIn, thingNotLive, unlockDismissed, gatingSpent, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, boxSoonestBare
+// == [Model Throwers]: bankSwept, signinUnanswered, nobodySignedIn, thingNotLive, unlockDismissed, gatingSpent, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, thingSoonestBare
 
 /** A `disabled` refusal: the bank was swept. */
 export function bankSwept(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.BankSwept) }
@@ -52,9 +52,9 @@ export function sidecarMissing(): Errors.VaultError { return new Errors.VaultErr
 /** A `record_conflict` refusal: a box's lifepath is of another life of its bank's root box. */
 export function boxOfOtherRoot(): Errors.VaultError { return new Errors.VaultError('record_conflict', Phrases.BoxOfOtherRoot) }
 
-/** A `stale_read` refusal: the device has heard of a newer revision of the box at `labelpath` but has no whole record of its newest life. */
-export function boxSoonestBare(labelpath: string): Errors.VaultError {
-  return new Errors.VaultError('stale_read', Phrases.BoxSoonestBare, { meta: { labelpaths: [labelpath] } })
+/** A `stale_read` refusal: the device has heard of a newer revision of the Thing at `labelpath` but has no whole record of its newest life. */
+export function thingSoonestBare(labelpath: string): Errors.VaultError {
+  return new Errors.VaultError('stale_read', Phrases.ThingSoonestBare, { meta: { labelpaths: [labelpath] } })
 }
 // --
 

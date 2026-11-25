@@ -416,13 +416,13 @@ describe("the world's Things, beside the bank's own writes", () => {
   it("have the bank's Thing that bank.put wrote once it resolves", async () => {
     const { bank, device } = await TH.buildBornBank()
     const written = await bank.put({ cited: bank.pickle(), record: nextBankThingOf(bank) })
-    expect(device.world.demandSortedVaultDB().thingAt({ ...bank.scope, labelpath: 'bank' })?.pickle()).to.deep.equal(written)
+    expect(device.world.demandVaultMinder().thingAt({ ...bank.scope, labelpath: 'bank' })?.pickle()).to.deep.equal(written)
   })
 
   it("have the main gate a gate verb wrote once the verb resolves", async () => {
     const { bank, device } = await TH.buildBornBank()
     const after = await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'another horse battery staple' })
-    expect(device.world.demandSortedVaultDB().thingAt({ ...bank.scope, labelpath: 'gate' })?.pickle()).to.deep.equal(after.pickle())
+    expect(device.world.demandVaultMinder().thingAt({ ...bank.scope, labelpath: 'gate' })?.pickle()).to.deep.equal(after.pickle())
   })
 })
 
@@ -470,9 +470,9 @@ describe("bank.put(args)", () => {
     const { bank, device } = await TH.buildBornBank()
     const record = nextBankThingOf(bank)
     await bank.put({ cited: bank.pickle(), record })
-    const sortedVaultDB = device.world.demandSortedVaultDB()
-    expect(sortedVaultDB.makeGetAsk({ labelpath: 'bank' }).track?.bank).to.deep.equal({ revseq: 1, lifepath: record.lifepath })
-    const answer = await device.vaultDB.tryGetThing(sortedVaultDB.makeGetAsk({ labelpath: 'bank' }))
+    const vaultMinder = device.world.demandVaultMinder()
+    expect(vaultMinder.makeGetAsk({ labelpath: 'bank' }).track?.bank).to.deep.equal({ revseq: 1, lifepath: record.lifepath })
+    const answer = await device.vaultDB.tryGetThing(vaultMinder.makeGetAsk({ labelpath: 'bank' }))
     expect(answer).to.deep.include({ ok: true, tracked: { bank: 'same', gate: 'same', box: 'same' } })
   })
 

@@ -27,7 +27,7 @@ type CachePrecis = Readonly<{ item?: Precis | null, soon?: Precis, dead?: Precis
 /** Where a chain ends: the box in brief, and, where a row states it, whether a get on the way refused `stale_read`. */
 type EndPrecis = CachePrecis & Readonly<{ isRefused?: boolean }>
 
-/** A chain of records the box's SortedVaultDB learns of in order, over the start it is seeded at, and where the box should end. */
+/** A chain of records the box's VaultMinder learns of in order, over the start it is seeded at, and where the box should end. */
 type ChainCase = Readonly<{
   initial:  CachePrecis
   chain:    readonly Precis[]

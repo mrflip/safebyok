@@ -4,8 +4,8 @@ import type * as TSQ from '@tanstack/query-core'
 import type * as Z from 'zod'
 import { type Errors, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import type { SortedVaultDB } from '../storage/sorted-vault-db'
-import { isSortedVaultDB } from './shapes-sorted-vault-db'
+import type { VaultMinder } from '../minding/vault-minder'
+import { isVaultMinder } from './shapes-vault-minder'
 import { Labelpath } from './primitives'
 import type { BankScope } from './shapes-stamps'
 import { type ThingRecord, ThingChecks } from './shapes-thing'
@@ -25,13 +25,13 @@ export const MaxTimerMillis = MaxTimerHours * 60 * 60 * 1000
 
 /** Options for `VaultTSQ.make`. */
 export type VaultTSQOpts = Readonly<{
-  /** The SortedVaultDB of the bank, whose Things the items are read from. */
-  vaultMinder: SortedVaultDB
+  /** The VaultMinder of the bank, whose Things the items are read from. */
+  vaultMinder: VaultMinder
   /** The client the items and listings are kept in: a host's own, or one made for the bank. */
   queryClient: TSQ.QueryClient
   /** The bank. */
   scope:       BankScope
-  /** Hears each refusal no caller waits on: a record the SortedVaultDB refuses, or what the vault TSQ fails to keep. Default: none hears it. */
+  /** Hears each refusal no caller waits on: a record the VaultMinder refuses, or what the vault TSQ fails to keep. Default: none hears it. */
   onBadNews?:  ((news: Errors.VaultError) => void) | undefined
 }>
 
@@ -65,7 +65,7 @@ export const VaultTSQChecks = Validator.Checkers('bad_record', ({ obj, custom, f
   const tsqStaleTime = union([uint.max(MaxTimerMillis, Phrases.StaleTimeShape), lit(Infinity)])
   return {
     makeArgs:     obj({
-      vaultMinder: custom<SortedVaultDB>(isSortedVaultDB, Phrases.SortedVaultDBExpected),
+      vaultMinder: custom<VaultMinder>(isVaultMinder, Phrases.VaultMinderExpected),
       queryClient: custom<TSQ.QueryClient>(isQueryClient, Phrases.QueryClientExpected),
       scope:       ThingChecks.bankScope,
       onBadNews:   fn<(news: Errors.VaultError) => void>().optional(),

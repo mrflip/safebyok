@@ -10,11 +10,11 @@ import type { BoxUnsealed } from '../shapes/shapes-bankish'
 import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
 import type { BoxLabelpath } from '../shapes/primitives'
 import { type GetOnceOpts, VaultTSQChecks } from '../shapes/shapes-vault-tsq'
-import type { PutOnceArgs } from '../shapes/shapes-sorted-vault-db'
+import type { PutOnceArgs } from '../shapes/shapes-vault-minder'
 import type { BoxRecord, ScopeAt, ThingScope } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 import { VaultChecks } from '../shapes/shapes-vault'
-import type { SortedVaultDB } from '../storage/sorted-vault-db'
+import type { VaultMinder } from '../minding/vault-minder'
 import type { WriteThingAnswer } from '../shapes/shapes-answers'
 
 /** One bank's boxes in this tab: the verbs to seal and write them, and to use their whispers.
@@ -76,7 +76,7 @@ export class Vault {
   async tryPutBoxOnce(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<Outcome.Outcome<Box>> {
     const sealed = await Outcome.outcomeOf(async () => await this.#sealedWriteOf(cited, patch, secrets))
     if (! sealed.ok) { return sealed }
-    return this.#boxOutcomeOf(await this.#sortedVaultDB.tryPutOnce(sealed.val))
+    return this.#boxOutcomeOf(await this.#vaultMinder.tryPutOnce(sealed.val))
   }
 
   /** {@link tryPutBoxOnce}, throwing its refusal instead of answering it: the box, on success.
@@ -93,7 +93,7 @@ export class Vault {
   async tryDelBoxOnce(labelpath: BoxLabelpath): Promise<Outcome.Outcome<Box>> {
     const sealed = await Outcome.outcomeOf(async () => await this.#sealedWriteOf(labelpath, { am: 'x' }))
     if (! sealed.ok) { return sealed }
-    return this.#boxOutcomeOf(await this.#sortedVaultDB.tryDelOnce(sealed.val))
+    return this.#boxOutcomeOf(await this.#vaultMinder.tryDelOnce(sealed.val))
   }
 
   /** {@link tryDelBoxOnce}, throwing its refusal instead of answering it: the box, holding its tombstone, on success. */
@@ -208,17 +208,17 @@ export class Vault {
    */
   #demandReadableBox(scope: ScopeAt<BoxLabelpath>): LiveOf<BoxRecord> {
     const box = this.#boxAt(scope)
-    if ((box === undefined) || (box.agekind === 'bare')) { throw Throwers.boxSoonestBare(scope.labelpath) }
+    if ((box === undefined) || (box.agekind === 'bare')) { throw Throwers.thingSoonestBare(scope.labelpath) }
     const record = box.pickle()
     if (! BaseBox.isLive(record)) { throw Throwers.boxAbsent({ boxlabel: scope.labelpath }) }
     return record
   }
   // --
 
-  // == [Helpers]: #sortedVaultDB, #sealedWriteOf, #donorAt, #boxOutcomeOf, #boxAt, #scopeAt, #demandOwnBox
+  // == [Helpers]: #vaultMinder, #sealedWriteOf, #donorAt, #boxOutcomeOf, #boxAt, #scopeAt, #demandOwnBox
 
-  /** The bank's SortedVaultDB, which holds its Things and sends its writes */
-  get #sortedVaultDB(): SortedVaultDB { return this.#world.demandSortedVaultDB() }
+  /** The bank's VaultMinder, which holds its Things and sends its writes */
+  get #vaultMinder(): VaultMinder { return this.#world.demandVaultMinder() }
 
   /** The write of the next revision after `cited`, or after the newest revision seen at a labelpath, applying `publicProps` and sealing `secretProps` */
   async #sealedWriteOf(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<PutOnceArgs<BoxRecord>> {
@@ -246,7 +246,7 @@ export class Vault {
 
   /** The box at `scope`, or undefined where this device has seen no record of it */
   #boxAt(scope: ThingScope): Box | undefined {
-    const thing = this.#sortedVaultDB.thingAt(scope)
+    const thing = this.#vaultMinder.thingAt(scope)
     return (thing instanceof Box) ? thing : undefined
   }
 

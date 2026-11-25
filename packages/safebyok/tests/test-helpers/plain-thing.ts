@@ -1,4 +1,4 @@
-/** `PlainThing`, a concrete Thing of any kind, for the tests of Thing and of a SortedVaultDB. */
+/** `PlainThing`, a concrete Thing of any kind, for the tests of Thing and of a VaultMinder. */
 
 import type { ThingRecord, ThingScope } from '../../src/shapes/shapes-thing'
 import { type SeenThing, SeenChecks } from '../../src/shapes/shapes-vault-event'
