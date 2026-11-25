@@ -1,15 +1,23 @@
 # Thread B: convex_vault (2026-11-25)
 
 Branch `20261125-convex_vault`, PR [#923](https://github.com/mrflip/safebyok/pull/923), stacked on [#916](https://github.com/mrflip/safebyok/pull/916).
-Proved: `pnpm justify` green after the catch-up onto `origin/20261125-big_names` (de6cc88db): safebyok-convex 184,
-safebyok 2203, safebyok-big 2950, convex-big 334, postgres 124, indexeddb 115, react 339, fastkey 43, graphql-big 448,
-e2e 576, demos 99/24/26/111, the other -big packages green; lint, typecheck and build clean.
+Proved: `pnpm justify` green after the rework on the Coach's rulings, on `origin/20261125-big_names` (3382c8d0c):
+safebyok-convex 224, safebyok 2291, safebyok-big 2951, convex-big 334, postgres 135, indexeddb 130, react 339, fastkey 43,
+graphql-big 448, e2e 576, demos 99/24/26/111, scripts 331, the other -big packages green; lint, typecheck and build clean.
 
 The catch-up rebase met one conflict, in `notes/security.md`: both sides added an entry at the top of *Of Interest*;
 both kept, this thread's first.
 
 A first worker died of a network error before committing; its uncommitted port was judged sound and kept, then
 finished, tested and committed by the second.
+
+Rework on the Coach's rulings (2026-11-25), rebased onto `origin/20261125-big_names` (3382c8d0c) without conflict:
+E1, a failed Convex call refuses `storage_issue` from the core's new `storageCallRefused`, the error its cause (so big's
+held-box fallback on `storage_unavailable` no longer applies); sidecar keys Convex will not store refuse `bad_record`
+before the call, checked by `convexToJson` rather than a walker of our own; E5b, the count test asserts no other
+document was written (convex-test's `documentsWritten` limit), two-clause titles split, sloppy-argument tests for each
+component function and for `ConvexVaultDB`'s options; E7, `server.ts` exports only `safebyokRefusal` and its type, the
+kind list, type and checker tied by `AssertEqual` (newly re-exported from `safebyok/storage` with `CheckerInput`).
 
 * **Built**
   * `packages/safebyok-convex`, public, 0.5.0, peer dependencies `safebyok` and `convex`, back in the `fixed` group.
