@@ -159,3 +159,7 @@ what differs from big, in a sentence or two.
   big's was, made at its first use (`storage/device-db.ts`). The bank no longer has it, and the device's `toJSON` no longer shows it.
   It is never forgotten: big's `vacate` forgot the device row, so the next device of the scope made a new `device_tok`,
   and the new core has no vacate yet, so a bank born again in the same browser records the old devicetok.
+  amended 2026-11-25 (lease_shelf thread 11, the Coach: "We'd prefer it to be per user+browser, there is already a
+  banktok"): the deviceDB keeps one devicetok per user (`deviceDB.ensureDevicetok(userid)`, filed at `[userid,
+  'devicetok']`), the same for every bank of that user in the browser, no longer one per bank scope. A devicetok filed
+  per bank scope by an earlier build is never read: each user is minted a fresh one once. The ctx is unchanged.

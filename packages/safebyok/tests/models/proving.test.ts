@@ -4,11 +4,11 @@ import { Consts, Crypto, Errors, GX, Phrases } from 'safebyok-big/internals'
 import { BaseBox } from '../../src/models/base-box'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
 import type { ProvingDevice } from '../../src/shapes/shapes-gateish'
-import { type BankScope, type StampedGate, leaseLifepathOf } from '../../src/shapes/shapes-stamps'
+import { type StampedGate, leaseLifepathOf } from '../../src/shapes/shapes-stamps'
 import type { GateRecord } from '../../src/shapes/shapes-thing'
 import type { WayinHeader, WayinRecord } from '../../src/shapes/shapes-wayin'
 import { Wayin } from '../../src/models/wayin'
-import { Lifeseq } from '../../src/shapes/primitives'
+import { type Userid, Lifeseq } from '../../src/shapes/primitives'
 
 import * as TH from '../test-helpers'
 
@@ -526,12 +526,12 @@ describe("a proving's header", () => {
     expect(header).to.deep.equal({ wayinkind: 'passkey', label: 'passkey0', credential_id, prf_salt_b64, devicetok: TH.Devicetok, born_at: TH.T0 })
   })
 
-  it("asks the device for the devicetok of the bank it is stamped for, of either kind of proving", async () => {
-    const ensureDevicetok = vi.fn((_scope: BankScope) => Promise.resolve(TH.Devicetok))
+  it("asks the device for the devicetok of the user of the bank it is stamped for, of either kind of proving", async () => {
+    const ensureDevicetok = vi.fn((_userid: Userid) => Promise.resolve(TH.Devicetok))
     const device          = { ...TH.provingDeviceOf(), ensureDevicetok }
     await novelPassphrase(device)
     await novelPasskey(TH.passkeyAnswerOf(), device)
-    expect(ensureDevicetok.mock.calls.map(([scope]) => scope)).to.deep.equal([TH.WorldBankStamp, TH.WorldBankStamp])
+    expect(ensureDevicetok.mock.calls.map(([userid]) => userid)).to.deep.equal([TH.WorldBankStamp.userid, TH.WorldBankStamp.userid])
   })
 
   it("draws a fresh salt for each passphrase proving", async () => {

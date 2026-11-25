@@ -1,12 +1,12 @@
-/** The deviceDB, which has each bank's devicetok on this device and the lease record of each gate on it, shared by every tab. A subclass writes the `do*` calls. */
+/** The deviceDB, which has each user's devicetok on this device and the lease record of each gate on it, shared by every tab. A subclass writes the `do*` calls. */
 
 import { Crypto, Errors, type Helpers } from 'safebyok-big/internals'
 import { BaseThing } from '../models/base-thing'
 import * as Throwers from '../refusals/throwers'
-import { type BankScope, type LeaseRecord, type LeaseScope, StampChecks } from '../shapes/shapes-stamps'
+import { type LeaseRecord, type LeaseScope, StampChecks } from '../shapes/shapes-stamps'
 import { DeviceDBChecks, type LeaseListener } from '../shapes/shapes-device-db'
 import { BankishChecks } from '../shapes/shapes-bankish'
-import type { Devicetok } from '../shapes/primitives'
+import type { Devicetok, Userid } from '../shapes/primitives'
 
 // == [The deviceDB]: DeviceDB
 
@@ -57,14 +57,14 @@ export abstract class DeviceDB {
 
   // == [Devicetok verbs]: ensureDevicetok
 
-  /** The devicetok of the bank at `scope` on this device, the same for every tab given this database, and another for each bank.
+  /** The devicetok of the user `userid` on this device, the same for every tab given this database and every bank of the user, and another for each user.
    * It answers the one stored, or a fresh one, stored now, where none is or the one stored fails its check.
    */
-  async ensureDevicetok(scope: BankScope): Promise<Devicetok> {
+  async ensureDevicetok(userid: Userid): Promise<Devicetok> {
     try {
-      const { userid, banklabel } = StampChecks.bankScope.parse(scope)
+      const useridChecked = BankishChecks.userid.parse(userid)
       const made   = Crypto.randomId()
-      const before = await this.doStowDevicetok({ userid, banklabel }, made, isDevicetokReplaced)
+      const before = await this.doStowDevicetok(useridChecked, made, isDevicetokReplaced)
       return isDevicetokReplaced(before) ? made : BankishChecks.devicetok.parse(before)
     } catch (err) { throw refusalOf(err, 'ensureDevicetok') }
   }
@@ -82,8 +82,8 @@ export abstract class DeviceDB {
   protected abstract doRing(scope: LeaseScope): void
   /** Call `hear` with each scope the bell rings for until the function answered is called. */
   protected abstract doListen(hear: (rung: unknown) => void): () => void
-  /** In one step: read the devicetok stored for the bank at `scope`, and put `devicetok` in its place when `isReplaced` holds of what was read. Answer what was read, or null. */
-  protected abstract doStowDevicetok(scope: BankScope, devicetok: Devicetok, isReplaced: (raw: unknown) => boolean): Helpers.Awaitable<unknown>
+  /** In one step: read the devicetok stored for the user `userid`, and put `devicetok` in its place when `isReplaced` holds of what was read. Answer what was read, or null. */
+  protected abstract doStowDevicetok(userid: Userid, devicetok: Devicetok, isReplaced: (raw: unknown) => boolean): Helpers.Awaitable<unknown>
   // --
 }
 // --
