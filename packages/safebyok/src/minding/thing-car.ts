@@ -1,17 +1,20 @@
-/** `ThingCar`, which a VaultMinder keeps at each labelpath: the Thing, the refusal it last raised at a record, and when its last news was read. */
+/** `ThingCar`, which a VaultMinder keeps at each labelpath: the Thing, the refusal it last raised at a record, and when its newest revision was read. */
 
 import { Clock, type Errors } from 'safebyok-big/internals'
 import type { EpochMillis } from '../shapes/primitives'
-import type { VoidSentinel } from '../shapes/shapes-thing'
-import type { ReadTc, VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
+import type { MaskedRow } from '../shapes/shapes-masked-view'
+import type { ThingCited, VoidSentinel } from '../shapes/shapes-thing'
+import type { Agekind, ReadTc, VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
 import { type CarWorld, type ReceivingThing, type ThingCarOpts, ThingCarChecks } from '../shapes/shapes-vault-minder'
 import { BaseThing } from '../models/base-thing'
-import { VacantReadTc } from '../storage/agerank'
+import { maskedOf } from '../helpers/mask-ciphertexts'
+import { VaultTSQ } from './vault-tsq'
+import { VacantReadTc, readAtOf } from '../storage/agerank'
 import * as Throwers from '../refusals/throwers'
 
 // == [ThingCar]: ThingCar
 
-/** A Thing, the refusal it last raised at a record, and when the last record it took as news was read.
+/** A Thing, the refusal it last raised at a record, and when the newest revision it took as news was read.
  * A devtool reads it, and nothing it keeps changes what the Thing answers.
  */
 export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
@@ -53,15 +56,16 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
   /** When the Thing last refused a record, or null where it has refused none. */
   get erred_at(): EpochMillis | null { return this.#erredAt }
 
-  /** When the last record the Thing took as news was read: the `VacantReadTc` until it takes one. */
+  /** When the newest revision the Thing took as news was last read: the `VacantReadTc` until it takes one. */
   get read_tc(): ReadTc { return this.#readTc }
   // --
 
   // == [Receiving]: receive
 
-  // The Thing's receive checks the event, so the car reads its read_tc only once the Thing has taken it.
+  // The Thing's receive checks the event, so the car reads its record only once the Thing has taken it.
   /** Have the Thing receive `event`, returning the events it returns: keep its refusal, and throw it, or clear the refusal kept, and keep when the record was read where it was news. */
   receive(event: VaultEvent): readonly VaultEvent[] {
+    const { citable, agekind } = this.thing
     let events: readonly VaultEvent[]
     try {
       events = this.thing.receive(event)
@@ -72,8 +76,36 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
       throw refusal
     }
     this.#lastErr = null
-    if (events.length > 0) { this.#readTc = event.read_tc }
+    if ((events.length > 0) && (event.eventkind === 'item')) { this.#readTc = this.#readTcAfter(citable, agekind, event.val, event.read_tc) }
     return events
+  }
+
+  // The time belongs to the newest revision, as the agerank's tcchunk does: a newer one brings its own, the same one the later, an older one leaves it.
+  /** The `read_tc` after `seen` is read at `read_tc`, over `citable`, the newest revision seen before it: moved where `seen` is that revision, or newer */
+  #readTcAfter(citable: Pick<ThingCited, 'lifepath' | 'revseq'>, agekind: Agekind, seen: Pick<ThingCited, 'lifepath' | 'revseq'>, read_tc: ReadTc): ReadTc {
+    const order = BaseThing.cmp(citable, seen)
+    if ((agekind === 'vacant') || (order > 0)) { return read_tc }
+    return ((order === 0) && (read_tc > this.#readTc)) ? read_tc : this.#readTc
+  }
+  // --
+
+  // == [A devtool's view]: inspectable
+
+  // The record is no devtool's to read whole: a gate's has each wayin's wrapped bankKey, which an offline guess at a
+  // passphrase is checked against.
+  /** The Thing's record, each ciphertext masked, for a devtool, as a vault TSQ item settled on it would show, dated by {@link read_tc} and with the refusal kept.
+   * For experimenting, never for an app's own logic: what it answers may change without notice.
+   */
+  inspectable(): MaskedRow {
+    return {
+      queryKey:        [...VaultTSQ.itemQueryKeyOf(this.thing)],
+      status:          'success',
+      fetchStatus:     'idle',
+      dataUpdatedAt:   readAtOf(this.#readTc),
+      isInvalidated:   false,
+      lastRefusalkind: this.#lastErr?.refusalkind ?? null,
+      val:             maskedOf(this.thing.pickle()),
+    }
   }
   // --
 }

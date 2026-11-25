@@ -261,9 +261,9 @@ describe("VaultTSQ's items", () => {
 describe("VaultTSQ.itemQueryOptions", () => {
   it("seeds an item with the live record its Thing holds, as of when it was read", async () => {
     const world = await worldWithBox()
-    const thing = world.sorted.thingAt(TH.BoxScope)
-    expect(world.vaultTSQ.itemQueryOptions(TH.BoxScope)).to.deep.equal({ queryKey: BoxKey, initialData: thing?.pickle(), initialDataUpdatedAt: thing?.read_at })
-    expect(world.vaultTSQ.itemQueryOptions(TH.BoxScope).initialData).to.eq(thing?.pickle())
+    const car = world.sorted.carAt(TH.BoxScope)
+    expect(world.vaultTSQ.itemQueryOptions(TH.BoxScope)).to.deep.equal({ queryKey: BoxKey, initialData: car?.thing.pickle(), initialDataUpdatedAt: readAtOf(car!.read_tc) })
+    expect(world.vaultTSQ.itemQueryOptions(TH.BoxScope).initialData).to.eq(car?.thing.pickle())
   })
 
   it("seeds null for a tombstone or nothing stored", async () => {

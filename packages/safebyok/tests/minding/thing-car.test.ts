@@ -5,7 +5,8 @@ import { Box } from '../../src/models/box'
 import { Thing } from '../../src/models/thing'
 import { ThingCar } from '../../src/minding/thing-car'
 import type { CarWorld } from '../../src/shapes/shapes-vault-minder'
-import { VacantReadTc, readTcNow } from '../../src/storage/agerank'
+import type { ReadTc, SeenThing } from '../../src/shapes/shapes-vault-event'
+import { VacantReadTc, readAtOf, readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
 
 /** A box's revisions: `two`, which a {@link TH.RefusingThing} takes, and `three` after it, which it refuses. */
@@ -16,6 +17,19 @@ const Revs = (() => {
 
 /** A world that makes a {@link TH.RefusingThing} at each labelpath. */
 const RefusingWorld: CarWorld<TH.RefusingThing> = Object.freeze({ makeThing: (shell) => TH.RefusingThing.make(shell) })
+
+/** A read_tc read at `millis` past the epoch. */
+function readTcAt(millis: number): ReadTc {
+  const hex = millis.toString(16).padStart(12, '0')
+  return `${hex.slice(0, 8)}-${hex.slice(8)}-7000-8000-000000000000`
+}
+
+/** Have `car` receive the item event of `record` read at `read_tc`, a car of a plain Thing made at `record`'s shell where there is none yet, and return the car. */
+function carReceived(car: ThingCar | undefined, record: SeenThing, read_tc: ReadTc = readTcNow()): ThingCar {
+  const receiver = car ?? ThingCar.make(Thing.shellOf(record), { world: TH.PlainWorld })
+  receiver.receive({ ...TH.thingEventOf(record), read_tc })
+  return receiver
+}
 
 /** What `car` holds, as a plain object. */
 function carFieldsOf(car: ThingCar): Pick<ThingCar, 'thing' | 'lastErr' | 'erred_at' | 'read_tc'> {
@@ -122,5 +136,52 @@ describe("car.receive(event)", () => {
     const car = ThingCar.make(Thing.shellOf(Revs.two), { world: TH.PlainWorld })
     const err = TH.expectSyncRefusal(() => car.receive({ ...TH.thingEventOf(Revs.two), labelpath: 'box/other' }), 'bad_record')
     expect(car.lastErr).to.equal(err)
+  })
+})
+
+describe("car.read_tc", () => {
+  it("is the read_tc of the record that was news, its first 48 bits the time it was read", () => {
+    const car = carReceived(undefined, TH.boxThingOf(), '0190a1b2-c3d4-7000-8000-000000000000')
+    expect(car.read_tc).to.eq('0190a1b2-c3d4-7000-8000-000000000000')
+    expect(readAtOf(car.read_tc)).to.eq(0x01_90_A1_B2_C3_D4)
+  })
+
+  it("is when a read_tc minted now was read", () => {
+    const before  = Date.now()
+    const read_tc = readTcNow()
+    const car     = carReceived(undefined, TH.boxThingOf(), read_tc)
+    expect(readAtOf(car.read_tc)).to.be.within(before, Date.now())
+  })
+
+  it("follows the newest revision: a newer one brings its own time, the same one the later, an older one none", () => {
+    const car = carReceived(undefined, TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 4 })), readTcAt(500_000))
+    carReceived(car, TH.boxThingOf('openai', { revseq: 2 }), readTcAt(900_000))
+    expect(readAtOf(car.read_tc), 'an older whole record').to.eq(500_000)
+    carReceived(car, TH.boxThingOf('openai', { revseq: 4 }), readTcAt(400_000))
+    expect(readAtOf(car.read_tc), 'the newest revision whole, read earlier').to.eq(500_000)
+    carReceived(car, TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 5 })), readTcAt(300_000))
+    expect(readAtOf(car.read_tc), 'a newer revision').to.eq(300_000)
+  })
+
+  it("moves for the newest revision seen again a chunk later, its Thing holding the record it held", () => {
+    const record = TH.boxThingOf('openai', { sidecar: { account: 'work' } })
+    const car    = carReceived(undefined, record, readTcAt(0))
+    carReceived(car, structuredClone(record), readTcAt(70_000))
+    expect(readAtOf(car.read_tc)).to.eq(70_000)
+    expect(car.thing.pickle()).to.equal(record)
+  })
+
+  it("moves for a newer soon over a soon, its Thing at the shell", () => {
+    const car = carReceived(undefined, TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 4 })), readTcAt(0))
+    expect(car.read_tc).to.eq(readTcAt(0))
+    carReceived(car, TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 5 })), readTcAt(200_000))
+    expect(readAtOf(car.read_tc)).to.eq(200_000)
+    expect(TH.PlainThing.isVoidSentinel(car.thing.pickle())).to.eq(true)
+  })
+
+  it("is left as it was by a record its Thing refuses", () => {
+    const car     = ThingCar.make({ ...TH.thingEventOf(Revs.two), read_tc: readTcAt(1000) }, { world: RefusingWorld })
+    TH.expectSyncRefusal(() => car.receive({ ...TH.thingEventOf(Revs.three), read_tc: readTcAt(2000) }), 'unexpected_error')
+    expect(car.read_tc).to.eq(readTcAt(1000))
   })
 })

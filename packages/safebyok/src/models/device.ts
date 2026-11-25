@@ -283,7 +283,7 @@ export class Device {
     if (this.#userid === null) { return EmptyMaskedView }
     const { bank, gate, rootBox } = this.#world
     return {
-      bankTSQ:  [bank, gate, rootBox].filter((thing) => thing !== null).map((thing) => ({ ...thing.inspectable(), lastRefusalkind: this.#world.vaultMinder?.carAt(thing)?.lastErr?.refusalkind ?? null })),
+      bankTSQ:  [bank, gate, rootBox].filter((thing) => thing !== null).flatMap((thing) => this.#world.vaultMinder?.carAt(thing)?.inspectable() ?? []),
       vaultTSQ: this.#vaultTSQ?.inspectable() ?? [],
       lease:    this.#world.inspectable(),
     }

@@ -20,7 +20,7 @@ import { type GateRecord, type ThingRecord, ThingFormat } from '../../src/shapes
 import { v7 as uuidv7 } from 'uuid'
 import type { GetWorldAnswer } from '../../src/shapes/shapes-answers'
 import { refusedAnswerOf } from '../../src/storage/refused-answer'
-import { VacantReadTc, readTcNow } from '../../src/storage/agerank'
+import { VacantReadTc, readAtOf, readTcNow } from '../../src/storage/agerank'
 import { type BadNews, type DeviceOpts, SignedOutWorld } from '../../src/shapes/shapes-bankish'
 import * as TH from '../test-helpers'
 
@@ -675,12 +675,12 @@ describe("device.inspectable()", () => {
   it("shows the refusal a root's Thing last raised at a record as its row's lastRefusalkind, and when the record it holds was read as its dataUpdatedAt", async () => {
     const { bank, device } = await TH.buildBornVault()
     const gateRow = () => device.inspectable().bankTSQ.find(({ val }) => (val as { labelpath: string }).labelpath === 'gate')
-    expect(gateRow()).to.include({ dataUpdatedAt: bank.gate.read_at, lastRefusalkind: null })
+    expect(gateRow()).to.include({ dataUpdatedAt: readAtOf(device.world.demandVaultMinder().carAt(bank.gate)!.read_tc), lastRefusalkind: null })
     // A read_tc that is no time code: the Things refuse every record the answer carries.
     const get = device.vaultDB.tryGetThing.bind(device.vaultDB)
     vi.spyOn(device.vaultDB, 'tryGetThing').mockImplementation(async (ask) => ({ ...(await get(ask)), read_tc: crypto.randomUUID() }))
     await TH.expectRefusal(device.world.demandVaultMinder().getOnce({ ...bank.scope, labelpath: 'gate' }), 'bad_record')
-    expect(gateRow()).to.include({ dataUpdatedAt: bank.gate.read_at, lastRefusalkind: 'bad_record' })
+    expect(gateRow()).to.include({ dataUpdatedAt: readAtOf(device.world.demandVaultMinder().carAt(bank.gate)!.read_tc), lastRefusalkind: 'bad_record' })
   })
 
   it("cuts each wrapped bankKey and each sealed whisper's ciphertext to its last 2 characters and its length", async () => {

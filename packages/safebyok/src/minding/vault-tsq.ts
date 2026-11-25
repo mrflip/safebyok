@@ -105,11 +105,11 @@ export class VaultTSQ {
   /** The query key of the box at `scope`, and its seed from what its Thing holds, for a host's query of it. */
   itemQueryOptions(scope: ThingScope): ItemQueryOptions {
     const itemScope = this.#parseItemScope(scope)
-    const thing     = this.#vaultMinder.thingAt(itemScope)
+    const car       = this.#vaultMinder.carAt(itemScope)
     const queryKey  = VaultTSQ.itemQueryKeyOf(itemScope)
-    const seed      = thing && itemValOf(thing)
-    if ((seed === undefined) || (thing?.read_at === undefined)) { return { queryKey } }
-    return { queryKey, initialData: seed, initialDataUpdatedAt: thing.read_at }
+    const seed      = car && itemValOf(car.thing)
+    if ((seed === undefined) || (car === undefined) || (car.thing.agekind === 'vacant')) { return { queryKey } }
+    return { queryKey, initialData: seed, initialDataUpdatedAt: readAtOf(car.read_tc) }
   }
 
   /** Get the box at `scope` once, unless its item is fresh by `opts.staleTime`: its live record, or null where none is stored live.

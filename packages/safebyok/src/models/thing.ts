@@ -1,14 +1,10 @@
 import { deepFreeze, isEqual, pick } from 'es-toolkit'
 import { Helpers, VX } from 'safebyok-big/internals'
 import { BaseThing } from './base-thing'
-import { maskedOf } from '../helpers/mask-ciphertexts'
-import { VaultTSQ } from '../minding/vault-tsq'
-import type { EpochMillis } from '../shapes/primitives'
-import type { MaskedRow } from '../shapes/shapes-masked-view'
 import type { LiveOf, ShellOf } from '../shapes/shapes-sealers'
-import type { BulletproofCallback, Sparse, ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
+import type { BulletproofCallback, Sparse, ThingRecord, Tombstone } from '../shapes/shapes-thing'
 import { type Agekind, type Agerank, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
-import { VacantAgerank, agekindOf, eventsOf, nextAgerankOf, readAtOf } from '../storage/agerank'
+import { VacantAgerank, agekindOf, eventsOf, nextAgerankOf } from '../storage/agerank'
 import * as Throwers from '../refusals/throwers'
 
 // == [Adoptable]: Adoptable
@@ -31,14 +27,13 @@ export type Adoptable<RecordT extends ThingRecord> = RecordT | Tombstone<RecordT
  * A listener can {@link subscribe} to it, and is told each time {@link receive} returns news.
  */
 export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT extends Adoptable<RecordT> = Adoptable<RecordT>> extends BaseThing {
-  // == [Props]: #record, #citable, #agerank, #readAt, #bulletproofCallback, #subscribers, #subscribe
+  // == [Props]: #record, #citable, #agerank, #bulletproofCallback, #subscribers, #subscribe
 
   // Set by the constructor's adopt.
   #record: Adoptable<RecordT> | undefined = undefined
   /** The Thing fields of the newest revision seen. */
   #citable: Sparse<ThingRecord>
   #agerank: Agerank = VacantAgerank
-  #readAt: EpochMillis | undefined = undefined
 
   /** Wraps each subscriber as it subscribes: what one throws goes where the maker said, or reaches `receive`'s caller where it said nothing. */
   readonly #bulletproofCallback: BulletproofCallback
@@ -73,7 +68,7 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   }
   // --
 
-  // == [Feed]: citable, agerank, agekind, read_at, receive
+  // == [Feed]: citable, agerank, agekind, receive
 
   /** What a write over this Thing cites: the Thing fields of the newest revision seen, whole or a live box's sparse form. */
   get citable(): Sparse<ThingRecord> { return this.#citable }
@@ -85,14 +80,11 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   /** Whether the newest revision seen has been seen whole ({@link Agekind}): `vacant` until this Thing first receives a record. Check it before reading the record. */
   get agekind(): Agekind { return agekindOf(this.#agerank) }
 
-  /** When the newest revision seen was last seen, in epoch milliseconds, or undefined until it first receives a record. */
-  get read_at(): EpochMillis | undefined { return this.#readAt }
-
   /** Take `proposed`, an event of this Thing, and return the events that are news: none, and nothing changed, unless its record is news.
    * News is a record that leaves the agerank greater than it was: from a later life, newer than any revision seen, a whole record newer than any
    * whole one seen, or the newest revision seen again in a later tcchunk, a span of 65.536 seconds, than it was last seen in.
    * The events are `proposed` with its ageranks, then any `life`, then any `aged`, each frozen. A whole record, a tombstone
-   * or the void sentinel is adopted, unless it equals the record held, which stays the same object; a live box's sparse form moves only `citable`, `agerank` and `read_at`.
+   * or the void sentinel is adopted, unless it equals the record held, which stays the same object; a live box's sparse form moves only `citable` and `agerank`.
    * Each subscriber is told once the news is taken in. A `life` or `aged` event returns none. Refuses an event of another Thing, and a record in any other form.
    */
   receive(proposed: VaultEvent<RecordT>): readonly VaultEvent<RecordT>[] {
@@ -103,22 +95,12 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
     const agerankWas = this.#agerank
     const agerank = nextAgerankOf(agerankWas, val, read_tc, liveness !== 'soon')
     if (agerank === undefined) { return NoEvents }
-    // Adopted first, so that an adopt that throws leaves this Thing as it was. Read before it, since adopt may move citable.
-    const readAt = this.#readAtAfter(val, readAtOf(read_tc))
+    // Adopted first, so that an adopt that throws leaves this Thing as it was.
     if ((liveness !== 'soon') && ! isEqual(this.#record, val)) { this.adopt(val) }
     this.#agerank = agerank
-    this.#readAt  = readAt
     if (BaseThing.cmp(this.#citable, val) > 0) { this.#citable = citedOf(val) }
     this.#tellSubscribers()
     return eventsOf(proposed, agerankWas, agerank)
-  }
-
-  // The time belongs to the newest revision, as the agerank's tcchunk does: a newer one brings its own, the same one the later.
-  /** The `read_at` after `seen` is read at `readAt`: moved where `seen` is the newest revision seen, or newer */
-  #readAtAfter(seen: Pick<ThingCited, 'lifepath' | 'revseq'>, readAt: EpochMillis): EpochMillis {
-    const order = BaseThing.cmp(this.#citable, seen)
-    if ((order > 0) || (this.#readAt === undefined)) { return readAt }
-    return (order === 0) ? Math.max(this.#readAt, readAt) : this.#readAt
   }
   // --
 
@@ -159,26 +141,6 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
 
   /** Let go of every subscriber: none is told of anything after. */
   protected dropSubscribers(): void { this.#subscribers.clear() }
-  // --
-
-  // == [A devtool's view]: inspectable
-
-  // The record is no devtool's to read whole: a gate's has each wayin's wrapped bankKey, which an offline guess at a
-  // passphrase is checked against.
-  /** The record this Thing models, each ciphertext masked, for a devtool, as a vault TSQ item settled on it would show.
-   * For experimenting, never for an app's own logic: what it answers may change without notice.
-   */
-  inspectable(): MaskedRow {
-    return {
-      queryKey:        [...VaultTSQ.itemQueryKeyOf(this)],
-      status:          'success',
-      fetchStatus:     'idle',
-      dataUpdatedAt:   this.#readAt ?? 0,
-      isInvalidated:   false,
-      lastRefusalkind: null,
-      val:             maskedOf(this.#record),
-    }
-  }
   // --
 }
 
