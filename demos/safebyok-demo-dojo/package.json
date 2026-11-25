@@ -20,7 +20,7 @@
     "justify": "pnpm install && pnpm lint && pnpm typecheck && pnpm test && SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm build"
   },
   "dependencies": {
-    "@tanstack/react-query": "^5.107.1",
+    "@tanstack/react-query": "^5.108.0",
     "es-toolkit": "^1.53.2",
     "idb-keyval": "^6.3.0",
     "react": "^19.3.1",
