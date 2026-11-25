@@ -3,10 +3,11 @@
 import type { UseStore } from 'idb-keyval'
 import { dbprefixOf, inOneStep, rowAt, versionedShelfOf } from 'safebyok-big/storage'
 import type { LeaseRecord, LeaseScope } from '../shapes/shapes-stamps'
+import type { Devicetok } from '../shapes/primitives'
 import { type IdbDeviceDBOpts, type LeaseScopepath, idbDeviceDBOpts } from '../shapes/shapes-device-db'
 import { DeviceDB } from './device-db'
 
-// == [The database]: LeaseDBVersion, leaseShelfOf, leaseDatabasenameOf, leaseBellnameOf, scopepathOf
+// == [The database]: LeaseDBVersion, leaseShelfOf, leaseDatabasenameOf, leaseBellnameOf, scopepathOf, DevicetokCkey
 
 // Zero-padded, so that a database name sorts as its version does. Its stem is not safebyok-big's `device`, whose
 // databases a shelf of the same stem at a newer version would delete.
@@ -26,9 +27,13 @@ export function leaseBellnameOf(dbName?: string): string { return `${dbprefixOf(
 
 /** Where the lease record at `scope` is filed: one for each gate. */
 export function scopepathOf({ userid, banklabel, labelpath }: LeaseScope): LeaseScopepath { return [userid, banklabel, labelpath] }
+
+// A string, so that it never meets a lease record's scopepath, which is an array.
+/** Where the device's devicetok is filed, in the same store as the lease records: one for the whole database. */
+export const DevicetokCkey = 'devicetok'
 // --
 
-/** A device database of each gate's lease record, in this browser's IndexedDB, shared by every tab of its origin.
+/** A device database of the device's devicetok and each gate's lease record, in this browser's IndexedDB, shared by every tab of its origin.
  * A live record's leaseKey is stored as its `CryptoKey` handle, by structured clone, and never as bytes (G4).
  */
 export class IdbDeviceDB extends DeviceDB {
@@ -48,7 +53,7 @@ export class IdbDeviceDB extends DeviceDB {
   }
   // --
 
-  // == [Protected, the calls of DeviceDB]: doPeekLease, doStowLease, doRing, doListen
+  // == [Protected, the calls of DeviceDB]: doPeekLease, doStowLease, doRing, doListen, doStowDevicetok
 
   protected async doPeekLease(scope: LeaseScope): Promise<unknown> {
     return await inOneStep(this.#shelf, 'readonly', (store) => rowAt(store, scopepathOf(scope)))
@@ -73,6 +78,14 @@ export class IdbDeviceDB extends DeviceDB {
     const channel = new BroadcastChannel(this.#bellname)
     channel.addEventListener('message', ({ data }: MessageEvent<unknown>) => { hear(data) })
     return () => { channel.close() }
+  }
+
+  protected async doStowDevicetok(devicetok: Devicetok, isReplaced: (raw: unknown) => boolean): Promise<unknown> {
+    return await inOneStep(this.#shelf, 'readwrite', async (store) => {
+      const before = await rowAt(store, DevicetokCkey)
+      if (isReplaced(before)) { store.put(devicetok, DevicetokCkey) }
+      return before
+    })
   }
   // --
 }

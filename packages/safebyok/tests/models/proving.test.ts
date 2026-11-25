@@ -128,9 +128,9 @@ describe("Proving.judgeStrength(device, scope, passphraseCleartext)", () => {
 describe("PassphraseProving.buildNovel(device, bankStamp, gateStamp, passphraseCleartext)", () => {
   const ArgsCases = [
     [() => ({ device: TH.omitting(TH.provingDeviceOf(), 'keyDeriver') }),                       'a device with no keyDeriver'],
-    [() => ({ device: TH.omitting(TH.provingDeviceOf(), 'device_tok') }),                       'a device with no device_tok'],
+    [() => ({ device: TH.omitting(TH.provingDeviceOf(), 'ensureDevicetok') }),                  'a device with no ensureDevicetok'],
     [() => ({ device: TH.omitting(TH.provingDeviceOf(), 'strengthChecker') }),                  'a device with no strengthChecker'],
-    [() => ({ device: TH.provingDeviceOf({ device_tok: '' }) }),                                'a device with an empty device_tok'],
+    [() => ({ device: TH.provingDeviceOf({ devicetok: '' }) }),                                 'a device whose devicetok is empty'],
     [() => ({ device: { ...TH.provingDeviceOf(), keyDeriver: TH.testDeriver } }),               "a device with the host's bare keyDeriver"],
     [() => ({ device: { ...TH.provingDeviceOf(), strengthChecker: TH.anyStrengthChecker } }),   "a device with the host's bare strengthChecker"],
     [() => ({ bankStamp: { ...TH.WorldBankStamp, lifeseq: undefined } }),                       'a bank stamp with no lifeseq'],
@@ -242,7 +242,7 @@ describe("PasskeyProving.buildNovel(device, bankStamp, gateStamp, passkeyClearte
 
   it("refuses a malformed device, and does not zero the answer", async () => {
     const answer = TH.passkeyAnswerOf()
-    const device = TH.omitting(TH.provingDeviceOf(), 'device_tok')
+    const device = TH.omitting(TH.provingDeviceOf(), 'ensureDevicetok')
     await TH.expectRefusal(novelPasskey(answer, device))
     expect(TH.isZeroed(answer.prfBytes)).to.be.false
   })
@@ -510,20 +510,20 @@ describe("guardKeyDeriver(hostDeriver)", () => {
 })
 
 describe("a proving's header", () => {
-  it("of a passphrase proving: the deriver's label, a fresh salt, the device's device_tok, and born_at from the time now", async () => {
+  it("of a passphrase proving: the deriver's label, a fresh salt, the device's devicetok, and born_at from the time now", async () => {
     vi.setSystemTime(TH.T0 + 5)
     const { header } = await novelPassphrase(TH.provingDeviceOf())
-    expect(header).to.deep.include({ wayinkind: 'passphrase', label: 'main', key_deriver_label: 'test_digest_v0', device_tok: TH.DeviceTok, born_at: TH.T0 + 5 })
-    expect(Object.keys(header)).to.have.members(['wayinkind', 'label', 'key_deriver_label', 'salt_b64', 'device_tok', 'born_at'])
+    expect(header).to.deep.include({ wayinkind: 'passphrase', label: 'main', key_deriver_label: 'test_digest_v0', devicetok: TH.Devicetok, born_at: TH.T0 + 5 })
+    expect(Object.keys(header)).to.have.members(['wayinkind', 'label', 'key_deriver_label', 'salt_b64', 'devicetok', 'born_at'])
     expect(Crypto.fromB64(header.salt_b64).length).to.eq(TH.testDeriver.salt_size)
     expect(Object.isFrozen(header)).to.be.true
   })
 
-  it("of a passkey proving: the answer's credential_id and salt, the device's device_tok, and born_at", async () => {
+  it("of a passkey proving: the answer's credential_id and salt, the device's devicetok, and born_at", async () => {
     const answer = TH.passkeyAnswerOf()
     const { credential_id, prf_salt_b64 } = answer
     const { header } = await novelPasskey(answer)
-    expect(header).to.deep.equal({ wayinkind: 'passkey', label: 'passkey0', credential_id, prf_salt_b64, device_tok: TH.DeviceTok, born_at: TH.T0 })
+    expect(header).to.deep.equal({ wayinkind: 'passkey', label: 'passkey0', credential_id, prf_salt_b64, devicetok: TH.Devicetok, born_at: TH.T0 })
   })
 
   it("draws a fresh salt for each passphrase proving", async () => {
@@ -629,7 +629,7 @@ const StampCases = [
 ] as const
 
 const HeaderCases = [
-  [{ device_tok: '00000000-0000-4000-8000-0000000000ee' }, 'a header whose device_tok was swapped'],
+  [{ devicetok: '00000000-0000-4000-8000-0000000000ee' }, 'a header whose devicetok was swapped'],
   [{ born_at: TH.T0 + 1 },                                 'a header whose born_at moved'],
 ] as const
 

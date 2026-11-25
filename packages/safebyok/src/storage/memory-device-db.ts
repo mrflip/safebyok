@@ -3,26 +3,32 @@
 import { Helpers } from 'safebyok-big/internals'
 import { DeviceDB } from './device-db'
 import type { LeaseRecord, LeaseScope } from '../shapes/shapes-stamps'
+import type { Devicetok } from '../shapes/primitives'
 
 /** A device database in this tab's memory, gone when the tab closes. Two Devices given one stand for two tabs of a browser. */
 export class MemoryDeviceDB extends DeviceDB {
-  // == [Props]: #leases, #hearers
+  // == [Props]: #leases, #hearers, #devicetok
 
   /** Each gate's lease record, by the ckey of its scope. */
   readonly #leases  = new Map<string, unknown>()
   readonly #hearers = new Set<(rung: unknown) => void>()
+  /** The devicetok stored, or null for none. */
+  #devicetok: unknown = null
   // --
 
-  // == [Leases]: _cheat_leases, ckeyOf
+  // == [Cheats and ckeys]: _cheat_leases, _cheat_plantDevicetok, ckeyOf
 
   /** For tests: each gate's lease record, by {@link MemoryDeviceDB.ckeyOf} its scope, to read or change in place. */
   _cheat_leases(): Map<string, unknown> { return this.#leases } // eslint-disable-line unicorn/prefer-private-class-fields
+
+  /** For tests: store `raw` as the devicetok, unchecked. */
+  _cheat_plantDevicetok(raw: unknown): void { this.#devicetok = raw } // eslint-disable-line unicorn/prefer-private-class-fields
 
   /** The ckey of the lease record at `scope`, in {@link _cheat_leases}. */
   static ckeyOf({ userid, banklabel, labelpath }: LeaseScope): string { return Helpers.ckeyOf(userid, banklabel, labelpath) }
   // --
 
-  // == [Protected, the calls of DeviceDB]: doPeekLease, doStowLease, doRing, doListen
+  // == [Protected, the calls of DeviceDB]: doPeekLease, doStowLease, doRing, doListen, doStowDevicetok
 
   protected doPeekLease(scope: LeaseScope): unknown { return structuredClone(this.#leases.get(MemoryDeviceDB.ckeyOf(scope)) ?? null) }
 
@@ -41,6 +47,12 @@ export class MemoryDeviceDB extends DeviceDB {
   protected doListen(hear: (rung: unknown) => void): () => void {
     this.#hearers.add(hear)
     return () => { this.#hearers.delete(hear) }
+  }
+
+  protected doStowDevicetok(devicetok: Devicetok, isReplaced: (raw: unknown) => boolean): unknown {
+    const before = this.#devicetok
+    if (isReplaced(before)) { this.#devicetok = devicetok }
+    return before
   }
   // --
 }

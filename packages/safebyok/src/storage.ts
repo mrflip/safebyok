@@ -4,7 +4,7 @@
 // each stays one binding across both packages.
 export { AdapterVaultDB } from './storage/adapter-vault-db'
 export { type Watcher, MemoryVaultDB } from './storage/memory-vault-db'
-export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
+export { type Banklabel, type BoxLabelpath, type Devicetok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
   type AnyThingRecord, type BankRecord, type BoxRecord, type BoxSparse, type GateRecord, type Modelkind, type Sealed, type Sparse, type StoredCited, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind,
   type VoidSentinel, type Wayins, Shell, ThingChecks, ThingFormat, thingkindVals,

@@ -9,7 +9,7 @@ function passphraseRecord(overrides: Record<string, unknown> = {}): Record<strin
     label:                  'main',
     key_deriver_label:      'test_digest_v0',
     salt_b64:               Crypto.toB64(Crypto.randomBytes(16)),
-    device_tok:             TH.DeviceTok,
+    devicetok:             TH.Devicetok,
     born_at:                TH.T0,
     bank_key_wayin_wrapped: TH.fakeCiphered('wayin-pp'),
     ...overrides,
@@ -22,7 +22,7 @@ function passkeyRecord(overrides: Record<string, unknown> = {}): Record<string, 
     label:                  'passkey0',
     credential_id:          'cred-test-1',
     prf_salt_b64:           Crypto.toB64(Crypto.randomBytes(Consts.PasskeySaltSize)),
-    device_tok:             TH.DeviceTok,
+    devicetok:             TH.Devicetok,
     born_at:                TH.T0,
     bank_key_wayin_wrapped: TH.fakeCiphered('wayin-pk'),
     ...overrides,
@@ -47,8 +47,8 @@ describe("Wayin.make(record)", () => {
     [() => passphraseRecord({ salt_b64: '' }),                                                           'refuses an empty passphrase salt'],
     [() => passphraseRecord({ salt_b64: Crypto.toB64(Crypto.randomBytes(15)) }),                         'refuses a passphrase salt of 15 bytes'],
     [() => passphraseRecord({ salt_b64: Crypto.toB64(Crypto.randomBytes(17)) }),                         'refuses a passphrase salt of 17 bytes'],
-    [() => passphraseRecord({ device_tok: undefined }),                                                  'refuses a record with no device_tok'],
-    [() => passphraseRecord({ device_tok: 'device_one' }),                                               'refuses a record whose device_tok is a label'],
+    [() => passphraseRecord({ devicetok: undefined }),                                                  'refuses a record with no devicetok'],
+    [() => passphraseRecord({ devicetok: 'device_one' }),                                               'refuses a record whose devicetok is a label'],
     [() => passphraseRecord({ wayinkind: 'password' }),                                                  'refuses a wayinkind of no known kind'],
     [() => passphraseRecord({ label: undefined }),                                                       'refuses a record with no label'],
     [() => passphraseRecord({ label: 'passkey0' }),                                                      "refuses a passphrase record under the passkey's label"],
@@ -101,15 +101,15 @@ describe("wayin.pickle()", () => {
     const wayin = Wayin.make(record as never)
     expect(Object.keys(wayin)).to.have.members(Object.keys(record))
     expect(wayin.salt_b64).to.eq(record['salt_b64'])
-    expect(() => { (wayin as { device_tok: string }).device_tok = 'device_other' }).to.throw(TypeError)
+    expect(() => { (wayin as { devicetok: string }).devicetok = 'device_other' }).to.throw(TypeError)
     expect(Object.isFrozen(wayin)).to.be.true
   })
 })
 
 describe("wayin.toJSON()", () => {
   const HeaderCases = [
-    [passphraseRecord, ['wayinkind', 'label', 'key_deriver_label', 'salt_b64', 'device_tok', 'born_at'], 'a passphrase wayin'],
-    [passkeyRecord,    ['wayinkind', 'label', 'credential_id', 'prf_salt_b64', 'device_tok', 'born_at'], 'a passkey wayin'],
+    [passphraseRecord, ['wayinkind', 'label', 'key_deriver_label', 'salt_b64', 'devicetok', 'born_at'], 'a passphrase wayin'],
+    [passkeyRecord,    ['wayinkind', 'label', 'credential_id', 'prf_salt_b64', 'devicetok', 'born_at'], 'a passkey wayin'],
   ] as const
 
   for (const [recordOf, fieldnames, blurb] of HeaderCases) {

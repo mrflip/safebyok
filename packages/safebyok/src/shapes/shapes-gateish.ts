@@ -16,6 +16,7 @@ import { BankChecks, GateChecks } from './shapes-thingkinds'
 import { type GateRecord, type Sparse, ThingChecks } from './shapes-thing'
 import type { PutAskDraft } from './shapes-asks'
 import type { WayinHeader } from './shapes-wayin'
+import type { Devicetok } from './primitives'
 
 // == [The form verbs' cleartexts]: CleartextChecks, BirthCleartexts, UnlockCleartexts, PassphraseReplaceCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, ProvedCleartexts, GatingCleartexts
 
@@ -159,7 +160,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, fn, bool, uint, custo
   leaseGate:           obj({ bankStamp: BankChecks.stamp, leaseMillis: uint, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }),
   // A gate's stamp is fixed for its life; the lease pins one revision of the gate too.
   gateRevisionedStamp: GateChecks.stamp.extend(ThingChecks.sparse.pick({ revtok: true, revseq: true }).shape),
-  provingDevice:       GX.provingDevice.extend({ strengthChecker: custom<GuardedStrengthChecker>(Consts.isGuarded, BigPhrases.GuardedExpected) }),
+  provingDevice:       GX.provingDevice.omit({ device_tok: true }).extend({ strengthChecker: custom<GuardedStrengthChecker>(Consts.isGuarded, BigPhrases.GuardedExpected), ensureDevicetok: fn<() => Promise<Devicetok>>() }),
   provingOpts:         obj({ wayinKey: custom<CryptoKey>(isWayinKey, Phrases.WayinKeyExpected) }).strict(),
 }))
 
@@ -173,7 +174,7 @@ function isWayinKey(val: unknown): val is CryptoKey {
 /** A {@link GateStamp} with the `revtok` and `revseq` of one revision of the gate: the revision a lease is granted under. */
 export type GateRevisionedStamp = Z.infer<typeof GateishChecks.gateRevisionedStamp>
 
-/** The parts of its device a proving is given: the wrapped key deriver and strength checker, and the device's token. */
+/** The parts of its device a proving is given: the wrapped key deriver and strength checker, and what answers the device's token. */
 export type ProvingDevice = Z.infer<typeof GateishChecks.provingDevice>
 
 /** The host's key deriver, wrapped by {@link guardKeyDeriver}. */

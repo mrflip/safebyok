@@ -10,9 +10,9 @@ import { CX, Validator } from 'safebyok-big/internals'
  * Each kind's record, its header (the record without the wrapped bankKey), and the union of each on `wayinkind`.
  * Each kind has the one `label` it is kept under in the bag: `main` for the passphrase, `passkey0` for the passkey.
  */
-export const WayinChecks = Validator.Checkers('bad_record', ({ obj, lit, discrim, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, device_tok, bank_key_wayin_wrapped }) => {
-  const passphraseWayinRecord = obj({ wayinkind: lit('passphrase'), label: lit('main'), key_deriver_label, salt_b64, device_tok, born_at: epochMillis, bank_key_wayin_wrapped }).strict()
-  const passkeyWayinRecord    = obj({ wayinkind: lit('passkey'), label: lit('passkey0'), credential_id, prf_salt_b64: prfSalt, device_tok, born_at: epochMillis, bank_key_wayin_wrapped }).strict()
+export const WayinChecks = Validator.Checkers('bad_record', ({ obj, lit, discrim, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, devicetok, bank_key_wayin_wrapped }) => {
+  const passphraseWayinRecord = obj({ wayinkind: lit('passphrase'), label: lit('main'), key_deriver_label, salt_b64, devicetok, born_at: epochMillis, bank_key_wayin_wrapped }).strict()
+  const passkeyWayinRecord    = obj({ wayinkind: lit('passkey'), label: lit('passkey0'), credential_id, prf_salt_b64: prfSalt, devicetok, born_at: epochMillis, bank_key_wayin_wrapped }).strict()
   const passphraseWayinHeader = passphraseWayinRecord.omit({ bank_key_wayin_wrapped: true }).strip()
   const passkeyWayinHeader    = passkeyWayinRecord.omit({ bank_key_wayin_wrapped: true }).strip()
   return {

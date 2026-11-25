@@ -6,6 +6,7 @@ import { type GateRevisionedStamp, type GuardedKeyDeriver, type LeaseGate, type 
 import type { BankScope, BankStamp, GateStamp, LeaseRecord, StampedGate } from '../shapes/shapes-stamps'
 import * as Stamps from '../shapes/shapes-stamps'
 import type { Modelkind, Sparse } from '../shapes/shapes-thing'
+import type { Devicetok } from '../shapes/primitives'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { Wayin, wayinCtxOf } from './wayin'
 import { bulletproofAsyncHandlerOf } from '../helpers/bulletproof'
@@ -191,7 +192,7 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
     const { bankStamp: bankStampChecked, gateStamp: gateStampChecked, passphraseClear: typed } = Checks.passphraseNovelArgs.parse({ device, bankStamp, gateStamp, passphraseClear: passphraseCleartext })
     const verdict = await super.judgeStrength(device, bankStampChecked, typed)
     if (! verdict.strong) { throw Throwers.weakPassphrase(verdict.reason) }
-    const header = mintPassphraseHeader(device)
+    const header = mintPassphraseHeader(device, await device.ensureDevicetok())
     const wayinKey = await passphraseKeyOf(device.keyDeriver, typed, Crypto.fromB64(header.salt_b64))
     return this.make({ bankStamp: bankStampChecked, gateStamp: gateStampChecked, header, stored: null }, { wayinKey })
   }
@@ -225,7 +226,7 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
   /** Build a proving for a new passkey wayin of the gate stamped `gateStamp`, in the bank stamped `bankStamp`. */
   static async buildNovel(device: ProvingDevice, bankStamp: BankStamp, gateStamp: GateStamp, passkeyCleartext: GX.PasskeyAnswer): Promise<PasskeyProving> {
     const { bankStamp: bankStampChecked, gateStamp: gateStampChecked, passkeyClear: answer } = Checks.passkeyNovelArgs.parse({ device, bankStamp, gateStamp, passkeyClear: passkeyCleartext })
-    const header = mintPasskeyHeader(device, answer)
+    const header = mintPasskeyHeader(await device.ensureDevicetok(), answer)
     const wayinKey = await Crypto.deriveWrappingKey(answer.prfBytes, wayinCtxOf(bankStampChecked, gateStampChecked, header))
     return this.make({ bankStamp: bankStampChecked, gateStamp: gateStampChecked, header, stored: null }, { wayinKey })
   }
@@ -250,26 +251,26 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
 
 // == [Headers]: mintPassphraseHeader, mintPasskeyHeader
 
-/** The header of a new passphrase wayin, with a fresh random salt */
-function mintPassphraseHeader({ keyDeriver, device_tok }: ProvingDevice): PassphraseWayinHeader {
+/** The header of a new passphrase wayin, recording `devicetok`, with a fresh random salt */
+function mintPassphraseHeader({ keyDeriver }: ProvingDevice, devicetok: Devicetok): PassphraseWayinHeader {
   return WayinChecks.passphraseWayinHeader.parse({
     wayinkind:         'passphrase',
     label:             'main',
     key_deriver_label: keyDeriver.key_deriver_label,
     salt_b64:          Crypto.toB64(Crypto.randomBytes(keyDeriver.salt_size)),
-    device_tok,
+    devicetok,
     born_at:           Clock.nowMillis(),
   })
 }
 
-/** The header of a new passkey wayin, for the passkey that gave `answer` */
-function mintPasskeyHeader({ device_tok }: ProvingDevice, { credential_id, prf_salt_b64 }: GX.PasskeyAnswer): PasskeyWayinHeader {
+/** The header of a new passkey wayin, recording `devicetok`, for the passkey that gave `answer` */
+function mintPasskeyHeader(devicetok: Devicetok, { credential_id, prf_salt_b64 }: GX.PasskeyAnswer): PasskeyWayinHeader {
   return WayinChecks.passkeyWayinHeader.parse({
     wayinkind:     'passkey',
     label:         'passkey0',
     credential_id,
     prf_salt_b64,
-    device_tok,
+    devicetok,
     born_at:       Clock.nowMillis(),
   })
 }

@@ -1,4 +1,4 @@
-/** What a deviceDB is, what its verbs are given beyond a lease record, what its listeners hear, and what an IdbDeviceDB is made with and files a record under. */
+/** What a deviceDB is, what its verbs are given beyond a lease record or a devicetok, what its listeners hear, and what an IdbDeviceDB is made with and files a record under. */
 
 import type * as Z from 'zod'
 import { Validator } from 'safebyok-big/internals'
@@ -18,7 +18,7 @@ export function isDeviceDB(val: unknown): val is DeviceDB {
 }
 
 /** The verbs of a {@link DeviceDB}. */
-const DeviceDBMembernames = ['peekLease', 'stowLease', 'listen'] as const satisfies readonly (keyof DeviceDB)[]
+const DeviceDBMembernames = ['peekLease', 'stowLease', 'listen', 'ensureDevicetok'] as const satisfies readonly (keyof DeviceDB)[]
 
 /** Called with the scope of a lease record stored, in this tab or another. It gets the scope only: peek for the record. */
 export type LeaseListener = (scope: LeaseScope) => void

@@ -83,7 +83,7 @@ describe("each ctx, byte for byte", () => {
   it("binds a passphrase wayin's wrap to the bank's stamp, the gate's, the purpose and its whole header", async () => {
     const { bank } = await TH.buildBornBank()
     const wayin = bank.gate.wayins.main
-    const ctx = textBytes(`[${BankStampText},${GateStampText},"bank_key_passphrase_wrapped",{"born_at":${String(wayin.born_at)},"device_tok":"${wayin.device_tok}","key_deriver_label":"${wayin.key_deriver_label}","label":"main","salt_b64":"${wayin.salt_b64}","wayinkind":"passphrase"}]`)
+    const ctx = textBytes(`[${BankStampText},${GateStampText},"bank_key_passphrase_wrapped",{"born_at":${String(wayin.born_at)},"devicetok":"${wayin.devicetok}","key_deriver_label":"${wayin.key_deriver_label}","label":"main","salt_b64":"${wayin.salt_b64}","wayinkind":"passphrase"}]`)
     const wayinKey = await Crypto.importWrappingKeyBytes(await TH.testDeriver.deriveKeyBytes(TH.TestPassphrase, Crypto.fromB64(wayin.salt_b64)))
     expect(await Crypto.unwrapKeyUnder(wayinKey, wayin.bank_key_wayin_wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
   })
@@ -93,7 +93,7 @@ describe("each ctx, byte for byte", () => {
     const prfBytes = new Uint8Array(answer.prfBytes)
     const { bank } = await TH.buildBornBank({ passkeyCleartext: answer })
     const wayin = bank.gate.wayins.passkey0!
-    const ctx = textBytes(`[${BankStampText},${GateStampText},"bank_key_passkey_wrapped",{"born_at":${String(wayin.born_at)},"credential_id":"${wayin.credential_id}","device_tok":"${wayin.device_tok}","label":"passkey0","prf_salt_b64":"${wayin.prf_salt_b64}","wayinkind":"passkey"}]`)
+    const ctx = textBytes(`[${BankStampText},${GateStampText},"bank_key_passkey_wrapped",{"born_at":${String(wayin.born_at)},"credential_id":"${wayin.credential_id}","devicetok":"${wayin.devicetok}","label":"passkey0","prf_salt_b64":"${wayin.prf_salt_b64}","wayinkind":"passkey"}]`)
     const passkeyKey = await Crypto.deriveWrappingKey(prfBytes, ctx)
     expect(await Crypto.unwrapKeyUnder(passkeyKey, wayin.bank_key_wayin_wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
   })

@@ -212,3 +212,67 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
   })
 }
 // --
+
+// == [The devicetok battery]: DeviceDBDevicetokBatteryOpts, describeDeviceDBDevicetokBattery
+
+/** The options of {@link describeDeviceDBDevicetokBattery}: how to make a deviceDB, another tab's view of it, and the cheat into the devicetok it stores. */
+export type DeviceDBDevicetokBatteryOpts<DBT extends DeviceDB> = Pick<DeviceDBLeaseBatteryOpts<DBT>, 'makeDeviceDB' | 'makeTwin'> & {
+  /** Stores `raw` as the devicetok, unchecked. */
+  plantDevicetok: (deviceDB: DBT, raw: unknown) => Helpers.Awaitable<void>
+}
+
+/** A UUID, as `crypto.randomUUID()` makes. */
+const UuidPattern = /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/
+
+/** Register the cases every deviceDB's `ensureDevicetok` must pass. */
+export function describeDeviceDBDevicetokBattery<DBT extends DeviceDB>(dbname: string, { makeDeviceDB, makeTwin, plantDevicetok }: DeviceDBDevicetokBatteryOpts<DBT>): void {
+  describe(`${dbname}: ensureDevicetok`, () => {
+    it("makes a devicetok, a UUID, at its first call, and answers the same one at each call after, in this tab and another", async () => {
+      const deviceDB  = makeDeviceDB()
+      const devicetok = await deviceDB.ensureDevicetok()
+      expect(devicetok).to.match(UuidPattern)
+      expect([await deviceDB.ensureDevicetok(), await makeTwin(deviceDB).ensureDevicetok()]).to.deep.equal([devicetok, devicetok])
+    })
+
+    it("makes another devicetok for another database", async () => {
+      expect(await makeDeviceDB().ensureDevicetok()).to.not.eq(await makeDeviceDB().ensureDevicetok())
+    })
+
+    it("answers one devicetok to calls made together", async () => {
+      const deviceDB   = makeDeviceDB()
+      const devicetoks = await Promise.all([deviceDB.ensureDevicetok(), makeTwin(deviceDB).ensureDevicetok(), deviceDB.ensureDevicetok()])
+      expect(new Set(devicetoks).size).to.eq(1)
+    })
+
+    it("files the devicetok apart from the leases: a lease stowed leaves it, and it leaves the lease", async () => {
+      const deviceDB  = makeDeviceDB()
+      const devicetok = await deviceDB.ensureDevicetok()
+      const lease     = await liveLeaseRecordOf()
+      await deviceDB.stowLease(lease)
+      expect(await deviceDB.ensureDevicetok()).to.eq(devicetok)
+      expect(sansKey(await deviceDB.peekLease(WorldLeaseScope))).to.deep.equal(sansKey(lease))
+    })
+
+    it("answers a devicetok stored", async () => {
+      const deviceDB = makeDeviceDB()
+      await plantDevicetok(deviceDB, '00000000-0000-4000-8000-0000000000d2')
+      expect(await deviceDB.ensureDevicetok()).to.eq('00000000-0000-4000-8000-0000000000d2')
+    })
+
+    const DamagedCases = [
+      ['device_one',                                       'a label'],
+      [42,                                                 'a number'],
+      [{ devicetok: '00000000-0000-4000-8000-0000000000d2' }, 'a devicetok wrapped in an object'],
+    ] as const
+    for (const [raw, blurb] of DamagedCases) {
+      it(`replaces a devicetok stored that is ${blurb} with a fresh one, kept from then on`, async () => {
+        const deviceDB = makeDeviceDB()
+        await plantDevicetok(deviceDB, raw)
+        const devicetok = await deviceDB.ensureDevicetok()
+        expect(devicetok).to.match(UuidPattern)
+        expect(await deviceDB.ensureDevicetok()).to.eq(devicetok)
+      })
+    }
+  })
+}
+// --

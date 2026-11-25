@@ -8,7 +8,7 @@ import type { BirthCleartexts, BirthDna } from '../shapes/shapes-gateish'
 import { type HostedVault, type ThingMakeOpts, ThingMakeChecks } from '../shapes/shapes-bankish'
 import type { ShellOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
-import { type DeviceTok, type Lifetok, Labelpath, Lifeseq } from '../shapes/primitives'
+import { type Lifetok, Labelpath, Lifeseq } from '../shapes/primitives'
 import { type BankRecord, type BoxRecord, type Modelkind, ThingFormat } from '../shapes/shapes-thing'
 import { type VaultItemEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
@@ -40,13 +40,10 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   }
   // --
 
-  // == [Getters]: device, device_tok, scope, stamp, gate, rootBox
+  // == [Getters]: device, scope, stamp, gate, rootBox
 
   /** The device this bank is on. */
   get device(): Device { return this.#device }
-
-  /** This device's token, recorded in each wayin the bank builds. */
-  get device_tok(): DeviceTok { return this.#device.device_tok }
 
   /** This bank's scope: its user and its `banklabel`. */
   get scope(): BankScope { return StampChecks.bankScope.parse(this) }
