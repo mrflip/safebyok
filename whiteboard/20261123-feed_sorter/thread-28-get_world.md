@@ -1,6 +1,6 @@
 # Thread 28: get_world (2026-11-25)
 
-Branch `20261124-get_world`, PR #NNN, stacked on [#893](https://github.com/mrflip/safebyok/pull/893). Proved: see the
+Branch `20261124-get_world`, PR [#894](https://github.com/mrflip/safebyok/pull/894), stacked on [#893](https://github.com/mrflip/safebyok/pull/893). Proved: see the
 PR's **Tests:** line (`pnpm justify` in full; idb-lean, postgres and react-lean by hand).
 
 Built by hand (no /sprint), from the orchestrator's brief (G1–G7). The Coach: "May we have a call, modelled on the
