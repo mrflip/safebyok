@@ -3,7 +3,7 @@
 Mode: **YOLO**. Issued by the Coach, 2026-11-25. Cap: 3 threads at once.
 Default levels: review `medium`; worker `opus` (thread-worker), reviewer `opus` for threads touching what
 `notes/guarantees-big.md` covers (lease, keys), else its `sonnet` pin; style pass on `style-reviewer`'s pin.
-Status: 0 flagged in review (roots not refreshed on reconnect), rework running (YOLO: fix); 1a and 1c building; the rest waiting.
+Status: 0 in its second rework (the reconnect refresh comes out, per the Coach); 1c ready (#902), in review; 1a building; the rest waiting.
 
 Sprint doc: https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh (Open Matters bookmark rev 3).
 
@@ -14,6 +14,10 @@ The design for threads 0 to 1b, with the rulings behind it: `lease_shelf-design.
 - `notes/transition.md`, *Using what big has*: for any thread that ports from safebyok-big.
 
 ## Ground rules
+- **Reviewers review for decoupling.** The Coach: "It is **exceptionally** important that you keep your reviewers
+  focused on **decoupling** the infrastructure, not on finding crossings." Every reviewer handoff quotes it.
+- **Freshness is the janitor's.** The Coach: "All that matters is when it was read. This is not a startup concern,
+  it's a janitorial concern." No fetch, guard or state on connect, disconnect or another lifecycle path.
 - **"A disable, a disconnect or a lock is intent, not a crisis"** (CLAUDE.md `#lock-is-intent`). An operation
   checks that its bank is unlocked and enabled at two points only: before it starts its critical path, and before
   it returns an unsealed value.

@@ -14,7 +14,19 @@ Curated by the orchestrator. Newer than the plan where they disagree.
 - Nothing can disable a world now: `World.endCause` returns the device's `#endCause`, which is never set. The
   `'swept'` stage has no way in.
 - A watch that throws at sign-in is now bad news, not stage `'failed'` (awaiting the Coach).
-- *Orchestrator:* review flagged that a reconnect did not refresh the bank, main gate and root box. YOLO: a connect
-  after sign-in calls `vaultMinder.tryGetWorldOnce()` and tells what it throws as bad news (rework underway).
+- *Orchestrator:* a review flagged that a reconnect did not refresh the roots; I fixed it under YOLO, and the Coach
+  overruled: "All that matters is when it was read ... it's a janitorial concern. That is concurrency machinery and
+  does not belong." The second rework takes the fetch back out. Freshness is 1c's janitor, by read time.
+- `device.disable()` ends a device for good (vacate will call it); the stage is `'disabled'`. It throws big's
+  `deviceDisabled()`, whose phrase still says "sweep or vacate".
 - While not connected, the vault TSQ does not hear the device's own `putBoxOnce`/`delBoxOnce`: a non-React host
   must call `connect()`.
+
+## Thread 1c `softlock` (#902, ready, in review)
+- Options kept as `device.softlockMillis`, `janitorMillis`, `gateStaleMillis`; softlock capped at `floor(leaseMillis/20)`.
+- `isSoftlocked` on World, Bank, Gate; `ensureUnlocked` consults it.
+- The janitor starts in `#connectSignedIn` (renamed from `#connectMinder`) and is cleared in disconnect. It locks
+  past the lease's end, and re-reads the roots through `tryGetWorldOnce` when the gate's read is older than
+  `gateStaleMinutes`.
+- **Every read of the lease's end goes through `world.leaseEndsAt`: 1b repoints that one getter.**
+- `read_tc` is uuid v7, monotonic: tests set the clock past every read_tc (`setClockPastEveryReadTc`).
