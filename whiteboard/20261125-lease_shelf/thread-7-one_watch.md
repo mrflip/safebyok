@@ -1,6 +1,6 @@
 # Thread 7: one_watch, one tab holds the watch (2026-11-25)
 
-Branch `20261125-one_watch`, PR (draft, number below once opened), stacked on #912 (thread 6, `20261125-lifecycle`).
+Branch `20261125-one_watch`, PR #915 (draft), stacked on #912 (thread 6, `20261125-lifecycle`).
 Proved: `pnpm --filter safebyok test` 2174 passed, lint and typecheck clean; `pnpm justify` at ready.
 
 * **Built**:
