@@ -285,7 +285,7 @@ export class World {
 
   // A renewal happens only while a lease is granted: a grant after the stored lease has ended, as when every tab closed
   // past its end, starts the next life.
-  /** `stored` as a grant follows it: a live record that can no longer unlock the bank as its tombstone, written now, and anything else as it is */
+  /** The record a grant follows over `stored`: its tombstone, written now, where `stored` is live but can no longer unlock the bank, or else `stored` itself */
   #endedIfStale(stored: LeaseRecord): Sparse<LeaseRecord> {
     const isStale = (stored.am === 'a') && ! this.#canUnlock(stored)
     return isStale ? Lease.tombstoneOf(stored) : stored
