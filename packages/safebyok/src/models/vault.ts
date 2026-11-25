@@ -123,8 +123,8 @@ export class Vault {
   /** The bank's storage stats, read from the vaultDB once: how many boxes and gates it stores, live and in all, their size in bytes, and the store's limits.
    * Needs no unlock. Nothing refuses a write for being over a limit.
    * @example
-   *   const { box, max } = await vault.stats()
-   *   const isNearlyFull = box.size > 0.9 * max.size
+   *   const { box, gate, max } = await vault.stats()
+   *   const isNearlyFull = (box.size + gate.size) > 0.9 * max.size
    */
   async stats(): Promise<VaultStats> {
     this.#bank.demandEnabled()
