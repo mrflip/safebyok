@@ -274,7 +274,7 @@ export class Device {
   }
 
   // It shuts first, so that a subscriber told of the lock, or a vault as it disconnects, finds every call refusing.
-  /** End the device for good: lock its bank, in every tab sharing its deviceDB, reject every call waiting for an `unlock` gating, and disconnect. Never throws; calling it twice in a row is the same as once.
+  /** End the device for good: lock its bank in this tab alone, reject every call waiting for an `unlock` gating, and disconnect. Never throws; calling it twice in a row is the same as once.
    * Every call on its bank, gate, vault or world after refuses `disabled`, and its world's snapshot shows the stage `'disabled'`.
    */
   disable(): this {

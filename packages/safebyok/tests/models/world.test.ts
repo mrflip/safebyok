@@ -576,11 +576,11 @@ describe("a lease shared by the tabs of one deviceDB", () => {
     expect(second.world.isUnlocked).to.be.true
   })
 
-  it("locks every tab when one is disabled", async () => {
+  it("leaves the other tabs unlocked when one is disabled, as a disconnect does", async () => {
     const { first, second } = await twoTabs()
     second.disable()
     await settle()
-    expect(first.device.world.isLocked).to.be.true
+    expect([first.device.world.isUnlocked, second.world.isLocked]).to.deep.equal([true, true])
   })
 
   it("locks every tab at the janitor's autolock in any one", async () => {

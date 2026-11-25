@@ -338,6 +338,7 @@ export class World {
   }
 
   // A disconnect drops this tab's lease alone, and stows no tombstone: one tab unmounting its provider locks no other.
+  // Only a lock, the janitor's autolock among them, ends the lease in every tab.
   /** Drop this world's lease in this tab alone, and stop what it keeps running: the deviceDB's listener, each vault it hosts hearing the VaultMinder, and the VaultMinder's watch of the vaultDB. Never throws; calling it twice in a row is the same as once.
    * The world stays enabled: its verbs still work, a call waiting in {@link ensureUnlocked} still waits, and {@link connect} resumes it, taking up the lease the deviceDB stores.
    * What the host's vaultDB or deviceDB throws as they stop goes to the device's `onBadNews`.
@@ -351,11 +352,11 @@ export class World {
     return this
   }
 
-  /** Reject every call waiting in {@link ensureUnlocked} with the device's end cause, stop the janitor, {@link lock} and {@link disconnect}. Internal: call `device.disable`, which ends the device first. */
+  // Only a lock ends the lease in every tab: a disable, as a disconnect, drops this tab's lease alone.
+  /** Reject every call waiting in {@link ensureUnlocked} with the device's end cause, stop the janitor, and {@link disconnect}. Internal: call `device.disable`, which ends the device first. */
   disable(): this {
     this.#settleUnlockWait(this.endCause)
     this.#stopJanitor()
-    this.lock()
     return this.disconnect()
   }
 
