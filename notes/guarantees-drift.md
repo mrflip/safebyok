@@ -112,15 +112,18 @@ what differs from big, in a sentence or two.
   the `rootShelf` the host hands `Device.make`, `localStorage` in a browser (`packages/safebyok/src/minding/root-shelf.ts`).
   No box and no listing is kept at rest on the device any more; no naked bankKey, no handle and no cleartext is kept.
 
-* 2026-11-25 (lease_shelf thread 1a, device_db), G4: **A lock stows a keyless tombstone; the keys go only when a stow
-  writes over them.** The new core's deviceDB (`packages/safebyok/src/storage/device-db.ts`, `idb-device-db.ts`,
-  `memory-device-db.ts`) has only `peekLease`, `stowLease` and `listen`: no forget, list or raw forget. A bank's lease
-  row is live on an even life and a tombstone on an odd one, and a stow keeps the newer by life, then revision. So a
-  lock is to stow a tombstone over the live row, and the leaseKey handle and the bankKey wrapped under it leave the
-  device's IndexedDB only when a stow writes over them: a tombstone, the next life's row, or any row over a row that
-  fails its check (big's exception, a damaged row kept until a later stow, now has no other way out). G4 holds in
-  substance: the leaseKey is made non-extractable and kept only as its `CryptoKey` handle, by structured clone, and a
-  tombstone has no keys. What drifts is that a lock no longer deletes the row, and that a row is no longer read only by
-  a query that names its bank's life: it is filed and peeked by its bank's scope alone, a live row cites its bank's
-  life (`bank_lifeseq`, `bank_lifetok`) and a tombstone none, so a row of an earlier life of the bank is told apart by
-  whoever peeks it. Nothing calls the deviceDB yet; thread 1b of lease_shelf has the Device stow and follow it.
+* 2026-11-25 (lease_shelf thread 1a, device_db; its words brought up to date by thread 1d, lease_thing), G4: **A lock
+  stows a keyless tombstone; the keys go only when a stow writes over them.** The new core's deviceDB
+  (`packages/safebyok/src/storage/device-db.ts`, `idb-device-db.ts`, `memory-device-db.ts`) has only `peekLease`,
+  `stowLease` and `listen`: no forget, list or raw forget. A bank's lease record is Thing-shaped (`LeaseRecord`, at
+  `lease/<gate label>`): live on an even life and a tombstone on an odd one, and a stow keeps the newer by life, then
+  revision. So a lock is to stow a tombstone (`Lease.tombstoneOf`) over the live record, and the leaseKey handle and
+  the bankKey wrapped under it leave the device's IndexedDB only when a stow writes over them: a tombstone, the next
+  life's record, or any record over one that fails its check (big's exception, a damaged row kept until a later stow,
+  now has no other way out). G4 holds in substance: the leaseKey is made non-extractable and kept only as its
+  `CryptoKey` handle, by structured clone, and a tombstone has no keys. What drifts is that a lock no longer deletes
+  the record, and that a record is no longer read only by a query that names its bank's life: it is filed and peeked by
+  its bank's scope alone, a live record cites its bank's life (`bank_lifeseq`, `bank_lifetok`) and a tombstone none, so
+  a record of an earlier life of the bank is told apart by whoever peeks it. A revision of a live record that changes
+  only its `ends_at` (`Lease.makeNextRecord`, a softlock) keeps its keys and its wrap, which binds the lease's stamp
+  alone. Nothing calls the deviceDB yet; thread 1b of lease_shelf has the Device stow and follow it.
