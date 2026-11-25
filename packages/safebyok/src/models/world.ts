@@ -535,7 +535,7 @@ export class World {
 
 // A browser's timer runs at once for a longer delay.
 /** The longest delay a timer waits, in milliseconds: about 24.8 days. */
-const MaxTimerMillis = 2 ** 31 - 1
+const MaxTimerMillis = (2 ** 31) - 1
 
 /** The labelpaths of the bank's roots, which the stage is read from. */
 const RootLabelpaths: ReadonlySet<Labelpath> = new Set(['bank', Labelpath.MainGate, Labelpath.RootBox])

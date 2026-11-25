@@ -355,7 +355,8 @@ describe("lease.evict() and isEvicted", () => {
     const sealing = lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const unsealing = TH.expectRefusal(lease.unseal(BaseBox, sealed), 'bank_locked')
     lease.evict()
-    expect((await sealing).whisper_sealed).to.have.all.keys('key_wrapped', 'ciphered', 'codectag', 'schematag')
+    const { whisper_sealed } = await sealing
+    expect(whisper_sealed).to.have.all.keys('key_wrapped', 'ciphered', 'codectag', 'schematag')
     await unsealing
   })
 })
@@ -419,7 +420,8 @@ describe("lease.isEnabled and lease.demandEnabled(), over its gate", () => {
     const sealing = lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const unsealing = TH.expectRefusal(lease.unseal(BaseBox, sealed), 'disabled')
     gate.end()
-    expect((await sealing).whisper_sealed).to.have.all.keys('key_wrapped', 'ciphered', 'codectag', 'schematag')
+    const { whisper_sealed } = await sealing
+    expect(whisper_sealed).to.have.all.keys('key_wrapped', 'ciphered', 'codectag', 'schematag')
     expect(await unsealing).to.equal(endCause)
   })
 })

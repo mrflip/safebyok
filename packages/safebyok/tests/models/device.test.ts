@@ -9,7 +9,7 @@ import { Consts, Errors, Phrases, SX } from 'safebyok-big/internals'
 import { browserOpts } from '../../src/browser'
 import { maskUuid } from '../../src/helpers/mask-uuid'
 import { Bank } from '../../src/models/bank'
-import { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from '../../src/models/device'
+import { DefaultGateStaleMillis, DefaultJanitorMillis, DefaultLeaseMillis, DefaultOnBadNews, DefaultSoftlockMillis, Device, tellBadNewsTo } from '../../src/models/device'
 import { BirthGating } from '../../src/models/gating'
 import { VaultTSQ } from '../../src/minding/vault-tsq'
 import { Vault } from '../../src/models/vault'
@@ -168,6 +168,19 @@ describe("Device.make(record, opts)", () => {
     expect(TH.makeDevice({}, { autolockMinutes: undefined }).leaseMillis).to.eq(DefaultLeaseMillis)
   })
 
+  it("softlocks, tidies and calls its gate stale after DefaultSoftlockMillis, DefaultJanitorMillis and DefaultGateStaleMillis where the host names none", () => {
+    const device = TH.makeDevice()
+    expect([device.softlockMillis, device.janitorMillis, device.gateStaleMillis]).to.deep.equal([DefaultSoftlockMillis, DefaultJanitorMillis, DefaultGateStaleMillis])
+    expect(TH.makeDevice({}, { softlockMinutes: 3, janitorMinutes: 2, gateStaleMinutes: 60 })).to.include({ softlockMillis: 3 * 60_000, janitorMillis: 2 * 60_000, gateStaleMillis: 60 * 60_000 })
+  })
+
+  it("softlocks for at most a twentieth of its lease, and not at all where that is under a minute", () => {
+    expect(TH.makeDevice({}, { autolockMinutes: 100, softlockMinutes: 10 }).softlockMillis).to.eq(5 * 60_000)
+    expect(TH.makeDevice({}, { autolockMinutes: 30, softlockMinutes: 10 }).softlockMillis).to.eq(90_000)
+    expect(TH.makeDevice({}, { autolockMinutes: 19, softlockMinutes: 10 }).softlockMillis).to.eq(0)
+    expect(TH.makeDevice({}, { autolockMinutes: 60, softlockMinutes: 0.5 }).softlockMillis).to.eq(0)
+  })
+
   it("warns through its logger of a test key deriver", () => {
     const warn = vi.fn()
     TH.makeDevice({}, { logger: { log: vi.fn(), warn, error: vi.fn() } })
@@ -191,6 +204,9 @@ describe("Device.make(record, opts)", () => {
     [{ autolockMinutes: 0 },     'an autolock of no minutes'],
     [{ autolockMinutes: -5 },    'an autolock of negative minutes'],
     [{ autolockMinutes: '30' },  'an autolock written as text'],
+    [{ softlockMinutes: 0 },     'a softlock of no minutes'],
+    [{ janitorMinutes: -1 },     'a janitor period of negative minutes'],
+    [{ gateStaleMinutes: '720' }, 'a gate staleness written as text'],
     [{ gates: ['main'] },        'an option of the old core'],
     [{ requestCleartext: vi.fn() }, 'a requestCleartext, which a device does not take'],
     [{ onBadNews: 'tell me' },   'an onBadNews that is not a function'],

@@ -314,27 +314,29 @@ Reasoning for wontfix: it is a crossing of a get and a sighting of a newer revis
 to own. The Coach: "I'm loath to override errors of TSQ to our helpful guess." Ruled by the Coach, 2026-11-24,
 feed_sorter (the redistribution design, section 12); narrowed to an item with no data by thread 20 of feed_sorter.
 
-### A get, a put or a notice that lands across a disconnect or a disable
+### A get, a put, a janitor's re-read of the roots or a notice that lands across a disconnect or a disable
 
 * current outcome: a `device.disconnect()` locks the bank, has the vault TSQ stop hearing the VaultMinder, and stops the
   VaultMinder's watch; it waits for nothing in flight. A get or a put already past its checks goes on: its answer lands
   in the VaultMinder and the vault TSQ's QueryClient as any answer does, and a put lands in storage. A notice the
   vaultDB delivers after its watch is stopped is told to whoever still listens to the VaultMinder, and the vault TSQ is
-  no longer among them. The next `device.connect()` invalidates the bank's items and listings, so what is shown then is
-  fetched again. A `device.disable()` disconnects, so the same holds of it, and no connect follows: what lands is kept
-  by a device whose every verb refuses.
+  no longer among them. The disconnect stops the world's janitor, but a re-read of the roots its last tick began goes
+  on, and its roots land in the VaultMinder as a get's answer does. The next `device.connect()` invalidates the bank's
+  items and listings, so what is shown then is fetched again. A `device.disable()` disconnects, so the same holds of
+  it, and no connect follows: what lands is kept by a device whose every verb refuses.
 * alternatives:
   - have the disconnect wait for, or cancel, what is in flight: abort machinery in a primitive's critical path.
   - drop an answer or a notice that lands once disconnected: a token or a state checked on every answer, for a crossing.
 * workaround: none needed: a disconnect leaves nothing stored inconsistent, and a connect fetches again.
 
 Steps to reproduce: hold a vaultDB's get, call `device.disconnect()`, then let the get answer: the box's item in
-`device.vaultTSQ` holds the answer.
+`device.vaultTSQ` holds the answer. Or hold the vaultDB's getworld once a janitor tick has asked it, call
+`device.disconnect()`, then let it answer: the VaultMinder holds the roots.
 
 Reasoning for wontfix: a disconnect comes when a provider unmounts, and a get is in flight for milliseconds (CLAUDE.md,
 *Hours separate updates*, `#no-slop-crossings`). What lands is what the vaultDB answered, nothing secret is kept past
 the lock, and guarding it would put a token or a wait on every answer. Written by lease_shelf thread 0, 2026-11-25,
-awaiting a ruling.
+awaiting a ruling; widened to the janitor's re-read by thread 1c, 2026-11-25.
 
 ## React
 
