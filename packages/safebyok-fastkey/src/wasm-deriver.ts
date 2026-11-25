@@ -1,6 +1,6 @@
 import { argon2id } from 'hash-wasm'
-import { VaultError } from 'safebyok-big'
-import { Argon2idWebV1, parseKeyDeriverSpec, type Argon2idKeyDeriver, type KeyDeriverSpec } from 'safebyok-big/browser'
+import { VaultError } from 'safebyok'
+import { Argon2idWebV1, parseKeyDeriverSpec, type Argon2idKeyDeriver, type KeyDeriverSpec } from 'safebyok/browser'
 import * as Phrases from './phrases'
 
 /** Make a frozen key deriver from a spec that has already been validated. */

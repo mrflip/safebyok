@@ -1,8 +1,8 @@
 import { argon2id } from 'hash-wasm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { type Bank, type DeviceOpts, VaultError, isVaultError } from 'safebyok-big'
-import { Argon2idWebV1, makeArgon2idDeriver, argon2idWebV1Deriver, type KeyDeriver, type KeyDeriverSpec } from 'safebyok-big/browser'
-import * as TH from 'safebyok-big/testing'
+import { type BoxRecord, type Device, type LiveOf, type VaultDB, VaultError, isVaultError } from 'safebyok'
+import { Argon2idWebV1, makeArgon2idDeriver, argon2idWebV1Deriver, type KeyDeriver, type KeyDeriverSpec } from 'safebyok/browser'
+import * as TH from 'safebyok/testing'
 import { makeArgon2idWasmDeriver, argon2idWasmWebV1Deriver } from '../src/wasm-deriver'
 
 /** A host's own spec that is cheap to derive under. Its three counts all differ, so a test catches two of them being swapped. */
@@ -35,8 +35,6 @@ const FakeWhisper = { apiKey: 'sk-fake-0000-not-a-real-key' }
 
 /** Argon2id's output for 'correct horse battery staple' and `saltOf(16)` under the supplied spec. */
 const SavedHex = 'efb4ef4c091ec9dacc4f1284c439742b414394599ffe4bbefc4dc300e4a4301b'
-
-TH.useBankWorlds()
 
 // The point of the package: the same spec, passphrase and salt must give the same bytes here as in the
 // core's @noble/hashes deriver. Otherwise a vault made on one device would not open on another.
@@ -205,53 +203,46 @@ describe("makeArgon2idWasmDeriver's bounds", () => {
   })
 })
 
-/** Two devices over one bankDB, each with its own key deriver: the first builds the bank, the second finds it locked. */
-function twoDevices(firstDeriver: KeyDeriver, secondDeriver: KeyDeriver) {
-  const world = TH.makeBankWorld()
-  return {
-    world,
-    first:  () => world.deviceOn({ keyDeriver: firstDeriver }).ensureBank(),
-    second: (overrides: Partial<DeviceOpts> = {}) => world.deviceOnAnotherDevice({ keyDeriver: secondDeriver, ...overrides }).ensureBank(),
-  }
+/** The labelpath of the box the first device puts. */
+const Openai = 'box/openai'
+
+/** A device of the test world deriving through `keyDeriver`, over `vaultDB` or a fresh one. */
+function deviceOf(keyDeriver: KeyDeriver, vaultDB?: VaultDB): Device { return TH.makeDevice({}, { keyDeriver, ...(vaultDB && { vaultDB }) }) }
+
+/** Birth the test world's bank on a device deriving through `keyDeriver`, put {@link FakeWhisper} in a box, and return the vaultDB it is stored in. */
+async function storeFakeBox(keyDeriver: KeyDeriver): Promise<VaultDB> {
+  const { device, vault } = await TH.buildBornVault({ device: deviceOf(keyDeriver) })
+  await vault.putBoxOnce(Openai, { sidecar: {} }, { whisper: FakeWhisper })
+  return device.vaultDB
 }
 
-/** Build the vault on `bank`, unlocked by its build, then put {@link FakeWhisper} in one of its boxes. */
-async function putFakeBox(bank: Bank): Promise<void> {
-  const vault = await bank.ensureVault(TH.VaultScopeGiven)
-  await vault.putBox({ boxlabel: 'openai', whisper: FakeWhisper })
-}
-
-/** Unlock `bank` (the test world's dialog types the passphrase), and check that the box the other device stored is there. */
-async function expectBoxUnseals(bank: Bank): Promise<void> {
-  await bank.ensureUnlocked()
-  const vault = await bank.ensureVault(TH.VaultScopeGiven)
-  const box = (await vault.getBox('openai'))!
-  await box.expose()
-  expect(box.whisper).to.deep.equal(FakeWhisper)
+/** Sign `device` in, unlock its bank by the test passphrase, and check that the box the other device stored unseals to {@link FakeWhisper}. */
+async function expectBoxUnseals(device: Device): Promise<void> {
+  await device.signin(TH.WorldScope.userid)
+  await device.bank!.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+  const record = await device.vaultTSQ.getOnce({ ...device.bank!.scope, labelpath: Openai })
+  const { whisper } = await device.vault!.unsealBox(record as LiveOf<BoxRecord>)
+  expect(whisper).to.deep.equal(FakeWhisper)
 }
 
 // Each test runs the real Argon2id at the supplied spec on both devices.
 describe("a vault shared between the two derivers", () => {
-  it("is accepted by Device.make under the supplied label", async () => {
-    const bank = await TH.makeBankWorld().deviceOn({ keyDeriver: argon2idWasmWebV1Deriver }).ensureBank()
-    const vault = await bank.ensureVault(TH.VaultScopeGiven)
-    expect(vault.bank.isUnlocked).to.be.true
+  it("is accepted by Device.make under the supplied label", { timeout: 60_000 }, async () => {
+    const { bank } = await TH.buildBornBank({ device: deviceOf(argon2idWasmWebV1Deriver) })
+    expect(bank.isUnlocked).to.be.true
   })
 
   it("made through WebAssembly opens through the core's deriver", { timeout: 60_000 }, async () => {
-    const devices = twoDevices(argon2idWasmWebV1Deriver, argon2idWebV1Deriver)
-    await putFakeBox(await devices.first())
-    await expectBoxUnseals(await devices.second())
+    const vaultDB = await storeFakeBox(argon2idWasmWebV1Deriver)
+    await expectBoxUnseals(deviceOf(argon2idWebV1Deriver, vaultDB))
   })
 
   it("made through the core's deriver opens through WebAssembly, and refuses a wrong passphrase there", { timeout: 60_000 }, async () => {
-    const devices = twoDevices(argon2idWebV1Deriver, argon2idWasmWebV1Deriver)
-    await putFakeBox(await devices.first())
-    const mistyped = await devices.second({
-      requestCleartext: async (gating) => { await TH.expectBad(gating.attempt(TH.byPassphrase('correct horse battery stapler')), 'wrong_passphrase') },
-    })
-    await expect(mistyped.ensureUnlocked()).rejects.toThrow(/dismissed/u)
-    await expectBoxUnseals(await devices.second())
+    const vaultDB = await storeFakeBox(argon2idWebV1Deriver)
+    const device  = deviceOf(argon2idWasmWebV1Deriver, vaultDB)
+    await device.signin(TH.WorldScope.userid)
+    await TH.expectRefusal(device.bank!.gate.unlock({ passphraseCleartext: 'correct horse battery stapler' }), 'wrong_passphrase')
+    await expectBoxUnseals(device)
   })
 })
 
@@ -276,7 +267,7 @@ describe("where WebAssembly cannot run", () => {
     vi.resetModules()
     const Fresh = await import('../src/wasm-deriver')
     // A fresh import also loads a fresh copy of safebyok, and the error thrown is that copy's VaultError.
-    const FreshCore = await import('safebyok-big')
+    const FreshCore = await import('safebyok')
     const refusal = await rejectionOf(Fresh.argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltOf(16)))
     expect(FreshCore.isVaultError(refusal, 'bad_record')).to.be.true
     expect((refusal as VaultError).message).to.include("'wasm-unsafe-eval'")
