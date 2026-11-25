@@ -1,8 +1,28 @@
 # Thread 1b: lease_shared (2026-11-25)
 
 Branch `20261125-lease_shared`, PR #909, stacked on #908 (8, on #907 1d, #903 1a, #902 1c, #900 0). Proved:
-`pnpm --filter safebyok test` 2143 passed; `pnpm --filter safebyok-react-lean test` 339 passed; both typecheck and
-lint clean. `pnpm justify` after the catch-up: see the PR.
+`pnpm justify` green after the catch-up (before the Coach's three rulings); since the rulings,
+`pnpm --filter safebyok test` 2147 passed, typecheck and lint clean; justify again before `ready`.
+
+* **The Coach's rulings (2026-11-25, through the orchestrator), each built:**
+  1. **E1 confirmed, narrowed**: "It should not, it's just for unmount. Vacate delete and lock cause lock". A
+     disconnect drops this tab's copy only. Correcting the handoff, `disable()` no longer tombstones either: it drops
+     this tab's copy as a disconnect does. Only `lock()` (and the janitor's autolock, which calls it, and a damaged
+     lease, whose gate locks) ends the shared lease. Vacate and delete come later.
+  2. **File the lease by gate**: "File it by gate so it doesn't change later. A gate might have different
+     authorizations you'd escalate into". The deviceDB's key, the bell's scope and `peekLease`'s argument are the
+     record's own scope, `LeaseScope` = `{ userid, banklabel, labelpath: 'lease/<gate label>' }`, made from a gate's
+     scope by `leaseScopeOf` (shapes-stamps, exported). *Deviation from the gloss's "the gate's scope"*: the lease's
+     labelpath names its gate one to one, so filing by it is filing by gate, and a tombstone (which carries no
+     `gate_labelpath`) files and rings itself with no mapping back from lease to gate. If the Coach wants the gate's
+     own scope at the API, it is `peekLease` taking a gate scope and a `gateLabelpathOf(leaseLabelpath)` for the
+     stow and the ring. `MemoryDeviceDB.ckeyOf` and IdbDeviceDB's `scopepathOf`/`LeaseScopepath` gain the labelpath;
+     no version bump: a record filed under the bank's scope by an earlier build is simply never peeked. Battery test
+     *files each gate's lease apart*. Test helper `TH.WorldLeaseScope`.
+  3. **Lifepath segments match the labelpath**: "Put in a dummy 0000000 to keep the invariant segments count matches
+     shape." A lease's lifepath is `LeaseLifeRoot` (`0000000000`, life 0's lifeseq) `/` its lifeseq
+     (`leaseLifepathOf`, exported); the shell's is `0000000000/-000000001`. `isLifepathOwn` checks that form;
+     `BaseThing.nextLifeOf` keeps the prefix, so cmp and the life ticks are unchanged.
 
 * **Built**:
   * First commit (thread 8's review): `World#connectSignedIn` is `#startWatch`; `#tidyConnected()` takes no argument.
@@ -20,8 +40,7 @@ lint clean. `pnpm justify` after the catch-up: see the PR.
     covers sign-in, from a shelf or the fetch), and at each ring (`#startListening` in `connect`, `#stopListening` in
     `disconnect`). It does nothing until the roots are live.
   * `#attachAndStow` for grants (both friends) and softlocks; `#attachLease` (no stow) for take-ups; `#dropLease`
-    (no stow) for disconnect and a newer tombstone; `lock()` = `#dropLease` + `#stowTombstoneOf`. `disable()` now
-    calls `lock()` before `disconnect()`. `#attachLease` settles the unlock wait only where the new lease is not
+    (no stow) for disconnect, disable and a newer tombstone; `lock()` = `#dropLease` + `#stowTombstoneOf`. `#attachLease` settles the unlock wait only where the new lease is not
     softlocked (so a softlock, or taking up a softlocked record, resumes no waiter).
   * `leaseEndsAt` reads `this.#lease?.ends_at`.
   * Gate: `WorldGateFriend.renewal` is `leaseFollowed(gateScope)`, async; the Scaffolding fallback is gone. A grant
@@ -37,10 +56,8 @@ lint clean. `pnpm justify` after the catch-up: see the PR.
     softlock everywhere / not when the end is sooner / on take-up, disconnect alone, disable and autolock lock all,
     refused stow and peek, no deviceDB); `lease.test.ts` for `nextEndingAt` and `stow`; device tests for the option.
 * **Decisions made**:
-  * **YOLO (awaiting the Coach, the Closer Look's E1): a disconnect drops this tab's lease alone, stowing nothing.**
-    It lives in one line of `World.disconnect` (`this.#dropLease()`, with a comment); the other ruling is
-    `this.lock()` there, plus the tests *drops the lease in a tab that disconnects alone* and the connect test in
-    `device.test.ts`. Connect, like sign-in, takes up the stored lease (a local peek, no backing-store fetch).
+  * **A disconnect drops this tab's lease alone, stowing nothing** (built YOLO, then confirmed: ruling 1). Connect,
+    like sign-in, takes up the stored lease (a local peek, no backing-store fetch).
   * **The softlock runs synchronously at a root's news, and a grant follows the newer of the stored record and the
     world's lease.** Otherwise a gate verb in this tab races itself: its own gate news softlocks the old lease (rev
     n+1) while its grant, following the stored rev n, also writes rev n+1, and the first stow wins on disk, leaving the
@@ -73,5 +90,8 @@ lint clean. `pnpm justify` after the catch-up: see the PR.
 * **For thread 6 (lifecycle)**: the one-line hooks are commented in `world.ts`: `#takeUp` ("an unlock, or a lock,
   taken up from another tab"), `#softlockPastGate` ("a softlock"), and the janitor's autolock is `#lockPastLeaseEnd`.
 * **For thread 5 (devicetok)**: `device.deviceDB` is always set (a `MemoryDeviceDB` when the host gives none).
-* **For the Coach**: E1 above (disconnect drops one tab's copy, vs. locks all tabs).
+* **For the Coach**: ruling 2's key is the lease's own scope (`lease/<gate label>`), not the gate's labelpath: say so
+  if the gate's own scope is wanted at the API.
+* **Earlier statements now superseded**: 1d's file says a lease's lifepath is its lifeseq alone (ruling 3), and 1a's
+  that the deviceDB files by bank scope (ruling 2).
 * **Looked up in the plan/progress**: 1b's plan entry, the progress notes for 0, 1c, 1a; design items 1-10.
