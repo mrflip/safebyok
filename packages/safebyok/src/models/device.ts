@@ -22,10 +22,19 @@ import { type Modelkind, ThingChecks } from '../shapes/shapes-thing'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
-// == [Defaults]: DefaultLeaseMillis
+// == [Defaults]: DefaultLeaseMillis, DefaultSoftlockMillis, DefaultJanitorMillis, DefaultGateStaleMillis
 
 /** How long a lease lasts when the host gives no `autolockMinutes`: fourteen days. */
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
+
+/** How near its end a lease asks the user again when the host gives no `softlockMinutes`: ten minutes, before the cap a short lease sets. */
+export const DefaultSoftlockMillis = 10 * 60_000
+
+/** How often the janitor runs when the host gives no `janitorMinutes`: every ten minutes. */
+export const DefaultJanitorMillis = 10 * 60_000
+
+/** How long after the gate was last read it is read again when the host gives no `gateStaleMinutes`: twelve hours. */
+export const DefaultGateStaleMillis = 12 * 60 * 60_000
 // --
 /** This browser, before and after anyone signs in: the host's functions, guarded, its world, and the signed-in user's bank and vault.
  * Make it with `Device.make(record, opts)`, which does no I/O, touches no browser global and subscribes to nothing; call
@@ -38,7 +47,7 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
  * reloading the page.
  */
 export class Device {
-  // == [Props]: banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #rootShelf, #vaultTsqClient, #world, #userid, #vaultTSQ, #vault, #signinAnswer, #endCause, toJSON
+  // == [Props]: banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, softlockMillis, janitorMillis, gateStaleMillis, #onBadNews, #rootShelf, #vaultTsqClient, #world, #userid, #vaultTSQ, #vault, #signinAnswer, #endCause, toJSON
 
   /** The label of the bank this device serves each user. */
   readonly banklabel:          Banklabel
@@ -52,6 +61,12 @@ export class Device {
   declare readonly logger:             Logger.VaultLogger
   /** The autolock duration in milliseconds: how long a lease lasts on this device. */
   readonly leaseMillis:        number
+  /** How near its end, in milliseconds, a lease asks the user again: `softlockMinutes`, at most a twentieth of {@link leaseMillis}, or 0 where that is under a minute. */
+  readonly softlockMillis:     number
+  /** How often, in milliseconds, the world's janitor locks a lease past its end and checks whether the gate is stale. */
+  readonly janitorMillis:      number
+  /** How long after this device last read the gate, in milliseconds, the world reads it again. */
+  readonly gateStaleMillis:    number
 
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
@@ -125,11 +140,14 @@ export class Device {
   static make(record: DeviceRecord, opts: DeviceOpts): Device { return new Device(record, opts) }
 
   private constructor(record: DeviceRecord, opts: DeviceOpts) {
-    const { record: { banklabel, device_tok }, opts: { vaultDB, keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, onBadNews = DefaultOnBadNews, queryClient = new QueryClient(), rootShelf } } = Checks.deviceMakeArgs.parse({ record, opts })
+    const { record: { banklabel, device_tok }, opts: { vaultDB, keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, softlockMinutes, janitorMinutes, gateStaleMinutes, onBadNews = DefaultOnBadNews, queryClient = new QueryClient(), rootShelf } } = Checks.deviceMakeArgs.parse({ record, opts })
     this.banklabel = banklabel
     this.device_tok = device_tok
     Helpers.decorate<Device>(this, { vaultDB, keyDeriver: guardKeyDeriver(keyDeriver), strengthChecker: guardStrengthChecker(strengthChecker), logger: Logger.parseLogger(logger) })
-    this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
+    this.leaseMillis     = millisOf(autolockMinutes, DefaultLeaseMillis)
+    this.softlockMillis  = softlockMillisOf(millisOf(softlockMinutes, DefaultSoftlockMillis), this.leaseMillis)
+    this.janitorMillis   = millisOf(janitorMinutes, DefaultJanitorMillis)
+    this.gateStaleMillis = millisOf(gateStaleMinutes, DefaultGateStaleMillis)
     this.#onBadNews = onBadNews
     this.#rootShelf = (rootShelf === undefined) ? null : guardRootShelf(rootShelf, (news) => { this.tellBadNews([news]) })
     this.#vaultTsqClient = queryClient
@@ -225,6 +243,7 @@ export class Device {
 
   // == [Locking and connecting]: lock, connect, disconnect, disable
 
+  // #lock-is-intent: a lock asks the user again at the next promptable action, and is not an alarm.
   /** Lock the signed-in user's bank ({@link World.lock}). Never throws. */
   lock(): this {
     this.#world.lock()
@@ -335,11 +354,17 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 }
 // --
 
-// == [Helpers]: millisOf, checkSecureContext, isUnbornIn
+// == [Helpers]: millisOf, softlockMillisOf, checkSecureContext, isUnbornIn
 
 // A host's Infinity minutes, for never, becomes ForeverMillis: past the entrypoint, nothing is infinite.
 /** `minutes` in milliseconds, capped at `ForeverMillis`, or `fallback` for none. */
 function millisOf(minutes: number | undefined, fallback: number): number { return (minutes === undefined ? fallback : Math.min(Math.round(minutes * Consts.MinuteMillis), Consts.ForeverMillis)) }
+
+/** `softlockMillis`, capped at a twentieth of `leaseMillis`, or 0 where that is under a minute */
+function softlockMillisOf(softlockMillis: number, leaseMillis: number): number {
+  const capped = Math.min(softlockMillis, Math.floor(leaseMillis / 20))
+  return (capped < Consts.MinuteMillis) ? 0 : capped
+}
 
 /** Refuse to run outside a secure context, where WebCrypto is missing */
 function checkSecureContext(): void {
@@ -360,16 +385,19 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
   deviceMakeArgs: obj({
     record: BankishChecks.deviceRecord,
     opts:   Validator.objCheck(() => ({
-      vaultDB:         ThingChecks.vaultDBShape,
-      keyDeriver:      custom<Deriver.KeyDeriver>(),
-      strengthChecker: custom<StrengthChecker>().optional(),
-      logger:          custom<Logger.VaultLogger>().optional(),
-      autolockMinutes: VX.positiveMinutes.optional(),
-      onBadNews:       fn<BadNewsHandler>().optional(),
-      queryClient:     custom<QueryClient>(isQueryClient, Phrases.QueryClientExpected).optional(),
-      rootShelf:       custom<RootShelf>(isRootShelf, Phrases.RootShelfExpected).optional(),
+      vaultDB:          ThingChecks.vaultDBShape,
+      keyDeriver:       custom<Deriver.KeyDeriver>(),
+      strengthChecker:  custom<StrengthChecker>().optional(),
+      logger:           custom<Logger.VaultLogger>().optional(),
+      autolockMinutes:  VX.positiveMinutes.optional(),
+      softlockMinutes:  VX.positiveMinutes.optional(),
+      janitorMinutes:   VX.positiveMinutes.optional(),
+      gateStaleMinutes: VX.positiveMinutes.optional(),
+      onBadNews:        fn<BadNewsHandler>().optional(),
+      queryClient:      custom<QueryClient>(isQueryClient, Phrases.QueryClientExpected).optional(),
+      rootShelf:        custom<RootShelf>(isRootShelf, Phrases.RootShelfExpected).optional(),
       // Ignored: the new core has no device database. Accepted so that `...browserOpts()` from safebyok/browser, which carries one, spreads in.
-      deviceDB:        custom<unknown>().optional(),
+      deviceDB:         custom<unknown>().optional(),
     }), { refusalkind: 'bad_record' }),
   }),
   tellBadNewsToArgs: obj({

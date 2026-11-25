@@ -1,6 +1,7 @@
 /** The world: the Things `world.makeThing` makes of each record, the bank, main gate and bank stamp it finds in its VaultMinder, and its snapshot. */
 
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
+import { Consts } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
 import { Box } from '../../src/models/box'
 import type { Device } from '../../src/models/device'
@@ -8,7 +9,8 @@ import { Gate } from '../../src/models/gate'
 import { type BadNews, type WorldSnapshot, PendingWorld, bankStageVals } from '../../src/shapes/shapes-bankish'
 import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import type { SeenThing } from '../../src/shapes/shapes-vault-event'
-import { readTcNow } from '../../src/storage/agerank'
+import { readAtOf, readTcNow } from '../../src/storage/agerank'
+import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -267,4 +269,118 @@ describe("a world's stage as its roots arrive one at a time", () => {
       expect([device.bank, device.vault]).to.not.include(null)
     })
   }
+})
+
+// uuid's v7 never mints a read_tc earlier than the last, whatever the clock says.
+/** Set the clock past every read_tc minted so far */
+function setClockPastEveryReadTc(): void {
+  vi.setSystemTime(readAtOf(readTcNow()) + 1)
+}
+
+describe("a world's softlock, near its lease's end", () => {
+  it("turns on softlockMillis before the lease ends, on the world, bank and gate alike", async () => {
+    const { bank, device } = await TH.buildBornBank({ device: TH.makeDevice({}, { autolockMinutes: 600, softlockMinutes: 10 }) })
+    const { world } = device
+    expect(world.leaseEndsAt).to.eq(TH.T0 + (600 * Consts.MinuteMillis))
+    expect([world.isSoftlocked, bank.isSoftlocked, bank.gate.isSoftlocked]).to.deep.equal([false, false, false])
+    vi.setSystemTime(world.leaseEndsAt! - (10 * Consts.MinuteMillis) - 1)
+    expect(world.isSoftlocked).to.be.false
+    vi.setSystemTime(world.leaseEndsAt! - (10 * Consts.MinuteMillis))
+    expect([world.isSoftlocked, bank.isSoftlocked, bank.gate.isSoftlocked]).to.deep.equal([true, true, true])
+    expect([world.isLocked, world.getSnapshot().stage]).to.deep.equal([false, 'unlocked'])
+  })
+
+  it("is on while the world is locked", async () => {
+    const { bank, device: { world } } = await TH.buildBornBank()
+    bank.lock()
+    expect([world.isSoftlocked, bank.isSoftlocked]).to.deep.equal([true, true])
+  })
+
+  it("has ensureUnlocked wait, though the bank shows unlocked, for an `unlock` gating that renews the lease", async () => {
+    const { bank, device: { world } } = await TH.buildBornBank({ device: TH.makeDevice({}, { autolockMinutes: 600 }) })
+    const nearEnd = world.leaseEndsAt! - Consts.MinuteMillis
+    vi.setSystemTime(nearEnd)
+    const ensuring = bank.ensureUnlocked()
+    expect(world.getSnapshot()).to.include({ stage: 'unlocked', isUnlockWanted: true })
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    expect(await ensuring).to.equal(bank)
+    expect(world.getSnapshot().isUnlockWanted).to.be.false
+    expect([world.leaseEndsAt, world.isSoftlocked]).to.deep.equal([nearEnd + (600 * Consts.MinuteMillis), false])
+  })
+
+  it("leaves a call that wants the bank unlocked alone before the softlock: ensureUnlocked resolves at once", async () => {
+    const { bank, device: { world } } = await TH.buildBornBank({ device: TH.makeDevice({}, { autolockMinutes: 600 }) })
+    vi.setSystemTime(world.leaseEndsAt! - (11 * Consts.MinuteMillis))
+    expect(await bank.ensureUnlocked()).to.equal(bank)
+    expect(world.getSnapshot().isUnlockWanted).to.be.false
+  })
+})
+
+describe("a world's janitor", () => {
+  it("locks the world at its first tick once the lease has ended", async () => {
+    const { device: { world } } = await TH.buildBornBank({ device: TH.makeDevice({}, { autolockMinutes: 25, janitorMinutes: 10 }) })
+    await vi.advanceTimersByTimeAsync(20 * Consts.MinuteMillis)
+    expect(world.isLocked).to.be.false
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
+    expect([world.isLocked, world.getSnapshot().stage]).to.deep.equal([true, 'locked'])
+  })
+
+  it("re-reads the roots at the first tick after the gate goes stale", async () => {
+    setClockPastEveryReadTc()
+    const vaultDB = new MemoryVaultDB()
+    const tryGetWorld = vi.spyOn(vaultDB, 'tryGetWorld')
+    await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, gateStaleMinutes: 25, janitorMinutes: 10 }) })
+    const asked = tryGetWorld.mock.calls.length
+    await vi.advanceTimersByTimeAsync(20 * Consts.MinuteMillis)
+    expect(tryGetWorld.mock.calls.length - asked).to.eq(0)
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
+    expect(tryGetWorld.mock.calls.length - asked).to.eq(1)
+    await vi.advanceTimersByTimeAsync(20 * Consts.MinuteMillis)
+    expect(tryGetWorld.mock.calls.length - asked).to.eq(1)
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
+    expect(tryGetWorld.mock.calls.length - asked).to.eq(2)
+  })
+
+  it("tells the device's onBadNews where the re-read is refused, and keeps the world as it was", async () => {
+    setClockPastEveryReadTc()
+    const vaultDB = new MemoryVaultDB()
+    const onBadNews = vi.fn()
+    const { device: { world } } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, onBadNews, gateStaleMinutes: 5, janitorMinutes: 10 }) })
+    vi.spyOn(vaultDB, 'tryGetWorld').mockRejectedValue(new Error('the network is down'))
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
+    await TH.eventually(() => onBadNews.mock.calls.length === 1)
+    expect(world.getSnapshot().stage).to.eq('unlocked')
+  })
+
+  it("stops on disconnect, and starts again on connect", async () => {
+    setClockPastEveryReadTc()
+    const vaultDB = new MemoryVaultDB()
+    const tryGetWorld = vi.spyOn(vaultDB, 'tryGetWorld')
+    const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, gateStaleMinutes: 5, janitorMinutes: 10 }) })
+    device.disconnect()
+    const asked = tryGetWorld.mock.calls.length
+    await vi.advanceTimersByTimeAsync(30 * Consts.MinuteMillis)
+    expect(tryGetWorld.mock.calls.length - asked).to.eq(0)
+    device.connect()
+    await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
+    expect(tryGetWorld.mock.calls.length - asked).to.be.at.least(1)
+  })
+
+  it("does not start until the device signs in", async () => {
+    const device = TH.makeDevice({ userid: null })
+    const before = vi.getTimerCount()
+    await device.signin(TH.WorldScope.userid)
+    expect(vi.getTimerCount() - before).to.eq(1)
+    device.disconnect()
+    expect(vi.getTimerCount() - before).to.eq(0)
+  })
+
+  it("stops for good once the device is disabled", async () => {
+    const device = TH.makeDevice({ userid: null })
+    const before = vi.getTimerCount()
+    await device.signin(TH.WorldScope.userid)
+    device.disable()
+    device.connect()
+    expect(vi.getTimerCount() - before).to.eq(0)
+  })
 })

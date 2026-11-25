@@ -178,7 +178,7 @@ export class Vault {
   }
 
   /** Call `fn` with the box at `labelpath` unsealed, and resolve what `fn` resolves.
-   * On a locked bank, it first waits for an `unlock` gating, and rejects if that wait is dismissed or the bank ends.
+   * On a locked bank, or one whose lease is near its end, it first waits for an `unlock` gating, and rejects if that wait is dismissed or the bank ends.
    * Then it gets and unseals the box as {@link withUnlockedWhisper} does, refusing as it refuses.
    * @example
    *   const reply = await vault.withWhisper('box/openai', ({ whisper }) => askModel(whisper['apiKey'], question))

@@ -146,7 +146,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
    */
   static async birth(device: Device, cleartexts: BirthCleartexts): Promise<Bank> { return await Checks.device.parse(device).birthGating(cleartexts).attempt() }
 
-  /** Resolve this bank once its device's world is unlocked ({@link World.ensureUnlocked}). While it waits, the snapshot's `isUnlockWanted` is true. */
+  /** Resolve this bank once its device's world is unlocked, its lease not near its end ({@link World.ensureUnlocked}). While it waits, the snapshot's `isUnlockWanted` is true. */
   async ensureUnlocked(): Promise<this> {
     await this.#world.ensureUnlocked()
     return this
@@ -158,6 +158,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
     return this
   }
 
+  // #lock-is-intent: a lock asks the user again at the next promptable action, and is not an alarm.
   /** Lock the bank: its device's world drops its lease and the keys in it ({@link World.lock}). */
   lock(): this {
     this.#world.lock()
@@ -171,7 +172,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
   hostVault(vault: HostedVault): void { this.#world.hostVault(vault) }
   // --
 
-  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, demandEnabled
+  // == [Guards]: isEnabled, endCause, isLocked, isSoftlocked, isUnlocked, demandEnabled
 
   /** True until its device ends. */
   get isEnabled(): boolean { return this.#world.isEnabled }
@@ -181,6 +182,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
 
   /** True while the device's world holds no lease. */
   get isLocked(): boolean { return this.#world.isLocked }
+
+  /** True while the device's world is locked, or its lease is near its end ({@link World.isSoftlocked}): {@link ensureUnlocked} then waits for an `unlock` gating. */
+  get isSoftlocked(): boolean { return this.#world.isSoftlocked }
 
   /** True while the device's world holds a lease. */
   get isUnlocked(): boolean { return this.#world.isUnlocked }

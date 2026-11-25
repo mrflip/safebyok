@@ -9,7 +9,7 @@ import { Consts, Errors, Phrases, SX } from 'safebyok-big/internals'
 import { browserOpts } from '../../src/browser'
 import { maskUuid } from '../../src/helpers/mask-uuid'
 import { Bank } from '../../src/models/bank'
-import { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from '../../src/models/device'
+import { DefaultGateStaleMillis, DefaultJanitorMillis, DefaultLeaseMillis, DefaultOnBadNews, DefaultSoftlockMillis, Device, tellBadNewsTo } from '../../src/models/device'
 import { BirthGating } from '../../src/models/gating'
 import { VaultTSQ } from '../../src/minding/vault-tsq'
 import { Vault } from '../../src/models/vault'
@@ -149,11 +149,11 @@ describe("Device.make(record, opts)", () => {
     expect([device.keyDeriver, device.strengthChecker]).to.not.include(TH.testDeriver).and.to.not.include(TH.anyStrengthChecker)
   })
 
-  it("spreads to its banklabel, token and leaseMillis alone: nothing secret and nothing opaque", () => {
+  it("spreads to its banklabel, token and durations alone: nothing secret and nothing opaque", () => {
     const device = TH.makeDevice()
     // The spread is this test's subject: what a log line or a host's `{ ...device }` sees of a device.
     const spread = { ...device } // eslint-disable-line @typescript-eslint/no-misused-spread
-    expect(Object.keys(spread)).to.have.members(['banklabel', 'device_tok', 'leaseMillis'])
+    expect(Object.keys(spread)).to.have.members(['banklabel', 'device_tok', 'leaseMillis', 'softlockMillis', 'janitorMillis', 'gateStaleMillis'])
     expect(Object.values(spread).every((val) => ['string', 'number'].includes(typeof val))).to.be.true
     expect([device.vaultDB, device.keyDeriver, device.strengthChecker, device.logger]).to.not.include(undefined)
   })
@@ -166,6 +166,19 @@ describe("Device.make(record, opts)", () => {
 
   it("leases for DefaultLeaseMillis where the host names no autolockMinutes", () => {
     expect(TH.makeDevice({}, { autolockMinutes: undefined }).leaseMillis).to.eq(DefaultLeaseMillis)
+  })
+
+  it("keeps the softlock, janitor period and gate staleness the host names, or their defaults", () => {
+    const device = TH.makeDevice()
+    expect([device.softlockMillis, device.janitorMillis, device.gateStaleMillis]).to.deep.equal([DefaultSoftlockMillis, DefaultJanitorMillis, DefaultGateStaleMillis])
+    expect(TH.makeDevice({}, { softlockMinutes: 3, janitorMinutes: 2, gateStaleMinutes: 60 })).to.include({ softlockMillis: 3 * 60_000, janitorMillis: 2 * 60_000, gateStaleMillis: 60 * 60_000 })
+  })
+
+  it("softlocks for at most a twentieth of its lease, and not at all where that is under a minute", () => {
+    expect(TH.makeDevice({}, { autolockMinutes: 100, softlockMinutes: 10 }).softlockMillis).to.eq(5 * 60_000)
+    expect(TH.makeDevice({}, { autolockMinutes: 30, softlockMinutes: 10 }).softlockMillis).to.eq(90_000)
+    expect(TH.makeDevice({}, { autolockMinutes: 19, softlockMinutes: 10 }).softlockMillis).to.eq(0)
+    expect(TH.makeDevice({}, { autolockMinutes: 60, softlockMinutes: 0.5 }).softlockMillis).to.eq(0)
   })
 
   it("warns through its logger of a test key deriver", () => {
@@ -191,6 +204,9 @@ describe("Device.make(record, opts)", () => {
     [{ autolockMinutes: 0 },     'an autolock of no minutes'],
     [{ autolockMinutes: -5 },    'an autolock of negative minutes'],
     [{ autolockMinutes: '30' },  'an autolock written as text'],
+    [{ softlockMinutes: 0 },     'a softlock of no minutes'],
+    [{ janitorMinutes: -1 },     'a janitor period of negative minutes'],
+    [{ gateStaleMinutes: '720' }, 'a gate staleness written as text'],
     [{ gates: ['main'] },        'an option of the old core'],
     [{ requestCleartext: vi.fn() }, 'a requestCleartext, which a device does not take'],
     [{ onBadNews: 'tell me' },   'an onBadNews that is not a function'],
