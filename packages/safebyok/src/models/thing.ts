@@ -18,20 +18,19 @@ export type Adoptable<RecordT extends ThingRecord> = RecordT | Tombstone<RecordT
 // --
 
 // TypeScript cannot type a static `make` here that returns the subclass while its constructor is private, so each
-// subclass declares its own: `make(record, opts[, friend])`, which checks what it is given and begins from that very record.
-// A subclass whose `PickleT` leaves out a tombstone or the void sentinel must begin from a whole live record, and never
-// receive either: `pickle` answers what was adopted, typed as the subclass says.
+// subclass declares its own: `make(begun, opts[, friend])`, which checks what it is given, constructs the Thing at its
+// shell, and has it receive `begun` where that is an item event.
 /** A model of the stored Thing at one labelpath, across its lives, which reads as the record it last adopted.
  * Each field of that record is read-only. Its Thing fields are its own enumerable props: a spread, `{ ...thing }`, or
  * `JSON.stringify` shows nothing secret and nothing opaque. A kind's body is read by a subclass's getters off the record adopted.
  * After a tombstone, a Thing answers the tombstone's body, never its last live record's; over the shell, which has none, each body field reads as undefined. Its scope fields never change.
  * Its type names the Thing fields and what a subclass declares; narrow {@link pickle} for the rest of a kind's fields.
  * What Thing itself holds is records as the vaultDB stores them, and what is derived from them: never a cleartext, a key or a lease.
- * It always models a record, at worst the shell, and its {@link receive} says which item events of the Thing are news.
- * A subclass checks what it begins from before calling `super`, and has no member under a record field's name but its body's getters. One that never receives may freeze itself last.
+ * It always models a record, at worst the shell, which it holds until it first receives one, and its {@link receive} says which item events of the Thing are news.
+ * A subclass has no member under a record field's name but its body's getters.
  * A listener can {@link subscribe} to it, and is told each time {@link receive} returns news.
  */
-export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT extends Adoptable<RecordT> = RecordT> extends BaseThing {
+export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT extends Adoptable<RecordT> = Adoptable<RecordT>> extends BaseThing {
   // == [Props]: #record, #citable, #agerank, #readAt, #bulletproofCallback, #subscribers, #subscribe
 
   // Set by the constructor's adopt.
@@ -53,14 +52,14 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
 
   // == [Construction]: constructor, adopt
 
-  /** A Thing that adopts `begun`: a whole record, a tombstone or the void sentinel, each subscriber wrapped by `bulletproofCallback` where given. */
-  protected constructor(begun: Adoptable<RecordT>, bulletproofCallback: BulletproofCallback = callAsIs) {
+  /** A Thing at `shell`, the shell at its labelpath, which has received nothing, each subscriber wrapped by `bulletproofCallback` where given. */
+  protected constructor(shell: ShellOf<RecordT>, bulletproofCallback: BulletproofCallback = callAsIs) {
     super()
     this.#bulletproofCallback = bulletproofCallback
-    const { userid, banklabel, labelpath } = begun
+    const { userid, banklabel, labelpath } = shell
     Helpers.tattoo(this, { userid, banklabel, labelpath }, { configurable: false })
-    this.#citable = citedOf(begun)
-    this.adopt(begun)
+    this.#citable = citedOf(shell)
+    this.adopt(shell)
   }
 
   // The scope fields are the constructor's: `receive` refuses a record of another scope before it adopts one.

@@ -24,7 +24,7 @@ export interface TSQWorld<VaultDBT extends MemoryVaultDB> {
  */
 export async function tsqWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT, makeThing: ThingMaker = TH.makePlainThing): Promise<TSQWorld<VaultDBT>> {
   const watching    = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
-  const sorted      = VaultMinder.make(TH.ThingBank, { vaultDB, makeThing })
+  const sorted      = VaultMinder.make(TH.ThingBank, { vaultDB, world: { makeThing } })
   const queryClient = new QueryClient()
   const vaultTSQ    = VaultTSQ.make({ vaultMinder: sorted, queryClient, scope: TH.ThingBank })
   await TH.expectGood(sorted.tryBirthBank(TH.birthBankAskOf()))

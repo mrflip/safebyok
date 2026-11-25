@@ -246,13 +246,12 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
   }
   // The bank is a root, its labelpath, label and lifepath fixed: the rules shellAt refines by hold of them already.
   const bankShell    = obj({ ...shellFields, labelpath: bankLabelpath, label: lit('bank'), lifepath: lit(VoidLifeseq) }).strict()
-  const boxRecordOrShell = union([boxRecord, shellAt(boxLabelpath)])
-  const bankThingOrShell = union([bankThing, bankShell])
-  const gateThingOrShell = union([gateThing, shellAt(gateLabelpath)])
-  const boxThingOrShell  = union([boxThing, shellAt(boxLabelpath)])
+  const gateShell    = shellAt(gateLabelpath)
+  const boxShell     = shellAt(boxLabelpath)
+  const boxRecordOrShell = union([boxRecord, boxShell])
   return {
-    bankLabelpath, gateLabelpath, boxLabelpath, wayins, storedWayins, storedLifetok,
-    bankThing, bankCited, bankThingOrShell, gateThing, gateCited, gateThingOrShell, boxThing, boxCited, boxThingOrShell, boxSparse, boxSealable, boxLiveSealable, boxRecord, boxRecordOrShell,
+    bankLabelpath, gateLabelpath, boxLabelpath, wayins, storedWayins, storedLifetok, bankShell, gateShell, boxShell,
+    bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse, boxSealable, boxLiveSealable, boxRecord, boxRecordOrShell,
   }
 }))
 
@@ -435,19 +434,8 @@ export const Shell = Object.freeze({
 export type Tombstone<RecordT extends Sparse<ThingRecord>> = TombstoneOf<RecordT>
 // --
 
-// == [Making a Thing]: BulletproofCallback, ThingMakeOpts, ThingMakeChecks
+// == [Making a Thing]: BulletproofCallback
 
 /** `callback`, wrapped so that what it throws is dealt with in one stated way, never reaching whoever calls it. */
 export type BulletproofCallback = <ArgsT extends unknown[]>(callback: (...args: ArgsT) => void) => ((...args: ArgsT) => void)
-
-/** The options every kind of Thing is made with. */
-export type ThingMakeOpts = Readonly<{
-  /** Wraps each subscriber the Thing is handed: a world's `bulletproofCallback`. Left out, what a subscriber throws reaches whoever had the Thing receive. */
-  bulletproofCallback?: BulletproofCallback | undefined
-}>
-
-/** The check of {@link ThingMakeOpts}, for a kind's make to extend. */
-export const ThingMakeChecks = Validator.Checkers('bad_record', ({ obj, fn }) => ({
-  thingMakeOpts: obj({ bulletproofCallback: fn<BulletproofCallback>().optional() }),
-}))
 // --

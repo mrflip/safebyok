@@ -83,7 +83,7 @@ async function putFlagOutcomesOf(stored: BoxRecord | null, [cited, record]: Cita
   const outcomes = []
   for (const [ifAbsent, ifPresent] of FlagCombos) {
     const inner  = new MemoryVaultDB()
-    const minder = VaultMinder.make(TH.ThingBank, { vaultDB: inner, makeThing: TH.makePlainThing })
+    const minder = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
     await TH.expectGood(minder.tryBirthBank(TH.birthBankAskOf()))
     if (stored !== null) { cheatStored(inner, stored) }
     outcomes.push(outcomeOf(await minder.tryPutOnce({ cited, record, ifAbsent, ifPresent }), record, stored))

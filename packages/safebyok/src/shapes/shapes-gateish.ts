@@ -5,7 +5,6 @@ import { NEVER } from 'zod'
 import { Consts, GX, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import type { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import type { Bank } from '../models/bank'
-import type { Device } from '../models/device'
 import type { Gate } from '../models/gate'
 import type { Gating } from '../models/gating'
 import type { Lease } from '../models/lease'
@@ -13,7 +12,7 @@ import type { Proving, guardKeyDeriver } from '../models/proving'
 import type { Wayin } from '../models/wayin'
 import type { BankScope, BankStamp, GateStamp, LeaseStamp } from './shapes-stamps'
 import { BankChecks, GateChecks } from './shapes-thingkinds'
-import { type GateRecord, type ThingMakeOpts, ThingChecks } from './shapes-thing'
+import { type GateRecord, ThingChecks } from './shapes-thing'
 import type { PutAskDraft } from './shapes-asks'
 import type { WayinHeader } from './shapes-wayin'
 
@@ -143,16 +142,10 @@ export interface WorldGateFriend {
 }
 // --
 
-// == [The gate's forms]: GateDna, GateOpts
+// == [The gate's forms]: GateDna
 
 /** The dna of a new main gate: its stamp, and its wayins. */
 export type GateDna = GateStamp & { wayins: { main: Wayin, passkey0: Wayin | null } }
-
-/** The options of {@link Gate.make}, beside its record. */
-export interface GateOpts extends ThingMakeOpts {
-  /** The device the gate's bank is on. */
-  device: Device
-}
 // --
 
 // == [What a proving is handed]: RawChecks, leaseGate, GateRevisionedStamp, ProvingDevice, GuardedKeyDeriver, ProvingParts, ProvingOpts

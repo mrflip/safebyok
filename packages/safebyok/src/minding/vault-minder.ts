@@ -1,7 +1,7 @@
 /** `VaultMinder`, which answers a vaultDB's verbs over another, and tells one bank's records that are news as an ordered feed. */
 
 import { once } from 'es-toolkit'
-import { Clock, Errors, SX } from 'safebyok-big/internals'
+import { type Errors, SX } from 'safebyok-big/internals'
 import { type Lifetok, Labelpath, Lifeseq } from '../shapes/primitives'
 import {
   type AnyAsk, type BirthBankAsk, type CitedOf, type DelAskDraft, type GetAsk, type GetWorldAsk, type ListAsk, type PutAskDraft, type Track, type Tracked, type WriteAsk,
@@ -10,12 +10,13 @@ import {
 import type { BankAskDraft } from '../shapes/shapes-bankish'
 import { type BankRecord, type ThingRecord, type ThingScope, Shell, ThingChecks } from '../shapes/shapes-thing'
 import type { BankScope } from '../shapes/shapes-stamps'
-import { type DelOnceArgs, type PutOnceArgs, type ReceivingThing, type ThingCar, type VaultMinderListener, type VaultMinderOpts, type ThingMaker, VaultMinderChecks } from '../shapes/shapes-vault-minder'
+import { type CarWorld, type DelOnceArgs, type PutOnceArgs, type ReceivingThing, type VaultMinderListener, type VaultMinderOpts, VaultMinderChecks } from '../shapes/shapes-vault-minder'
 import { type ReadTc, type SeenThing, type VaultEvent, SeenChecks, VaultDBSourcelabel } from '../shapes/shapes-vault-event'
 import * as Throwers from '../refusals/throwers'
 import { BaseThing } from '../models/base-thing'
-import { VacantAgerank, VacantReadTc, itemSeenOf } from '../storage/agerank'
+import { VacantAgerank, itemSeenOf } from '../storage/agerank'
 import { refusedAnswerOf } from '../storage/refused-answer'
+import { ThingCar } from './thing-car'
 import type { BadAnswer, BirthBankAnswer, GetThingAnswer, GetWorldAnswer, Kids, ListThingsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import type { VaultDB } from '../storage/vault-db'
 
@@ -39,7 +40,7 @@ type Told<AnswerT> = Readonly<{ answer: AnswerT, refusal: Errors.VaultError | nu
  * taken all the same, and reaches no one, then or later: listen before asking it anything.
  */
 export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> implements Omit<VaultDB, 'watch'> {
-  // == [Props]: VaultDBSourcelabel, #vaultDB, #scope, #makeThing, #cars, #listenings, #newestBanktok, #unwatchWrapped
+  // == [Props]: VaultDBSourcelabel, #vaultDB, #scope, #world, #cars, #listenings, #newestBanktok, #unwatchWrapped
 
   /** The `sourcelabel` of each event of a record from the wrapped vaultDB, from an answer or its watch. */
   static get VaultDBSourcelabel(): typeof VaultDBSourcelabel { return VaultDBSourcelabel }
@@ -48,7 +49,8 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   readonly #vaultDB: VaultDB
   /** The bank this vaultDB serves. */
   readonly #scope: BankScope
-  readonly #makeThing: ThingMaker<ThingT>
+  /** The world that makes each Thing kept. */
+  readonly #world: CarWorld<ThingT>
   /** The car of the Thing at each labelpath a record was learned of at. */
   readonly #cars = new Map<Labelpath, ThingCar<ThingT>>()
   readonly #listenings = new Set<Listening>()
@@ -67,7 +69,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     const { scope: bankScope, opts: { vaultDB } } = VaultMinderChecks.makeArgs.parse({ scope, opts })
     this.#vaultDB   = vaultDB
     this.#scope     = Object.freeze({ userid: bankScope.userid, banklabel: bankScope.banklabel })
-    this.#makeThing = opts.makeThing
+    this.#world     = opts.world
     this.#unwatchWrapped = once(vaultDB.watch(bankScope, (notice) => { this.#tellNotice(notice) }, (news) => { this.#tellBadNews(news, null) }))
     Object.freeze(this)
   }
@@ -378,23 +380,12 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return firstRefusal
   }
 
-  /** The events the Thing at `labelpath`, `seen`'s, returns for `seen` at `dispatch`, its car kept first where there is none, the car's `lastErr` set or cleared, and its `read_tc` moved where the record is news */
+  /** The events the Thing at `labelpath`, `seen`'s, returns for `seen` at `dispatch`, its car kept first where there is none */
   #receiveAtThing(labelpath: Labelpath, seen: SeenThing, dispatch: Dispatch): readonly VaultEvent[] {
     const proposed = Object.freeze({
       eventkind: 'item', ...this.#scope, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: VacantAgerank, agerankWas: VacantAgerank, ...dispatch, ...itemSeenOf(seen),
     } as const)
-    const car = this.#ensureCar(labelpath, seen)
-    let events: readonly VaultEvent[]
-    try {
-      events = car.thing.receive(proposed)
-    } catch (err) {
-      const refusal = Throwers.refusalOfThrown(err)
-      this.#cars.set(labelpath, Object.freeze({ ...car, lastErr: refusal, erred_at: Clock.nowMillis() }))
-      throw refusal
-    }
-    const read_tc = (events.length > 0) ? dispatch.read_tc : car.read_tc
-    if ((car.lastErr !== null) || (read_tc !== car.read_tc)) { this.#cars.set(labelpath, Object.freeze({ ...car, lastErr: null, read_tc })) }
-    return events
+    return this.#ensureCar(labelpath, seen).receive(proposed)
   }
 
   // The car is kept before its Thing receives a record, so that a subscriber the Thing tells finds it here, and stays
@@ -403,8 +394,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   #ensureCar(labelpath: Labelpath, seen: SeenThing): ThingCar<ThingT> {
     const kept = this.#cars.get(labelpath)
     if (kept !== undefined) { return kept }
-    const shell = BaseThing.isVoidSentinel(seen) ? seen : Shell.inParentLivesOf(seen)
-    const car   = Object.freeze({ thing: this.#makeThing(shell), lastErr: null, erred_at: null, read_tc: VacantReadTc })
+    const car = ThingCar.make(BaseThing.shellOf(seen), { world: this.#world })
     this.#cars.set(labelpath, car)
     return car
   }

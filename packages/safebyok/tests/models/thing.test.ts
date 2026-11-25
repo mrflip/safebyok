@@ -514,9 +514,9 @@ function eventOf(record: SeenThing, read_tc: ReadTc = ReadTcChunk0): VaultItemEv
   return { ...TH.itemEventOf(record), read_tc }
 }
 
-/** Hand `thing`'s receive the event of `record` read at `read_tc`, a plain Thing begun from `record` where there is none yet, and return the Thing and the events it returns */
+/** Hand `thing`'s receive the event of `record` read at `read_tc`, a plain Thing made at `record`'s shell where there is none yet, and return the Thing and the events it returns */
 function received(thing: TH.PlainThing | undefined, record: SeenThing, read_tc: ReadTc = ReadTcChunk0): readonly [TH.PlainThing, readonly VaultEvent[]] {
-  const receiver = thing ?? TH.PlainThing.make(record)
+  const receiver = thing ?? TH.PlainThing.make(Thing.shellOf(record))
   return [receiver, receiver.receive(eventOf(record, read_tc))]
 }
 
@@ -605,7 +605,7 @@ describe("Thing.receive", () => {
   it("keeps the sourcelabel, read_tc and banktok of the event it receives on every event", () => {
     const record = TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 3 }))
     const stamp  = { sourcelabel: 'other_tab', read_tc: readTcNow(), banktok: TH.FirstLifetok }
-    const events = TH.PlainThing.make(record).receive({ ...eventOf(record), ...stamp })
+    const events = TH.PlainThing.make(Thing.shellOf(record)).receive({ ...eventOf(record), ...stamp })
     expect(events).to.have.lengthOf(3)
     for (const event of events) { expect(event).to.include(stamp) }
   })
@@ -630,7 +630,7 @@ describe("Thing.receive", () => {
   it("returns no events for a life or aged event, and changes nothing", () => {
     const soon = TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 3 }))
     const [thing, events] = received(undefined, soon)
-    const later = TH.PlainThing.make(soon).receive(eventOf(soon, readTcOf(2)))
+    const later = TH.PlainThing.make(Thing.shellOf(soon)).receive(eventOf(soon, readTcOf(2)))
     for (const event of [...events.slice(1), ...later.slice(1)]) {
       expect(thing.receive(event)).to.deep.equal([])
     }
@@ -690,7 +690,7 @@ describe("Thing.agekind", () => {
   ] as const
   for (const [seens, expected, blurb] of AgekindCases) {
     it(blurb, () => {
-      const thing = TH.PlainThing.make(seens[0] ?? whole2)
+      const thing = TH.PlainThing.make(Thing.shellOf(seens[0] ?? whole2))
       for (const seen of seens) { thing.receive(eventOf(seen)) }
       expect(thing.agekind).to.eq(expected)
     })
@@ -712,7 +712,7 @@ describe("Thing's held record, the same object", () => {
 describe("thing.subscribe(listener)", () => {
   it("tells each subscriber once for each record that is news, a newer sparse revision among them, and for none that is not", () => {
     const whole2   = TH.boxThingOf('openai', { revseq: 2 })
-    const thing    = TH.PlainThing.make(whole2)
+    const thing    = TH.PlainThing.make(Thing.shellOf(whole2))
     const listener = vi.fn()
     thing.subscribe(listener)
     thing.receive(eventOf(whole2))
@@ -726,7 +726,7 @@ describe("thing.subscribe(listener)", () => {
 
   it("tells a subscriber once the news is taken in, the Thing reading as the record it adopted", () => {
     const whole2 = TH.boxThingOf('openai', { revseq: 2 })
-    const thing  = TH.PlainThing.make(whole2)
+    const thing  = TH.PlainThing.make(Thing.shellOf(whole2))
     const read: unknown[] = []
     thing.subscribe(() => { read.push([thing.pickle(), thing.agerank]) })
     thing.receive(eventOf(whole2))
@@ -734,7 +734,7 @@ describe("thing.subscribe(listener)", () => {
   })
 
   it("stops telling a listener once it unsubscribes", () => {
-    const thing       = TH.PlainThing.make(TH.boxThingOf())
+    const thing       = TH.PlainThing.make(Thing.shellOf(TH.boxThingOf()))
     const listener    = vi.fn()
     const unsubscribe = thing.subscribe(listener)
     unsubscribe()
@@ -743,13 +743,13 @@ describe("thing.subscribe(listener)", () => {
   })
 
   it("lets what a subscriber throws reach receive's caller, where its maker gave no bulletproofCallback", () => {
-    const thing = TH.PlainThing.make(TH.boxThingOf())
+    const thing = TH.PlainThing.make(Thing.shellOf(TH.boxThingOf()))
     thing.subscribe(() => { throw new Error("a bug in the host") })
     expect(() => thing.receive(eventOf(TH.boxThingOf()))).to.throw("a bug in the host")
   })
 
   it("refuses a listener that is not a function", () => {
-    const thing = TH.PlainThing.make(TH.boxThingOf())
+    const thing = TH.PlainThing.make(Thing.shellOf(TH.boxThingOf()))
     TH.expectSyncRefusal(() => thing.subscribe('call me' as never), 'bad_record')
   })
 })
@@ -816,12 +816,12 @@ describe("Thing's props, record and citable", () => {
 
     it("pickles as the shell under a later life of the root box, where the soon names one", () => {
       const soon = TH.boxSparseOf(TH.boxThingOf('openai', { lifepath: lifepathOf(2, false), lifeseq: Lifeseq.ofLifenum(2), revseq: 1 }))
-      expect(TH.PlainThing.make(soon).pickle()).to.deep.equal(Shell.of({ ...TH.BoxScope, lifepath: `${Lifeseq.ofLifenum(2)}/${VoidLifeseq}` }))
+      expect(TH.PlainThing.make(eventOf(soon)).pickle()).to.deep.equal(Shell.of({ ...TH.BoxScope, lifepath: `${Lifeseq.ofLifenum(2)}/${VoidLifeseq}` }))
     })
 
     it("pickles as a root's own shell, begun by a soon of the root", () => {
       const soon = TH.boxSparseOf(TH.rootBoxOf({ revseq: 3 }))
-      expect(TH.PlainThing.make(soon).pickle()).to.deep.equal(Shell.of(TH.RootScope))
+      expect(TH.PlainThing.make(eventOf(soon)).pickle()).to.deep.equal(Shell.of(TH.RootScope))
     })
 
     it("has the shell's props", () => {
@@ -851,17 +851,20 @@ describe("Thing's props, record and citable", () => {
     })
   })
 
-  it("adopts the record it is begun from where that is whole, a tombstone or the void sentinel", () => {
+  it("made from an item event, holds its record, whole, a tombstone or the void sentinel, having received it", () => {
     const tomb = TH.boxThingOf('openai', { am: 'x', lifepath: lifepathOf(1, false), lifeseq: Lifeseq.ofLifenum(1), revseq: 0 })
     for (const record of [TH.boxThingOf(), tomb, Shell.of({ ...TH.BoxScope, lifepath: lifepathOf(0, true) })]) {
-      const thing = TH.PlainThing.make(record)
+      const thing = TH.PlainThing.make(eventOf(record))
       expect(thing.pickle()).to.eq(record)
       expect(propsOf(thing)).to.deep.equal(Thing.sparseOf(record))
+      expect(thing.agerank).to.not.eq(VacantAgerank)
     }
   })
 
-  it("has the vacant agerank and no read_at until it first receives a record", () => {
-    const thing = TH.PlainThing.make(TH.boxThingOf())
+  it("made from the shell, holds it, with the vacant agerank and no read_at until it first receives a record", () => {
+    const shell = Thing.shellOf(TH.boxThingOf())
+    const thing = TH.PlainThing.make(shell)
+    expect(thing.pickle()).to.eq(shell)
     expect([thing.agerank, thing.read_at]).to.deep.equal([VacantAgerank, undefined])
   })
 
@@ -875,13 +878,13 @@ describe("Thing's props, record and citable", () => {
 
   it("answers its Thing fields by name, and no body: a kind writes out its own", () => {
     const record = TH.boxThingOf()
-    const thing = TH.PlainThing.make(record)
+    const thing = TH.PlainThing.make(eventOf(record))
     expect(Object.getOwnPropertyNames(thing)).to.have.members(Object.keys(Thing.sparseOf(record)))
   })
 
   it("sets every Thing field non-writable, its scope fields non-configurable and the rest configurable", () => {
     const record = TH.boxThingOf()
-    const thing = TH.PlainThing.make(record)
+    const thing = TH.PlainThing.make(eventOf(record))
     const scopeFieldnames = new Set(['userid', 'banklabel', 'labelpath'])
     const thingFieldnames = Object.keys(Thing.sparseOf(record))
     for (const fieldname of thingFieldnames) {
@@ -892,23 +895,22 @@ describe("Thing's props, record and citable", () => {
     expect(Reflect.deleteProperty(thing, 'labelpath')).to.eq(false)
   })
 
-  it("pickles to the very record it was made from, deeply frozen", () => {
+  it("pickles to the very record its item event carried, deeply frozen", () => {
     const record = TH.boxThingOf()
-    const thing = TH.PlainThing.make(record)
+    const thing = TH.PlainThing.make(eventOf(record))
     expect(thing.pickle()).to.eq(record)
     expect(Object.isFrozen(record.sidecar)).to.eq(true)
   })
 
   it("is the scope of its record, and has no stamp", () => {
-    const thing = TH.PlainThing.make(TH.boxThingOf())
+    const thing = TH.PlainThing.make(eventOf(TH.boxThingOf()))
     expect(thing.scope).to.deep.equal(TH.BoxScope)
     expect(thing.stamp).to.eq(undefined)
   })
 
   it("is left as it was by a receive whose adopt throws", () => {
     const live2 = TH.boxThingOf('openai', { revseq: 2 })
-    const thing = TH.RefusingThing.make(live2)
-    thing.receive(eventOf(live2))
+    const thing = TH.RefusingThing.make(eventOf(live2))
     const before = [thing.agerank, thing.read_at, thing.citable, thing.pickle(), thing.revseq]
     const refused = TH.boxThingOf('openai', { revseq: TH.RefusingThing.RefusedRevseq, revtok: TH.revtokOf('three') })
     expect(() => thing.receive(eventOf(refused, readTcOf(1)))).to.throw(TH.RefusingThing.Refusal)
@@ -987,8 +989,9 @@ describe("Thing refusals", () => {
     })
   }
 
-  it("refuses to begin from anything but a record of a Thing", () => {
-    for (const val of [undefined, 42, {}, { ...live, lifepath: TH.Life0, lifeseq: TH.Life0 }]) {
+  it("refuses to be made from anything but the shell or an item event", () => {
+    const shallowShell = { ...Thing.shellOf(live), lifepath: VoidLifeseq }
+    for (const val of [undefined, 42, {}, live, shallowShell, { ...eventOf(live), val: { ...live, lifepath: TH.Life0, lifeseq: TH.Life0 } }, { ...eventOf(live), sourcelabel: undefined }]) {
       TH.expectSyncRefusal(() => TH.PlainThing.make(val as never), 'bad_record')
     }
   })

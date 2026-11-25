@@ -1,25 +1,26 @@
 /** `PlainThing`, a concrete Thing of any kind, and `RefusingThing`, one that refuses a record, for the tests of Thing and of a VaultMinder. */
 
-import { type ThingRecord, type ThingScope, Shell } from '../../src/shapes/shapes-thing'
-import { type SeenThing, SeenChecks } from '../../src/shapes/shapes-vault-event'
+import type { ThingRecord, ThingScope, VoidSentinel } from '../../src/shapes/shapes-thing'
+import { type VaultItemEvent, SeenChecks } from '../../src/shapes/shapes-vault-event'
 import { type Adoptable, Thing } from '../../src/models/thing'
 
 // == [PlainThing]: PlainThing, RefusingThing
 
 /** A Thing of any kind that holds only the records seen of it, with no device, gate or lease.
- * Begun from a record that is not whole, it models the shell until it receives a whole one. It binds no ctx, so it has no stamp.
+ * It holds the shell until it receives a whole record. It binds no ctx, so it has no stamp.
  */
 export class PlainThing extends Thing<ThingRecord, ThingScope, undefined, Adoptable<ThingRecord>> {
   // == [Construction]: make, constructor
 
-  // Begun as `world.makeThing` begins a Thing: the VaultMinder that makes one has it receive `seen` after.
-  /** A Thing begun from `seen`, the first record learned of at its labelpath: `seen` itself where it is whole, else the shell under the lives it names above it. */
-  static make(seen: SeenThing): PlainThing {
-    SeenChecks.seenCited.parse(seen)
-    return new PlainThing(super.isWhole(seen) ? seen : Shell.inParentLivesOf(seen))
+  /** A Thing at `begun`, the shell at its labelpath, or an item event of its record, which it then receives. */
+  static make(begun: VoidSentinel | VaultItemEvent): PlainThing {
+    SeenChecks.begun.parse(begun)
+    const thing = new PlainThing(super.shellOf(('eventkind' in begun) ? begun.val : begun))
+    if ('eventkind' in begun) { thing.receive(begun) }
+    return thing
   }
 
-  private constructor(begun: Adoptable<ThingRecord>) { super(begun) }
+  private constructor(shell: VoidSentinel) { super(shell) }
   // --
 
   // == [Shapes]: scope, stamp
@@ -33,20 +34,22 @@ export class PlainThing extends Thing<ThingRecord, ThingScope, undefined, Adopta
 }
 
 // A subclass's adopt may check what it adopts, as Gate's does its wayins: this one refuses outright.
-/** A Thing of any kind whose adopt throws for a record of revseq {@link RefusingThing.RefusedRevseq}, begun as a {@link PlainThing} is. */
+/** A Thing of any kind whose adopt throws for a record of revseq {@link RefusingThing.RefusedRevseq}, made as a {@link PlainThing} is. */
 export class RefusingThing extends Thing<ThingRecord, ThingScope, undefined, Adoptable<ThingRecord>> {
   /** The revseq whose record this Thing's adopt refuses. */
   static readonly RefusedRevseq = 3
   /** What its adopt says as it refuses. */
   static readonly Refusal = "This record is refused."
 
-  /** A Thing begun from `seen`: `seen` itself where it is whole, else the shell under the lives it names above it. */
-  static make(seen: SeenThing): RefusingThing {
-    SeenChecks.seenCited.parse(seen)
-    return new RefusingThing(super.isWhole(seen) ? seen : Shell.inParentLivesOf(seen))
+  /** A Thing at `begun`, the shell at its labelpath, or an item event of its record, which it then receives. */
+  static make(begun: VoidSentinel | VaultItemEvent): RefusingThing {
+    SeenChecks.begun.parse(begun)
+    const thing = new RefusingThing(super.shellOf(('eventkind' in begun) ? begun.val : begun))
+    if ('eventkind' in begun) { thing.receive(begun) }
+    return thing
   }
 
-  private constructor(begun: Adoptable<ThingRecord>) { super(begun) }
+  private constructor(shell: VoidSentinel) { super(shell) }
 
   /** Where this Thing is stored. */
   get scope(): ThingScope { return Object.freeze({ userid: this.userid, banklabel: this.banklabel, labelpath: this.labelpath }) }

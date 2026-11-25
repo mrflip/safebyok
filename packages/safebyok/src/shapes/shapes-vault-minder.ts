@@ -3,40 +3,38 @@
 import { type Errors, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { type CitedOf, type DelAskDraft, type PutAskDraft, AskChecks } from './shapes-asks'
-import type { EpochMillis, Labelpath } from './primitives'
+import type { Labelpath } from './primitives'
 import { type ThingRecord, type VoidSentinel, ThingChecks, isLifepathDeep, isParityRight } from './shapes-thing'
-import { type ReadTc, type SeenThing, type VaultEvent, SeenChecks, isSeenForm, livenessVals, vaultEventkindVals } from './shapes-vault-event'
+import { type SeenThing, type VaultEvent, SeenChecks, isSeenForm, livenessVals, vaultEventkindVals } from './shapes-vault-event'
 import { BaseThing } from '../models/base-thing'
 import type { Adoptable, Thing } from '../models/thing'
+import type { ThingCar } from '../minding/thing-car'
 import type { VaultMinder } from '../minding/vault-minder'
 import type { VaultDB } from '../storage/vault-db'
 
-// == [Shapes]: ReceivingThing, ThingMaker, ThingCar, VaultMinderOpts, VaultMinderListener, PutOnceArgs, DelOnceArgs
+// == [Shapes]: ReceivingThing, ThingMaker, CarWorld, ThingCarOpts, VaultMinderOpts, VaultMinderListener, PutOnceArgs, DelOnceArgs
 
 /** What a {@link VaultMinder} reads of each Thing it keeps. */
 export type ReceivingThing = Pick<Thing<ThingRecord, unknown, unknown, Adoptable<ThingRecord>>, 'receive' | 'agerank' | 'agekind' | 'citable' | 'read_at' | 'pickle'>
 
-/** Make the Thing a {@link VaultMinder} keeps at `shell`'s labelpath, holding `shell`: it then receives the first record learned of there. */
+/** Make the Thing at `shell`'s labelpath, holding `shell`, which has received nothing. */
 export type ThingMaker<ThingT extends ReceivingThing = ReceivingThing> = (shell: VoidSentinel) => ThingT
 
-/** The Thing a {@link VaultMinder} keeps at a labelpath, the refusal it last raised at a record, and when its last news was read. It changes no answer. */
-export type ThingCar<ThingT extends ReceivingThing = ReceivingThing> = Readonly<{
-  /** The Thing, the same object for as long as the VaultMinder lives. */
-  thing:    ThingT
-  /** The refusal the Thing raised at the last record it was handed, or null where it took that record. */
-  lastErr:  Errors.VaultError | null
-  /** When the Thing last refused a record, or null where it has refused none. */
-  erred_at: EpochMillis | null
-  /** When the last record the Thing took as news was read: the `VacantReadTc`, before any record, until it takes one. */
-  read_tc:  ReadTc
+/** What a {@link ThingCar} reaches of its world: the maker of the Thing it carries. A device's `World` is one. */
+export type CarWorld<ThingT extends ReceivingThing = ReceivingThing> = Readonly<{ makeThing: ThingMaker<ThingT> }>
+
+/** The options of `ThingCar.make`, beside the Thing, shell or item event it is made from. */
+export type ThingCarOpts<ThingT extends ReceivingThing = ReceivingThing> = Readonly<{
+  /** Makes the car's Thing where it is handed none: a device's world. */
+  world: CarWorld<ThingT>
 }>
 
 /** Options for `VaultMinder.make`. */
 export interface VaultMinderOpts<ThingT extends ReceivingThing = ReceivingThing> {
   /** The vaultDB to wrap. */
   vaultDB: VaultDB
-  /** Makes the Thing kept at each labelpath, once, holding the shell there: a device's world's `makeThing`. */
-  makeThing: ThingMaker<ThingT>
+  /** Makes the Thing kept at each labelpath, once, holding the shell there: a device's world. */
+  world:   CarWorld<ThingT>
 }
 
 /** What listens to a {@link VaultMinder}: it hears each event that is news, and is told of trouble. */
@@ -54,11 +52,23 @@ export type PutOnceArgs<RecordT extends ThingRecord = ThingRecord> = Readonly<Om
 export type DelOnceArgs<RecordT extends ThingRecord = ThingRecord> = Readonly<Omit<DelAskDraft<RecordT>, 'cited' | 'track' | 'banktok'> & { cited?: CitedOf<RecordT> }>
 // --
 
-// == [Checks]: VaultMinderChecks, VaultMinderMembernames, isVaultMinder
+// == [Checks]: ThingCarChecks, VaultMinderChecks, VaultMinderMembernames, isVaultMinder
+
+/** The checks of `ThingCar.make`'s arguments, and of the world a car or a VaultMinder makes Things with. */
+export const ThingCarChecks = Validator.Checkers('bad_record', ({ obj, custom, union, fn }) => {
+  const world = obj({ makeThing: fn<ThingMaker>() })
+  return {
+    world,
+    makeArgs: obj({
+      begun: union([custom<ReceivingThing>((val) => val instanceof BaseThing, Phrases.ThingExpected), SeenChecks.begun]),
+      opts:  obj({ world }),
+    }),
+  }
+})
 
 /** The checks of `VaultMinder.make`'s arguments, of a listener, and of what a device database rang, handed to `receive`. */
 export const VaultMinderChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn }) => ({
-  makeArgs:  obj({ scope: ThingChecks.bankScope, opts: obj({ vaultDB: ThingChecks.vaultDBShape, makeThing: fn<ThingMaker>() }) }),
+  makeArgs:  obj({ scope: ThingChecks.bankScope, opts: obj({ vaultDB: ThingChecks.vaultDBShape, world: ThingCarChecks.world }) }),
   listener:  obj({ hear: fn(), onBadNews: fn() }),
   /** An event rung: its kind and scope, who dispatched it, when it was read, and its bank's lifetok, the void one where its source knew none. Its `val` is checked apart, and the rest is not read. */
   rungEvent: obj({

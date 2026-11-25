@@ -10,8 +10,9 @@ export * from './storage'
 /* eslint-enable import-x/export */
 export { VaultMinder } from './minding/vault-minder'
 export {
-  type DelOnceArgs, type PutOnceArgs, type ReceivingThing, type ThingCar, type ThingMaker, type VaultMinderListener, type VaultMinderOpts, VaultMinderChecks, isVaultMinder,
+  type CarWorld, type DelOnceArgs, type PutOnceArgs, type ReceivingThing, type ThingCarOpts, type ThingMaker, type VaultMinderListener, type VaultMinderOpts, ThingCarChecks, VaultMinderChecks, isVaultMinder,
 } from './shapes/shapes-vault-minder'
+export { ThingCar } from './minding/thing-car'
 export { VaultTSQ } from './minding/vault-tsq'
 export {
   type GetOnceOpts, type ItemQueryOptions, type TsqStaleTime, type VaultMutationOptions, type VaultTSQOpts, MaxTimerHours, MaxTimerMillis, VaultTSQChecks, isQueryClient,

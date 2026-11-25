@@ -4,7 +4,7 @@ import { Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { type Banklabel, type Lifetok, type Userid, Labelpath } from './primitives'
 import type { LiveOf, ShellOf, SparseOf } from './shapes-sealers'
-import { type ThingRecord, type Thingkind, type Tombstone, ThingChecks, isLifepathDeep, isParityRight } from './shapes-thing'
+import { type ThingRecord, type Thingkind, type Tombstone, PerKindChecks, ThingChecks, isLifepathDeep, isParityRight } from './shapes-thing'
 import { BaseThing } from '../models/base-thing'
 import { itemSeenOf } from '../storage/agerank'
 
@@ -137,31 +137,47 @@ export function isSeenForm(val: SeenThing): boolean { return BaseThing.isWhole(v
 
 // The lifepath's depth is what lets two ageranks of one Thing compare as text: every lifepath of the Thing then has as
 // many lifeseqs, each ten characters, so the fields after it line up.
-/** The checks of what a Thing is begun from or receives: a record, its `read_tc`, and the event it comes in. */
-export const SeenChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom }) => {
+/** The checks of what a Thing is made from or receives: a record, its `read_tc`, the event it comes in, and the shell.
+ * Also `begun`, what a Thing of any kind is made from: the shell at its labelpath, or an `item` event of its record.
+ */
+export const SeenChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, lit, str, union }) => {
   /** Check the scope and citation of a record or a void sentinel, keeping the rest: a lifeseq for each label, its own odd exactly for a tombstone. */
   const seenCited = ThingChecks.scopedCited.loose()
     .refine(isLifepathDeep, Phrases.LifepathDepth)
     .refine(isParityRight, Phrases.LifeseqParity)
   /** Check a `read_tc`: a UUID version 7. */
   const readTc = custom<ReadTc>((val) => (typeof val === 'string') && ReadTcPattern.test(val), Phrases.ReadTcShape)
+  /** Check an `item` event's scope and modelkind, and its record, liveness and `read_tc`, each consistent with the others. */
+  const item = obj({
+    ...ThingChecks.thingScope.shape,
+    modelkind: ThingChecks.modelkind,
+    liveness:  oneof(livenessVals),
+    val:       seenCited,
+    read_tc:   readTc,
+  })
+    .refine(({ labelpath, modelkind }) => Labelpath.modelkindOf(labelpath) === modelkind, Phrases.EventModelkind)
+    .refine(({ val, ...scope }) => BaseThing.haveSameScope(val, scope), Phrases.EventOfOtherThing)
+    .refine(({ val }) => isSeenForm(val as SeenThing), Phrases.SeenFormUnknown)
+    .refine(({ val, liveness }) => itemSeenOf(val as SeenThing).liveness === liveness, Phrases.EventLiveness)
+  /** Check an `item` event whole: as `item` does, and its kind, who dispatched it, its bank's lifetok and its ageranks. */
+  const itemEvent = item.and(obj({
+    eventkind:   lit('item'),
+    sourcelabel: ThingChecks.label,
+    banktok:     PerKindChecks.storedLifetok.shape.lifetok,
+    agerank:     str,
+    agerankWas:  str,
+  }))
+  /** Check the shell at a labelpath of any kind. */
+  const shell = union([PerKindChecks.bankShell, PerKindChecks.gateShell, PerKindChecks.boxShell])
   return {
     seenCited,
     readTc,
     /** Check an event's kind and scope. */
     event: obj({ ...ThingChecks.thingScope.shape, eventkind: oneof(vaultEventkindVals) }),
-    /** Check an `item` event: its scope and modelkind, and its record, liveness and `read_tc`, each consistent with the others. */
-    item:  obj({
-      ...ThingChecks.thingScope.shape,
-      modelkind: ThingChecks.modelkind,
-      liveness:  oneof(livenessVals),
-      val:       seenCited,
-      read_tc:   readTc,
-    })
-      .refine(({ labelpath, modelkind }) => Labelpath.modelkindOf(labelpath) === modelkind, Phrases.EventModelkind)
-      .refine(({ val, ...scope }) => BaseThing.haveSameScope(val, scope), Phrases.EventOfOtherThing)
-      .refine(({ val }) => isSeenForm(val as SeenThing), Phrases.SeenFormUnknown)
-      .refine(({ val, liveness }) => itemSeenOf(val as SeenThing).liveness === liveness, Phrases.EventLiveness),
+    item,
+    itemEvent,
+    shell,
+    begun: union([shell, itemEvent]),
   }
 })
 // --

@@ -5,13 +5,15 @@ import type { Gate } from './gate'
 import type { BirthGating } from './gating'
 import type { World } from './world'
 import type { BirthCleartexts, BirthDna } from '../shapes/shapes-gateish'
-import type { BankOpts, HostedVault } from '../shapes/shapes-bankish'
+import { type HostedVault, type ThingMakeOpts, ThingMakeChecks } from '../shapes/shapes-bankish'
 import type { ShellOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import { type DeviceTok, type Lifetok, Labelpath, Lifeseq } from '../shapes/primitives'
-import { type BankRecord, type BoxRecord, type Modelkind, ThingFormat, ThingMakeChecks } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type Modelkind, ThingFormat } from '../shapes/shapes-thing'
+import { type VaultItemEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import type { PutAskDraft } from '../shapes/shapes-asks'
+import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
 /** The signed-in user's bank on this device: its main gate and its root box.
@@ -73,19 +75,24 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
 
   // == [Construction]: make, constructor, mintStamps, makeRecord
 
-  /** Make the bank of `record`, a whole bank record, live or a tombstone, or the bank's shell, on `opts.device`. Nothing is fetched or stored.
-   * It is locked or unlocked as its device's world is, and finds its main gate there. Each subscriber is wrapped by `opts.bulletproofCallback`, where given.
+  /** Make the bank at `begun`, the bank's shell, or an item event of its record, which it then receives. Nothing is fetched or stored.
+   * It is locked or unlocked as `opts.world` is, and finds its main gate there. Throws where it refuses `begun`'s record.
    * Internal: the device's world makes the bank its VaultMinder keeps.
    */
-  static make(record: BankRecord | ShellOf<BankRecord>, opts: BankOpts): Bank { return new Bank(record, opts) }
+  static make(begun: ShellOf<BankRecord> | VaultItemEvent<BankRecord>, opts: ThingMakeOpts): Bank {
+    Checks.bankMakeArgs.parse({ begun, opts })
+    const { world } = opts
+    const seen = ('eventkind' in begun) ? begun.val : begun
+    Validator.checkedConsistent(StampChecks.bankScope.parse(seen), world.device.scope, { kind: 'record_conflict' })
+    const bank = new Bank(super.shellOf(seen), world)
+    if ('eventkind' in begun) { bank.receive(begun) }
+    return bank
+  }
 
-  // A bank models the very record it is handed, never the check's copy.
-  private constructor(record: BankRecord | ShellOf<BankRecord>, opts: BankOpts) {
-    const { opts: { device, bulletproofCallback } } = Checks.bankMakeArgs.parse({ record, opts })
-    Validator.checkedConsistent(StampChecks.bankScope.parse(record), device.scope, { kind: 'record_conflict' })
-    super(record, bulletproofCallback)
-    this.#device = device
-    this.#world  = device.world
+  private constructor(shell: ShellOf<BankRecord>, world: World) {
+    super(shell, world.bulletproofCallback)
+    this.#device = world.device
+    this.#world  = world
   }
 
   /** Fresh stamps for a new bank of `scope` and its main gate, both in their first life.
@@ -202,13 +209,11 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
 
 // Defined here, not with the shapes: they name a model class.
 /** The checks of {@link Bank.make}'s arguments, and of the device {@link Bank.birth} and {@link Bank.birthGating} are handed. */
-const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
+const Checks = Validator.Checkers('bad_record', ({ obj, custom, union }) => ({
   device:      custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
   bankMakeArgs: obj({
-    record: BankChecks.recordOrShell,
-    opts:   ThingMakeChecks.thingMakeOpts.extend({
-      device:  custom<Device>(),
-    }),
+    begun: union([BankChecks.shell, SeenChecks.itemEvent]).refine(({ labelpath }) => Labelpath.isOfModelkind(labelpath, 'bank'), Phrases.BegunOfOtherKind),
+    opts:  ThingMakeChecks.thingMakeOpts,
   }),
 }))
 // --
