@@ -1,7 +1,7 @@
 # Thread 30: car_class (2026-11-25)
 
-Branch `20261125-car_class`, PR #TBD, stacked on [#895](https://github.com/mrflip/safebyok/pull/895). Proved: see the PR's
-**Tests:** line.
+Branch `20261125-car_class`, PR [#896](https://github.com/mrflip/safebyok/pull/896), stacked on [#895](https://github.com/mrflip/safebyok/pull/895). Proved:
+`pnpm justify` green in full, nothing skipped: safebyok 1950, react-lean 338, idb-lean 115, postgres 365, dojo 111, knockknock 26, envman 24, e2e 576, root scripts 331.
 
 Built by hand (no /sprint), from the orchestrator's brief (M1–M5). The Coach's sketch: `ThingCar.make(recordish, { world })`
 calls `world.makeThing`, which stays polymorphic and picks the factory; each kind's static make goes shellOf → `new this`
