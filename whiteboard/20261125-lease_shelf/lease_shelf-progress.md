@@ -41,3 +41,10 @@ Curated by the orchestrator. Newer than the plan where they disagree.
 - Refusals: damaged row `damaged_lease`; failing store `storage_unavailable` (`Throwers.deviceDBFailed`, name only, G8).
 - **Planning lesson:** 1a compacted twice, ten minutes apart. 1b is larger: it goes to `thread-worker-400k`, and its
   handoff quotes only what it needs.
+
+## Filing notes (*Orchestrator:*)
+- `scripts/file-thread` checks first whether the recorded `sprintbase` is on main; if it is, it rebases onto main and
+  never reads `sprintbasebranch`. A thread cut from main that must stack on another thread is rebased by hand
+  (`--onto origin/<base thread> <old base>`), with both settings updated, before filing. 1a needed this.
+- #900 filed and out of draft; #902 filed (conflict on doc blocks and the wontfix row only), out of draft once CI is
+  green; #903 being stacked onto #902.
