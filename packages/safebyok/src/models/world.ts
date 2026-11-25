@@ -283,7 +283,7 @@ export class World {
     return this.#lease ?? Lease.shellOf(gateScope)
   }
 
-  /** Attach `lease`, as `#attachLease` does, and stow it in the deviceDB, for every tab to take up. */
+  /** Attach `lease`, and stow it in the deviceDB for every tab to take up. */
   #attachAndStow(lease: Lease): void {
     this.#attachLease(lease)
     void this.#stowLease(lease)
@@ -409,7 +409,6 @@ export class World {
     return (stored !== null) && ((this.#lease === null) || (BaseThing.cmp(this.#lease, stored) > 0))
   }
 
-  // Thread 6 announces here an unlock, or a lock, taken up from another tab.
   /** Attach the Lease of `stored` where it can unlock the bank, or else drop this world's lease */
   #takeUp(stored: LeaseRecord): void {
     if (this.#canUnlock(stored)) {
@@ -425,8 +424,8 @@ export class World {
     return (stored.am === 'a') && (Clock.nowMillis() < stored.ends_at) && (stored.gate_labelpath === gate?.labelpath) && (stored.gate_lifeseq === gate.lifeseq)
   }
 
-  // Thread 6 announces a softlock here. A softlock only ever brings the end nearer, so every tab that hears the same gate
-  // change writes the same revision, and the first stow keeps it (notes/wontfix.md).
+  // A softlock only ever brings the end nearer, so every tab that hears the same gate change writes the same revision,
+  // and the first stow keeps it (notes/wontfix.md).
   /** Attach and stow the next revision of this world's lease, ending the device's `softlockMillis` from now, where the gate has moved past the revision the lease cites and that end is the nearer */
   #softlockPastGate(): void {
     const lease = this.#lease
