@@ -1,6 +1,6 @@
 # Thread 10: the car's read_at (2026-11-25)
 
-Branch `20261125-car_read_at`, PR to follow, stacked on #911 (thread 9). Proved: `pnpm --filter safebyok test` (lint-clean, typecheck green, 36 files, 2,292 tests).
+Branch `20261125-car_read_at`, PR #924, stacked on #911 (thread 9). Proved: `pnpm --filter safebyok test` (lint-clean, typecheck green, 36 files, 2,292 tests).
 
 * **Built**: `ThingCar.read_at` (`src/minding/thing-car.ts`), `readAtOf(this.#readTc)`, decoded in the car that owns the `read_tc`. Read through it: World's `#isGateStale` (World no longer imports `readAtOf`), `VaultTSQ.itemQueryOptions`' `initialDataUpdatedAt`, the car's `inspectable` `dataUpdatedAt`, and `VaultTSQ.#hear`'s two `setQueryData` calls. `readAtOf` stays in `storage/agerank.ts` for storage and the car. VOCABULARY's `read_at` entry now says `car.read_at`. Test: `describe("car.read_at")` in `tests/minding/thing-car.test.ts`.
 * **Decisions made**: `setDataOptionsOf` is gone. `#hear` fetches the car (`carAt(scope)!`, the event is the car's own) once, and dates both the `aged`-bare null and the item from `car.read_at`, so `vault-tsq.ts` imports neither `readAtOf` nor `ReadTc`.
