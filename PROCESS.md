@@ -34,6 +34,10 @@ the rebase that prepares filing; if that turns up trouble, go back to the select
 `pnpm justify`, as you judge the odds. Run it before a PR leaves draft: `scripts/file-thread`
 runs it, and pushes nothing unless it passes.
 
+After a rebase or a fix you are confident will pass, push while `pnpm justify` runs, so CI runs
+beside it: the stack's tip first, so its run starts first, then the branches below. A justify at
+the tip proves the stack.
+
 Do not select by change with pnpm's `...[<base>]` filter: it selects the root when a root file
 changed, whose `test` runs every package again, and its packages run one at a time, each
 rebuilding its dependencies. It is slower than `pnpm justify`.
@@ -86,13 +90,28 @@ Comments, doc blocks and READMEs across a whole target are brought to plain Engl
   (the "Stacked on #N" line carries the order), so it lists the PRs below it until they merge,
   then only its own commits.
 * **Every commit reaches main individually**, so each should pass `pnpm justify`, though only the
-  tip is proven (*Proving*). An intermediate red commit is allowed only when it isolates
-  something, say a large mechanical change from the thoughtful repairs after it, and the PR says
-  so.
-* **Force-push only with an explicit lease**: `--force-with-lease=<branch>:<sha you rebased from>`,
+  tip is proven (*Proving*). An intermediate red commit is allowed when it isolates something,
+  say a large mechanical change from the thoughtful repairs after it, and the PR says so.
+* **For a major refactoring, red PRs are allowed in a stack whose top is green.** Report that you
+  intend to, before you do. Each says what is red and which PR mends it, and stays a draft until
+  the top is green.
+* **Force-push only with an explicit lease**: `--force-with-lease=refs/heads/<branch>:<sha you rebased from>`,
   the branch's tip when you started from it, never one fetched since. A lease read off a fresh
-  fetch always matches, so it guards nothing. Never plain `--force`, and never a branch that isn't your
-  thread's.
+  fetch always matches, so it guards nothing. Never plain `--force`. Any branch of the work at
+  hand may be force-pushed this way, another agent's included.
+* **Push with an explicit refspec**, `<sha-or-branch>:refs/heads/<branch>`, then check with
+  `git ls-remote origin <branch>`: a stacked branch may track the one below it, and a bare
+  `git push origin <branch>` lands there.
+* **A rebase in the base checkout moves other branches**: `rebase.updateRefs` is on, so every
+  local branch whose tip lies in the range moves too. Read its "Updated the following refs" line,
+  and put each back (`git branch -f`) or push it under a lease.
+* **Check a PR is open before pushing to it**: the Coach merges whatever is ready, unannounced.
+  Test the value, `[ "$(gh pr view <n> --json state --jq .state)" = OPEN ]`, since a bare
+  `gh pr view` succeeds on a merged PR. A merged branch takes new commits only through a new PR.
+* **Before moving a PR, list what stands on it**: every open PR whose body is "Stacked on" it,
+  siblings and other sessions' included (`gh pr list --state open --json number,body`). Before a
+  base-sync or marking ready, check with `git merge-base --is-ancestor` that its base's tip has
+  not moved.
 * **Never merge a PR, enable auto-merge, or queue one. The Coach merges.**
 * Before a command that throws work away (`reset --hard`, `restore`, `clean`, `branch -D`), make
   what it would discard reachable first: commit it or put a branch on it. If you can't tell what

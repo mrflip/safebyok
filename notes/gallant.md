@@ -11,6 +11,9 @@ them is to fix the code. When you review against this file:
 * Check a proposed fix against the plan before you offer it. This file teaches the faults, not the rulings, so a fix that follows
   the wording here can still undo something ruled.
 
+Agents copy bad code as readily as good, and a Gallant teaches its register too: check a new pair against
+`#plain-english` before adding it.
+
 **Status** covers the sites named, not the whole codebase, so a fault marked *Fixed* can still live elsewhere. *Fixed*
 means merged, or on #470. *Planned* means ruled or proposed for a later thread in
 `whiteboard/20261104-newput/newput-plan.md`, and not built. *Open* means a live case that has no thread and needs a ruling.
