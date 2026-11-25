@@ -63,7 +63,7 @@ export class SafebyokVaultComponent {
     // An ask with no lawful `userid` refuses `identity_revoked` too, not `bad_record`: until the caller is shown to be the user
     // the ask names, nothing is said to them about the ask.
     /** Throw `identity_revoked` unless the caller is signed in as the `userid` of `scope`. */
-    async function demandCaller(ctx: GenericQueryCtx<DataModel>, scope: unknown): Promise<void> {
+    async function checkCaller(ctx: GenericQueryCtx<DataModel>, scope: unknown): Promise<void> {
       const callerId = await opts.getUserId(ctx)
       const userReport = scopeUser.safeParse(scope)
       if ((! callerId) || (! userReport.success) || (callerId !== userReport.data.userid)) { throw new ConvexError<SafebyokRefusal>({ kind: 'identity_revoked' }) }
@@ -74,7 +74,7 @@ export class SafebyokVaultComponent {
         args:    CVX.askArgs,
         returns: CVX.thingFetched,
         handler: async (ctx, args) => {
-          await demandCaller(ctx, args.ask)
+          await checkCaller(ctx, args.ask)
           return await ctx.runQuery(things.getThing, args)
         },
       }),
@@ -82,7 +82,7 @@ export class SafebyokVaultComponent {
         args:    CVX.askArgs,
         returns: CVX.thingWritten,
         handler: async (ctx, args) => {
-          await demandCaller(ctx, args.ask)
+          await checkCaller(ctx, args.ask)
           return await ctx.runMutation(things.writeThing, args)
         },
       }),
@@ -90,7 +90,7 @@ export class SafebyokVaultComponent {
         args:    CVX.askArgs,
         returns: CVX.thingsFetched,
         handler: async (ctx, args) => {
-          await demandCaller(ctx, args.ask)
+          await checkCaller(ctx, args.ask)
           return await ctx.runQuery(things.listThings, args)
         },
       }),
@@ -98,7 +98,7 @@ export class SafebyokVaultComponent {
         args:    CVX.askArgs,
         returns: CVX.rootsWritten,
         handler: async (ctx, args) => {
-          await demandCaller(ctx, args.ask)
+          await checkCaller(ctx, args.ask)
           return await ctx.runMutation(things.birthBank, args)
         },
       }),
@@ -106,7 +106,7 @@ export class SafebyokVaultComponent {
         args:    CVX.askArgs,
         returns: CVX.rootsFetched,
         handler: async (ctx, args) => {
-          await demandCaller(ctx, args.ask)
+          await checkCaller(ctx, args.ask)
           return await ctx.runQuery(things.getWorld, args)
         },
       }),
@@ -114,7 +114,7 @@ export class SafebyokVaultComponent {
         args:    CVX.watchArgs,
         returns: CVX.thingsWatched,
         handler: async (ctx, args) => {
-          await demandCaller(ctx, args.scope)
+          await checkCaller(ctx, args.scope)
           return await ctx.runQuery(things.watchThings, args)
         },
       }),
