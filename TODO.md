@@ -130,3 +130,9 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   `safebyok/storage`) and `scopepathOf` (from `safebyok/browser`) are exported without parsing their argument, as their
   neighbours (`leaseBellnameOf`) are. Give each a check at the entrypoint and a test of its own, in a thread that may
   rename exports (the Coach, 2026-11-25, on #907).
+* **A hidden watch-holding tab on iOS Safari.** `OneWatchVaultDB` hands the watch to the tab holding a Web Lock.
+  Chrome does not freeze a page holding a lock others wait on, and Firefox does not freeze pages, but WebKit suspends a
+  background tab soon after it goes quiet, and nothing found says a held lock exempts it. If it does not, a hidden
+  holder starves a visible tab of events. Try it on a real iOS device (Playwright's WebKit is desktop WebKit, and does
+  not reproduce iOS's background suspension); the remedy, if needed, releases the lock when the page is hidden and asks
+  again when it is shown (the Coach, 2026-11-25, on #915).
