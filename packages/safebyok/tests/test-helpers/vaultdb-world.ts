@@ -2,9 +2,11 @@
 
 import { type Lifepath, type Lifetok, Labelpath, Lifeseq } from '../../src/shapes/primitives'
 import {
-  type BankRecord, type BoxRecord, type GateRecord, type ThingCited, type ThingRecord,
+  type BankRecord, type BoxRecord, type BoxSparse, type GateRecord, type ThingCited, type ThingRecord,
   Shell, ThingFormat,
 } from '../../src/shapes/shapes-thing'
+import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
+import { BaseThing } from '../../src/models/base-thing'
 import type { SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
 import { itemSeenOf, readTcNow } from '../../src/storage/agerank'
 import { PlainThing } from './plain-thing'
@@ -87,6 +89,9 @@ export function boxThingOf(label = 'openai', overrides: Partial<BoxRecord> = {})
   }
 }
 
+/** The sparse form of the live box `box`, as a listing carries it: its Thing fields, checked as a box's sparse form. */
+export function boxSparseOf(box: BoxRecord): BoxSparse { return BoxChecks.sparse.parse(BaseThing.sparseOf(box)) }
+
 /** The revision after `prior`, written a millisecond later, with `overrides` laid over it. */
 export function nextOf<RecordT extends ThingRecord>(prior: RecordT, overrides: Partial<RecordT> = {}): RecordT {
   return { ...prior, revtok: revtokOf(String(prior.revseq + 1)), revseq: prior.revseq + 1, written_at: prior.written_at + 1, ...overrides }
@@ -135,7 +140,7 @@ export function getGateAskOf(ifAbsent: GetAsk['ifAbsent'] = 'nil'): GetAsk { ret
 export function getAskAt(labelpath: Labelpath, ifAbsent: GetAsk['ifAbsent'] = 'nil'): GetAsk { return getAskOf({ ...ThingBank, labelpath, ifAbsent }) }
 
 /** The ask that lists the children of the Thing at `labelpath` in {@link ThingBank}. */
-export function listAskAt(labelpath: Labelpath, ifAbsent: ListAsk['ifAbsent'] = 'fail'): ListAsk { return listAskOf({ ...ThingBank, labelpath, ifAbsent }) }
+export function listAskAt(labelpath: Labelpath): ListAsk { return listAskOf({ ...ThingBank, labelpath }) }
 
 /** The ask that births {@link ThingBank} with its three roots, each at revision 0 of life 0, with `overrides` laid over it. */
 export function birthBankAskOf(overrides: Partial<BirthBankAsk> = {}): BirthBankAsk {

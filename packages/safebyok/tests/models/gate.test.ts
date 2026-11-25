@@ -1,16 +1,18 @@
 import { describe, expect, it, vi } from 'vitest'
 import { noop } from 'es-toolkit'
-import { Errors } from 'safebyok-big/internals'
+import { Crypto, Errors } from 'safebyok-big/internals'
 import { BaseBox } from '../../src/models/base-box'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
+import type { BadNews } from '../../src/shapes/shapes-bankish'
 import type { WorldGateFriend } from '../../src/shapes/shapes-gateish'
 import type { ShellOf } from '../../src/shapes/shapes-sealers'
 import { type GateRecord, ThingFormat } from '../../src/shapes/shapes-thing'
 import { Thing } from '../../src/models/thing'
 import { Lifeseq } from '../../src/shapes/primitives'
+import { readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -276,15 +278,16 @@ describe("a gate over the shell or a tombstone", () => {
     expect(Object.isFrozen(gate.wayins?.main)).to.be.true
   })
 
-  it("stops answering its wayins once it receives a tombstone of a later life", async () => {
-    const gate = makeGate(await gateRecordOf())
+  it("refuses a tombstone of the main gate, sparse or whole, still answering its wayins", async () => {
+    const record = await gateRecordOf()
+    const gate = makeGate(record)
     const later = Lifeseq.ofLifenum(1)
-    const tombstone = { ...TH.GateScope, label: 'gate', fmt: ThingFormat, revtok: TH.revtokOf('gone'), revseq: 1, am: 'x', lifeseq: later, lifepath: later, born_at: TH.T0, written_at: TH.T0 + 1 } as const
-    gate.receive(TH.thingEventOf<GateRecord>(tombstone))
-    expect(gate.pickle()).to.equal(tombstone)
-    expect(Object.hasOwn(gate, 'wayins')).to.be.false
-    TH.expectSyncRefusal(() => gate.main, 'absent_thing')
-    await TH.expectRefusal(gate.unlock({ passphraseCleartext: TH.TestPassphrase }), 'absent_thing')
+    const tombstone = { ...record, revtok: TH.revtokOf('gone'), revseq: 1, am: 'x', lifeseq: later, lifepath: later, written_at: TH.T0 + 1 } as const
+    for (const val of [tombstone, Thing.sparseOf(tombstone)]) {
+      TH.expectSyncRefusal(() => gate.receive(TH.thingEventOf<GateRecord>(val as never)), 'bad_record')
+    }
+    expect(gate.pickle()).to.equal(record)
+    expect(gate.wayins).to.deep.equal(record.wayins)
   })
 
   it("adopts a newer revision it receives, answering that revision's wayins", async () => {
@@ -306,26 +309,24 @@ describe("gate.demandPasskeyAddable()", () => {
 })
 
 describe("gate.subscribe(listener)", () => {
-  it("tells its subscribers of a lock, an unlock, a wait opened and dismissed, a gate change and its end, and of nothing after", async () => {
-    const { bank } = await TH.buildBornBank()
+  it("tells its subscribers of each gate change, this device's or another's, and of no lock, unlock or wait", async () => {
+    const { bank, device } = await TH.buildBornBank()
     const { gate } = bank
     const counter = TH.countCalls(gate.subscribe)
     gate.lock()
-    expect([counter.calls, gate.isLocked]).to.deep.equal([1, true])
     const ensuring = TH.expectRefusal(gate.ensureUnlocked(), 'dismissed')
-    expect([counter.calls, gate.isUnlockWanted]).to.deep.equal([2, true])
     gate.dismissUnlock()
     await ensuring
-    expect([counter.calls, gate.isUnlockWanted]).to.deep.equal([3, false])
     await gate.unlock({ passphraseCleartext: TH.TestPassphrase })
-    expect([counter.calls, gate.isUnlocked]).to.deep.equal([4, true])
+    expect(counter.calls).to.eq(0)
+    const before = gate.pickle()
     await gate.addPasskey({ passphraseCleartext: TH.TestPassphrase, nextPasskeyCleartext: TH.passkeyAnswerOf() })
-    expect(counter.calls).to.be.greaterThan(4)
-    const beforeSweep = counter.calls
-    gate.sweep()
-    expect(counter.calls).to.eq(beforeSweep + 1)
-    gate.lock()
-    expect(counter.calls).to.eq(beforeSweep + 1)
+    expect(counter.calls).to.eq(1)
+    expect(gate.pickle()).to.not.equal(before)
+    const elsewhere = { ...gate.pickle(), revtok: Crypto.randomId(), revseq: gate.revseq + 1, written_at: TH.T0 + 1 }
+    device.world.demandVaultMinder().receive({ ...TH.itemEventOf(elsewhere), sourcelabel: 'other_device', read_tc: readTcNow() })
+    expect(counter.calls).to.eq(2)
+    expect(gate.pickle()).to.deep.equal(elsewhere)
   })
 
   it("tells every subscriber when one throws, and passes the throw to the device's onBadNews", async () => {
@@ -334,9 +335,10 @@ describe("gate.subscribe(listener)", () => {
     bank.gate.subscribe(() => { throw new Error("a bug in the host") })
     const listener = vi.fn()
     bank.gate.subscribe(listener)
-    bank.gate.lock()
+    await bank.gate.addPasskey({ passphraseCleartext: TH.TestPassphrase, nextPasskeyCleartext: TH.passkeyAnswerOf() })
     expect(listener).toHaveBeenCalledOnce()
     await TH.eventually(() => onBadNews.mock.calls.length === 1)
+    expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'unexpected_error' })
   })
 
   it("refuses a listener that is not a function", async () => {

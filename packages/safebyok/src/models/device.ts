@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/query-core'
-import { isEqual, noop } from 'es-toolkit'
+import { noop } from 'es-toolkit'
 import { Consts, Deriver, Errors, type GX, Helpers, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
 import type { BirthGating } from './gating'
@@ -7,11 +7,10 @@ import { Proving, guardKeyDeriver } from './proving'
 import { Vault } from './vault'
 import { World } from './world'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
-import { maskedRecordRowOf } from '../minding/masked-rows'
 import { guardRootShelf, isRootLabelpath, peekRoots, stowRoots } from '../minding/root-shelf'
 import { VaultTSQ } from '../minding/vault-tsq'
-import { type BadNewsHandler, type DeviceJSON, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, type RootShelf, BankishChecks, isRootShelf } from '../shapes/shapes-bankish'
-import { type MaskedRow, type MaskedView, type MaskedViewLease, EmptyMaskedView } from '../shapes/shapes-masked-view'
+import { type BadNewsHandler, type DeviceJSON, type DeviceOpts, type DeviceRecord, type RootShelf, BankishChecks, isRootShelf } from '../shapes/shapes-bankish'
+import { type MaskedView, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import { isQueryClient } from '../shapes/shapes-vault-tsq'
 import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
 import type { BankScope } from '../shapes/shapes-stamps'
@@ -22,6 +21,7 @@ import { itemSeenOf, readTcNow } from '../storage/agerank'
 import { Labelpath } from '../shapes/primitives'
 import type { ReadTc, SeenThing, VaultEvent } from '../shapes/shapes-vault-event'
 import { type Modelkind, PerKindChecks, ThingChecks } from '../shapes/shapes-thing'
+import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
@@ -33,14 +33,14 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 /** This browser, before and after anyone signs in: the host's functions, guarded, its world, and the signed-in user's bank and vault.
  * Make it with `Device.make(record, opts)`, which does no I/O, touches no browser global and subscribes to nothing; call
  * `hello()` to start it, and `signin(userid)` once the host knows who is signed in, which brings up that user's bank
- * from the roots kept on the host's root shelf. Its snapshot's stage is `'signed_out'` until then, `'starting'` while it
+ * from the roots kept on the host's root shelf. Its world's snapshot shows the stage `'signed_out'` until then, `'starting'` while it
  * starts the user's bank, then `'locked'` for a bank stored, or `'unborn'` for none, which a
  * {@link birthGating} on this device fills.
  * It serves the first user it is told of for its life: another user signing in is a sign-out, which the host answers by
  * reloading the page.
  */
 export class Device {
-  // == [Props]: banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #rootShelf, #vaultTsqClient, #world, #userid, #vaultTSQ, #vault, #signinAnswer, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
+  // == [Props]: banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #rootShelf, #vaultTsqClient, #world, #userid, #vaultTSQ, #vault, #signinAnswer, #endCause, toJSON
 
   /** The label of the bank this device serves each user. */
   readonly banklabel:          Banklabel
@@ -67,22 +67,13 @@ export class Device {
   #userid: Userid | null = null
   /** The vault TSQ of the signed-in user's boxes, made as `signin` starts the bank. */
   #vaultTSQ: VaultTSQ | null = null
-  /** The vault of the bank's boxes, made once the bank is. */
+  /** The vault of the bank's boxes, made at the first read of {@link vault} once the bank is live. */
   #vault: Vault | null = null
   /** What `signin` resolves, once it has been called. */
   #signinAnswer: Promise<void> | null = null
   // Nothing ends a device yet: its sweep ends only its banks.
   /** Why the device ended, or null while it is enabled. */
   #endCause:   Errors.VaultError | null = null
-
-  /** The current snapshot, which {@link getSnapshot} returns. */
-  #snapshot: DeviceSnapshot
-  readonly #subscribers = new Set<() => void>()
-  readonly #getSnapshot = (): DeviceSnapshot => this.#snapshot
-  readonly #subscribe = (listener: () => void): (() => void) => {
-    this.#subscribers.add(VX.listener.parse(listener))
-    return () => { this.#subscribers.delete(listener) }
-  }
 
   /** The user signed in on this device, its banklabel and its token, for `JSON.stringify`. */
   toJSON(): DeviceJSON {
@@ -91,7 +82,7 @@ export class Device {
   }
   // --
 
-  // == [Getters]: userid, scope, autolockMinutes, vaultTsqClient, vaultTSQ, world, bank, vault, getSnapshot, subscribe
+  // == [Getters]: userid, scope, autolockMinutes, vaultTsqClient, vaultTSQ, world, bank, vault
 
   /** The user signed in on this device, or null until `signin`. */
   get userid(): Userid | null { return this.#userid }
@@ -115,25 +106,19 @@ export class Device {
     return this.#vaultTSQ
   }
 
-  /** The world of the signed-in user's bank: what locks, unlocks and ends it, and holds its lease. The same one from `Device.make` on. */
+  /** The world of the signed-in user's bank: what locks, unlocks and ends it, holds its lease, and has the snapshot a host renders. The same one from `Device.make` on. */
   get world(): World { return this.#world }
 
   /** The signed-in user's bank, or null until its world has it live, with its main gate and root box: found stored, or born on this device. */
   get bank(): Bank | null { return this.#world.areRootsLive ? this.#world.bank : null }
 
-  /** The vault of this device's bank's boxes, or null while the device has no bank. */
-  get vault(): Vault | null { return this.#vault }
-
-  /** This device's snapshot getter, already bound, as `useSyncExternalStore` wants it.
-   * It returns the same frozen object until something in the snapshot changes. The snapshot includes the world's, so one
-   * subscription here hears every change to either.
-   */
-  get getSnapshot(): () => DeviceSnapshot { return this.#getSnapshot }
-
-  /** Subscribe a listener to this device's snapshot, returning its unsubscribe. Already bound, as `useSyncExternalStore` wants it.
-   * The listener is called with no argument after each change: read the snapshot again. What it throws goes to {@link tellBadNews}.
-   */
-  get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
+  /** The vault of this device's bank's boxes, or null while the device has no bank. The same one from its first read on. */
+  get vault(): Vault | null {
+    const { bank } = this
+    if (bank === null) { return null }
+    this.#vault ??= Vault.make(bank, this.vaultTSQ)
+    return this.#vault
+  }
   // --
 
   // == [Construction]: make, constructor
@@ -155,8 +140,6 @@ export class Device {
     this.#rootShelf = (rootShelf === undefined) ? null : guardRootShelf(rootShelf, (news) => { this.tellBadNews([news]) })
     this.#vaultTsqClient = queryClient
     this.#world = World.make({ device: this })
-    this.#snapshot = this.#makeSnapshot()
-    this.#world.subscribe(this.#align)
     if (Deriver.isTestDeriver(keyDeriver)) { this.logger.warn(PhrasesX.TestDeriverNotice, { oplabel: 'Device.make' }) }
     Object.freeze(this)
   }
@@ -197,7 +180,9 @@ export class Device {
   #listenShelf(vaultMinder: VaultMinder): void {
     const shelf = this.#rootShelf
     if (shelf === null) { return }
-    vaultMinder.listen({ hear: (event) => { if ((event.eventkind === 'item') && isRootLabelpath(event.labelpath)) { stowRoots(shelf, this.scope, this.#world) } }, onBadNews: noop })
+    const hear = this.#world.bulletproofCallback((event: VaultEvent) => { if ((event.eventkind === 'item') && isRootLabelpath(event.labelpath)) { stowRoots(shelf, this.scope, this.#world) } })
+    // The onBadNews of the vault TSQ, listening beside it, tells the device of the same record refused.
+    vaultMinder.listen({ hear, onBadNews: noop })
   }
 
   /** Tell the device who is signed in, and start that user's bank: resolves once the snapshot shows `'locked'`, `'unborn'` or `'failed'` (with `lastErr`). Never rejects.
@@ -222,7 +207,7 @@ export class Device {
     // Made before the stage is checked, so a refusal here zeroes the host's passkey answer, and empties a form's secret
     // fields, as every gating does (G2).
     const gating = this.#world.birthGating(params)
-    if (['signed_out', 'starting'].includes(this.#snapshot.bank.stage)) {
+    if (['signed_out', 'starting'].includes(this.#world.getSnapshot().stage)) {
       gating.vacate()
       throw Throwers.signinUnanswered()
     }
@@ -284,62 +269,13 @@ export class Device {
   // == [Ending]: sweep
 
   /** Sweep the signed-in user's bank, if the device has one, and stop watching its vaultDB. Never throws.
-   * The device stays usable: it judges passphrases. Its snapshot shows the swept bank.
+   * The device stays usable: it judges passphrases. Its world's snapshot shows the swept bank.
    */
   sweep(): this {
     if (this.bank !== null) { this.#world.sweep() }
     // The watch's stop is the host's vaultDB code: what it throws is news.
     try { this.#world.vaultMinder?.sweep() } catch (err) { this.tellBadNews([err]) }
     return this
-  }
-  // --
-
-  // == [Snapshot]: align, makeSnapshot
-
-  // An arrow, so it stays bound: the world calls it as a subscriber. The bank is live once the world's stage reads
-  // `'locked'`, which the world tells of, so the vault is made here, before a subscriber reads it.
-  /** Make the vault once the bank is live, remake the snapshot, and tell each subscriber if it changed. */
-  readonly #align = (): void => {
-    const { bank } = this
-    if ((bank !== null) && (this.#vault === null)) {
-      this.#vault = Vault.make(bank, this.vaultTSQ)
-    }
-    const next = this.#makeSnapshot()
-    if (isEqual(next, this.#snapshot)) { return }
-    this.#snapshot = next
-    for (const listener of this.#subscribers) {
-      try {
-        listener()
-      } catch (err) {
-        this.tellBadNews([err])
-      }
-    }
-  }
-
-  /** A new snapshot of this device: its world's snapshot. */
-  #makeSnapshot(): DeviceSnapshot {
-    return Object.freeze({ bank: this.#world.getSnapshot() })
-  }
-  // --
-
-  // == [A devtool's view]: maskedView, #maskedRootRows
-
-  // The roots are no devtool's to read whole: the gate's record has each wayin's wrapped bankKey, which an offline
-  // guess at a passphrase is checked against. What leaves here is a copy, with every ciphertext masked, and of
-  // the lease only its loggable: the world hands out no lease.
-  /** The bank's roots as the world's Things have them (`bankTSQ`), the vault TSQ and the lease, masked for a devtool.
-   * Each row has its key, its state, and a copy of its record or listing with each ciphertext masked. The lease shows its loggable and when it ends, never its key material.
-   * For experimenting, never for an app's own logic: what it answers may change without notice. Before `signin`, it answers {@link EmptyMaskedView}.
-   */
-  maskedView(): MaskedView {
-    if (this.#userid === null) { return EmptyMaskedView }
-    return { bankTSQ: this.#maskedRootRows(), vaultTSQ: this.#vaultTSQ?.maskedRows() ?? [], lease: maskedViewLeaseOf(this.bank === null ? undefined : this.#world) }
-  }
-
-  /** The row of each root the world's Things have heard of, masked, under its item key */
-  #maskedRootRows(): MaskedRow[] {
-    const { bank, gate, rootBox } = this.#world
-    return [bank, gate, rootBox].filter((thing) => thing !== null).map((thing) => maskedRecordRowOf(VaultTSQ.itemQueryKeyOf(thing), thing.pickle(), thing.written_at))
   }
   // --
 
@@ -373,6 +309,23 @@ export class Device {
 
   /** Always `'device'`: this model's {@link Modelkind}. */
   get modelkind(): 'device' { return 'device' satisfies Modelkind }
+
+  // == [A devtool's view]: inspectable
+
+  /** Safe view of the device, for logging and debugging.
+   * It has the bank's roots (`bankTSQ`) and the vault TSQ, each ciphertext masked, and the lease's loggable and when it ends, never its key material. Before `signin`, it answers {@link EmptyMaskedView}.
+   * For experimenting, never for an app's own logic: what it answers may change without notice.
+   */
+  inspectable(): MaskedView {
+    if (this.#userid === null) { return EmptyMaskedView }
+    const { bank, gate, rootBox } = this.#world
+    return {
+      bankTSQ:  [bank, gate, rootBox].filter((thing) => thing !== null).map((thing) => thing.inspectable()),
+      vaultTSQ: this.#vaultTSQ?.inspectable() ?? [],
+      lease:    this.#world.inspectable(),
+    }
+  }
+  // --
 }
 
 // == [Host functions]: DefaultOnBadNews, tellBadNewsTo
@@ -400,7 +353,7 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 }
 // --
 
-// == [Helpers]: millisOf, checkSecureContext, ShelvedSourcelabel, banktokOf, shelvedEventOf, maskedViewLeaseOf
+// == [Helpers]: millisOf, checkSecureContext, ShelvedSourcelabel, banktokOf, shelvedEventOf
 
 // A host's Infinity minutes, for never, becomes ForeverMillis: past the entrypoint, nothing is infinite.
 /** `minutes` in milliseconds, capped at `ForeverMillis`, or `fallback` for none. */
@@ -428,19 +381,12 @@ function shelvedEventOf(record: SeenThing, read_tc: ReadTc, banktok: Lifetok | u
     sourcelabel: ShelvedSourcelabel, read_tc, banktok, ...itemSeenOf(record),
   }
 }
-
-/** The lease `world` holds, as a devtool is shown it: its loggable and when it ends, or `active: false` for no world, or one locked. */
-function maskedViewLeaseOf(world: World | undefined): MaskedViewLease {
-  const loggable = world?.leaseLoggable ?? null
-  const endsAt = world?.leaseEndsAt ?? null
-  return ((loggable === null) || (endsAt === null)) ? EmptyMaskedView.lease : { active: true, ...loggable, ends_at: endsAt }
-}
 // --
 
 // == [Checks]: Checks
 
 /** The checks of {@link Device.make}'s arguments, {@link Device.signin}'s, a root read from a root shelf, and {@link tellBadNewsTo}'s. */
-const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
+const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom, union }) => ({
   userid:        BankishChecks.userid,
   deviceMakeArgs: obj({
     record: BankishChecks.deviceRecord,
@@ -457,8 +403,8 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
       deviceDB:        custom<unknown>().optional(),
     }), { refusalkind: 'bad_record' }),
   }),
-  // Loose, so the record reaches the VaultMinder whole, which checks it as it checks any record.
-  shelvedRoot:   ThingChecks.sparse.loose(),
+  // The shelf keeps the roots only while all three are live, each whole.
+  shelvedRoot:   union([BankChecks.record, GateChecks.record, BoxChecks.record]),
   tellBadNewsToArgs: obj({
     onBadNews: fn<BadNewsHandler>(),
     device:    custom<Device>(),

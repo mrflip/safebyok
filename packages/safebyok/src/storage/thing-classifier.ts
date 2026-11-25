@@ -6,7 +6,7 @@ import { policyRefusalOf } from './policies'
 import { Labelpath } from '../shapes/primitives'
 import type { BirthBankActual, DamagedThing, GotActual, KidEntry, Kids, ListThingsActual, WroteActual } from '../shapes/shapes-answers'
 import type { ReadTc } from '../shapes/shapes-vault-event'
-import { type Sparse, type StoredCited, type ThingCited, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
+import { type BoxSparse, type StoredCited, type ThingCited, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
 import { BaseThing } from '../models/base-thing'
 import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
@@ -255,7 +255,7 @@ function trackedEntryOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>
 }
 // --
 
-// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, isChildLabelpath, kidsOf, classifyBirthBank
+// == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, listedOf, isChildLabelpath, kidsOf, classifyBirthBank
 // Each is given the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`, with when it read them;
 // a get and a write are given the nearest Thing stored above the ask's scope; a birth is given the bank's three roots, and,
 // where it is born, reports the world its puts wrote.
@@ -291,17 +291,16 @@ export function classifyWriteThing(ask: WriteAsk, raw: unknown, above: AboveFetc
 /** The raw rows a concrete adapter fetched for a listing: the parent (null for none), and each child one label under it with its labelpath. */
 export type ThingsFetched = Readonly<{ parent: unknown, children: readonly Readonly<{ labelpath: Labelpath, raw: unknown }>[] }>
 
-/** Classify a listing against the {@link ThingsFetched} rows: the parent's get act, the children of its live life as a {@link Kids} value,
- * the parent as its `parentage`, each child sparse as its `deltas` in labelpath order, and the children that fail their checks.
+/** Classify a listing against the {@link ThingsFetched} rows: the children of the parent's live life as a {@link Kids} value,
+ * the parent as its `parentage`, each child as its `deltas` in labelpath order, and the children that fail their checks. A live box is listed sparse, and any other Thing whole.
+ * A parent that is not live has no children, and refuses: `gone` with its tombstone as the `record`, or `void` with the shell at a root, or null below one.
  */
 export function classifyListThings(ask: ListAsk, { parent: rawParent, children }: ThingsFetched, worldFetched: WorldFetched): ListThingsActual {
   const stored    = storedThingOf(ask, rawParent)
-  const act       = getActOf(ask, stored)
-  const parentage = (stored === null) ? [] : [BaseThing.sparseOf(stored)]
-  const beside    = { world: worldOf(ask, worldFetched), tracked: trackedOf(ask, worldFetched.tracked), read_tc: worldFetched.read_tc }
-  if (isRefusedAct(act))  { return { ok: false, act, parentage, deltas: [], damaged_rows: [], ...beside } }
-  // A tombstone or none has no children.
-  if (stored?.am !== 'a') { return { ok: true, act, kids: kidsOf(ask, stored, []), parentage, deltas: [], damaged_rows: [], ...beside } }
+  const beside    = { world: worldOf(ask, worldFetched), tracked: trackedOf(ask, worldFetched.tracked), read_tc: worldFetched.read_tc, parentage: [], deltas: [], damaged_rows: [] }
+  // The listing reads nothing above its parent, so the shell's lives are known only at a root, which has nothing above it.
+  if (stored === null)    { return { ok: false, act: 'void', record: (Labelpath.parentOf(ask.labelpath) === '') ? Shell.under(ask, null) : null, ...beside } }
+  if (stored.am !== 'a')  { return { ok: false, act: 'gone', record: stored, ...beside } }
   const { userid, banklabel } = ask
   // A child hangs off its parent's live lifepath: an earlier life's children are not its.
   const lifepathUnder = `${stored.lifepath}/`
@@ -312,8 +311,13 @@ export function classifyListThings(ask: ListAsk, { parent: rawParent, children }
     const child = listedThingOf({ userid, banklabel, labelpath }, raw)
     if (child === null) { damaged_rows.push({ userid, banklabel, labelpath, am: 'd' }) } else if (child.lifepath.startsWith(lifepathUnder)) { living.push(child) }
   }
-  const deltas = sortBy(living, [(thing) => thing.labelpath]).map((thing) => BaseThing.sparseOf(thing))
-  return { ok: true, act, kids: kidsOf(ask, stored, deltas), parentage, deltas, damaged_rows, ...beside }
+  const deltas = sortBy(living, [(thing) => thing.labelpath]).map((thing) => listedOf(thing))
+  return { ...beside, ok: true, act: 'gotlive', kids: kidsOf(ask, stored, deltas), parentage: [listedOf(stored)], deltas, damaged_rows }
+}
+
+/** `thing` as a listing carries it: a live box's sparse form, or any other Thing whole, a tombstone among them. */
+function listedOf(thing: ThingRecord): ThingRecord | BoxSparse {
+  return ((thing.am === 'a') && Labelpath.isOfModelkind(thing.labelpath, 'box')) ? BaseThing.sparseOf(thing) as BoxSparse : thing
 }
 
 /** True when `labelpath` is one label under the listing's parent, of the parent's kind. */
@@ -323,13 +327,13 @@ function isChildLabelpath(ask: ListAsk, labelpath: Labelpath): boolean {
 }
 
 // Object.fromEntries makes each label an own key, `__proto__` among them.
-/** The {@link Kids} value of `deltas`, the children of `parent` stored at the listing's scope, null for none, but for its `read_tc`, which is the report's. */
-function kidsOf(ask: ListAsk, parent: ThingRecord | null, deltas: readonly Sparse<ThingRecord>[]): Omit<Kids, 'read_tc'> {
-  const entryOf = ({ label, lifeseq }: Sparse<ThingRecord>): [string, KidEntry] => [label, { lifeseq }]
+/** The {@link Kids} value of `deltas`, the children of the live `parent` stored at the listing's scope, but for its `read_tc`, which is the report's. */
+function kidsOf(ask: ListAsk, parent: ThingRecord, deltas: readonly (ThingRecord | BoxSparse)[]): Omit<Kids, 'read_tc'> {
+  const entryOf = ({ label, lifeseq }: ThingRecord | BoxSparse): [string, KidEntry] => [label, { lifeseq }]
   return {
     modelkind:  'kids',
     parentpath: ask.labelpath,
-    parentlife: parent?.lifepath ?? Shell.VoidLifeseq,
+    parentlife: parent.lifepath,
     items:      Object.fromEntries(deltas.filter((delta) => delta.am === 'a').map((delta) => entryOf(delta))),
     gones:      Object.fromEntries(deltas.filter((delta) => delta.am !== 'a').map((delta) => entryOf(delta))),
   }

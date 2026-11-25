@@ -93,7 +93,7 @@ export function bornAtNotNow(ask: WriteAsk): Errors.VaultError { return new Erro
 export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
 // --
 
-// == [Storing Throwers]: PoliciedMeta, gateIssue, bornAtNotStored, lifetokNotStored, rowOfOtherAddress, bankRootsMissing, answerNotMade
+// == [Storing Throwers]: PoliciedMeta, gateIssue, bornAtNotStored, lifetokNotStored, rowOfOtherAddress, bankRootsMissing, listParentNotLive, answerNotMade
 
 // Big types a refusal's meta.act as its own BadAct, which has no `policied`.
 /** Refusal meta with act `policied`, for a write the act tables allow but a storage policy, the born_at check or the lifetok check refuses. */
@@ -119,6 +119,9 @@ export function rowOfOtherAddress(fieldnames: readonly string[]): Errors.VaultEr
 
 /** A `storage_issue` refusal: a live bank is stored without its main gate or its root box. */
 export function bankRootsMissing(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.BankRootsMissing) }
+
+/** An `absent_thing` refusal of a list whose parent holds a tombstone or nothing, which has no children. `meta` names its act, its oplabel and its ask. */
+export function listParentNotLive(meta: Errors.RefusalMeta): Errors.VaultError { return new Errors.VaultError('absent_thing', Phrases.ListParentNotLive, { meta }) }
 
 /** An `unexpected_error` refusal: a vaultDB could not make the answer for a failure. */
 export function answerNotMade(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerNotMade) }

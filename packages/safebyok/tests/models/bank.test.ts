@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Crypto, Errors } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
-import { type BadNews, bankStageVals } from '../../src/shapes/shapes-bankish'
 import { Lease } from '../../src/models/lease'
 import type { ShellOf } from '../../src/shapes/shapes-sealers'
 import { Lifeseq } from '../../src/shapes/primitives'
@@ -102,9 +101,9 @@ describe("Bank.make(record, { device }), by the device's world", () => {
     device.lock()
     await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(bank.isUnlocked).to.be.true
-    expect(bank.getSnapshot()).to.include({ stage: 'unlocked' })
+    expect(device.world.getSnapshot()).to.include({ stage: 'unlocked' })
     bank.gate.lock()
-    expect(bank.getSnapshot()).to.include({ stage: 'locked' })
+    expect(device.world.getSnapshot()).to.include({ stage: 'locked' })
   })
 
   it("pickles to its Thing alone, frozen, without its root box", async () => {
@@ -301,109 +300,6 @@ describe("bank.lock() and bank.sweep()", () => {
     expect(bank.isEnabled).to.be.false
     expect(bank.endCause).to.include({ refusalkind: 'disabled' })
     expect(device.isEnabled).to.be.true
-  })
-})
-
-describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
-  it("shows a born bank unlocked, its lease ending the device's lease length after it was proved", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    expect(bank.getSnapshot()).to.deep.equal({ stage: 'unlocked', isLocked: false, isEnded: false, endCause: null, leaseEndsAt: TH.T0 + device.leaseMillis, lastErr: null, isUnlockWanted: false })
-    expect(Object.isFrozen(bank.getSnapshot())).to.be.true
-  })
-
-  it("tells its subscribers once each for a lock, an `unlock` gating and a sweep, the snapshot the same object between them", async () => {
-    const { bank } = await TH.buildBornBank()
-    const counter = TH.countCalls(bank.subscribe)
-    const unlocked = bank.getSnapshot()
-    expect(bank.getSnapshot()).to.equal(unlocked)
-
-    bank.lock()
-    const locked = bank.getSnapshot()
-    expect(counter.calls).to.eq(1)
-    expect(locked).to.deep.equal({ stage: 'locked', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false })
-    expect(bank.getSnapshot()).to.equal(locked)
-
-    await bank.gate.gatingUnlockAttempt({ passphrase: TH.TestPassphrase })
-    expect(counter.calls).to.eq(2)
-    expect(bank.getSnapshot()).to.deep.equal(unlocked)
-
-    bank.sweep()
-    expect(counter.calls).to.eq(3)
-    expect(bank.getSnapshot()).to.deep.equal({ stage: 'swept', isLocked: true, isEnded: true, endCause: bank.endCause, leaseEndsAt: null, lastErr: null, isUnlockWanted: false })
-    expect(bank.getSnapshot().endCause).to.equal(bank.endCause).and.include({ refusalkind: 'disabled' })
-  })
-
-  it("tells no subscriber of a call that changes nothing in the snapshot: a second lock or sweep, a wrong passphrase, or a box landing", async () => {
-    const { bank, vault } = await TH.buildBornVault()
-    const counter = TH.countCalls(bank.subscribe)
-    const unlocked = bank.getSnapshot()
-    await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    expect(bank.getSnapshot()).to.equal(unlocked)
-    bank.lock()
-    bank.lock()
-    await TH.expectRefusal(bank.gate.gatingUnlockAttempt({ passphrase: 'not the passphrase' }), 'wrong_passphrase')
-    expect(counter.calls).to.eq(1)
-    bank.sweep()
-    bank.sweep()
-    expect(counter.calls).to.eq(2)
-  })
-
-  it("shows the bank swept once its device is swept", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    const counter = TH.countCalls(bank.subscribe)
-    device.sweep()
-    expect(counter.calls).to.eq(1)
-    expect(bank.getSnapshot()).to.include({ stage: 'swept', isEnded: true, endCause: bank.endCause })
-  })
-
-  it("leaves its snapshot unchanged once swept, telling no subscriber of a lock or of its device's sweep", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    bank.sweep()
-    const swept = bank.getSnapshot()
-    const counter = TH.countCalls(bank.subscribe)
-    bank.lock()
-    device.sweep()
-    expect(counter.calls).to.eq(0)
-    expect(bank.getSnapshot()).to.equal(swept)
-    expect(swept.endCause).to.equal(bank.endCause)
-  })
-
-  it("shows only stages that bankStageVals lists", async () => {
-    const { bank } = await TH.buildBornBank()
-    const snapshots = [bank.getSnapshot()]
-    bank.lock()
-    snapshots.push(bank.getSnapshot())
-    bank.sweep()
-    snapshots.push(bank.getSnapshot())
-    expect(snapshots.map(({ stage }) => stage)).to.deep.equal(['unlocked', 'locked', 'swept'])
-    expect(bankStageVals).to.include.members(snapshots.map(({ stage }) => stage))
-  })
-
-  it("stops telling a listener once it unsubscribes", async () => {
-    const { bank } = await TH.buildBornBank()
-    const listener = vi.fn()
-    const unsubscribe = bank.subscribe(listener)
-    bank.lock()
-    unsubscribe()
-    bank.sweep()
-    expect(listener).toHaveBeenCalledOnce()
-  })
-
-  it("tells every subscriber when one throws, and passes the throw to the device's onBadNews", async () => {
-    const onBadNews = vi.fn()
-    const { bank } = await TH.buildBornBank({ device: TH.makeDevice({}, { onBadNews }) })
-    bank.subscribe(() => { throw new Error('a bug in the host') })
-    const listener = vi.fn()
-    bank.subscribe(listener)
-    bank.lock()
-    expect(listener).toHaveBeenCalledOnce()
-    await TH.eventually(() => onBadNews.mock.calls.length === 1)
-    expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'unexpected_error' })
-  })
-
-  it("refuses a listener that is not a function", async () => {
-    const { bank } = await TH.buildBornBank()
-    TH.expectSyncRefusal(() => bank.subscribe('call me' as never), 'bad_record')
   })
 })
 

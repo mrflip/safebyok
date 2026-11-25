@@ -7,10 +7,10 @@ import { WaysIn } from './WaysIn'
 
 /** The page below the header, by the bank's stage. The unlock dialog is mounted at every stage, and opens while a knock waits for the passphrase. */
 export function KnockKnock({ username }: Readonly<{ username: string | undefined }>) {
-  const bank = Knock.useBank()
+  const world = Knock.useWorld()
   return (
     <>
-      {screenOf(bank.stage, username, bank.lastErr?.message)}
+      {screenOf(world.stage, username, world.lastErr?.message)}
       <UnlockDialog username={username} />
     </>
   )

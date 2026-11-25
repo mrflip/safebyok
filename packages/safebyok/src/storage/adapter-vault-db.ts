@@ -135,7 +135,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const beside      = { ...besideOf(actual), ...ActualChecks.listed.parse(actual) }
       return frozenAnswerOf<ListThingsAnswer>(actual.ok
         ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, val: { ...actual.kids, read_tc: beside.read_tc } }
-        : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: [], err: Throwers.actRefused('vault', actual.act, { oplabel: 'listThings', ask: loggableAsk }) })
+        : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: actual.record, err: Throwers.listParentNotLive({ oplabel: 'listThings', ask: loggableAsk, act: actual.act }) })
     } catch (err) { return { ...this.answerForThrown(err, 'listThings', ask), dbhas: null, parentage: [], deltas: [], damaged_rows: [] } }
   }
 

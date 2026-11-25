@@ -23,12 +23,12 @@ describe('the fixture', () => {
     await loadFixture()
     for (const userid of ['hero', 'thierry']) {
       const device = await signedInDevice(userid)
-      expect(device.getSnapshot().bank.stage).to.eq('locked')
+      expect(device.world.getSnapshot().stage).to.eq('locked')
       const passphraseCleartext = Fixture.users.find((user) => user.userid === userid)?.passphrase ?? ''
       await device.bank!.gate.unlockGating({ passphraseCleartext }).attempt()
-      expect(device.getSnapshot().bank.stage).to.eq('unlocked')
+      expect(device.world.getSnapshot().stage).to.eq('unlocked')
     }
     const nolo = await signedInDevice('nolo')
-    expect(nolo.getSnapshot().bank.stage).to.eq('unborn')
+    expect(nolo.world.getSnapshot().stage).to.eq('unborn')
   })
 })

@@ -5,8 +5,7 @@ import { omit } from 'es-toolkit'
 import { BaseBox } from '../../src/models/base-box'
 import { Box } from '../../src/models/box'
 import { Thing } from '../../src/models/thing'
-import { Lifeseq } from '../../src/shapes/primitives'
-import { Shell } from '../../src/shapes/shapes-thing'
+import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
 import * as TH from '../test-helpers'
 
@@ -77,14 +76,14 @@ describe("a Box's props", () => {
     expect(BoxChecks.cited.parse(box)).to.deep.include(box.citable)
   })
 
-  it("stops answering its live record's body once it adopts a sparse tombstone", () => {
-    const box = Box.make(TH.boxThingOf())
-    const life1 = Lifeseq.ofLifenum(1)
-    const tomb = Thing.sparseOf(TH.boxThingOf('openai', { am: 'x', lifepath: `${TH.Life0}/${life1}`, lifeseq: life1, revseq: 1 }))
-    box.receive(TH.thingEventOf(tomb))
+  it("answers the tombstone's own body once it adopts one, never its live record's", () => {
+    const live = TH.boxThingOf('openai', { sidecar: { account: 'work' } })
+    const box  = Box.make(live)
+    const tomb = TH.boxTombOf(live)
+    box.receive(TH.thingEventOf<BoxRecord>(tomb))
     expect(box.pickle()).to.eq(tomb)
-    expect(Object.getOwnPropertyNames(box)).to.have.members(Object.keys(tomb))
-    expect(box.sidecar).to.eq(undefined)
+    expect(Object.getOwnPropertyNames(box)).to.have.members(Object.keys(Thing.sparseOf(tomb)))
+    expect([box.sidecar, box.whisper_sealed]).to.deep.equal([{}, tomb.whisper_sealed])
     expect(box).to.include({ am: 'x', labelpath: tomb.labelpath })
   })
 })

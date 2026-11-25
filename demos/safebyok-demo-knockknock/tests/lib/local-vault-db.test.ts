@@ -7,7 +7,7 @@ import * as TH from '../test-helpers'
 async function stageFoundOver(vaultDB: LocalStorageVaultDB): Promise<string> {
   const device = TH.makeDevice({}, { vaultDB })
   await device.signin(TH.WorldScope.userid)
-  return device.getSnapshot().bank.stage
+  return device.world.getSnapshot().stage
 }
 
 beforeEach(() => { localStorage.clear() })

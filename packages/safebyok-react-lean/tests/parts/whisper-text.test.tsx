@@ -8,7 +8,7 @@ import * as TH from '../test-helpers'
 
 /** The bank's stage as a line of text, the joke service's key as a `WhisperText`, and the unlock dialog. */
 function KeyScreen({ world, field = 'apiKey', masked, onError }: Readonly<{ world: TH.ProviderWorld, field?: string, masked?: ReactNode, onError?: ((err: Error) => void) | undefined }>) {
-  const stage = world.Bank.useBank((snap) => snap.stage)
+  const stage = world.Bank.useWorld((snap) => snap.stage)
   return (
     <>
       <p>{stage}</p>

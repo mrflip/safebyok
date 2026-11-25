@@ -4,7 +4,7 @@ import { type Errors, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { type CitedOf, type DelAskDraft, type PutAskDraft, AskChecks } from './shapes-asks'
 import { type ThingRecord, type VoidSentinel, ThingChecks, isLifepathDeep, isParityRight } from './shapes-thing'
-import { type SeenThing, type VaultEvent, SeenChecks, livenessVals, vaultEventkindVals } from './shapes-vault-event'
+import { type SeenThing, type VaultEvent, SeenChecks, isSeenForm, livenessVals, vaultEventkindVals } from './shapes-vault-event'
 import { BaseThing } from '../models/base-thing'
 import type { Adoptable, Thing } from '../models/thing'
 import type { VaultMinder } from '../minding/vault-minder'
@@ -61,11 +61,12 @@ export const VaultMinderChecks = Validator.Checkers('bad_record', ({ obj, oneof,
   rungVoid:  custom<VoidSentinel>((val) => BaseThing.isVoidSentinel(val), Phrases.VoidSentinelExpected)
     .refine(isLifepathDeep, Phrases.LifepathDepth)
     .refine(isParityRight, Phrases.LifeseqParity),
-  /** The `val` of any other `item` event rung: a Thing's fields, sparse or whole, never the void sentinel; its lifepath as deep as its labelpath, its own lifeseq odd exactly for a tombstone. */
-  rungThing: ThingChecks.sparse
+  /** The `val` of any other `item` event rung: a whole record, live or a tombstone, or a live box's sparse form, never the void sentinel; its lifepath as deep as its labelpath, its own lifeseq odd exactly for a tombstone. */
+  rungThing: ThingChecks.sparse.loose()
     .refine((val) => ! BaseThing.isVoidSentinel(val), Phrases.ThingFieldsExpected)
     .refine(isLifepathDeep, Phrases.LifepathDepth)
-    .refine(isParityRight, Phrases.LifeseqParity),
+    .refine(isParityRight, Phrases.LifeseqParity)
+    .refine((val) => isSeenForm(val as SeenThing), Phrases.SeenFormUnknown),
 }))
 
 /** The members of {@link VaultMinder} that are functions. */

@@ -43,7 +43,7 @@ export const GateChecks = Object.freeze({
 })
 
 /** The checks of a box's Thing: its record, its citation and what is stored of it, the storage policies it may name (none), and its labelpath.
- * Also its `recordOrShell`, which a Box begins from, its `live` record, its `liveOrShell` record, which a bank has of its root box, and its `stamp`.
+ * Also its `recordOrShell`, which a Box begins from, its `live` record, its `liveOrShell` record, which a bank has of its root box, its `sparse` form, a live box without its body, and its `stamp`.
  * And what its seal is given: its sealable, a live one for a tombstone (`liveSealable`), the public props of a revision and of a tombstone, and the cleartexts.
  */
 export const BoxChecks = Object.freeze({
@@ -55,6 +55,7 @@ export const BoxChecks = Object.freeze({
   labelpath:            PerKindChecks.boxLabelpath,
   live:                 PerKindChecks.boxRecord,
   liveOrShell:          PerKindChecks.boxRecordOrShell,
+  sparse:               PerKindChecks.boxSparse,
   stamp:                StampChecks.boxStamp,
   sealable:             PerKindChecks.boxSealable,
   liveSealable:         PerKindChecks.boxLiveSealable,

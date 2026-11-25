@@ -18,7 +18,7 @@ function serviceOf(box: Parameters<NonNullable<WhisperMaskProps['ifLocked']>>[0]
 
 /** The bank's stage as a line of text, and the joke service's key as a `WhisperMask`. */
 function KeyScreen({ world, ...props }: Readonly<{ world: TH.ProviderWorld } & Partial<WhisperMaskProps>>) {
-  const stage = world.Bank.useBank((snap) => snap.stage)
+  const stage = world.Bank.useWorld((snap) => snap.stage)
   return (
     <>
       <p>{stage}</p>

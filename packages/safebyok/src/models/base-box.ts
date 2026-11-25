@@ -18,10 +18,10 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
   // == [Body]: sidecar, whisper_sealed
   // Read off the record adopted: a field it lacks reads as undefined.
 
-  /** What a UI may show beside the whisper while the bank is locked: `{}` for a tombstone, and undefined over the shell or a sparse tombstone. */
+  /** What a UI may show beside the whisper while the bank is locked: `{}` for a tombstone, and undefined over the shell. */
   get sidecar(): BoxRecord['sidecar'] | undefined { return wholeOf(this.pickle())?.sidecar }
 
-  /** The whisper, sealed, or undefined over the shell or a sparse tombstone. */
+  /** The whisper, sealed, or undefined over the shell. */
   get whisper_sealed(): Sealed | undefined { return wholeOf(this.pickle())?.whisper_sealed }
   // --
 
@@ -121,7 +121,7 @@ Object.freeze(BaseBox satisfies Sealer<BoxRecord, BoxCleartexts>)
 
 // == [Helpers]: wholeOf, deserializeWhisper
 
-/** `record` where it has a box's body, live or a tombstone, else undefined: the shell, or a sparse tombstone */
+/** `record` where it has a box's body, live or a tombstone, else undefined: the shell */
 function wholeOf(record: Adoptable<BoxRecord>): BoxRecord | undefined { return ('whisper_sealed' in record) ? record : undefined }
 
 // What JSON.parse throws is replaced, never made the cause: a SyntaxError can quote the text it failed on.

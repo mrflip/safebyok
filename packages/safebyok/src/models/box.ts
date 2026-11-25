@@ -1,7 +1,7 @@
 import { BaseBox } from './base-box'
 import type { ShellOf } from '../shapes/shapes-sealers'
 import type { BoxStamp } from '../shapes/shapes-stamps'
-import { type BoxRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
+import { type BoxRecord, type ThingMakeOpts, type ThingScope, ThingChecks, ThingMakeChecks } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 
 /** A box of the signed-in user's bank, as last heard of: a live box, its tombstone, or its shell. */
@@ -9,13 +9,16 @@ export class Box extends BaseBox {
   // == [Construction]: make, constructor
 
   // A box models the very record it is handed, never the check's copy.
-  /** Make the box of `record`, a whole box record, live or a tombstone, or the box's shell. Nothing is fetched or stored. */
-  static make(record: BoxRecord | ShellOf<BoxRecord>): Box {
+  /** Make the box of `record`, a whole box record, live or a tombstone, or the box's shell. Nothing is fetched or stored.
+   * Each subscriber is wrapped by `opts.bulletproofCallback`, where given.
+   */
+  static make(record: BoxRecord | ShellOf<BoxRecord>, opts: ThingMakeOpts = {}): Box {
     BoxChecks.recordOrShell.parse(record)
-    return new Box(record)
+    const { bulletproofCallback } = ThingMakeChecks.thingMakeOpts.parse(opts)
+    return new Box(record, bulletproofCallback)
   }
 
-  private constructor(begun: BoxRecord | ShellOf<BoxRecord>) { super(begun) }
+  private constructor(begun: BoxRecord | ShellOf<BoxRecord>, bulletproofCallback: ThingMakeOpts['bulletproofCallback']) { super(begun, bulletproofCallback) }
   // --
 
   // == [Shapes]: scope, stamp

@@ -2,13 +2,13 @@
 
 import { once } from 'es-toolkit'
 import { Errors } from 'safebyok-big/internals'
-import { type Lifetok, Labelpath } from '../shapes/primitives'
+import { type Lifetok, Labelpath, Lifeseq } from '../shapes/primitives'
 import {
-  type BirthBankAsk, type CitedOf, type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type Tracked, type WorldRecord, type WriteAsk,
+  type AnyAsk, type BirthBankAsk, type CitedOf, type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type Tracked, type WorldRecord, type WriteAsk,
   delAskOf, getAskOf, listAskOf, putAskOf,
 } from '../shapes/shapes-asks'
 import type { BankAskDraft } from '../shapes/shapes-bankish'
-import { type BankRecord, type ThingRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
+import { type BankRecord, type ThingRecord, type ThingScope, Shell, ThingChecks } from '../shapes/shapes-thing'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type DelOnceArgs, type PutOnceArgs, type ReceivingThing, type VaultMinderListener, type VaultMinderOpts, type ThingMaker, VaultMinderChecks } from '../shapes/shapes-vault-minder'
 import { type ReadTc, type SeenThing, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
@@ -71,11 +71,13 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   // --
 
   // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank
-  // Each verb hands what it is given to the wrapped vaultDB, which checks it and answers a refusal rather than throwing, and
-  // returns that answer unchanged. The records it carries are told first, out to in, at the answer's read_tc.
+  // Each verb refuses an ask of another bank, by its userid and banklabel, and hands any other to the wrapped vaultDB, which
+  // checks the rest, its banktok among it, and answers a refusal rather than throwing. Each returns that answer unchanged.
+  // The records it carries are told first, out to in, at the answer's read_tc.
 
   /** {@link VaultDB.tryGetThing}: a get that finds nothing tells the shell its answer carries. */
   async tryGetThing(ask: GetAsk): Promise<GetThingAnswer> {
+    try { this.#checkOwnAsk(ask) } catch (err) { return refusedAnswerOf(ask, err) }
     const answer = await this.#vaultDB.tryGetThing(ask)
     this.#tellAnswer(answer, [...rootsOf(answer), ...gotRecordsOf(answer)])
     return answer
@@ -83,25 +85,30 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
 
   /** {@link VaultDB.tryWriteThing}: a write refused over nothing stored tells the shell its answer carries. */
   async tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer> {
+    try { this.#checkOwnAsk(ask) } catch (err) { return refusedAnswerOf(ask, err) }
     const answer = await this.#vaultDB.tryWriteThing(ask)
     this.#tellAnswer(answer, [...rootsOf(answer), ...writtenRecordsOf(answer)])
     return answer
   }
 
-  /** {@link VaultDB.tryListThings}: the parent and each Thing listed are told sparse, in labelpath order. */
+  /** {@link VaultDB.tryListThings}: the parent and each Thing listed are told in labelpath order, or a refusal's tombstone or shell. */
   async tryListThings(ask: ListAsk): Promise<ListThingsAnswer> {
+    try { this.#checkOwnAsk(ask) } catch (err) { return { ...refusedAnswerOf(ask, err), parentage: [], deltas: [], damaged_rows: [] } }
     const answer = await this.#vaultDB.tryListThings(ask)
-    this.#tellAnswer(answer, [...rootsOf(answer), ...answer.parentage, ...answer.deltas])
+    this.#tellAnswer(answer, [...rootsOf(answer), ...listedRecordsOf(answer)])
     return answer
   }
 
   /** {@link VaultDB.tryBirthBank} */
   async tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer> {
+    try { this.#checkOwnAsk(ask) } catch (err) { return refusedAnswerOf(ask, err) }
     const answer = await this.#vaultDB.tryBirthBank(ask)
     this.#tellAnswer(answer, [...rootsOf(answer), ...bornRecordsOf(answer)])
     return answer
   }
 
+  /** Refuse an ask of another bank than this vaultDB's */
+  #checkOwnAsk(ask: AnyAsk): void { ThingChecks.bankScope.parseConsistent(ask, this.#scope) }
   // --
 
   // == [Once verbs]: tryGetOnce, getOnce, tryListOnce, listOnce, tryPutOnce, putOnce, tryDelOnce, delOnce
@@ -129,9 +136,9 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return thing.pickle() as ReturnType<ThingT['pickle']>
   }
 
-  /** List the children of the Thing at `labelpath` once. A parent deleted or never stored lists none. A child stored damaged is told to each listener's `onBadNews`. */
+  /** List the children of the live Thing at `labelpath` once. A parent deleted or never stored refuses `absent_thing`. A child stored damaged is told to each listener's `onBadNews`. */
   async tryListOnce(labelpath: Labelpath): Promise<ListThingsAnswer> {
-    const ask    = this.makeListAsk({ labelpath, ifAbsent: 'nil' })
+    const ask    = this.makeListAsk({ labelpath })
     const answer = await this.tryListThings(ask)
     if (answer.damaged_rows.length > 0) { this.#tellBadNews(Throwers.childrenStoredDamaged(ask, answer.damaged_rows)) }
     return answer
@@ -174,10 +181,14 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return answer.val as RecordT
   }
 
-  // Where no Thing is kept at its labelpath, the cited is left out, and the vaultDB refuses the ask.
-  /** The citable of the Thing kept at `record`'s labelpath, as a write of `record` cites it */
+  // The act tables read a revseq of -1 and the void revtok as citing nothing stored. The cited lives above it are the
+  // record's, as the ask's checks demand, so a record of a life after the first refuses there.
+  /** The citable of the Thing kept at `record`'s labelpath, as a write of `record` cites it, or the void revision where none is kept */
   #citableAt<RecordT extends ThingRecord>(record: RecordT): CitedOf<RecordT> {
-    return this.thingAt(record)?.citable as CitedOf<RecordT>
+    const thing = this.thingAt(record)
+    if (thing !== undefined) { return thing.citable as CitedOf<RecordT> }
+    const parentLifepath = Lifeseq.leadingOf(ThingChecks.lifepath.parse(record.lifepath))
+    return ((parentLifepath === '') ? Shell.Cited : Shell.childCited(parentLifepath)) as CitedOf<RecordT>
   }
 
   /** The labelpath of `scoped`, refusing a scope of another bank */
@@ -192,7 +203,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   makeGetAsk(draft: BankAskDraft): GetAsk { return getAskOf({ ...draft, ...this.#scope, ...this.#bankFields() }) }
 
   /** The list ask for the children of the Thing at `draft.labelpath` in this bank. */
-  makeListAsk(draft: BankAskDraft): ListAsk { return listAskOf({ ...draft, ...this.#scope, ...this.#bankFields() }) }
+  makeListAsk(draft: Omit<BankAskDraft, 'ifAbsent'>): ListAsk { return listAskOf({ ...draft, ...this.#scope, ...this.#bankFields() }) }
 
   /** The put ask writing `draft.record` over `draft.cited`, in this bank. */
   makePutAsk<RecordT extends ThingRecord>(draft: Omit<PutAskDraft<RecordT>, 'track' | 'banktok'>): WriteAsk<RecordT> {
@@ -310,17 +321,23 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     }
   }
 
-  // A Thing is kept only once it has received its first record, so a refused record leaves no Thing behind.
+  // A Thing is kept before it receives its first record, so that a subscriber it tells finds it here, and is let go
+  // where that record is refused, so a refused record leaves no Thing behind.
   /** The events the Thing at `seen`'s labelpath returns for `seen` at `dispatch`, the Thing made first where there is none */
   #receiveAtThing(seen: SeenThing, dispatch: Dispatch): readonly VaultEvent[] {
     const { labelpath } = SeenChecks.seenCited.parseConsistent(seen, this.#scope)
     const proposed = Object.freeze({
       eventkind: 'item', ...this.#scope, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: undefined, agerankWas: undefined, ...dispatch, ...itemSeenOf(seen),
     } as const)
-    const thing  = this.#things.get(labelpath) ?? this.#makeThing(seen)
-    const events = thing.receive(proposed)
+    const kept  = this.#things.get(labelpath)
+    const thing = kept ?? this.#makeThing(seen)
     this.#things.set(labelpath, thing)
-    return events
+    try {
+      return thing.receive(proposed)
+    } catch (err) {
+      if (kept === undefined) { this.#things.delete(labelpath) }
+      throw err
+    }
   }
 
   /** Tell `news` to every listener's `onBadNews`. */
@@ -343,7 +360,7 @@ function isStored(record: Adoptable<ThingRecord> | undefined): record is ThingRe
 function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
 // --
 
-// == [Records of an answer]: rootsOf, bankOfWorld, gotRecordsOf, writtenRecordsOf, bornRecordsOf
+// == [Records of an answer]: rootsOf, bankOfWorld, gotRecordsOf, writtenRecordsOf, listedRecordsOf, bornRecordsOf
 
 // The world and tracked of one step agree, so a root they both carry is told once: its Thing drops the second.
 // Unspecified for a missing or damaged row: notes/wontfix.md.
@@ -369,6 +386,12 @@ function gotRecordsOf(answer: GetThingAnswer): SeenThing[] {
 /** The record a write's `answer` carries of its own Thing: the Thing written or found, or a refusal's dbhas, the shell where none is stored, none where the verb threw. */
 function writtenRecordsOf(answer: WriteThingAnswer): SeenThing[] {
   if (answer.ok) { return [answer.val] }
+  return (answer.dbhas === null) ? [] : [answer.dbhas]
+}
+
+/** The records a list's `answer` carries of its own: the parent and each child listed, or a refusal's dbhas, none where it names none or the verb threw. */
+function listedRecordsOf(answer: ListThingsAnswer): SeenThing[] {
+  if (answer.ok) { return [...answer.parentage, ...answer.deltas] }
   return (answer.dbhas === null) ? [] : [answer.dbhas]
 }
 

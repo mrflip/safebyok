@@ -379,7 +379,7 @@ and `discard` has always emptied every input of the draft. Ruled by the Coach, 2
 
 ### A stage change that reveals a suspending subtree shows its fallback
 
-The bank's stage reaches React through `useSyncExternalStore` (`safebyok-react-lean`, `useBank`). React's manual: an
+The bank's stage reaches React through `useSyncExternalStore` (`safebyok-react-lean`, `useWorld`). React's manual: an
 update from an external store is never a transition. So when an unlock, or any other stage change, first renders a
 subtree that suspends on a record, React shows that subtree's `Suspense` fallback, and a host cannot have it wait
 behind the screen before by wrapping the change in `startTransition`.
@@ -457,7 +457,7 @@ costs any. Ruled by the Coach, 2026-11-22.
 * alternatives:
   - take the secret fields out in the giver before it looks for the bank: a step in every attempt, for a form that is
     not shown at this stage.
-* workaround: show each form only at its own stage (`useBank().stage`), as the kit's forms are documented.
+* workaround: show each form only at its own stage (`useWorld().stage`), as the kit's forms are documented.
 
 Steps to reproduce: render an unlock form at stage `unborn`, or before the device's sign-in answers; type a passphrase; submit.
 

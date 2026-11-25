@@ -130,15 +130,15 @@ describe("bank.sweep() and device.sweep(), over the vaults made on the bank", ()
     const onBadNews = vi.fn()
     const { device } = await TH.buildBornVault({ device: TH.makeDevice({}, { vaultDB, onBadNews }) })
     expect(() => device.sweep()).not.to.throw()
-    expect(device.getSnapshot().bank).to.include({ stage: 'swept' })
+    expect(device.world.getSnapshot()).to.include({ stage: 'swept' })
     await TH.eventually(() => onBadNews.mock.calls.length === 1)
     expect(onBadNews.mock.calls.map(([badNews]) => (badNews as BadNews).news.refusalkind)).to.deep.equal(['unexpected_error'])
   })
 
-  it("tell the bank's subscribers once, and nothing after", async () => {
+  it("tell the world's subscribers once, and nothing after", async () => {
     const { bank, device } = await TH.buildBornVault()
     const listener = vi.fn()
-    bank.subscribe(listener)
+    bank.device.world.subscribe(listener)
     bank.sweep()
     bank.lock()
     bank.dismissUnlock()
@@ -480,7 +480,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     bank.lock()
     const fn = vi.fn(({ whisper }: BoxUnsealed) => String(whisper['apiKey']))
     const using = vault.withWhisper(Openai, fn)
-    expect(bank.getSnapshot().isUnlockWanted).to.be.true
+    expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.true
     expect(fn).not.toHaveBeenCalled()
     await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await using).to.equal('sk-test-0000')
@@ -497,7 +497,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const using = other.withWhisper(Openai, ({ revseq }) => revseq)
     await vi.advanceTimersByTimeAsync(0)
     expect(boxGetsOf(asked)).to.equal(0)
-    expect(other.bank.getSnapshot().isUnlockWanted).to.be.true
+    expect(other.bank.device.world.getSnapshot().isUnlockWanted).to.be.true
     await other.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await using).to.equal(0)
     expect(boxGetsOf(asked)).to.equal(1)
@@ -509,7 +509,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     bank.lock()
     const fn = vi.fn()
     const refused = TH.expectRefusal(vault.withWhisper(Openai, fn), 'absent_box')
-    expect(bank.getSnapshot().isUnlockWanted).to.be.true
+    expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.true
     await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     await refused
     expect(fn).not.toHaveBeenCalled()
@@ -572,7 +572,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await using).to.equal('done')
     const kept   = device.vaultTsqClient.getQueryCache().getAll().map(({ state }) => state.data)
-    const traces = JSON.stringify([boxAt(vault)!.pickle(), kept, bank.getSnapshot(), device.getSnapshot()])
+    const traces = JSON.stringify([boxAt(vault)!.pickle(), kept, device.world.getSnapshot()])
     expect(traces).to.include(Openai).and.not.include('sk-test-0000')
   })
 
@@ -582,7 +582,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     await TH.expectRefusal(vault.withWhisper(Openai, undefined as never), 'bad_record')
     await TH.expectRefusal(vault.withWhisper(Openai, 'apiKey' as never), 'bad_record')
     await TH.expectRefusal(vault.withWhisper('gate' as never, () => undefined), 'bad_record')
-    expect(bank.getSnapshot().isUnlockWanted).to.be.false
+    expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.false
   })
 
   it("refuses the root box's labelpath, wanting no unlock and fetching nothing", async () => {
@@ -592,7 +592,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const err = await TH.expectRefusal(vault.withWhisper('box', () => undefined), 'bad_record')
     expect(err.message).to.include(Phrases.VaultBoxIsRoot)
     expect(fetched).not.toHaveBeenCalled()
-    expect(bank.getSnapshot().isUnlockWanted).to.be.false
+    expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.false
   })
 })
 
@@ -621,7 +621,7 @@ describe("vault.withUnlockedWhisper(labelpath, fn)", () => {
     const asked = vi.spyOn(bank.device.vaultDB, 'tryGetThing')
     const fn = vi.fn()
     await TH.expectRefusal(vault.withUnlockedWhisper(Openai, fn), 'bank_locked')
-    expect(bank.getSnapshot().isUnlockWanted).to.be.false
+    expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.false
     expect(boxGetsOf(asked)).to.equal(0)
     expect(fn).not.toHaveBeenCalled()
   })
@@ -640,6 +640,34 @@ describe("vault.withUnlockedWhisper(labelpath, fn)", () => {
     const fn = vi.fn()
     await TH.expectRefusal(vault.withUnlockedWhisper(Openai, fn), 'absent_box')
     expect(fn).not.toHaveBeenCalled()
+  })
+
+  it("runs on the box it holds where storage is out of reach, the box's item showing the refusal beside its record", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    const box = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const queryKey = VaultTSQ.itemQueryKeyOf(openaiScopeOf(bank))
+    await bank.device.vaultTsqClient.invalidateQueries({ queryKey })
+    const asked = refuseGets(bank)
+    expect(await vault.withUnlockedWhisper(Openai, ({ whisper }) => String(whisper['apiKey']))).to.equal('sk-test-0000')
+    expect(boxGetsOf(asked)).to.equal(1)
+    expect(bank.device.vaultTsqClient.getQueryState(queryKey)).to.deep.include({ status: 'error', data: box })
+    expect(bank.device.vaultTsqClient.getQueryState(queryKey)?.error).to.include({ refusalkind: 'storage_unavailable' })
+  })
+
+  it("rejects with any other refusal of the get, for a box it holds, never calling fn", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    await bank.device.vaultTsqClient.invalidateQueries({ queryKey: VaultTSQ.itemQueryKeyOf(openaiScopeOf(bank)) })
+    refuseGets(bank, Throwers.storageIssue())
+    const fn = vi.fn()
+    await TH.expectRefusal(vault.withUnlockedWhisper(Openai, fn), 'storage_issue')
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it("rejects with the get's refusal for a box it has seen nothing of", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    refuseGets(bank)
+    await TH.expectRefusal(vault.withUnlockedWhisper(Openai, () => undefined), 'storage_unavailable')
   })
 
   it("refuses an fn that is not a function, or a labelpath that is not a box's", async () => {
@@ -697,7 +725,7 @@ describe("vault.forceTimelyUnlocked(labelpath, opts)", () => {
     bank.lock()
     await TH.expectRefusal(vault.forceTimelyUnlocked(Openai, { staleTime: -1 }), 'bad_record')
     await TH.expectRefusal(vault.forceTimelyUnlocked('gate' as never), 'bad_record')
-    expect(bank.getSnapshot().isUnlockWanted).to.be.false
+    expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.false
   })
 })
 
@@ -1040,8 +1068,7 @@ function boxGetsOf(asked: { mock: { calls: [GetAsk][] } }): number {
   return asked.mock.calls.filter(([ask]) => ask.labelpath === Openai).length
 }
 
-/** Make `bank`'s vaultDB refuse every get from now on, `storage_unavailable`, and return the spy that saw them. */
-function refuseGets(bank: Bank) {
-  const refusal = Throwers.storageUnavailable(new Error('connection refused'))
+/** Make `bank`'s vaultDB refuse every get from now on with `refusal`, by default `storage_unavailable`, and return the spy that saw them. */
+function refuseGets(bank: Bank, refusal = Throwers.storageUnavailable(new Error('connection refused'))) {
   return vi.spyOn(bank.device.vaultDB, 'tryGetThing').mockImplementation((ask) => Promise.resolve(refusedAnswerOf(ask, refusal)))
 }

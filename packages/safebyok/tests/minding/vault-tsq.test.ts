@@ -112,7 +112,7 @@ describe("VaultTSQ's writer, on each event the VaultMinder tells", () => {
 
   it("makes no item of a box known only sparse", async () => {
     const world = await tsqWorldOf(new MemoryVaultDB())
-    world.notify(noticeOf(Thing.sparseOf(Box0)))
+    world.notify(noticeOf(TH.boxSparseOf(Box0)))
     expect(itemQueryAt(world)).to.be.undefined
   })
 
@@ -120,7 +120,7 @@ describe("VaultTSQ's writer, on each event the VaultMinder tells", () => {
     const world = await worldWithBox()
     const held  = boxHeldIn(world)
     const asked = vi.spyOn(world.vaultDB, 'tryGetThing')
-    world.notify(noticeOf(Thing.sparseOf(Box1)))
+    world.notify(noticeOf(TH.boxSparseOf(Box1)))
     expect(world.sorted.thingAt(TH.BoxScope)?.agekind).to.eq('cold')
     expect(itemQueryAt(world)?.state).to.deep.include({ data: held, isInvalidated: true })
     expect(asked).not.toHaveBeenCalled()
@@ -129,7 +129,7 @@ describe("VaultTSQ's writer, on each event the VaultMinder tells", () => {
   it("sets null as an item, invalidated, at the time it was read, when a newer life is known only sparse", async () => {
     const world   = await worldWithBox()
     const read_tc = readTcNow()
-    world.notify(noticeOf(Thing.sparseOf(Reborn), read_tc))
+    world.notify(noticeOf(TH.boxSparseOf(Reborn), read_tc))
     expect(world.sorted.thingAt(TH.BoxScope)?.agekind).to.eq('bare')
     expect(itemQueryAt(world)?.state).to.deep.include({ data: null, status: 'success', isInvalidated: true, dataUpdatedAt: readAtOf(read_tc) })
   })
@@ -137,14 +137,14 @@ describe("VaultTSQ's writer, on each event the VaultMinder tells", () => {
   it("sets null over a tombstone's item, invalidated, when a newer life is known only sparse", async () => {
     const world = await worldWithBox()
     world.notify(noticeOf(TH.boxTombOf(Box0)))
-    world.notify(noticeOf(Thing.sparseOf(Reborn)))
+    world.notify(noticeOf(TH.boxSparseOf(Reborn)))
     expect(itemQueryAt(world)?.state).to.deep.include({ data: null, isInvalidated: true })
   })
 
   it("makes no item, when a newer life is known only sparse, of a box whose item holds nothing", async () => {
     const world = await worldWithBox()
     world.queryClient.removeQueries({ queryKey: BoxKey })
-    world.notify(noticeOf(Thing.sparseOf(Reborn)))
+    world.notify(noticeOf(TH.boxSparseOf(Reborn)))
     expect(world.sorted.thingAt(TH.BoxScope)?.agekind).to.eq('bare')
     expect(itemQueryAt(world)).to.be.undefined
   })
@@ -196,7 +196,7 @@ describe("VaultTSQ's items", () => {
 
   it("refuse stale_read where storage answers an earlier life than one known only sparse, and show an observer null", async () => {
     const world = await worldWithBox()
-    world.notify(noticeOf(Thing.sparseOf(Reborn)))
+    world.notify(noticeOf(TH.boxSparseOf(Reborn)))
     const err = await TH.expectRefusal(world.vaultTSQ.getOnce(TH.BoxScope))
     expect(err.refusalkind).to.eq('stale_read')
     expect(new QueryObserver(world.queryClient, { queryKey: BoxKey }).getCurrentResult()).to.deep.include({ status: 'error', data: null })
@@ -209,7 +209,7 @@ describe("VaultTSQ's items", () => {
 
   it("are stale while cold, after a get answers with the record held, with nothing invalidated", async () => {
     const world = await worldWithBox()
-    world.notify(noticeOf(Thing.sparseOf(Box1)))
+    world.notify(noticeOf(TH.boxSparseOf(Box1)))
     expect(await world.vaultTSQ.getOnce(TH.BoxScope)).to.deep.equal(boxHeldIn(world))
     expect(world.sorted.thingAt(TH.BoxScope)?.agekind).to.eq('cold')
     expect(itemQueryAt(world)?.state.isInvalidated).to.eq(false)
@@ -221,7 +221,7 @@ describe("VaultTSQ's items", () => {
     const observer = new QueryObserver(world.queryClient, { queryKey: BoxKey })
     const stop     = observer.subscribe(noop)
     cheatStored(world.vaultDB, Reborn)
-    world.notify(noticeOf(Thing.sparseOf(Reborn)))
+    world.notify(noticeOf(TH.boxSparseOf(Reborn)))
     expect(observer.getCurrentResult()).to.deep.include({ data: null, fetchStatus: 'fetching' })
     await vi.waitFor(() => { expect(observer.getCurrentResult().data).to.deep.equal(boxHeldIn(world)).and.deep.equal(Reborn) })
     stop()
@@ -246,7 +246,7 @@ describe("VaultTSQ.itemQueryOptions", () => {
 
   it("seeds nothing for a box known only sparse in its newest life, or not known at all", async () => {
     const world = await worldWithBox()
-    world.notify(noticeOf(Thing.sparseOf(Reborn)))
+    world.notify(noticeOf(TH.boxSparseOf(Reborn)))
     expect(world.vaultTSQ.itemQueryOptions(TH.BoxScope)).to.deep.equal({ queryKey: BoxKey })
     const otherScope = { ...TH.ThingBank, labelpath: 'box/anthropic' }
     expect(world.vaultTSQ.itemQueryOptions(otherScope)).to.deep.equal({ queryKey: VaultTSQ.itemQueryKeyOf(otherScope) })
@@ -259,7 +259,7 @@ describe("VaultTSQ.itemQueryOptions", () => {
     const stop     = observer.subscribe(noop)
     expect(observer.getCurrentResult().data).to.eq(boxHeldIn(world))
     cheatStored(world.vaultDB, Reborn)
-    world.notify(noticeOf(Thing.sparseOf(Reborn)))
+    world.notify(noticeOf(TH.boxSparseOf(Reborn)))
     expect(observer.getCurrentResult()).to.deep.include({ data: null, fetchStatus: 'fetching' })
     await vi.waitFor(() => { expect(observer.getCurrentResult().data).to.deep.equal(boxHeldIn(world)).and.deep.equal(Reborn) })
     stop()

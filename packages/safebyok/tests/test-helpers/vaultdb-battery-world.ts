@@ -18,7 +18,7 @@ export function describeVaultDBWorld({ fresh, bornBank, withGate, boxesBorn, row
       const vaultDB = await withGate()
       expect(await vaultDB.tryGetThing(getAskAt('gate'))).to.deep.include({ ok: true, world: null })
       expect(await vaultDB.tryGetThing(getAskAt('box'))).to.deep.include({ ok: true, act: 'gotvoid', world: null })
-      expect(await vaultDB.tryListThings(listAskAt('box', 'nil'))).to.deep.include({ ok: true, world: null })
+      expect(await vaultDB.tryListThings(listAskAt('box'))).to.deep.include({ ok: false, world: null })
     })
 
     it("is the bank and its main gate, to a get and a listing", async () => {
