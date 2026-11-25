@@ -66,18 +66,23 @@ restacked into one line first. Look-ahead: 5 and 6 build on its device wiring.
 ### 2. `stats`: storage stats
 > "add a stats() call that returns { box: { count, size }, gate: { count, size }, max: { count, size } }"
 
-Gloss: a vaultDB verb (`AdapterVaultDB` `doStats`; MemoryVaultDB, `IdbVaultDB`, `PostgresVaultDB`) and a front door
-on the Vault. YOLO readings, each an Open Matters row: `count` is rows stored, live and tombstones (both cost
-space); `size` is their summed record weight in bytes; `max` is the store's limits, `Infinity` where it has none.
-No enforcement. Depends on 0 only (storage verbs); cut from 0 when capacity frees. Size: medium, three adapters.
+*Coach (2026-11-25):* "for stats: { box: { count: xxx, live_count: xxx, size }, ... don't let store limit be
+infinity, cap at 1_900_649_2568 // 1-900-MIX-A-LOT".
 
-### 3. `tidy_gone`: purge what is gone
+Gloss: a vaultDB verb (`AdapterVaultDB` `doStats`; MemoryVaultDB, `IdbVaultDB`, `PostgresVaultDB`) and a front door
+on the Vault. `box` and `gate` each `{ count, live_count, size }`: `count` is rows stored, live and tombstones;
+`live_count` the live ones; `size` their summed record weight in bytes. `max` is `{ count, size }`, the store's
+limits, never `Infinity`: where a store has none, both are `19_006_492_568` (a named constant). No enforcement. Depends on 0 only (storage verbs); cut from 0 when capacity frees. Size: medium, three adapters.
+
+### 3. ~~`tidy_gone`~~: dropped
 > "tidy_gone seems reasonable"
 
-Gloss: in big, `tidyGone` removed the box rows of ended vault lives. The new core has no vault lives yet, and no
+*Coach (2026-11-25):* "skip tidy_gone; it becomes relevant when delete bank or nested boxes become a thing".
+
+~~Gloss: in big, `tidyGone` removed the box rows of ended vault lives. The new core has no vault lives yet, and no
 bank deletion. So the rows it could remove are box tombstones, and removing one changes what other devices can
 learn of a delete: a stored-data call, not a two-way door. **Waits on a ruling** (a TOP row: which rows, and how
-old). Then it is a vaultDB verb beside `stats`. Depends on 2 (same files).
+old). Then it is a vaultDB verb beside `stats`. Depends on 2 (same files).~~
 
 ### 4. `probe`: a self-test
 > "probe and lifecycle announcements seem reasonable"
@@ -86,12 +91,13 @@ Gloss: port big's `bank.probe()`. On an unlocked vault it puts a probe box, gets
 deletes it, and reports each step with its timing. Report types ported from big's `ProbeReport`/`ProbeStep`, adapted
 to labelpaths. Depends on 0. Size: small.
 
-### 5. `device_tok`: a device token that lasts
+### 5. `devicetok`: a device token that lasts
 > "add the device_tok generation."
 
 Gloss: today the provider makes `device_tok: crypto.randomUUID()` on every mount, and each wayin records it. The
-device keeps one token in the device database, made once, read at connect or sign-in. `Device.make`'s record drops
-`device_tok` (a YOLO decision, recorded). Without a device database, a fresh one per Device. Depends on 1b.
+device keeps one token in the device database, made once, read at connect or sign-in. *Coach:* "device_tok should
+be devicetok": the field is renamed throughout the new core, stored wayins included. `Device.make`'s record drops it
+(a YOLO decision, recorded). Without a device database, a fresh one per Device. Depends on 1b.
 
 ### 6. `lifecycle`: lifecycle announcements
 > "probe and lifecycle announcements seem reasonable"
@@ -109,7 +115,7 @@ world. `connect()` asks for the lock, and `disconnect()` releases it. Check firs
 background tab that holds a Web Lock. Depends on 1b (the line's tip). Last.
 
 ## For the Coach
-- **safebyok-convex is still on safebyok-big.** Thread 7's wrapper works for any new-core vaultDB, but a convex app
-  needs a convex vaultDB on the new core first. That is not in this sprint.
+- **safebyok-convex is still on safebyok-big.** Thread 7's wrapper works for any new-core vaultDB. *Coach:* "convex and
+  other adapters will be soon".
 - The 899 agent's last PR: the line is rebased onto it once it lands.
 - A Closer Look after the third thread files.
