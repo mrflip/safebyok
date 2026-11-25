@@ -4,7 +4,7 @@
 import 'fake-indexeddb/auto'
 import { noop } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { type StatsAnswer, type StoreLimits, type VaultEvent, Shell, StoreLimitCap, StoreQuotaLeast, VaultError } from 'safebyok/storage'
+import { type StatsAnswer, type StoreLimits, type VaultEvent, Shell, StoreLimitCap, StoreLimitFloor, VaultError } from 'safebyok/storage'
 import { IdbVaultDB } from '../src/idb-vault-db'
 import { VaultDBVersion } from '../src/vault-shelf'
 import * as TH from './test-helpers'
@@ -103,11 +103,16 @@ describe("IdbVaultDB's stats", () => {
 })
 
 describe("IdbVaultDB's quota at open", () => {
-  it("refuses storage_blocked on opening its database where the browser's quota is under StoreQuotaLeast", async () => {
-    vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: StoreQuotaLeast - 1 }) } })
+  it("refuses storage_blocked on opening its database where the browser's quota is under StoreLimitFloor", async () => {
+    vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: StoreLimitFloor - 1 }) } })
     const idbVaultDB = TH.makeIdbVaultDB()
     const refusal = await TH.expectBad(idbVaultDB.tryGetThing(TH.getGateAskOf()), 'storage_blocked')
-    expect(refusal.message).to.match(/withholds/)
+    expect(refusal.message).to.match(/offers the page 4999 bytes/)
+  })
+
+  it("refuses storage_blocked at the world read, the first call a device makes at sign-in, where the quota is under StoreLimitFloor", async () => {
+    vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: StoreLimitFloor - 1 }) } })
+    await TH.expectBad(TH.makeIdbVaultDB().tryGetWorld(TH.getWorldAskOf()), 'storage_blocked')
   })
 
   it("refuses a quota of 0", async () => {
@@ -115,8 +120,8 @@ describe("IdbVaultDB's quota at open", () => {
     await TH.expectBad(TH.makeIdbVaultDB().tryStats(TH.statsAskOf()), 'storage_blocked')
   })
 
-  it("opens its database where the browser's quota is StoreQuotaLeast", async () => {
-    vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: StoreQuotaLeast }) } })
+  it("opens its database where the browser's quota is StoreLimitFloor", async () => {
+    vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: StoreLimitFloor }) } })
     await TH.expectGood(TH.makeIdbVaultDB().tryGetThing(TH.getGateAskOf()))
   })
 

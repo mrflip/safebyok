@@ -4,19 +4,21 @@ import type * as Z from 'zod'
 import { Validator } from 'safebyok-big/internals'
 import type { Labelpath } from './primitives'
 
-// == [Limits]: StoreLimitCap, StoreLimitFloor, StoreQuotaLeast, storeLimitsOf
+// == [Limits]: StoreLimitCap, StoreLimitLeastBoxes, StoreLimitFloor, storeLimitsOf
 
 // 1-900-MIX-A-LOT: a finite number past any store's limit, and well inside a safe integer.
 /** The most a store's limit is reported as, and the limit reported where a store sets none: never `Infinity`. */
 export const StoreLimitCap = 19_006_492_568
 
+// The Coach: a store must allow two boxes and StoreLimitFloor bytes, or we can't help it; no store may offer less.
+/** The fewest boxes a store may allow. */
+export const StoreLimitLeastBoxes = 2
+
 // notes/reference-sizes.md: a medium box 1,087 bytes, a gate with a passphrase and a passkey wayin 1,029, an empty root box 566:
 // 2,682 bytes, plus half again is 4,023, rounded up to the next 1000.
-/** The size in bytes below which a store cannot hold even a bank's first few Things. */
+/** The fewest bytes a store may allow: below this it cannot hold even a bank's first few Things. */
 export const StoreLimitFloor = 5000
 
-/** The smallest quota a browser may give a page for an IndexedDB store to open: twice {@link StoreLimitFloor}. */
-export const StoreQuotaLeast = 2 * StoreLimitFloor
 
 /** The limits a store reports: each of `limits` given, capped at {@link StoreLimitCap}, and the cap for each left out. */
 export function storeLimitsOf(limits: Partial<StoreLimits> = {}): StoreLimits {
@@ -30,7 +32,10 @@ export function storeLimitsOf(limits: Partial<StoreLimits> = {}): StoreLimits {
 /** The checks of a bank's storage stats. Each refuses `storage_issue`: a concrete adapter that reports a bad one is broken. */
 export const VaultStatsChecks = Validator.Checkers('storage_issue', ({ obj, uint }) => {
   const thingkindStats = obj({ count: uint, live_count: uint, size: uint }).strict()
-  const storeLimits    = obj({ count: uint.max(StoreLimitCap), size: uint.max(StoreLimitCap) }).strict()
+  const storeLimits    = obj({
+    count: uint.min(StoreLimitLeastBoxes).max(StoreLimitCap),
+    size:  uint.min(StoreLimitFloor).max(StoreLimitCap),
+  }).strict()
   return {
     thingkindStats,
     storeLimits,
@@ -45,7 +50,7 @@ export const VaultStatsChecks = Validator.Checkers('storage_issue', ({ obj, uint
  */
 export type ThingkindStats = Readonly<Z.infer<typeof VaultStatsChecks.thingkindStats>>
 
-/** The most a store holds, as it reports it: `count`, of Things, and `size`, in bytes. Each is at most {@link StoreLimitCap}, which a store with no limit reports. */
+/** The most a store holds, as it reports it: `count`, of Things, and `size`, in bytes. `count` is at least {@link StoreLimitLeastBoxes} and `size` at least {@link StoreLimitFloor}; each is at most {@link StoreLimitCap}, which a store with no limit reports. */
 export type StoreLimits = Readonly<Z.infer<typeof VaultStatsChecks.storeLimits>>
 
 /** A bank's storage stats: its boxes and its gates as stored, and the store's limits under `max`. Nothing refuses a write for being over a limit. */

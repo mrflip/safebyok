@@ -33,7 +33,7 @@ export {
 } from './shapes/shapes-answers'
 export { type VaultDB, isVaultDB } from './storage/vault-db'
 // A bank's storage stats, as `tryStats` answers them, and how a concrete adapter measures them.
-export { type FiledRaw, type StoreLimits, type ThingkindStats, type VaultStats, StoreLimitCap, StoreQuotaLeast, VaultStatsChecks, storeLimitsOf } from './shapes/shapes-vault-stats'
+export { type FiledRaw, type StoreLimits, type ThingkindStats, type VaultStats, StoreLimitCap, StoreLimitFloor, StoreLimitLeastBoxes, VaultStatsChecks, storeLimitsOf } from './shapes/shapes-vault-stats'
 export { rowWeightOf, vaultStatsOf } from './storage/vault-stats'
 // The events a vaultDB's watcher is notified with.
 export {

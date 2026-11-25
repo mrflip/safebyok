@@ -36,21 +36,26 @@ then "for stats: { box: { count: xxx, live_count: xxx, size }, ... don't let sto
     the size, and the cap as the count. The quota is the origin's, not the bank's. It is read before the IDB transaction
     opens (a non-IDB await would commit it). A rejected estimate refuses (`storage_unavailable`, as any IDB failure
     does); no `navigator.storage` reports the cap.
-  * `storeLimits` keeps accepting 0 (`uint.max(cap)`). The floor belongs to IdbVaultDB's open, not to the shape: an
-    adapter may report any limit by the shape's interface, and Memory and Postgres report the cap.
+  * **`storeLimits` refuses a limit under two boxes or under 5,000 bytes** (the Coach: "you must allow two boxes and
+    5000 bytes or we can't help you"): `count: uint.min(StoreLimitLeastBoxes).max(cap)`, `size: uint.min(StoreLimitFloor).max(cap)`.
+    A custom adapter that reports such a limit from `doStats` meets `storage_issue` ("a concrete adapter that reports a bad
+    one is broken"), from `AdapterVaultDB.tryStats`. Today's adapters report the cap for the count, so only IndexedDB's
+    size can trip it, and its first-use check refuses `storage_blocked` before `doStats` runs.
   * **`vault.stats()` needs no unlock** (`#lock-is-intent`): it refuses only while the roots are not live or the device
     is disabled, as every vault read does through `#bank`.
-  * **A quota too small refuses at open** (the Coach's ruling: "continuing to operate with a limit of 0 is surprising
-    behavior"). `StoreLimitFloor = 5_000` (arithmetic from `notes/reference-sizes.md` in the `//` above it, beside
-    `StoreLimitCap`) and `StoreQuotaLeast = 2 * StoreLimitFloor` = 10,000, in shapes-vault-stats.ts. IdbVaultDB wraps its
-    shelf in `shelfRefusingSmallQuota`: the first use of the shelf reads `navigator.storage.estimate()` once and refuses
-    `storage_blocked` (thrower `storeQuotaTooSmall`, phrase `StoreQuotaTooSmall`) under the least; later uses go straight
-    through. The constructor is synchronous, and idb-keyval opens its database lazily at the first transaction, so the
-    shelf's first use is "when it first opens". No `navigator.storage`: nothing is checked. A failed check is not
-    remembered, so the next use reads the estimate again; a rejected estimate refuses `storage_unavailable` as before.
-    `doStats` still reads the quota itself, for the limit it reports. Memory and Postgres are untouched. Set aside: a
-    check in each `do*` verb (a guard on every verb), and one in `doStats` alone (a store that opens would still run
-    with a quota of 0 for every other verb).
+  * **A quota too small refuses at startup** (the Coach: "A quota less than 2 or that size should refuse at start",
+    meaning "you must allow two boxes and 5000 bytes or we can't help you"; and "at startup" is "at the earliest
+    convenience", not when someone first stores). `StoreLimitFloor = 5_000` (arithmetic from `notes/reference-sizes.md`
+    in the `//` above it) and `StoreLimitLeastBoxes = 2`, in shapes-vault-stats.ts; the earlier `StoreQuotaLeast` (10,000) is gone.
+    IdbVaultDB wraps its shelf in `shelfRefusingSmallQuota`: the quota is only available async, so the constructor cannot
+    check it; the earliest point is the shelf's first use of any kind, which at startup is the world read at sign-in
+    (`tryGetWorld`), not a store. That first use reads `navigator.storage.estimate()` once and refuses `storage_blocked`
+    (thrower `storeQuotaTooSmall`, phrase `StoreQuotaTooSmall`) under `StoreLimitFloor`; later uses go straight through. No
+    `navigator.storage`: nothing is checked. A failed check is not remembered, so the next use reads the estimate again; a
+    rejected estimate refuses `storage_unavailable` as before. The phrase states only the quota offered and the least a
+    vault needs. `doStats` still reads the quota itself, for the limit it reports. Memory and Postgres are untouched.
+    Set aside: a check in each `do*` verb (a guard on every verb), one in `doStats` alone (a store that opens would
+    still run with a quota of 0 for every other verb), and a check in the constructor (the estimate is async).
   * **No enforcement**: nothing refuses a write over a limit.
 * **Deviations**: none from the handoff.
 * **Discoveries**:

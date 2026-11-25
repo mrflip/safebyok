@@ -4,7 +4,7 @@ import { AnswerNotMade } from '../../src/phrases'
 import { AdapterVaultDB } from '../../src/storage/adapter-vault-db'
 import type { Actual, BirthBankActual, GetWorldActual, GotActual, ListThingsActual, Received, StatsActual } from '../../src/shapes/shapes-answers'
 import type { BirthBankAsk, GetAsk, GetWorldAsk, ListAsk, StatsAsk, ThingWatchScope, WriteAsk } from '../../src/shapes/shapes-asks'
-import { StoreLimitCap } from '../../src/shapes/shapes-vault-stats'
+import { StoreLimitCap, StoreLimitFloor, StoreLimitLeastBoxes } from '../../src/shapes/shapes-vault-stats'
 import { Thing } from '../../src/models/thing'
 import { Shell } from '../../src/shapes/shapes-thing'
 import type { VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
@@ -136,9 +136,17 @@ describe("AdapterVaultDB.tryStats(ask), a store that reports oddly", () => {
     expect(await vaultDB.tryStats(TH.statsAskOf())).to.deep.include({ ok: true, act: 'got', val: statsOf({}) })
   })
 
-  it("refuses, as a broken store, stats with a field missing, a count that is no whole number, or a limit of Infinity or past the cap", async () => {
+  it("answers a limit of exactly two boxes and the floor in bytes", async () => {
+    const stats = statsOf({ max: { count: StoreLimitLeastBoxes, size: StoreLimitFloor } })
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'got', stats }))
+    expect(await vaultDB.tryStats(TH.statsAskOf())).to.deep.include({ ok: true, val: stats })
+  })
+
+  it("refuses, as a broken store, stats with a field missing, a count that is no whole number, or a limit of Infinity, past the cap, or under two boxes or the floor in bytes", async () => {
     for (const stats of [statsOf({ gate: undefined }), statsOf({ box: { ...Counted, size: 1.5 } }), statsOf({ box: { ...Counted, live_count: -1 } }),
-      statsOf({ max: { count: Infinity, size: StoreLimitCap } }), statsOf({ max: { count: StoreLimitCap, size: StoreLimitCap + 1 } }), statsOf({ extra: 1 })]) {
+      statsOf({ max: { count: Infinity, size: StoreLimitCap } }), statsOf({ max: { count: StoreLimitCap, size: StoreLimitCap + 1 } }),
+      statsOf({ max: { count: StoreLimitLeastBoxes - 1, size: StoreLimitCap } }), statsOf({ max: { count: StoreLimitCap, size: StoreLimitFloor - 1 } }),
+      statsOf({ extra: 1 })]) {
       const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'got', stats }))
       await TH.expectBad(vaultDB.tryStats(TH.statsAskOf()), 'storage_issue')
     }
