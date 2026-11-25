@@ -174,8 +174,8 @@ export abstract class AdapterVaultDB implements VaultDB {
    * Records a datastore pushes together are notified one at a time.
    * A Thing that fails its checks or belongs to another bank goes to `onBadNews` instead of `onNotice`, as does an error `onNotice` throws.
    */
-  watch(scope: ThingWatchScope, onNotice: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
-    const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews })
+  watch(scope: ThingWatchScope, onNotice: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void, onEnded: () => void = noop): () => void {
+    const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews, onEnded })
     // A notice handler that throws is a bug in the host's code, not trouble in storage.
     const notify = bulletproofHandlerOf(onNotice, { ifError: 'tell', transformer: Throwers.refusalOfThrown, onBadNews })
     return this.doWatch(bankScope, (received) => {
@@ -189,7 +189,7 @@ export abstract class AdapterVaultDB implements VaultDB {
         return
       }
       notify(event)
-    }, onBadNews)
+    }, onBadNews, onEnded)
   }
   // --
 
@@ -258,7 +258,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doStats(ask: StatsAsk): Helpers.Awaitable<StatsActual>
   /** Start watching the datastore: call `receive` with each changed Thing, one at a time ({@link Received}), and `onBadNews` with any trouble,
    * whether or not it ends the watch. Return a function that stops it. Left unwritten, for a datastore with no watch, it calls neither.
+   * Where the watch ends before its stop is called, call `onEnded` once, then `onBadNews` with why ({@link VaultDB.watch}).
    */
-  protected doWatch(_scope: ThingWatchScope, _receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void { return noop }
+  protected doWatch(_scope: ThingWatchScope, _receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void, _onEnded: () => void): () => void { return noop }
   // --
 }
