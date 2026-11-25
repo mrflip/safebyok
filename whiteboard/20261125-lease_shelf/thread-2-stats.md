@@ -1,6 +1,6 @@
 # Thread 2: stats (2026-11-25)
 
-Branch `20261125-stats`, PR (draft, opening), stacked on #900. Proved, per package: safebyok 2023 tests in 32 files,
+Branch `20261125-stats`, PR #905, stacked on #900. Proved, per package: safebyok 2023 tests in 32 files,
 safebyok-idb-lean 125, safebyok-postgres 372; tsc and lint clean in each. `pnpm justify` not yet run.
 
 The Coach's text: "add a stats() call that returns { box: { count, size }, gate: { count, size }, max: { count, size } }",
