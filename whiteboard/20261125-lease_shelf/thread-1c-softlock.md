@@ -1,7 +1,7 @@
 # Thread 1c: softlock (2026-11-25)
 
-Branch `20261125-softlock`, PR #902, stacked on #900 (thread 0, connect). Proved: `pnpm --filter safebyok test` 1992
-passed, lint and typecheck clean; `safebyok-react-lean` typecheck clean, 339 tests passed; `pnpm justify`
+Branch `20261125-softlock`, PR #902, stacked on #900 (thread 0, connect). Proved: `pnpm --filter safebyok test` 2013
+passed after the filing rebase onto #900 at f35aa35f0, lint and typecheck clean; `safebyok-react-lean` typecheck clean, 339 tests passed; `pnpm justify`
 green after the catch-up onto #900's tip, 8245 tests across 16 suites.
 
 * **Built**:
@@ -52,6 +52,12 @@ green after the catch-up onto #900's tip, 8245 tests across 16 suites.
     makes the gate look fresh until the clock catches up.
   - `TH.makeDevice` connects and signs in, so every test device runs a janitor; with the 10-minute default and real
     timers in a few files, nothing fired in the suite.
+  - **Filing rebase onto #900 at f35aa35f0** (which added `device.disable()`, renamed the stage `'swept'` to
+    `'disabled'`, and dropped a roots refresh at connect): conflicts in world.ts doc blocks and wontfix's disconnect
+    row, resolved to keep both sides. `World.disable()` disconnects, so it stops the janitor; `World.connect`'s
+    `isEnabled` guard and `#connectSignedIn` both stand; wontfix's row covers a janitor re-read across a disable too.
+    A test, "stops for good once the device is disabled", pins it. The janitor's stale-gate re-read stays the one
+    place freshness lives, since `connect()` now fetches nothing.
 
 * **For the Coach**:
   - Autolock is now at janitor granularity (10 min by default), and later where a background tab's timers are
