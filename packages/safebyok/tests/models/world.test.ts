@@ -192,7 +192,7 @@ describe("world.getSnapshot() and world.subscribe(listener)", () => {
     expect(world.getSnapshot().endCause).to.equal(device.endCause).and.include({ refusalkind: 'disabled' })
   })
 
-  it("leaves its snapshot unchanged once disabled, telling no subscriber of a lock, a connect, a disconnect or a second disable", async () => {
+  it("tells no subscriber once disabled", async () => {
     const { bank, device } = await TH.buildBornBank()
     const { world } = device
     device.disable()

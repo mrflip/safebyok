@@ -631,7 +631,7 @@ describe("device.connect() and device.disconnect()", () => {
 })
 
 describe("device.disable()", () => {
-  it("ends the device and its bank for good, locked and showing the stage 'disabled', stopping the watch; never throws, and a second call does nothing", async () => {
+  it("ends the device and its bank for good, once", async () => {
     const vaultDB = new MemoryVaultDB()
     const stop = vi.fn()
     vi.spyOn(vaultDB, 'watch').mockReturnValue(stop)

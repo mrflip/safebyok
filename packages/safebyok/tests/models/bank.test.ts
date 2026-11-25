@@ -289,7 +289,7 @@ describe("bank.lock() and bank.hostVault(vault)", () => {
     expect(hosted.connect).not.toHaveBeenCalled()
   })
 
-  it("disconnects each vault it hosts once as its device is disabled, and hosts no vault after", async () => {
+  it("disconnects each vault it hosts, once, as its device is disabled", async () => {
     const { bank, device } = await TH.buildBornBank()
     const hosted = { connect: vi.fn(), disconnect: vi.fn(() => { expect(bank.isEnabled).to.be.false }) }
     bank.hostVault(hosted)
@@ -301,7 +301,7 @@ describe("bank.lock() and bank.hostVault(vault)", () => {
 })
 
 describe("a bank whose device is disabled", () => {
-  it("is locked and disabled for good, with its device's end cause, evicting its lease once", async () => {
+  it("is locked and ended with its device's end cause", async () => {
     const { bank, device } = await TH.buildBornBank()
     const evict = vi.spyOn(Lease.prototype, 'evict')
     device.disable()
