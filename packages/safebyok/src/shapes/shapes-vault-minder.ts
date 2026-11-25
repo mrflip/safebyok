@@ -3,7 +3,7 @@
 import { type Errors, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { type CitedOf, type DelAskDraft, type PutAskDraft, AskChecks } from './shapes-asks'
-import type { EpochMillis } from './primitives'
+import type { EpochMillis, Labelpath } from './primitives'
 import { type ThingRecord, type VoidSentinel, ThingChecks, isLifepathDeep, isParityRight } from './shapes-thing'
 import { type ReadTc, type SeenThing, type VaultEvent, SeenChecks, isSeenForm, livenessVals, vaultEventkindVals } from './shapes-vault-event'
 import { BaseThing } from '../models/base-thing'
@@ -43,8 +43,8 @@ export interface VaultMinderOpts<ThingT extends ReceivingThing = ReceivingThing>
 export type VaultMinderListener = Readonly<{
   /** Hear `event`, of a record that is news. */
   hear: (event: VaultEvent) => void
-  /** Be told of `news`, trouble no caller is waiting on: a record that fails its checks, or what `hear` threw. */
-  onBadNews: (news: Errors.VaultError) => void
+  /** Be told of `news`, trouble no caller is waiting on: a record that fails its checks, or what `hear` threw. `labelpath` is the record's, or null where the trouble is of no one record. */
+  onBadNews: (news: Errors.VaultError, labelpath: Labelpath | null) => void
 }>
 
 /** What `VaultMinder.putOnce` writes: a put ask's draft, whose `cited` defaults to the citable of the Thing at the record's labelpath. */

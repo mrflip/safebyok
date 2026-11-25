@@ -545,6 +545,20 @@ describe("VaultMinder.thingAt(scoped)", () => {
   })
 })
 
+describe("VaultMinder's listeners, of bad news", () => {
+  it("are told the labelpath of a record its Thing refuses, and null for what their hear throws", () => {
+    const { vaultDB } = refusingOverQuietMemory()
+    const told: [string, string | null][] = []
+    vaultDB.listen({ hear: () => { throw new Error('host bug') }, onBadNews: (news, labelpath) => { told.push([news.refusalkind, labelpath]) } })
+    vaultDB.receive(rungOf(Revs.three))
+    expect(told).to.deep.equal([['unexpected_error', 'box/openai']])
+    told.length = 0
+    vaultDB.receive(rungOf(Revs.two))
+    expect(told.every(([, labelpath]) => labelpath === null)).to.equal(true)
+    expect(told.length).to.be.greaterThan(0)
+  })
+})
+
 describe("VaultMinder.carAt(scoped)", () => {
   it("holds the refusal its Thing last raised at a record, and when, and clears it at a record taken, keeping when", async () => {
     const { vaultDB, inner } = refusingOverQuietMemory()

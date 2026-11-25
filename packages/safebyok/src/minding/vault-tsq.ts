@@ -20,8 +20,8 @@ import { bankKeyHeadOf, labelsOf } from './query-keys'
 
 // == [VaultTSQ]: VaultTSQ
 
-// The writer, `#hear`, is the only code that changes an item or a listing: the queryFns answer what the Thing holds,
-// and nothing here acts on a query's success.
+// The writer, `#hear` and `#hearRefused`, is the only code that changes an item or a listing: the queryFns answer what
+// the Thing holds, and nothing here acts on a query's success.
 /** One bank's vault TSQ: its boxes under the root box, as items, and their listings, in a client it is handed.
  * An item is the box's live record, deep-equal to the one its Thing holds, or null where none is stored live. Across
  * revisions, a part of the record left unchanged stays the same object. Once the box is known only sparse in a newer life
@@ -68,7 +68,13 @@ export class VaultTSQ {
       gcTime:    Infinity,
     })
     // Synchronous on purpose: the VaultMinder tells an answer's records before its verb resolves.
-    this.#unlisten = vaultMinder.listen({ hear: (event) => { this.#hear(event) }, onBadNews })
+    this.#unlisten = vaultMinder.listen({
+      hear:      (event) => { this.#hear(event) },
+      onBadNews: (news, labelpath) => {
+        this.#hearRefused(labelpath)
+        onBadNews(news)
+      },
+    })
     Object.freeze(this)
   }
   // --
@@ -141,7 +147,7 @@ export class VaultTSQ {
   }
   // --
 
-  // == [The writer]: #hear, #hearLife
+  // == [The writer]: #hear, #hearLife, #hearRefused
 
   /** Bring the items up to date with `event`, and the listings with a `life` event. */
   #hear(event: VaultEvent): void {
@@ -176,6 +182,15 @@ export class VaultTSQ {
       void this.#queryClient.invalidateQueries({ queryKey: parentKey, exact: true }, { cancelRefetch: false })
     }
     void this.#queryClient.resetQueries({ queryKey: VaultTSQ.listQueryKeyOf(this.#scopeOf(labelpath)), exact: true })
+  }
+
+  // A refusal met by the item's own fetch lands while that fetch runs, so the refetch it asks for is that same fetch, and
+  // nothing loops.
+  /** Refetch the item of the box at `labelpath`, a record of which its Thing refused, so that its query shows the refusal beside its data. */
+  #hearRefused(labelpath: Labelpath | null): void {
+    if ((labelpath === null) || ! isItemLabelpath(labelpath)) { return }
+    const queryKey = VaultTSQ.itemQueryKeyOf(this.#scopeOf(labelpath))
+    void this.#queryClient.invalidateQueries({ queryKey, exact: true }, { cancelRefetch: false })
   }
   // --
 

@@ -68,7 +68,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     this.#vaultDB   = vaultDB
     this.#scope     = Object.freeze({ userid: bankScope.userid, banklabel: bankScope.banklabel })
     this.#makeThing = opts.makeThing
-    this.#unwatchWrapped = once(vaultDB.watch(bankScope, (notice) => { this.#tellNotice(notice) }, (news) => { this.#tellBadNews(news) }))
+    this.#unwatchWrapped = once(vaultDB.watch(bankScope, (notice) => { this.#tellNotice(notice) }, (news) => { this.#tellBadNews(news, null) }))
     Object.freeze(this)
   }
   // --
@@ -170,7 +170,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   async tryListOnce(labelpath: Labelpath): Promise<ListThingsAnswer> {
     const ask    = this.makeListAsk({ labelpath })
     const answer = await this.tryListThings(ask)
-    if (answer.damaged_rows.length > 0) { this.#tellBadNews(Throwers.childrenStoredDamaged(ask, answer.damaged_rows)) }
+    if (answer.damaged_rows.length > 0) { this.#tellBadNews(Throwers.childrenStoredDamaged(ask, answer.damaged_rows), null) }
     return answer
   }
 
@@ -278,7 +278,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
    *   Things it lists, and last the answer's own record.
    * - A record no newer than one seen of its Thing is told to no one, unless it is the newest revision seen, read in a
    *   later span of 65.536 seconds than that revision was last seen in.
-   * - What `hear` throws goes to the listener's own `onBadNews`.
+   * - What `hear` throws goes to the listener's own `onBadNews`, of no labelpath; a record refused goes to every listener's, with its labelpath.
    */
   listen(listener: VaultMinderListener): () => void {
     VaultMinderChecks.listener.parse(listener)
@@ -352,33 +352,34 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   #banktokOr(banktok: Lifetok): Lifetok { return (banktok === SX.VoidLifeTok) ? this.#newestBanktok : banktok }
 
   /** Tell every listener each event the Things return for `seens`, in order, each carrying `dispatch`, and return the first refusal a record raised, or null.
-   * A record refused goes to every listener's `onBadNews`.
+   * A record refused goes to every listener's `onBadNews`, with its labelpath, or null where that is refused too.
    */
   #tell(seens: readonly SeenThing[], dispatch: Dispatch): Errors.VaultError | null {
     let firstRefusal: Errors.VaultError | null = null
     for (const seen of seens) {
+      let labelpath: Labelpath | null = null
       let events: readonly VaultEvent[]
       try {
-        events = this.#receiveAtThing(seen, dispatch)
+        ({ labelpath } = SeenChecks.seenCited.parseConsistent(seen, this.#scope))
+        events = this.#receiveAtThing(labelpath, seen, dispatch)
       } catch (err) {
         const refusal = Throwers.refusalOfThrown(err)
-        this.#tellBadNews(refusal)
+        this.#tellBadNews(refusal, labelpath)
         firstRefusal ??= refusal
         continue
       }
       for (const event of events) {
         for (const { listener } of this.#listenings) {
           // A listener whose hear throws has a bug in the host's code, not trouble in storage.
-          try { listener.hear(event) } catch (err) { listener.onBadNews(Throwers.refusalOfThrown(err)) }
+          try { listener.hear(event) } catch (err) { listener.onBadNews(Throwers.refusalOfThrown(err), null) }
         }
       }
     }
     return firstRefusal
   }
 
-  /** The events the Thing at `seen`'s labelpath returns for `seen` at `dispatch`, its car kept first where there is none, the car's `lastErr` set or cleared, and its `read_tc` moved where the record is news */
-  #receiveAtThing(seen: SeenThing, dispatch: Dispatch): readonly VaultEvent[] {
-    const { labelpath } = SeenChecks.seenCited.parseConsistent(seen, this.#scope)
+  /** The events the Thing at `labelpath`, `seen`'s, returns for `seen` at `dispatch`, its car kept first where there is none, the car's `lastErr` set or cleared, and its `read_tc` moved where the record is news */
+  #receiveAtThing(labelpath: Labelpath, seen: SeenThing, dispatch: Dispatch): readonly VaultEvent[] {
     const proposed = Object.freeze({
       eventkind: 'item', ...this.#scope, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: VacantAgerank, agerankWas: VacantAgerank, ...dispatch, ...itemSeenOf(seen),
     } as const)
@@ -408,9 +409,9 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return car
   }
 
-  /** Tell `news` to every listener's `onBadNews`. */
-  #tellBadNews(news: Errors.VaultError): void {
-    for (const { listener } of this.#listenings) { listener.onBadNews(news) }
+  /** Tell `news`, of the record at `labelpath` or of none, to every listener's `onBadNews`. */
+  #tellBadNews(news: Errors.VaultError, labelpath: Labelpath | null): void {
+    for (const { listener } of this.#listenings) { listener.onBadNews(news, labelpath) }
   }
   // --
 }
