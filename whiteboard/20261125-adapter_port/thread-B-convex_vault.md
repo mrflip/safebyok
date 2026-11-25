@@ -1,8 +1,12 @@
 # Thread B: convex_vault (2026-11-25)
 
 Branch `20261125-convex_vault`, PR [#923](https://github.com/mrflip/safebyok/pull/923), stacked on [#916](https://github.com/mrflip/safebyok/pull/916).
-Proved: `pnpm --filter safebyok-convex test` 183 tests in 6 files, lint and typecheck clean; `pnpm justify` after the
-catch-up rebase: see the PR's **Tests:** line.
+Proved: `pnpm justify` green after the catch-up onto `origin/20261125-big_names` (de6cc88db): safebyok-convex 184,
+safebyok 2203, safebyok-big 2950, convex-big 334, postgres 124, indexeddb 115, react 339, fastkey 43, graphql-big 448,
+e2e 576, demos 99/24/26/111, the other -big packages green; lint, typecheck and build clean.
+
+The catch-up rebase met one conflict, in `notes/security.md`: both sides added an entry at the top of *Of Interest*;
+both kept, this thread's first.
 
 A first worker died of a network error before committing; its uncommitted port was judged sound and kept, then
 finished, tested and committed by the second.
