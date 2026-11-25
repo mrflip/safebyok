@@ -3,6 +3,7 @@
 import type * as Z from 'zod'
 import { NEVER } from 'zod'
 import { Consts, GX, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
+import * as Phrases from '../phrases'
 import type { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import type { Bank } from '../models/bank'
 import type { Gate } from '../models/gate'
@@ -148,7 +149,7 @@ export interface WorldGateFriend {
 export type GateDna = GateStamp & { wayins: { main: Wayin, passkey0: Wayin | null } }
 // --
 
-// == [What a proving is handed]: RawChecks, leaseGate, GateRevisionedStamp, ProvingDevice, GuardedKeyDeriver, ProvingParts, ProvingOpts
+// == [What a proving is handed]: RawChecks, leaseGate, isWayinKey, GateRevisionedStamp, ProvingDevice, GuardedKeyDeriver, ProvingParts, ProvingOpts
 
 /** The checks of what a lease and a proving are handed. */
 const RawChecks = Validator.Checkers('bad_record', ({ obj, fn, bool, custom }) => ({
@@ -156,7 +157,15 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, fn, bool, custom }) =
   // A gate's stamp is fixed for its life; the lease pins one revision of the gate too.
   gateRevisionedStamp: GateChecks.stamp.extend(ThingChecks.sparse.pick({ revtok: true }).shape),
   provingDevice:       GX.provingDevice.extend({ strengthChecker: custom<GuardedStrengthChecker>(Consts.isGuarded, BigPhrases.GuardedExpected) }),
+  provingOpts:         obj({ wayinKey: custom<CryptoKey>(isWayinKey, Phrases.WayinKeyExpected) }).strict(),
 }))
+
+/** True for a wayinKey as a proving derives one: a non-extractable 256-bit AES-GCM CryptoKey for `wrapKey` and `unwrapKey`, and nothing else. */
+function isWayinKey(val: unknown): val is CryptoKey {
+  return (val instanceof CryptoKey) && (! val.extractable)
+    && (val.algorithm.name === 'AES-GCM') && ('length' in val.algorithm) && (val.algorithm.length === 256)
+    && (val.usages.length === 2) && val.usages.includes('wrapKey') && val.usages.includes('unwrapKey')
+}
 
 /** A {@link GateStamp} with the `revtok` of one revision of the gate: the revision a lease is granted under. */
 export type GateRevisionedStamp = Z.infer<typeof GateishChecks.gateRevisionedStamp>
@@ -248,6 +257,6 @@ const StrengthChecks = Validator.Checkers('bad_record', ({ custom }) => ({
   strengthChecker: custom<StrengthChecker>(GX.isStrengthChecker, BigPhrases.StrengthCheckerShape),
 }))
 
-/** The checks of a {@link GateRevisionedStamp}, a {@link ProvingDevice}, a {@link LeaseGate} and a host's {@link StrengthChecker}. */
+/** The checks of a {@link GateRevisionedStamp}, a {@link ProvingDevice}, a proving's {@link ProvingOpts}, a {@link LeaseGate} and a host's {@link StrengthChecker}. */
 export const GateishChecks = Object.freeze({ ...RawChecks, ...StrengthChecks })
 // --

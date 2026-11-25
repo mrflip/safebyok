@@ -10,6 +10,7 @@ import { Wayin, wayinCtxOf } from './wayin'
 import { bulletproofAsyncHandlerOf } from '../helpers/bulletproof'
 import { type PasskeyWayinHeader, type PassphraseWayinHeader, type WayinHeader, WayinChecks } from '../shapes/shapes-wayin'
 import * as Throwers from '../refusals/throwers'
+import * as Phrases from '../phrases'
 
 // == [NOVEL and the usages]: NOVEL, Novel, RewrapUsage, CheckUsage
 
@@ -171,7 +172,10 @@ export class PassphraseProving extends Proving<PassphraseWayinHeader> {
   // == [Construction]: make, buildNovel, buildStored
 
   /** Make the proving of `parts`, under `opts.wayinKey`. */
-  static make(parts: ProvingParts<PassphraseWayinHeader>, opts: ProvingOpts): PassphraseProving { return new PassphraseProving(parts, opts) }
+  static make(parts: ProvingParts<PassphraseWayinHeader>, opts: ProvingOpts): PassphraseProving {
+    const args = Checks.passphraseMakeArgs.parse({ parts, opts })
+    return new PassphraseProving(args.parts, args.opts)
+  }
 
   /** Build a proving for a new passphrase wayin of the gate stamped `gateStamp`, in the bank stamped `bankStamp`, under a fresh salt.
    * Throws `weak_passphrase` if the strength checker judges the passphrase weak.
@@ -206,7 +210,10 @@ export class PasskeyProving extends Proving<PasskeyWayinHeader> {
   // == [Construction]: make, buildNovel, buildStored
 
   /** Make the proving of `parts`, under `opts.wayinKey`. */
-  static make(parts: ProvingParts<PasskeyWayinHeader>, opts: ProvingOpts): PasskeyProving { return new PasskeyProving(parts, opts) }
+  static make(parts: ProvingParts<PasskeyWayinHeader>, opts: ProvingOpts): PasskeyProving {
+    const args = Checks.passkeyMakeArgs.parse({ parts, opts })
+    return new PasskeyProving(args.parts, args.opts)
+  }
 
   /** Build a proving for a new passkey wayin of the gate stamped `gateStamp`, in the bank stamped `bankStamp`. */
   static async buildNovel(device: ProvingDevice, bankStamp: BankStamp, gateStamp: GateStamp, passkeyCleartext: GX.PasskeyAnswer): Promise<PasskeyProving> {
@@ -323,9 +330,13 @@ async function passphraseKeyOf(keyDeriver: GuardedKeyDeriver, passphrase: GX.Pas
 
 // Defined here, not with the shapes: they name a model class.
 // The builders' checks are big's, over the lean core's stamps and the lean core's strength checker.
-/** The checks of {@link Proving.buildLease}'s arguments, and the static builders' and `judgeStrength`'s arguments. */
-const Checks = Validator.Checkers('bad_record', ({ obj }) => {
+/** The checks of {@link Proving.buildLease}'s arguments, and the static makers', builders' and `judgeStrength`'s arguments. */
+const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => {
+  // A wayin's header has a check of its own kind, so each kind's parts are checked apart.
+  const provingParts = obj({ bankStamp: BankChecks.stamp, gateStamp: GateChecks.stamp, stored: custom<Wayin>((val) => val instanceof Wayin, Phrases.WayinExpected).nullable() })
   return {
+    passphraseMakeArgs:   obj({ parts: provingParts.extend({ header: WayinChecks.passphraseWayinHeader.strict() }).strict(), opts: GateishChecks.provingOpts }),
+    passkeyMakeArgs:      obj({ parts: provingParts.extend({ header: WayinChecks.passkeyWayinHeader.strict() }).strict(), opts: GateishChecks.provingOpts }),
     provingLeaseArgs:     obj({ gate: GateishChecks.leaseGate, cited: GateishChecks.gateRevisionedStamp, renewed: Stamps.StampChecks.leaseStamp.pick({ born_at: true }).nullable() }),
     passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: BankChecks.stamp, gateStamp: GateChecks.stamp, device: GateishChecks.provingDevice }),
     passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: BankChecks.stamp, gateStamp: GateChecks.stamp, device: GateishChecks.provingDevice }),

@@ -6,6 +6,7 @@ import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } fr
 import type { ProvingDevice } from '../../src/shapes/shapes-gateish'
 import type { StampedGate } from '../../src/shapes/shapes-stamps'
 import type { GateRecord } from '../../src/shapes/shapes-thing'
+import type { WayinHeader, WayinRecord } from '../../src/shapes/shapes-wayin'
 import { Wayin } from '../../src/models/wayin'
 import { Lifeseq } from '../../src/shapes/primitives'
 
@@ -350,6 +351,89 @@ describe("PasskeyProving.buildStored(gate, passkeyCleartext)", () => {
     await TH.expectRefusal(PasskeyProving.buildStored(gate, { ...answerOf(), prfBytes: new Uint8Array(32) }))
   })
 })
+
+/** What a proving's make is handed, loosely typed, so that a test can hand it anything. */
+type MakeHanded = { parts: Readonly<Record<'bankStamp' | 'gateStamp' | 'header' | 'stored', unknown> & Record<string, unknown>>, opts: Readonly<Record<string, unknown>> }
+
+/** What a refusal case hands a make in place of a part: the other kind's header, a wayin's record, and things that are not a wayinKey. */
+type MakeSpares = { otherHeader: WayinHeader, record: WayinRecord, keyBytes: Uint8Array, extractableKey: CryptoKey, boxKey: CryptoKey, shortKey: CryptoKey }
+
+/** A fresh wayinKey, as a passphrase proving derives one. */
+function wayinKeyOf(): Promise<CryptoKey> { return Crypto.importWrappingKeyBytes(Crypto.randomBytes(Consts.PassphraseKeySize)) }
+
+/** The parts and options of a new wayin of `novel`'s kind, over its stamps and header, under a fresh wayinKey. */
+async function makeHandedOf(novel: Proving): Promise<MakeHanded> {
+  return { parts: { bankStamp: novel.bankStamp, gateStamp: novel.gateStamp, header: novel.header, stored: null }, opts: { wayinKey: await wayinKeyOf() } }
+}
+
+/** The spares a refusal case draws on: `other`'s header, the record of a new wayin of `novel`, and keys of every wrong kind. */
+async function makeSparesOf(novel: Proving, other: Proving): Promise<MakeSpares> {
+  const wayin = await novel.buildWayin(NOVEL)
+  return {
+    otherHeader:    other.header,
+    record:         wayin.pickle(),
+    keyBytes:       Crypto.randomBytes(Consts.PassphraseKeySize),
+    extractableKey: await Crypto.makeBankKey(),
+    boxKey:         await Crypto.makeBoxKey(),
+    shortKey:       await crypto.subtle.generateKey({ name: 'AES-GCM', length: 128 }, false, ['wrapKey', 'unwrapKey']),
+  }
+}
+
+/** Each kind of proving: its class, a novel proving of it, and a novel proving of the other kind. */
+const MakeKinds = [
+  [PassphraseProving, () => novelPassphrase(), () => novelPasskey()],
+  [PasskeyProving,    () => novelPasskey(),    () => novelPassphrase()],
+] as const
+
+const MakeRefusalCases: readonly (readonly [(handed: MakeHanded, spares: MakeSpares) => MakeHanded, string])[] = [
+  [({ parts, opts }) => ({ parts: TH.omitting(parts, 'bankStamp'), opts }),                     'parts with no bankStamp'],
+  [({ parts, opts }) => ({ parts: TH.omitting(parts, 'gateStamp'), opts }),                     'parts with no gateStamp'],
+  [({ parts, opts }) => ({ parts: TH.omitting(parts, 'header'), opts }),                        'parts with no header'],
+  [({ parts, opts }) => ({ parts: TH.omitting(parts, 'stored'), opts }),                        'parts with no stored wayin, not even null'],
+  [({ parts }) => ({ parts, opts: {} }),                                                        'opts with no wayinKey'],
+  [({ parts, opts }) => ({ parts: { ...parts, bankStamp: parts.gateStamp }, opts }),            "the gate's stamp as the bank's"],
+  [({ parts, opts }) => ({ parts: { ...parts, gateStamp: parts.bankStamp }, opts }),            "the bank's stamp as the gate's"],
+  [({ parts, opts }, { otherHeader }) => ({ parts: { ...parts, header: otherHeader }, opts }),  "the other kind of wayin's header"],
+  [({ parts, opts }, { record }) => ({ parts: { ...parts, header: record }, opts }),            "a whole wayin record, wrapped bankKey and all, as the header"],
+  [({ parts, opts }, { record }) => ({ parts: { ...parts, stored: record }, opts }),            "a wayin's record in place of a Wayin"],
+  [({ parts }, { keyBytes }) => ({ parts, opts: { wayinKey: keyBytes } }),                      'key bytes in place of a CryptoKey'],
+  [({ parts }, { extractableKey }) => ({ parts, opts: { wayinKey: extractableKey } }),          'an extractable key'],
+  [({ parts }, { boxKey }) => ({ parts, opts: { wayinKey: boxKey } }),                          'a key for encrypt and decrypt'],
+  [({ parts }, { shortKey }) => ({ parts, opts: { wayinKey: shortKey } }),                      'a 128-bit key'],
+  [({ parts, opts }) => ({ parts: { ...parts, passphraseCleartext: TH.TestPassphrase }, opts }), 'parts with an unknown field'],
+  [({ parts, opts }, { keyBytes }) => ({ parts, opts: { ...opts, keyBytes } }),                 'opts with an unknown field'],
+]
+
+for (const [ProvingClass, novelOf, otherOf] of MakeKinds) {
+  describe(`${ProvingClass.name}.make(parts, opts)`, () => {
+    it("makes a proving of the parts given, whose wayinKey wraps a new wayin and proves it once stored", async () => {
+      const handed = await makeHandedOf(await novelOf())
+      const proving = ProvingClass.make(handed.parts as never, handed.opts as never)
+      expect(proving).to.be.instanceOf(ProvingClass)
+      expect(proving.header).to.deep.equal(handed.parts.header)
+      expect(proving.bankStamp).to.deep.equal(TH.WorldBankStamp)
+      expect(proving.gateStamp).to.deep.equal(TH.WorldGateStamp)
+      const stored = await proving.buildWayin(NOVEL)
+      const prover = ProvingClass.make({ ...handed.parts, stored } as never, handed.opts as never)
+      await expectOneBankKey(proving, prover)
+    })
+
+    for (const [handedOf, blurb] of MakeRefusalCases) {
+      it(`refuses ${blurb} as 'bad_record', quoting nothing it was handed and with no cause`, async () => {
+        const novel = await novelOf()
+        const handed = await makeHandedOf(novel)
+        const spares = await makeSparesOf(novel, await otherOf())
+        const { parts, opts } = handedOf(handed, spares)
+        const err = TH.expectSyncRefusal(() => ProvingClass.make(parts as never, opts as never), 'bad_record')
+        expect(err.cause).to.be.undefined
+        const text = TH.thrownText(err)
+        // Short leaves (a wayinkind, a lifeseq, a byte) turn up in any message or stack; every secret or token is longer.
+        expect(TH.leafTexts({ handed, spares }).filter((leaf) => leaf.length >= 16 && text.includes(leaf))).to.deep.equal([])
+        expect(text).to.not.include(TH.TestPassphrase)
+      })
+    }
+  })
+}
 
 describe("guardKeyDeriver(hostDeriver)", () => {
   it("has the deriver's label and salt length, and marks the result as guarded", () => {
