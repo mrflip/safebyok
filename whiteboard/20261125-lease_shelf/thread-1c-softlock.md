@@ -1,8 +1,8 @@
 # Thread 1c: softlock (2026-11-25)
 
 Branch `20261125-softlock`, PR #902, stacked on #900 (thread 0, connect). Proved: `pnpm --filter safebyok test` 1992
-passed, lint and typecheck clean; `safebyok-react-lean` typecheck clean, 339 tests passed. `pnpm justify` runs after
-the catch-up.
+passed, lint and typecheck clean; `safebyok-react-lean` typecheck clean, 339 tests passed; `pnpm justify`
+green after the catch-up onto #900's tip, 8245 tests across 16 suites.
 
 * **Built**:
   - **Options** (`shapes/shapes-bankish.ts` DeviceOpts, `models/device.ts`): `softlockMinutes` (10), `janitorMinutes`
