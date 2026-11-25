@@ -125,16 +125,15 @@ write. Ruled by the Coach, 2026-11-20, vault_snapper W2: "A put needs unlock any
     a birth whose bank is not yet made goes on, and the device holds the bank it makes. A device stays usable after
     its sweep, so the birth is not refused.
   - Two gate changes on one bank at once each cite the gate they proved against: the first to reach the vaultDB is
-    written, and the second refuses `stale_write`, changes nothing and unlocks nothing. Until the bank observes itself,
-    its main gate stays the one it last wrote, so a gate change made on another device refuses `stale_write` here too.
+    written, and the second refuses `stale_write`, changes nothing and unlocks nothing.
 * alternatives:
   - have a lock or a sweep wait for, or reach into, an attempt in flight, or have an attempt check the lock state between
     its steps: a lifecycle call reaching across an attempt, or new checks in a primitive's critical path, for a crossing.
   - a lock across the form verbs: a lock is a last resort.
-  - take the gate stored from a `stale_write`'s answer and prove against it: the bank observing itself, which is later
-    work, and which would still not let a proof made against one gate write over another.
+  - prove again against the gate a `stale_write`'s answer carries: a retry in the verb's path, which would still not
+    let a proof made against one gate write over another.
 * workaround: the host's form submits one verb at a time and awaits it before locking or sweeping the bank; after
-  `stale_write`, the host makes the bank again from what is stored.
+  `stale_write`, the user submits again: the gate then models the revision the refusal carried.
 
 Steps to reproduce: call `bank.unlock(...)` and, before it resolves, `bank.lock()`: the bank ends unlocked. Or call
 `bank.replacePassphrase(...)` twice without awaiting the first: the second refuses `stale_write`. Or call
@@ -303,9 +302,9 @@ worker, 2026-11-21, awaiting a ruling.
   later life is still told at once, since the time is the agerank's last field: only freshness is affected, never which revision
   is newer.
 * alternatives:
-  - cap an incoming time at the sorter's own present chunk: a clock read and a branch in the common path of every
-    record sorted, for a broken system; and whether to tolerate a clock that runs ahead or to panic is the customer's
-    call, not the sorter's.
+  - cap an incoming time at the minder's own present chunk: a clock read and a branch in the common path of every
+    record received, for a broken system; and whether to tolerate a clock that runs ahead or to panic is the customer's
+    call, not the minder's.
   - refuse a `read_tc` from the future: the same check, with a refusal where a cap would accept, the same call taken
     from the customer.
 * workaround: the customer keeps its datastore's and its devices' clocks in step, or refetches what it shows; the bankDB
@@ -410,8 +409,7 @@ that is worth more than one smoothed fallback. The limit is React's, stated in i
 
 A form whose action resolves its refusal as the action's state (`useActionState`) shows that refusal until the action
 next runs. Where the draft is still dirty after a refused Save, as it is with a sidecar edit pending, Undo discards the
-draft and leaves the message where it is. Envman's row, with its Save as a form Action, shows the message under the row;
-there the bank locking discards the draft too, by the demo's own code.
+draft and leaves the message where it is.
 
 Current outcome: a stale message under a row whose draft is clean again. The next Save replaces or removes it.
 
@@ -452,20 +450,3 @@ not write.
 Reasoning for wontfix: the only reader is a component the host wrote, inside the form the user typed the secret into,
 where it could read the input itself; nothing retains the secret; and each alternative costs every host more than this
 costs any. Ruled by the Coach, 2026-11-22.
-
-### A form verb handed a form at a stage that has no bank leaves the form's secret fields in it
-
-* current outcome: `Knock`'s form verbs and each hook's `attempt` refuse `absent_vault` (the birth: with nobody signed
-  in) before the core's maker runs, so the `FormData` keeps `passphrase`, `nextPassphrase` and `confirmation`, and
-  React keeps that `FormData` as the form's status. `attempt` resolves refused, with nothing in the mutation's `error`.
-  The core's own entrypoints empty the form at every stage.
-* alternatives:
-  - take the secret fields out in the giver before it looks for the bank: a step in every attempt, for a form that is
-    not shown at this stage.
-* workaround: show each form only at its own stage (`useWorld().stage`), as the kit's forms are documented.
-
-Steps to reproduce: render an unlock form at stage `unborn`, or before the device's sign-in answers; type a passphrase; submit.
-
-Reasoning for wontfix: the paths here are a host showing a form at a stage it is not for, and a bank that ends under a
-shown form; the host is not the threat model, and an ending is answered by a page reload. Written by the workshop's
-thread 7 (gating_attempt), 2026-11-23.
