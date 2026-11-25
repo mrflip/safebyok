@@ -155,5 +155,5 @@ what differs from big, in a sentence or two.
   `devicetok` (`packages/safebyok/src/shapes/shapes-wayin.ts`), so the header bound into the wayin's ctx names the field
   `devicetok`; the construction (`cipherCtx` over the stamps, the purpose and the whole header) is unchanged. It is still
   not secret. A proving reads it from the device (`ensureDevicetok`, `models/device.ts`): the host's `devicetok` option,
-  or the one the deviceDB keeps for every bank and tab given it, made at its first use
-  (`storage/device-db.ts`), not big's one per bank scope. The bank no longer has it, and the device's `toJSON` no longer shows it.
+  or the one the deviceDB keeps for the signed-in user's bank, the same for every tab given it and one per bank scope as
+  big's was, made at its first use (`storage/device-db.ts`). The bank no longer has it, and the device's `toJSON` no longer shows it.
