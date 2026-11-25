@@ -94,8 +94,8 @@ export const VaultMinderChecks = Validator.Checkers('bad_record', ({ obj, oneof,
 
 /** The members of {@link VaultMinder} that are functions. */
 const VaultMinderMembernames = [
-  'tryGetThing', 'tryWriteThing', 'tryListThings', 'tryBirthBank', 'tryGetWorld', 'listen', 'receive', 'thingAt', 'carAt', 'connect', 'disconnect',
-  'tryGetWorldOnce', 'tryGetOnce', 'getOnce', 'tryListOnce', 'listOnce', 'tryPutOnce', 'putOnce', 'tryDelOnce', 'delOnce', 'makeGetAsk', 'makeListAsk', 'makePutAsk', 'makeDelAsk',
+  'tryGetThing', 'tryWriteThing', 'tryListThings', 'tryBirthBank', 'tryGetWorld', 'tryStats', 'listen', 'receive', 'thingAt', 'carAt', 'connect', 'disconnect',
+  'tryGetWorldOnce', 'tryStatsOnce', 'tryGetOnce', 'getOnce', 'tryListOnce', 'listOnce', 'tryPutOnce', 'putOnce', 'tryDelOnce', 'delOnce', 'makeGetAsk', 'makeListAsk', 'makePutAsk', 'makeDelAsk',
 ] as const satisfies readonly (keyof VaultMinder)[]
 
 /** True for an object with a function for each member of {@link VaultMinder}. */
