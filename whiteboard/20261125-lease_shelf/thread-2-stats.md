@@ -41,6 +41,11 @@ then "for stats: { box: { count: xxx, live_count: xxx, size }, ... don't let sto
     A custom adapter that reports such a limit from `doStats` meets `storage_issue` ("a concrete adapter that reports a bad
     one is broken"), from `AdapterVaultDB.tryStats`. Today's adapters report the cap for the count, so only IndexedDB's
     size can trip it, and its first-use check refuses `storage_blocked` before `doStats` runs.
+  * **`world.stats()` and `world.tryStats()`** (the Coach, option (b) of "stats on the world record?": "a front door beside
+    vault.stats() over the same verb, costing nothing until called"), in a `[Stats]` section of `src/models/world.ts`: roots
+    live, device enabled, then `tryStatsOnce` of the VaultMinder, no unlock. `vault.stats()` now returns `world.stats()`, so
+    the two share one body. Not a field on the world record or the snapshot. Test: "world.stats() and world.tryStats()" in
+    tests/models/world.test.ts (same stats as vault's after a lock; refuses before signin and when disabled, reading nothing).
   * **`vault.stats()` needs no unlock** (`#lock-is-intent`): it refuses only while the roots are not live or the device
     is disabled, as every vault read does through `#bank`.
   * **A quota too small refuses at startup** (the Coach: "A quota less than 2 or that size should refuse at start",

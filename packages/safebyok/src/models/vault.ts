@@ -126,10 +126,7 @@ export class Vault {
    *   const { box, gate, max } = await vault.stats()
    *   const isNearlyFull = (box.size + gate.size) > 0.9 * max.size
    */
-  async stats(): Promise<VaultStats> {
-    this.#bank.demandEnabled()
-    return Outcome.valOf(await this.#vaultMinder.tryStatsOnce())
-  }
+  stats(): Promise<VaultStats> { return this.#world.stats() }
 
   /** {@link stats}, resolving an `Outcome` instead of throwing. */
   tryStats(): Promise<Outcome.Outcome<VaultStats>> { return Outcome.outcomeOf(() => this.stats()) }

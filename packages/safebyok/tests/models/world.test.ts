@@ -705,3 +705,24 @@ describe("the host's onLifecycle", () => {
     expect(second.world.isUnlocked).to.be.true
   })
 })
+
+describe("world.stats() and world.tryStats()", () => {
+  it("answer the stats vault.stats() does, with no unlock", async () => {
+    const { bank, device, vault } = await TH.buildBornVault()
+    bank.lock()
+    const stats = await device.world.stats()
+    expect(stats.box).to.deep.include({ count: 1, live_count: 1 })
+    expect(stats).to.deep.equal(await vault.stats())
+    expect(await device.world.tryStats()).to.deep.equal({ ok: true, val: stats })
+  })
+
+  it("refuse before signin (the roots are not live), and a disabled device, reading nothing", async () => {
+    await TH.expectRefusal(TH.makeDevice({ userid: null }).world.stats(), 'absent_thing')
+    const { bank, device } = await TH.buildBornVault()
+    const read = vi.spyOn(bank.device.vaultDB, 'tryStats')
+    device.disable()
+    await TH.expectRefusal(device.world.stats(), 'disabled')
+    expect(await device.world.tryStats()).to.deep.include({ ok: false })
+    expect(read).not.toHaveBeenCalled()
+  })
+})
