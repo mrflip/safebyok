@@ -14,3 +14,7 @@ Curated by the orchestrator. Newer than the plan where they disagree.
 - Nothing can disable a world now: `World.endCause` returns the device's `#endCause`, which is never set. The
   `'swept'` stage has no way in.
 - A watch that throws at sign-in is now bad news, not stage `'failed'` (awaiting the Coach).
+- *Orchestrator:* review flagged that a reconnect did not refresh the bank, main gate and root box. YOLO: a connect
+  after sign-in calls `vaultMinder.tryGetWorldOnce()` and tells what it throws as bad news (rework underway).
+- While not connected, the vault TSQ does not hear the device's own `putBoxOnce`/`delBoxOnce`: a non-React host
+  must call `connect()`.

@@ -3,7 +3,7 @@
 Mode: **YOLO**. Issued by the Coach, 2026-11-25. Cap: 3 threads at once.
 Default levels: review `medium`; worker `opus` (thread-worker), reviewer `opus` for threads touching what
 `notes/guarantees-big.md` covers (lease, keys), else its `sonnet` pin; style pass on `style-reviewer`'s pin.
-Status: 0 in review (#900); 1a and 1c building; the rest waiting.
+Status: 0 flagged in review (roots not refreshed on reconnect), rework running (YOLO: fix); 1a and 1c building; the rest waiting.
 
 Sprint doc: https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh (Open Matters bookmark rev 3).
 
