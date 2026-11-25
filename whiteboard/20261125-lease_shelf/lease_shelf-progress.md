@@ -46,8 +46,7 @@ Curated by the orchestrator. Newer than the plan where they disagree.
 - `scripts/file-thread` checks first whether the recorded `sprintbase` is on main; if it is, it rebases onto main and
   never reads `sprintbasebranch`. A thread cut from main that must stack on another thread is rebased by hand
   (`--onto origin/<base thread> <old base>`), with both settings updated, before filing. 1a needed this.
-- #900 filed and out of draft; #902 filed (conflict on doc blocks and the wontfix row only), out of draft once CI is
-  green; #903 being stacked onto #902.
+- #900, #902, #903 filed and out of draft, a line bottom to top. #903 was refiled onto #902 by hand at e135f59d4.
 
 ## Thread 2 `stats` (#905, ready, in review)
 - `tryStats(ask)` on every vaultDB (`doStats` in Memory, IdbVaultDB, PostgresVaultDB); `vault.stats()`/`tryStats()`,
@@ -56,3 +55,16 @@ Curated by the orchestrator. Newer than the plan where they disagree.
 - **A new vaultDB implements `doStats`; a VaultDB test stub needs `tryStats`.**
 - **Planning lesson:** 2 compacted twice, nine minutes apart, as 1a did. Any thread touching several adapters, or
   porting a module with its tests, goes to `thread-worker-400k`.
+
+## Thread 4 `probe` (#906, ready, in review)
+- `vault.probe(asked)`/`tryProbe(asked)` in vault.ts's `[Probing]` section: put, get (through the minder's `getOnce`,
+  which always asks storage), unseal and compare (es-toolkit `isEqual`), del, each timed. Locked bank refuses
+  `bank_locked` up front, no unlock asked. Default labelpath `box/safebyok_probe`, unreserved.
+- A failed step keeps its own refusalkind, adds `meta.stepkind` (big's `RefusalMeta` broadened), cause attached.
+- **Discovery:** `VaultTSQ.getOnce(scope, { staleTime: 0 })` can answer from cache: items are dated by storage's
+  `read_tc`, which can run ahead of the tab's clock (the Closer Look's E3, again). A verb that must ask storage goes
+  through the minder.
+
+## For the wrap-up (*Orchestrator:*)
+- World.connect's doc block says a second call "does nothing"; it should say a call after a failed watch retries it
+  (VaultMinder's `#unwatchWrapped ??=` stays null when watch throws). For the documentarian pass, or 1b's first commit.

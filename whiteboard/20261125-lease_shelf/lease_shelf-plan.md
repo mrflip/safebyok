@@ -3,7 +3,7 @@
 Mode: **YOLO**. Issued by the Coach, 2026-11-25. Cap: 3 threads at once.
 Default levels: review `medium`; worker `opus` (thread-worker), reviewer `opus` for threads touching what
 `notes/guarantees-big.md` covers (lease, keys), else its `sonnet` pin; style pass on `style-reviewer`'s pin.
-Status: 0, 1c, 1a filed; 2 stats ready (#905), in review; 1d lease_thing and 4 probe building; 1b waits on 1d; Closer Look running.
+Status: 0, 1c, 1a filed and out of draft (#900, #902, #903); 2 stats (#905) reviewed (fixed), in rework for the quota floor; 4 probe (#906) in review; 1d lease_thing building; 1b waits on 1d; Closer Look done (doc tab), awaiting triage.
 
 Sprint doc: https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh (Open Matters bookmark rev 3).
 
@@ -102,7 +102,9 @@ infinity, cap at 1_900_649_2568 // 1-900-MIX-A-LOT".
 Gloss: a vaultDB verb (`AdapterVaultDB` `doStats`; MemoryVaultDB, `IdbVaultDB`, `PostgresVaultDB`) and a front door
 on the Vault. `box` and `gate` each `{ count, live_count, size }`: `count` is rows stored, live and tombstones;
 `live_count` the live ones; `size` their summed record weight in bytes. `max` is `{ count, size }`, the store's
-limits, never `Infinity`: where a store has none, both are `19_006_492_568` (a named constant). No enforcement. Depends on 0 only (storage verbs); cut from 0 when capacity frees. Size: medium, three adapters.
+limits, never `Infinity`: where a store has none, both are `19_006_492_568` (a named constant). No enforcement.
+*Coach (2026-11-25), on a store limit of 0:* "continuing to operate with a limit of 0 is surprising behavior. In the notes/sizings file, take the size of a single medium box, plus the world record, add 50% again and round up to the nearest 1000 bytes. A quota less than 2 or that size should refuse at start." *Orchestrator (YOLO calls):* the floor is 5,000 bytes (medium box 1,087 + gate 1,029 + root box 566 from `notes/reference-sizes.md`, which sizes no bank record; ×1.5, rounded up); a quota below twice that, 10,000, refuses `storage_blocked` when IdbVaultDB first opens its database. A rework after the review.
+*Review:* `medium` on opus, fixed: isVaultMinder's member list (outside the diff, kept), the `stats()` example, `FiledRaw` moved to shapes, a doc block, a chai form. Left (minor): idb-lean `Filed` duplicates `FiledRaw` (Cleanup); `quotaNow` readability (taste); mechanism-walking doc blocks with their `doGetWorld` siblings (documentarian). Depends on 0 only (storage verbs); cut from 0 when capacity frees. Size: medium, three adapters.
 
 ### 3. ~~`tidy_gone`~~: dropped
 > "tidy_gone seems reasonable"
@@ -119,7 +121,7 @@ old). Then it is a vaultDB verb beside `stats`. Depends on 2 (same files).~~
 
 Gloss: port big's `bank.probe()`. On an unlocked vault it puts a probe box, gets it back, unseals and compares it,
 deletes it, and reports each step with its timing. Report types ported from big's `ProbeReport`/`ProbeStep`, adapted
-to labelpaths. Depends on 0. Size: small.
+to labelpaths. Depends on 0. Size: small. Branch `20261125-probe`, PR #906, cut from 1c. Ready; in review (`medium` on opus).
 
 ### 5. `devicetok`: a device token that lasts
 > "add the device_tok generation."
