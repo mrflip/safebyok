@@ -1,7 +1,7 @@
 # Thread 8: janitor (2026-11-25)
 
 Branch `20261125-janitor`, PR #908, stacked on #903 (1a, on #902 and #900). Proved: `pnpm --filter safebyok test`
-2090 passed, lint and typecheck clean; `safebyok-react-lean` tests 339 passed.
+2090 passed; `pnpm justify` green after the catch-up (8343 tests across 16 suites).
 
 * **Built**:
   * `World`'s janitor (`world.ts`, `[The janitor]`) starts at `signin` and stops only in `disable`, not in
