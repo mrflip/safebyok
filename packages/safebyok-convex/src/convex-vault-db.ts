@@ -13,7 +13,7 @@ import { safebyokRefusal } from './refusals'
 import type { SafebyokRefusal } from './refusals'
 import type { SafebyokVaultApi } from './server'
 
-// == [Clients]: ConvexCalls, ConvexWatchingClient, ConvexReactWatchingClient, ConvexVaultClient, ConvexVaultDBOpts, Filed
+// == [Clients]: ConvexCalls, ConvexWatchingClient, ConvexReactWatchingClient, ConvexVaultClient, ConvexVaultDBOpts, Watched
 
 /** The `query` and `mutation` calls that `ConvexClient` and `ConvexReactClient` share. */
 export type ConvexCalls = {
@@ -50,8 +50,8 @@ export type ConvexVaultClient = ConvexWatchingClient | ConvexReactWatchingClient
  */
 export type ConvexVaultDBOpts = Readonly<{ client: ConvexVaultClient, api: SafebyokVaultApi }>
 
-/** One Thing of what `watchThings` returns: its labelpath, and the Thing raw. */
-type Filed = { labelpath: string, raw: unknown }
+/** What `watchThings` returns: each Thing committed after the cursor it was given, the bank raw, and the cursor to watch from next. */
+type Watched = FunctionReturnType<SafebyokVaultApi['watchThings']>
 // --
 
 // == [The vaultDB]: ConvexVaultDB
@@ -135,20 +135,32 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
     return this.classifyStats(ask, { ...bankFetched, read_tc }, { box, gate, max: ConvexBankLimits })
   }
 
-  // Convex re-sends a watched query's whole result each time it changes, so `receive` gets only the Things that differ from
-  // the previous result, each with the banktok of the bank in the same result. The first result is the starting state, and
-  // is not reported.
+  // Each result of `watchThings` holds the Things committed after the cursor it was asked with, so `receive` gets each, with
+  // the banktok of the bank in the same result. Where the cursor moved, the watch subscribes again from the new one, and drops
+  // the old subscription; every Thing committed later is after the new cursor. The first subscription, from null, fetches no
+  // Thing: the watch reports what changes after it starts.
   protected override doWatch(scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: VaultError) => void): () => void {
-    let seen: ReadonlyMap<string, string> | null = null
-    const hearThings = (things: Filed[]): void => {
-      if (seen !== null) { for (const received of changesOf(scope, seen, things)) { receive(received) } }
-      seen = serializedOf(things)
-    }
+    let cursor: bigint | null = null
+    let unsubscribe = noop
+    let isWatching = true
     const fail = (thrown: unknown): void => { onBadNews(refusalOf('watchThings', thrown)) }
-    const unsubscribe = this.#subscribe(scope, hearThings, fail)
+    const watchFrom = (from: bigint | null): void => {
+      cursor = from
+      const { stop, replay } = this.#subscribe(scope, from, hearThings, fail)
+      unsubscribe = stop
+      replay()
+    }
+    // A listener told of a Thing may stop the watch then and there, and a stopped watch subscribes no more.
+    const hearThings = (watched: Watched): void => {
+      const banktok = DB.Classifier.banktokOf(scope, watched.bank)
+      for (const { raw } of watched.things) { receive({ record: raw, banktok }) }
+      if ((! isWatching) || (watched.cursor === cursor)) { return }
+      unsubscribe()
+      watchFrom(watched.cursor)
+    }
+    watchFrom(null)
     // Convex counts a query's watchers, and each unsubscribe call lowers that count. A second call would end another watch
     // of the same bank on the same client.
-    let isWatching = true
     return () => {
       if (! isWatching) { return }
       isWatching = false
@@ -159,21 +171,20 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 
   // == [Watching]: #subscribe
 
-  // A failing watch reports to `fail` and keeps running. When it recovers, its next result is compared with the last one it received.
-  #subscribe({ userid, banklabel }: ThingWatchScope, hearThings: (things: Filed[]) => void, fail: (thrown: unknown) => void): () => void {
-    const args = { scope: { userid, banklabel } }
+  // A failing watch reports to `fail` and keeps running. A ConvexReactClient already watching the same query sends no
+  // first result, only changes, so `replay` hears the result it holds, once `stop` is in the caller's hands.
+  /** Subscribe to `watchThings` from `cursor`, returning the subscription's `stop`, and a `replay` of any result the client already holds. */
+  #subscribe({ userid, banklabel }: ThingWatchScope, cursor: bigint | null, hearThings: (watched: Watched) => void, fail: (thrown: unknown) => void) {
+    const args = { scope: { userid, banklabel }, cursor }
     if ('watchQuery' in this.#client) {
       const watch = this.#client.watchQuery(this.#api.watchThings, args)
       const hearLatest = () => {
-        const things = latestOf(watch, fail)
-        if (things !== undefined) { hearThings(things) }
+        const watched = latestOf(watch, fail)
+        if (watched !== undefined) { hearThings(watched) }
       }
-      const unsubscribe = watch.onUpdate(hearLatest)
-      // A ConvexReactClient that is already watching this bank sends no first result, only changes.
-      hearLatest()
-      return unsubscribe
+      return { stop: watch.onUpdate(hearLatest), replay: hearLatest }
     }
-    return this.#client.onUpdate(this.#api.watchThings, args, hearThings, fail)
+    return { stop: this.#client.onUpdate(this.#api.watchThings, args, hearThings, fail), replay: noop }
   }
   // --
 }
@@ -181,13 +192,13 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 
 // == [Limits]: ConvexBankLimits
 
-// docs.convex.dev/production/state/limits: one query may scan 32,000 documents and read 16 MiB. The stats and the watch each
-// read every Thing of a bank in one query, so a bank holds no more than that.
+// docs.convex.dev/production/state/limits: one query may scan 32,000 documents and read 16 MiB. The stats read every Thing
+// of a bank in one query, as may a watch that comes back after long enough away, so a bank holds no more than that.
 /** The most a bank holds in Convex: the documents and bytes one query may read. */
 const ConvexBankLimits = DB.storeLimitsOf({ count: 32_000, size: 16_777_216 })
 // --
 
-// == [Helpers]: runOrRefuse, refusalOf, refusalOfCrossed, storedOutOfStep, demandStorableKeys, demandUnwritten, checkedWritten, serializedOf, changesOf, latestOf
+// == [Helpers]: runOrRefuse, refusalOf, refusalOfCrossed, storedOutOfStep, demandStorableKeys, demandUnwritten, checkedWritten, latestOf, noop
 
 // Accepts a thunk because ConvexReactClient.query can throw synchronously, before it returns a promise.
 /** Run `thunk`, converting anything it throws into a safebyok refusal. */
@@ -242,23 +253,8 @@ function checkedWritten<WrittenT>(written: WrittenT | null): WrittenT {
   return written
 }
 
-/** Each Thing of `things`, serialized, by its labelpath. */
-function serializedOf(things: Filed[]): ReadonlyMap<string, string> {
-  return new Map(things.map(({ labelpath, raw }) => [labelpath, JSON.stringify(raw)]))
-}
-
-// Both results come from Convex's own serializer, so an unchanged Thing serializes the same way twice.
-/** The notices for the Things in `things` that are new or changed since `seen`, each with the banktok of the bank among `things`. */
-function changesOf(scope: ThingWatchScope, seen: ReadonlyMap<string, string>, things: Filed[]): Received[] {
-  const bank = things.find(({ labelpath }) => labelpath === 'bank')?.raw ?? null
-  const banktok = DB.Classifier.banktokOf(scope, bank)
-  return things
-    .filter(({ labelpath, raw }) => seen.get(labelpath) !== JSON.stringify(raw))
-    .map(({ raw }) => ({ record: raw, banktok }))
-}
-
 /** A React watch's latest result, or undefined while it has none. A failing watch passes its error to `fail`, and gives undefined. */
-function latestOf(watch: { localQueryResult(): Filed[] | undefined }, fail: (thrown: unknown) => void): Filed[] | undefined {
+function latestOf(watch: { localQueryResult(): Watched | undefined }, fail: (thrown: unknown) => void): Watched | undefined {
   try {
     return watch.localQueryResult()
   } catch (err) {
@@ -266,6 +262,9 @@ function latestOf(watch: { localQueryResult(): Filed[] | undefined }, fail: (thr
     return undefined
   }
 }
+
+/** Do nothing. */
+function noop(): void { /* nothing */ }
 // --
 
 // == [Checks]: isConvexClient, SafebyokVaultFnnames, isSafebyokVaultApi, convexVaultDBOpts

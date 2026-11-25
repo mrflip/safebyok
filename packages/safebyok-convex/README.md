@@ -75,8 +75,9 @@ call made before then refuses as `identity_revoked`.
   whether to write with the core's own classifier. The client classifies what the component fetched to the same answer,
   and refuses `unexpected_error` should the two disagree on whether it wrote: a component out of step with the client's
   copy of safebyok.
-* **A watch hears every device's writes**, from a `watchThings` query kept open on the bank. Convex sends the whole
-  bank each time a Thing changes, and the watch tells its listener of each Thing that differs from the last result.
+* **A watch hears every device's writes**, from a `watchThings` query kept open on the bank. Each result holds only
+  the Things committed since the last, and the watch then subscribes again from the newest; it tells its listener of
+  each Thing written after it started, once. It is Convex's reactive query throughout: nothing polls.
 * **Any other failure refuses as `storage_issue`**: Convex resends a call itself after a reconnect, so a call that
   fails, failed in your deployment, and trying it again is unlikely to help. The refusal's message names the call but
   none of Convex's error text, which on a dev deployment may quote the call's arguments; Convex's error is its `cause`
@@ -87,12 +88,13 @@ call made before then refuses as `identity_revoked`.
 ## What is stored
 
 One table inside the component, `things`: each Thing as the core wrote it, beside its `userid`, `banklabel` and
-`labelpath`, indexed `by_scope` on those three, so one range fetches the children of a Thing. A deleted Thing stays as
-its tombstone.
+`labelpath`, indexed `by_scope` on those three, so one range fetches the children of a Thing. Each also holds
+`commit_ts`, the timestamp Convex committed its last write at, indexed `by_commit` after `userid` and `banklabel`, so
+one range fetches what a bank's watch has not yet heard. A deleted Thing stays as its tombstone.
 
-**How big a bank can be.** `watchThings` reads every Thing of the bank each time one changes, and `stats` reads them
-all once, within a Convex query's limits (32,000 documents, 16 MiB read), so a bank past that makes its watch go quiet
-and its stats refuse. The stats report those two limits as the bank's `max`, and weigh each Thing as the UTF-8 length
+**How big a bank can be.** `stats` reads every Thing of a bank in one query, within a Convex query's limits (32,000
+documents, 16 MiB read), as may a watch that comes back after long enough away, so a bank past that makes its stats
+refuse and such a watch go quiet. The stats report those two limits as the bank's `max`, and weigh each Thing as the UTF-8 length
 of its JSON, a little under what Convex counts for its document.
 
 **What a sidecar may hold.** Convex refuses an object key, anywhere in a stored Thing, that starts with `$`, holds a
