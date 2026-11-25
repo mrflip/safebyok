@@ -55,7 +55,7 @@ const LeaseLabelpathPattern = /^lease\/[^/]+$/
 export function leaseLabelpathOf(gateLabelpath: Labelpath): LeaseLabelpath { return `lease/${Labelpath.labelOf(gateLabelpath)}` }
 
 /** The scope a deviceDB files the lease of the gate at `gateScope` under: the gate's bank, and the lease's labelpath, which names the gate. */
-export function leaseScopeOf({ userid, banklabel, labelpath }: { userid: string, banklabel: string, labelpath: Labelpath }): LeaseScope {
+export function leaseScopeOf({ userid, banklabel, labelpath }: Pick<GateStamp, 'userid' | 'banklabel' | 'labelpath'>): LeaseScope {
   return { userid, banklabel, labelpath: leaseLabelpathOf(labelpath) }
 }
 
