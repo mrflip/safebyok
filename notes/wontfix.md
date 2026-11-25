@@ -512,3 +512,23 @@ not write.
 Reasoning for wontfix: the only reader is a component the host wrote, inside the form the user typed the secret into,
 where it could read the input itself; nothing retains the secret; and each alternative costs every host more than this
 costs any. Ruled by the Coach, 2026-11-22.
+
+### Two probes at one labelpath at once refuse each other's steps
+
+* current outcome: `vault.probe` puts, gets, unseals and deletes the box at its labelpath, by default
+  `box/safebyok_probe`, each step over the newest revision this device has seen. Two probes at that labelpath at once,
+  in two tabs or on two devices, may find each other's revisions: a put or a del refuses `stale_write`, a get refuses
+  `absent_box` over the other's tombstone, each with `meta.stepkind` naming the step; or a get finds the other's
+  revision, whose whisper matches where both put the same one.
+* alternatives:
+  - a fresh labelpath for each probe: a probe that fails before its del leaves a box no later probe writes over, in the
+    host's own listing.
+  - a lock around the probe: a lock where none was needed, for two self-tests run at once.
+* workaround: give each tab or device a labelpath of its own (`vault.probe({ labelpath: 'box/probe_tab1' })`), or run
+  the probe again.
+
+Steps to reproduce: start `vault.probe()` on two devices of one bank; hold the first's get until the second has put.
+
+Reasoning for wontfix: a probe is a self-test a host runs at startup or on demand, and its refusal is an honest
+report of what storage answered. A fixed default labelpath means a failed probe's box is written over by the next one.
+Written by lease_shelf thread 4, 2026-11-25, awaiting a ruling.

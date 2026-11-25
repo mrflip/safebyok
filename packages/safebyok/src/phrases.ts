@@ -225,3 +225,11 @@ export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of mil
 /** Children a list found stored damaged, and left out of its answer. */
 export const ChildrenStoredDamaged = "Some of the Things this list found are stored damaged, so it left them out: the refusal's meta.labelpaths names each one. They were left as they are in storage."
 // --
+
+// == [Probing]: probeStepRefused
+
+/** A step of `Vault.probe` refused, its own refusal kept as the cause. */
+export function probeStepRefused(stepkind: string): string {
+  return `The probe of storage and keys was refused at its ${stepkind} step: the refusal's meta.stepkind names the step, and its cause says why.`
+}
+// --

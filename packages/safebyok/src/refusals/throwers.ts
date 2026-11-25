@@ -8,6 +8,7 @@ import * as Phrases from '../phrases'
 import { type ThingRecord } from '../shapes/shapes-thing'
 import { type ListAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
 import type { DamagedThing } from '../shapes/shapes-answers'
+import type { ProbeStepkind } from '../shapes/shapes-vault-probe'
 
 // == [Big's Throwers]: every thrower of safebyok-big, re-exported
 
@@ -135,5 +136,15 @@ export function worldNotHeard(): Errors.VaultError { return new Errors.VaultErro
 /** The bad news of `damaged_rows`, the children a list for `ask` found stored damaged and left out, each named by its labelpath. */
 export function childrenStoredDamaged(ask: ListAsk, damaged_rows: readonly DamagedThing[]): Errors.VaultError {
   return new Errors.VaultError('damaged_row', Phrases.ChildrenStoredDamaged, { meta: { ask: loggableAskOf(ask), labelpaths: damaged_rows.map(({ labelpath }) => labelpath) } })
+}
+// --
+
+// == [Probing Throwers]: probeStepRefused
+
+// The step's own kind is kept, so a host branches on a probe's refusal as it would on the verb's.
+/** The refusal of `stepkind`, a step of `Vault.probe`, for what it threw: of that refusal's kind, its meta naming the step, the refusal its cause. */
+export function probeStepRefused(stepkind: ProbeStepkind, thrown: unknown): Errors.VaultError {
+  const cause = refusalOfThrown(thrown)
+  return new Errors.VaultError(cause.refusalkind, Phrases.probeStepRefused(stepkind), { cause, meta: { ...cause.meta, stepkind } })
 }
 // --

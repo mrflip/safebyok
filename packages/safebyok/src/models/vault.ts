@@ -1,4 +1,5 @@
-import { Errors, type Helpers, Outcome } from 'safebyok-big/internals'
+import { isEqual } from 'es-toolkit'
+import { Clock, Errors, type Helpers, Outcome } from 'safebyok-big/internals'
 import type { Bank } from './bank'
 import { BaseBox } from './base-box'
 import { Box } from './box'
@@ -14,10 +15,11 @@ import type { PutOnceArgs } from '../shapes/shapes-vault-minder'
 import type { BoxRecord, ScopeAt, ThingScope } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 import { VaultChecks } from '../shapes/shapes-vault'
+import { type ProbeAsked, ProbeChecks, type ProbeLabelpath, type ProbeReport, type ProbeStep, type ProbeStepkind } from '../shapes/shapes-vault-probe'
 import type { VaultMinder } from '../minding/vault-minder'
 import type { ThingCar } from '../minding/thing-car'
 
-/** One bank's boxes in this tab: the verbs to seal and write them, and to use their whispers.
+/** One bank's boxes in this tab: the verbs to seal and write them, to use their whispers, and to probe storage and keys with one.
  * Each seal is made under the bank's lease, so it needs the bank unlocked. A write answers the record stored.
  */
 export class Vault {
@@ -229,6 +231,43 @@ export class Vault {
   }
   // --
 
+  // == [Probing]: probe, tryProbe
+
+  /** Test storage and keys end to end: put a box, get it back from storage, unseal it, check its whisper, and delete it. Needs the bank unlocked.
+   * Resolves a report of each step's time in milliseconds, and whether the whisper unsealed was the one put. It never waits for an `unlock` gating.
+   * The box at `asked.labelpath`, by default {@link ProbeLabelpath}, is written over and then deleted: give a labelpath none of your boxes use.
+   * A step's refusal rejects as a refusal of the same kind, its `meta.stepkind` naming the step and the step's refusal its cause.
+   * Two probes at one labelpath at once may refuse each other's steps.
+   * @example
+   *   const { whisperMatched, steps } = await vault.probe()
+   */
+  async probe(asked: ProbeAsked = {}): Promise<ProbeReport> {
+    const { labelpath, whisper, sidecar } = ProbeChecks.probeAsked.parse(asked)
+    const scope = this.#scopeAt(labelpath as BoxLabelpath)
+    this.#bank.demandEnabled()
+    if (this.#bank.isLocked) { throw Throwers.needUnlocked() }
+    const put    = await timedStepOf('put', () => this.putBoxOnce(scope.labelpath, { sidecar }, { whisper }))
+    // The vault TSQ's get may answer from its item even under a staleTime of 0, since storage's clock dates the item: the minder's get always asks storage.
+    const got    = await timedStepOf('get', async () => {
+      await this.#vaultMinder.getOnce(scope)
+      return this.#demandReadableBox(scope)
+    })
+    const unseal = await timedStepOf('unseal', async () => {
+      const unsealed = await this.unsealBox(got.val)
+      return isEqual(unsealed.whisper, whisper)
+    })
+    const del    = await timedStepOf('del', () => this.delBoxOnce(scope.labelpath))
+    return {
+      labelpath:      scope.labelpath,
+      whisperMatched: unseal.val,
+      steps:          { put: put.step, get: got.step, unseal: unseal.step, del: del.step },
+    }
+  }
+
+  /** {@link probe}, resolving an `Outcome` instead of throwing. */
+  tryProbe(asked: ProbeAsked = {}): Promise<Outcome.Outcome<ProbeReport>> { return Outcome.outcomeOf(() => this.probe(asked)) }
+  // --
+
   // == [Helpers]: #vaultMinder, #sealedWriteOf, #donorAt, #boxCarAt, #scopeAt, #demandOwnBox
 
   /** The bank's VaultMinder, which holds its Things and sends its writes */
@@ -273,4 +312,18 @@ export class Vault {
 
 /** True of the car of a box */
 function isBoxCar(car: ThingCar | undefined): car is ThingCar<Box> { return car?.thing instanceof Box }
+// --
+
+// == [Probing helpers]: timedStepOf
+
+/** What `fn`, the probe's step `stepkind`, resolves, and how long it took; what it throws, as the probe's refusal at that step. */
+async function timedStepOf<ValT>(stepkind: ProbeStepkind, fn: () => Promise<ValT>): Promise<{ val: ValT, step: ProbeStep }> {
+  const startedAt = Clock.nowMillis()
+  try {
+    const val = await fn()
+    return { val, step: { millis: Clock.nowMillis() - startedAt } }
+  } catch (err) {
+    throw Throwers.probeStepRefused(stepkind, err)
+  }
+}
 // --
