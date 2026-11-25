@@ -69,3 +69,18 @@ finished, tested and committed by the second.
     with rows); stated in the README and changeset.
 
 **Rework after review (2026-11-25), renames before the first release:** `demandCaller` is `checkCaller` (it awaits `getUserId`; STYLE.md's `demandFoo` is synchronous, and `checkFoo` promises nothing about sync); `safebyokErrorKindVals`/`SafebyokErrorKind` are `safebyokErrorkindVals`/`SafebyokErrorkind`; `FakeDeployment.as`/`.arrange` are `_cheat_backendAs`/`_cheat_arrange`. The security.md entry's one `demandCaller` was changed in place, since that entry is unmerged. The old safebyok-convex-big keeps the old names.
+
+**Rework after lease_shelf's line (2026-11-25):** rebased onto #916's tip f99077407 (`sprintbase`), now on main with #905
+`stats`, #911 `pg_read_tc` and #915 `one_watch`. One conflict, `packages/safebyok/src/storage.ts`'s `shapes-asks`
+export: main added `type StatsAsk`, this thread `checkedWriteAsk`, `checkedBirthBankAsk` and `birthPutsOf`; both kept.
+* **`doStats`**: a new component query `stats` (served by the wrapper as the seventh function, behind `checkCaller`)
+  reads every Thing of the bank by `by_scope` (`bankThingsIn`, now shared with `watchThings`) beside `rootsIn`, and
+  returns `vaultStatsOf`'s `box` and `gate` with the bank and `tracked`. The client adds `max: ConvexBankLimits`,
+  32,000 Things and 16,777,216 bytes: Convex's documented per-query limits (documents scanned, data read), which bound
+  a bank because the stats and the watch read it whole. The stats battery runs against Convex (194 tests).
+* **`read_tc`: left to the fallback**, as memory and IndexedDB do. Considered minting it in the component with
+  `readTcNow()` under Convex's `Date.now()`; set aside because a query's `Date.now()` is frozen at its start and Convex
+  re-serves a cached query result (its best-practices page: a `Date.now()` query is still cached, only invalidated
+  more often), so a later get could answer an earlier read_tc, against the battery's "a later read_tc for each later
+  list"; and using `Date.now()` in a query costs Convex's cache. Answers keep the device time made before the call is
+  sent; watch notices are dated on arrival.
