@@ -4,12 +4,12 @@
 import 'fake-indexeddb/auto'
 import { noop } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { type VaultEvent, Shell, VaultError } from 'safebyok/storage'
+import { type StatsAnswer, type StoreLimits, type VaultEvent, Shell, StoreLimitCap, VaultError } from 'safebyok/storage'
 import { IdbVaultDB } from '../src/idb-vault-db'
 import { VaultDBVersion } from '../src/vault-shelf'
 import * as TH from './test-helpers'
 
-afterEach(() => { vi.restoreAllMocks() })
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 TH.describeVaultDBBattery('IdbVaultDB', {
   makeVaultDB:   () => TH.makeIdbVaultDB(),
@@ -73,6 +73,32 @@ describe("IdbVaultDB's databases", () => {
     const answer = await idbVaultDB.tryListThings(TH.listAskAt('box'))
     await TH.expectGood(answer)
     expect(answer.deltas.map(({ labelpath }) => labelpath)).to.deep.equal([box.labelpath])
+  })
+})
+
+/** The answer to an ask for the test bank's stats from a fresh IdbVaultDB, in a browser whose `navigator` is `navigatorStub`. */
+async function statsWhere(navigatorStub: object): Promise<StatsAnswer> {
+  vi.stubGlobal('navigator', navigatorStub)
+  return await TH.makeIdbVaultDB().tryStats(TH.statsAskOf())
+}
+
+/** The limits a good `answer` reports, or null for a refusal. */
+function maxOf(answer: StatsAnswer): StoreLimits | null { return answer.ok ? answer.val.max : null }
+
+describe("IdbVaultDB's stats", () => {
+  it("reports the quota the browser estimates as its size limit, capped, and the cap as its count limit", async () => {
+    const estimated = await statsWhere({ storage: { estimate: () => Promise.resolve({ quota: 5_000_000, usage: 10 }) } })
+    expect(maxOf(estimated)).to.deep.equal({ count: StoreLimitCap, size: 5_000_000 })
+    const vast = await statsWhere({ storage: { estimate: () => Promise.resolve({ quota: 10 * StoreLimitCap }) } })
+    expect(maxOf(vast)).to.deep.equal({ count: StoreLimitCap, size: StoreLimitCap })
+  })
+
+  it("reports the cap for each limit where the browser gives no estimate", async () => {
+    expect(maxOf(await statsWhere({}))).to.deep.equal({ count: StoreLimitCap, size: StoreLimitCap })
+  })
+
+  it("refuses storage_unavailable where the browser's estimate fails", async () => {
+    await TH.expectBad(statsWhere({ storage: { estimate: () => Promise.reject(new Error('no estimate')) } }), 'storage_unavailable')
   })
 })
 
