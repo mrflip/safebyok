@@ -247,10 +247,11 @@ export function trackedOf({ userid, banklabel, track }: AnyAsk, fetched: Tracked
   }
 }
 
-// A pair at the void revision is how an ask says it tracks nothing of that root, as an ask without a track once did.
-/** `'same'`, or the Thing at `scope` checked by `check`: a root `pair` tracks at the void revision is always `'same'`. */
+// Nothing stored is at the void revision, as the shell is: a pair there is the same as no row, and differs from any row.
+/** `'same'`, or the Thing at `scope` checked by `check`: `'same'` where the raw row has the revision `pair` tracks, or where none is stored and `pair` is at the void revision. */
 function trackedEntryOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>, scope: ThingScope, pair: Track['bank'], raw: unknown): RecordT | 'same' {
-  return ((raw === 'same') || (pair.revseq === SX.VoidRevisionSeq)) ? 'same' : writtenOf(check, scope, raw)
+  const isVoidSame = (raw === null) && (pair.revseq === Shell.Cited.revseq) && (pair.lifepath === Shell.Cited.lifepath)
+  return ((raw === 'same') || isVoidSame) ? 'same' : writtenOf(check, scope, raw)
 }
 // --
 

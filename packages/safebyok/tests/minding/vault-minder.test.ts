@@ -146,7 +146,7 @@ describe("VaultMinder, what only a wrapper can show", () => {
     await TH.aWhile()
     expect(events).to.deep.equal([])
     await vaultDB.tryGetThing(TH.getGateAskOf())
-    expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate')])
+    expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ...firstSeen('box')])
   })
 
   it("calls the wrapped watch's stop once, however often swept", () => {
@@ -216,7 +216,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     await inner.tryBirthBank(TH.birthBankAskOf())
     for (const label of ['openai', 'anthropic']) { await inner.tryWriteThing(TH.birthAskOf(TH.boxThingOf(label), Shell.childCited(TH.Life0))) }
     const { events } = heardOf(vaultDB)
-    await vaultDB.tryListThings(TH.listAskAt('box'))
+    await vaultDB.tryListThings({ ...TH.listAskAt('box'), track: TH.trackOf() })
     expect(shorthandsOf(events)).to.deep.equal([
       ...firstSeen('bank'), ...firstSeen('gate'), ...firstSeenSparse('box'), ...firstSeenSparse('box/anthropic'), ...firstSeenSparse('box/openai'),
     ])
@@ -228,7 +228,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
   it("tells of a birth's roots, each write's record, and a get's record, the answers' own objects", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     const { events } = heardOf(vaultDB)
-    const born = await vaultDB.tryBirthBank(TH.birthBankAskOf())
+    const born = await vaultDB.tryBirthBank(TH.birthBankAskOf({ track: TH.trackOf() }))
     expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ...firstSeen('box')])
     const box = TH.boxThingOf()
     const written = await vaultDB.tryWriteThing(TH.birthAskOf(box, Shell.childCited(TH.Life0)))
@@ -245,14 +245,14 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     await inner.tryBirthBank(TH.birthBankAskOf())
     const { events } = heardOf(vaultDB)
     await vaultDB.tryGetThing(TH.getGateAskOf())
-    expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate')])
+    expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ...firstSeen('box')])
     await vaultDB.tryGetThing(TH.getGateAskOf())
     const next = TH.nextGateOf(TH.gateThingOf())
     await vaultDB.tryWriteThing(TH.replaceAskOf(TH.gateThingOf(), next))
     const gate = TH.gateThingOf()
     vaultDB.receive(rungOf(gate))
     await TH.aWhile()
-    expect(shorthandsOf(events.slice(4))).to.deep.equal([['item', 'gate', 'full']])
+    expect(shorthandsOf(events.slice(6))).to.deep.equal([['item', 'gate', 'full']])
   })
 
   it("tells of the newest revision seen again in a later span of time, and of nothing for it again in that span", async () => {
@@ -301,7 +301,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await inner.tryBirthBank(TH.birthBankAskOf())
     const { events } = heardOf(vaultDB)
-    expect(await vaultDB.tryGetThing(TH.getAskAt('box/openai'))).to.deep.include({ act: 'gotvoid' })
+    expect(await vaultDB.tryGetThing({ ...TH.getAskAt('box/openai'), track: TH.trackOf() })).to.deep.include({ act: 'gotvoid' })
     expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ['item', 'box/openai', 'void'], ['life', 'box/openai', 'died']])
     const unborn = sortedOverMemory()
     const unbornEvents = heardOf(unborn.vaultDB).events
@@ -315,8 +315,8 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     const { events } = heardOf(vaultDB)
     const answer = await vaultDB.tryWriteThing({ ...TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)), ifAbsent: 'fail' })
     expect(answer).to.deep.include({ ok: false, act: 'void' })
-    expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ['item', 'box/openai', 'void'], ['life', 'box/openai', 'died']])
-    expect(events[4]).to.deep.include({ val: Shell.of({ ...TH.BoxScope, lifepath: `${TH.Life0}/${Shell.VoidLifeseq}` }) })
+    expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ...firstSeen('box'), ['item', 'box/openai', 'void'], ['life', 'box/openai', 'died']])
+    expect(events[6]).to.deep.include({ val: Shell.of({ ...TH.BoxScope, lifepath: `${TH.Life0}/${Shell.VoidLifeseq}` }) })
   })
 
   it("tells of the void at a root as the root's own shell", async () => {
@@ -420,12 +420,12 @@ describe("VaultMinder.receive(event)", () => {
     const read_tc = readTcNow()
     vaultDB.receive(rungOf(next, read_tc))
     vaultDB.receive(rungOf(TH.boxThingOf(), read_tc))
-    const rung = events.slice(4)
+    const rung = events.slice(6)
     expect(shorthandsOf(rung)).to.deep.equal([['item', 'gate', 'full'], ...firstSeen('box/openai')])
     for (const event of rung) { expect(event).to.deep.include({ sourcelabel: 'other_tab', read_tc }) }
     expect(rung[0]).to.deep.include({ val: next })
     await vaultDB.tryGetThing(TH.getGateAskOf())
-    expect(events).to.have.lengthOf(7)
+    expect(events).to.have.lengthOf(9)
   })
 
   it("tells of nothing for a repeat received, or for a life or aged event, whatever its agerank", async () => {
@@ -680,15 +680,17 @@ describe("VaultMinder's asks: makeGetAsk, makeListAsk, makePutAsk and makeDelAsk
     expect(vaultDB.makeDelAsk({ cited: box, record: TH.boxTombOf(box) })).to.deep.include({ ...TH.ThingBank, op: 'del', modelkind: 'box', ifAbsent: 'fail', ...known })
   })
 
-  it("carry the banktok, and track the root box at the void revision while its Thing is not kept, or holds only its shell", async () => {
+  it("track each root at the void revision while its Thing is not kept, or holds only its shell, so a get's answer sends each root stored whole", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await TH.expectGood(inner.tryBirthBank(TH.birthBankAskOf()))
-    await vaultDB.tryGetThing(TH.getAskAt('bank'))
-    expect(vaultDB.makeGetAsk({ labelpath: 'box/openai' })).to.deep.include({ banktok: TH.bankThingOf().lifetok, track: { ...TH.trackOf(), box: VoidTrack.box } })
+    expect(vaultDB.makeGetAsk({ labelpath: 'box/openai' }).track).to.deep.equal(VoidTrack)
     const soon = TH.boxSparseOf(TH.rootBoxOf({ revseq: 3 }))
     vaultDB.receive(rungOf(soon))
     expect(vaultDB.thingAt(TH.RootScope)?.pickle()).to.deep.equal(Shell.of(TH.RootScope))
-    expect(vaultDB.makeGetAsk({ labelpath: 'box/openai' }).track.box).to.deep.equal(VoidTrack.box)
+    expect(vaultDB.makeGetAsk({ labelpath: 'box/openai' }).track).to.deep.equal(VoidTrack)
+    const answer = await vaultDB.tryGetThing(vaultDB.makeGetAsk({ labelpath: 'bank' }))
+    expect(answer).to.deep.include({ ok: true, tracked: { bank: TH.bankThingOf(), gate: TH.gateThingOf(), box: TH.rootBoxOf() } })
+    expect(vaultDB.makeGetAsk({ labelpath: 'box/openai' })).to.deep.include({ banktok: TH.bankThingOf().lifetok, track: TH.trackOf() })
   })
 
   it("track a root known newer only sparse at the whole record its Thing holds, so the answer sends the newer whole", async () => {

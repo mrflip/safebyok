@@ -48,13 +48,17 @@ export function describeVaultDBTracked({ fresh, bornBank }: VaultDBBatteryWorld)
       expect(await vaultDB.tryBirthBank(other)).to.deep.include({ ok: true, act: 'passed', tracked: { bank: 'same', gate: 'same', box: 'same' } })
     })
 
-    it("is 'same' for each root an ask tracks at the void revision, whether or not one is stored", async () => {
-      const same    = { bank: 'same', gate: 'same', box: 'same' }
-      const vaultDB = await bornBank()
-      expect(await vaultDB.tryGetThing({ ...getAskAt('box'), track: VoidTrack })).to.deep.include({ ok: true, tracked: same })
-      expect(await vaultDB.tryListThings({ ...listAskAt('box'), track: VoidTrack })).to.deep.include({ ok: true, tracked: same })
-      const empty   = await fresh()
+    it("is, for each root, 'same' where the ask tracks the void revision and none is stored, or tracks the revision stored, and the stored root whole where it tracks any other", async () => {
+      const same  = { bank: 'same', gate: 'same', box: 'same' }
+      const whole = { bank: bankThingOf(), gate: gateThingOf(), box: rootBoxOf() }
+      const empty = await fresh()
       expect(await empty.tryGetThing({ ...getAskAt('box'), track: VoidTrack })).to.deep.include({ ok: true, act: 'gotvoid', tracked: same })
+      const vaultDB = await bornBank()
+      expect(await vaultDB.tryGetThing({ ...getAskAt('box'), track: VoidTrack })).to.deep.include({ ok: true, tracked: whole })
+      expect(await vaultDB.tryListThings({ ...listAskAt('box'), track: VoidTrack })).to.deep.include({ ok: true, tracked: whole })
+      expect(await vaultDB.tryGetThing({ ...getAskAt('box'), track: trackOf() })).to.deep.include({ ok: true, tracked: same })
+      const mixed = { bank: VoidTrack.bank, gate: trackOf().gate, box: RootStaleTrack.box }
+      expect(await vaultDB.tryGetThing({ ...getAskAt('box'), track: mixed })).to.deep.include({ ok: true, tracked: { bank: bankThingOf(), gate: 'same', box: rootBoxOf() } })
     })
 
     it("refuses a track that is not the revseq and lifepath of the bank, the main gate and the root box", async () => {

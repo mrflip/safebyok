@@ -96,7 +96,7 @@ const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => 
 export const AskChecks = Object.freeze({ ...RawChecks, loggableAsk })
 
 /** The revseq and lifepath the ask's sender has of its bank, its main gate and its root box, each at the void revision where it knows none stored.
- * The answer's `tracked` says, for each, whether it is still the one stored; a root tracked at the void revision is always `'same'`.
+ * The answer's `tracked` says, for each, whether it is still the one stored; a root tracked at the void revision is `'same'` where none is stored.
  */
 export type Track           = Readonly<Z.infer<typeof AskChecks.track>>
 /** The revseq and lifepath a track gives a root its sender knows none stored of. */
