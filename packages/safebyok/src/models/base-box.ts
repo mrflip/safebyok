@@ -1,4 +1,4 @@
-import { CX, Clock, Crypto, StableJsonify, Validator } from 'safebyok-big/internals'
+import { CX, Clock, StableJsonify, Validator } from 'safebyok-big/internals'
 import type { BoxRecord, Sealed, ThingScope } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 import type { BoxCleartexts, BoxPublicProps, LiveOf, RevisionOf, SealTags, Sealable, Sealer, TombstoneOf } from '../shapes/shapes-sealers'
@@ -67,7 +67,7 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
     const heirSidecar = (thing.am === 'a') ? donorSidecar : undefined
     const { sidecar = heirSidecar, written_at = Clock.nowMillis() } = BoxChecks.publicProps.parse(publicProps)
     if (sidecar === undefined) { throw Throwers.sidecarMissing() }
-    const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'a', sidecar } as const
+    const revision = { ...BaseThing.revisionAfter(thing, written_at), am: 'a', sidecar } as const
     if (thing.am === 'a') {
       return { ...thing, ...revision }
     }
@@ -82,7 +82,7 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
   static tombstoneOf(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps = {}): RevisionOf<TombstoneOf<BoxRecord>, BoxCleartexts> {
     const thing                              = BoxChecks.liveSealable.parse(donorProps)
     const { written_at = Clock.nowMillis() } = BoxChecks.tombstonePublicProps.parse(publicProps)
-    const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'x', sidecar: {} } as const
+    const revision = { ...BaseThing.revisionAfter(thing, written_at), am: 'x', sidecar: {} } as const
     return { ...thing, ...BaseThing.nextLifeOf(thing), ...revision }
   }
   // --

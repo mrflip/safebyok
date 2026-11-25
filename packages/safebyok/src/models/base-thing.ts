@@ -1,5 +1,5 @@
 import { pick } from 'es-toolkit'
-import { SX } from 'safebyok-big/internals'
+import { Crypto, SX } from 'safebyok-big/internals'
 import { type Banklabel, type EpochMillis, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq, VoidLifeseq } from '../shapes/primitives'
 import type { ShellOf } from '../shapes/shapes-sealers'
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, Shell, ThingChecks } from '../shapes/shapes-thing'
@@ -113,7 +113,7 @@ export abstract class BaseThing implements Sparse<ThingRecord> {
   }
   // --
 
-  // == [Reading records]: shellOf, haveSameScope, cmp, sparseOf, nextLifeOf
+  // == [Reading records]: shellOf, haveSameScope, cmp, sparseOf, nextLifeOf, revisionAfter
 
   // The shell is built at `seen`'s labelpath, so it is of `seen`'s kind, which TypeScript cannot follow through `Shell`.
   /** The shell a Thing of `seen` is made at: `seen` itself where it is the void sentinel, else the shell under the lives it names above it. */
@@ -144,6 +144,11 @@ export abstract class BaseThing implements Sparse<ThingRecord> {
   static nextLifeOf({ lifeseq, lifepath }: Pick<Sparse<ThingRecord>, 'lifeseq' | 'lifepath'>): Pick<Sparse<ThingRecord>, 'lifeseq' | 'lifepath'> {
     const nextLifeseq = Lifeseq.ofLifenum(Lifeseq.lifenumOf(lifeseq) + 1)
     return { lifeseq: nextLifeseq, lifepath: `${lifepath.slice(0, lifepath.lastIndexOf('/') + 1)}${nextLifeseq}` }
+  }
+
+  /** The revtok, revseq and `written_at` of the revision after `cited`, written at `written_at`: a fresh revtok, and the next revseq. */
+  static revisionAfter({ revseq }: Pick<ThingCited, 'revseq'>, written_at: EpochMillis): Pick<Sparse<ThingRecord>, 'revtok' | 'revseq' | 'written_at'> {
+    return { revtok: Crypto.randomId(), revseq: revseq + 1, written_at }
   }
   // --
 }
