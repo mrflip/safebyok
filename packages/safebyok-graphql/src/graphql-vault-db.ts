@@ -1,7 +1,6 @@
 /** A browser-side vaultDB that sends each verb to your GraphQL server, where `vaultResolvers` answers it from the server's own vaultDB. */
 
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
-import type * as Z from 'zod'
 import * as DB from 'safebyok/storage'
 import { Classifier } from 'safebyok/storage'
 import { WireChecks } from './shapes/shapes-wire'
@@ -32,7 +31,7 @@ const graphQLVaultDBOpts = DB.objCheck(({ custom }) => ({
   client: custom<GraphQLVaultClient>(isGraphQLVaultClient, Phrases.NotGraphQLVaultClient),
 }), 'bad_record')
 
-true satisfies DB.AssertEqual<GraphQLVaultDBOpts, Z.input<typeof graphQLVaultDBOpts>>
+true satisfies DB.AssertEqual<GraphQLVaultDBOpts, DB.CheckerInput<typeof graphQLVaultDBOpts>>
 // --
 
 // == [The vaultDB]: GraphQLVaultDB

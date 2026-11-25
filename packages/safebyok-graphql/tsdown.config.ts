@@ -17,6 +17,9 @@ export default defineConfig({
   sourcemap:  true,
   clean:      true,
   exports:    { devExports: '@safebyok/source' },
+  // The declarations of the package's own checks name zod's types while they are built, and none survives into dist:
+  // left to bundle, zod is listed in package.json as inlined, though nothing of it is.
+  deps:       { neverBundle: [/^zod(\/|$)/u] },
   publint:    { level: 'warning' },
   attw:       { profile: 'strict', level: 'error' },
   failOnWarn: 'ci-only',
