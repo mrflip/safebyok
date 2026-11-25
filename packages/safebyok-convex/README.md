@@ -134,7 +134,7 @@ await deployment.close()
 
 * `deployment.client(subject)` is a `ConvexClient` signed in as `subject`, or as no one.
   `deployment.connectWith(subject, make)` connects any other client, such as a `ConvexReactClient`.
-* `deployment.arrange(change)` runs `change` on the backend, and every client watching hears of it, as it would a write
+* `deployment._cheat_arrange(change)` runs `change` on the backend, and every client watching hears of it, as it would a write
   from elsewhere.
 * The clients log quietly. Pass a `logger`, as in `fakeDeployment(host, { logger })`, to capture their log lines.
 

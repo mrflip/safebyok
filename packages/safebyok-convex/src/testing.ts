@@ -127,14 +127,14 @@ export class FakeDeployment<Host extends FakeHost> {
   }
 
   /** Return the backend, acting as `subject`, to set up or inspect stored rows directly.
-   * A change made this way is not pushed to watchers: use `arrange` for that.
+   * A change made this way is not pushed to watchers: use `_cheat_arrange` for that.
    */
-  as(subject: string | null): ReturnType<Host['createTest']> {
+  _cheat_backendAs(subject: string | null): ReturnType<Host['createTest']> { // eslint-disable-line unicorn/prefer-private-class-fields
     return this.backendAs(subject) as ReturnType<Host['createTest']>
   }
 
   /** Run `change` on the backend, then push every watched query whose result changed. */
-  async arrange<T>(change: (backend: ReturnType<Host['createTest']>) => Promise<T>): Promise<T> {
+  async _cheat_arrange<T>(change: (backend: ReturnType<Host['createTest']>) => Promise<T>): Promise<T> { // eslint-disable-line unicorn/prefer-private-class-fields
     const answer = await this.enqueue(async () => {
       const changed = await change(this.backend as ReturnType<Host['createTest']>)
       this.ts += 1

@@ -67,3 +67,5 @@ finished, tested and committed by the second.
   * Setup path in the README (three steps) is the one you asked be right and short: please read it against your app.
   * Upgrading from convex-big means emptying the old component tables before deploy (Convex refuses to drop a table
     with rows); stated in the README and changeset.
+
+**Rework after review (2026-11-25), renames before the first release:** `demandCaller` is `checkCaller` (it awaits `getUserId`; STYLE.md's `demandFoo` is synchronous, and `checkFoo` promises nothing about sync); `safebyokErrorKindVals`/`SafebyokErrorKind` are `safebyokErrorkindVals`/`SafebyokErrorkind`; `FakeDeployment.as`/`.arrange` are `_cheat_backendAs`/`_cheat_arrange`. The security.md entry's one `demandCaller` was changed in place, since that entry is unmerged. The old safebyok-convex-big keeps the old names.

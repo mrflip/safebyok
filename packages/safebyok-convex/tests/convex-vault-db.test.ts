@@ -12,7 +12,7 @@ import { fakeDeployment } from '../src/testing'
 import type { FakeDeployment, FakeHost } from '../src/testing'
 
 type ComponentDeployment = FakeDeployment<ReturnType<typeof TH.componentHost>>
-type ComponentBackend = ReturnType<ComponentDeployment['as']>
+type ComponentBackend = ReturnType<ComponentDeployment['_cheat_backendAs']>
 type ComponentDb = Parameters<Parameters<ComponentBackend['run']>[0]>[0]['db']
 
 // Each deployment a test makes is closed afterwards, so no client keeps its socket's timers alive.
@@ -51,10 +51,10 @@ async function thingDocAt(db: ComponentDb, { userid, banklabel, labelpath }: Thi
   return await db.query('things').withIndex('by_scope', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel).eq('labelpath', labelpath)).unique()
 }
 
-/** The cheat into what `convexVaultDB` stores. Each plants through `arrange`, so the clients hear of it as of a write from elsewhere. */
+/** The cheat into what `convexVaultDB` stores. Each plants through `_cheat_arrange`, so the clients hear of it as of a write from elsewhere. */
 function _cheat_convexThingsOf(convexVaultDB: ConvexVaultDB): TH.VaultDBRowCheats {
   const { deployment } = madeOf(convexVaultDB)
-  const run: ComponentBackend['run'] = async (fn) => await deployment.arrange(async (backend) => await backend.run(fn))
+  const run: ComponentBackend['run'] = async (fn) => await deployment._cheat_arrange(async (backend) => await backend.run(fn))
   return {
     plant: async (scope, raw) => {
       await run(async ({ db }) => {
@@ -106,7 +106,7 @@ function alterWritten(convexVaultDB: ConvexVaultDB, alter: (written: unknown) =>
 
 /** How many Things the deployment stores. */
 async function thingCountOf(convexVaultDB: ConvexVaultDB): Promise<number> {
-  const docs = await madeOf(convexVaultDB).deployment.as(null).run(async ({ db }) => await db.query('things').collect())
+  const docs = await madeOf(convexVaultDB).deployment._cheat_backendAs(null).run(async ({ db }) => await db.query('things').collect())
   return docs.length
 }
 
