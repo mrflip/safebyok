@@ -77,10 +77,12 @@ call made before then refuses as `identity_revoked`.
   copy of safebyok.
 * **A watch hears every device's writes**, from a `watchThings` query kept open on the bank. Convex sends the whole
   bank each time a Thing changes, and the watch tells its listener of each Thing that differs from the last result.
-* **Any other failure refuses as `storage_unavailable`**, naming the call but none of Convex's error text, which on a dev
-  deployment may quote the call's arguments. Your deployment's logs have the full error. Offline, a call waits for the
-  connection, as every Convex call does, and Convex resends a mutation when it reconnects, so a write may land after
-  any timeout you set.
+* **Any other failure refuses as `storage_issue`**: Convex resends a call itself after a reconnect, so a call that
+  fails, failed in your deployment, and trying it again is unlikely to help. The refusal's message names the call but
+  none of Convex's error text, which on a dev deployment may quote the call's arguments; Convex's error is its `cause`
+  (in production, Convex's own "Server Error" and a request ID), and your deployment's logs have the request. A
+  `ConvexError` your own code throws goes the same way. Offline, a call waits for the connection, as every Convex call
+  does, and Convex resends a mutation when it reconnects, so a write may land after any timeout you set.
 
 ## What is stored
 

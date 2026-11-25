@@ -48,7 +48,7 @@ export type { IfAbsent, IfPresent, PutIfAbsent, RefusedAct } from 'safebyok-big/
 export { VaultError, isVaultError, type Capacity, type RefusalFamily, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'
 export { fetchFailed, identityRevoked, sanitizeForeignError, storageFailed, storageRefusalOf, storageUnavailable, unexpectedError } from 'safebyok-big/storage'
 export { storageIssue } from 'safebyok-big/refusals/throwers'
-export { storeQuotaTooSmall } from './refusals/throwers'
+export { storageCallRefused, storeQuotaTooSmall } from './refusals/throwers'
 // An IndexedDB store's own: each call's one transaction, the row at a key within it, and the versioned database.
 export { dbprefixOf, inOneStep, rowAt, versionedShelfOf, type VersionedShelfSpec } from 'safebyok-big/storage'
 export { Checker, Checkers, objCheck, type ConsistencyRefusal, type ObjCheckOpts, type Refusing, type Story } from 'safebyok-big/storage'

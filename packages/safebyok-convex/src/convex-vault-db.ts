@@ -197,13 +197,14 @@ async function runOrRefuse<ValT>(oplabel: string, thunk: () => Promise<ValT>): P
   }
 }
 
-// On a dev deployment Convex's error text may quote the call's arguments, so its message is never passed on. A refusal from
-// the host's safebyok functions is recognized by its `data`, which only they make.
-/** The refusal for `thrown`: a refusal sent by the host's safebyok functions, else `storage_unavailable` naming `oplabel`. */
+// Convex's client sends a call again itself after a reconnect, so what it throws is a function's failure, which would repeat.
+// Its error is kept only as the cause, never in the message: on a dev deployment its text may quote the call's arguments.
+// A refusal from the host's safebyok functions is recognized by its `data`, which only they make.
+/** The refusal for `thrown`: a refusal sent by the host's safebyok functions, else `storage_issue` naming `oplabel`. */
 function refusalOf(oplabel: string, thrown: unknown): VaultError {
-  if (! (thrown instanceof ConvexError)) { return DB.storageFailed(oplabel, thrown) }
+  if (! (thrown instanceof ConvexError)) { return DB.storageCallRefused(oplabel, thrown) }
   const refusalReport = safebyokRefusal.safeParse(thrown.data)
-  return refusalReport.success ? refusalOfCrossed(refusalReport.data) : DB.storageFailed(oplabel, thrown)
+  return refusalReport.success ? refusalOfCrossed(refusalReport.data) : DB.storageCallRefused(oplabel, thrown)
 }
 
 /** Rebuild the VaultError that `crossed`, a `ConvexError`'s `data`, describes, with the core's message. */

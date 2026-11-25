@@ -249,10 +249,15 @@ export function probeStepRefused(stepkind: string): string {
 export const ProbePutNotGot = "Storage answered the probe's get without the revision its put had just written: storage lost the write, or answered from a replica or cache that lags behind it."
 // --
 
-// == [Storing]: StoreQuotaTooSmall
+// == [Storing]: StoreQuotaTooSmall, storageCallRefused
 
 /** An IndexedDB store opened where the browser offers the page `quota` bytes, fewer than the `least` a vault needs. */
 export function StoreQuotaTooSmall(quota: number, least: number): string {
   return `This browser offers the page ${String(quota)} bytes of storage, and a vault needs at least ${String(least)}.`
+}
+
+/** The vault's storage refused the call `oplabel`, as it would again. */
+export function storageCallRefused(oplabel: string): string {
+  return `The vault's storage refused ${oplabel}: trying again is unlikely to help. Its logs have the request, and this refusal's cause has what it answered.`
 }
 // --

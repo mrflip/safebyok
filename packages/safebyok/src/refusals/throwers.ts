@@ -3,7 +3,7 @@
 // The rules for a refusal, its thrower and its phrase are at the top of safebyok-big's refusals/throwers.ts.
 
 import { Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
-import { unexpectedError } from 'safebyok-big/refusals/throwers'
+import { sanitizeForeignError, unexpectedError } from 'safebyok-big/refusals/throwers'
 import * as Phrases from '../phrases'
 import { type ThingRecord } from '../shapes/shapes-thing'
 import { StoreLimitFloor } from '../shapes/shapes-vault-stats'
@@ -92,7 +92,7 @@ export function bornAtNotNow(ask: WriteAsk): Errors.VaultError { return new Erro
 export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
 // --
 
-// == [Storing Throwers]: PoliciedMeta, gateIssue, storeQuotaTooSmall, bornAtNotStored, lifetokNotStored, rowOfOtherAddress, bankRootsMissing, listParentNotLive, answerNotMade
+// == [Storing Throwers]: PoliciedMeta, gateIssue, storeQuotaTooSmall, storageCallRefused, bornAtNotStored, lifetokNotStored, rowOfOtherAddress, bankRootsMissing, listParentNotLive, answerNotMade
 
 // Big types a refusal's meta.act as its own BadAct, which has no `policied`.
 /** Refusal meta with act `policied`, for a write the act tables allow but a storage policy, the born_at check or the lifetok check refuses. */
@@ -106,6 +106,11 @@ export function gateIssue(stored: ThingRecord | null, why: string): Errors.Vault
 /** A `storage_blocked` refusal: the browser's `quota` of bytes for the page is under {@link StoreLimitFloor}, too little for a vault. */
 export function storeQuotaTooSmall(quota: number): Errors.VaultError {
   return new Errors.VaultError('storage_blocked', Phrases.StoreQuotaTooSmall(quota, StoreLimitFloor))
+}
+
+/** A `storage_issue` refusal: the vault's storage refused the call `oplabel`, and would refuse it again. What it threw is the cause. */
+export function storageCallRefused(oplabel: string, thrown: unknown): Errors.VaultError {
+  return new Errors.VaultError('storage_issue', Phrases.storageCallRefused(oplabel), { cause: sanitizeForeignError(thrown) })
 }
 
 /** A `bad_record` refusal of a write over `stored`, the live Thing whose born_at it changes. */

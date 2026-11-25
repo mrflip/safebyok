@@ -118,11 +118,27 @@ describe("ConvexVaultDB's refusals", () => {
     await TH.expectBad(convexVaultDB.tryBirthBank(TH.birthBankAskOf()), 'identity_revoked')
   })
 
-  it("quote nothing of any other failure's text", async () => {
+  it("refuse a failed call as storage_issue, Convex's error its cause", async () => {
+    const convexVaultDB = makeConvexVaultDB()
+    const thrown = new Error('[Request ID: 0123456789abcdef] Server Error')
+    failNextCallWith(convexVaultDB, thrown)
+    const refusal = await TH.expectBad(convexVaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
+    expect(refusal.cause).to.equal(thrown)
+  })
+
+  it("quote nothing of a failed call's error in the refusal's message", async () => {
     const convexVaultDB = makeConvexVaultDB()
     failNextCall(convexVaultDB, 'host detail sk-live-0000')
-    const refusal = await TH.expectBad(convexVaultDB.tryGetThing(TH.getGateAskOf()), 'storage_unavailable')
-    expect(TH.thrownText(refusal)).not.to.include('sk-live-0000')
+    const refusal = await TH.expectBad(convexVaultDB.tryWriteThing(TH.birthAskOf()), 'storage_issue')
+    expect(refusal.message).not.to.include('sk-live-0000')
+  })
+
+  it("refuse a host's own ConvexError as storage_issue, the error its cause", async () => {
+    const convexVaultDB = makeConvexVaultDB()
+    const thrown = new ConvexError({ code: 'over_quota' })
+    failNextCallWith(convexVaultDB, thrown)
+    const refusal = await TH.expectBad(convexVaultDB.tryListThings(TH.listAskAt('box')), 'storage_issue')
+    expect(refusal.cause).to.equal(thrown)
   })
 
   it("hand on the component's refusal of an ask, with its sentence", async () => {
