@@ -33,8 +33,8 @@ type Told<AnswerT> = Readonly<{ answer: AnswerT, refusal: Errors.VaultError | nu
 
 /** A vaultDB's verbs over another vaultDB, for one bank, telling its listeners each record it learns of that is news, in order.
  * It learns of the records each answer carries, of what the wrapped vaultDB's watch notifies, and of the events a device database rings, handed to its `receive`.
- * It keeps a Thing for each labelpath it learns of a record at, for as long as it lives, and each Thing's `receive` says what is news.
- * Beside each Thing it keeps the refusal the Thing last raised at a record, and when its last news was read: {@link carAt}.
+ * It keeps a car for each labelpath it learns of a record at, for as long as it lives: {@link carAt}. The car's `receive` says what is news,
+ * and the car keeps the Thing, what a write over it cites, how far it has been seen, and the refusal it last raised at a record.
  * It builds the bank's asks, and its once verbs send them, each answering only once its records have been told.
  * It watches the wrapped vaultDB from when it is made until its `sweep`. A record it learns of while no one listens is
  * taken all the same, and reaches no one, then or later: listen before asking it anything.
@@ -308,7 +308,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   /** The Thing at `scoped`, a labelpath of this vaultDB's bank, or undefined where no record of it has been learned of. The same object across records and lives. */
   thingAt(scoped: ThingScope): ThingT | undefined { return this.carAt(scoped)?.thing }
 
-  /** The Thing at `scoped`, the refusal it last raised at a record and when its last news was read, or undefined where {@link thingAt} is.
+  /** The car of the Thing at `scoped`: what a write over it cites, how far it has been seen, and the refusal it last raised at a record; or undefined where {@link thingAt} is.
    * Its `lastErr` is for a devtool, never for an app's own logic.
    */
   carAt(scoped: ThingScope): ThingCar<ThingT> | undefined {

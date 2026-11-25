@@ -197,7 +197,7 @@ export class Device {
   // once, as bad news told by the VaultMinder; sign-in then reports only what the roots amount to: all three live, the
   // bank unborn, or broken. A failure to fetch them, once a bank is up from what was restored, is no caller's to hear.
   // The VaultMinder is made right before the vault TSQ and the world listen to it, with nothing awaited between: its
-  // Things remember what they take, so a record it took with no one listening would reach them later only as a repeat,
+  // cars remember what they take, so a record it took with no one listening would reach them later only as a repeat,
   // which it drops. The world takes the roots shelved before the vaultDB is asked. The vault is made last, on everything
   // made before it.
   /** Start the signed-in user's bank over a VaultMinder of it: from the roots shelved, where there are any, and from the three roots the vaultDB answers. */
