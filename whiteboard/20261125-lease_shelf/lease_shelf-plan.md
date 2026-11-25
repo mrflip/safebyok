@@ -3,7 +3,7 @@
 Mode: **YOLO**. Issued by the Coach, 2026-11-25. Cap: 3 threads at once.
 Default levels: review `medium`; worker `opus` (thread-worker), reviewer `opus` for threads touching what
 `notes/guarantees-big.md` covers (lease, keys), else its `sonnet` pin; style pass on `style-reviewer`'s pin.
-Status: 0, 1c, 1a filed and out of draft (#900, #902, #903); 2 stats (#905) reviewed (fixed), in rework for the quota floor; 4 probe (#906) reviewed (flagged), in rework; 1d lease_thing building; 8 janitor building; 1b waits on 1d; Closer Look done (doc tab), awaiting triage.
+Status: 0, 1c, 1a, 4 out of draft (#900, #902, #903, #906); 2 stats (#905) refiled after the quota and world.stats() amendment, CI running; 1d (#907) reviewed (fixed), filing; 8 janitor (#908) ready, in review; 1b waits on 1d and 8 (8 restacked onto 1d first) and on the Closer Look's E1.
 
 Sprint doc: https://claude.ai/artifact/2p9KWcXkKrceDPV3sYmDsh (Open Matters bookmark rev 3).
 
@@ -82,7 +82,8 @@ Gloss: the stored `LeaseRecord` carries every Thing sparse field, as a union on 
 `gate_revseq`; tombstone: Thing fields only); `LeaseTombstone` is `TombstoneOf<LeaseRecord>`; "row" leaves every
 lease name; `Lease` is the model over `LiveOf<LeaseRecord>`; `Proving.buildLease` takes the stored lease it follows.
 The wrap stays bound to the stamp alone. `'lease'` stays out of `Thingkind`. Levels: worker `thread-worker-400k` on
-opus; review `high` on opus. Depends on 1a. Building.
+opus; review `high` on opus. Depends on 1a. PR #907. Reviewed; filing.
+*Review:* `high` on opus, fixed: test tables realigned, `stowLease`'s local `lease` → `leaseRecord`, a `Scaffolding:` comment on the gate's `renewal() ?? Lease.shellOf(this)` fallback (1b removes it), two doc blocks. G3, G4, G8, G9 hold; ctx bytes unchanged. Left (minor): `leaseLabelpathOf`/`scopepathOf` exported unchecked (a row); `isOfItsGate`'s type literal; `storedLeaseOf`/`leaseOf` return records; `makeNextRecord` accepts a later `ends_at`; VOCABULARY's *lease* entry says "lives only in memory" (1b).
 
 ### 1b. `lease_shared`: one lease on disk, shared by every tab
 > "Lease is same on all tabs." "Newer gate revision should move lease expiry time to now+softlock time" ... "The
@@ -161,7 +162,7 @@ and the Thing, used by the janitor and root-shelf, so the World no longer decode
 invalidates listings and roots, not items (the listing's sparse records already mark a moved item cold through
 VaultMinder). World.connect's doc block says a call after a failed watch retries it. The janitor stays in World, in
 its own section (the Closer Look's E4 is open). Levels: review `medium` on opus. Branch `20261125-janitor`, cut from
-1a's tip. Depends on 1c; beside 1d; 1b builds on both at the restack. Size: medium.
+1a's tip. Depends on 1c; beside 1d; 1b builds on both at the restack. Size: medium. PR #908, ready; in review. No car `readAt` (the Thing's `read_at` serves).
 
 ## For the Coach
 - **safebyok-convex is still on safebyok-big.** Thread 7's wrapper works for any new-core vaultDB. *Coach:* "convex and
