@@ -595,6 +595,16 @@ describe("device.connect() and device.disconnect()", () => {
     expect(watch).toHaveBeenCalledTimes(2)
   })
 
+  it("leaves a call waiting for an `unlock` gating waiting, and the next unlock resolves it", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const ensuring = bank.ensureUnlocked()
+    device.disconnect()
+    expect(device.world.getSnapshot().isUnlockWanted).to.be.true
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    expect(await ensuring).to.equal(bank)
+  })
+
   it("never throws, telling onBadNews what the vaultDB's watch throws as it starts or stops", async () => {
     const onBadNews = vi.fn()
     const vaultDB = new MemoryVaultDB()
