@@ -25,12 +25,12 @@
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/pg": "^8.23.1",
     "@urql/core": "^6.0.3",
-    "@vitest/coverage-v8": "^5.1.0",
+    "@vitest/coverage-v8": "^5.1.1",
     "@vitest/eslint-plugin": "^1.6.28",
-    "convex": "^1.49.0",
-    "convex-helpers": "^0.1.135",
-    "convex-test": "^0.0.69",
-    "eslint": "^10.14.0",
+    "convex": "^1.51.0",
+    "convex-helpers": "^0.1.136",
+    "convex-test": "^0.0.72",
+    "eslint": "^10.15.0",
     "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-plugin-chai-expect": "^4.1.1",
     "eslint-plugin-chai-friendly": "^1.2.1",
@@ -38,7 +38,7 @@
     "eslint-plugin-sonarjs": "^4.2.2",
     "eslint-plugin-unicorn": "^80.0.0",
     "graphql": "^17.1.0",
-    "graphql-yoga": "^6.0.1",
+    "graphql-yoga": "^6.1.0",
     "pg": "^8.23.1",
     "react": "^19.3.1",
     "safebyok-big": "workspace:*",
@@ -46,7 +46,7 @@
     "safebyok-graphql-big": "workspace:*",
     "safebyok-postgres-big": "workspace:*",
     "typescript": "6.0.3",
-    "typescript-eslint": "^8.72.2",
-    "vitest": "^5.1.0"
+    "typescript-eslint": "^8.73.0",
+    "vitest": "^5.1.1"
   }
 }
