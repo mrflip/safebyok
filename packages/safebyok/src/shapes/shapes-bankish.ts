@@ -166,7 +166,7 @@ export interface DeviceOpts {
   gateStaleMinutes?: number | undefined
   /** Hears each refusal no caller waits on. Default: {@link DefaultOnBadNews}, a warning on the device's logger. */
   onBadNews?:        BadNewsHandler | undefined
-  /** Hears what changed the device's lease, other than your own lock, unlock or disable: a lease taken up as the device signs in or connects, a lock or an unlock in another tab, the autolock, a softlock. Your own gate verb (replacing the passphrase, adding or revoking a passkey) announces `softlocked` in its own tab, since the new gate revision softlocks the old lease before the renewed one attaches. What it throws or rejects with is reported to the platform. Default: {@link DefaultOnLifecycle}, which does nothing. */
+  /** Hears what changed the device's lease, other than your own lock, unlock or disable: a lease taken up as the device signs in or connects, a lock or an unlock in another tab, the autolock, a softlock. Your own gate verb (replacing the passphrase, adding or revoking a passkey) announces `softlocked` in its own tab. What it throws or rejects with is reported to the platform. Default: {@link DefaultOnLifecycle}, which does nothing. */
   onLifecycle?:      LifecycleHandler | undefined
   /** The QueryClient the signed-in user's boxes are kept in, under their bank's key: your own, so one client serves your queries and the vault's. Default: one the device makes. */
   queryClient?:      QueryClient | undefined
