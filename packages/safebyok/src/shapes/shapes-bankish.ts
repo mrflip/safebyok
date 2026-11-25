@@ -112,8 +112,8 @@ export const lifecyclekindVals = ['lease_taken_up', 'lock_taken_up', 'autolocked
 export type Lifecyclekind = typeof lifecyclekindVals[number]
 
 // #lock-is-intent: each is news of what happened, never an alarm.
-/** What changed a device's lease without a call of the host's own, by its `kind`:
- * - `'lease_taken_up'` -- this tab took up the lease the deviceDB stores, newer than its own: an unlock, a renewal or a softlock in another tab, or one stowed before this page loaded
+/** What changed a device's lease, other than its own lock, unlock or disable, by its `kind`:
+ * - `'lease_taken_up'` -- this tab took up the lease the deviceDB stores, newer than its own: an unlock, a renewal or a softlock in another tab, or, as it signs in or connects, one stowed before
  * - `'lock_taken_up'`  -- this tab dropped its lease, as the deviceDB stores one that no longer unlocks the bank: a lock in another tab, its autolock among them
  * - `'autolocked'`     -- this tab's janitor locked the lease past its end, in every tab
  * - `'softlocked'`     -- the bank's gate changed, so this tab brought its lease's end to `softlockMinutes` from now
@@ -123,7 +123,7 @@ export type DeviceAnnouncement = Readonly<{ kind: Lifecyclekind }>
 /** What `onLifecycle` hears: a {@link DeviceAnnouncement}, and the device it happened to. */
 export type DeviceEvent = DeviceAnnouncement & Readonly<{ device: Device }>
 
-/** `Device.make`'s `onLifecycle`: hears what changed the device's lease without a call of the host's own. */
+/** `Device.make`'s `onLifecycle`: hears what changed the device's lease, other than its own lock, unlock or disable. */
 export type LifecycleHandler = (event: DeviceEvent) => unknown
 
 /** `onLifecycle` as a device keeps it, wrapped by `guardOnLifecycle`. It never throws. */
@@ -166,7 +166,7 @@ export interface DeviceOpts {
   gateStaleMinutes?: number | undefined
   /** Hears each refusal no caller waits on. Default: {@link DefaultOnBadNews}, a warning on the device's logger. */
   onBadNews?:        BadNewsHandler | undefined
-  /** Hears what changed the device's lease without a call of yours: a lock or an unlock in another tab, the autolock, a softlock. What it throws or rejects with is reported to the platform. Default: {@link DefaultOnLifecycle}, which does nothing. */
+  /** Hears what changed the device's lease, other than your own lock, unlock or disable: a lease taken up as the device signs in or connects, a lock or an unlock in another tab, the autolock, a softlock. What it throws or rejects with is reported to the platform. Default: {@link DefaultOnLifecycle}, which does nothing. */
   onLifecycle?:      LifecycleHandler | undefined
   /** The QueryClient the signed-in user's boxes are kept in, under their bank's key: your own, so one client serves your queries and the vault's. Default: one the device makes. */
   queryClient?:      QueryClient | undefined

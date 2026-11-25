@@ -301,7 +301,7 @@ export class Device {
   }
 
   // Not awaited: an announcement is news of what happened, and nothing waits on the host's answer.
-  /** Tell the host's `onLifecycle` what changed this device's lease without a call of the host's own. Never throws. Internal: the world calls it. */
+  /** Tell the host's `onLifecycle` of `announcement`. What the handler throws or rejects with is reported to the platform, never thrown. Internal: the world calls it. */
   announce(announcement: DeviceAnnouncement): void {
     Checks.announcement.parse(announcement)
     void this.#onLifecycle({ ...announcement, device: this })
