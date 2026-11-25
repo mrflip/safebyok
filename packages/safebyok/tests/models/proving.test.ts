@@ -528,7 +528,7 @@ describe("a proving's header", () => {
 
   it("asks the device for the devicetok of the bank it is stamped for, of either kind of proving", async () => {
     const ensureDevicetok = vi.fn((_scope: BankScope) => Promise.resolve(TH.Devicetok))
-    const device = { ...TH.provingDeviceOf(), ensureDevicetok }
+    const device          = { ...TH.provingDeviceOf(), ensureDevicetok }
     await novelPassphrase(device)
     await novelPasskey(TH.passkeyAnswerOf(), device)
     expect(ensureDevicetok.mock.calls.map(([scope]) => scope)).to.deep.equal([TH.WorldBankStamp, TH.WorldBankStamp])
