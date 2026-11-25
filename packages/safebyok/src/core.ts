@@ -33,8 +33,8 @@ export { type VaultDB, isVaultDB } from './storage/vault-db'
 export type { Agerank, ItemSeen, Liveness, ReadTc, VaultAgedEvent, VaultEvent, VaultEventOf, VaultEventkind, VaultItemEvent, VaultLifeEvent } from './shapes/shapes-vault-event'
 export {
   type BadNews, type BadNewsHandler, type BankAskDraft, type BankStage, type BoxUnsealed, type DeviceAnnouncement, type DeviceEvent, type DeviceJSON, type DeviceOpts, type DeviceRecord,
-  type HostedVault, type LifecycleHandler, type Lifecyclekind, type RefusalSnapshot, type RootShelf, type ThingMakeOpts, type WorldOpts, type WorldSnapshot,
-  BankishChecks, DefaultBanklabel, PendingWorld, SignedOutWorld, ThingMakeChecks, bankStageVals, isRootShelf, isWorld, lifecyclekindVals,
+  type HostedVault, type LeaseAnnouncement, type LifecycleHandler, type Lifecyclekind, type RefusalSnapshot, type RootShelf, type StageCrossing, type ThingMakeOpts, type WorldOpts, type WorldSnapshot,
+  BankishChecks, DefaultBanklabel, PendingWorld, SignedOutWorld, ThingMakeChecks, bankStageVals, isRootShelf, isWorld, leasekindVals, lifecyclekindVals,
 } from './shapes/shapes-bankish'
 export {
   type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateGatingFriend, type GateRevisionedStamp, type GatingCleartexts, type GuardedKeyDeriver,

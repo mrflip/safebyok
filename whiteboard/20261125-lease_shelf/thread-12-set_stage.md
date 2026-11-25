@@ -1,0 +1,17 @@
+# Thread 12: set_stage (2026-11-25)
+
+Branch `20261125-set_stage`, PR #TBD, stacked on #924 (thread 10). Proved: `pnpm --filter safebyok test` (lint and typecheck clean, 36 files, 2,296 tests). `pnpm justify` after the catch-up: see the PR's **Tests:**.
+
+* **Built**:
+  * **`World#setStage(stage)`** (world.ts, section *Snapshot*): inscribes `#stage`, the stage the world was last at (null before the first), and announces `{ kind: 'stage_crossed', from, to }` through `device.announce` where it differs. `#stageOf()` still computes the stage from its sources and `#makeSnapshot` still builds from it; `#setStage` is called from `align()` with the new snapshot's stage (after the snapshot is set, before the subscribers are told) and once from the constructor, which inscribes the first stage and announces nothing.
+  * **A new lifecycle kind, `stage_crossed`** (shapes-bankish.ts): `lifecyclekindVals` gains it; `leasekindVals` is the four lease kinds; `DeviceAnnouncement` is now `LeaseAnnouncement | StageCrossing` (`StageCrossing` carries `from` and `to`, both `BankStage`). `device.announce` checks the union (device.ts `Checks.announcement`). Exported from core.ts: `LeaseAnnouncement`, `StageCrossing`, `leasekindVals`.
+  * **`DefaultOnLifecycle` now logs** each announcement on `device.logger.log` (big's `VaultLogger` has `log`, `warn`, `error`: `log` is the level for news, per `#lock-is-intent`), story `{ oplabel: 'Device.onLifecycle', ...announcement }`, message from `Phrases.LeaseAnnounced(kind)` or `Phrases.StageCrossed(from, to)` (new phrases.ts section *Telling the host*). The story is the kind and the two stage names: no secret material.
+  * **notes/wontfix.md**: a row for "a tab that replaces its own passphrase hears its own `softlocked`" (the Coach's ruling 2).
+  * Tests: world.test.ts `the host's onLifecycle` (three crossing tests) and `the default onLifecycle` (logs at `log`, none at `warn` or `error`); device.test.ts `device.announce` (default logs; a malformed crossing refuses). `kindsHeardOn` in world.test.ts now leaves the crossings out, so the take-up tests read as before.
+* **Decisions made**:
+  * **The crossing goes to `onLifecycle`**, as the Coach's ruling reads ("a default lifecycle handler that logs each crossing"), so a host's own handler hears crossings too, its own tab's calls included (a host's `lock()` is announced as `unlocked>locked`, where it hears no lease kind for it). Hosts that want only lease news filter on `kind`.
+  * **Where `#setStage` is called**: `align()`, the one place the snapshot changes, so the announcement and the snapshot cannot disagree. The stage is not stored by `#setStage` for anyone to read back: only `#setStage` reads `#stage`, to tell a crossing from a repeat.
+  * A device made with a userid crosses `signed_out>starting` in its own construction, which a host's handler hears as the first crossing.
+* **Approaches set aside**: a separate `onStage` option (the ruling put it through the lifecycle handler); deriving `#stage` instead of holding it (a crossing needs the previous stage).
+* **Discoveries**: the default logger is now busier: every device in a test logs its crossings on the console unless a test passes a logger.
+* **For the Coach**: a host's custom `onLifecycle` now hears `stage_crossed` too; that widens the announcement's contract (`DeviceAnnouncement`), and each existing handler that switches on `kind` without a default sees a new one.
