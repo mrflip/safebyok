@@ -5,7 +5,7 @@ import * as Phrases from '../phrases'
 import { type CitedOf, type DelAskDraft, type PutAskDraft, AskChecks } from './shapes-asks'
 import type { EpochMillis } from './primitives'
 import { type ThingRecord, type VoidSentinel, ThingChecks, isLifepathDeep, isParityRight } from './shapes-thing'
-import { type SeenThing, type VaultEvent, SeenChecks, isSeenForm, livenessVals, vaultEventkindVals } from './shapes-vault-event'
+import { type ReadTc, type SeenThing, type VaultEvent, SeenChecks, isSeenForm, livenessVals, vaultEventkindVals } from './shapes-vault-event'
 import { BaseThing } from '../models/base-thing'
 import type { Adoptable, Thing } from '../models/thing'
 import type { VaultMinder } from '../minding/vault-minder'
@@ -19,7 +19,7 @@ export type ReceivingThing = Pick<Thing<ThingRecord, unknown, unknown, Adoptable
 /** Make the Thing a {@link VaultMinder} keeps at `shell`'s labelpath, holding `shell`: it then receives the first record learned of there. */
 export type ThingMaker<ThingT extends ReceivingThing = ReceivingThing> = (shell: VoidSentinel) => ThingT
 
-/** The Thing a {@link VaultMinder} keeps at a labelpath, and the refusal it last raised at a record. For a devtool: it changes no answer. */
+/** The Thing a {@link VaultMinder} keeps at a labelpath, the refusal it last raised at a record, and when its last news was read. It changes no answer. */
 export type ThingCar<ThingT extends ReceivingThing = ReceivingThing> = Readonly<{
   /** The Thing, the same object for as long as the VaultMinder lives. */
   thing:    ThingT
@@ -27,6 +27,8 @@ export type ThingCar<ThingT extends ReceivingThing = ReceivingThing> = Readonly<
   lastErr:  Errors.VaultError | null
   /** When the Thing last refused a record, or null where it has refused none. */
   erred_at: EpochMillis | null
+  /** When the last record the Thing took as news was read: the `VacantReadTc`, before any record, until it takes one. */
+  read_tc:  ReadTc
 }>
 
 /** Options for `VaultMinder.make`. */

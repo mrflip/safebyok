@@ -21,7 +21,7 @@ import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type ReadTc, type SeenThing, type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { type EpochMillis, type Lifetok, Labelpath } from '../shapes/primitives'
 import { peekRoots, stowRoots } from '../minding/root-shelf'
-import { VacantAgerank, itemSeenOf, readTcNow } from '../storage/agerank'
+import { VacantAgerank, itemSeenOf } from '../storage/agerank'
 import type { VaultMinder } from '../minding/vault-minder'
 import { isVaultMinder } from '../shapes/shapes-vault-minder'
 import * as Phrases from '../phrases'
@@ -172,13 +172,12 @@ export class World {
   }
 
   // Each root is told apart, so a damaged one is news, and the rest still reach their Things.
-  /** Hand `vaultMinder` each root `shelf` keeps of the device's bank. */
+  /** Hand `vaultMinder` each root `shelf` keeps of the device's bank, read when the shelf says it was. */
   #seedFromShelf(vaultMinder: VaultMinder, shelf: RootShelf): void {
-    const read_tc = readTcNow()
     const roots   = peekRoots(shelf, this.#device.scope)
     const banktok = banktokOf(roots[0])
     for (const root of roots) {
-      try { vaultMinder.receive(shelvedEventOf(Checks.shelvedRoot.parse(root), read_tc, banktok)) } catch (err) { this.#device.tellBadNews([err]) }
+      try { vaultMinder.receive(shelvedEventOf(Checks.shelvedRoot.parse(root), banktok)) } catch (err) { this.#device.tellBadNews([err]) }
     }
   }
 
@@ -465,14 +464,14 @@ const RootLabelpaths: ReadonlySet<Labelpath> = new Set(['bank', Labelpath.MainGa
 /** The `sourcelabel` of the events of the roots a world read from its root shelf. */
 const ShelvedSourcelabel = 'root_shelf'
 
-/** The lifetok of `root`, where it is a live bank's record, else the void lifetok, as the events of the roots shelved carry it */
-function banktokOf(root: unknown): Lifetok {
-  const report = PerKindChecks.bankThing.safeParse(root)
-  return (report.success && (report.data.am === 'a')) ? report.data.lifetok : SX.VoidLifeTok
+/** The lifetok of the root shelved in `shelved`, where it is a live bank's record, else the void lifetok, as the events of the roots shelved carry it */
+function banktokOf(shelved: unknown): Lifetok {
+  const report = Checks.shelvedBank.safeParse(shelved)
+  return (report.success && (report.data.record.am === 'a')) ? report.data.record.lifetok : SX.VoidLifeTok
 }
 
-/** The `item` event of `record`, a root read from a root shelf, read at `read_tc` in the bank of `banktok`, with the vacant agerank */
-function shelvedEventOf(record: SeenThing, read_tc: ReadTc, banktok: Lifetok): VaultEvent {
+/** The `item` event of `record`, a root read from a root shelf, read at its `read_tc` in the bank of `banktok`, with the vacant agerank */
+function shelvedEventOf({ record, read_tc }: Readonly<{ record: SeenThing, read_tc: ReadTc }>, banktok: Lifetok): VaultEvent {
   const { userid, banklabel, labelpath } = record
   return {
     eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: VacantAgerank, agerankWas: VacantAgerank,
@@ -554,6 +553,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom, union }) => ({
     shelf:       custom<RootShelf>(isRootShelf, Phrases.RootShelfExpected).nullable(),
   }),
   // The shelf keeps the roots only while all three are live, each whole.
-  shelvedRoot: union([BankChecks.record, GateChecks.record, BoxChecks.record]),
+  shelvedRoot: obj({ record: union([BankChecks.record, GateChecks.record, BoxChecks.record]), read_tc: SeenChecks.readTc }),
+  shelvedBank: obj({ record: PerKindChecks.bankThing }),
 }))
 // --

@@ -6,7 +6,8 @@ import { type ThingRecord, Shell } from '../../src/shapes/shapes-thing'
 import type { ReadTc, SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { VaultMinder } from '../../src/minding/vault-minder'
-import { VacantAgerank, readTcNow } from '../../src/storage/agerank'
+import { v7 as uuidv7 } from 'uuid'
+import { VacantAgerank, VacantReadTc, readTcNow } from '../../src/storage/agerank'
 import { VoidTrack } from '../../src/shapes/shapes-asks'
 import type { VaultDB } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
@@ -549,8 +550,9 @@ describe("VaultMinder.carAt(scoped)", () => {
     const { vaultDB, inner } = refusingOverQuietMemory()
     const { badNews } = heardOf(vaultDB)
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
-    vaultDB.receive(rungOf(Revs.two))
-    expect(vaultDB.carAt(TH.BoxScope)).to.deep.equal({ thing: vaultDB.thingAt(TH.BoxScope), lastErr: null, erred_at: null })
+    const read_tc = readTcNow()
+    vaultDB.receive(rungOf(Revs.two, read_tc))
+    expect(vaultDB.carAt(TH.BoxScope)).to.deep.equal({ thing: vaultDB.thingAt(TH.BoxScope), lastErr: null, erred_at: null, read_tc })
     cheatStored(inner, Revs.three)
     await TH.expectRefusal(vaultDB.getOnce(TH.BoxScope), 'unexpected_error')
     const refused = vaultDB.carAt(TH.BoxScope)!
@@ -558,16 +560,33 @@ describe("VaultMinder.carAt(scoped)", () => {
     expect(isThingRefusal(badNews[0]!)).to.equal(true)
     expect(refused.erred_at).to.be.a('number')
     vaultDB.receive(rungOf(Revs.two))
-    expect(vaultDB.carAt(TH.BoxScope)).to.deep.equal({ thing: refused.thing, lastErr: null, erred_at: refused.erred_at })
+    expect(vaultDB.carAt(TH.BoxScope)).to.deep.equal({ thing: refused.thing, lastErr: null, erred_at: refused.erred_at, read_tc })
   })
 
-  it("is frozen, and the same object until its refusal changes", () => {
+  it("holds when its Thing's last news was read: the vacant read_tc before any, unchanged at a repeat in the same tcchunk, moved in a later one", () => {
+    const { vaultDB } = refusingOverQuietMemory()
+    const earlierAt = (Math.floor(Date.now() / 65_536) - 10) * 65_536
+    const earlier   = uuidv7({ msecs: earlierAt })
+    vaultDB.receive(rungOf(Revs.three, earlier))
+    expect(vaultDB.carAt(TH.BoxScope)!.read_tc).to.eq(VacantReadTc)
+    vaultDB.receive(rungOf(Revs.two, earlier))
+    expect(vaultDB.carAt(TH.BoxScope)!.read_tc).to.eq(earlier)
+    vaultDB.receive(rungOf(Revs.two, uuidv7({ msecs: earlierAt + 1 })))
+    expect(vaultDB.carAt(TH.BoxScope)!.read_tc).to.eq(earlier)
+    const later = readTcNow()
+    vaultDB.receive(rungOf(Revs.two, later))
+    expect(vaultDB.carAt(TH.BoxScope)!.read_tc).to.eq(later)
+  })
+
+  it("is frozen, and the same object until its refusal, or when its last news was read, changes", () => {
     const { vaultDB } = refusingOverQuietMemory()
     vaultDB.receive(rungOf(Revs.two))
     const car = vaultDB.carAt(TH.BoxScope)
-    vaultDB.receive(rungOf(TH.nextOf(Revs.three)))
+    vaultDB.receive(rungOf(Revs.two))
     expect(vaultDB.carAt(TH.BoxScope)).to.equal(car)
     expect(Object.isFrozen(car)).to.equal(true)
+    vaultDB.receive(rungOf(TH.nextOf(Revs.three)))
+    expect(vaultDB.carAt(TH.BoxScope)).to.not.equal(car)
   })
 
   it("answers undefined where no record is learned of, or the record's scope is refused before a Thing is made", () => {

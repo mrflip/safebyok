@@ -15,9 +15,11 @@ import { VaultTSQ } from '../../src/minding/vault-tsq'
 import { BankRootsMissing } from '../../src/phrases'
 import { EmptyMaskedView } from '../../src/shapes/shapes-masked-view'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { type GateRecord, ThingFormat } from '../../src/shapes/shapes-thing'
+import { type GateRecord, type ThingRecord, ThingFormat } from '../../src/shapes/shapes-thing'
+import { v7 as uuidv7 } from 'uuid'
 import type { GetWorldAnswer } from '../../src/shapes/shapes-answers'
 import { refusedAnswerOf } from '../../src/storage/refused-answer'
+import { VacantReadTc, readTcNow } from '../../src/storage/agerank'
 import { type BadNews, type DeviceOpts, SignedOutWorld } from '../../src/shapes/shapes-bankish'
 import * as TH from '../test-helpers'
 
@@ -243,27 +245,31 @@ const WorldShelfCkey = `safebyok:roots:${TH.WorldScope.banklabel}:${TH.WorldScop
 
 /** Each value at the bank's key that reads as nothing kept, and what it is. */
 const UnreadShelvedCases = [
-  ["[\"roots-a000000\",{},{},{}]", 'a value of another version'],
-  ["{\"bank\":",                    'a value that does not parse'],
-  ["[\"roots-a010501\"]",          'a value of today\'s version without its roots'],
+  ["[\"roots-a000000\",{},{},{}]",         'a value of another version'],
+  [`["roots-${ThingFormat}",{},{},{}]`,     'a value of the version that kept no read times'],
+  ["{\"bank\":",                            'a value that does not parse'],
+  [`["roots-tc-${ThingFormat}"]`,            'a value of today\'s version without its roots'],
 ] as const
 
 describe("a device's root shelf", () => {
-  it("has the bank's three roots once it is born, under the bank's key, whole, after the version", async () => {
+  it("has the bank's three roots once it is born, under the bank's key, after the version, each whole beside when it was read", async () => {
     const rootShelf = new TH.MemoryShelf()
     const { device, bank } = await TH.buildBornBank({ device: TH.makeDevice({}, { rootShelf }) })
     expect([...rootShelf.items.keys()]).to.deep.equal([WorldShelfCkey])
     const [version, ...roots] = shelvedOf(rootShelf)
-    expect(version).to.eq(`roots-${ThingFormat}`)
-    expect(roots).to.deep.equal([bank.pickle(), bank.gate.pickle(), device.world.rootBox!.pickle()])
+    expect(version).to.eq(`roots-tc-${ThingFormat}`)
+    const things = [bank, bank.gate, device.world.rootBox!]
+    expect(roots).to.deep.equal(things.map((thing) => ({ record: thing.pickle(), read_tc: device.world.vaultMinder!.carAt(thing)!.read_tc })))
+    expect(roots.map((root) => (root as { read_tc: string }).read_tc)).to.not.include(VacantReadTc)
   })
 
   it("has the main gate's next revision once the passphrase is replaced", async () => {
     const rootShelf = new TH.MemoryShelf()
     const { bank }  = await TH.buildBornBank({ device: TH.makeDevice({}, { rootShelf }) })
     await bank.gate.gatingReplacePassphraseAttempt({ passphrase: TH.TestPassphrase, nextPassphrase: 'another fake passphrase for tests' })
-    expect(shelvedOf(rootShelf)[2]).to.deep.equal(bank.gate.pickle())
-    expect((shelvedOf(rootShelf)[2] as { revseq: number }).revseq).to.eq(1)
+    const { record } = shelvedOf(rootShelf)[2] as { record: { revseq: number } }
+    expect(record).to.deep.equal(bank.gate.pickle())
+    expect(record.revseq).to.eq(1)
   })
 
   for (const [shelved, blurb] of UnreadShelvedCases) {
@@ -280,6 +286,21 @@ describe("a device's root shelf", () => {
     })
   }
 
+  it("keeps when each root was read, so storage confirming the same revisions in a later tcchunk is news, put back with when it was read", async () => {
+    const { born, device, rootShelf } = await bornAndReloaded()
+    const earlier = uuidv7({ msecs: (Math.floor(Date.now() / 65_536) - 10) * 65_536 })
+    const [version, ...shelved] = shelvedOf(rootShelf) as [string, ...{ record: ThingRecord, read_tc: string }[]]
+    rootShelf.setItem(WorldShelfCkey, JSON.stringify([version, ...shelved.map(({ record }) => ({ record, read_tc: earlier }))]))
+    const tryGetWorld = vi.spyOn(born.device.vaultDB, 'tryGetWorld')
+    const signingIn   = device.signin(TH.WorldScope.userid)
+    const things      = [device.world.bank!, device.world.gate!, device.world.rootBox!]
+    expect(things.map((thing) => device.world.vaultMinder!.carAt(thing)!.read_tc)).to.deep.equal([earlier, earlier, earlier])
+    await signingIn
+    const { read_tc } = await tryGetWorld.mock.results[0]!.value as GetWorldAnswer
+    expect(things.map((thing) => device.world.vaultMinder!.carAt(thing)!.read_tc)).to.deep.equal([read_tc, read_tc, read_tc])
+    expect(shelvedOf(rootShelf).slice(1)).to.deep.equal(shelved.map(({ record }) => ({ record, read_tc })))
+  })
+
   it("keeps each bank's roots under a key of its own, so another user signing in reads none of them", async () => {
     const { device, rootShelf } = await bornAndReloaded()
     const otherScope = { ...TH.WorldScope, userid: 'u_other' }
@@ -293,13 +314,13 @@ describe("a device's root shelf", () => {
   it("tells onBadNews of a damaged root, and the others still reach their Things", async () => {
     const onBadNews = vi.fn()
     const { born, device, rootShelf } = await bornAndReloaded({ onBadNews })
-    const [version, bank, , rootBox] = shelvedOf(rootShelf)
-    rootShelf.setItem(WorldShelfCkey, JSON.stringify([version, bank, { labelpath: 'gate' }, rootBox]))
+    const [version, bank, , rootBox] = shelvedOf(rootShelf) as [string, { record: unknown }, unknown, { record: unknown }]
+    rootShelf.setItem(WorldShelfCkey, JSON.stringify([version, bank, { record: { labelpath: 'gate' }, read_tc: readTcNow() }, rootBox]))
     vi.spyOn(born.device.vaultDB, 'tryGetWorld').mockReturnValue(new Promise(noop))
     void device.signin(TH.WorldScope.userid)
     await TH.eventually(() => onBadNews.mock.calls.length === 1)
     expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'bad_record' })
-    expect([device.world.bank?.pickle(), device.world.gate, device.world.rootBox?.pickle()]).to.deep.equal([bank, null, rootBox])
+    expect([device.world.bank?.pickle(), device.world.gate, device.world.rootBox?.pickle()]).to.deep.equal([bank.record, null, rootBox.record])
     expect(device.world.getSnapshot().stage).to.eq('starting')
   })
 

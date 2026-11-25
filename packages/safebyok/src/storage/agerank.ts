@@ -6,7 +6,7 @@ import { type EpochMillis, type Lifepath, Lifeseq, Revseq } from '../shapes/prim
 import type { ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
 import type { Agekind, Agerank, ItemSeen, ReadTc, SeenThing, VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
 
-// == [Agerank]: TcchunkDigits, NoRevseq, VacantAgerank, AgerankFields, readTcNow, readAtOf, tcchunkOf, nextAgerankOf, lifeAgerankOf, tcchunkAfter, laterOf, itemSeenOf, eventsOf, agekindOf, seenAgekindOf, fieldsOf, isOfLife
+// == [Agerank]: TcchunkDigits, NoRevseq, VacantAgerank, VacantReadTc, AgerankFields, readTcNow, readAtOf, tcchunkOf, nextAgerankOf, lifeAgerankOf, tcchunkAfter, laterOf, itemSeenOf, eventsOf, agekindOf, seenAgekindOf, fieldsOf, isOfLife
 
 // Eight digits make a span of 65.536 seconds: a record seen again at its revision a minute or two later is news, which
 // sits well with TanStack Query's five minutes before it collects a query.
@@ -19,6 +19,9 @@ const NoRevseq = Revseq.padded(-1)
 // `(` sorts as text below `-` and every base-32 digit, so below the first character of every lifepath.
 /** The agerank of a Thing that has received nothing: it sorts below every other, and is of no life. */
 export const VacantAgerank: Agerank = ['(vacant)', NoRevseq, NoRevseq, '00000000'].join('|')
+
+/** The `read_tc` of no read: a UUID version 7 at the epoch, before any read, in the tcchunk the {@link VacantAgerank} spells. */
+export const VacantReadTc: ReadTc = '00000000-0000-7000-8000-000000000000'
 
 /** An agerank's four fields, as it spells them: its lifepath, the newest revseq seen in that life, the newest whole one, and the tcchunk the newest was last read in. */
 type AgerankFields = readonly [lifepath: Lifepath, highRevseq: string, itemRevseq: string, tcchunk: string]

@@ -14,7 +14,7 @@ import { type DelOnceArgs, type PutOnceArgs, type ReceivingThing, type ThingCar,
 import { type ReadTc, type SeenThing, type VaultEvent, SeenChecks, VaultDBSourcelabel } from '../shapes/shapes-vault-event'
 import * as Throwers from '../refusals/throwers'
 import { BaseThing } from '../models/base-thing'
-import { VacantAgerank, itemSeenOf } from '../storage/agerank'
+import { VacantAgerank, VacantReadTc, itemSeenOf } from '../storage/agerank'
 import { refusedAnswerOf } from '../storage/refused-answer'
 import type { BadAnswer, BirthBankAnswer, GetThingAnswer, GetWorldAnswer, Kids, ListThingsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import type { VaultDB } from '../storage/vault-db'
@@ -33,7 +33,7 @@ type Told<AnswerT> = Readonly<{ answer: AnswerT, refusal: Errors.VaultError | nu
 /** A vaultDB's verbs over another vaultDB, for one bank, telling its listeners each record it learns of that is news, in order.
  * It learns of the records each answer carries, of what the wrapped vaultDB's watch notifies, and of the events a device database rings, handed to its `receive`.
  * It keeps a Thing for each labelpath it learns of a record at, for as long as it lives, and each Thing's `receive` says what is news.
- * Beside each Thing it keeps the refusal the Thing last raised at a record, for a devtool: {@link carAt}.
+ * Beside each Thing it keeps the refusal the Thing last raised at a record, and when its last news was read: {@link carAt}.
  * It builds the bank's asks, and its once verbs send them, each answering only once its records have been told.
  * It watches the wrapped vaultDB from when it is made until its `sweep`. A record it learns of while no one listens is
  * taken all the same, and reaches no one, then or later: listen before asking it anything.
@@ -309,7 +309,9 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   /** The Thing at `scoped`, a labelpath of this vaultDB's bank, or undefined where no record of it has been learned of. The same object across records and lives. */
   thingAt(scoped: ThingScope): ThingT | undefined { return this.carAt(scoped)?.thing }
 
-  /** The Thing at `scoped` and the refusal it last raised at a record, or undefined where {@link thingAt} is. For a devtool, never for an app's own logic. */
+  /** The Thing at `scoped`, the refusal it last raised at a record and when its last news was read, or undefined where {@link thingAt} is.
+   * Its `lastErr` is for a devtool, never for an app's own logic.
+   */
   carAt(scoped: ThingScope): ThingCar<ThingT> | undefined {
     const { labelpath } = ThingChecks.thingScope.parseConsistent(scoped, this.#scope)
     return this.#cars.get(labelpath)
@@ -374,7 +376,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return firstRefusal
   }
 
-  /** The events the Thing at `seen`'s labelpath returns for `seen` at `dispatch`, its car kept first where there is none, and the car's `lastErr` set or cleared */
+  /** The events the Thing at `seen`'s labelpath returns for `seen` at `dispatch`, its car kept first where there is none, the car's `lastErr` set or cleared, and its `read_tc` moved where the record is news */
   #receiveAtThing(seen: SeenThing, dispatch: Dispatch): readonly VaultEvent[] {
     const { labelpath } = SeenChecks.seenCited.parseConsistent(seen, this.#scope)
     const proposed = Object.freeze({
@@ -389,7 +391,8 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
       this.#cars.set(labelpath, Object.freeze({ ...car, lastErr: refusal, erred_at: Clock.nowMillis() }))
       throw refusal
     }
-    if (car.lastErr !== null) { this.#cars.set(labelpath, Object.freeze({ ...car, lastErr: null })) }
+    const read_tc = (events.length > 0) ? dispatch.read_tc : car.read_tc
+    if ((car.lastErr !== null) || (read_tc !== car.read_tc)) { this.#cars.set(labelpath, Object.freeze({ ...car, lastErr: null, read_tc })) }
     return events
   }
 
@@ -400,7 +403,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     const kept = this.#cars.get(labelpath)
     if (kept !== undefined) { return kept }
     const shell = BaseThing.isVoidSentinel(seen) ? seen : Shell.inParentLivesOf(seen)
-    const car   = Object.freeze({ thing: this.#makeThing(shell), lastErr: null, erred_at: null })
+    const car   = Object.freeze({ thing: this.#makeThing(shell), lastErr: null, erred_at: null, read_tc: VacantReadTc })
     this.#cars.set(labelpath, car)
     return car
   }
