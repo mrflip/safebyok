@@ -24,7 +24,7 @@ export { Wayin } from './models/wayin'
 export { type PasskeyWayinHeader, type PasskeyWayinRecord, type PassphraseWayinHeader, type PassphraseWayinRecord, type WayinHeader, type WayinRecord, WayinChecks } from './shapes/shapes-wayin'
 export type { AddPasskeyGating, BirthGating, Gating, ReplacePassphraseGating, RevokePasskeyGating, UnlockGating } from './models/gating'
 export { vacateHanded } from './models/gating'
-export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
+export { type Banklabel, type BoxLabelpath, type Devicetok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
   type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GetWorldAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside,
   type WriteThingAnswer,

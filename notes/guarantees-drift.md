@@ -149,3 +149,13 @@ what differs from big, in a sentence or two.
   `Proving.buildLease` as the record a grant follows, whose `Lease.nextRevisionOf` keeps its Thing fields alone; no
   field of the world keeps a record, and `device.deviceDB` hands back the host's deviceDB, inside the trust boundary as
   G4 says. Without a deviceDB, a device keeps its lease in a `MemoryDeviceDB` of its own, gone with the page, as before.
+
+* 2026-11-25 (lease_shelf thread 5, devicetok), *The construction*'s "not secret, by design" list and the access path
+  through `GX.provingDevice`: **`device_tok` is `devicetok`, kept by the device database.** A wayin's header records
+  `devicetok` (`packages/safebyok/src/shapes/shapes-wayin.ts`), so the header bound into the wayin's ctx names the field
+  `devicetok`; the construction (`cipherCtx` over the stamps, the purpose and the whole header) is unchanged. It is still
+  not secret. A proving reads it from the device (`ensureDevicetok`, `models/device.ts`): the host's `devicetok` option,
+  or the one the deviceDB keeps for the signed-in user's bank, the same for every tab given it and one per bank scope as
+  big's was, made at its first use (`storage/device-db.ts`). The bank no longer has it, and the device's `toJSON` no longer shows it.
+  It is never forgotten: big's `vacate` forgot the device row, so the next device of the scope made a new `device_tok`,
+  and the new core has no vacate yet, so a bank born again in the same browser records the old devicetok.

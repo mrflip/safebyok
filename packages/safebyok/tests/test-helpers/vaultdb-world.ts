@@ -32,11 +32,11 @@ const FakeCiphered = Object.freeze({ cipher_iv_b64: 'aXY', ciphertext_b64: 'Y3Q'
 
 /** The main gate's passphrase wayin, its ciphertext fake. */
 export const MainWayin = WayinChecks.passphraseWayinRecord.parse({
-  wayinkind: 'passphrase', label: 'main', key_deriver_label: 'test', salt_b64: 'c2FsdHNhbHRzYWx0c2FsdA', device_tok: '00000000-0000-4000-8000-0000000000d1', born_at: T0, bank_key_wayin_wrapped: FakeCiphered,
+  wayinkind: 'passphrase', label: 'main', key_deriver_label: 'test', salt_b64: 'c2FsdHNhbHRzYWx0c2FsdA', devicetok: '00000000-0000-4000-8000-0000000000d1', born_at: T0, bank_key_wayin_wrapped: FakeCiphered,
 })
 /** The main gate's passkey wayin, its ciphertext fake. */
 export const Passkey0Wayin = WayinChecks.passkeyWayinRecord.parse({
-  wayinkind: 'passkey', label: 'passkey0', credential_id: 'cred1', prf_salt_b64: 'A'.repeat(43), device_tok: '00000000-0000-4000-8000-0000000000d1', born_at: T0, bank_key_wayin_wrapped: FakeCiphered,
+  wayinkind: 'passkey', label: 'passkey0', credential_id: 'cred1', prf_salt_b64: 'A'.repeat(43), devicetok: '00000000-0000-4000-8000-0000000000d1', born_at: T0, bank_key_wayin_wrapped: FakeCiphered,
 })
 /** Another passphrase wayin, as `replacePassphrase` puts. */
 export const OtherMainWayin = WayinChecks.passphraseWayinRecord.parse({ ...MainWayin, salt_b64: 'b3RoZXJzYWx0b3RoZXJzYQ' })

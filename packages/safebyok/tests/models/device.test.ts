@@ -46,9 +46,9 @@ describe("a page that is not a secure context", () => {
 })
 
 describe("Device.make(record, opts)", () => {
-  it("makes an enabled device of the record's banklabel and token, nobody signed in", () => {
+  it("makes an enabled device of the record's banklabel, nobody signed in", () => {
     const device = TH.makeDevice({ userid: null })
-    expect(device).to.include({ banklabel: TH.WorldScope.banklabel, device_tok: TH.DeviceTok, userid: null, bank: null })
+    expect(device).to.include({ banklabel: TH.WorldScope.banklabel, userid: null, bank: null })
     expect(device.world.getSnapshot()).to.equal(SignedOutWorld)
     expect(device.isEnabled).to.be.true
     expect(device.demandEnabled()).to.equal(device)
@@ -56,7 +56,7 @@ describe("Device.make(record, opts)", () => {
   })
 
   it("serves the bank labelled 'main' where its record names none", () => {
-    const device = Device.make({ device_tok: TH.DeviceTok }, { keyDeriver: TH.testDeriver, logger: TH.quietLogger, vaultDB: new MemoryVaultDB() })
+    const device = Device.make({}, { keyDeriver: TH.testDeriver, logger: TH.quietLogger, vaultDB: new MemoryVaultDB() })
     expect(device.banklabel).to.eq('main')
   })
 
@@ -74,7 +74,7 @@ describe("Device.make(record, opts)", () => {
   it("accepts the bag of browserOpts() spread in, keeping the lease in its device database", () => {
     const vaultDB = new MemoryVaultDB()
     const opts = browserOpts({ dbName: 'device-test' })
-    const device = Device.make({ banklabel: TH.WorldScope.banklabel, device_tok: TH.DeviceTok }, { ...opts, vaultDB, logger: TH.quietLogger })
+    const device = Device.make({ banklabel: TH.WorldScope.banklabel }, { ...opts, vaultDB, logger: TH.quietLogger })
     expect(device.isEnabled).to.be.true
     expect([device.vaultDB, device.deviceDB]).to.deep.equal([vaultDB, opts.deviceDB])
   })
@@ -146,10 +146,10 @@ describe("Device.make(record, opts)", () => {
     expect(device.world.getSnapshot().stage).to.eq('starting')
   })
 
-  it("serializes as its user, banklabel and token alone, and is frozen", () => {
-    expect(TH.jsonOf(TH.makeDevice({ userid: null }))).to.deep.equal({ userid: null, banklabel: TH.WorldScope.banklabel, device_tok: TH.DeviceTok })
+  it("serializes as its user and banklabel alone, and is frozen", () => {
+    expect(TH.jsonOf(TH.makeDevice({ userid: null }))).to.deep.equal({ userid: null, banklabel: TH.WorldScope.banklabel })
     const device = TH.makeDevice()
-    expect(TH.jsonOf(device)).to.deep.equal({ ...TH.WorldScope, device_tok: TH.DeviceTok })
+    expect(TH.jsonOf(device)).to.deep.equal({ ...TH.WorldScope })
     expect(device.toJSON()).to.deep.equal(TH.jsonOf(device))
     expect(Object.isFrozen(device)).to.be.true
   })
@@ -160,11 +160,11 @@ describe("Device.make(record, opts)", () => {
     expect([device.keyDeriver, device.strengthChecker]).to.not.include(TH.testDeriver).and.to.not.include(TH.anyStrengthChecker)
   })
 
-  it("spreads to its banklabel, token and durations alone: nothing secret and nothing opaque", () => {
+  it("spreads to its banklabel and durations alone: nothing secret and nothing opaque", () => {
     const device = TH.makeDevice()
     // The spread is this test's subject: what a log line or a host's `{ ...device }` sees of a device.
     const spread = { ...device } // eslint-disable-line @typescript-eslint/no-misused-spread
-    expect(Object.keys(spread)).to.have.members(['banklabel', 'device_tok', 'leaseMillis', 'softlockMillis', 'janitorMillis', 'gateStaleMillis'])
+    expect(Object.keys(spread)).to.have.members(['banklabel', 'leaseMillis', 'softlockMillis', 'janitorMillis', 'gateStaleMillis'])
     expect(Object.values(spread).every((val) => ['string', 'number'].includes(typeof val))).to.be.true
     expect([device.vaultDB, device.keyDeriver, device.strengthChecker, device.logger]).to.not.include(undefined)
   })
@@ -222,6 +222,8 @@ describe("Device.make(record, opts)", () => {
     [{ requestCleartext: vi.fn() }, 'a requestCleartext, which a device does not take'],
     [{ onBadNews: 'tell me' },   'an onBadNews that is not a function'],
     [{ onLifecycle: 'tell me' }, 'an onLifecycle that is not a function'],
+    [{ devicetok: 'device_one' }, 'a devicetok that is a label'],
+    [{ devicetok: '' },          'an empty devicetok'],
   ] as const
 
   for (const [moved, blurb] of OtherOptsCases) {
@@ -231,8 +233,7 @@ describe("Device.make(record, opts)", () => {
   }
 
   const RecordCases = [
-    [{ device_tok: undefined },            'no device_tok'],
-    [{ device_tok: 'device_one' },         'a device_tok that is a label'],
+    [{ devicetok: TH.Devicetok },          'a devicetok, which its opts take'],
     [{ banklabel: '' },                    'an empty banklabel'],
     [{ userid: 'u1' },                     'a userid, which signin takes'],
     [{ gates: ['main'] },                  'a field a device record does not have'],
@@ -240,13 +241,13 @@ describe("Device.make(record, opts)", () => {
 
   for (const [moved, blurb] of RecordCases) {
     it(`refuses a record with ${blurb}`, () => {
-      TH.expectSyncRefusal(() => Device.make({ device_tok: TH.DeviceTok, ...moved } as never, { keyDeriver: TH.testDeriver, vaultDB: new MemoryVaultDB() }), 'bad_record')
+      TH.expectSyncRefusal(() => Device.make({ ...moved } as never, { keyDeriver: TH.testDeriver, vaultDB: new MemoryVaultDB() }), 'bad_record')
     })
   }
 
   it("refuses no record, no opts, or opts with no keyDeriver or no vaultDB", () => {
     const vaultDB = new MemoryVaultDB()
-    const record = { banklabel: TH.WorldScope.banklabel, device_tok: TH.DeviceTok }
+    const record = { banklabel: TH.WorldScope.banklabel }
     TH.expectSyncRefusal(() => Device.make(null as never, { keyDeriver: TH.testDeriver, vaultDB }))
     TH.expectSyncRefusal(() => Device.make(record, undefined as never))
     TH.expectSyncRefusal(() => Device.make(record, { vaultDB } as never))
@@ -604,7 +605,7 @@ describe("device.connect() and device.disconnect()", () => {
   it("watches nothing until connected, even once signed in, and watches once however often connected", async () => {
     const vaultDB = new MemoryVaultDB()
     const watch = vi.spyOn(vaultDB, 'watch')
-    const device = Device.make({ banklabel: TH.WorldScope.banklabel, device_tok: TH.DeviceTok }, { keyDeriver: TH.testDeriver, logger: TH.quietLogger, vaultDB })
+    const device = Device.make({ banklabel: TH.WorldScope.banklabel }, { keyDeriver: TH.testDeriver, logger: TH.quietLogger, vaultDB })
     await device.signin(TH.WorldScope.userid)
     expect(watch).not.toHaveBeenCalled()
     expect(device.connect().connect()).to.equal(device)
@@ -637,7 +638,7 @@ describe("device.connect() and device.disconnect()", () => {
   it("never throws, telling onBadNews what the vaultDB's watch throws as it starts or stops", async () => {
     const onBadNews = vi.fn()
     const vaultDB = new MemoryVaultDB()
-    const device = Device.make({ banklabel: TH.WorldScope.banklabel, device_tok: TH.DeviceTok }, { keyDeriver: TH.testDeriver, logger: TH.quietLogger, vaultDB, onBadNews })
+    const device = Device.make({ banklabel: TH.WorldScope.banklabel }, { keyDeriver: TH.testDeriver, logger: TH.quietLogger, vaultDB, onBadNews })
     await device.signin(TH.WorldScope.userid)
     vi.spyOn(vaultDB, 'watch').mockImplementationOnce(() => { throw new Error('no watching here') }).mockReturnValue(() => { throw new Error('no stopping here') })
     device.connect()
@@ -709,6 +710,60 @@ describe("device.judgeStrength(passphraseCleartext)", () => {
 
   it("rejects, rather than throws, a value that is not a string", async () => {
     await TH.expectRefusal(TH.makeDevice().judgeStrength(null as never), 'bad_record')
+  })
+})
+
+/** A deviceDB in memory whose devicetok stow throws. */
+class DevicetokFailingDB extends MemoryDeviceDB {
+  protected override doStowDevicetok(): never { throw new TypeError('no devicetok here') }
+}
+
+describe("device.ensureDevicetok()", () => {
+  it("answers the host's devicetok, asking the deviceDB nothing, before signin as after", async () => {
+    const deviceDB = new MemoryDeviceDB()
+    const ensure   = vi.spyOn(deviceDB, 'ensureDevicetok')
+    expect(await TH.makeDevice({ userid: null }, { deviceDB }).ensureDevicetok(TH.WorldScope)).to.eq(TH.Devicetok)
+    expect(await TH.makeDevice({}, { deviceDB }).ensureDevicetok(TH.WorldScope)).to.eq(TH.Devicetok)
+    expect(ensure).not.toHaveBeenCalled()
+  })
+
+  it("with no devicetok from the host, answers the one its deviceDB keeps for its bank: the same at each call, and to each device of that bank given that deviceDB", async () => {
+    const deviceDB     = new MemoryDeviceDB()
+    const [one, other] = [TH.makeDevice({}, { deviceDB, devicetok: undefined }), TH.makeDevice({}, { deviceDB, devicetok: undefined })]
+    const devicetok    = await one.ensureDevicetok(TH.WorldScope)
+    expect([await one.ensureDevicetok(TH.WorldScope), await other.ensureDevicetok(TH.WorldScope), await deviceDB.ensureDevicetok(TH.WorldScope)]).to.deep.equal([devicetok, devicetok, devicetok])
+  })
+
+  it("with no devicetok from the host, answers another devicetok for another user's bank given the same deviceDB", async () => {
+    const device = TH.makeDevice({}, { deviceDB: new MemoryDeviceDB(), devicetok: undefined })
+    expect(await device.ensureDevicetok(TH.WorldScope)).to.not.eq(await device.ensureDevicetok({ ...TH.WorldScope, userid: 'u2' }))
+  })
+
+  it("with no devicetok from the host, answers the devicetok of the bank it is asked for, signed in or not", async () => {
+    const deviceDB = new MemoryDeviceDB()
+    const device   = TH.makeDevice({ userid: null }, { deviceDB, devicetok: undefined })
+    expect(await device.ensureDevicetok(TH.WorldScope)).to.eq(await deviceDB.ensureDevicetok(TH.WorldScope))
+  })
+
+  it("with no deviceDB from the host either, answers a devicetok of each device's own", async () => {
+    const [one, other] = [TH.makeDevice({}, { devicetok: undefined }), TH.makeDevice({}, { devicetok: undefined })]
+    expect(await one.ensureDevicetok(TH.WorldScope)).to.not.eq(await other.ensureDevicetok(TH.WorldScope))
+  })
+
+  it("is recorded in each wayin a birth builds", async () => {
+    const deviceDB = new MemoryDeviceDB()
+    const { bank } = await TH.buildBornBank({ passkeyCleartext: TH.passkeyAnswerOf(), device: TH.makeDevice({}, { deviceDB, devicetok: undefined }) })
+    const devicetok = await deviceDB.ensureDevicetok(TH.WorldScope)
+    expect([bank.gate.main.devicetok, bank.gate.passkey0?.devicetok]).to.deep.equal([devicetok, devicetok])
+  })
+
+  it("tells onBadNews where the deviceDB refuses, and answers a fresh devicetok, so that a birth still builds its wayin", async () => {
+    const onBadNews = vi.fn()
+    const { bank, device } = await TH.buildBornBank({ device: TH.makeDevice({}, { deviceDB: new DevicetokFailingDB(), devicetok: undefined, onBadNews }) })
+    expect(bank.gate.main.devicetok).to.not.eq(TH.Devicetok)
+    expect(await device.ensureDevicetok(TH.WorldScope)).to.not.eq(bank.gate.main.devicetok)
+    await TH.eventually(() => onBadNews.mock.calls.length === 2)
+    expect(onBadNews.mock.calls.map(([heard]) => (heard as BadNews).news.refusalkind)).to.deep.equal(['storage_unavailable', 'storage_unavailable'])
   })
 })
 

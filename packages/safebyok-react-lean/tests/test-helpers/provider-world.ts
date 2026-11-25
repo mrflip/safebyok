@@ -202,7 +202,7 @@ export async function buildProviderWorld({ stored = 'none', isInConfig = false, 
     _cheat_device:  () => devices[0]!,
     _cheat_devices: () => [...devices],
     _cheat_putJokesKey: async (passphraseCleartext) => {
-      const device = makeDeviceUnspied({ banklabel: LeanTH.WorldScope.banklabel, device_tok: globalThis.crypto.randomUUID() }, { keyDeriver: LeanTH.testDeriver, logger: LeanTH.quietLogger, vaultDB })
+      const device = makeDeviceUnspied({ banklabel: LeanTH.WorldScope.banklabel }, { keyDeriver: LeanTH.testDeriver, logger: LeanTH.quietLogger, vaultDB })
       await device.signin(ProviderUser)
       await device.bank!.gate.unlock({ passphraseCleartext })
       await device.vault!.putBoxOnce(`box/${JokesPath}`, { sidecar: { service: 'jokes' } }, { whisper: LeanTH.Whisper })

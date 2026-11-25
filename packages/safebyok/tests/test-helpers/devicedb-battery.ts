@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { Helpers } from 'safebyok-big/internals'
 import { eventually, expectRefusal, expectSyncRefusal } from 'safebyok-big/testing'
 import type { LiveOf } from '../../src/shapes/shapes-sealers'
-import type { LeaseScope, LeaseRecord } from '../../src/shapes/shapes-stamps'
+import type { BankScope, LeaseScope, LeaseRecord } from '../../src/shapes/shapes-stamps'
 import type { DeviceDB } from '../../src/storage/device-db'
 import { WorldScope } from './models-world'
 import { WorldLeaseScope } from './devicedb-world'
@@ -209,6 +209,85 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
       await eventually(() => heard.length > 0)
       expect(heard).to.deep.equal([WorldScope.banklabel])
     })
+  })
+}
+// --
+
+// == [The devicetok battery]: DeviceDBDevicetokBatteryOpts, describeDeviceDBDevicetokBattery
+
+/** The options of {@link describeDeviceDBDevicetokBattery}: how to make a deviceDB, another tab's view of it, and the cheat into the devicetoks it stores. */
+export type DeviceDBDevicetokBatteryOpts<DBT extends DeviceDB> = Pick<DeviceDBLeaseBatteryOpts<DBT>, 'makeDeviceDB' | 'makeTwin'> & {
+  /** Stores `raw` as the devicetok of the bank at `scope`, unchecked. */
+  plantDevicetok: (deviceDB: DBT, scope: BankScope, raw: unknown) => Helpers.Awaitable<void>
+}
+
+/** A UUID, as `crypto.randomUUID()` makes. */
+const UuidPattern = /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/
+
+/** Register the cases every deviceDB's `ensureDevicetok` must pass. */
+export function describeDeviceDBDevicetokBattery<DBT extends DeviceDB>(dbname: string, { makeDeviceDB, makeTwin, plantDevicetok }: DeviceDBDevicetokBatteryOpts<DBT>): void {
+  describe(`${dbname}: ensureDevicetok`, () => {
+    it("makes a devicetok, a UUID, at its first call for a bank, and answers the same one at each call after, in this tab and another", async () => {
+      const deviceDB  = makeDeviceDB()
+      const devicetok = await deviceDB.ensureDevicetok(WorldScope)
+      expect(devicetok).to.match(UuidPattern)
+      expect([await deviceDB.ensureDevicetok(WorldScope), await makeTwin(deviceDB).ensureDevicetok(WorldScope)]).to.deep.equal([devicetok, devicetok])
+    })
+
+    it("makes another devicetok for each other bank in the same database: another user's, or another banklabel's", async () => {
+      const deviceDB   = makeDeviceDB()
+      const devicetoks = [
+        await deviceDB.ensureDevicetok(WorldScope),
+        await deviceDB.ensureDevicetok({ ...WorldScope, userid: 'u2' }),
+        await deviceDB.ensureDevicetok({ ...WorldScope, banklabel: 'other' }),
+      ]
+      expect(new Set(devicetoks).size).to.eq(3)
+      expect(await deviceDB.ensureDevicetok(WorldScope)).to.eq(devicetoks[0])
+    })
+
+    it("makes another devicetok for another database", async () => {
+      expect(await makeDeviceDB().ensureDevicetok(WorldScope)).to.not.eq(await makeDeviceDB().ensureDevicetok(WorldScope))
+    })
+
+    it("answers one devicetok to calls made together", async () => {
+      const deviceDB   = makeDeviceDB()
+      const devicetoks = await Promise.all([deviceDB.ensureDevicetok(WorldScope), makeTwin(deviceDB).ensureDevicetok(WorldScope), deviceDB.ensureDevicetok(WorldScope)])
+      expect(new Set(devicetoks).size).to.eq(1)
+    })
+
+    it("files the devicetok apart from the leases of its bank: a lease stowed leaves it, and it leaves the lease", async () => {
+      const deviceDB  = makeDeviceDB()
+      const devicetok = await deviceDB.ensureDevicetok(WorldScope)
+      const lease     = await liveLeaseRecordOf()
+      await deviceDB.stowLease(lease)
+      expect(await deviceDB.ensureDevicetok(WorldScope)).to.eq(devicetok)
+      expect(sansKey(await deviceDB.peekLease(WorldLeaseScope))).to.deep.equal(sansKey(lease))
+    })
+
+    it("answers a devicetok stored", async () => {
+      const deviceDB = makeDeviceDB()
+      await plantDevicetok(deviceDB, WorldScope, '00000000-0000-4000-8000-0000000000d2')
+      expect(await deviceDB.ensureDevicetok(WorldScope)).to.eq('00000000-0000-4000-8000-0000000000d2')
+    })
+
+    it("refuses a scope that is no bank's", async () => {
+      await expectRefusal(makeDeviceDB().ensureDevicetok({ userid: 'u1' } as never), 'bad_record')
+    })
+
+    const DamagedCases = [
+      ['device_one',                                          'a label'],
+      [42,                                                    'a number'],
+      [{ devicetok: '00000000-0000-4000-8000-0000000000d2' }, 'a devicetok wrapped in an object'],
+    ] as const
+    for (const [raw, blurb] of DamagedCases) {
+      it(`replaces a devicetok stored that is ${blurb} with a fresh one, stored from then on`, async () => {
+        const deviceDB = makeDeviceDB()
+        await plantDevicetok(deviceDB, WorldScope, raw)
+        const devicetok = await deviceDB.ensureDevicetok(WorldScope)
+        expect(devicetok).to.match(UuidPattern)
+        expect(await deviceDB.ensureDevicetok(WorldScope)).to.eq(devicetok)
+      })
+    }
   })
 }
 // --

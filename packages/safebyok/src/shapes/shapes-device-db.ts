@@ -1,4 +1,4 @@
-/** What a deviceDB is, what its verbs are given beyond a lease record, what its listeners hear, and what an IdbDeviceDB is made with and files a record under. */
+/** What a deviceDB is, what its verbs are given beyond a lease record or a devicetok, what its listeners hear, and what an IdbDeviceDB is made with and files a record under. */
 
 import type * as Z from 'zod'
 import { Validator } from 'safebyok-big/internals'
@@ -18,7 +18,7 @@ export function isDeviceDB(val: unknown): val is DeviceDB {
 }
 
 /** The verbs of a {@link DeviceDB}. */
-const DeviceDBMembernames = ['peekLease', 'stowLease', 'listen'] as const satisfies readonly (keyof DeviceDB)[]
+const DeviceDBMembernames = ['peekLease', 'stowLease', 'listen', 'ensureDevicetok'] as const satisfies readonly (keyof DeviceDB)[]
 
 /** Called with the scope of a lease record stored, in this tab or another. It gets the scope only: peek for the record. */
 export type LeaseListener = (scope: LeaseScope) => void
@@ -30,7 +30,7 @@ export const DeviceDBChecks = Object.freeze(Validator.Checkers('bad_record', ({ 
 })))
 // --
 
-// == [IndexedDB]: IdbDeviceDBOpts, idbDeviceDBOpts, LeaseScopepath
+// == [IndexedDB]: IdbDeviceDBOpts, idbDeviceDBOpts, LeaseScopepath, DevicetokScopepath
 
 /** What an IdbDeviceDB is made with. */
 export interface IdbDeviceDBOpts {
@@ -43,6 +43,9 @@ export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optio
 
 /** Where the lease database files a gate's lease record. */
 export type LeaseScopepath = [userid: Userid, banklabel: Banklabel, labelpath: LeaseLabelpath]
+
+/** Where the lease database files a bank's devicetok. */
+export type DevicetokScopepath = [userid: Userid, banklabel: Banklabel, devicetok: 'devicetok']
 // --
 
 true satisfies Z.core.util.AssertEqual<IdbDeviceDBOpts, Z.input<typeof idbDeviceDBOpts>>

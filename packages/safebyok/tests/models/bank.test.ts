@@ -45,7 +45,7 @@ describe("Bank.mintStamps(scope)", () => {
   it("accepts the scope of anything that has one, such as a device", () => {
     const { bankStamp } = Bank.mintStamps(TH.makeDevice().scope)
     expect(bankStamp).to.include(TH.ThingBank)
-    expect(bankStamp).to.not.have.property('device_tok')
+    expect(bankStamp).to.not.have.property('devicetok')
   })
 
   const ScopeCases = [
@@ -88,7 +88,6 @@ describe("Bank.make(begun, { world }), by the device's world", () => {
     expect(bank.stamp).to.deep.equal(TH.WorldBankStamp)
     expect(bank.scope).to.deep.equal(TH.ThingBank)
     expect(bank.device).to.equal(device)
-    expect(bank.device_tok).to.eq(TH.DeviceTok)
     expect(bank).to.equal(device.world.bank)
     expect(bank.gate).to.equal(device.world.gate)
     expect(bank.rootBox).to.equal(device.world.rootBox?.pickle())

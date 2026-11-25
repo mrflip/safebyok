@@ -7,13 +7,16 @@
 import { PassphraseSaltSize } from './consts'
 import type { Boxlabel, KeyDeriverLabel, Vaultlabel } from './aliases'
 
-// == [Names]: LabelShape, DeviceTokShape, UserIdMissing, UserIdChars
+// == [Names]: LabelShape, DeviceTokShape, DevicetokShape, UserIdMissing, UserIdChars
 
 /** A label of the wrong shape. */
 export const LabelShape = "A label is lowercase letters, digits and single underscores, starting with a letter and ending on a letter or digit, two characters at least"
 
 /** A device_tok that is no UUID. */
 export const DeviceTokShape = "A device_tok is a UUID, such as crypto.randomUUID() makes, kept by the host for this device"
+
+/** A devicetok, the new core's, that is no UUID. */
+export const DevicetokShape = "A devicetok is a UUID, such as crypto.randomUUID() makes"
 
 /** An empty user_id. */
 export const UserIdMissing = "A user_id names the signed-in user, so it can't be empty"

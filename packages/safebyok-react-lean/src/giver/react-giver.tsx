@@ -238,8 +238,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
   function Provider({ userid, vaultDB, keyDeriver, children }: ProviderProps) {
     // StrictMode makes a second device and discards it, and a server render discards its own: making one does no I/O,
     // and subscribes to nothing. The hooks observe its QueryClient from their first render, before anyone signs in.
-    // Cheat (react_life): a fresh device_tok for each device. Nothing keeps one across a reload yet.
-    const [device] = useState(() => Device.make({ banklabel, device_tok: globalThis.crypto.randomUUID() }, {
+    const [device] = useState(() => Device.make({ banklabel }, {
       ...configDeviceOpts, vaultDB: vaultDB ?? configVaultDB, ...(keyDeriver && { keyDeriver }),
     }))
     /** The device, once a userid is signed in on it. */

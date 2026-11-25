@@ -20,6 +20,7 @@ export {
 export type { ScopeAt } from './shapes/shapes-thing'
 export { Vault } from './models/vault'
 export { VaultChecks } from './shapes/shapes-vault'
+export { type ProbeArgs, type ProbeReport, type ProbeStep, type ProbeStepkind, ProbeChecks, ProbeLabelpath, probeStepkindVals } from './shapes/shapes-vault-probe'
 export { DefaultStrengthChecker, guardStrengthChecker } from './helpers/passphrase-strength'
 export { maskUuid } from './helpers/mask-uuid'
 export { type BulletproofFailOpts, type BulletproofOpts, type BulletproofTellOpts, bulletproofAsyncHandlerOf, bulletproofHandlerOf } from './helpers/bulletproof'

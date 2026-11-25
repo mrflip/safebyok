@@ -1,10 +1,12 @@
-/** The deviceDB, which has the lease record of each gate on this device, shared by every tab. A subclass writes the `do*` calls. */
+/** The deviceDB, which has each bank's devicetok on this device and the lease record of each gate on it, shared by every tab. A subclass writes the `do*` calls. */
 
-import { Errors, type Helpers } from 'safebyok-big/internals'
+import { Crypto, Errors, type Helpers } from 'safebyok-big/internals'
 import { BaseThing } from '../models/base-thing'
 import * as Throwers from '../refusals/throwers'
-import { type LeaseRecord, type LeaseScope, StampChecks } from '../shapes/shapes-stamps'
+import { type BankScope, type LeaseRecord, type LeaseScope, StampChecks } from '../shapes/shapes-stamps'
 import { DeviceDBChecks, type LeaseListener } from '../shapes/shapes-device-db'
+import { BankishChecks } from '../shapes/shapes-bankish'
+import type { Devicetok } from '../shapes/primitives'
 
 // == [The deviceDB]: DeviceDB
 
@@ -53,7 +55,22 @@ export abstract class DeviceDB {
   }
   // --
 
-  // == [Protected, for a subclass to write]: doPeekLease, doStowLease, doRing, doListen
+  // == [Devicetok verbs]: ensureDevicetok
+
+  /** The devicetok of the bank at `scope` on this device, the same for every tab given this database, and another for each bank.
+   * It answers the one stored, or a fresh one, stored now, where none is or the one stored fails its check.
+   */
+  async ensureDevicetok(scope: BankScope): Promise<Devicetok> {
+    try {
+      const { userid, banklabel } = StampChecks.bankScope.parse(scope)
+      const made   = Crypto.randomId()
+      const before = await this.doStowDevicetok({ userid, banklabel }, made, isDevicetokReplaced)
+      return isDevicetokReplaced(before) ? made : BankishChecks.devicetok.parse(before)
+    } catch (err) { throw refusalOf(err, 'ensureDevicetok') }
+  }
+  // --
+
+  // == [Protected, for a subclass to write]: doPeekLease, doStowLease, doRing, doListen, doStowDevicetok
 
   // A device database must start each call's work in the order of the calls: otherwise a `peekLease` made after a
   // `stowLease` may miss the record it stored.
@@ -65,11 +82,13 @@ export abstract class DeviceDB {
   protected abstract doRing(scope: LeaseScope): void
   /** Call `hear` with each scope the bell rings for until the function answered is called. */
   protected abstract doListen(hear: (rung: unknown) => void): () => void
+  /** In one step: read the devicetok stored for the bank at `scope`, and put `devicetok` in its place when `isReplaced` holds of what was read. Answer what was read, or null. */
+  protected abstract doStowDevicetok(scope: BankScope, devicetok: Devicetok, isReplaced: (raw: unknown) => boolean): Helpers.Awaitable<unknown>
   // --
 }
 // --
 
-// == [Helpers]: storedLeaseOf, isReplaced, refusalOf
+// == [Helpers]: storedLeaseOf, isReplaced, isDevicetokReplaced, refusalOf
 
 /** The lease record `raw` as checked; refuses `damaged_lease` when it fails its checks. */
 function storedLeaseOf(raw: unknown): LeaseRecord {
@@ -84,6 +103,9 @@ function isReplaced(raw: unknown, record: LeaseRecord): boolean {
   const storedReport = StampChecks.leaseRecord.safeParse(raw)
   return (! storedReport.success) || (BaseThing.cmp(storedReport.data, record) > 0)
 }
+
+/** True when `raw`, the devicetok stored, is replaced by a fresh one: none is stored, or it fails its check. */
+function isDevicetokReplaced(raw: unknown): boolean { return ! BankishChecks.devicetok.safeParse(raw).success }
 
 /** The refusal for a verb's throw: a refusal as it is, anything else as `storage_unavailable`, with nothing of it but its `name`. */
 function refusalOf(thrown: unknown, oplabel: string): Errors.VaultError {

@@ -22,7 +22,7 @@ export async function putBoxElsewhere(userid: string, labelpath: string): Promis
 /** A new device, signed in as `userid`, over a vaultDB of its own on the dojo's database. */
 async function signedInElsewhere(userid: string): Promise<Device> {
   const vaultDB = new IdbVaultDB({ dbName: DojoDBName })
-  const device = Device.make({ banklabel: Banklabel, device_tok: globalThis.crypto.randomUUID() }, { vaultDB, keyDeriver: dojoDeriver, strengthChecker: switchableChecker })
+  const device = Device.make({ banklabel: Banklabel }, { vaultDB, keyDeriver: dojoDeriver, strengthChecker: switchableChecker })
   await device.hello()
   await device.signin(userid)
   return device

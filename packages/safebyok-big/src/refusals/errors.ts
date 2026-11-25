@@ -149,6 +149,8 @@ export type RefusalMeta = {
   ask?:          Readonly<Record<string, unknown>>
   /** The labelpath of each Thing the refusal names, such as each child a list found stored damaged. A labelpath is a name, never secret. */
   labelpaths?:   readonly string[]
+  /** A refusal of a call made in steps, such as the new core's `Vault.probe`: the step that refused. */
+  stepkind?:     string
 }
 
 /** The rows `err` hands a bankDB's answer, empty where it has none. */

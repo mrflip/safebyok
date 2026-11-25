@@ -4,7 +4,7 @@
 // each stays one binding across both packages.
 export { AdapterVaultDB } from './storage/adapter-vault-db'
 export { type Watcher, MemoryVaultDB } from './storage/memory-vault-db'
-export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
+export { type Banklabel, type BoxLabelpath, type Devicetok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
   type AnyThingRecord, type BankRecord, type BoxRecord, type BoxSparse, type GateRecord, type Modelkind, type Sealed, type Sparse, type StoredCited, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind,
   type VoidSentinel, type Wayins, Shell, ThingChecks, ThingFormat, thingkindVals,
@@ -26,7 +26,7 @@ export {
 // The deviceDB, which has each gate's lease record on this device, and its memory store. The IndexedDB store is on `safebyok/browser`.
 export { DeviceDB } from './storage/device-db'
 export { MemoryDeviceDB } from './storage/memory-device-db'
-export { type LeaseListener, type LeaseScopepath, DeviceDBChecks } from './shapes/shapes-device-db'
+export { type DevicetokScopepath, type LeaseListener, type LeaseScopepath, DeviceDBChecks } from './shapes/shapes-device-db'
 export {
   type Actual, type ActualBeside, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GetWorldActual, type GetWorldAnswer, type GoodAnswer, type GotActual,
   type KidEntry, type Kids, type ListThingsActual, type ListThingsAnswer, type ListedBeside, type Received, type WriteThingAnswer, type WroteActual, ActualChecks,

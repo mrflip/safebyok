@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/query-core'
-import { Consts, Deriver, Errors, type GX, Helpers, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
+import { Consts, Crypto, Deriver, Errors, type GX, Helpers, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
 import type { BirthGating } from './gating'
 import { Proving, guardKeyDeriver } from './proving'
@@ -14,7 +14,7 @@ import { type MaskedView, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import { isQueryClient } from '../shapes/shapes-vault-tsq'
 import type { BirthCleartexts, BirthDna, GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
 import type { BankScope } from '../shapes/shapes-stamps'
-import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
+import type { Banklabel, Devicetok, Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
 import type { DeviceDB } from '../storage/device-db'
 import { MemoryDeviceDB } from '../storage/memory-device-db'
@@ -50,12 +50,10 @@ export const DefaultGateStaleMillis = 12 * 60 * 60_000
  * reloading the page.
  */
 export class Device {
-  // == [Props]: banklabel, device_tok, vaultDB, deviceDB, keyDeriver, strengthChecker, logger, leaseMillis, softlockMillis, janitorMillis, gateStaleMillis, #onBadNews, #onLifecycle, #rootShelf, #vaultTsqClient, #world, #userid, #vaultTSQ, #vault, #signinAnswer, #endCause, toJSON
+  // == [Props]: banklabel, vaultDB, deviceDB, keyDeriver, strengthChecker, logger, leaseMillis, softlockMillis, janitorMillis, gateStaleMillis, #onBadNews, #onLifecycle, #rootShelf, #vaultTsqClient, #world, #userid, #vaultTSQ, #vault, #signinAnswer, #endCause, #devicetok, toJSON
 
   /** The label of the bank this device serves each user. */
   readonly banklabel:          Banklabel
-  /** This device's token, recorded in each wayin it builds. */
-  readonly device_tok:         DeviceTok
   // Hidden, so that a spread or a log line of the device passes by the host's objects and their guards.
   /** Where this device's banks are stored. */
   declare readonly vaultDB:            VaultDB
@@ -93,11 +91,13 @@ export class Device {
   #signinAnswer: Promise<void> | null = null
   /** Why the device ended, or null while it is enabled. */
   #endCause:   Errors.VaultError | null = null
+  /** The host's `devicetok`, or null for none: then the deviceDB's is recorded. */
+  readonly #devicetok: Devicetok | null
 
-  /** The user signed in on this device, its banklabel and its token, for `JSON.stringify`. */
+  /** The user signed in on this device and its banklabel, for `JSON.stringify`. */
   toJSON(): DeviceJSON {
-    const { userid, banklabel, device_tok } = this
-    return { userid, banklabel, device_tok }
+    const { userid, banklabel } = this
+    return { userid, banklabel }
   }
   // --
 
@@ -139,7 +139,7 @@ export class Device {
 
   // == [Construction]: make, constructor
 
-  /** Make a device of the banklabel and token in `record`, guarding the host's functions in `opts`, with nobody signed in.
+  /** Make a device of the banklabel in `record`, guarding the host's functions in `opts`, with nobody signed in.
    * The signed-in user's boxes are kept in `opts.queryClient`, the host's own, under the bank's key, or in a QueryClient the
    * device makes: {@link vaultTsqClient}. The signed-in bank's roots are read from `opts.rootShelf` at {@link signin}.
    * Nothing is fetched from the vaultDB until then, and nothing is watched until the device is both signed in and {@link connect}ed.
@@ -147,9 +147,9 @@ export class Device {
   static make(record: DeviceRecord, opts: DeviceOpts): Device { return new Device(record, opts) }
 
   private constructor(record: DeviceRecord, opts: DeviceOpts) {
-    const { record: { banklabel, device_tok }, opts: { vaultDB, deviceDB = new MemoryDeviceDB(), keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, softlockMinutes, janitorMinutes, gateStaleMinutes, onBadNews = DefaultOnBadNews, onLifecycle = DefaultOnLifecycle, queryClient = new QueryClient(), rootShelf } } = Checks.deviceMakeArgs.parse({ record, opts })
+    const { record: { banklabel }, opts: { vaultDB, deviceDB = new MemoryDeviceDB(), keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, softlockMinutes, janitorMinutes, gateStaleMinutes, onBadNews = DefaultOnBadNews, onLifecycle = DefaultOnLifecycle, queryClient = new QueryClient(), rootShelf, devicetok = null } } = Checks.deviceMakeArgs.parse({ record, opts })
     this.banklabel = banklabel
-    this.device_tok = device_tok
+    this.#devicetok = devicetok
     Helpers.decorate<Device>(this, { vaultDB, deviceDB, keyDeriver: guardKeyDeriver(keyDeriver), strengthChecker: guardStrengthChecker(strengthChecker), logger: Logger.parseLogger(logger) })
     this.leaseMillis     = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.softlockMillis  = softlockMillisOf(millisOf(softlockMinutes, DefaultSoftlockMillis), this.leaseMillis)
@@ -171,6 +171,23 @@ export class Device {
    * `Bank.birth` and `bank.gate.replacePassphrase` ask the same checker, and refuse `weak_passphrase` where it is not.
    */
   async judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> { return await Proving.judgeStrength(this, this.scope, passphraseCleartext) }
+  // --
+
+  // == [The devicetok]: ensureDevicetok
+
+  // As a refused lease stow is (World.#stowLease), a refused devicetok is bad news: the wayin is still built.
+  /** The token each wayin this device builds records: the host's `devicetok`, or the one the deviceDB keeps for the bank at `scope`, made at its first use.
+   * Where the deviceDB refuses, it tells `onBadNews`, and answers a fresh token for this call alone.
+   */
+  async ensureDevicetok(scope: BankScope): Promise<Devicetok> {
+    if (this.#devicetok !== null) { return this.#devicetok }
+    try {
+      return await this.deviceDB.ensureDevicetok(scope)
+    } catch (err) {
+      this.tellBadNews([err])
+      return Crypto.randomId()
+    }
+  }
   // --
 
   // == [Starting]: hello, signin, birthGating, gatingBirthAttempt, #doSignin
@@ -427,6 +444,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom, oneof }
       queryClient:      custom<QueryClient>(isQueryClient, Phrases.QueryClientExpected).optional(),
       rootShelf:        custom<RootShelf>(isRootShelf, Phrases.RootShelfExpected).optional(),
       deviceDB:         DeviceDBChecks.deviceDB.optional(),
+      devicetok:        BankishChecks.devicetok.optional(),
     }), { refusalkind: 'bad_record' }),
   }),
   announcement:  obj({ kind: oneof(lifecyclekindVals) }).strict(),

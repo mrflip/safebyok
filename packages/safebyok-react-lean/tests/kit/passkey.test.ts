@@ -6,7 +6,7 @@ import * as TH from '../test-helpers'
 
 /** The passkey header that a vault with the passkey `credential_id` has on its gate. */
 function headerOf(credential_id: string, prf_salt_b64: string): WayinHeader {
-  return { wayinkind: 'passkey', label: 'passkey0', credential_id, prf_salt_b64, device_tok: TH.DeviceTok, born_at: 0 } as WayinHeader
+  return { wayinkind: 'passkey', label: 'passkey0', credential_id, prf_salt_b64, devicetok: TH.Devicetok, born_at: 0 } as WayinHeader
 }
 
 /** The refusal that `promise` rejects with. */

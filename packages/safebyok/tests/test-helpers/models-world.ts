@@ -80,36 +80,36 @@ export const WorldGateStamp: GateStamp = Object.freeze({ ...WorldScope, labelpat
 export const WorldGate: GateRevisionedStamp = Object.freeze({ ...WorldGateStamp, revtok: revtokOf('gate1'), revseq: 0 })
 // --
 
-// == [Devices]: TestPassphrase, DeviceTok, ProvingDeviceGiven, provingDeviceOf, DeviceGiven, makeDevice, MemoryShelf, passkeyAnswerOf
+// == [Devices]: TestPassphrase, Devicetok, ProvingDeviceGiven, provingDeviceOf, DeviceGiven, makeDevice, MemoryShelf, passkeyAnswerOf
 
 /** An obvious fake passphrase, never a real one. */
 export const TestPassphrase = GX.passphraseCleartext.parse('correct horse battery staple')
 
-/** The `device_tok` of every device made here. */
-export const DeviceTok = '00000000-0000-4000-8000-00000000000a'
+/** The `devicetok` of every device made here, the host's own. */
+export const Devicetok = '00000000-0000-4000-8000-00000000000a'
 
 /** The options of a {@link provingDeviceOf} device: the host's own deriver and checker, which it wraps with a device's guards. */
 export interface ProvingDeviceGiven {
   keyDeriver?:      Deriver.KeyDeriver | undefined
   strengthChecker?: StrengthChecker | undefined
-  device_tok?:      string | undefined
+  devicetok?:       string | undefined
 }
 
-/** A proving device without a Device: the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link DeviceTok}, each wrapped as a device wraps it. */
-export function provingDeviceOf({ keyDeriver = testDeriver, strengthChecker = anyStrengthChecker, device_tok = DeviceTok }: ProvingDeviceGiven = {}): ProvingDevice {
-  return { keyDeriver: guardKeyDeriver(keyDeriver), strengthChecker: guardStrengthChecker(strengthChecker), device_tok }
+/** A proving device without a Device: the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link Devicetok}, each wrapped as a device wraps it. */
+export function provingDeviceOf({ keyDeriver = testDeriver, strengthChecker = anyStrengthChecker, devicetok = Devicetok }: ProvingDeviceGiven = {}): ProvingDevice {
+  return { keyDeriver: guardKeyDeriver(keyDeriver), strengthChecker: guardStrengthChecker(strengthChecker), ensureDevicetok: () => Promise.resolve(devicetok) }
 }
 
 /** What a {@link makeDevice} device is made of: its record, and the user it signs in, or null to leave it signed out. */
 export type DeviceGiven = Partial<DeviceRecord & { userid: Userid | null }>
 
-/** A Device of {@link WorldScope}'s banklabel and {@link DeviceTok}, connected and signed in as its user, its sign-in under way, with `given` laid over them:
+/** A Device of {@link WorldScope}'s banklabel and the host's {@link Devicetok}, connected and signed in as its user, its sign-in under way, with `given` laid over them:
  * over `testDeriver`, a checker that passes everything, a quiet logger and a fresh MemoryVaultDB, with `opts` laid over those.
  * Await `device.signin(device.userid!)` for its bank to come up.
  */
 export function makeDevice(given: DeviceGiven = {}, opts: Partial<DeviceOpts> = {}): Device {
   const { userid = WorldScope.userid, ...record } = given
-  const device = Device.make({ banklabel: WorldScope.banklabel, device_tok: DeviceTok, ...record }, { keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, vaultDB: new MemoryVaultDB(), ...opts })
+  const device = Device.make({ banklabel: WorldScope.banklabel, ...record }, { keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, vaultDB: new MemoryVaultDB(), devicetok: Devicetok, ...opts })
   device.connect()
   if (userid !== null) { void device.signin(userid) }
   return device

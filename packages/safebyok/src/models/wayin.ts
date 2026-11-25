@@ -3,7 +3,7 @@ import type { CX, EX } from 'safebyok-big/internals'
 import { Crypto, Helpers } from 'safebyok-big/internals'
 import type * as Stamps from '../shapes/shapes-stamps'
 import { type WayinHeader, type WayinRecord, WayinChecks } from '../shapes/shapes-wayin'
-import type { DeviceTok, EpochMillis } from '../shapes/primitives'
+import type { Devicetok, EpochMillis } from '../shapes/primitives'
 import type { Modelkind } from '../shapes/shapes-thing'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 
@@ -26,12 +26,12 @@ export function wayinCtxOf(bankStamp: Stamps.BankStamp, gateStamp: Stamps.GateSt
 
 /** One way into a bank, recorded in its gate: its passphrase or its passkey. */
 export class Wayin {
-  // == [Props]: wayinkind, label, device_tok, born_at, bank_key_wayin_wrapped, key_deriver_label, salt_b64, credential_id, prf_salt_b64, labelpath, am, written_at, #pickle
+  // == [Props]: wayinkind, label, devicetok, born_at, bank_key_wayin_wrapped, key_deriver_label, salt_b64, credential_id, prf_salt_b64, labelpath, am, written_at, #pickle
 
   declare readonly wayinkind:              EX.Wayinkind
   /** The ckey its gate's `wayins` keep it under. */
   declare readonly label:                  'main' | 'passkey0'
-  declare readonly device_tok:             DeviceTok
+  declare readonly devicetok:              Devicetok
   declare readonly born_at:                EpochMillis
   declare readonly bank_key_wayin_wrapped: WayinRecord['bank_key_wayin_wrapped']
   /** Only on a passphrase wayin. */

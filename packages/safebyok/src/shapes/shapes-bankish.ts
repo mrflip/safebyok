@@ -12,7 +12,7 @@ import type { StrengthChecker } from './shapes-gateish'
 import type { BoxCleartexts, UnsealedOf } from './shapes-sealers'
 import type { BoxRecord } from './shapes-thing'
 import type { GetAsk, ListAsk } from './shapes-asks'
-import type { Banklabel, DeviceTok, EpochMillis, Labelpath, Userid } from './primitives'
+import type { Banklabel, Devicetok, EpochMillis, Labelpath, Userid } from './primitives'
 import * as Phrases from '../phrases'
 
 // == [The bank's forms]: BoxUnsealed
@@ -84,17 +84,18 @@ function isHostedVault(val: unknown): val is HostedVault {
 /** The banklabel of the bank a device serves where its record names none. */
 export const DefaultBanklabel = 'main'
 
-/** The checks of a {@link DeviceRecord}, and of the userid `Device.signin` is handed. */
-export const BankishChecks = Validator.Checkers('bad_record', ({ obj, user_id, banklabel, device_tok }) => ({
-  deviceRecord: obj({ banklabel: banklabel.default(DefaultBanklabel), device_tok }).strict(),
+/** The checks of a {@link DeviceRecord}, of the userid `Device.signin` is handed, and of a devicetok. */
+export const BankishChecks = Validator.Checkers('bad_record', ({ obj, user_id, banklabel, devicetok }) => ({
+  deviceRecord: obj({ banklabel: banklabel.default(DefaultBanklabel) }).strict(),
   userid:       user_id,
+  devicetok,
 }), [CX])
 
-/** A device's record, as `Device.make` takes it: the banklabel of the bank it serves each user, `'main'` where left out, and its token. */
+/** A device's record, as `Device.make` takes it: the banklabel of the bank it serves each user, `'main'` where left out. */
 export type DeviceRecord = Z.input<typeof BankishChecks.deviceRecord>
 
 /** A device as it serializes: its record, and the user signed in on it, or null for none. */
-export type DeviceJSON = Readonly<{ userid: Userid | null, banklabel: Banklabel, device_tok: DeviceTok }>
+export type DeviceJSON = Readonly<{ userid: Userid | null, banklabel: Banklabel }>
 
 /** The argument of `onBadNews`: a refusal no caller waits on, and the device it reached. */
 export interface BadNews {
@@ -172,8 +173,10 @@ export interface DeviceOpts {
   queryClient?:      QueryClient | undefined
   /** Where the device keeps the signed-in bank's three roots between page loads: hand it `localStorage`. Without one, nothing is kept, and each page load waits on the vaultDB for the bank. */
   rootShelf?:        RootShelf | undefined
-  /** Where the device keeps the signed-in bank's lease, which every tab given the same one shares, and which outlasts a page load: `browserOpts()` from `safebyok/browser` hands an `IdbDeviceDB`. Default: one in the device's memory, so this tab's lease is its own and ends with the page. */
+  /** Where the device keeps the signed-in bank's lease, which every tab given the same one shares, and which outlasts a page load: `browserOpts()` from `safebyok/browser` hands an `IdbDeviceDB`. Default: one in the device's memory, so this tab's lease is its own and ends with the page. It keeps this device's devicetok for each bank too. */
   deviceDB?:         DeviceDB | undefined
+  /** The token each wayin this device builds records, a UUID, visible in storage. Default: the one the deviceDB keeps for the signed-in user's bank, made at its first use. Make it at random, and another for each user: one shared by users, or derived from anything about the device, would link records the vault does not link. */
+  devicetok?:        Devicetok | undefined
 }
 // --
 
