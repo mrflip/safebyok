@@ -1,6 +1,6 @@
 # Thread 4: probe (2026-11-25)
 
-Branch `20261125-probe`, PR #TBD, stacked on #902 (thread 1c, softlock). Proved: `vitest tests/models/vault-probe.test.ts`
+Branch `20261125-probe`, PR #906, stacked on #902 (thread 1c, softlock). Proved: `vitest tests/models/vault-probe.test.ts`
 11 passed; `tests/models/` with `tests/index.test.ts` 1207 passed; safebyok lint and typecheck clean.
 
 * **Built**:
