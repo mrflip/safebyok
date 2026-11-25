@@ -136,8 +136,14 @@ review `medium`; worker on opus.
 Gloss. `safebyok-postgres` no longer bends to the old one: fold `postgres-driver.ts`'s watch plumbing and vaultDB
 refusal back into `postgres-vault-db.ts` (or into concepts of their own), keep pg's error mapping where it reads best,
 drop the line-for-line copies' old wording, and make the package read as one clean adapter: README, exports, tests.
-Also *Coach (2026-11-25): "yes for onbadnews for the watch"*: a failed UNLISTEN at a watch's stop is reported to `onBadNews`, not swallowed. And main's #926 (`watch_recovery`) added an optional `onEnded` to `VaultDB.watch` ("called once where the watch ends before its stop is called"): a Postgres watch that ends itself on a failed fetch calls it.
+Also *Coach (2026-11-25): "yes for onbadnews for the watch"*, and *(2026-11-25) "it is explicitly ok for there to be news sent after it; change the note to say so"*: a failed UNLISTEN at a watch's stop is reported to `onBadNews`, not swallowed. And main's #926 (`watch_recovery`) added an optional `onEnded` to `VaultDB.watch` ("called once where the watch ends before its stop is called"): a Postgres watch that ends itself on a failed fetch calls it.
 Depends on: B's rework batch (E3's Postgres edits are on #923). Size: medium. Levels: review `medium`.
+
+### G. `postgres_listen`: a ready-made PostgresListen for node-postgres
+
+> yes write, in a new pr … postgres go ahead but in a new thread after all of your prs are filed
+
+Gloss. `safebyok-postgres` exports a `PostgresListen` built for node-postgres's `Client` (a dedicated connection, LISTEN/UNLISTEN, notification routing by channel, reporting a failed UNLISTEN as news), replacing the README's recipe; D's server can use it. Cut only after every other sprint PR has filed. Depends on: all of A–F and D1 filed. Size: small. Levels: review `low`.
 
 ## For the Coach
 
