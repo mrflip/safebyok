@@ -325,6 +325,8 @@ describe("a world's softlock, near its lease's end", () => {
 })
 
 describe("a world's janitor", () => {
+  afterEach(() => { vi.unstubAllGlobals() })
+
   it("locks the world at its first tick once the lease has ended", async () => {
     const { device: { world } } = await TH.buildBornBank({ device: TH.makeDevice({}, { autolockMinutes: 25, janitorMinutes: 10 }) })
     await vi.advanceTimersByTimeAsync(20 * Consts.MinuteMillis)
@@ -406,7 +408,6 @@ describe("a world's janitor", () => {
     await vi.advanceTimersByTimeAsync(10 * Consts.MinuteMillis)
     expect([world.demandVaultMinder().isWatching, innerWatch.mock.calls.length, onBadNews.mock.calls.length]).to.deep.equal([true, 2, 1])
     world.demandVaultMinder().disconnect()
-    vi.unstubAllGlobals()
   })
 
   it("starts no watch while disconnected", async () => {
