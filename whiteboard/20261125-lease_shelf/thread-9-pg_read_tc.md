@@ -1,6 +1,6 @@
 # Thread 9: Postgres mints read_tc (2026-11-25)
 
-Branch `20261125-pg_read_tc`, PR #TBD, stacked on #905 (thread 2, `20261125-stats`). Proved: `safebyok-postgres` lint, typecheck, and its 6 test files, 374 tests (PGlite 0.5.16, which is PostgreSQL 18.6).
+Branch `20261125-pg_read_tc`, PR #911, stacked on #905 (thread 2, `20261125-stats`). Proved: `safebyok-postgres` lint, typecheck, and its 6 test files, 374 tests (PGlite 0.5.16, which is PostgreSQL 18.6).
 
 * **Built**: every statement `PostgresVaultDB` runs returns `read_tc` as a column, `uuidv7()::text AS read_tc` (`ReadTcSql` in `src/vault-queries.ts`), beside the rows it reads: the get, write (all three kinds), list, birth, get-world and stats statements. `src/postgres-vault-db.ts` takes `read_tc` from the row; `readTcNow` is no longer imported there, and the `Omit<..., 'read_tc'>` row types are gone. The README says `PostgresVaultDB` needs Postgres 18 or later, for `uuidv7()`. Two tests in `tests/postgres-vault-db.test.ts`: two reads in one session are dated in order, and within a second of the database's `clock_timestamp()`; and an answer carries the `read_tc` of the row a fake client returns (which a client-minted `read_tc` would fail).
 * **Decisions made**:
