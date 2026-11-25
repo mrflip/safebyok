@@ -1,5 +1,5 @@
--- safebyok-postgres: the functions PostgresBankDB calls to write a bank, gate, vault or box row. For Postgres 14 or later.
--- Run it after the tables, and again with each upgrade of safebyok-postgres: each run replaces the functions.
+-- safebyok-postgres-big: the functions PostgresBankDB calls to write a bank, gate, vault or box row. For Postgres 14 or later.
+-- Run it after the tables, and again with each upgrade of safebyok-postgres-big: each run replaces the functions.
 --
 -- Each write function checks a record against the stored rows and stores it, in one call. It does not throw when it
 -- stores nothing. It returns one row, which says whether it stored the record (ok), and when it did, what happened

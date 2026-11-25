@@ -1,4 +1,4 @@
--- safebyok-postgres: the four tables PostgresBankDB stores its rows in. For Postgres 14 or later.
+-- safebyok-postgres-big: the four tables PostgresBankDB stores its rows in. For Postgres 14 or later.
 -- Safe to run again: it creates only what is missing.
 --
 -- Each row is the record safebyok wrote, with a column for each of its fields. A field that is an object is a jsonb column.

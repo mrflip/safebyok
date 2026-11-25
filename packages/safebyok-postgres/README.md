@@ -1,12 +1,12 @@
 # safebyok-postgres
 
-safebyok's bankDB in [Postgres](https://www.postgresql.org): the SQL that makes four tables, and
-**`PostgresBankDB`**, which writes bank, gate, vault and box rows to them from your server. Your database has
-ciphertext and the few unencrypted fields a row is found by. It never sees a whisper, a passphrase,
-or any key that could decipher one.
+safebyok's vaultDB in [Postgres](https://www.postgresql.org): the SQL that makes three tables and the functions that
+write to them, and **`PostgresVaultDB`**, which stores a bank's Things there from your server. Your database has
+ciphertext and the few unencrypted fields a row is found by. It never sees a whisper, a passphrase, or any key that
+could decipher one.
 
-It brings no driver: it uses the driver you have, a `pg` Pool or a PGlite, and has no runtime
-dependency but `safebyok`.
+It brings no driver: it uses the driver you have, a `pg` Pool or a PGlite, and has no runtime dependency but
+`safebyok`.
 
 ## Install
 
@@ -14,99 +14,78 @@ dependency but `safebyok`.
 pnpm add safebyok safebyok-postgres
 ```
 
-`safebyok` is a peer dependency, so the adapter and your app share one copy, and a `VaultError`
-from one is a `VaultError` to the other.
+`safebyok` is a peer dependency, so the adapter and your app share one copy, and a `VaultError` from one is a
+`VaultError` to the other.
 
 ## Make the tables and the functions
 
-`BankTablesSql` is the SQL of the tables, for Postgres 14 or later. The package also ships it as
-`bank-tables.sql`, to copy into your migrations. It creates only what is missing, so it is safe to
-run again. Until 1.0 there is no migration: a release that changes the tables says so in its
-changelog, and you drop them and run it again.
+`VaultTablesSql` is the SQL of the tables, for Postgres 14 or later. It creates only what is missing, so it is safe to
+run again. Until 1.0 there is no migration: a release that changes the tables says so in its changelog, and you drop
+them and run it again. Each table has a column for each field of a Thing, and checks each row's shape on its own; a row
+it refuses (SQLSTATE `23514`) is one safebyok could not have read back.
 
-`PostgresVaultDB`, the vaultDB of the new `safebyok` core (not yet exported), needs **Postgres 18 or later**: each
-statement it runs dates its read with Postgres's own `uuidv7()`, so the time an answer was read is the database's,
-never the device's.
+`PostgresVaultDB` needs **Postgres 18 or later**: each statement it runs dates its read with Postgres's own `uuidv7()`,
+so the time an answer was read is the database's, never the device's.
 
-Each table has a column for each field of a row, and checks each row's shape: its `am`, the columns
-a live row has and a tombstone lacks, and the outline of each `jsonb` field. A row they refuse
-(SQLSTATE `23514`) is one safebyok could not have read back. They do not check `fmt`: a row in a
-later format may sit beside these, and the functions never overwrite it.
-
-`BankFunctionsSql` is the SQL of the functions `PostgresBankDB` calls to write a row, shipped as
-`bank-functions.sql`. Run it after the tables, and **again with each upgrade of this package**:
-each run replaces the functions. They run with the caller's privileges, and only their owner, the
-role that ran the file, may call them. So run both files as the role your pool connects as, or grant
-that role `EXECUTE`.
+`VaultFunctionsSql` is the SQL of the functions `PostgresVaultDB` calls to write a Thing. Run it after the tables, and
+**again with each upgrade of this package**. Each function's name carries the version of the tables it is built for and
+its own revision, so an upgrade adds its functions beside the old ones, and running the same version again replaces its
+own. They run with the caller's privileges, and only their owner, the role that ran the SQL, may call them. So run both
+as the role your server connects as, or grant that role `EXECUTE`.
 
 ```ts
-import { BankFunctionsSql, BankTablesSql } from 'safebyok-postgres'
+import { VaultFunctionsSql, VaultTablesSql } from 'safebyok-postgres'
 
-await pool.query(BankTablesSql)    // pg runs several statements in one query without parameters
-await pool.query(BankFunctionsSql)
-await pglite.exec(BankTablesSql)
-await pglite.exec(BankFunctionsSql)
+await pool.query(VaultTablesSql)    // pg runs several statements in one query without parameters
+await pool.query(VaultFunctionsSql)
+await pglite.exec(VaultTablesSql)
+await pglite.exec(VaultFunctionsSql)
 ```
 
-**A database with older safebyok tables**: drop `safebyok_boxes` and `safebyok_vaults`, and each `safebyok_` function,
-before you run these files. They create only what is missing, so an older table of the same name stays as it is. The
-rows it had are not read: each user's bank starts empty.
+**A database with the tables of an earlier release** (`safebyok_banks`, `safebyok_gates`, `safebyok_vaults`,
+`safebyok_boxes`): this release does not read them, and each user's bank starts empty. Drop them, and their `safebyok_`
+functions, when you no longer need them.
 
 ## Use
 
 ```ts
 import { Pool } from 'pg'
-import { PostgresBankDB, pgClientOf } from 'safebyok-postgres'
+import { PostgresVaultDB } from 'safebyok-postgres'
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-const bankDB = new PostgresBankDB({ client: pgClientOf(pool) })
+const vaultDB = new PostgresVaultDB({ client: pool })
 ```
 
-* **`client`** runs a statement (`query`) and a transaction (`transaction`). A PGlite works as it
-  is. `pgClientOf(pool)` wraps a `pg` Pool, and runs each transaction on a connection it checks out.
-  For any other driver, write a wrapper with the same two functions.
-* **`listen`**, optional, is how `watch` hears writes made by other servers and devices; see
-  below. Without it, a watch hears nothing, and a device learns of another's writes when it next
-  reads.
-* **`maxBoxes`**, optional, 100 if left out, is a best-effort cap on the box rows of one vault life. A put of a new box
-  past it is refused with `vault_full`. A deleted box's tombstone still counts, so deleting a box frees no room. A vault
-  made anew starts at zero. The cap is exact at moderate write rates. A strict cap would take concurrency machinery this
-  package does not add.
-* **`maxRecordSizeEst`**, optional, as every bankDB accepts it: 5,600 bytes if left out, so a box's row fits a `NOTIFY`.
+* **`client`** runs a statement: anything with `query(text, params)` that resolves to `{ rows }`, as a `pg` Pool, a
+  `pg` connection and a PGlite do.
+* **`listen`**, optional, is how `watch` hears writes made by other servers and devices; see below. Without it, a watch
+  hears nothing, and a device learns of another's writes when it next reads.
 
-`PostgresBankDB` writes what it is handed under the scope it is handed. **Your route decides who
-may reach which bank**: check the signed-in user before a request reaches the bankDB, and build
-each scope's `user_id` from that check, never from the request.
+`PostgresVaultDB` writes what it is handed under the scope it is handed. **Your route decides who may reach which
+bank**: check the signed-in user before a request reaches the vaultDB, and build each scope's `userid` from that check,
+never from the request.
 
-A failed statement that a retry may mend is refused with `storage_unavailable`: a lost or refused
-connection, a serialization failure or deadlock, a server short of resources or shutting down, a
-lock not granted in time, a write sent to a server that is read-only for now, as during a failover
-(SQLSTATE classes `08`, `40`, `53`, `57`, and `55P03` and `25006`). A lost or refused
-connection is also told by a Node system error code such as `ECONNRESET`, or by `pg`'s own message
-for one; a wrapper for another driver passes it on with a SQLSTATE or a Node code as the error's
-`code`. Every other failed statement, a missing table or privilege among them, is refused with
-`unexpected_error`. Either way its cause is the driver's message and code.
+A failed statement that a retry may mend is refused with `storage_unavailable`: a lost or refused connection, a
+serialization failure or deadlock, a server short of resources or shutting down, a lock not granted in time, a write
+sent to a server that is read-only for now, as during a failover (SQLSTATE classes `08`, `40`, `53`, `57`, and `55P03`
+and `25006`). A lost or refused connection is also told by a Node system error code such as `ECONNRESET`, or by `pg`'s
+own message for one; a wrapper for another driver passes it on with a SQLSTATE or a Node code as the error's `code`.
+Every other failed statement, a missing table or privilege among them, is refused with `unexpected_error`. Either way
+its cause is the driver's message and code.
 
 ## Hearing other writes
 
-Each write notifies on its user's channel, `bankChannelOf(user_id)`, which is
-`safebyok_` followed by the user_id, as it commits. The database function `safebyok_tell` builds it:
-a JSON object with the written row's address under `at`, the row under `row`, and the row above it
-under `parent`: a gate's or a vault's bank row, a box's vault row. A box's address carries its
-vault's life, `bank_tok` and `vault_tok`. Postgres refuses a notification of 8,000 bytes or more.
-A notification that is too large drops the row above first, then the row, and the listener fetches
-what is stored at the address. A fetch that fails in a way a retry may mend drops the notice; any
-other failure ends the watch and is handed to its `onBadNews`. Deleting a bank notifies once, of its tombstone: the gate,
-vault and box rows deleted with it notify none. `listen(channel, onNotify)` passes the text of each
-notification on that channel to `onNotify`, unchanged, and returns a function that stops listening.
-A watch hears a box with its vault's row as its parent, or with a null parent when the vault row did
-not fit. A bank or gate row is heard only by a watch of the whole bank. Any role that can connect to the database can `LISTEN` on a channel, and so can read the
-rows a notification carries: the same ciphertext and wrapped keys the tables contain.
+Each write notifies on its user's channel, `thingsChannelOf(userid)`, which is `safebyok_things_` followed by the
+userid, as it commits: a JSON object with the Thing's scope under `at`, the Thing under `thing`, and its bank's row under
+`bank`. Postgres refuses a notification of 8,000 bytes or more; one that is too large drops the bank row first, then the
+Thing, and the listener fetches what it lacks. A fetch that fails in a way a retry may mend drops the notice; any other
+failure ends the watch and is handed to its `onBadNews`. Any role that can connect to the database can `LISTEN` on a
+channel, and so can read the Things a notification carries: the same ciphertext and wrapped keys the tables contain.
 
-LISTEN needs a connection of its own for as long as it listens, so share one among every watch.
-This recipe LISTENs on a channel the first time a watch asks for it and **never UNLISTENs**. The
-stop function it returns only drops that watch's handler, and the connection keeps listening on
-every channel it has been asked for until it closes.
+`listen(channel, onNotify)` passes the text of each notification on that channel to `onNotify`, unchanged, and returns
+a function that stops listening. LISTEN needs a connection of its own for as long as it listens, so share one among
+every watch. This recipe LISTENs on a channel the first time a watch asks for it and **never UNLISTENs**: the stop
+function it returns only drops that watch's handler.
 
 ```ts
 import { Client, escapeIdentifier } from 'pg'
@@ -126,7 +105,7 @@ const listen: PostgresListen = async (channel, onNotify) => {
   const listeners = listenersOf.get(channel) ?? new Set()
   if (! listenersOf.has(channel)) {
     listenersOf.set(channel, listeners)
-    // A user_id may contain capitals and punctuation, which LISTEN accepts only in a quoted identifier.
+    // A userid may contain capitals and punctuation, which LISTEN accepts only in a quoted identifier.
     try {
       await listener.query(`LISTEN ${escapeIdentifier(channel)}`)
     } catch (err) {
@@ -137,82 +116,50 @@ const listen: PostgresListen = async (channel, onNotify) => {
   listeners.add(onNotify)
   return () => listeners.delete(onNotify)
 }
-const bankDB = new PostgresBankDB({ client: pgClientOf(pool), listen })
+const vaultDB = new PostgresVaultDB({ client: pool, listen })
 ```
 
-A write made just after a watch's first LISTEN can go unheard, as can any notification while the
-listener is reconnecting. A watch is only a hint: a device that misses one learns of the write when
-it next fetches. A PGlite's own `listen` fits as it is, given the channel quoted (`"safebyok_..."`),
-but takes its turn behind the statements already queued.
+A write made just after a watch's first LISTEN can go unheard, as can any notification while the listener is
+reconnecting. A watch is only a hint: a device that misses one learns of the write when it next fetches. A PGlite's own
+`listen` fits as it is, given the channel quoted (`"safebyok_things_..."`).
 
-**A user_id whose channel passes 63 bytes cannot write.** A channel is a Postgres identifier, at
-most 63 bytes, so a user_id of more than 54 characters (a user_id is ASCII, a byte a character, and
-a percent-encoded character is three) makes every write that would notify fail with
-`unexpected_error`, its cause Postgres's `channel name too long`. Keep user_ids to 54 characters
-with this package for now.
+**A userid whose channel passes 63 bytes cannot write.** A channel is a Postgres identifier, at most 63 bytes, so a
+userid of more than 47 bytes makes every write fail with `unexpected_error`, its cause Postgres's
+`channel name too long`. Keep userids to 47 bytes with this package for now.
 
 ## What is stored
 
-`safebyok_banks` has a row per bank, keyed by `user_id` and `banklabel`. `safebyok_gates` has a row
-per gate of a bank, keyed by those and `gatelabel`; today every bank has one, `main`, with the
-bank's wayins in `wayins`. `safebyok_vaults` has a row per vault, keyed by the bank's primary key and
-`vaultlabel`. `safebyok_boxes` has a row per box, keyed by the vault's primary key, the life of its vault
-(`bank_tok` and `vault_tok`) and its `boxlabel`. Each field of a row is a column of its own. The
-labels, the tokens and `am` are `text`. `fmt`, `revision_seq` and `whisper_schema_version` are
-`integer`. The times, `registered_at` and `written_at`, are `bigint`, in UTC epoch milliseconds.
-A field that is an object is a `jsonb` column: a gate's `wayins`, `auth`, `sigs` and `meta`, and a
-box's `sidecar`, `box_key_wrapped` and `whisper_ciphered`. Your own SQL can read any of them, a
-sidecar's fields included (`sidecar->>'note'`), but leave the writing to `PostgresBankDB`.
+`safebyok_bank_things` has a row per bank, `safebyok_gate_things` a row per gate, and `safebyok_box_things` a row per
+box, each keyed by `userid`, `banklabel` and `labelpath`. Each field of a Thing is a column of its own; a field that is
+an object is a `jsonb` column. Every text column is `COLLATE "C"`, compared and sorted byte for byte, as safebyok
+compares names. Each time is a `bigint` in UTC epoch milliseconds. Your own SQL can read any of them, but leave the
+writing to `PostgresVaultDB`.
 
-A deleted bank, vault or box leaves its tombstone in place: the same row, its `am` `'x'` where a
-live row's is `'a'`, and a box's `jsonb` columns null. Deleting a bank deletes every gate, vault and
-box row under it, in the same transaction; building it again does the same to any left. A vault or
-box row under another `bank_tok` than its bank row's, or a box row under another life than its
-vault row's, is of an ended life: no read returns it, and `tidyGone` deletes it. Each gate, vault
-and box row has a foreign key to the bank row at its scope, whatever that bank's `bank_tok`: no row
-is stored where no bank row is, and **a `DELETE` of a bank row is refused while rows stand under
-it**. `PostgresBankDB` never deletes a bank row, so that is your own SQL's doing, and a `TRUNCATE`
-of the banks table must name all four tables.
+A deleted Thing leaves its tombstone in place: the same row, its `am` `'x'` where a live row's is `'a'`. Each write is
+one statement, which takes effect only if the stored row still has the revision the write cites, and waits only on a
+writer of the same row. No table has a foreign key.
 
-Row-level security is on with no policy, so of the roles you grant the tables to, only their
-owner, the role your server connects as, can reach the rows. A superuser, or a role that bypasses
-row-level security, can reach them too. A notification is not a table: any role that may
-connect can LISTEN on any user's channel and hear the rows each write changes.
+Row-level security is on with no policy, so of the roles you grant the tables to, only their owner, the role your server
+connects as, can reach the rows. A superuser, or a role that bypasses row-level security, can reach them too. A
+notification is not a table: any role that may connect can LISTEN on any user's channel and hear the Things each write
+stores.
 
-**You own the database's roles, and are responsible for its row-level security** and for who may
-connect and LISTEN: this package grants nothing and creates no role or policy.
-
-Each write is one conditional `INSERT` or `UPDATE`, which takes effect only if the stored row still
-has the revision the write expects at that moment. A vault write reads its bank row,
-and a box write its vault row, without a lock, so writers under one bank do not wait for each other.
-A new row's foreign key acquires a share lock on its bank row, which waits only on a `DELETE` of that
-row. Two things follow:
-
-* A vault or box written while its bank or vault is deleted or built anew may land in the life that
-  has ended. No read returns it, and `tidyGone`, or the bank built anew, deletes it. Until then the
-  row stays, and it keeps a `DELETE` of its bank row refused. This is accepted: safebyok may later
-  offer advice, or functions, that acquire locks for tighter atomicity under the same contract. If you
-  write boxes heavily under vaults that get deleted and are not written again, call `tidyGone` now
-  and then.
-* The box cap is soft. Writers racing to add their first box can pass it together, and `tidyGone`
-  does not trim the rows they add.
+**You own the database's roles, and are responsible for its row-level security** and for who may connect and LISTEN:
+this package grants nothing and creates no role or policy.
 
 ## On Supabase
 
-Supabase is Postgres, so this package runs there as it is: put `bank-tables.sql` and
-`bank-functions.sql` in a migration and run `PostgresBankDB` on your server, connected with the database connection string.
+Supabase is Postgres, so this package runs there as it is: run `VaultTablesSql` and `VaultFunctionsSql` in a migration
+and run `PostgresVaultDB` on your server, connected with the database connection string.
 
-* **Keep the tables out of the Data API.** The tables come with row-level security on and no
-  policy, so the `anon` and `authenticated` roles reach nothing: leave them so.
-* **Listen over a direct or session-mode connection.** The transaction-mode pooler (port 6543)
-  cannot keep a LISTEN.
+* **Keep the tables out of the Data API.** The tables come with row-level security on and no policy, so the `anon` and
+  `authenticated` roles reach nothing: leave them so.
+* **Listen over a direct or session-mode connection.** The transaction-mode pooler (port 6543) cannot keep a LISTEN.
 
 This package has not been run against Supabase: this section is a reading of its documentation.
 
 ## Developing this package
 
-`pnpm justify` runs its lint, typecheck, tests and build, with publint and arethetypeswrong. The
-tests run against [PGlite](https://pglite.dev), a real Postgres compiled to WebAssembly and run
-in-process, through the battery every bankDB runs (`describeBankDBBattery`, from
-`safebyok/testing`), with a second PostgresBankDB over the same database as another device. The
-same battery runs over a real Postgres in `e2e/tests/postgres/`, when `SAFEBYOK_PG_URL` reaches one.
+`pnpm justify` runs its lint, typecheck, tests and build, with publint and arethetypeswrong. The tests run against
+[PGlite](https://pglite.dev), a real Postgres compiled to WebAssembly and run in-process, through the battery every
+vaultDB runs (`describeVaultDBBattery`, from `safebyok/testing`).

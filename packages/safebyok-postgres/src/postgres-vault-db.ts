@@ -1,11 +1,10 @@
 /** A vaultDB that keeps its Things in Postgres. */
 
-// eslint-disable-next-line import-x/no-extraneous-dependencies -- a devDependency while PostgresVaultDB is not exported
 import {
   type AnyAsk, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldActual, type GetWorldAsk, type GotActual, type ListThingsActual, type ListAsk, type StatsActual, type StatsAsk, type ThingkindStats,
   type ReadTc, type Received, type ThingWatchScope, type VaultError, type WriteAct, type WriteAsk, type WroteActual, AdapterVaultDB, Classifier, Shell, VoidLifeTok, VoidTrack, getAskOf, isVaultError, objCheck, storeLimitsOf,
 } from 'safebyok/storage'
-import { type PostgresListen, type PostgresQueryable, jsonOrNull, listenOrNull, refusalOf, storedNothing, unlistenOnceListening } from './postgres-bank-db'
+import { type PostgresListen, type PostgresQueryable, jsonOrNull, listenOrNull, refusalOf, storedNothing, unlistenOnceListening } from './postgres-driver'
 import { BirthRootsSql, GetThingSql, GetWorldSql, ListThingsSql, StatsSql, WriteThingSql } from './vault-queries'
 
 // == [The driver]: PostgresVaultDBOpts, isPostgresQueryable

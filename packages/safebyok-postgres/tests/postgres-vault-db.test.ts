@@ -6,7 +6,7 @@ import { type ThingScope, type Thingkind, type VaultError, Labelpath, Lifeseq, T
 import * as VT from 'safebyok/testing'
 import * as Phrases from '../src/phrases'
 import { PostgresVaultDB, thingsChannelOf } from '../src/postgres-vault-db'
-import type { PostgresListen } from '../src/postgres-bank-db'
+import type { PostgresListen } from '../src/postgres-driver'
 import { TableVersion, VaultFunctionNames, VaultFunctionsSql } from '../src/vault-functions'
 import { GetThingSql } from '../src/vault-queries'
 import { VaultTablesSql } from '../src/vault-tables'
