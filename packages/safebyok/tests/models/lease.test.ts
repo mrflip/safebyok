@@ -102,7 +102,7 @@ describe("Lease.make(record, { gate })", () => {
     [(record: LeaseRecord) => ({ ...record, wayinkind: 'carrier_pigeon' }),                           'of an unknown wayinkind'],
     [(record: LeaseRecord) => ({ ...record, extra: 'field' }),                                        'with a field no lease has'],
     [({ gate_labelpath, ...record }: LiveLeaseRecord) => ({ ...record, gatelabelpath: gate_labelpath }),  'with its gate labelpath at gatelabelpath'],
-    [(record: LeaseRecord) => ({ ...record, gate_labelpath: 'gate/passkeys' }),                      "whose labelpath is not its gate's"],
+    [(record: LeaseRecord) => ({ ...record, gate_labelpath: 'gate/passkeys' }),                       "whose labelpath is not its gate's"],
     [(record: LeaseRecord) => ({ ...record, ends_at: undefined }),                                    'with no ends_at'],
     [() => TH.leaseTombstoneOf(),                                                                        'that is a tombstone'],
     [() => 'a lease',                                                                                    'that is not a record at all'],
@@ -447,10 +447,10 @@ describe("a tampered lease record", () => {
     [(record: LiveLeaseRecord) => ({ ...record, proved_at: record.proved_at + 1 }),                        'its proved_at moved'],
     [(record: LiveLeaseRecord) => ({ ...record, born_at: record.born_at - 1 }),                            'its born_at moved'],
     [(record: LiveLeaseRecord) => ({ ...record, wayinkind: 'passkey' }),                                   'its wayinkind changed'],
-    [(record: LiveLeaseRecord) => ({ ...record, gate_revtok: TH.revtokOf('gate2') }),                     'its gate_revtok changed'],
-    [(record: LiveLeaseRecord) => ({ ...record, gate_lifeseq: Lifeseq.ofLifenum(1) }),                    'its gate_lifeseq changed'],
+    [(record: LiveLeaseRecord) => ({ ...record, gate_revtok: TH.revtokOf('gate2') }),                      'its gate_revtok changed'],
+    [(record: LiveLeaseRecord) => ({ ...record, gate_lifeseq: Lifeseq.ofLifenum(1) }),                     'its gate_lifeseq changed'],
     [(record: LiveLeaseRecord) => ({ ...record, gate_labelpath: 'gate/passkeys', labelpath: 'lease/passkeys', label: 'passkeys' }), 'its gate_labelpath changed'],
-    [(record: LiveLeaseRecord, other: LiveLeaseRecord) => ({ ...record, lease_key: other.lease_key }),      "another lease's leaseKey"],
+    [(record: LiveLeaseRecord, other: LiveLeaseRecord) => ({ ...record, lease_key: other.lease_key }),     "another lease's leaseKey"],
     [(record: LiveLeaseRecord, other: LiveLeaseRecord) => ({ ...record, bank_key_lease_wrapped: other.bank_key_lease_wrapped }), "another lease's wrapped bankKey"],
   ] as const
 
@@ -502,8 +502,8 @@ describe("a lease's Thing fields", () => {
 
 describe("Lease.shellOf(gateScope)", () => {
   const GateLabelpathCases = [
-    ['gate',          'gate',      'lease/gate',      'the main gate'],
-    ['gate/passkeys', 'passkeys',  'lease/passkeys',  'a gate with a label'],
+    ["gate",          "gate",      "lease/gate",      'the main gate'],
+    ["gate/passkeys", "passkeys",  "lease/passkeys",  'a gate with a label'],
   ] as const
 
   for (const [labelpath, label, leaseLabelpath, blurb] of GateLabelpathCases) {
