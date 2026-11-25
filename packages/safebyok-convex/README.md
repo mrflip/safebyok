@@ -67,8 +67,8 @@ call made before then refuses as `identity_revoked`.
 * **`getUserId` decides who may reach which bank.** Every call names the `userid` whose Things it reads or writes, and
   each function refuses a caller who is signed out (`getUserId` returns null, undefined or `''`) or signed in as anyone
   else, with `identity_revoked`. Use the same id your app gives the core as `userid`.
-* **Each call is one Convex query or mutation.** A write fetches the Thing it cites, and the bank and main gate it reports
-  as the world, and writes in the same mutation, so it is written only over the Thing it expected. Convex runs each
+* **Each call is one Convex query or mutation.** A write fetches the Thing at its scope, the nearest Thing above it, and
+  the bank, main gate and root box, and writes in the same mutation, so it is written only over the Thing it expected. Convex runs each
   mutation as one serializable transaction.
 * **Each write is checked again on your deployment.** Anyone signed in can call these functions directly, so the
   component checks each ask with the core's own checks, refusing one that fails them with `bad_record`, and decides
