@@ -325,7 +325,9 @@ feed_sorter (the redistribution design, section 12); narrowed to an item with no
   no longer among them. The disconnect stops the world's janitor, but a re-read of the roots its last tick began goes
   on, and its roots land in the VaultMinder as a get's answer does. A peek of the deviceDB that a connect, a root's news
   or a ring began goes on too, and where the lease stored is newer it is taken up: the disconnected tab holds it until a
-  lock, a later disconnect or the janitor's autolock past its end. The next `device.connect()` invalidates the bank's
+  lock, a later disconnect or the janitor's autolock past its end. Either way the take-up is announced to the host's
+  `onLifecycle` as it lands, after a disable too: a `lease_taken_up`, or a `lock_taken_up` where the tab still held a
+  lease. The next `device.connect()` invalidates the bank's
   items and listings, so what is shown then is fetched again. A `device.disable()` disconnects, so the same holds of
   it, and no connect follows: what lands is kept by a device whose every verb refuses, and a lease taken up is evicted
   as it is attached.
@@ -343,7 +345,7 @@ Reasoning for wontfix: a disconnect comes when a provider unmounts, and a get is
 the lock, and guarding it would put a token or a wait on every answer. A lease taken up after a disconnect is the one
 every connected tab holds, and nothing is stored. Written by lease_shelf thread 0, 2026-11-25,
 awaiting a ruling; widened to the janitor's re-read by thread 1c, 2026-11-25, and to a take-up of the stored lease by
-thread 1b, 2026-11-25.
+thread 1b, 2026-11-25; its announcement to `onLifecycle` added by thread 6, 2026-11-25.
 
 ### Two tabs that stow a lease record at once keep only what stow-keeps-newest keeps
 
