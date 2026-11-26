@@ -284,7 +284,7 @@ export const AnswerOfOtherManifest = "The vaultDB made an answer that is not a c
 
 // == [Storage policies]: PolicyPhrases, PhraseForRefusaltag
 
-/** The message of each refusal a storage policy makes, for a datastore that judges the policies in its own language (Postgres's `VaultFunctionsSql`). */
+/** The message of each refusal a storage policy makes, by the tag a datastore's verdict names it with. */
 export const PolicyPhrases = {
   ProvedWayinMoved:  BigPhrases.ProvedWayinMoved,
   OtherWayinMoved:   BigPhrases.OtherWayinMoved,

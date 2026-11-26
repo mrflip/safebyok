@@ -1,8 +1,7 @@
 /** What `AdapterVaultDB` makes of a datastore's manifest of each verb: each row checked once, the act its tags find in the act tables of `notes/answer-contract.md`, and the answer. */
 
-import { invert, sortBy } from 'es-toolkit'
+import { sortBy } from 'es-toolkit'
 import { CX, EX, SX, Validator } from 'safebyok-big/internals'
-import { PolicyPhrases } from '../phrases'
 import { BaseThing } from '../models/base-thing'
 import { Labelpath, type Lifetok } from '../shapes/primitives'
 import { type BoxSparse, type ThingRecord, type ThingScope, type VoidSentinel, PerKindChecks, Shell, ThingChecks } from '../shapes/shapes-thing'
@@ -13,7 +12,7 @@ import {
 import type { BirthBankAnswer, DamagedThing, GetThingAnswer, GetWorldAnswer, KidEntry, Kids, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import {
   type BankObserved, type CheckedBankObserved, type CheckedBirthManifest, type CheckedGetManifest, type CheckedListManifest, type CheckedManifestRows, type CheckedRoots, type CheckedStatsManifest,
-  type CheckedWorldManifest, type CheckedWriteManifest, type BirthManifest, type GetManifest, type ListManifest, type ListedChild, type PolicyPhrase, type Presence, type Refusaltag, type RevseqCmp, type RevtokCmp, type RootTags, type ScribedBirthManifest, type ScribedGetManifest,
+  type CheckedWorldManifest, type CheckedWriteManifest, type BirthManifest, type GetManifest, type ListManifest, type ListedChild, type PolicyTag, type Presence, type Refusaltag, type RevseqCmp, type RevtokCmp, type RootTags, type ScribedBirthManifest, type ScribedGetManifest,
   type ScribedListManifest, type ScribedWriteManifest, type StatsManifest, type WorldManifest, type WriteManifest, type WriteTags, ManifestChecks,
 } from '../shapes/shapes-manifest'
 import { VaultStatsChecks } from '../shapes/shapes-vault-stats'
@@ -156,7 +155,7 @@ export function checkedWatchedOf(bankScope: ThingWatchScope, raw: unknown): Thin
 }
 // --
 
-// == [Tables]: RevisionGrid, MatchActs, StaleActs, GetActs, ListActs, PolicyTagForPhrase, writeTableActOf, rootActOf, refusaltagOf, policyFailureOf, isGoodAct, isRefusedAct, isWriteAct
+// == [Tables]: RevisionGrid, MatchActs, StaleActs, GetActs, ListActs, writeTableActOf, rootActOf, refusaltagOf, policyFailureOf, isGoodAct, isRefusedAct, isWriteAct
 // The act tables of `notes/answer-contract.md`, each by the tags that decide it. A write's revisions are judged first, by the
 // grid of its *Revisions* section; where they match, or are stale, the act is then found by the op, the presence of the ante
 // row, and the flag that applies over it: `ifPresent` over a live row, `ifAbsent` over a tombstone or none.
@@ -198,10 +197,6 @@ const GetActs = {
 /** The act of a listing, by its parent's presence: only a live parent lists. */
 const ListActs = { void: 'void', gone: 'gone', live: 'gotlive' } as const satisfies Record<Presence, 'gotlive' | EX.RefusedAct>
 
-// Scaffolding: until thread 9 (`policy_tags`), where a datastore hands back a failed storage policy's tag in place of its message.
-/** The name of each storage policy's refusal in {@link PolicyPhrases}, by its message. */
-const PolicyTagForPhrase = invert(PolicyPhrases)
-
 // Each cell is keyed by the flags that reach it: a put's `ifAbsent` is add or fail (`AskChecks.writeAsk`), and a del's flags
 // are fixed at fail and repl. The lookup casts a cell to every flag's record, since a checked ask never carries another.
 /** The act the put or del table finds from a write's revisions, the ante row's presence and life, and the flag that applies. */
@@ -227,18 +222,18 @@ function rootActOf(put: WriteAsk, tags: RootTags): EX.PutAct | EX.DelAct | EX.Re
  * A changed born_at wins over a failed policy, and a failed policy over a changed lifetok.
  */
 function refusaltagOf(ask: WriteAsk, tags: WriteTags): Refusaltag | null {
-  const policyPhrase = policyFailureOf(ask, tags)
+  const policyTag = policyFailureOf(ask, tags)
   if (tags.born_at_cmp === 'changed') { return 'BornAtNotStored' }
-  if (policyPhrase !== null)          { return PolicyTagForPhrase[policyPhrase] }
+  if (policyTag !== null)             { return policyTag }
   return (tags.lifetok_cmp === 'changed') ? 'LifetokNotStored' : null
 }
 
-/** Why the first storage policy `ask` names refuses it, by its verdict in `tags`, or null where each is met. */
-function policyFailureOf({ options }: WriteAsk, { policies }: WriteTags): PolicyPhrase | null {
+/** The refusal's tag of the first storage policy `ask` names that refuses it, by its verdict in `tags`, or null where each is met. */
+function policyFailureOf({ options }: WriteAsk, { policies }: WriteTags): PolicyTag | null {
   const named = options?.policies ?? []
   for (const policy of named) {
     const verdict = policies[policy]
-    if (verdict?.ok === false) { return verdict.message }
+    if (verdict?.ok === false) { return verdict.refusaltag }
   }
   return null
 }

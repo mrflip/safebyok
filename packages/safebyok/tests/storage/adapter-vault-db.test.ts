@@ -167,6 +167,16 @@ describe("AdapterVaultDB.tryGetThing(ask), a store that reports oddly", () => {
 })
 
 describe("AdapterVaultDB.tryWriteThing(ask), a store that reports oddly", () => {
+  it("refuses, as a broken store, a storage policy's verdict whose refusal is not a tag of PolicyPhrases", async () => {
+    const gate     = TH.gateThingOf()
+    const ask      = TH.replaceAskOf(gate, TH.nextGateOf(gate), { policies: ['add_passkey'] })
+    const manifest = { tags: ManifestTags.writeTagsOf(ask, gate, false), actual: gate }
+    for (const verdict of [{ ok: false, refusaltag: 'PasskeyGone' }, { ok: false, message: Phrases.PolicyPhrases.PasskeyStored }]) {
+      const vaultDB = new ScriptedVaultDB(() => ({ ...manifest, tags: { ...manifest.tags, policies: { add_passkey: verdict } } }))
+      await TH.expectBad(vaultDB.tryWriteThing(ask), 'storage_issue')
+    }
+  })
+
   it("refuses, as a broken store, a write it reports making with no row", async () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ...writeManifestOf(TH.birthAskOf(), null, true), actual: null }))
     await TH.expectBad(vaultDB.tryWriteThing(TH.birthAskOf()), 'storage_issue')

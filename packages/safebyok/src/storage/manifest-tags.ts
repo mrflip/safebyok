@@ -110,8 +110,8 @@ export function policiesOf(ask: WriteAsk, ante: unknown): PolicyVerdicts {
 /** The verdict of `policy` on `ask` over the raw `ante` row: met wherever that is no live gate, since a policy judges only a live gate's replacement. */
 function policyVerdictOf(policy: EX.StoragePolicy, ask: WriteAsk, ante: unknown): PolicyVerdict {
   if ((ask.modelkind !== 'gate') || (presenceOf(ante) !== 'live')) { return { ok: true } }
-  const message = GatePolicies[policy](ask, anteWayinsOf(ante))
-  return (message === null) ? { ok: true } : { ok: false, message }
+  const refusaltag = GatePolicies[policy](ask, anteWayinsOf(ante))
+  return (refusaltag === null) ? { ok: true } : { ok: false, refusaltag }
 }
 
 // A gate whose wayins are no object is judged as if it had no wayins: each policy then refuses.

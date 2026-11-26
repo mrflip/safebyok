@@ -23,7 +23,7 @@ describe("ManifestTags, over the raw rows in a datastore", () => {
     expect(ManifestTags.writeTagsOf(ask, null, false).policies).to.deep.equal({ add_passkey: { ok: true } })
     expect(ManifestTags.writeTagsOf(ask, { ...gate, am: 'x' }, false).policies).to.deep.equal({ add_passkey: { ok: true } })
     expect(ManifestTags.writeTagsOf(ask, gate, false).policies).to.deep.equal({ add_passkey: { ok: true } })
-    expect(ManifestTags.writeTagsOf(ask, { ...gate, wayins: 'none' }, false).policies.add_passkey).to.deep.include({ ok: false })
+    expect(ManifestTags.writeTagsOf(ask, { ...gate, wayins: 'none' }, false).policies.add_passkey).to.deep.equal({ ok: false, refusaltag: 'PasskeyStored' })
   })
 
   it("makes a written write's tags of its ask alone: those of the ante row its write predicate lets through", () => {

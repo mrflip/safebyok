@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Errors, Phrases as BigPhrases, SX } from 'safebyok-big/internals'
-import type { CheckedGetManifest, CheckedWriteManifest, WriteTags } from '../../src/shapes/shapes-manifest'
+import type { CheckedGetManifest, CheckedWriteManifest, PolicyTag, WriteTags } from '../../src/shapes/shapes-manifest'
 import type { WriteAsk } from '../../src/shapes/shapes-asks'
 import type { WriteThingAnswer } from '../../src/shapes/shapes-answers'
 import * as Phrases from '../../src/phrases'
@@ -180,7 +180,7 @@ describe("ManifestActs.scribeWriteAct(ask, manifest), a write the tables let thr
 
   it("scribes policied for a replacement that fails a storage policy it names, and the write where each it names is met", () => {
     const ask = { ...askOf(PutAsk, 'live', 'repl'), options: { policies: ['add_passkey', 'revoke_passkey'] } } as WriteAsk
-    const failed = { add_passkey: { ok: true }, revoke_passkey: { ok: false, message: Phrases.PolicyPhrases.NoPasskeyStored } } as const
+    const failed = { add_passkey: { ok: true }, revoke_passkey: { ok: false, refusaltag: 'NoPasskeyStored' } } as const
     const met    = { add_passkey: { ok: true }, revoke_passkey: { ok: true } } as const
     expect(scribedActOf(ask, tagsOf('live', 'eq', 'eq', { policies: failed }))).to.eq('policied')
     expect(scribedActOf(ask, tagsOf('live', 'eq', 'eq', { policies: met }))).to.eq('replaced')
@@ -195,7 +195,7 @@ describe("ManifestActs.scribeWriteAct(ask, manifest), a write the tables let thr
 
 describe("ManifestActs.writeAnswerOf(ask, manifest), a policied write", () => {
   const PoliciedAsk = { ...askOf(PutAsk, 'live', 'repl'), options: { policies: ['add_passkey'] } } as WriteAsk
-  const Failed      = { add_passkey: { ok: false, message: Phrases.PolicyPhrases.PasskeyStored } } as const
+  const Failed      = { add_passkey: { ok: false, refusaltag: 'PasskeyStored' } } as const
   const RefusalCases = [
     ["bad_record", Phrases.BornAtNotStored,                                        { born_at_cmp: "changed", lifetok_cmp: "changed", policies: Failed }, 'refuses bad_record for a changed born_at, before a failed storage policy or a changed lifetok'],
     ["gate_issue", BigPhrases.gateIssue(Phrases.PolicyPhrases.PasskeyStored),       { lifetok_cmp: "changed", policies: Failed },                         'refuses gate_issue with a failed storage policy\'s message, before a changed lifetok'],
@@ -212,11 +212,11 @@ describe("ManifestActs.writeAnswerOf(ask, manifest), a policied write", () => {
     })
   }
 
-  it("refuses gate_issue with each storage policy's message", () => {
-    for (const message of Object.values(Phrases.PolicyPhrases)) {
-      const answer = writeAnsweredOf(PoliciedAsk, tagsOf('live', 'eq', 'eq', { policies: { add_passkey: { ok: false, message } } }), LiveBox)
-      expect(answer.act, message).to.eq('policied')
-      expect(refusalOf(answer), message).to.deep.include({ refusalkind: 'gate_issue', message: BigPhrases.gateIssue(message) })
+  it("refuses gate_issue with the message of each storage policy's refusaltag", () => {
+    for (const refusaltag of Object.keys(Phrases.PolicyPhrases) as PolicyTag[]) {
+      const answer = writeAnsweredOf(PoliciedAsk, tagsOf('live', 'eq', 'eq', { policies: { add_passkey: { ok: false, refusaltag } } }), LiveBox)
+      expect(answer.act, refusaltag).to.eq('policied')
+      expect(refusalOf(answer), refusaltag).to.deep.include({ refusalkind: 'gate_issue', message: BigPhrases.gateIssue(Phrases.PolicyPhrases[refusaltag]) })
     }
   })
 })

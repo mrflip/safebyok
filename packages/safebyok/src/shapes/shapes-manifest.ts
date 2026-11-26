@@ -11,7 +11,7 @@ import { type ReadTc, SeenChecks } from './shapes-vault-event'
 import type { VaultStats } from './shapes-vault-stats'
 import { PolicyPhrases } from '../phrases'
 
-// == [Tags]: ManifestChecks, PolicyVerdict, PolicyVerdicts, PolicyPhrase, PolicyTag, Refusaltag, GetTags, WriteTags, RootTags, BirthTags, Presence, RevtokCmp, RevseqCmp, SameCmp, AnteWayins, TrackedRows
+// == [Tags]: ManifestChecks, PolicyVerdict, PolicyVerdicts, PolicyTag, Refusaltag, GetTags, WriteTags, RootTags, BirthTags, Presence, RevtokCmp, RevseqCmp, SameCmp, AnteWayins, TrackedRows
 // Each tag spells the field it compares. A datastore makes them of the row it judged a write against, the ante row.
 
 /** The checks of what a datastore hands back: its tags, a listing's children, a birth's or a world's roots, a watch's {@link Received}, its `tracked` and its `read_tc`. Each refuses `storage_issue`. */
@@ -19,7 +19,8 @@ export const ManifestChecks = Validator.Checkers('storage_issue', ({ obj, arr, l
   const presence       = oneof(['void', 'gone', 'live'])
   const revtokCmp      = oneof(['birth', '=next', 'eq', 'neq'])
   const sameCmp        = oneof(['same', 'changed', 'moot'])
-  const policyVerdict  = discrim('ok', [obj({ ok: lit(true) }).strict(), obj({ ok: lit(false), message: oneof(PolicyPhrases) }).strict()])
+  const policyTag      = oneof(Object.keys(PolicyPhrases) as PolicyTag[])
+  const policyVerdict  = discrim('ok', [obj({ ok: lit(true) }).strict(), obj({ ok: lit(false), refusaltag: policyTag }).strict()])
   const policyVerdicts = obj({ replace_passphrase: policyVerdict.optional(), add_passkey: policyVerdict.optional(), revoke_passkey: policyVerdict.optional() }).strict()
   const rootTags       = obj({
     /** The ante root's liveness: none (`void`), a tombstone (`gone`), or live. */
@@ -63,15 +64,12 @@ export const ManifestChecks = Validator.Checkers('storage_issue', ({ obj, arr, l
   }
 })
 
-/** A storage policy's verdict on one write: met, or the {@link PolicyPhrases} message saying why not. */
+/** A storage policy's verdict on one write: met, or the tag of the {@link PolicyPhrases} message saying why not. */
 export type PolicyVerdict = Readonly<Z.infer<typeof ManifestChecks.policyVerdict>>
 
 /** A verdict for each storage policy a write names. */
 export type PolicyVerdicts = Readonly<Z.infer<typeof ManifestChecks.policyVerdicts>>
 true satisfies Z.core.util.AssertEqual<keyof PolicyVerdicts, EX.StoragePolicy>
-
-/** The message of a storage policy's refusal: one of {@link PolicyPhrases}. */
-export type PolicyPhrase = (typeof PolicyPhrases)[PolicyTag]
 
 /** The name of a storage policy's refusal in {@link PolicyPhrases}. */
 export type PolicyTag = keyof typeof PolicyPhrases

@@ -1,4 +1,4 @@
-import { type Thingkind, PolicyPhrases } from 'safebyok/storage'
+import type { PolicyTag, Thingkind } from 'safebyok/storage'
 
 // == [Names]: TableVersion, SqlRevision, VaultFunctionNames
 
@@ -39,8 +39,8 @@ type WriteFunctionSpec = Readonly<{ kind: Thingkind, table: string, body: readon
 
 const VoidRevtok = `'00000000-0000-0000-0000-000000000000'`
 
-/** `text` as a SQL string literal. */
-function sqlTextOf(text: string): string { return `'${text.replaceAll("'", "''")}'` }
+/** A storage policy's refusal tag as a SQL string literal. */
+function sqlTagOf(tag: PolicyTag): string { return `'${tag}'` }
 
 /** The SQL of one kind's write function, from what sets it apart. */
 function writeFunctionOf({ kind, table, body, lifetoked, policied }: WriteFunctionSpec): string {
@@ -281,15 +281,15 @@ $$;
 
 -- The storage policies, one function each, as notes/storage-policies.md lists them, less big's registered_at check: the
 -- write function checks born_at for every live-over-live write. Each is a copy of safebyok's GatePolicies, check for
--- check and message for message, and returns why it refuses the write, or null where it allows it. A gate's passkey0 is
+-- check and tag for tag, and returns the tag of its refusal, or null where it allows the write. A gate's passkey0 is
 -- an object, or JSON null for none.
 
 -- Why a write that names replace_passphrase refuses: it must replace the passphrase wayin the gating proved against, and nothing else.
 CREATE OR REPLACE FUNCTION ${VaultFunctionNames.replace_passphrase_refusal}(ante_wayins jsonb, cited_wayins jsonb, proposed_wayins jsonb) RETURNS text
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT CASE
-    WHEN (NOT COALESCE(((ante_wayins->'main') = (cited_wayins->'main')), false))           THEN ${sqlTextOf(PolicyPhrases.ProvedWayinMoved)}
-    WHEN (NOT COALESCE(((ante_wayins - 'main') = (proposed_wayins - 'main')), false))      THEN ${sqlTextOf(PolicyPhrases.OtherWayinMoved)}
+    WHEN (NOT COALESCE(((ante_wayins->'main') = (cited_wayins->'main')), false))           THEN ${sqlTagOf('ProvedWayinMoved')}
+    WHEN (NOT COALESCE(((ante_wayins - 'main') = (proposed_wayins - 'main')), false))      THEN ${sqlTagOf('OtherWayinMoved')}
   END
 $$;
 
@@ -297,9 +297,9 @@ $$;
 CREATE OR REPLACE FUNCTION ${VaultFunctionNames.add_passkey_refusal}(ante_wayins jsonb, proposed_wayins jsonb) RETURNS text
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT CASE
-    WHEN (jsonb_typeof(ante_wayins->'passkey0') IS DISTINCT FROM 'null')                   THEN ${sqlTextOf(PolicyPhrases.PasskeyStored)}
-    WHEN (jsonb_typeof(proposed_wayins->'passkey0') IS DISTINCT FROM 'object')             THEN ${sqlTextOf(PolicyPhrases.PasskeyNotAdded)}
-    WHEN (NOT COALESCE(((ante_wayins - 'passkey0') = (proposed_wayins - 'passkey0')), false)) THEN ${sqlTextOf(PolicyPhrases.OtherWayinMoved)}
+    WHEN (jsonb_typeof(ante_wayins->'passkey0') IS DISTINCT FROM 'null')                   THEN ${sqlTagOf('PasskeyStored')}
+    WHEN (jsonb_typeof(proposed_wayins->'passkey0') IS DISTINCT FROM 'object')             THEN ${sqlTagOf('PasskeyNotAdded')}
+    WHEN (NOT COALESCE(((ante_wayins - 'passkey0') = (proposed_wayins - 'passkey0')), false)) THEN ${sqlTagOf('OtherWayinMoved')}
   END
 $$;
 
@@ -307,9 +307,9 @@ $$;
 CREATE OR REPLACE FUNCTION ${VaultFunctionNames.revoke_passkey_refusal}(ante_wayins jsonb, proposed_wayins jsonb) RETURNS text
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT CASE
-    WHEN (jsonb_typeof(ante_wayins->'passkey0') IS DISTINCT FROM 'object')                 THEN ${sqlTextOf(PolicyPhrases.NoPasskeyStored)}
-    WHEN (jsonb_typeof(proposed_wayins->'passkey0') IS DISTINCT FROM 'null')               THEN ${sqlTextOf(PolicyPhrases.PasskeyNotRevoked)}
-    WHEN (NOT COALESCE(((ante_wayins - 'passkey0') = (proposed_wayins - 'passkey0')), false)) THEN ${sqlTextOf(PolicyPhrases.OtherWayinMoved)}
+    WHEN (jsonb_typeof(ante_wayins->'passkey0') IS DISTINCT FROM 'object')                 THEN ${sqlTagOf('NoPasskeyStored')}
+    WHEN (jsonb_typeof(proposed_wayins->'passkey0') IS DISTINCT FROM 'null')               THEN ${sqlTagOf('PasskeyNotRevoked')}
+    WHEN (NOT COALESCE(((ante_wayins - 'passkey0') = (proposed_wayins - 'passkey0')), false)) THEN ${sqlTagOf('OtherWayinMoved')}
   END
 $$;
 
@@ -317,13 +317,13 @@ $$;
 -- since a policy judges only a live gate's replacement. ManifestTags' policyVerdictOf.
 CREATE OR REPLACE FUNCTION ${VaultFunctionNames.policy_verdict_of}(policy text, modelkind text, cited jsonb, proposed jsonb, ante jsonb) RETURNS jsonb
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
-  SELECT CASE WHEN (refusal IS NULL) THEN jsonb_build_object('ok', true) ELSE jsonb_build_object('ok', false, 'message', refusal) END
+  SELECT CASE WHEN (refusaltag IS NULL) THEN jsonb_build_object('ok', true) ELSE jsonb_build_object('ok', false, 'refusaltag', refusaltag) END
   FROM (SELECT CASE
     WHEN ((modelkind <> 'gate') OR (${VaultFunctionNames.presence_of}(ante) <> 'live')) THEN NULL
     WHEN (policy = 'replace_passphrase') THEN ${VaultFunctionNames.replace_passphrase_refusal}(ante->'wayins', cited->'wayins', proposed->'wayins')
     WHEN (policy = 'add_passkey')        THEN ${VaultFunctionNames.add_passkey_refusal}(ante->'wayins', proposed->'wayins')
     WHEN (policy = 'revoke_passkey')     THEN ${VaultFunctionNames.revoke_passkey_refusal}(ante->'wayins', proposed->'wayins')
-  END AS refusal) AS judged
+  END AS refusaltag) AS judged
 $$;
 
 -- A verdict for each storage policy in policies, keyed by the policy. ManifestTags.policiesOf.
