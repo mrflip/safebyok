@@ -1,8 +1,8 @@
 # Thread 9: policy_tags (2026-11-26)
 
-Branch `20261126-policy_tags`, PR #943, stacked on #942. Proved: `pnpm --filter <pkg> test` for `safebyok` (2,426),
-`safebyok-postgres` (168), `safebyok-indexeddb` (130), `safebyok-convex` (232); lint and typecheck of `safebyok` and
-`safebyok-postgres` clean. `pnpm justify` after the catch-up: pending.
+Branch `20261126-policy_tags`, PR #943, stacked on #942. Proved: `pnpm justify` green after the catch-up onto #942
+(`safebyok` 2,425, `safebyok-postgres` 168, `safebyok-convex` 232, `safebyok-indexeddb` 130, `safebyok-react` 339,
+e2e 576, root 331, every `-big` package and demo).
 
 * **Built**
   * **A policy verdict names its refusal by tag.** `ManifestChecks.policyVerdict` (`shapes-manifest.ts`) is
