@@ -60,7 +60,7 @@ Each read in the step, after any write.
 
 ## Rows
 
-A row is what the datastore stores at a scope, raw, as our code wrote it: every field of the Thing record, `userid`,
+A row is what the datastore has at a scope, raw, as our code wrote it: every field of the Thing record, `userid`,
 `banklabel` and `labelpath` among them. Null means no row. Hand back the row as stored, never a repair of it.
 
 ## Per verb
@@ -99,8 +99,8 @@ A row is what the datastore stores at a scope, raw, as our code wrote it: every 
 **World** (`WorldManifest`): `actual`, the bank's three roots, as the birth's.
 
 **Stats** (`StatsManifest`): `stats`, the bank's `VaultStats`: the count, the live count and the size in bytes of its
-boxes and of its gates, the bank's own row not counted, and `max`, the store's limits, each capped by `storeLimitsOf`,
-which gives the cap for one the store lacks. `vaultStatsOf(rows, limits)` measures it from the raw rows.
+boxes and of its gates, the bank's own row not counted, and `max`, the datastore's limits, each capped by `storeLimitsOf`,
+which gives the cap for one the datastore lacks. `vaultStatsOf(rows, limits)` measures it from the raw rows.
 
 ## The tags
 
@@ -144,8 +144,8 @@ the predicate let through, which the ask alone makes (`ManifestTags.writtenTagsO
 
 ## The birth predicate
 
-The datastore writes all three puts' records where none of the bank, the main gate and the root box is stored (Postgres's
-`birth_roots`), and writes none of them otherwise.
+The datastore writes all three puts' records where the ante roots are all null: none of the bank, the main gate and the
+root box is there (Postgres's `birth_roots`). Otherwise it writes none of them.
 
 ## The watch
 
