@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Threads 8 and 9 filed (#942, #943); thread 6 filed (#944); thread 7 filed (#945); restacked onto #913 (merged); thread 10 in review (#946); thread 11 (graphql_manifest) next
+* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Threads 8 and 9 filed (#942, #943); thread 6 filed (#944); thread 7 filed (#945); restacked onto #913 (merged); thread 10 filed (#946); thread 11 (graphql_manifest) building
 
 ## Read first
 
@@ -167,7 +167,8 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 
 *Orchestrator:* no Coach text of its own; gathered from the reviews. A documentarian pass over the files the sprint changed (thread 2's review: "What a ..." first lines, steps listed in doc blocks, the listing copy check's doc block, two-behaviour test titles, a leftover `const manifest = raw`; `isWritable`/`isBirthWritable`'s doc blocks for the datastores that share them); the stale eslint config comments naming the deleted `storage/classifier.ts` (safebyok-indexeddb's and the dojo demo's); the Postgres header's privilege sentence and the README's "beside the old ones"; the battery's damaged-bank case made real for Postgres and Convex (thread 5's review: it is hollow there). Also from thread 6's report and review: widen VOCABULARY's **ante** and **actual** rows to name the deviceDB's stow (`stowLease`, `Lease.stow`), as the Coach's "same rule for every read or write" reads; doc blocks still saying "no Thing stored" where a row a step carries is meant; "store" as noun and verb ("the store's limits", "the deviceDB stores"; the exported `StoreLimits` named, not renamed, without a ruling), and `notes/` where it says "stored" for actual or ante (`vault-adapter-contract.md`, `wontfix.md`, `storage-policies.md`). No behaviour change but the battery case.
 *Levels:* worker `thread-worker-400k` (*Orchestrator:* four kinds of work across the line's files); review `low`.
-*Status:* building, cut from thread 7's tip (1450bd91d).
+*Review:* fixed (sonnet, medium floor), 3 doc-block fixes; battery case verified real on all four datastores; privilege sentences match the REVOKEs. Left: three-way doc blocks thin; changeset could name the two reworded messages.
+*Status:* filed 2026-11-26 at e393ed88f (rebased onto the restacked #945; plus a security.md entry correcting #707's privilege claim); PR #946 stays draft until thread 11 makes the line green.
 *Depends on:* thread 7.
 *Look-ahead:* none.
 *Size:* small-medium.
