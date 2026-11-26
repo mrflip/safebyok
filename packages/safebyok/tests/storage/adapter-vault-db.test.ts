@@ -79,7 +79,10 @@ function noticedRecordsOver(vaultDB: ScriptedVaultDB): VaultItemEvent['val'][] {
 }
 
 /** A step that throws a refusal carrying a row as its dbhas. */
-function thrower(): never { throw Throwers.taggedRefusal(TH.birthAskOf(), { act: 'policied', actual: TH.gateThingOf(), refusaltag: 'BornAtNotStored' }) }
+function thrower(): never {
+  const gate = TH.gateThingOf()
+  throw Throwers.taggedRefusal(TH.replaceAskOf(gate, TH.nextOf(gate)), { act: 'policied', actual: gate, refusaltag: 'ProvedWayinMoved' })
+}
 
 /** A value that throws on any look at it: what a broken backend might throw, or a broken host might ask. */
 const Booby = new Proxy({}, { get() { throw new Error('boom') }, getPrototypeOf() { throw new Error('boom') }, has() { throw new Error('boom') } })
