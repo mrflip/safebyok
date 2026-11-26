@@ -8,7 +8,8 @@ The orchestrator's curated summary of what the threads have taught. Newer than t
 * Answers carry the actual row, for every verb: never `ask.record`.
 * Words: actual (returned), ante (in the datastore at the start), proposed (the ask's value, in prose; `WriteAsk.record` keeps its name for now).
 * Postgres keeps Things in columns (it does). Convex is restructured to typed per-kind tables.
-* `damaged_row` is renamed; the name is open (`incompat_row` or `incompatible_row`).
+* `damaged_row` is renamed `incompatible_row` (Open Matters).
+* Red PRs are green-lit: threads 1–2 may land red in idb, postgres and convex, mended by 3–5.
 * Tags spell their fieldname; `'same'` rather than `'kept'`.
 * The address check moves into `demandThreeWayConsistency` ("for comfort").
 * Banktok: aspirational; will later hard-scope every record. No comparison now.
