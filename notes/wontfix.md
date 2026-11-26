@@ -91,7 +91,7 @@ the datastore has lost or damaged either row.
 Reasoning for wontfix: the device was sent revisions of both rows, so either case means storage has gone wrong
 underneath it: work stops until the page reloads, or until a developer catches the error and restarts the system.
 Pinned by a type-level test that each `tracked` entry is exactly its record or `'same'`, and by a `//` comment at the
-`tracked` type, at `VaultMinder`'s `rootsOf` and at the classifier's `banktokOf` pointing here. Ruled by the Coach,
+`tracked` type, at `VaultMinder`'s `rootsOf` and at `banktokOrVoidOf` in the new core's `src/storage/manifest-acts.ts` pointing here. Ruled by the Coach,
 2026-11-15, lean_buttonup T1; kept 2026-11-25 ("damaged_rows are mostly impossible hallucinations so stay with my
 ruling").
 

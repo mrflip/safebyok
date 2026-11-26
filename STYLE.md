@@ -119,7 +119,7 @@ VOCABULARY.md *Shapes*: `VaultRecord`, `VaultSparse`, `VaultStamp`; never a bare
 
 **A plain string type's helpers ride on a companion object of the same name**, beside the type:
 `Lifeseq.ofLifenum(lifenum)`, `Labelpath.modelkindOf(labelpath)`. **A module of related functions
-is imported whole**: `import * as Classifier from './thing-classifier'`, `import * as Throwers from '../refusals/throwers'`.
+is imported whole**: `import * as ManifestActs from './manifest-acts'`, `import * as Throwers from '../refusals/throwers'`.
 
 **A name is the doc block's first line, compressed.** Write that line (*Comments and doc
 blocks*), then read the name against it: the verb promises what the line says, in the vocabulary
