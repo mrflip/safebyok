@@ -150,7 +150,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     const box  = VT.boxThingOf()
     const tomb = VT.boxTombOf(box)
     const gate = VT.gateThingOf()
-    const pkey = VT.gateThingOf({ wayins: VT.WithPasskey })
+    const passkeyGate = VT.gateThingOf({ wayins: VT.WithPasskey })
     const bank = VT.bankThingOf()
     const otherMain = { ...VT.MainOnly, main: VT.OtherMainWayin }
     const cases: [ante: ThingRecord | null, ask: WriteAsk, written: boolean][] = [
@@ -160,7 +160,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
       [tomb, putAskOf({ cited: tomb, record: VT.boxRebornOf(tomb), ...VT.SenderKnows }), true],
       [bank, VT.replaceAskOf(bank, VT.nextOf(bank)), true],
       [gate, VT.replaceAskOf(gate, VT.nextGateOf(gate, { wayins: VT.WithPasskey }), { policies: ['add_passkey'] }), true],
-      [pkey, VT.replaceAskOf(pkey, VT.nextGateOf(pkey, { wayins: VT.MainOnly }), { policies: ['revoke_passkey'] }), true],
+      [passkeyGate, VT.replaceAskOf(passkeyGate, VT.nextGateOf(passkeyGate, { wayins: VT.MainOnly }), { policies: ['revoke_passkey'] }), true],
       [gate, VT.replaceAskOf(gate, VT.nextGateOf(gate, { wayins: otherMain }), { policies: ['replace_passphrase'] }), true],
       [null, VT.replaceAskOf(box, VT.nextOf(box)), false],
       [box,  VT.birthAskOf(box), false],
@@ -170,7 +170,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
       [tomb, VT.delAskFor(tomb, VT.boxTombOf(tomb)), false],
       [bank, VT.replaceAskOf(bank, VT.nextOf(bank, { lifetok: VT.OtherLifetok })), false],
       [gate, VT.replaceAskOf(gate, VT.nextGateOf(gate, { born_at: gate.born_at + 1 })), false],
-      [pkey, VT.replaceAskOf(pkey, VT.nextGateOf(pkey), { policies: ['add_passkey'] }), false],
+      [passkeyGate, VT.replaceAskOf(passkeyGate, VT.nextGateOf(passkeyGate), { policies: ['add_passkey'] }), false],
       [gate, VT.replaceAskOf(gate, VT.nextGateOf(gate), { policies: ['add_passkey', 'revoke_passkey'] }), false],
       [gate, VT.replaceAskOf(gate, VT.nextGateOf(gate, { wayins: VT.WithPasskey }), { policies: ['revoke_passkey', 'replace_passphrase'] }), false],
       [gate, VT.replaceAskOf({ ...gate, wayins: otherMain }, VT.nextGateOf(gate, { wayins: otherMain }), { policies: ['replace_passphrase'] }), false],
@@ -249,7 +249,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     expect(grants).to.deep.equal([{ any: false }])
   })
 
-  it("refuses with storage_issue a birth whose statement wrote nothing where its tags find a birth, as functions of another version may", async () => {
+  it("refuses with storage_issue a birth whose statement wrote nothing where its tags find a birth", async () => {
     const unborn  = { presence: 'void', revtok_cmp: 'birth' }
     const vaultDB = new PostgresVaultDB({ client: answeringClient({
       tags: { bank: unborn, gate: unborn, root: unborn, written: false }, actual: { bank: null, gate: null, root: null },
