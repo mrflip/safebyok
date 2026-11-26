@@ -121,10 +121,10 @@ describe("ManifestActs.scribeWriteAct(ask, manifest), the life and liveness a ma
 
 describe("ManifestActs.scribeWriteAct(ask, manifest), a write the tables let through and its fixed fields or policies forbid", () => {
   const PoliciedCases = [
-    ["policied", PutAsk, { born_at_cmp: 'changed' },                                     'scribes policied for a replacement that changes the born_at'],
-    ["policied", PutAsk, { lifetok_cmp: 'changed' },                                     'scribes policied for a replacement that changes the lifetok'],
-    ["policied", DelAsk, { lifetok_cmp: 'changed' },                                     'scribes policied for a deletion that changes the lifetok'],
-    ["replaced", PutAsk, { born_at_cmp: 'same', lifetok_cmp: 'same' },                   'scribes the write where each fixed field is the same'],
+    ["policied", PutAsk, { born_at_cmp: "changed" },                                     'scribes policied for a replacement that changes the born_at'],
+    ["policied", PutAsk, { lifetok_cmp: "changed" },                                     'scribes policied for a replacement that changes the lifetok'],
+    ["policied", DelAsk, { lifetok_cmp: "changed" },                                     'scribes policied for a deletion that changes the lifetok'],
+    ["replaced", PutAsk, { born_at_cmp: "same", lifetok_cmp: "same" },                   'scribes the write where each fixed field is the same'],
   ] as const
   for (const [act, ask, overrides, blurb] of PoliciedCases) {
     it(blurb, () => {
@@ -134,7 +134,7 @@ describe("ManifestActs.scribeWriteAct(ask, manifest), a write the tables let thr
 
   it("scribes policied for a replacement that fails a storage policy it names, and the write where each it names is met", () => {
     const ask = { ...askOf(PutAsk, 'live', 'repl'), options: { policies: ['add_passkey', 'revoke_passkey'] } } as WriteAsk
-    const failed = { add_passkey: { ok: true }, revoke_passkey: { ok: false, message: 'no passkey' } } as const
+    const failed = { add_passkey: { ok: true }, revoke_passkey: { ok: false, message: "no passkey" } } as const
     const met    = { add_passkey: { ok: true }, revoke_passkey: { ok: true } } as const
     expect(scribedActOf(ask, tagsOf('live', 'eq', 'eq', { policies: failed }))).to.eq('policied')
     expect(scribedActOf(ask, tagsOf('live', 'eq', 'eq', { policies: met }))).to.eq('replaced')

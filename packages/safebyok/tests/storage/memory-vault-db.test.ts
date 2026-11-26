@@ -68,9 +68,9 @@ describe("Classifier.classifyListThings(ask, fetched, roots)", () => {
 
 describe("MemoryVaultDB, a row planted above a scope where nothing is stored", () => {
   const AboveCases = [
-    ['storage_issue', TH.boxThingOf('open'),              'refuses, as a broken store, a row above the scope that names a labelpath not above it'],
-    ['storage_issue', 'not a Thing',                      'refuses, as a broken store, a row above the scope that is not an object'],
-    ['damaged_row',   { ...TH.rootBoxOf(), revseq: -2 },  'refuses, as a damaged row, a row above the scope whose revision fails its checks'],
+    ["storage_issue", TH.boxThingOf('open'),              'refuses, as a broken store, a row above the scope that names a labelpath not above it'],
+    ["storage_issue", "not a Thing",                      'refuses, as a broken store, a row above the scope that is not an object'],
+    ["damaged_row",   { ...TH.rootBoxOf(), revseq: -2 },  'refuses, as a damaged row, a row above the scope whose revision fails its checks'],
   ] as const
   const voidPut = { ...TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)), ifAbsent: 'fail' } as const
 

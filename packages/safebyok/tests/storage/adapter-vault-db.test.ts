@@ -371,7 +371,7 @@ describe("AdapterVaultDB, what a watcher is notified of from a verb's answer", (
     const steps: [() => unknown, () => unknown][] = [
       [() => ({ ok: false, act: 'stale', record: TH.gateThingOf() }), () => writeManifestOf(TH.birthAskOf(), OtherGate, false)],
       [() => ({ ok: true, act: 'born', record: TH.gateThingOf() }), () => writeManifestOf(TH.birthAskOf(), null, true)],
-      [() => { throw Throwers.gateIssue(TH.gateThingOf(), 'a test') }, () => { throw Throwers.gateIssue(TH.gateThingOf(), 'a test') }],
+      [() => { throw Throwers.gateIssue(TH.gateThingOf(), "a test") }, () => { throw Throwers.gateIssue(TH.gateThingOf(), "a test") }],
     ]
     for (const [step, manifestStep] of steps) {
       const vaultDB = new ScriptedVaultDB(step as () => object, manifestStep as () => object)
