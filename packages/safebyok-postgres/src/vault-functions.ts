@@ -3,13 +3,12 @@ import { type Thingkind, PolicyPhrases } from 'safebyok/storage'
 // == [Names]: TableVersion, SqlRevision, VaultFunctionNames
 
 // TableVersion is safebyok's ThingFormat, spelled out; a test holds them equal, so TableVersion moves whenever ThingFormat
-// does. Until 1.0.0, no change to
-// the tables or the functions bumps either name: nothing stored binds backward, and a host drops the vault tables,
-// creates them again and runs VaultFunctionsSql again over them, first dropping each function whose arguments or result
-// changed, which Postgres will not replace in place. From 1.0.0: bump both when any table's columns, CHECKs or stored
-// record format change, since functions built for other tables will not work. Bump SqlRevision when a function's
-// behaviour or signature changes over the same tables, and reset it to 0 when TableVersion moves. Each pair names a new
-// set of functions; the older sets stay installed beside it.
+// does. Until 1.0.0, no change to the tables or the functions bumps either name: nothing stored binds backward, and a host
+// drops the vault tables, creates them again and runs VaultFunctionsSql again over them, first dropping each function whose
+// arguments or result changed, which Postgres will not replace in place. From 1.0.0: bump both when any table's columns,
+// CHECKs or stored record format change, since functions built for other tables will not work. Bump SqlRevision when a
+// function's behaviour or signature changes over the same tables, and reset it to 0 when TableVersion moves. Each pair names
+// a new set of functions; the older sets stay installed beside it.
 /** The head of every vault function's name: the tables these functions are built for, and the `fmt` of the Things in them. */
 export const TableVersion = 'a010501'
 /** The tail of every vault function's name: the revision of these functions over the same tables. */
