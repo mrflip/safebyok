@@ -164,6 +164,29 @@ describe("AdapterVaultDB.tryGetThing(ask), a datastore that reports oddly", () =
     const vaultDB = new ScriptedVaultDB(() => ({ tags: { presence: 'here' }, actual: null }))
     await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
   })
+
+  it("answers the shell under an ancestor handed back whole, or as its scope and lifepath alone", async () => {
+    const shell = Shell.under(TH.BoxScope, TH.rootBoxOf())
+    const lives = { ...TH.RootScope, lifepath: TH.Life0 }
+    for (const ancestor of [TH.rootBoxOf(), lives]) {
+      const vaultDB = new ScriptedVaultDB(() => ({ ...getManifestOf(null), ancestor }))
+      expect(await vaultDB.tryGetThing(TH.getAskAt('box/openai'))).to.deep.include({ ok: true, act: 'gotvoid', dbhas: shell })
+    }
+  })
+
+  it("refuses an ancestor's lives that are not those of a Thing above the scope, or a whole ancestor that fails its kind's checks", async () => {
+    const lives = { ...TH.RootScope, lifepath: TH.Life0 }
+    const cases = [
+      [{ ...lives, userid: 'u2' },                  'storage_issue'],
+      [{ ...lives, lifepath: `${TH.Life0}/${TH.Life0}` }, 'incompatible_row'],
+      [{ ...lives, revseq: 0 },                     'incompatible_row'],
+      [{ ...TH.rootBoxOf(), whisper_sealed: 'not sealed' }, 'incompatible_row'],
+    ] as const
+    for (const [ancestor, refusalkind] of cases) {
+      const vaultDB = new ScriptedVaultDB(() => ({ ...getManifestOf(null), ancestor }))
+      await TH.expectBad(vaultDB.tryGetThing(TH.getAskAt('box/openai')), refusalkind)
+    }
+  })
 })
 
 describe("AdapterVaultDB.tryWriteThing(ask), a datastore that reports oddly", () => {
@@ -199,6 +222,23 @@ describe("AdapterVaultDB.tryListThings(ask), a datastore that reports oddly", ()
     expect(answer.ok).to.equal(true)
     expect(answer.deltas.map(({ labelpath }) => labelpath)).to.deep.equal(['box/anthropic', 'box/openai'])
     expect(answer.incompatible_rows.map(({ labelpath }) => labelpath)).to.deep.equal(['box/bad'])
+  })
+
+  it("lists a live box handed back sparse, the parent or a child, as it lists one handed back whole", async () => {
+    const sparse  = [TH.boxSparseOf(TH.boxThingOf('openai')), TH.boxSparseOf(TH.boxThingOf('anthropic'))]
+    const whole   = await new ScriptedVaultDB(() => listManifestOf(TH.rootBoxOf(), [TH.boxThingOf('openai'), TH.boxThingOf('anthropic')])).tryListThings(TH.listAskAt('box'))
+    const vaultDB = new ScriptedVaultDB(() => listManifestOf(TH.boxSparseOf(TH.rootBoxOf()), sparse))
+    const answer  = await vaultDB.tryListThings(TH.listAskAt('box'))
+    expect(answer).to.deep.include({ ok: true, parentage: whole.parentage, deltas: whole.deltas, incompatible_rows: [] })
+    expect(answer.ok ? answer.val.items : null).to.deep.eq(whole.ok ? whole.val.items : undefined)
+  })
+
+  it("answers a sparse tombstone, or a whole live box missing a field, as incompatible", async () => {
+    const tomb    = { ...TH.boxSparseOf(TH.boxThingOf('gone')), am: 'x' }
+    const { sidecar: _sidecar, ...sidecarless } = TH.boxThingOf('bare')
+    const vaultDB = new ScriptedVaultDB(() => listManifestOf(TH.rootBoxOf(), [tomb, sidecarless]))
+    const answer  = await vaultDB.tryListThings(TH.listAskAt('box'))
+    expect(answer.incompatible_rows.map(({ labelpath }) => labelpath)).to.deep.equal(['box/gone', 'box/bare'])
   })
 
   it("reads no child under a parent that is not live", async () => {

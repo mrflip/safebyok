@@ -11,7 +11,7 @@ import {
 } from '../shapes/shapes-asks'
 import type { BirthBankAnswer, IncompatibleThing, GetThingAnswer, GetWorldAnswer, KidEntry, Kids, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import {
-  type BankObserved, type CheckedBankObserved, type CheckedBirthManifest, type CheckedGetManifest, type CheckedListManifest, type CheckedManifestRows, type CheckedRoots, type CheckedStatsManifest,
+  type AncestorLives, type BankObserved, type CheckedBankObserved, type CheckedBirthManifest, type CheckedGetManifest, type CheckedListManifest, type CheckedManifestRows, type CheckedRoots, type CheckedStatsManifest,
   type CheckedWorldManifest, type CheckedWriteManifest, type BirthManifest, type GetManifest, type ListManifest, type ListedChild, type PolicyTag, type Presence, type Refusaltag, type RevseqCmp, type RevtokCmp, type RootTags, type ScribedBirthManifest, type ScribedGetManifest,
   type ScribedListManifest, type ScribedWriteManifest, type StatsManifest, type WorldManifest, type WriteManifest, type WriteTags, ManifestChecks,
 } from '../shapes/shapes-manifest'
@@ -19,7 +19,7 @@ import { VaultStatsChecks } from '../shapes/shapes-vault-stats'
 import * as ManifestTags from './manifest-tags'
 import * as Throwers from '../refusals/throwers'
 
-// == [Observations]: checkGetObservations, checkWriteObservations, checkListObservations, checkBirthObservations, checkWorldObservations, checkStatsObservations, checkedRowsOf, checkedRowOf, checkedChildrenOf, checkedRootsOf, checkedRootOf, checkedAncestorOf, checkedBankObservedOf, banktokOrVoidOf, checkedTrackedOf, trackedEntryOf, checkedWatchedOf
+// == [Observations]: checkGetObservations, checkWriteObservations, checkListObservations, checkBirthObservations, checkWorldObservations, checkStatsObservations, checkedRowsOf, checkedRowOf, checkedParentOf, checkedChildrenOf, checkedRootsOf, checkedRootOf, checkedAncestorOf, checkedBankObservedOf, banktokOrVoidOf, checkedTrackedOf, trackedEntryOf, checkedWatchedOf
 // A row that fails its kind's checks is incompatible: a record our code would not write, which refuses `incompatible_row`. A manifest
 // that is malformed, or a row that is no object, means the datastore or its concrete adapter is broken, and refuses `storage_issue`.
 
@@ -35,7 +35,7 @@ export function checkWriteObservations(ask: WriteAsk, manifest: WriteManifest): 
 
 /** Check a listing's manifest in place: its tags, its parent, and where the parent is live, each child once, setting aside those that fail their kind's checks as `incompatible_rows`. */
 export function checkListObservations(ask: ListAsk, manifest: ListManifest): asserts manifest is ListManifest & CheckedListManifest {
-  const actual = checkedRowOf(ask, manifest.actual)
+  const actual = checkedParentOf(ask, manifest.actual)
   const listed = (actual?.am === 'a') ? checkedChildrenOf(ask, manifest.children) : { children: [], incompatible_rows: [] }
   Object.assign(manifest, { ...checkedBankObservedOf(ask, manifest), tags: ManifestChecks.getTags.parse(manifest.tags), actual, ...listed })
 }
@@ -68,10 +68,17 @@ function checkedRowOf({ labelpath }: Pick<ThingScope, 'labelpath'>, row: unknown
   return ThingkindChecks.ofLabelpath(labelpath).stored.parse(row)
 }
 
+/** A listing's raw parent, read at its labelpath, checked by its kind but not its address: a live box may be sparse. Null for none. */
+function checkedParentOf({ labelpath }: Pick<ThingScope, 'labelpath'>, row: unknown): ThingRecord | BoxSparse | null {
+  if (row === null) { return null }
+  if (! CX.isPlainBag(row)) { throw Throwers.storageIssue() }
+  return ThingkindChecks.ofLabelpath(labelpath).listed.parse(row)
+}
+
 // A child is checked by the listing's modelkind, not by the labelpath it is listed at: `demandListConsistency` checks that.
-/** A listing's raw children, each checked by its kind but not its address: those that pass, and those that fail as `incompatible_rows`. */
+/** A listing's raw children, each checked by its kind but not its address: those that pass, a live box whole or sparse, and those that fail as `incompatible_rows`. */
 function checkedChildrenOf({ userid, banklabel, modelkind }: ListAsk, children: unknown): Pick<CheckedListManifest, 'children' | 'incompatible_rows'> {
-  const check = ThingkindChecks.byModelkind[modelkind].stored
+  const check = ThingkindChecks.byModelkind[modelkind].listed
   const listed: ListedChild[] = []
   const incompatible_rows: IncompatibleThing[] = []
   for (const { labelpath, raw } of ManifestChecks.children.parse(children)) {
@@ -96,12 +103,14 @@ function checkedRootOf<RecordT>(check: Readonly<{ parse: (row: unknown) => Recor
 }
 
 // The ancestor is found by a prefix of the scope, not by an address, and the shell is built from it: its address is checked here, where it is read.
-/** The nearest row above `scope`, checked by its kind and its address, or null for none. */
-function checkedAncestorOf({ userid, banklabel, labelpath }: ThingScope, row: unknown): ThingRecord | null {
+// A whole row has more fields than its lives, so it is checked by its kind as ever.
+/** The nearest row above `scope`, or its {@link AncestorLives} alone, checked by its kind and its address, or null for none. */
+function checkedAncestorOf({ userid, banklabel, labelpath }: ThingScope, row: unknown): ThingRecord | AncestorLives | null {
   if (row === null) { return null }
   const abovepath = ManifestTags.fieldOf(row, 'labelpath')
   if ((typeof abovepath !== 'string') || (! labelpath.startsWith(`${abovepath}/`))) { throw Throwers.rowOfOtherAddress(['labelpath']) }
-  const ancestor: ThingRecord = ThingkindChecks.ofLabelpath(abovepath).stored.parse(row)
+  const livesReport = ManifestChecks.ancestorLives.safeParse(row)
+  const ancestor    = livesReport.success ? livesReport.data : ThingkindChecks.ofLabelpath(abovepath).stored.parse(row)
   const fieldnames = Validator.disagreeingFieldnames(ancestor, { userid, banklabel, labelpath: abovepath })
   if (fieldnames.length > 0) { throw Throwers.rowOfOtherAddress(fieldnames) }
   return ancestor
@@ -341,13 +350,13 @@ export function listAnswerOf(ask: ListAsk, manifest: ScribedListManifest): ListT
 export function voidParentOf(ask: ListAsk): VoidSentinel | null { return (Labelpath.parentOf(ask.labelpath) === '') ? Shell.under(ask, null) : null }
 
 /** `thing` as a listing carries it: a live box's sparse form, or any other Thing whole, a tombstone among them. */
-function listedOf(thing: ThingRecord): ThingRecord | BoxSparse {
+function listedOf(thing: ThingRecord | BoxSparse): ThingRecord | BoxSparse {
   return ((thing.am === 'a') && Labelpath.isOfModelkind(thing.labelpath, 'box')) ? BaseThing.sparseOf(thing) as BoxSparse : thing
 }
 
 // Object.fromEntries makes each label an own key, `__proto__` among them.
 /** The {@link Kids} value of `deltas`, the children of the live `parent` at the listing's scope, read at `read_tc`. */
-function kidsOf(ask: ListAsk, parent: ThingRecord, deltas: readonly (ThingRecord | BoxSparse)[], read_tc: Kids['read_tc']): Kids {
+function kidsOf(ask: ListAsk, parent: ThingRecord | BoxSparse, deltas: readonly (ThingRecord | BoxSparse)[], read_tc: Kids['read_tc']): Kids {
   const entryOf = ({ label, lifeseq }: ThingRecord | BoxSparse): [string, KidEntry] => [label, { lifeseq }]
   return {
     modelkind:  'kids',

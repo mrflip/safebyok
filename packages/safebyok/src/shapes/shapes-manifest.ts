@@ -2,19 +2,20 @@
 
 import type * as Z from 'zod'
 import { CX, type EX, Validator } from 'safebyok-big/internals'
-import type { Labelpath, Lifetok } from './primitives'
-import type { BankRecord, BoxRecord, GateRecord, ThingRecord } from './shapes-thing'
+import type { Labelpath, Lifepath, Lifetok } from './primitives'
+import { type BankRecord, type BoxRecord, type BoxSparse, type GateRecord, type ThingRecord, type ThingScope, ThingChecks, isLifepathDeep } from './shapes-thing'
 import type { TombstoneOf } from './shapes-sealers'
 import type { BankRoots, Tracked } from './shapes-asks'
 import type { IncompatibleThing } from './shapes-answers'
 import { type ReadTc, SeenChecks } from './shapes-vault-event'
 import type { VaultStats } from './shapes-vault-stats'
 import { PolicyPhrases } from '../phrases'
+import * as Phrases from '../phrases'
 
-// == [Tags]: ManifestChecks, PolicyVerdict, PolicyVerdicts, PolicyTag, Refusaltag, GetTags, WriteTags, RootTags, BirthTags, Presence, RevtokCmp, RevseqCmp, SameCmp, AnteWayins, TrackedRows
+// == [Tags]: ManifestChecks, PolicyVerdict, PolicyVerdicts, PolicyTag, Refusaltag, GetTags, WriteTags, RootTags, BirthTags, Presence, RevtokCmp, RevseqCmp, SameCmp, AnteWayins, TrackedRows, AncestorLives
 // Each tag spells the field it compares. A datastore makes them of the row it judged a write against, the ante row.
 
-/** The checks of what a datastore hands back: its tags, a listing's children, a birth's or a world's roots, a watch's {@link Received}, its `tracked` and its `read_tc`. Each refuses `storage_issue`. */
+/** The checks of what a datastore hands back: its tags, a listing's children, a birth's or a world's roots, an ancestor's lives, a watch's {@link Received}, its `tracked` and its `read_tc`. Each refuses `storage_issue`. */
 export const ManifestChecks = Validator.Checkers('storage_issue', ({ obj, arr, lit, str, bool, unk, oneof, discrim, custom }) => {
   const presence       = oneof(['void', 'gone', 'live'])
   const revtokCmp      = oneof(['birth', '=next', 'eq', 'neq'])
@@ -57,6 +58,8 @@ export const ManifestChecks = Validator.Checkers('storage_issue', ({ obj, arr, l
     birthTags: obj({ bank: rootTags, gate: rootTags, root: rootTags, written: bool }).strict(),
     children:  arr(obj({ labelpath: str, raw: unk }).strict()),
     roots:     obj({ bank: unk, gate: unk, root: unk }).strict(),
+    /** An ancestor handed back as its scope and lifepath alone, and no other field: see {@link AncestorLives}. */
+    ancestorLives: ThingChecks.thingScope.extend({ lifepath: ThingChecks.lifepath }).strict().refine(isLifepathDeep, Phrases.LifepathDepth),
     /** Pick what a watch's {@link Received} carries beside its record and banktok: the `read_tc` its datastore made, where it made one. */
     received:  obj({ read_tc: SeenChecks.readTc.optional() }),
     tracked:   custom<Readonly<Record<string, unknown>>>(CX.isPlainBag),
@@ -116,6 +119,10 @@ export type AnteWayins = Readonly<Record<string, unknown>>
 
 /** The raw bank, main gate and root box a datastore read, each null for none, under its key in a `track`: what `tracked` is made of. */
 export type TrackedRows = Readonly<{ bank: unknown, [Labelpath.MainGate]: unknown, [Labelpath.RootBox]: unknown }>
+
+// A datastore that has only the shell, as a vaultDB across a wire does, knows the lives above the scope and no more of the row.
+/** The scope and lifepath of the nearest Thing above a scope: all a shell is built from. A datastore may hand back an ancestor as these alone. */
+export type AncestorLives = Readonly<ThingScope & { lifepath: Lifepath }>
 // --
 
 // == [Manifests]: BankObserved, GetManifest, WriteManifest, ListManifest, RootRows, BirthManifest, WorldManifest, StatsManifest, CheckedBankObserved, CheckedManifestRows, CheckedRoots, ListedChild, CheckedGetManifest, CheckedWriteManifest, CheckedListManifest, CheckedBirthManifest, CheckedWorldManifest, CheckedStatsManifest, ScribedGetManifest, ScribedWriteManifest, ScribedListManifest, ScribedBirthManifest, Received
@@ -140,7 +147,7 @@ export interface GetManifest extends BankObserved {
   tags: GetTags
   /** The row at the ask's scope, null for none. */
   actual: unknown
-  /** Where `actual` is null, the nearest row above the scope, live or a tombstone, null for none: it gives the shell's lifepath. Read nowhere else. */
+  /** Where `actual` is null, the nearest row above the scope, live or a tombstone, or its {@link AncestorLives} alone; null for none. It gives the shell's lifepath. Read nowhere else. */
   ancestor: unknown
 }
 
@@ -152,7 +159,7 @@ export interface WriteManifest extends BankObserved {
   tags: WriteTags
   /** The row written where the datastore wrote, else the ante row; null for none. */
   actual: unknown
-  /** Where `actual` is null, the nearest row above the scope, live or a tombstone, null for none: it gives the shell's lifepath. Read nowhere else. */
+  /** Where `actual` is null, the nearest row above the scope, live or a tombstone, or its {@link AncestorLives} alone; null for none. It gives the shell's lifepath. Read nowhere else. */
   ancestor: unknown
 }
 
@@ -162,7 +169,9 @@ export interface ListManifest extends BankObserved {
   tags: GetTags
   /** The parent, the row at the ask's scope, null for none. */
   actual: unknown
-  /** Each row one label under the ask's labelpath, as `{ labelpath, raw }`. The vaultDB reads them only where the parent is live, so `[]` serves where it is not. */
+  /** Each row one label under the ask's labelpath, as `{ labelpath, raw }`. The vaultDB reads them only where the parent is live, so `[]` serves where it is not.
+   * A live box may be handed back sparse, as a listing answers it, and the parent too.
+   */
   children: unknown
 }
 
@@ -200,13 +209,13 @@ export interface StatsManifest extends BankObserved {
 export type CheckedBankObserved = { banktok: Lifetok, tracked: Tracked, read_tc: ReadTc }
 
 /** A get's or a write's rows, each checked once. */
-export type CheckedManifestRows = CheckedBankObserved & { actual: ThingRecord | null, ancestor: ThingRecord | null }
+export type CheckedManifestRows = CheckedBankObserved & { actual: ThingRecord | null, ancestor: ThingRecord | AncestorLives | null }
 
 /** A bank's three roots, each checked by its kind, null for none. */
 export type CheckedRoots = { bank: BankRecord | null, gate: GateRecord | null, root: BoxRecord | null }
 
-/** A listed child that passes its kind's checks, with the labelpath the datastore listed it at. */
-export type ListedChild = Readonly<{ labelpath: Labelpath, record: ThingRecord }>
+/** A listed child that passes its kind's checks, with the labelpath the datastore listed it at: a live box may be sparse. */
+export type ListedChild = Readonly<{ labelpath: Labelpath, record: ThingRecord | BoxSparse }>
 
 /** A get's manifest, its tags and each row checked. */
 export type CheckedGetManifest = CheckedManifestRows & { tags: GetTags }
@@ -214,8 +223,10 @@ export type CheckedGetManifest = CheckedManifestRows & { tags: GetTags }
 /** A write's manifest, its tags and each row checked. */
 export type CheckedWriteManifest = CheckedManifestRows & { tags: WriteTags }
 
-/** A listing's manifest, its tags and each row checked: its children, where the parent is live, those that pass their kind's checks and, as `incompatible_rows`, those that fail. */
-export type CheckedListManifest = CheckedBankObserved & { tags: GetTags, actual: ThingRecord | null, children: readonly ListedChild[], incompatible_rows: readonly IncompatibleThing[] }
+/** A listing's manifest, its tags and each row checked: its children, where the parent is live, those that pass their kind's checks and, as `incompatible_rows`, those that fail.
+ * A live box, the parent or a child, may be sparse.
+ */
+export type CheckedListManifest = CheckedBankObserved & { tags: GetTags, actual: ThingRecord | BoxSparse | null, children: readonly ListedChild[], incompatible_rows: readonly IncompatibleThing[] }
 
 /** A birth's manifest, its tags and each root checked. */
 export type CheckedBirthManifest = CheckedBankObserved & { tags: BirthTags, actual: CheckedRoots }
@@ -246,7 +257,7 @@ export type ScribedWriteManifest = CheckedWriteManifest & (
 
 /** A listing's checked manifest with the act its parent's tags find, and whether it answers good. */
 export type ScribedListManifest = CheckedListManifest & (
-  | { ok: true,  act: 'gotlive', actual: ThingRecord }
+  | { ok: true,  act: 'gotlive', actual: ThingRecord | BoxSparse }
   | { ok: false, act: 'gone',    actual: TombstoneOf<ThingRecord> }
   | { ok: false, act: 'void',    actual: null }
 )

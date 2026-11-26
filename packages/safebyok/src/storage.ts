@@ -24,7 +24,7 @@ export {
 // A datastore's contract (notes/vault-adapter-contract.md): the manifest each verb's step hands back, the tags in it, and the functions that make them in TypeScript.
 export * as ManifestTags from './storage/manifest-tags'
 export {
-  type AnteWayins, type BankObserved, type BirthManifest, type BirthTags, type CheckedBankObserved, type CheckedBirthManifest, type CheckedGetManifest, type CheckedListManifest, type CheckedManifestRows, type CheckedRoots,
+  type AncestorLives, type AnteWayins, type BankObserved, type BirthManifest, type BirthTags, type CheckedBankObserved, type CheckedBirthManifest, type CheckedGetManifest, type CheckedListManifest, type CheckedManifestRows, type CheckedRoots,
   type CheckedStatsManifest, type CheckedWorldManifest, type CheckedWriteManifest, type GetManifest, type GetTags, type ListManifest, type ListedChild, type PolicyTag, type PolicyVerdict, type PolicyVerdicts, type Presence,
   type Received, type Refusaltag, type RevseqCmp, type RevtokCmp, type RootRows, type RootTags, type SameCmp, type ScribedBirthManifest, type ScribedGetManifest, type ScribedListManifest, type ScribedWriteManifest, type StatsManifest, type TrackedRows,
   type WorldManifest, type WriteManifest, type WriteTags, ManifestChecks,
@@ -58,14 +58,14 @@ export {
 export { VoidLifeTok, storagePolicyVals, type Awaitable, type DelAct, type GoodAct, type GotAct, type PutAct, type StoragePolicy, type WriteAct } from 'safebyok-big/storage'
 export type { IfAbsent, IfPresent, PutIfAbsent, RefusedAct } from 'safebyok-big/internals'
 // The values of an ask's flags, of each verb's acts and of a refusal's kind, for an adapter that names them on a wire.
-export { badActVals, ifAbsentVals, refusedActVals, refusalkindVals } from 'safebyok-big/storage'
+export { badActVals, ifAbsentVals, refusedActVals, refusalkindVals, writeActVals } from 'safebyok-big/storage'
 /** The values of a put's `ifPresent` and `ifAbsent`, and of a get's, a put's and a del's acts. */
 export const { delActVals, gotActVals, ifPresentVals, putActVals, putIfAbsentVals } = EX
 export { VaultError, isVaultError, type Capacity, type RefusalFamily, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'
 export { fetchFailed, identityRevoked, sanitizeForeignError, storageFailed, storageRefusalOf, storageUnavailable, unexpectedError } from 'safebyok-big/storage'
 export { storageIssue } from 'safebyok-big/refusals/throwers'
 export { refusalOfThrown, storageCallRefused, storeQuotaTooSmall } from './refusals/throwers'
-// What crosses a wire, for an adapter whose server runs a whole vaultDB: a refusal, and the parts of an answer the classifier's `crossed*` functions read.
+// What crosses a wire, for an adapter whose server runs a whole vaultDB: a refusal, and the act an answer gives beside it.
 export { type CrossedAct, type CrossedAnswered, type CrossedErr, CrossedChecks, crossedErrOf, refusedOverWire } from './shapes/shapes-crossed'
 // An IndexedDB adapter's own: each call's one transaction, the row at a key within it, and the versioned database.
 export { dbprefixOf, inOneStep, rowAt, versionedShelfOf, type VersionedShelfSpec } from 'safebyok-big/storage'

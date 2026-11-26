@@ -36,18 +36,17 @@ describe("crossedErrOf", () => {
 })
 
 describe("refusedOverWire", () => {
-  it("makes a refusal that crossed a VaultError again, with no Thing named where the answer names none", () => {
+  it("makes a refusal that crossed a VaultError again, naming no Thing", () => {
     const refusal = refusedOverWire(crossedErrOf(serverRefusal()))
     expect(refusal).to.be.instanceOf(Errors.VaultError)
     expect(refusal).to.deep.include({ refusalkind: 'storage_unavailable', message: 'The datastore hiccuped' })
     expect(refusal.meta).to.deep.eq({ oplabel: 'getThing', act: 'void', fieldnames: ['labelpath'] })
-    expect(Errors.rowsOfRefusal(refusal)).to.deep.eq({ dbhas: null })
+    expect(Errors.rowsOfRefusal(refusal)).to.deep.eq({})
   })
 
-  it("lays the answer's act over the refusal's, and hands on the Thing the answer names whole", () => {
-    const refusal = refusedOverWire(crossedErrOf(serverRefusal()), { act: 'gone', dbhas: TH.gateThingOf() })
+  it("lays the answer's act over the refusal's", () => {
+    const refusal = refusedOverWire(crossedErrOf(serverRefusal()), { act: 'gone' })
     expect(refusal.meta).to.have.property('act', 'gone')
-    expect(Errors.rowsOfRefusal(refusal).dbhas).to.deep.eq(TH.gateThingOf())
   })
 
   it("refuses a refusal that does not cross as one", () => {
@@ -65,14 +64,13 @@ describe("refusedOverWire", () => {
     }
   })
 
-  it("refuses an answer beside it that does not name an act and a Thing", () => {
+  it("refuses an answer beside it that does not name an act", () => {
     const crossed = crossedErrOf(serverRefusal())
     const MalformedCases = [
-      [null,                                            'no answer at all'],
-      [{ act: 'gotlive' },                              'a good act'],
-      [{ dbhas: { labelpath: 'gate' } },                'a Thing with only its labelpath'],
-      [{ dbhas: { ...TH.gateThingOf(), revseq: 'x' } }, 'a Thing with a revseq that is no number'],
-      [{ act: 'void', rows: {} },                       'rows beside them'],
+      [null,                           'no answer at all'],
+      [{ act: 'gotlive' },             'a good act'],
+      [{ dbhas: TH.gateThingOf() },    'a Thing beside it'],
+      [{ act: 'void', rows: {} },      'rows beside it'],
     ] as const
     for (const [answered, blurb] of MalformedCases) {
       expect(() => refusedOverWire(crossed, answered as never), blurb).to.throw(Errors.VaultError).with.property('refusalkind', 'storage_issue')

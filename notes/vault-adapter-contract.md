@@ -70,7 +70,9 @@ A row is what the datastore has at a scope, raw, as our code wrote it: every fie
 - `actual`: the row at the ask's scope, null for none.
 - `ancestor`: where `actual` is null, the nearest row above the scope (the longest stored labelpath that is a prefix
   of the scope's, ending at a `/`), live or a tombstone, null for none. It gives the shell its lifepath. Where `actual`
-  is a row, null, as it is read nowhere else.
+  is a row, null, as it is read nowhere else. A datastore that has only the shell, as a vaultDB across a wire does, may
+  hand back the ancestor's `{ userid, banklabel, labelpath, lifepath }` and no other field (`AncestorLives`): all that
+  the shell is built from.
 - `tags`: `{ presence }` of `actual` (`ManifestTags.getTagsOf`).
 
 **Write** (`WriteManifest`):
@@ -88,6 +90,8 @@ A row is what the datastore has at a scope, raw, as our code wrote it: every fie
   stored at, and the row. The vaultDB reads them only under a live parent, so a datastore may read them whatever the
   parent (Postgres and memory do), or hand back `[]` where it is not live. A child that fails its kind's checks is
   answered among `incompatible_rows`, not refused; one of an earlier life is dropped by the vaultDB.
+- A live box, the parent or a child, may be handed back whole or in its sparse form (`BoxSparse`, without its sidecar and
+  sealed whisper), as a listing answers it: a datastore that has only that, as a vaultDB across a wire does.
 
 **Birth** (`BirthManifest`):
 

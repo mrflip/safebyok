@@ -5,7 +5,7 @@
 import { isEqual, pick } from 'es-toolkit'
 import { Validator } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
-import { type ThingRecord, type ThingScope, Shell } from '../shapes/shapes-thing'
+import { type BoxSparse, type ThingRecord, type ThingScope, Shell } from '../shapes/shapes-thing'
 import { type BirthBankAsk, type GetAsk, type GetWorldAsk, type ListAsk, type StatsAsk, type ThingWatchScope, type Tracked, type WriteAsk, RootLabelpaths, birthPutsOf } from '../shapes/shapes-asks'
 import type { BirthBankAnswer, GetThingAnswer, GetWorldAnswer, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import type {
@@ -78,7 +78,7 @@ export function demandStatsConsistency(ask: StatsAsk, manifest: CheckedStatsMani
 // The checks every verb makes alike.
 
 /** A row the datastore read by its address, null for none, and the labelpath it was read at. */
-type RowAt = readonly [row: ThingRecord | null, labelpath: Labelpath]
+type RowAt = readonly [row: ThingRecord | BoxSparse | null, labelpath: Labelpath]
 
 /** The part of a manifest an answer copies beyond the bank, as the answer carries it and as the manifest has it. */
 type Copy = Readonly<{ carried: unknown, expected: unknown }>

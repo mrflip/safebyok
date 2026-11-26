@@ -11,7 +11,7 @@ import { type Thingkind, PerKindChecks, policiesByModelkind } from './shapes-thi
 // A bundle makes no check of its own: each is made in shapes-thing, shapes-stamps, shapes-sealers or shapes-asks, which
 // sit below this module and read their checks where they are made.
 
-/** The checks of the bank's Thing: its record, its citation and what is stored of it, the storage policies it may name (none), and its labelpath.
+/** The checks of the bank's Thing: its record, its citation, what is stored of it and what a listing is handed of it (`listed`), the storage policies it may name (none), and its labelpath.
  * Also its `shell`, its `stamp`, and `birthAsk`, the ask that writes a new bank's first Things: it leaves its three records unchecked, for `BankChecks.record`, `GateChecks.record` and `BoxChecks.record`.
  */
 export const BankChecks = Object.freeze({
@@ -19,13 +19,14 @@ export const BankChecks = Object.freeze({
   shell:         PerKindChecks.bankShell,
   cited:         PerKindChecks.bankCited,
   stored:        PerKindChecks.bankThing.refusingAs('incompatible_row'),
+  listed:        PerKindChecks.bankThing.refusingAs('incompatible_row'),
   policies:      policiesByModelkind.bank,
   labelpath:     PerKindChecks.bankLabelpath,
   stamp:         StampChecks.bankStamp,
   birthAsk:      AskChecks.birthBankAsk,
 })
 
-/** The checks of a gate's Thing: its record, its citation and what is stored of it, the storage policies it may name, and its labelpath.
+/** The checks of a gate's Thing: its record, its citation, what is stored of it and what a listing is handed of it (`listed`), the storage policies it may name, and its labelpath.
  * Also its `shell`, its wayins, its `stamp`, and its `stampedGate`.
  */
 export const GateChecks = Object.freeze({
@@ -33,6 +34,7 @@ export const GateChecks = Object.freeze({
   shell:         PerKindChecks.gateShell,
   cited:         PerKindChecks.gateCited,
   stored:        PerKindChecks.gateThing.refusingAs('incompatible_row'),
+  listed:        PerKindChecks.gateThing.refusingAs('incompatible_row'),
   policies:      policiesByModelkind.gate,
   labelpath:     PerKindChecks.gateLabelpath,
   wayins:        PerKindChecks.wayins,
@@ -40,7 +42,7 @@ export const GateChecks = Object.freeze({
   stampedGate:   StampChecks.stampedGate,
 })
 
-/** The checks of a box's Thing: its record, its citation and what is stored of it, the storage policies it may name (none), and its labelpath.
+/** The checks of a box's Thing: its record, its citation, what is stored of it and what a listing is handed of it (`listed`: whole, or live and sparse), the storage policies it may name (none), and its labelpath.
  * Also its `shell`, its `live` record, its `liveOrShell` record, which a bank has of its root box, its `sparse` form, a live box without its body, and its `stamp`.
  * And what its seal is given: its sealable, a live one for a tombstone (`liveSealable`), the public props of a revision and of a tombstone, and the cleartexts.
  */
@@ -49,6 +51,7 @@ export const BoxChecks = Object.freeze({
   shell:                PerKindChecks.boxShell,
   cited:                PerKindChecks.boxCited,
   stored:               PerKindChecks.boxThing.refusingAs('incompatible_row'),
+  listed:               PerKindChecks.boxListed.refusingAs('incompatible_row'),
   policies:             policiesByModelkind.box,
   labelpath:            PerKindChecks.boxLabelpath,
   live:                 PerKindChecks.boxRecord,
@@ -63,7 +66,7 @@ export const BoxChecks = Object.freeze({
 })
 
 /** The bundle of each kind of Thing, by its modelkind. */
-const byModelkind = Object.freeze({ bank: BankChecks, gate: GateChecks, box: BoxChecks } as const satisfies Record<Thingkind, { record: unknown, cited: unknown, stored: unknown, policies: readonly EX.StoragePolicy[] }>)
+const byModelkind = Object.freeze({ bank: BankChecks, gate: GateChecks, box: BoxChecks } as const satisfies Record<Thingkind, { record: unknown, cited: unknown, stored: unknown, listed: unknown, policies: readonly EX.StoragePolicy[] }>)
 
 /** The bundle for the kind of Thing at `labelpath`, which must be sound. */
 function ofLabelpath(labelpath: Labelpath): typeof byModelkind[Thingkind] { return byModelkind[Labelpath.modelkindOf(labelpath)] }

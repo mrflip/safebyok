@@ -245,9 +245,11 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
   const gateShell    = shellAt(gateLabelpath)
   const boxShell     = shellAt(boxLabelpath)
   const boxRecordOrShell = union([boxRecord, boxShell])
+  // What a listing may be handed of a box: the box whole, or where it is live, its sparse form, as a listing answers it.
+  const boxListed    = union([boxThing, boxSparse])
   return {
     bankLabelpath, gateLabelpath, boxLabelpath, wayins, banktok, bankShell, gateShell, boxShell,
-    bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse, boxSealable, boxLiveSealable, boxRecord, boxRecordOrShell,
+    bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse, boxListed, boxSealable, boxLiveSealable, boxRecord, boxRecordOrShell,
   }
 }))
 
