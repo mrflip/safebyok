@@ -2,8 +2,10 @@
 
 Branch `20261126-convex_manifest`, PR [#941](https://github.com/mrflip/safebyok/pull/941), stacked on
 [#939](https://github.com/mrflip/safebyok/pull/939) (thread 3, `20261126-idb_manifest` at `517463cf4`; sprintbase
-recorded). Proved so far: `pnpm --filter safebyok-convex` lint, typecheck, test (232 of 232); `pnpm --filter safebyok
-test` (2,412). `pnpm justify` not yet run.
+recorded). Proved: `pnpm justify` after the catch-up: red only in safebyok-postgres (lint, typecheck, 107 of 170
+tests; thread 4 mends it), and in timeouts under load in the dojo demo, the envman demo and e2e, each green run alone
+(dojo 111, envman 24, e2e 576). Green: safebyok-convex 232, safebyok 2,412, safebyok-indexeddb 130, safebyok-react 339,
+root 331, knockknock 26, react demo 99, every `-big` package.
 
 * **Built**:
   - `packages/safebyok-convex/src/component/schema.ts`: three tables, `bank_things`, `gate_things`, `box_things`, a
