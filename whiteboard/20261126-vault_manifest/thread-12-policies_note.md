@@ -1,12 +1,12 @@
 # Thread 12: policies_note (2026-11-26)
 
-Branch `20261126-policies_note`, PR #948, stacked on #947. Proved: pending.
+Branch `20261126-policies_note`, PR #948, stacked on #947. Proved: `pnpm justify` green after the catch-up onto the first #947 (e2e 576/576); the GraphQL line's edit after it is docs only.
 
 * **Built**: `notes/storage-policies.md` rewritten for the new core: the three gate policies' tables, row for row with
   `GatePolicies` (`packages/safebyok/src/storage/policies.ts`) and Postgres's `*_refusal` functions; where a policy is
   judged (the datastore, in its one atomic step, against the ante row; `ManifestTags.policiesOf`/`policyVerdictOf` for
-  memory, IndexedDB and Convex; `policies_of`/`policy_verdict_of`/`policies_met` in Postgres; GraphQL remaking tags
-  with `ManifestTags`); what `AdapterVaultDB` makes of the verdicts (three-way check, `policied`, `taggedRefusal`,
+  memory, IndexedDB and Convex; `policies_of`/`policy_verdict_of`/`policies_met` in Postgres; GraphQL's client
+  forwarding the answer of its server's vaultDB, per the Coach's ruling that GraphQL is a non-transforming pipe); what `AdapterVaultDB` makes of the verdicts (three-way check, `policied`, `taggedRefusal`,
   `RefusalkindForRefusaltag`, `PhraseForRefusaltag`); what the policies do not check. It points to
   `notes/vault-adapter-contract.md` (*The tags*, *The write predicate*) for the contract. Big's description is gone.
 * **Decisions made**: rows renumbered (RP1-2, AP1-3, RK1-3) without big's `registered_at` row, so each table matches the
@@ -23,3 +23,5 @@ Branch `20261126-policies_note`, PR #948, stacked on #947. Proved: pending.
   order"; with big's registered_at row gone, that is no longer true of big. Left as is: big is frozen. Pointers to this
   note from the root README (big's `putGate`), `notes/answer-contract.md` and `notes/design-proof.md` describe big or
   older designs and were left alone.
+* **For the filer**: the note's GraphQL bullet describes #947 as redone (a forwarding `GraphQLVaultDB`), not as this
+  branch was cut from it. Filing rebases onto the redone #947; check the bullet still holds of it then.

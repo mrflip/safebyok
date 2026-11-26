@@ -68,7 +68,8 @@ they name, and a policy refusal means some other caller sent the write.
 * **Postgres**: SQL copies of the same, check for check and tag for tag: one `*_refusal` function per policy,
   `policy_verdict_of` and `policies_of`. The gate's write function writes only where `policies_met(policies_of(...))`
   holds of the ante row, and `write_tags_of` hands the verdicts back.
-* **GraphQL**: `GraphQLVaultDB` makes the tags again with `ManifestTags`, from what its server answers.
+* **GraphQL**: the server's datastore judges the policies, whichever datastore the GraphQL server's vaultDB runs over,
+  and `GraphQLVaultDB` forwards that vaultDB's answer.
 
 ## What the vaultDB makes of the verdicts
 
