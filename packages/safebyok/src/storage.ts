@@ -6,7 +6,7 @@ import { EX } from 'safebyok-big/internals'
 
 export { AdapterVaultDB } from './storage/adapter-vault-db'
 export { MemoryVaultDB } from './storage/memory-vault-db'
-export { type Watcher, MemoryDatastore } from './storage/memory-datastore'
+export { type Watcher, MemoryDatastore, isBirthWritable, isWritable } from './storage/memory-datastore'
 export { type Banklabel, type BoxLabelpath, type Devicetok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
   type AnyThingRecord, type BankRecord, type BoxRecord, type BoxSparse, type GateRecord, type Modelkind, type Sealed, type Sparse, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind,

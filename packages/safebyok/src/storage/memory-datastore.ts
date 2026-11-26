@@ -150,7 +150,7 @@ export class MemoryDatastore {
  *   lifetok check, `(stored.am <> 'a') OR (stored.lifetok = proposed.lifetok)`, the bank's alone; and its storage policies, the gate's alone
  * - and the flag the ask's TypeScript checked before the SQL ran: `ifPresent` `'repl'` over a live row, `ifAbsent` `'add'` over a tombstone
  */
-function isWritable(ask: WriteAsk, ante: unknown): boolean {
+export function isWritable(ask: WriteAsk, ante: unknown): boolean {
   if (ante === null) { return (ask.cited.revtok === SX.VoidRevisionTok) && (ask.ifAbsent === 'add') }
   const isLive        = (ManifestTags.fieldOf(ante, 'am') === 'a')
   const isCited       = (ManifestTags.fieldOf(ante, 'revtok') === ask.cited.revtok) && (ManifestTags.fieldOf(ante, 'am') === ask.cited.am) && (ManifestTags.fieldOf(ante, 'lifepath') === ask.cited.lifepath) && (ManifestTags.fieldOf(ante, 'revseq') === ask.record.revseq - 1)
@@ -164,5 +164,5 @@ function isWritable(ask: WriteAsk, ante: unknown): boolean {
 }
 
 /** True when the datastore writes a birth's three roots over the raw `ante` roots, by its own predicate, a copy of `VaultFunctionsSql`'s `birth_roots`: where none of the three is stored. */
-function isBirthWritable(ante: RootRows): boolean { return (ante.bank === null) && (ante.gate === null) && (ante.root === null) }
+export function isBirthWritable(ante: RootRows): boolean { return (ante.bank === null) && (ante.gate === null) && (ante.root === null) }
 // --
