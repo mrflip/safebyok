@@ -149,7 +149,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Look-ahead:* thread 7 renames "damaged" in the same prose.
 *Size:* medium, mechanical but judgment per use.
 *Review:* fixed (sonnet, medium, opus style pass), alignment after renames and `KidEntry`'s "actual life". Left: deviceDB ante/actual → thread 10 widens VOCABULARY's rows; `isWritten` vs the `written` tag (stands); remaining "no Thing stored" doc blocks → thread 10.
-*Status:* reviewed at 6d23440ef; PR #944. Bare "stored" 540 → 309; `Refusaltag` values `BornAtMoved`, `LifetokMoved` (phrases reworded); `PerKindChecks.banktok`, `checkedLeaseOf`, `cheatPlant`; the deviceDB's "stored lease" kept as at-rest.
+*Status:* filed 2026-11-26 at 6d23440ef; PR #944 out of draft. Bare "stored" 540 → 309; `Refusaltag` values `BornAtMoved`, `LifetokMoved` (phrases reworded); `PerKindChecks.banktok`, `checkedLeaseOf`, `cheatPlant`; the deviceDB's "stored lease" kept as at-rest.
 
 ### 7. incompatible_row — the refusal kind renamed
 
