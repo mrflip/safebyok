@@ -30,7 +30,7 @@ TH.describeVaultDBBattery('GraphQLVaultDB over a MemoryVaultDB', {
   }),
 })
 
-describe('GraphQLVaultDB over a MemoryVaultDB', () => {
+describe("GraphQLVaultDB over a MemoryVaultDB", () => {
   it("stores a bank born over the wire in the server's MemoryVaultDB", async () => {
     const vaultDB = makeVaultDB()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))

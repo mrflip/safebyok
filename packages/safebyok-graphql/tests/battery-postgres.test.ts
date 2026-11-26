@@ -10,7 +10,7 @@ TH.describeVaultDBBattery('GraphQLVaultDB over a PostgresVaultDB', {
   _cheat_rowsOf: () => TH.postgresRows,
 })
 
-describe('GraphQLVaultDB over a PostgresVaultDB', () => {
+describe("GraphQLVaultDB over a PostgresVaultDB", () => {
   it("stores a bank born over the wire in the server's PostgresVaultDB", async () => {
     const postgres = await TH.postgresVaultDB()
     await TH.expectGood(TH.browserOver(TH.schemaOver(postgres)).tryBirthBank(TH.birthBankAskOf()))
