@@ -1,6 +1,6 @@
 # Thread 10: sprint_tidy (2026-11-26)
 
-Branch `20261126-sprint_tidy`, PR pending, stacked on #945. Proved: safebyok 2,425, safebyok-indexeddb 130, safebyok-postgres 168, safebyok-convex 232 tests green after the battery change.
+Branch `20261126-sprint_tidy`, PR #946, stacked on #945. Proved: safebyok 2,425, safebyok-indexeddb 130, safebyok-postgres 168, safebyok-convex 232 tests green after the battery change.
 
 * **Built**
   * **The battery's incompatible bank, real everywhere.** "carries a bank incompatible outside its lifetok forward" planted a stray `auth`, which Postgres's `jsonb_populate_record` and Convex's plant drop, so it ran on a sound bank there. It now plants `written_at: Number.MAX_SAFE_INTEGER` (past `FarFuture`, so `epochMillis` refuses it), a column both tables hold with no CHECK against it, and the case first expects a get of the bank to refuse `incompatible_row`, so a plant that loses its damage fails loudly.
