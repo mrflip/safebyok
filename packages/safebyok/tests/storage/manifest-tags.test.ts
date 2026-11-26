@@ -26,10 +26,12 @@ describe("ManifestTags, over the raw rows in a datastore", () => {
     expect(ManifestTags.writeTagsOf(ask, { ...gate, wayins: 'none' }, false).policies.add_passkey).to.deep.include({ ok: false })
   })
 
-  it("gives the void lifetok for no bank row, and the lifetok as it stands otherwise", () => {
+  it("gives the void lifetok for no bank row, the lifetok as it stands otherwise, and null for a row without one", () => {
     expect(ManifestTags.banktokOf(null)).to.eq(SX.VoidLifeTok)
     expect(ManifestTags.banktokOf(TH.bankThingOf())).to.eq(TH.bankThingOf().lifetok)
     expect(ManifestTags.banktokOf({ lifetok: 7 })).to.eq(7)
+    expect(ManifestTags.banktokOf({ am: 'a' })).to.eq(null)
+    expect(ManifestTags.banktokOf('damaged')).to.eq(null)
   })
 
   it("tracks each root as the same where its revseq and lifepath are the ones tracked, else its row", () => {

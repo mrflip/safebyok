@@ -15,8 +15,9 @@ import { GatePolicies } from './policies'
 /** The field `fieldname` of the raw `row`: undefined where the row has none, or is no object. */
 export function fieldOf(row: unknown, fieldname: string): unknown { return CX.isPlainBag(row) ? row[fieldname] : undefined }
 
-/** The lifetok of the raw bank row `bank`, the void lifetok where there is none. */
-export function banktokOf(bank: unknown): unknown { return (bank === null) ? SX.VoidLifeTok : fieldOf(bank, 'lifetok') }
+// Null, never undefined, for a bank row without a lifetok: a transport that drops undefined (Convex's, JSON) would drop the key with it.
+/** The lifetok of the raw bank row `bank`: the void lifetok where there is no bank row, null where the row has no lifetok. */
+export function banktokOf(bank: unknown): unknown { return (bank === null) ? SX.VoidLifeTok : (fieldOf(bank, 'lifetok') ?? null) }
 // --
 
 // == [Tags]: presenceOf, getTagsOf, writeTagsOf, birthTagsOf, rootTagsOf, revtokCmpOf, revseqCmpOf, bornAtCmpOf, lifetokCmpOf, policiesOf, policyVerdictOf, anteWayinsOf

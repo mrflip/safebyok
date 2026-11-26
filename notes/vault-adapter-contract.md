@@ -49,11 +49,10 @@ override `answerForThrown` to tell one of the datastore's errors from another.
 
 Each read in the step, after any write.
 
-- **`banktok`**: the bank row's lifetok, the void lifetok (`SX.VoidLifeTok`) where there is no bank row
-  (`ManifestTags.banktokOf`). A manifest without the key refuses `storage_issue` (`Phrases.BanktokMissing`). A banktok
+- **`banktok`**: the bank row's lifetok, the void lifetok (`SX.VoidLifeTok`) where there is no bank row, and null where
+  the row has no lifetok (`ManifestTags.banktokOf`). A manifest without the key refuses `storage_issue` (`Phrases.BanktokMissing`). A banktok
   that is no lifetok, as a damaged bank row's is, reads as the void lifetok, and the step's answer stands: the banktok is
-  news, never the verdict. Keep the key even then: `banktokOf` of a bank row with no lifetok is `undefined`, so a
-  datastore whose transport drops `undefined` (JSON does) hands back null there.
+  news, never the verdict.
 - **`tracked`**: for each of the bank (`bank`), the main gate (`gate`) and the root box (`box`), by its key in the ask's
   `track`, `'same'` where its row stands at the revseq and lifepath the ask tracks, else the raw row, null for none
   (`ManifestTags.trackedOf`). A null row where the track is at the void revision reads as `'same'` too.
