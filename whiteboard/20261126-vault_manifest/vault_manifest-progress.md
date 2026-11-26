@@ -36,3 +36,5 @@ The orchestrator's curated summary of what the threads have taught. Newer than t
 * *Orchestrator:* a three-way check only our code can fail refuses `unexpected_error` (thread 2 switches `answerOfOtherManifest`).
 * The demos' `LocalStorageVaultDB` overrides `doWriteThing`; it takes its ckey from `MemoryDatastore.ckeyOf`.
 * Ruled: one consistency function per verb, each calling a shared function for the checks every verb shares (thread 2 builds it, and moves thread 1's onto it). The ancestor stays checked whole when read. Every `damaged_row` check becomes `incompatible_row` (thread 7).
+* *Orchestrator:* thread 1's review found MemoryDatastore's write predicate narrower than Postgres's `WHERE` (no `fmt`, no `lifeseq_ok`): a datastore's predicate copies its model's `WHERE` clause by clause, every ante field it reads. Threads 3 and 5 check theirs against `writeFunctionOf` the same way.
+* *Orchestrator:* a `policied` refusal is a scribed act, not a throw, so it carries the step's real banktok, tracked and read_tc (kept, YOLO; Coach row).

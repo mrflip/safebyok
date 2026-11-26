@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** thread 1 ready, PR #934, in review (high, opus); thread 2 building, stacked on #934 (`/workspace/byok-manifest_rest`)
+* **Status:** thread 1 reviewed (flagged; kept by YOLO call, Open Matters TOP) and filing, PR #934; thread 2 building, stacked on #934
 
 ## Read first
 
@@ -49,6 +49,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Look-ahead:* thread 2 copies its pattern for the other verbs, and threads 3–5 implement its `do*` contract: keep the manifest types and the tag functions exported from `safebyok/storage`, documented as a datastore's contract.
 *Size:* large; the largest in the sprint. If it nears its cap, stop after the write verb and report what remains.
 *Status:* ready 2026-11-26, PR #934; one compaction (~366k), just before its readiness check. Red only in the three adapters. Deviations: one consistency check per verb; the ancestor checked whole, address and all, when read; a `policied` refusal carries the step's real banktok, tracked and read_tc; a write over an incompatible row is written where its cited revision matches (the reviewer weighs it); a void get under an incompatible ancestor refuses `damaged_row`; the demos pulled forward.
+*Review:* flagged (opus, high), 7 fixes: MemoryDatastore's `isWritable` now copies Postgres's `fmt` and `lifeseq_ok` clauses (it overwrote rows of another format); distinct policies counted in `demandTagsOfAsk`; `ante` for `stored` in three throwers; doc and style fixes. Significant, left: a `policied` refusal now carries the real banktok, tracked and read_tc in a working vaultDB; kept (YOLO), Open Matters TOP. Minor: m1 missing manifest banktok, m6 types into shapes, m7 `checkedBanktokOf` rename, m8 destructure spelling, m9 interfaces → thread 2; m3 `unexpected_error` → thread 2; m4 ancestor → Coach accepted; m10 security-note wording → amended before filing; m11 VOCABULARY → thread 6; m2, m5 stand.
 
 ### 2. manifest_rest — list, birth, world and stats on the Manifest
 
