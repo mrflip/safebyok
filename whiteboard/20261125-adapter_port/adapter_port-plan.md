@@ -7,7 +7,7 @@ on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin. Up to 3 th
 
 Sprint doc: https://claude.ai/artifact/LdbJqWk27MHUvdCNQGBFTK (doc 9ef98d92-eb17-4e25-8ee6-e23d6871618e; tabs: Open Matters 6e187ae9-478a body b6bb67df-8264, State enum f88d13eb-9fff; Cleanup 23302d02-ef2b body f42312cf-406e; Progress 91b99d7f-31f1 body 3eb8062d-a469; Resolved 3c0c907f-62db body 9e44ff2c-c3ac). Bookmark rev: Open Matters 2.
 
-Status: A–F merged to main (0a860f282). Line: main → #932 D1 (ready) → #935 G (filed, restacked on #932) → H `adapter_tidy` (building) → documentarian → #913. Base synced at 0befbc37d (stale).
+Status: A–F merged to main (0a860f282). Line: main → #932 D1 (ready) → #935 G (filed, restacked on #932) → H `adapter_tidy` (building) → documentarian → #913. Base synced at 0befbc37d (stale). Flake seen: core `vault-minder.test.ts` "sorts an answer's records while no one listens to it…" failed once on node-compat (22) for #935 (a1a0ae43c), passed on rerun; not this sprint's code.
 ready. D waits on the Coach's yes to C's design.
 
 ## Read first
