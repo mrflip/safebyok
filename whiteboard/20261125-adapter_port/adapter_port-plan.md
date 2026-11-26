@@ -7,7 +7,7 @@ on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin. Up to 3 th
 
 Sprint doc: https://claude.ai/artifact/LdbJqWk27MHUvdCNQGBFTK (doc 9ef98d92-eb17-4e25-8ee6-e23d6871618e; tabs: Open Matters 6e187ae9-478a body b6bb67df-8264, State enum f88d13eb-9fff; Cleanup 23302d02-ef2b body f42312cf-406e; Progress 91b99d7f-31f1 body 3eb8062d-a469; Resolved 3c0c907f-62db body 9e44ff2c-c3ac). Bookmark rev: Open Matters 2.
 
-Status: line on main 70dc5189e: #916 (ready) → #923 (CI build fix in progress: zod dts in safebyok-convex) → #914 → #913 (squashed). Filed on #923: F #930 (postgres_standalone, reviewed fixed), E #931 (convex_deltas, reviewed fixed). D1 `graphql_vault` building from #914. Base synced at 0befbc37d. Sprint doc rev ~1004.
+Status: line on main 70dc5189e: #916 → #923 → #931 → #930 → #914 (all ready, CI green, justify green at the top) → #932 D1 `graphql_vault` (reviewed fixed, rework on minors 1–5, 7, 8 under way) → #913. G `postgres_listen` waits on D1 filing. Base synced at 0befbc37d (stale: before E, F, C moved). Cleanup adds: D1 doc blocks (review minor 9) for the documentarian.
 ready. D waits on the Coach's yes to C's design.
 
 ## Read first
