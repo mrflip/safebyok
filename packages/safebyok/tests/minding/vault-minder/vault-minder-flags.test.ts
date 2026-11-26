@@ -52,13 +52,13 @@ const PutFlagCases = [
   // nothing stored: only ifAbsent acts
   ["nothing",   "void",    ["born val=record",    "born val=record",    "born val=record",    "void dbhas=shell",   "void dbhas=shell",   "void dbhas=shell"],   'a first revision is born, or refused where ifAbsent fails'],
   // a live box: only ifPresent acts, and a stale citation is stale unless ifPresent gets
-  ["live",      "void",    ["stale dbhas=ante", "stale dbhas=ante", "passed val=ante",  "stale dbhas=ante", "stale dbhas=ante", "passed val=ante"],  'citing nothing over a live box is stale, unless ifPresent gets'],
-  ["live",      "current", ["replaced val=record", "camped dbhas=ante", "passed val=ante", "replaced val=record", "camped dbhas=ante", "passed val=ante"], 'citing the live revision replaces it, camps on it, or gets it'],
-  ["live",      "older",   ["stale dbhas=ante", "stale dbhas=ante", "passed val=ante",  "stale dbhas=ante", "stale dbhas=ante", "passed val=ante"],  'citing an older revision over a live box is stale, unless ifPresent gets'],
+  ["live",      "void",    ["stale dbhas=ante",   "stale dbhas=ante",   "passed val=ante",    "stale dbhas=ante",   "stale dbhas=ante",   "passed val=ante"],    'citing nothing over a live box is stale, unless ifPresent gets'],
+  ["live",      "current", ["replaced val=record", "camped dbhas=ante", "passed val=ante",    "replaced val=record", "camped dbhas=ante", "passed val=ante"],    'citing the live revision replaces it, camps on it, or gets it'],
+  ["live",      "older",   ["stale dbhas=ante",   "stale dbhas=ante",   "passed val=ante",    "stale dbhas=ante",   "stale dbhas=ante",   "passed val=ante"],    'citing an older revision over a live box is stale, unless ifPresent gets'],
   // a tombstone: only ifAbsent acts, and only over a citation of the tombstone
-  ["tombstone", "void",    ["stale dbhas=ante", "stale dbhas=ante", "stale dbhas=ante", "stale dbhas=ante", "stale dbhas=ante", "stale dbhas=ante"], 'citing nothing over a tombstone is stale under every flag'],
-  ["tombstone", "current", ["reborn val=record",  "reborn val=record",  "reborn val=record",  "gone dbhas=ante",  "gone dbhas=ante",  "gone dbhas=ante"],  'citing the tombstone is reborn, or refused where ifAbsent fails'],
-  ["tombstone", "older",   ["stale dbhas=ante", "stale dbhas=ante", "stale dbhas=ante", "stale dbhas=ante", "stale dbhas=ante", "stale dbhas=ante"], 'citing the live revision a tombstone followed is stale under every flag'],
+  ["tombstone", "void",    ["stale dbhas=ante",   "stale dbhas=ante",   "stale dbhas=ante",   "stale dbhas=ante",   "stale dbhas=ante",   "stale dbhas=ante"],   'citing nothing over a tombstone is stale under every flag'],
+  ["tombstone", "current", ["reborn val=record",  "reborn val=record",  "reborn val=record",  "gone dbhas=ante",    "gone dbhas=ante",    "gone dbhas=ante"],    'citing the tombstone is reborn, or refused where ifAbsent fails'],
+  ["tombstone", "older",   ["stale dbhas=ante",   "stale dbhas=ante",   "stale dbhas=ante",   "stale dbhas=ante",   "stale dbhas=ante",   "stale dbhas=ante"],   'citing the live revision a tombstone followed is stale under every flag'],
 ] as const
 // --
 

@@ -322,7 +322,7 @@ describe("checkedWriteAsk(ask), of the main gate", () => {
   const BadRecordCases: readonly (readonly [WriteAsk, string, string])[] = [
     // the record does not follow the one cited:
     [{ ...good, record: { ...next, revseq: 2 } },                                    Phrases.RevseqNotNext,      'a revseq that skips one'],
-    [{ ...good, record: { ...next, revtok: ante.revtok } },                        Phrases.RevtokNotNew,       'a revtok that is not new'],
+    [{ ...good, record: { ...next, revtok: ante.revtok } },                          Phrases.RevtokNotNew,       'a revtok that is not new'],
     [TH.birthAskOf(TH.gateThingOf({ revtok: Shell.Cited.revtok })),                  Phrases.RevtokNotNew,       'the void revtok'],
     [{ ...good, record: { ...next, lifeseq: lifeseq2, lifepath: lifeseq2 } },        Phrases.LifeseqNotNext,     'a new life where am stays'],
     [TH.birthAskOf(TH.gateThingOf({ born_at: TH.T0 - 1 })),                          Phrases.BornAtNotNow,       'a birth born before it is written'],
@@ -342,7 +342,7 @@ describe("checkedWriteAsk(ask), of the main gate", () => {
     [{ ...good, cited: { revtok: TH.revtokOf('0'), revseq: 0 } } as never,                   'lifepath',                 'a citation of too little'],
     [{ ...good, cited: { ...noTestimony, am: 'x' } },                                Phrases.LifeseqParity,      'a citation whose am its lifepath belies'],
     [{ ...good, cited: { ...noTestimony, lifepath: `${Life0}/${Life0}` } },          Phrases.LifepathNotKept,    'a citation of another lifepath'],
-    [{ ...good, cited: { ...ante, wayins: {} } } as never,                        'wayins.main',              'a cited gate whose wayins fail'],
+    [{ ...good, cited: { ...ante, wayins: {} } } as never,                          'wayins.main',              'a cited gate whose wayins fail'],
   ]
 
   for (const [ask, said, blurb] of BadRecordCases) {

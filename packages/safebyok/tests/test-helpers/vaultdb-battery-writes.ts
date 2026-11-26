@@ -137,7 +137,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     const ActCases = [
       // the datastore moved on:
       ["stale",  replaceAskOf(ante, nextGateOf(ante, { revtok: revtokOf('1b') })), 'expects a revision the datastore has moved past'],
-      ["retcon", replaceAskOf(ante, next),                                      'resends a write that already landed'],
+      ["retcon", replaceAskOf(ante, next),                                        'resends a write that already landed'],
       ["forked", replaceAskOf({ ...next, revtok: revtokOf('fork') }, nextGateOf(next)), 'expects the ante revseq under another revtok'],
       // the caller is ahead of the datastore, or confused:
       ["ahead",  replaceAskOf(later, nextGateOf(later)),                          'expects a revision the store has not reached'],
