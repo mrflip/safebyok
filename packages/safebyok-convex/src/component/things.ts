@@ -62,8 +62,8 @@ export const writeThing = mutation({
   args:    CVX.askArgs,
   returns: CVX.writeManifest,
   handler: async (ctx, { ask: sent }): Promise<Observed<WriteManifest>> => {
-    const ask     = askFor(() => DB.checkedWriteAsk(sent))
-    const ante    = await rowAt(ctx.db, ask)
+    const ask       = askFor(() => DB.checkedWriteAsk(sent))
+    const ante      = await rowAt(ctx.db, ask)
     const isWritten = DB.isWritable(ask, ante)
     if (isWritten) { await writeAt(ctx.db, ask) }
     const actual = await rowAt(ctx.db, ask)
@@ -76,9 +76,9 @@ export const birthBank = mutation({
   args:    CVX.askArgs,
   returns: CVX.birthManifest,
   handler: async (ctx, { ask: sent }): Promise<Observed<BirthManifest>> => {
-    const ask     = askFor(() => DB.checkedBirthBankAsk(sent))
-    const puts    = DB.birthPutsOf(ask)
-    const ante    = await rootsOf(ctx.db, ask)
+    const ask       = askFor(() => DB.checkedBirthBankAsk(sent))
+    const puts      = DB.birthPutsOf(ask)
+    const ante      = await rootsOf(ctx.db, ask)
     const isWritten = DB.isBirthWritable(ante)
     if (isWritten) { for (const put of puts) { await writeAt(ctx.db, put) } }
     return { tags: DB.ManifestTags.birthTagsOf(puts, ante, isWritten), actual: await rootsOf(ctx.db, ask), ...(await bankObservedOf(ctx.db, ask)) }

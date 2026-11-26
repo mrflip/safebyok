@@ -144,7 +144,7 @@ async function buildWatchedVault() {
 describe("device.disconnect() and device.connect(), over the vaults made on the bank", () => {
   it("stop each vault hearing at disconnect: the vault TSQ hears no more, and the one watch of the host's vaultDB stops", async () => {
     const { bank, device, vault, unwatched } = await buildWatchedVault()
-    const first  = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const first   = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const planted = await vault.sealBox(first, {}, { whisper: TH.Whisper })
     device.disconnect()
     rowsOf(bank).set(Openai, planted)
@@ -156,7 +156,7 @@ describe("device.disconnect() and device.connect(), over the vaults made on the 
 
   it("have each vault hear again at connect", async () => {
     const { bank, device, vault } = await buildWatchedVault()
-    const first  = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const first   = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const planted = await vault.sealBox(first, {}, { whisper: TH.Whisper })
     device.disconnect()
     device.connect()
@@ -184,7 +184,7 @@ describe("device.disconnect() and device.connect(), over the vaults made on the 
 describe("a vault whose device is disabled", () => {
   it("hears no more: its vault TSQ stops hearing, and the one watch of the host's vaultDB stops", async () => {
     const { bank, device, vault, unwatched } = await buildWatchedVault()
-    const first  = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const first   = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const planted = await vault.sealBox(first, {}, { whisper: TH.Whisper })
     device.disable()
     device.connect()

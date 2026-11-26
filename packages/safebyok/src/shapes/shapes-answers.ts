@@ -50,7 +50,7 @@ export type WriteThingAnswer = Answer<ThingRecord, EX.PutAct | EX.DelAct>
 /** A child Thing that fails its kind's checks: its scope, and `am: 'd'`. */
 export type DamagedThing = Readonly<ThingScope & { am: 'd' }>
 
-/** One child in a {@link Kids} value: the lifeseq of its actual life. */
+/** One child in a {@link Kids} value: the lifeseq of its life as the list read it. */
 export type KidEntry = Readonly<{ lifeseq: Lifeseq }>
 
 // Keyed by label, not labelpath. JavaScript orders an object's keys that look like whole numbers first, so a reader that

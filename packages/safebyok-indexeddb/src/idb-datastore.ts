@@ -104,7 +104,7 @@ export class IdbDatastore {
   /** Write `ask.record` where {@link DB.isWritable} allows, and observe the result, in one transaction. */
   async writeThing(ask: WriteAsk): Promise<WriteManifest> {
     const manifest = await DB.inOneStep(this.#shelf, 'readwrite', async (store): Promise<WriteManifest> => {
-      const ante    = await rowAt(store, ask)
+      const ante      = await rowAt(store, ask)
       const isWritten = DB.isWritable(ask, ante)
       if (isWritten) { store.put(ask.record, thingScopepathOf(ask)) }
       const actual = await rowAt(store, ask)
@@ -127,7 +127,7 @@ export class IdbDatastore {
   /** Write a new bank's three roots, each put's record, where {@link DB.isBirthWritable} allows, and observe the result, in one transaction. */
   async birthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthManifest> {
     const manifest = await DB.inOneStep(this.#shelf, 'readwrite', async (store): Promise<BirthManifest> => {
-      const ante    = await rootsOf(store, ask)
+      const ante      = await rootsOf(store, ask)
       const isWritten = DB.isBirthWritable(ante)
       if (isWritten) { for (const put of puts) { store.put(put.record, thingScopepathOf(put)) } }
       const actual = await rootsOf(store, ask)

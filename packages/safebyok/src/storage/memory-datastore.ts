@@ -90,7 +90,7 @@ export class MemoryDatastore {
 
   /** Write `ask.record` where {@link isWritable} allows, and observe the result, in one step. */
   writeThing(ask: WriteAsk): WriteManifest {
-    const ante    = this.#rowAt(ask)
+    const ante      = this.#rowAt(ask)
     const isWritten = isWritable(ask, ante)
     if (isWritten) { this.#thingsOf(ask).set(ask.labelpath, structuredClone(ask.record)) }
     const actual   = this.#rowAt(ask)
@@ -112,7 +112,7 @@ export class MemoryDatastore {
 
   /** Write a new bank's three roots, each put's record, where {@link isBirthWritable} allows, and observe the result, in one step. */
   birthBank(ask: BirthBankAsk, puts: BirthPuts): BirthManifest {
-    const ante    = this.#rootsOf(ask)
+    const ante      = this.#rootsOf(ask)
     const isWritten = isBirthWritable(ante)
     if (isWritten) { for (const { labelpath, record } of puts) { this.#thingsOf(ask).set(labelpath, structuredClone(record)) } }
     const actual   = this.#rootsOf(ask)
