@@ -25,8 +25,8 @@ export {
 export * as ManifestTags from './storage/manifest-tags'
 export {
   type AnteWayins, type BankObserved, type BirthManifest, type BirthTags, type CheckedBankObserved, type CheckedBirthManifest, type CheckedGetManifest, type CheckedListManifest, type CheckedManifestRows, type CheckedRoots,
-  type CheckedStatsManifest, type CheckedWorldManifest, type CheckedWriteManifest, type GetManifest, type GetTags, type ListManifest, type ListedChild, type PolicyVerdict, type PolicyVerdicts, type Presence,
-  type Received, type RevseqCmp, type RevtokCmp, type RootRows, type RootTags, type SameCmp, type ScribedBirthManifest, type ScribedGetManifest, type ScribedListManifest, type ScribedWriteManifest, type StatsManifest, type TrackedRows,
+  type CheckedStatsManifest, type CheckedWorldManifest, type CheckedWriteManifest, type GetManifest, type GetTags, type ListManifest, type ListedChild, type PolicyPhrase, type PolicyTag, type PolicyVerdict, type PolicyVerdicts, type Presence,
+  type Received, type Refusaltag, type RevseqCmp, type RevtokCmp, type RootRows, type RootTags, type SameCmp, type ScribedBirthManifest, type ScribedGetManifest, type ScribedListManifest, type ScribedWriteManifest, type StatsManifest, type TrackedRows,
   type WorldManifest, type WriteManifest, type WriteTags, ManifestChecks,
 } from './shapes/shapes-manifest'
 export { PolicyPhrases } from './phrases'
