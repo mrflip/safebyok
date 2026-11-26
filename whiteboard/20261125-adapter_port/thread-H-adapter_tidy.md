@@ -1,6 +1,6 @@
 # Thread H: adapter_tidy (2026-11-26)
 
-Branch `20261126-adapter_tidy`, PR #PRNUM, stacked on #935 (thread G), which stands on #932 (D1). Proved: package tests
+Branch `20261126-adapter_tidy`, PR #936, stacked on #935 (thread G), which stands on #932 (D1). Proved: package tests
 before catch-up -- safebyok 2353, safebyok-graphql 285, safebyok-postgres 179, safebyok-postgres-big 246, all green;
 typecheck and lint clean in each. `pnpm justify` after the catch-up rebase: see the PR's **Tests:** line.
 
