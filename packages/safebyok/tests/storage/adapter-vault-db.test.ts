@@ -174,7 +174,7 @@ describe("AdapterVaultDB.tryGetThing(ask), a datastore that reports oddly", () =
     }
   })
 
-  it("refuses an ancestor's lives that are not those of a Thing above the scope, or a whole ancestor that fails its kind's checks", async () => {
+  it("refuses an ancestor that fails its checks, whole or as its lives", async () => {
     const lives = { ...TH.RootScope, lifepath: TH.Life0 }
     const cases = [
       [{ ...lives, userid: 'u2' },                  'storage_issue'],
@@ -224,7 +224,7 @@ describe("AdapterVaultDB.tryListThings(ask), a datastore that reports oddly", ()
     expect(answer.incompatible_rows.map(({ labelpath }) => labelpath)).to.deep.equal(['box/bad'])
   })
 
-  it("lists a live box handed back sparse, the parent or a child, as it lists one handed back whole", async () => {
+  it("lists a live box handed back sparse as it lists one handed back whole", async () => {
     const sparse  = [TH.boxSparseOf(TH.boxThingOf('openai')), TH.boxSparseOf(TH.boxThingOf('anthropic'))]
     const whole   = await new ScriptedVaultDB(() => listManifestOf(TH.rootBoxOf(), [TH.boxThingOf('openai'), TH.boxThingOf('anthropic')])).tryListThings(TH.listAskAt('box'))
     const vaultDB = new ScriptedVaultDB(() => listManifestOf(TH.boxSparseOf(TH.rootBoxOf()), sparse))

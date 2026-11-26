@@ -157,7 +157,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     }
   })
 
-  it("refuses a Thing of another kind than the ask's as incompatible_row, and one at another address as storage_issue", async () => {
+  it("refuses a Thing other than the one at the ask's scope", async () => {
     const served = await servedOf(VaultOperations.getThing, TH.getGateAskOf())
     const cases = [[TH.rootBoxOf(), 'incompatible_row'], [TH.gateThingOf({ userid: 'u2' }), 'storage_issue']] as const
     for (const [val, refusalkind] of cases) {
@@ -219,7 +219,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     }
   })
 
-  it("refuses a write the server says it did not make where its tables would, or made where the Thing does not show it, as storage_issue", async () => {
+  it("refuses a write whose Thing does not bear out whether the server wrote, as storage_issue", async () => {
     const refused = await servedOf(VaultOperations.writeThing, TH.birthAskOf())
     const written = { ...refused, ok: true, act: 'born', dbhas: null, err: null }
     const misfits = [
@@ -314,7 +314,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     expect(await vaultDB.tryListThings(TH.listAskAt('box'))).to.deep.include({ ok: true, deltas: [first], incompatible_rows: [incompatible] })
   })
 
-  it("refuses a listing whose children are not the parent's, or whose act its parent does not fit, as storage_issue", async () => {
+  it("refuses a listing whose parent or children do not fit its ask, as storage_issue", async () => {
     const served = await servedOf(VaultOperations.listThings, TH.listAskAt('box'), ['anthropic', 'openai'])
     const [first, second] = served['deltas'] as [object, DB.BoxSparse]
     const misfits = [
