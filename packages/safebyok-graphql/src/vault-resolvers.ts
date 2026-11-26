@@ -75,7 +75,9 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
     return (signedIn === userid) ? null : DB.identityRevoked()
   }
 
-  /** Answer `given` by `verb` if `checkAsk` passes it and the request is signed in as its user, in wire form; else the refusal, as a verb that threw answers. */
+  /** Answer `given` by `verb` in wire form, if it passes `checkAsk` and the request is signed in as its user.
+   * Otherwise answer its refusal, as a verb that threw does.
+   */
   async function serveSignedIn<AskT extends DB.AnyAsk>(context: ContextT, given: AskT, checkAsk: (given: unknown) => AskT, verb: (ask: AskT) => Promise<AnyAnswer>): Promise<WireAnswer> {
     // graphql-js builds an input object with a null prototype: the check's parse gives it back as plain objects, which the vaultDB's checks take.
     let ask: AskT
@@ -87,7 +89,7 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
     return wireAnswerOf(await verb(ask))
   }
 
-  /** Watch `scope` and yield its notices in wire form, for as long as the request stays signed in as its user. */
+  /** Watch `scope`, returning its notices in wire form for as long as the request stays signed in as its user. */
   async function watchNotices(context: ContextT, given: DB.ThingWatchScope): Promise<AsyncIterableIterator<WireNotice>> {
     let scope: DB.ThingWatchScope
     try {
@@ -188,9 +190,7 @@ function endingWith(refusal: DB.VaultError): AsyncIterableIterator<WireNotice> {
   return iterator
 }
 
-/** Start watching `scope` on `vaultDB`, and return a stream reader of its notices in wire form. Cancelling the reader stops the watch.
- * Where the watch ends itself, the stream closes after the bad news that says why.
- */
+/** Watch `scope` on `vaultDB`, returning a reader of its notices in wire form. Cancelling the reader stops the watch. */
 function openWatch(vaultDB: DB.VaultDB, scope: DB.ThingWatchScope): ReadableStreamDefaultReader<WireNotice> {
   // Use a reader, not the stream's own async iterator. The iterator's `return` waits for a pending `next`, which on a quiet
   // bank never resolves, so a subscriber that left would keep the watch open. A reader's `cancel` ends the pending read at once.

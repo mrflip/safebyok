@@ -1,10 +1,10 @@
 /** A browser-side vaultDB that sends each verb to your GraphQL server, where `vaultResolvers` answers it from the server's own vaultDB.
  *
- * GraphQL only carries each answer, so a verb answers here as the server's vaultDB answered it. Where trouble lies decides how you meet it:
- * - The server's vaultDB refused, or failed in its datastore (`storage_issue`, `unexpected_error` or any other kind): the bad answer it gave, as it gave it.
- * - The server could not serve the request, as where its `getUserId` throws: a bad answer carrying that refusal, `unexpected_error` or the VaultError `getUserId` threw. A watch ends with it.
- * - The request broke this package's rules, as a watch scope that fails its check, which only another client sends: likewise, carrying the refusal of the rule (`bad_record`).
- * - GraphQL itself failed, as where the server serves some other schema: a bad answer of `unexpected_error`, which leaves the server's text behind. A request that fails in the network is `storage_unavailable`.
+ * A verb answers here as the server's vaultDB answered it. Where the trouble lies decides the bad answer you get:
+ * - The server's vaultDB refused, or its datastore failed: the bad answer it gave, whatever its kind.
+ * - The server could not serve the request, as when its `getUserId` throws: the VaultError `getUserId` threw, or else `unexpected_error`. A watch ends with it.
+ * - The request broke this package's rules, as a watch scope that fails its check (only another client sends one): the rule's refusal, `bad_record`.
+ * - GraphQL itself failed, as when the server serves another schema: `unexpected_error`, without the server's error text. A request that fails in the network gets `storage_unavailable`.
  */
 
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
@@ -194,8 +194,8 @@ function besideOf(ask: DB.AnyAsk, { banktok, tracked, read_tc }: CheckedAnswer):
   return { banktok, tracked: Classifier.crossedTrackedOf(ask, tracked), read_tc }
 }
 
-// A verb that threw answers `tracked: 'unread'`, and only it: its refusal is thrown again, with its act and the Thing it names.
-/** Where `answer` is that of a verb that threw, throw its refusal again, naming its act and the Thing stored it names, checked. */
+// The server answers `tracked: 'unread'` for a verb that threw, and for no other answer.
+/** Rethrow the refusal of a server verb that threw, with its act and the Thing it names. */
 function throwIfThrown(ask: DB.AnyAsk, { act, tracked, dbhas, err }: RefusedAnswer): void {
   if (tracked === 'unread') { throw DB.refusedOverWire(err, { act, dbhas: (dbhas === null) ? null : Classifier.crossedNamedOf(ask, dbhas) }) }
 }
@@ -224,7 +224,7 @@ function carriedErrOf(gqlErr: unknown): unknown {
   return ((typeof extensions === 'object') && (extensions !== null)) ? (extensions as Record<string, unknown>)[CrossedErrExtension] : undefined
 }
 
-/** Pass the Thing a notice in `result` carries to `receive`, or its trouble to `onBadNews`. Return the trouble where the notice is the watch's last, else null. */
+/** Pass a notice's Thing to `receive` and its trouble to `onBadNews`, or return the trouble that ends the watch. */
 function hearNotice({ data }: OperationResult<unknown>, receive: (received: DB.Received) => void, onBadNews: (news: DB.VaultError) => void): DB.VaultError | null {
   const fields = ((typeof data === 'object') && (data !== null)) ? data as Record<string, unknown> : {}
   const report = WireChecks.notice.safeParse(noticeDrop(fields['safebyokWatchThings']))
