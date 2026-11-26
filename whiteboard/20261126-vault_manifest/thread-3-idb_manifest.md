@@ -1,6 +1,6 @@
 # Thread 3: idb_manifest (2026-11-26)
 
-Branch `20261126-idb_manifest`, PR [#939](https://github.com/mrflip/safebyok/pull/939), stacked on [#937](https://github.com/mrflip/safebyok/pull/937). Proved: see the last line.
+Branch `20261126-idb_manifest`, PR [#939](https://github.com/mrflip/safebyok/pull/939), stacked on [#937](https://github.com/mrflip/safebyok/pull/937). Proved: `pnpm justify` after the catch-up rebase: red only in safebyok-postgres (107 of 170 tests, lint, typecheck) and safebyok-convex (149 of 231, lint, typecheck), threads 4 and 5; green: safebyok-indexeddb 130, safebyok 2,412, safebyok-react 339, e2e 576, root 331, dojo 111, demos react 99, envman 24, knockknock 26, every -big package.
 
 * **Built**:
   - `packages/safebyok-indexeddb/src/idb-datastore.ts`: `IdbDatastore`, laid out as `MemoryDatastore` is
