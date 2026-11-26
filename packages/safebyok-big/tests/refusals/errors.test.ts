@@ -128,6 +128,7 @@ const FamilyCases = [
   ["same_passphrase",     "condition", 'a new passphrase equal to the current one asks the user for another'],
   ["camped",              "condition", 'a put told not to replace a live record adopts the one stored'],
   ["damaged_row",         "bad_news",  'a row from storage that fails its checks is set aside and reported'],
+  ["incompatible_row",    "bad_news",  'a row from storage that is a record our code would not write is set aside and reported'],
   ["damaged_vault",       "bad_news",  'the vault row above a box asked for failing its checks is told of'],
   ["storage_issue",       "bad_news",  'a row that is not an object, or is stored at the wrong address, will not be fixed by a retry'],
   ["gate_issue",          "misuse",    'gate params at odds with the stored row are a bug in the caller'],
