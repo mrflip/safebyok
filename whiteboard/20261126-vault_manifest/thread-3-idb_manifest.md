@@ -1,6 +1,6 @@
 # Thread 3: idb_manifest (2026-11-26)
 
-Branch `20261126-idb_manifest`, PR (see below), stacked on [#937](https://github.com/mrflip/safebyok/pull/937). Proved: see the last line.
+Branch `20261126-idb_manifest`, PR [#939](https://github.com/mrflip/safebyok/pull/939), stacked on [#937](https://github.com/mrflip/safebyok/pull/937). Proved: see the last line.
 
 * **Built**:
   - `packages/safebyok-indexeddb/src/idb-datastore.ts`: `IdbDatastore`, laid out as `MemoryDatastore` is
