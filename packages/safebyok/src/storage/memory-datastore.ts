@@ -143,12 +143,12 @@ export class MemoryDatastore {
 // == [The write's predicates]: isWritable, isBirthWritable
 
 /** True when the datastore writes `ask.record` over the raw `ante` row, by its own predicate, a copy of `VaultFunctionsSql`'s write functions:
- * - over no row, `INSERT … WHERE (cited.revtok = <the void revtok>) … ON CONFLICT DO NOTHING`, and the ask's `ifAbsent` is `'add'`
- * - over a row, the `UPDATE`'s `WHERE`: `stored.revtok = cited.revtok`, `stored.am = cited.am`, `stored.lifepath = cited.lifepath`,
- *   `stored.revseq = (proposed.revseq - 1)` and `stored.fmt = proposed.fmt`; its `lifeseq_ok` over `stored.lifeseq`, which past the ask's
- *   checks is the stored lifeseq being the cited lifepath's last; its born_at check, `(stored.am <> proposed.am) OR (stored.born_at = proposed.born_at)`; its
- *   lifetok check, `(stored.am <> 'a') OR (stored.lifetok = proposed.lifetok)`, the bank's alone; and its storage policies, the gate's alone
- * - and the flag the ask's TypeScript checked before the SQL ran: `ifPresent` `'repl'` over a live row, `ifAbsent` `'add'` over a tombstone
+ * - over no row, `INSERT … WHERE (cited.revtok = <the void revtok>) AND (if_absent = 'add') … ON CONFLICT DO NOTHING`
+ * - over a row, the `UPDATE`'s `WHERE`: `ante.revtok = cited.revtok`, `ante.am = cited.am`, `ante.lifepath = cited.lifepath`,
+ *   `ante.revseq = (proposed.revseq - 1)` and `ante.fmt = proposed.fmt`; its flag clause, `if_present = 'repl'` over a live row and
+ *   `if_absent = 'add'` over a tombstone; its `lifeseq_ok` over `ante.lifeseq`, which past the ask's checks is the ante lifeseq being the
+ *   cited lifepath's last; its born_at check, `(ante.am <> proposed.am) OR (ante.born_at = proposed.born_at)`; its lifetok check,
+ *   `(ante.am <> 'a') OR (ante.lifetok = proposed.lifetok)`, the bank's alone; and its `policies_met` over `policies_of`, the gate's alone
  */
 export function isWritable(ask: WriteAsk, ante: unknown): boolean {
   if (ante === null) { return (ask.cited.revtok === SX.VoidRevisionTok) && (ask.ifAbsent === 'add') }
