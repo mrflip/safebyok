@@ -29,7 +29,8 @@ export {
   type Received, type RevseqCmp, type RevtokCmp, type RootRows, type RootTags, type SameCmp, type ScribedBirthManifest, type ScribedGetManifest, type ScribedListManifest, type ScribedWriteManifest, type StatsManifest, type TrackedRows,
   type WorldManifest, type WriteManifest, type WriteTags, ManifestChecks,
 } from './shapes/shapes-manifest'
-export { GatePolicies, PolicyPhrases } from './storage/policies'
+export { PolicyPhrases } from './phrases'
+export { GatePolicies } from './storage/policies'
 export { VacantAgerank, readAtOf, readTcNow } from './storage/agerank'
 export {
   type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseRecord, type LeaseScope, type LeaseStamp, type LeaseTombstone, LeaseFormat, LeaseLabelpath, LeaseLifeRoot, StampChecks, leaseLifepathOf,

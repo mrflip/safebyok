@@ -1,5 +1,7 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
+import { Phrases as BigPhrases } from 'safebyok-big/internals'
+
 // == [Models]: VaultDBExpected, DeviceDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, RootShelfExpected, ThingSoonestBare, WorldExpected, ThingExpected, BegunOfOtherKind, WayinExpected, WayinKeyExpected, WayinOfOtherHeader
 
 /** A vaultDB that lacks one of its verbs or builders. */
@@ -278,4 +280,17 @@ export const BanktokMissing = "The vault's storage handed back no banktok, the l
 
 /** The vaultDB's answer is not its manifest's. */
 export const AnswerOfOtherManifest = "The vaultDB made an answer that is not a copy of what its storage handed back: a bug in safebyok."
+// --
+
+// == [Storage policies]: PolicyPhrases
+
+/** The message of each refusal a storage policy makes, for a datastore that judges the policies in its own language (Postgres's `VaultFunctionsSql`). */
+export const PolicyPhrases = {
+  ProvedWayinMoved:  BigPhrases.ProvedWayinMoved,
+  OtherWayinMoved:   BigPhrases.OtherWayinMoved,
+  PasskeyStored:     BigPhrases.PasskeyStored,
+  PasskeyNotAdded:   BigPhrases.PasskeyNotAdded,
+  NoPasskeyStored:   BigPhrases.NoPasskeyStored,
+  PasskeyNotRevoked: BigPhrases.PasskeyNotRevoked,
+} as const
 // --

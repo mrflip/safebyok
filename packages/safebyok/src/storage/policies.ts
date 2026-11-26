@@ -1,21 +1,12 @@
 /** The storage policies a write names, each refusing it unless the gate it replaces allows it. */
 
 import { isEqual, omit } from 'es-toolkit'
-import { type EX, Phrases as BigPhrases } from 'safebyok-big/internals'
+import type { EX } from 'safebyok-big/internals'
+import { PolicyPhrases } from '../phrases'
 import type { GateWriteAsk } from '../shapes/shapes-asks'
 import type { AnteWayins } from '../shapes/shapes-manifest'
 
-// == [Policies]: PolicyPhrases, GatePolicies
-
-/** The message of each refusal a storage policy makes, for a datastore that judges the policies in its own language (Postgres's `VaultFunctionsSql`). */
-export const PolicyPhrases = {
-  ProvedWayinMoved:  BigPhrases.ProvedWayinMoved,
-  OtherWayinMoved:   BigPhrases.OtherWayinMoved,
-  PasskeyStored:     BigPhrases.PasskeyStored,
-  PasskeyNotAdded:   BigPhrases.PasskeyNotAdded,
-  NoPasskeyStored:   BigPhrases.NoPasskeyStored,
-  PasskeyNotRevoked: BigPhrases.PasskeyNotRevoked,
-} as const
+// == [Policies]: GatePolicies
 
 // Each judges a write that replaces the live gate. Each line is one row of its policy's table in notes/storage-policies.md,
 // in the same order, less big's registered_at row: every live-over-live write leaves its born_at the same.
