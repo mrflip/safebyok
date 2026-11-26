@@ -98,9 +98,9 @@ export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new 
 /** Refusal meta with act `policied`, for a write the act tables allow but a storage policy, the born_at check or the lifetok check refuses. */
 export const PoliciedMeta = { act: 'policied' } as unknown as Errors.RefusalMeta
 
-/** A `gate_issue` refusal of a write over `stored`, saying `why`, with `meta` and the act `policied`. */
-export function gateIssue(stored: ThingRecord | null, why: string, meta: Errors.RefusalMeta = {}): Errors.VaultError {
-  return new Errors.VaultError('gate_issue', BigPhrases.gateIssue(why), { rows: { dbhas: stored }, meta: { ...meta, ...PoliciedMeta } })
+/** A `gate_issue` refusal of a write over `ante`, saying `why`, with `meta` and the act `policied`. */
+export function gateIssue(ante: ThingRecord | null, why: string, meta: Errors.RefusalMeta = {}): Errors.VaultError {
+  return new Errors.VaultError('gate_issue', BigPhrases.gateIssue(why), { rows: { dbhas: ante }, meta: { ...meta, ...PoliciedMeta } })
 }
 
 /** A `storage_blocked` refusal: the browser's `quota` of bytes for the page is under {@link StoreLimitFloor}, too little for a vault. */
@@ -113,14 +113,14 @@ export function storageCallRefused(oplabel: string, thrown: unknown): Errors.Vau
   return new Errors.VaultError('storage_issue', Phrases.storageCallRefused(oplabel), { cause: sanitizeForeignError(thrown) })
 }
 
-/** A `bad_record` refusal of a write over `stored`, the live Thing whose born_at it changes, with `meta` and the act `policied`. */
-export function bornAtNotStored(stored: ThingRecord | null, meta: Errors.RefusalMeta = {}): Errors.VaultError {
-  return new Errors.VaultError('bad_record', Phrases.BornAtNotStored, { rows: { dbhas: stored }, meta: { ...meta, ...PoliciedMeta } })
+/** A `bad_record` refusal of a write over `ante`, the live Thing whose born_at it changes, with `meta` and the act `policied`. */
+export function bornAtNotStored(ante: ThingRecord | null, meta: Errors.RefusalMeta = {}): Errors.VaultError {
+  return new Errors.VaultError('bad_record', Phrases.BornAtNotStored, { rows: { dbhas: ante }, meta: { ...meta, ...PoliciedMeta } })
 }
 
-/** A `bad_record` refusal of a write of the bank over `stored`, the live bank whose lifetok it changes, with `meta` and the act `policied`. */
-export function lifetokNotStored(stored: ThingRecord | null, meta: Errors.RefusalMeta = {}): Errors.VaultError {
-  return new Errors.VaultError('bad_record', Phrases.LifetokNotStored, { rows: { dbhas: stored }, meta: { ...meta, ...PoliciedMeta } })
+/** A `bad_record` refusal of a write of the bank over `ante`, the live bank whose lifetok it changes, with `meta` and the act `policied`. */
+export function lifetokNotStored(ante: ThingRecord | null, meta: Errors.RefusalMeta = {}): Errors.VaultError {
+  return new Errors.VaultError('bad_record', Phrases.LifetokNotStored, { rows: { dbhas: ante }, meta: { ...meta, ...PoliciedMeta } })
 }
 
 /** A `storage_issue` refusal: storage answered a row at another address than asked, by the `fieldnames` that disagree. */
