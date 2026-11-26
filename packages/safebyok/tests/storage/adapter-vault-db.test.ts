@@ -27,7 +27,7 @@ class ScriptedVaultDB extends AdapterVaultDB {
     this.isBanktokless = isBanktokless
   }
 
-  /** What `step` reports, with the defaults above unless it gives them. */
+  /** The manifest `step` reports, with the defaults above unless it gives them. */
   #report(): unknown {
     const banktok = this.isBanktokless ? {} : { banktok: SX.VoidLifeTok }
     return { ...banktok, tracked: { bank: 'same', gate: 'same', box: 'same' }, read_tc: readTcNow(), ancestor: null, ...this.step() }
@@ -57,7 +57,7 @@ function listManifestOf(actual: unknown, children: readonly { labelpath: string 
   return { tags: ManifestTags.getTagsOf(actual), actual, children: children.map((child) => ({ labelpath: child.labelpath, raw: child })) }
 }
 
-/** No root stored. */
+/** A bank with none of its three roots. */
 const NoRoots: RootRows = { bank: null, gate: null, root: null }
 
 /** A birth's manifest of `ask` over the `ante` roots, with its tags made from them: the ask's records where `written`, else the ante roots. */

@@ -20,23 +20,21 @@ import * as Throwers from '../refusals/throwers'
 // conservatively prudent; with it, "overkill, but justifiably for a nascent code base". It is not every safety check,
 // nor every repeated one: the ask's entry checks, and each row's check against its kind, stand on their own.
 
-/** Refuse a get whose ask, manifest and answer disagree: tags that are not the actual row's, an answer that is not the manifest's, or a row at another address. */
+/** Refuse a get whose ask, manifest and answer disagree. */
 export function demandGetConsistency(ask: GetAsk, manifest: ScribedGetManifest, answer: GetThingAnswer): void {
   if (! isEqual(ManifestTags.getTagsOf(manifest.actual), manifest.tags)) { throw Throwers.tagsOfOtherRow() }
   demandSharedConsistency(ask, manifest, answer, recordCopyOf(ask, manifest, answer), [[manifest.actual, ask.labelpath]])
 }
 
-/** Refuse a write whose ask, manifest and answer disagree: a datastore that wrote where the act is no write or the reverse, a row written without
- * the proposed revision, tags that are not the unwritten row's or not those of a write the ask let through, an answer that is not the manifest's, or a row at another address.
- */
+/** Refuse a write whose ask, manifest and answer disagree, among them a datastore that says it wrote where the act is no write, or the reverse. */
 export function demandWriteConsistency(ask: WriteAsk, manifest: ScribedWriteManifest, answer: WriteThingAnswer): void {
   if (manifest.tags.written !== ManifestActs.isWriteAct(manifest.act)) { throw Throwers.writtenOfOtherAct() }
   if (manifest.tags.written) { demandProposedWritten(ask.record, manifest.actual); demandTagsOfWritten(ask, manifest.tags) } else { demandTagsOfActual(ask, manifest) }
   demandSharedConsistency(ask, manifest, answer, recordCopyOf(ask, manifest, answer), [[manifest.actual, ask.labelpath]])
 }
 
-/** Refuse a listing whose ask, manifest and answer disagree: tags that are not the parent's, an answer that is not the manifest's, a child listed at
- * a labelpath that is not one label under the parent of its modelkind, or a row at another address.
+/** Refuse a listing whose ask, manifest and answer disagree.
+ * Of what the answer carries beside the bank, only the parent's lifepath, or a refused listing's `dbhas`, is compared with the manifest.
  */
 export function demandListConsistency(ask: ListAsk, manifest: ScribedListManifest, answer: ListThingsAnswer): void {
   if (! isEqual(ManifestTags.getTagsOf(manifest.actual), manifest.tags)) { throw Throwers.tagsOfOtherRow() }
@@ -50,9 +48,7 @@ export function demandListConsistency(ask: ListAsk, manifest: ScribedListManifes
   demandSharedConsistency(ask, manifest, answer, copy, [[manifest.actual, ask.labelpath], ...rows])
 }
 
-/** Refuse a birth whose ask, manifest and answer disagree: a datastore that wrote where the act is no birth or the reverse, a root written without
- * its proposed revision, tags that are not the unwritten roots', an answer that is not the manifest's, or a root at another address.
- */
+/** Refuse a birth whose ask, manifest and answer disagree, among them a datastore that says it wrote where the act is no birth, or the reverse. */
 export function demandBirthConsistency(ask: BirthBankAsk, manifest: ScribedBirthManifest, answer: BirthBankAnswer): void {
   if (manifest.tags.written !== ManifestActs.isWriteAct(manifest.act)) { throw Throwers.writtenOfOtherAct() }
   const puts = birthPutsOf(ask)
@@ -66,13 +62,13 @@ export function demandBirthConsistency(ask: BirthBankAsk, manifest: ScribedBirth
   demandSharedConsistency(ask, manifest, answer, copy, rootRowsOf(manifest.actual))
 }
 
-/** Refuse a get of the world whose ask, manifest and answer disagree: an answer that is not the manifest's, or a root at another address. */
+/** Refuse a get of the world whose ask, manifest and answer disagree. */
 export function demandWorldConsistency(ask: GetWorldAsk, manifest: CheckedWorldManifest, answer: GetWorldAnswer): void {
   const copy = { carried: answer.ok ? answer.val : answer.dbhas, expected: ManifestActs.worldRootsOf(ask, manifest.actual) }
   demandSharedConsistency(ask, manifest, answer, copy, rootRowsOf(manifest.actual))
 }
 
-/** Refuse an ask for stats whose manifest and answer disagree: an answer that is not the manifest's, or a root `tracked` carries at another address. */
+/** Refuse an ask for stats whose manifest and answer disagree. */
 export function demandStatsConsistency(ask: StatsAsk, manifest: CheckedStatsManifest, answer: StatsAnswer): void {
   demandSharedConsistency(ask, manifest, answer, { carried: answer.ok ? answer.val : answer.dbhas, expected: manifest.stats }, [])
 }
@@ -84,13 +80,11 @@ export function demandStatsConsistency(ask: StatsAsk, manifest: CheckedStatsMani
 /** A row the datastore read by its address, null for none, and the labelpath it was read at. */
 type RowAt = readonly [row: ThingRecord | null, labelpath: Labelpath]
 
-/** What an answer carries of its manifest beyond the bank, and what the manifest says it should be. */
+/** The part of a manifest an answer copies beyond the bank, as the answer carries it and as the manifest has it. */
 type Copy = Readonly<{ carried: unknown, expected: unknown }>
 
 // Each row is read by its address, so one at another is the datastore disagreeing with the ask.
-/** Refuse what every verb refuses alike: an answer that does not copy its manifest (`copy`, and the manifest's banktok, `tracked` and `read_tc`), or a row
- * at another address than it was read at, among `rows` and the roots `tracked` carries.
- */
+/** Refuse an answer that does not copy its manifest, or a row among `rows` or in `tracked` at another address than it was read at. */
 function demandSharedConsistency({ userid, banklabel }: ThingWatchScope, manifest: CheckedBankObserved, answer: Pick<CheckedBankObserved, 'banktok' | 'read_tc'> & { tracked: unknown }, copy: Copy, rows: readonly RowAt[]): void {
   const isCopied = isEqual(copy.carried, copy.expected) && (answer.banktok === manifest.banktok) && (answer.tracked === manifest.tracked) && (answer.read_tc === manifest.read_tc)
   if (! isCopied) { throw Throwers.answerOfOtherManifest() }
@@ -100,7 +94,7 @@ function demandSharedConsistency({ userid, banklabel }: ThingWatchScope, manifes
   }
 }
 
-/** What a get's or a write's answer carries of its record, and the manifest's: its record, or the shell under the ancestor where there is none. */
+/** The record a get's or a write's answer carries, and the manifest's: its actual row, or the shell under the ancestor where there is none. */
 function recordCopyOf(ask: ThingScope, manifest: CheckedManifestRows, answer: GetThingAnswer | WriteThingAnswer): Copy {
   return { carried: ('dbhas' in answer) ? answer.dbhas : answer.val, expected: manifest.actual ?? Shell.under(ask, manifest.ancestor) }
 }

@@ -122,7 +122,7 @@ export type TrackedRows = Readonly<{ bank: unknown, [Labelpath.MainGate]: unknow
 // A datastore hands back a manifest; `AdapterVaultDB` then writes onto it, step by step, until it reads as the answer.
 // `notes/vault-adapter-contract.md` is the datastore author's account of each.
 
-/** What every manifest carries of the bank, each read in the step, after any write. */
+/** The bank's part of every manifest, read in the step after any write. */
 export interface BankObserved {
   /** The bank row's lifetok, the void lifetok where there is no bank row. */
   banktok: unknown
@@ -132,7 +132,7 @@ export interface BankObserved {
   read_tc: unknown
 }
 
-/** What a datastore observed in one atomic step of a get, each row exactly as it stands at the step's last read.
+/** A datastore's observations of one atomic step of a get, each row exactly as it stands at the step's last read.
  * The vaultDB writes onto the manifest it is handed, so hand it a new one each step.
  */
 export interface GetManifest extends BankObserved {
@@ -144,7 +144,7 @@ export interface GetManifest extends BankObserved {
   ancestor: unknown
 }
 
-/** What a datastore observed in one atomic step of a write, each row exactly as it stands at the step's last read.
+/** A datastore's observations of one atomic step of a write, each row exactly as it stands at the step's last read.
  * The vaultDB writes onto the manifest it is handed, so hand it a new one each step.
  */
 export interface WriteManifest extends BankObserved {
@@ -156,13 +156,13 @@ export interface WriteManifest extends BankObserved {
   ancestor: unknown
 }
 
-/** What a datastore observed in one atomic step of a listing. */
+/** A datastore's observations of one atomic step of a listing. */
 export interface ListManifest extends BankObserved {
   /** The parent's tags, made of `actual`. */
   tags: GetTags
   /** The parent, the row at the ask's scope, null for none. */
   actual: unknown
-  /** Each row one label under the ask's labelpath, as `{ labelpath, raw }`: the labelpath it is stored at, and the row. The vaultDB reads them only where the parent is live, so `[]` serves where it is not. */
+  /** Each row one label under the ask's labelpath, as `{ labelpath, raw }`. The vaultDB reads them only where the parent is live, so `[]` serves where it is not. */
   children: unknown
 }
 
@@ -176,7 +176,7 @@ export interface RootRows {
   root: unknown
 }
 
-/** What a datastore observed in one atomic step of a birth. */
+/** A datastore's observations of one atomic step of a birth. */
 export interface BirthManifest extends BankObserved {
   /** The birth's tags: each root's, made of it before any write, and whether the datastore wrote. */
   tags: BirthTags
@@ -184,19 +184,19 @@ export interface BirthManifest extends BankObserved {
   actual: RootRows
 }
 
-/** What a datastore observed in one atomic step of a get of the world. */
+/** A datastore's observations of one atomic step of a get of the world. */
 export interface WorldManifest extends BankObserved {
   /** The bank's three roots. */
   actual: RootRows
 }
 
-/** What a datastore observed in one atomic step of an ask for stats. */
+/** A datastore's observations of one atomic step of an ask for stats. */
 export interface StatsManifest extends BankObserved {
   /** The bank's {@link VaultStats}, raw. */
   stats: unknown
 }
 
-/** What a manifest carries of the bank, checked. */
+/** The bank's part of a manifest, checked. */
 export type CheckedBankObserved = { banktok: Lifetok, tracked: Tracked, read_tc: ReadTc }
 
 /** A get's or a write's rows, each checked once. */

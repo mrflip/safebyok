@@ -55,7 +55,7 @@ async function thingDocAt(db: ComponentDb, { userid, banklabel, labelpath }: Thi
 }
 
 // As Postgres's plant (`jsonb_populate_record`), a field of `raw` its table has no field for is dropped; one of the wrong type is refused.
-/** Insert `raw` as the document at `scope`, in place of any stored there. */
+/** Insert `raw` as the document at `scope`, in place of any there. */
 async function plantIn(db: ComponentDb, scope: ThingScope, raw: unknown): Promise<void> {
   const doc = await thingDocAt(db, scope)
   if (doc) { await db.delete(doc._id) }

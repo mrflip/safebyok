@@ -14,7 +14,7 @@ import { VaultFunctionNames } from './vault-functions'
 
 // Postgres 18's uuidv7() is monotonic within a connection, so two reads in one session are dated in the order they ran.
 // The banktok is ManifestTags.banktokOf: a bank row with no lifetok, which its NOT NULL column forbids, would hand back null, never drop the key.
-/** The columns every manifest carries, of the `world` and `root` columns of the statement's subquery and the track (`track`, a parameter): `banktok`, the bank row's lifetok or the void lifetok for none; `tracked`; and `read_tc`, a UUID version 7 Postgres makes as it runs the statement. */
+/** The SQL of the `banktok`, `tracked` and `read_tc` columns every manifest carries, made of the subquery's `world` and `root` columns and the parameter `track`. */
 function bankObservedSqlOf(track: string): string {
   const banktok = `CASE WHEN ((world->'bank') = 'null'::jsonb) THEN to_jsonb('${VoidLifeTok}'::text) ELSE (world->'bank'->'lifetok') END AS banktok`
   return `${banktok}, ${VaultFunctionNames.tracked}(world, root, ${track}::text::jsonb) AS tracked, uuidv7()::text AS read_tc`

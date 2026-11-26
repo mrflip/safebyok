@@ -1,4 +1,4 @@
-/** What `AdapterVaultDB` makes of a datastore's manifest of each verb: each row checked once, the act its tags find in the act tables of `notes/answer-contract.md`, and the answer. */
+/** `AdapterVaultDB`'s reading of a datastore's manifest of each verb: each row checked once, the act its tags find in the act tables of `notes/answer-contract.md`, and the answer. */
 
 import { sortBy } from 'es-toolkit'
 import { CX, EX, SX, Validator } from 'safebyok-big/internals'
@@ -108,7 +108,7 @@ function checkedAncestorOf({ userid, banklabel, labelpath }: ThingScope, row: un
 }
 
 // A manifest with no banktok is a datastore that forgot it; one whose banktok is no lifetok read an incompatible bank row, whose own check speaks for it.
-/** What a manifest carries of the bank, each checked. */
+/** The bank's part of a manifest, checked. */
 function checkedBankObservedOf(ask: AnyAsk, manifest: BankObserved): CheckedBankObserved {
   if (! ('banktok' in manifest)) { throw Throwers.banktokMissing() }
   return { banktok: banktokOrVoidOf(manifest.banktok), tracked: checkedTrackedOf(ask, manifest.tracked), read_tc: ManifestChecks.read_tc.parse(manifest.read_tc) }

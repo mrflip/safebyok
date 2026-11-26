@@ -142,13 +142,15 @@ export class MemoryDatastore {
 
 // == [The write's predicates]: isWritable, isBirthWritable
 
-/** True when the datastore writes `ask.record` over the raw `ante` row, by its own predicate, a copy of `VaultFunctionsSql`'s write functions:
- * - over no row, `INSERT … WHERE (cited.revtok = <the void revtok>) AND (if_absent = 'add') … ON CONFLICT DO NOTHING`
- * - over a row, the `UPDATE`'s `WHERE`: `ante.revtok = cited.revtok`, `ante.am = cited.am`, `ante.lifepath = cited.lifepath`,
- *   `ante.revseq = (proposed.revseq - 1)` and `ante.fmt = proposed.fmt`; its flag clause, `if_present = 'repl'` over a live row and
- *   `if_absent = 'add'` over a tombstone; its `lifeseq_ok` over `ante.lifeseq`, which past the ask's checks is the ante lifeseq being the
- *   cited lifepath's last; its born_at check, `(ante.am <> proposed.am) OR (ante.born_at = proposed.born_at)`; its lifetok check,
- *   `(ante.am <> 'a') OR (ante.lifetok = proposed.lifetok)`, the bank's alone; and its `policies_met` over `policies_of`, the gate's alone
+// A copy of VaultFunctionsSql's write functions, clause for clause:
+// - over no row, `INSERT … WHERE (cited.revtok = <the void revtok>) AND (if_absent = 'add') … ON CONFLICT DO NOTHING`
+// - over a row, the `UPDATE`'s `WHERE`: `ante.revtok = cited.revtok`, `ante.am = cited.am`, `ante.lifepath = cited.lifepath`,
+//   `ante.revseq = (proposed.revseq - 1)` and `ante.fmt = proposed.fmt`; its flag clause, `if_present = 'repl'` over a live row and
+//   `if_absent = 'add'` over a tombstone; its `lifeseq_ok` over `ante.lifeseq`, which past the ask's checks is the ante lifeseq being the
+//   cited lifepath's last; its born_at check, `(ante.am <> proposed.am) OR (ante.born_at = proposed.born_at)`; its lifetok check,
+//   `(ante.am <> 'a') OR (ante.lifetok = proposed.lifetok)`, the bank's alone; and its `policies_met` over `policies_of`, the gate's alone
+/** True when a datastore writes `ask.record` over the raw `ante` row, the row it read in the same step, null for none.
+ * Every datastore writes by this predicate. One that judges a write in its own code, as memory, IndexedDB and Convex do, calls it in the step that writes.
  */
 export function isWritable(ask: WriteAsk, ante: unknown): boolean {
   if (ante === null) { return (ask.cited.revtok === SX.VoidRevisionTok) && (ask.ifAbsent === 'add') }
@@ -163,6 +165,7 @@ export function isWritable(ask: WriteAsk, ante: unknown): boolean {
   return isCited && isOfFormat && isLifeseqOwn && isFlagged && isBornAtSame && isLifetokSame && isPolicyMet
 }
 
-/** True when the datastore writes a birth's three roots over the raw `ante` roots, by its own predicate, a copy of `VaultFunctionsSql`'s `birth_roots`: where the ante roots are all null. */
+// A copy of VaultFunctionsSql's birth_roots, which writes only where it reads none of the three.
+/** True when a datastore writes a birth's three roots over the raw `ante` roots, read in the same step: where all three are null. */
 export function isBirthWritable(ante: RootRows): boolean { return (ante.bank === null) && (ante.gate === null) && (ante.root === null) }
 // --

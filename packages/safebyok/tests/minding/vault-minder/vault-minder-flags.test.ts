@@ -78,7 +78,7 @@ function nameOf(seen: unknown, record: BoxRecord, ante: BoxRecord | null): strin
   return JSON.stringify(seen)
 }
 
-/** What a put of a citation's record over it answers under each pair of flags, each over a new VaultMinder of a born bank with `ante` at the box's labelpath. */
+/** The answers of a put of a citation's record over it under each pair of flags, each over a new VaultMinder of a born bank with `ante` at the box's labelpath. */
 async function putFlagOutcomesOf(ante: BoxRecord | null, [cited, record]: Citation): Promise<string[]> {
   const outcomes = []
   for (const [ifAbsent, ifPresent] of FlagCombos) {
