@@ -52,7 +52,8 @@ Each read in the step, after any write.
 - **`banktok`**: the bank row's lifetok, the void lifetok (`SX.VoidLifeTok`) where there is no bank row
   (`ManifestTags.banktokOf`). A manifest without the key refuses `storage_issue` (`Phrases.BanktokMissing`). A banktok
   that is no lifetok, as a damaged bank row's is, reads as the void lifetok, and the step's answer stands: the banktok is
-  news, never the verdict.
+  news, never the verdict. Keep the key even then: `banktokOf` of a bank row with no lifetok is `undefined`, so a
+  datastore whose transport drops `undefined` (JSON does) hands back null there.
 - **`tracked`**: for each of the bank (`bank`), the main gate (`gate`) and the root box (`box`), by its key in the ask's
   `track`, `'same'` where its row stands at the revseq and lifepath the ask tracks, else the raw row, null for none
   (`ManifestTags.trackedOf`). A null row where the track is at the void revision reads as `'same'` too.
@@ -122,7 +123,12 @@ A birth's root tags are `presence` and `revtok_cmp` alone: its puts cite the she
 ## The write predicate
 
 The datastore writes `ask.record` whole at the ask's scope, and only where this holds of the ante row. It is a copy of
-Postgres's write functions in `VaultFunctionsSql`, and `MemoryDatastore`'s `isWritable` copies it in TypeScript.
+Postgres's write functions in `VaultFunctionsSql`, and `MemoryDatastore`'s `isWritable` copies it in TypeScript. Port it
+clause by clause, and drop none. The tags see only some of the clauses, and not `fmt` or `lifeseq`, so the loss of one
+of those goes uncaught; where the datastore writes and the act tables find no write, or the reverse, the ask refuses
+`storage_issue`. Postgres's `WHERE` has more clauses than these; the rest compare the record with the cited row
+(its revtok new, no tombstone over a tombstone, the lifepath kept, a rebirth born when written), which
+`checkedWriteAsk` has settled before the step runs.
 
 - **Over no row**: the ask cites the void revtok, and its `ifAbsent` is `'add'` (`INSERT … ON CONFLICT DO NOTHING`).
 - **Over a row**, all of:
@@ -168,7 +174,7 @@ unwritten. The order and timing of notifications against reads, writes and other
 | `written` where the act is no write, or the reverse                                   | `storage_issue`                            |
 | a written row without the record's revtok, revseq, lifepath or liveness               | `storage_issue`                            |
 | policy verdicts for other policies than the ask names; `revtok_cmp` `birth` where the ask cites no shell | `storage_issue`         |
-| a row, child, root or tracked row at another address than it was read at; a listing child more than one label under the parent | `storage_issue` |
+| a row, child, root or tracked row at another address than it was read at; a listing child not one label under the parent, or of another modelkind than the listing's | `storage_issue` |
 | a birth over a live bank whose main gate or root box is missing                      | `storage_issue`                            |
 
 An answer that does not copy its manifest refuses `unexpected_error`: only our own code can make one.
