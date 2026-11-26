@@ -136,7 +136,6 @@ const InputChecks = [
   ['safebyokBirthBank',   'ask',   AskChecks.birthBankAsk],
   ['safebyokWatchThings', 'scope', AskChecks.thingWatchScope],
 ] as const
-
 // --
 
 describe("VaultSchemaSdl", () => {
