@@ -1,6 +1,6 @@
 # Thread 9: policy_tags (2026-11-26)
 
-Branch `20261126-policy_tags`, PR #TBD, stacked on #942. Proved: `pnpm --filter <pkg> test` for `safebyok` (2,426),
+Branch `20261126-policy_tags`, PR #943, stacked on #942. Proved: `pnpm --filter <pkg> test` for `safebyok` (2,426),
 `safebyok-postgres` (168), `safebyok-indexeddb` (130), `safebyok-convex` (232); lint and typecheck of `safebyok` and
 `safebyok-postgres` clean. `pnpm justify` after the catch-up: pending.
 
