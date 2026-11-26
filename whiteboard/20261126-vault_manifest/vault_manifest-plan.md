@@ -133,7 +133,8 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Depends on:* thread 8.
 *Look-ahead:* none.
 *Size:* medium.
-*Status:* ready at 8fc85c578, PR #943; in review (opus, medium). The verdict is `{ ok: true } | { ok: false, refusaltag }`; MemoryDatastore, IdbDatastore and Convex needed no edit (they build through `ManifestTags`).
+*Review:* fixed (opus, medium), 1 fix (`policyFailureOf`'s doc block). Convex and idb verified to follow through `ManifestTags.writeTagsOf`; the host's message verified unchanged. Nothing left.
+*Status:* reviewed at df315821d, filing; PR #943. The verdict is `{ ok: true } | { ok: false, refusaltag }`; MemoryDatastore, IdbDatastore and Convex needed no edit (they build through `ManifestTags`).
 
 ### 6. actual_words — "stored" sorted into actual, ante and stored
 
