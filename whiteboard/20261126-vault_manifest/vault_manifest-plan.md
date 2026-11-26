@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1–3 filed (#934, #937, #939, drafts); thread 4 in review (#940; reviewer resumed after a stall); thread 5 ready (#941, stacked on #939), in review; Closer Look done at 517463cf4 (tab `05583f4e-9aa9`, body `b4c7c47f-af71`), awaiting the Coach's replies; nothing scheduled from it before triage
+* **Status:** threads 1–3 filed (#934, #937, #939, drafts); thread 4 filed (#940, at d2b6998a8, beside thread 3); thread 5 ready (#941, stacked on #939), in review; Closer Look done at 517463cf4 (tab `05583f4e-9aa9`, body `b4c7c47f-af71`), awaiting the Coach's replies; nothing scheduled from it before triage
 
 ## Read first
 
@@ -91,6 +91,8 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Look-ahead:* thread 5 copies its manifest shape over Convex.
 *Size:* medium-large.
 *Status:* ready 2026-11-26, PR #940; cut off once by the network outage while proving, resumed. Deviations: the policy clause applies over any live gate (as the TypeScript); a missing wayins key fails a policy in SQL, passes in TypeScript (incompatible rows only); a write function out of step refuses `storage_issue` (three-way) not `unexpected_error`; the write functions' signatures change, so the changeset tells hosts to drop every `safebyok_a010501_r000_*` function before rerunning; `PolicyPhrases` exported.
+*Review:* fixed (opus, high), 5 fixes: `PolicyPhrases` moved to `src/phrases.ts`; the Postgres-18 header and README (predates the thread); test names and titles; style. Checked the predicate clause for clause, tags, quoting, REVOKE. Left: phrases baked into the SQL (stands); `StoredNothing` hint gone (stands); header's privilege sentence, README's "beside the old ones", doc blocks, a long title → thread 6.
+*Status:* filed 2026-11-26 at d2b6998a8.
 
 ### 5. convex_manifest — Convex in typed tables, onto the Manifest
 
