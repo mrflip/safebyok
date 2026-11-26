@@ -149,9 +149,7 @@ export class MemoryDatastore {
 //   `if_absent = 'add'` over a tombstone; its `lifeseq_ok` over `ante.lifeseq`, which past the ask's checks is the ante lifeseq being the
 //   cited lifepath's last; its born_at check, `(ante.am <> proposed.am) OR (ante.born_at = proposed.born_at)`; its lifetok check,
 //   `(ante.am <> 'a') OR (ante.lifetok = proposed.lifetok)`, the bank's alone; and its `policies_met` over `policies_of`, the gate's alone
-/** True when a datastore writes `ask.record` over the raw `ante` row, the row it read in the same step, null for none.
- * Every datastore writes by this predicate. One that judges a write in its own code, as memory, IndexedDB and Convex do, calls it in the step that writes.
- */
+/** True when a datastore writes `ask.record` over the raw `ante` row, the row it read in the same step, null for none. */
 export function isWritable(ask: WriteAsk, ante: unknown): boolean {
   if (ante === null) { return (ask.cited.revtok === SX.VoidRevisionTok) && (ask.ifAbsent === 'add') }
   const isLive        = (ManifestTags.fieldOf(ante, 'am') === 'a')
