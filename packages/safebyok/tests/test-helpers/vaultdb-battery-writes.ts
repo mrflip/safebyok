@@ -301,9 +301,11 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     }
 
     // Each of these asks tracks the incompatible row at its revision, so the answer's tracked is 'same' there, and never the incompatible row.
+    // A written_at past the far future is a row every datastore's table can hold, and that fails the bank's checks.
     it("carries a bank incompatible outside its lifetok forward, under a put that keeps the lifetok", async () => {
       const vaultDB = await fresh()
-      await rowsOf(vaultDB).plant(BankScope, { ...ante, auth: { stray: true } })
+      await rowsOf(vaultDB).plant(BankScope, { ...ante, written_at: Number.MAX_SAFE_INTEGER })
+      await expectBad(vaultDB.tryGetThing(getAskAt('bank')), 'incompatible_row')
       const next = nextOf(ante)
       expect(await vaultDB.tryWriteThing({ ...replaceAskOf(ante, next), track: trackOf(ante, Shell.Cited, Shell.Cited) })).to.deep.include({ ok: true, act: 'replaced', val: next })
       expect(await gotAt(vaultDB, 'bank')).to.deep.equal(next)
