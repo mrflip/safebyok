@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Threads 8 and 9 filed (#942, #943); thread 6 filed (#944); thread 7 filed (#945); restacked onto #913 (merged); thread 10 filed (#946); thread 11 (graphql_manifest) building
+* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Threads 8 and 9 filed (#942, #943); thread 6 filed (#944); thread 7 filed (#945); restacked onto #913 (merged); thread 10 filed (#946); thread 11 (graphql_manifest) reviewed, small rework, then filing; the line is green again
 
 ## Read first
 
@@ -182,6 +182,8 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Depends on:* thread 10.
 *Look-ahead:* none.
 *Size:* medium.
+*Review:* fixed (opus, medium), 4 fixes (`isWriteAct` exported for `GraphQLVaultDB`'s rebuilt copy; one phrases import; header and doc blocks; five two-behaviour titles). Significant, to the Coach: the core's contract accepts a sparse live box in a listing and `AncestorLives` from every datastore (two broken-row shapes answer differently; no working one). Minor: a carried shell's scope unchecked → rework (`Shell.under` equality); incompatible rows' bank rebuilt from the ask (left); test tables without blurbs.
+*Status:* ready at 0a4ec1adb, reviewed to 21d0a6404; rework on the shell check; PR #947. Wire: a listing's answer drops its kids; `SafebyokKids` gone; `SafebyokIncompatibleThing`.
 
 ## Line
 
