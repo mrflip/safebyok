@@ -114,7 +114,7 @@ Each tag spells the field it compares, and is made of the ante row (a get's and 
 | `lifepath_eq` | boolean                                    | the row's lifepath is the cited one, or there is no row                                                                                                                         |
 | `born_at_cmp` | `same`, `changed`, `moot`                  | a live record over a live row: whether the row's `born_at` is the record's; `moot` for any other write                                                                          |
 | `lifetok_cmp` | `same`, `changed`, `moot`                  | a write of the bank over a live bank: whether the row's `lifetok` is the record's; `moot` for any other write                                                                   |
-| `policies`    | `{ [policy]: { ok: true } \| { ok: false, message } }` | one verdict per storage policy the ask's `options.policies` names, and no other: each met where the row is no live gate (`notes/storage-policies.md`)                |
+| `policies`    | `{ [policy]: { ok: true } \| { ok: false, message } }` | one verdict per storage policy the ask's `options.policies` names, and no other: each met where the row is no live gate (`notes/storage-policies.md`); a `message` is one of `PolicyPhrases` |
 | `written`     | boolean                                    | the datastore's own predicate wrote                                                                                                                                             |
 
 A birth's root tags are `presence` and `revtok_cmp` alone: its puts cite the shell, so the rest do not vary.

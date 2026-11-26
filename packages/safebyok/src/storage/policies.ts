@@ -4,7 +4,7 @@ import { isEqual, omit } from 'es-toolkit'
 import type { EX } from 'safebyok-big/internals'
 import { PolicyPhrases } from '../phrases'
 import type { GateWriteAsk } from '../shapes/shapes-asks'
-import type { AnteWayins } from '../shapes/shapes-manifest'
+import type { AnteWayins, PolicyPhrase } from '../shapes/shapes-manifest'
 
 // == [Policies]: GatePolicies
 
@@ -14,24 +14,24 @@ import type { AnteWayins } from '../shapes/shapes-manifest'
 /** The storage policies, each a check of a gate write ask against the wayins of the live gate it replaces. Each returns why it refuses, or null to allow the write. */
 export const GatePolicies = {
   /** The record replaces the passphrase wayin the gating proved against, and nothing else. */
-  replace_passphrase({ cited, record }: GateWriteAsk, ante: AnteWayins): string | null {
+  replace_passphrase({ cited, record }: GateWriteAsk, ante: AnteWayins): PolicyPhrase | null {
     if (! isEqual(cited.wayins?.main, ante['main']))                     { return PolicyPhrases.ProvedWayinMoved }
     if (! isEqual(omit(record.wayins, ['main']), omit(ante, ['main'])))  { return PolicyPhrases.OtherWayinMoved }
     return null
   },
   /** The record adds a passkey wayin to a gate that has none, and changes nothing else. */
-  add_passkey({ record }: GateWriteAsk, ante: AnteWayins): string | null {
+  add_passkey({ record }: GateWriteAsk, ante: AnteWayins): PolicyPhrase | null {
     if (ante['passkey0'] !== null)                                              { return PolicyPhrases.PasskeyStored }
     if (record.wayins.passkey0 === null)                                        { return PolicyPhrases.PasskeyNotAdded }
     if (! isEqual(omit(record.wayins, ['passkey0']), omit(ante, ['passkey0']))) { return PolicyPhrases.OtherWayinMoved }
     return null
   },
   /** The record removes the gate's passkey wayin, and changes nothing else. */
-  revoke_passkey({ record }: GateWriteAsk, ante: AnteWayins): string | null {
+  revoke_passkey({ record }: GateWriteAsk, ante: AnteWayins): PolicyPhrase | null {
     if (ante['passkey0'] === null)                                              { return PolicyPhrases.NoPasskeyStored }
     if (record.wayins.passkey0 !== null)                                        { return PolicyPhrases.PasskeyNotRevoked }
     if (! isEqual(omit(record.wayins, ['passkey0']), omit(ante, ['passkey0']))) { return PolicyPhrases.OtherWayinMoved }
     return null
   },
-} as const satisfies Record<EX.StoragePolicy, (ask: GateWriteAsk, ante: AnteWayins) => string | null>
+} as const satisfies Record<EX.StoragePolicy, (ask: GateWriteAsk, ante: AnteWayins) => PolicyPhrase | null>
 // --

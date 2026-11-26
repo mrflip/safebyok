@@ -1,7 +1,8 @@
 /** What `AdapterVaultDB` makes of a datastore's manifest of each verb: each row checked once, the act its tags find in the act tables of `notes/answer-contract.md`, and the answer. */
 
-import { sortBy } from 'es-toolkit'
-import { CX, EX, type Errors, SX, Validator } from 'safebyok-big/internals'
+import { invert, sortBy } from 'es-toolkit'
+import { CX, EX, SX, Validator } from 'safebyok-big/internals'
+import { PolicyPhrases } from '../phrases'
 import { BaseThing } from '../models/base-thing'
 import { Labelpath, type Lifetok } from '../shapes/primitives'
 import { type BoxSparse, type ThingRecord, type ThingScope, type VoidSentinel, PerKindChecks, Shell, ThingChecks } from '../shapes/shapes-thing'
@@ -12,7 +13,7 @@ import {
 import type { BirthBankAnswer, DamagedThing, GetThingAnswer, GetWorldAnswer, KidEntry, Kids, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import {
   type BankObserved, type CheckedBankObserved, type CheckedBirthManifest, type CheckedGetManifest, type CheckedListManifest, type CheckedManifestRows, type CheckedRoots, type CheckedStatsManifest,
-  type CheckedWorldManifest, type CheckedWriteManifest, type BirthManifest, type GetManifest, type GetTags, type ListManifest, type ListedChild, type RootTags, type ScribedBirthManifest, type ScribedGetManifest,
+  type CheckedWorldManifest, type CheckedWriteManifest, type BirthManifest, type GetManifest, type ListManifest, type ListedChild, type PolicyPhrase, type Presence, type Refusaltag, type RevseqCmp, type RevtokCmp, type RootTags, type ScribedBirthManifest, type ScribedGetManifest,
   type ScribedListManifest, type ScribedWriteManifest, type StatsManifest, type WorldManifest, type WriteManifest, type WriteTags, ManifestChecks,
 } from '../shapes/shapes-manifest'
 import { VaultStatsChecks } from '../shapes/shapes-vault-stats'
@@ -155,69 +156,81 @@ export function checkedWatchedOf(bankScope: ThingWatchScope, raw: unknown): Thin
 }
 // --
 
-// == [Tables]: getActOf, listActOf, putActOf, rootActOf, delActOf, isLifeMismatch, isPolicied, policyFailureOf, isGoodAct, isRefusedAct, isWriteAct
+// == [Tables]: RevisionGrid, MatchActs, StaleActs, GetActs, ListActs, PolicyTagForPhrase, writeTableActOf, rootActOf, refusaltagOf, policyFailureOf, isGoodAct, isRefusedAct, isWriteAct
+// The act tables of `notes/answer-contract.md`, each by the tags that decide it. A write's revisions are judged first, by the
+// grid of its *Revisions* section; where they match, or are stale, the act is then found by the op, the presence of the ante
+// row, and the flag that applies over it: `ifPresent` over a live row, `ifAbsent` over a tombstone or none.
 
-/** The act of a get: see the get table in `notes/answer-contract.md`. */
-function getActOf({ ifAbsent }: Pick<GetAsk, 'ifAbsent'>, { presence }: GetTags): EX.GotAct | 'void' | 'gone' {
-  if (presence === 'live') { return 'gotlive' }
-  if (presence === 'void') { return (ifAbsent === 'nil') ? 'gotvoid' : 'void' }
-  return (ifAbsent === 'nil') ? 'gotgone' : 'gone'
-}
+/** The act of a write by the flag that applies, as the put and del tables find it: the flags a write may carry there, and no others. */
+type FlagActs = Readonly<Record<EX.PutIfAbsent | EX.IfPresent, EX.PutAct | EX.DelAct | EX.RefusedAct>>
 
-/** The act of a listing: its parent's presence, and only a live parent lists. */
-function listActOf({ presence }: GetTags): 'gotlive' | 'void' | 'gone' {
-  if (presence === 'live') { return 'gotlive' }
-  return presence
-}
+// A cited shell's revtok comes only with its revseq, so a `birth` revtok meets a `birth` revseq alone: its other cells are
+// those the put table's first matching row finds.
+/** How the ante row's revision stands to the cited one, by `revtok_cmp` then `revseq_cmp`: `match` and `stale` leave the act to the flags, and each other is the act. */
+const RevisionGrid = {
+  'birth': { birth: 'match',  eq: 'match',  stale: 'match',  ahead: 'ahead' },
+  '=next': { birth: 'retcon', eq: 'retcon', stale: 'retcon', ahead: 'retcon' },
+  'eq':    { birth: 'clash',  eq: 'match',  stale: 'clash',  ahead: 'ahead' },
+  'neq':   { birth: 'stale',  eq: 'forked', stale: 'stale',  ahead: 'ahead' },
+} as const satisfies Record<RevtokCmp, Record<RevseqCmp, 'match' | 'stale' | EX.RefusedAct>>
 
-/** The act of a write of a live record: see the put table in `notes/answer-contract.md`. The first matching row wins. */
-export function putActOf(ask: WriteAsk, tags: Pick<WriteTags, 'presence' | 'revtok_cmp' | 'revseq_cmp' | 'lifepath_eq'>): EX.PutAct | EX.RefusedAct {
-  const { presence, revtok_cmp, revseq_cmp } = tags
-  if (revtok_cmp === '=next')                                                           { return 'retcon' }
-  if (revseq_cmp === 'ahead')                                                           { return 'ahead' }
-  if ((revtok_cmp === 'eq')  && ((revseq_cmp !== 'eq') || isLifeMismatch(ask, tags)))   { return 'clash' }
-  if ((revtok_cmp === 'neq') && (revseq_cmp === 'eq'))                                  { return 'forked' }
-  // The flag that applies: `ifPresent` over a live Thing, `ifAbsent` over a tombstone or none.
-  const opflag = (presence === 'live') ? ask.ifPresent : ask.ifAbsent
-  if (revtok_cmp === 'neq')                                                             { return ((presence === 'live') && (opflag === 'get')) ? 'passed' : 'stale' }
-  if (presence   === 'void')                                                            { return (opflag === 'add') ? 'born'   : 'void' }
-  if (presence   === 'gone')                                                            { return (opflag === 'add') ? 'reborn' : 'gone' }
-  if (opflag     === 'repl')                                                            { return 'replaced' }
-  return (opflag === 'get') ? 'passed' : 'camped'
-}
+/** The act of a write whose revision matches the cited one, by its op, the ante row's presence and the flag that applies. */
+const MatchActs = {
+  put: { void: { add: 'born', fail: 'void' }, gone: { add: 'reborn', fail: 'gone' }, live: { repl: 'replaced', get: 'passed', fail: 'camped' } },
+  del: { void: { fail: 'void' },              gone: { fail: 'dubdel' },              live: { repl: 'deleted' } },
+} as const satisfies Record<WriteAsk['op'], Record<Presence, Partial<FlagActs>>>
 
-/** The act of a write of a tombstone: see the del table in `notes/answer-contract.md`. The first matching row wins. */
-function delActOf(ask: WriteAsk, tags: WriteTags): EX.DelAct | EX.RefusedAct {
-  const { presence, revtok_cmp, revseq_cmp } = tags
-  if (revtok_cmp === '=next')                                                           { return 'retcon' }
-  if (revseq_cmp === 'ahead')                                                           { return 'ahead' }
-  if ((revtok_cmp === 'eq')  && ((revseq_cmp !== 'eq') || isLifeMismatch(ask, tags)))   { return 'clash' }
-  if ((revtok_cmp === 'neq') && (revseq_cmp === 'eq'))                                  { return 'forked' }
-  if (revtok_cmp === 'neq')                                                             { return (presence === 'gone') ? 'gone' : 'stale' }
-  if (presence   === 'void')                                                            { return 'void' }
-  return (presence === 'gone') ? 'dubdel' : 'deleted'
+/** The act of a write whose cited revision is stale, by its op, the ante row's presence and the flag that applies. */
+const StaleActs = {
+  put: { void: { add: 'stale', fail: 'stale' }, gone: { add: 'stale', fail: 'stale' }, live: { repl: 'stale', get: 'passed', fail: 'stale' } },
+  del: { void: { fail: 'stale' },               gone: { fail: 'gone' },                live: { repl: 'stale' } },
+} as const satisfies Record<WriteAsk['op'], Record<Presence, Partial<FlagActs>>>
+
+/** The act of a get, by the actual row's presence and its `ifAbsent`. */
+const GetActs = {
+  void: { nil: 'gotvoid', fail: 'void' },
+  gone: { nil: 'gotgone', fail: 'gone' },
+  live: { nil: 'gotlive', fail: 'gotlive' },
+} as const satisfies Record<Presence, Record<GetAsk['ifAbsent'], EX.GotAct | EX.RefusedAct>>
+
+/** The act of a listing, by its parent's presence: only a live parent lists. */
+const ListActs = { void: 'void', gone: 'gone', live: 'gotlive' } as const satisfies Record<Presence, 'gotlive' | EX.RefusedAct>
+
+// Scaffolding: until thread 9 (`policy_tags`), where a datastore hands back a failed storage policy's tag in place of its message.
+/** The name of each storage policy's refusal in {@link PolicyPhrases}, by its message. */
+const PolicyTagForPhrase = invert(PolicyPhrases)
+
+// Each cell is keyed by the flags that reach it: a put's `ifAbsent` is add or fail (`AskChecks.writeAsk`), and a del's flags
+// are fixed at fail and repl. Its type is read as every flag's, so that the flag that applies can look it up.
+/** The act the put or del table finds from a write's revisions, the ante row's presence and life, and the flag that applies. */
+function writeTableActOf(ask: WriteAsk, tags: Pick<WriteTags, 'presence' | 'revtok_cmp' | 'revseq_cmp' | 'lifepath_eq'>): EX.PutAct | EX.DelAct | EX.RefusedAct {
+  // The lifepath stands where big's life tok stood: it names the Thing's life, and the lives above it.
+  const isLifeSame = tags.lifepath_eq && ((tags.presence === 'live') === (ask.cited.am === 'a'))
+  const graded     = RevisionGrid[tags.revtok_cmp][tags.revseq_cmp]
+  const revision   = ((! isLifeSame) && (graded === 'match') && (tags.revtok_cmp === 'eq')) ? 'clash' : graded
+  const flag       = (tags.presence === 'live') ? ask.ifPresent : ask.ifAbsent
+  if (revision === 'match') { return (MatchActs[ask.op][tags.presence] as FlagActs)[flag] }
+  if (revision === 'stale') { return (StaleActs[ask.op][tags.presence] as FlagActs)[flag] }
+  return revision
 }
 
 // A root's put cites the shell, so its revseq is always a birth's. Its lifepath agreement is read only where its revtok is
 // the shell's, which a birth's revseq makes a clash already.
 /** The act of one root's put in a birth: see the put table in `notes/answer-contract.md`. */
-function rootActOf(put: WriteAsk, tags: RootTags): EX.PutAct | EX.RefusedAct {
-  return putActOf(put, { ...tags, revseq_cmp: 'birth', lifepath_eq: true })
+function rootActOf(put: WriteAsk, tags: RootTags): EX.PutAct | EX.DelAct | EX.RefusedAct {
+  return writeTableActOf(put, { ...tags, revseq_cmp: 'birth', lifepath_eq: true })
 }
 
-// The lifepath stands where big's life tok stood: it names the Thing's life, and the lives above it.
-/** True when the ante row differs from the cited one in its life or its liveness. */
-function isLifeMismatch({ cited }: Pick<WriteAsk, 'cited'>, { presence, lifepath_eq }: Pick<WriteTags, 'presence' | 'lifepath_eq'>): boolean {
-  return (! lifepath_eq) || ((presence === 'live') !== (cited.am === 'a'))
-}
-
-/** True when a write changes a field fixed for the Thing's life, or fails a storage policy `ask` names. */
-function isPolicied(ask: WriteAsk, tags: WriteTags): boolean {
-  return (tags.born_at_cmp === 'changed') || (tags.lifetok_cmp === 'changed') || (policyFailureOf(ask, tags) !== null)
+/** The name of the phrase refusing a write that changes a field fixed for the Thing's life, or fails a storage policy `ask` names: a changed born_at's first, then the first failed policy's, then a changed lifetok's; null where none applies. */
+function refusaltagOf(ask: WriteAsk, tags: WriteTags): Refusaltag | null {
+  const policyPhrase = policyFailureOf(ask, tags)
+  if (tags.born_at_cmp === 'changed') { return 'BornAtNotStored' }
+  if (policyPhrase !== null)          { return PolicyTagForPhrase[policyPhrase] }
+  return (tags.lifetok_cmp === 'changed') ? 'LifetokNotStored' : null
 }
 
 /** Why the first storage policy `ask` names refuses it, by its verdict in `tags`, or null where each is met. */
-function policyFailureOf({ options }: WriteAsk, { policies }: WriteTags): string | null {
+function policyFailureOf({ options }: WriteAsk, { policies }: WriteTags): PolicyPhrase | null {
   const named = options?.policies ?? []
   for (const policy of named) {
     const verdict = policies[policy]
@@ -242,20 +255,22 @@ export function isWriteAct(act: string): act is EX.WriteAct { return (EX.writeAc
 
 /** Write onto a get's manifest the act the get table finds from its tags, and whether it answers good. */
 export function scribeGetAct(ask: GetAsk, manifest: CheckedGetManifest): asserts manifest is ScribedGetManifest {
-  const act = getActOf(ask, manifest.tags)
+  const act = GetActs[manifest.tags.presence][ask.ifAbsent]
   Object.assign(manifest, { ok: isGoodAct(act), act })
 }
 
-/** Write onto a write's manifest the act the put or del table finds from its tags, or `policied` where that act writes but a fixed field or a storage policy forbids it, and whether it answers good. */
+/** Write onto a write's manifest the act the put or del table finds from its tags, and whether it answers good;
+ * or `policied`, where that act writes but a fixed field or a storage policy forbids it, with the name of the phrase it is refused with.
+ */
 export function scribeWriteAct(ask: WriteAsk, manifest: CheckedWriteManifest): asserts manifest is ScribedWriteManifest {
-  const tableAct = (ask.op === 'put') ? putActOf(ask, manifest.tags) : delActOf(ask, manifest.tags)
-  const act      = (isWriteAct(tableAct) && isPolicied(ask, manifest.tags)) ? 'policied' : tableAct
-  Object.assign(manifest, { ok: isGoodAct(act), act })
+  const act        = writeTableActOf(ask, manifest.tags)
+  const refusaltag = isWriteAct(act) ? refusaltagOf(ask, manifest.tags) : null
+  if (refusaltag === null) { Object.assign(manifest, { ok: isGoodAct(act), act }) } else { Object.assign(manifest, { ok: false, act: 'policied', refusaltag }) }
 }
 
 /** Write onto a listing's manifest the act its parent's presence finds, and whether it answers good. */
 export function scribeListAct(_ask: ListAsk, manifest: CheckedListManifest): asserts manifest is ScribedListManifest {
-  const act = listActOf(manifest.tags)
+  const act = ListActs[manifest.tags.presence]
   Object.assign(manifest, { ok: (act === 'gotlive'), act })
 }
 
@@ -276,7 +291,7 @@ export function scribeBirthAct(ask: BirthBankAsk, manifest: CheckedBirthManifest
 }
 // --
 
-// == [Answers]: getAnswerOf, writeAnswerOf, policiedRefusalOf, listAnswerOf, voidParentOf, listedOf, kidsOf, birthAnswerOf, worldAnswerOf, worldRootsOf, statsAnswerOf
+// == [Answers]: getAnswerOf, writeAnswerOf, listAnswerOf, voidParentOf, listedOf, kidsOf, birthAnswerOf, worldAnswerOf, worldRootsOf, statsAnswerOf
 
 /** The answer to a get, stripped from its scribed manifest. Where there is no actual row, its `dbhas` is the shell under the ancestor. */
 export function getAnswerOf(ask: GetAsk, manifest: ScribedGetManifest): GetThingAnswer {
@@ -294,18 +309,9 @@ export function writeAnswerOf(ask: WriteAsk, manifest: ScribedWriteManifest): Wr
   const { banktok, tracked, read_tc } = manifest
   const beside = { ask: loggableAskOf(ask), banktok, tracked, read_tc }
   if (manifest.ok) { return { ok: true, ...beside, act: manifest.act, val: manifest.actual } }
-  const meta  = { oplabel: 'writeThing', ask: beside.ask }
   const dbhas = manifest.actual ?? Shell.under(ask, manifest.ancestor)
-  if (manifest.act === 'policied') { return { ok: false, ...beside, act: manifest.act, dbhas, err: policiedRefusalOf(ask, manifest, meta) } }
-  return { ok: false, ...beside, act: manifest.act, dbhas, err: Throwers.actRefused('vault', manifest.act, meta) }
-}
-
-/** The refusal of a `policied` write, with `meta`: a changed born_at's, else a failed storage policy's, else a changed lifetok's. */
-function policiedRefusalOf(ask: WriteAsk, { tags, actual }: ScribedWriteManifest, meta: Errors.RefusalMeta): Errors.VaultError {
-  const why = policyFailureOf(ask, tags)
-  if (tags.born_at_cmp === 'changed') { return Throwers.bornAtNotStored(actual, meta) }
-  if (why !== null)                   { return Throwers.gateIssue(actual, why, meta) }
-  return Throwers.lifetokNotStored(actual, meta)
+  if (manifest.act === 'policied') { return { ok: false, ...beside, act: manifest.act, dbhas, err: Throwers.taggedRefusal(ask, manifest) } }
+  return { ok: false, ...beside, act: manifest.act, dbhas, err: Throwers.actRefused('vault', manifest.act, { oplabel: 'writeThing', ask: beside.ask }) }
 }
 
 /** The answer to a listing, stripped from its scribed manifest: the children of the parent's live life as a {@link Kids} value, the parent as its `parentage`,

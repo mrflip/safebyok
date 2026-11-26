@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { SX } from 'safebyok-big/internals'
-import type { CheckedWriteManifest, WriteTags } from '../../src/shapes/shapes-manifest'
+import { Errors, Phrases as BigPhrases, SX } from 'safebyok-big/internals'
+import type { CheckedGetManifest, CheckedWriteManifest, WriteTags } from '../../src/shapes/shapes-manifest'
 import type { WriteAsk } from '../../src/shapes/shapes-asks'
+import type { WriteThingAnswer } from '../../src/shapes/shapes-answers'
+import * as Phrases from '../../src/phrases'
 import * as ManifestActs from '../../src/storage/manifest-acts'
 import { readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
@@ -28,12 +30,51 @@ function tagsOf(presence: WriteTags['presence'], revtok_cmp: WriteTags['revtok_c
   return { presence, revtok_cmp, revseq_cmp, lifepath_eq: true, born_at_cmp: 'moot', lifetok_cmp: 'moot', policies: {}, written: false, ...overrides }
 }
 
-/** The act `scribeWriteAct` writes onto a checked manifest of `tags`, for `ask`. */
-function scribedActOf(ask: WriteAsk, tags: WriteTags): string {
-  const manifest: CheckedWriteManifest = { tags, actual: null, ancestor: null, banktok: SX.VoidLifeTok, tracked: { bank: 'same', gate: 'same', box: 'same' }, read_tc: readTcNow() }
+/** What every manifest here carries beside its tags and rows: the void banktok, each root the same as tracked, and a read_tc made now. */
+function besideOf() { return { banktok: SX.VoidLifeTok, tracked: { bank: 'same', gate: 'same', box: 'same' }, read_tc: readTcNow() } as const }
+
+/** The answer `writeAnswerOf` makes of a checked manifest of `tags` over the `actual` row, scribed for `ask`. */
+function writeAnsweredOf(ask: WriteAsk, tags: WriteTags, actual: CheckedWriteManifest['actual'] = null) {
+  const manifest: CheckedWriteManifest = { tags, actual, ancestor: null, ...besideOf() }
   ManifestActs.scribeWriteAct(ask, manifest)
-  return manifest.act
+  return ManifestActs.writeAnswerOf(ask, manifest)
 }
+
+/** The refusal a refused `answer` carries. */
+function refusalOf(answer: WriteThingAnswer): Errors.VaultError {
+  if (answer.ok) { throw new Error(`answered ${answer.act}`) }
+  return answer.err
+}
+
+/** The act `scribeWriteAct` writes onto a checked manifest of `tags`, for `ask`. */
+function scribedActOf(ask: WriteAsk, tags: WriteTags): string { return writeAnsweredOf(ask, tags).act }
+
+/** Each revseq comparison, for a row whose revseq is "@": the act is the same at every one. */
+const EveryRevseq = ["birth", "eq", "stale", "ahead"] as const
+
+/** The revseq comparisons a row of a table names: "@" for every one. */
+function revseqsOf(revseqCmp: WriteTags['revseq_cmp'] | "@"): readonly WriteTags['revseq_cmp'][] { return (revseqCmp === "@") ? EveryRevseq : [revseqCmp] }
+
+// Each row of the get table of notes/answer-contract.md. A flag of "@" is every flag.
+const GetRows = [
+  ["GV1", ["nil"],         "void", "gotvoid"],
+  ["GV2", ["fail"],        "void", "void"],
+  ["GG1", ["nil"],         "gone", "gotgone"],
+  ["GG2", ["fail"],        "gone", "gone"],
+  ["GL1", ["nil", "fail"], "live", "gotlive"],
+] as const
+
+describe("ManifestActs.scribeGetAct(ask, manifest), row by row of the get table", () => {
+  for (const [abbr, flags, presence, act] of GetRows) {
+    it(`${abbr}: ${act}`, () => {
+      for (const ifAbsent of flags) {
+        const manifest: CheckedGetManifest = { tags: { presence }, actual: null, ancestor: null, ...besideOf() }
+        ManifestActs.scribeGetAct(TH.getAskAt('box', ifAbsent), manifest)
+        expect(manifest.act, ifAbsent).to.eq(act)
+      }
+    })
+  }
+})
 
 // Each row of the put and del tables of notes/answer-contract.md, as the new core reads them. A flag of "@" is every flag
 // that applies over that row: ifAbsent's over none or a tombstone, ifPresent's over a live row.
@@ -41,7 +82,7 @@ const PutRows = [
   ["PV1",  "birth", "birth", ["add"],                "void", "born"],
   ["PV2",  "birth", "birth", ["fail"],               "void", "void"],
   ["PV3",  "neq",   "ahead", ["add", "fail"],        "void", "ahead"],
-  ["PG1",  "=next", "eq",    ["add", "fail"],        "gone", "retcon"],
+  ["PG1",  "=next", "@",     ["add", "fail"],        "gone", "retcon"],
   ["PG3",  "neq",   "birth", ["add", "fail"],        "gone", "stale"],
   ["PG4",  "neq",   "stale", ["add", "fail"],        "gone", "stale"],
   ["PG5",  "eq",    "stale", ["add", "fail"],        "gone", "clash"],
@@ -50,7 +91,7 @@ const PutRows = [
   ["PG8",  "eq",    "ahead", ["add", "fail"],        "gone", "ahead"],
   ["PG9",  "eq",    "eq",    ["add"],                "gone", "reborn"],
   ["PG10", "eq",    "eq",    ["fail"],               "gone", "gone"],
-  ["PL1",  "=next", "eq",    ["repl", "get", "fail"], "live", "retcon"],
+  ["PL1",  "=next", "@",     ["repl", "get", "fail"], "live", "retcon"],
   ["PL4r", "neq",   "birth", ["repl"],               "live", "stale"],
   ["PL4f", "neq",   "birth", ["fail"],               "live", "stale"],
   ["PL3",  "neq",   "birth", ["get"],                "live", "passed"],
@@ -69,7 +110,7 @@ const PutRows = [
 const DelRows = [
   ["DV1", "birth", "birth", "void", "void"],
   ["DV2", "neq",   "ahead", "void", "ahead"],
-  ["DG1", "=next", "eq",    "gone", "retcon"],
+  ["DG1", "=next", "@",     "gone", "retcon"],
   ["DG3", "neq",   "birth", "gone", "gone"],
   ["DG4", "neq",   "stale", "gone", "gone"],
   ["DG5", "eq",    "stale", "gone", "clash"],
@@ -77,7 +118,7 @@ const DelRows = [
   ["DG7", "neq",   "ahead", "gone", "ahead"],
   ["DG8", "eq",    "ahead", "gone", "ahead"],
   ["DG9", "eq",    "eq",    "gone", "dubdel"],
-  ["DL1", "=next", "eq",    "live", "retcon"],
+  ["DL1", "=next", "@",     "live", "retcon"],
   ["DL3", "neq",   "birth", "live", "stale"],
   ["DL4", "neq",   "stale", "live", "stale"],
   ["DL5", "eq",    "stale", "live", "clash"],
@@ -91,7 +132,9 @@ describe("ManifestActs.scribeWriteAct(ask, manifest), a put, row by row of the p
   for (const [abbr, revtokCmp, revseqCmp, flags, presence, act] of PutRows) {
     it(`${abbr}: ${act}`, () => {
       for (const flag of flags) {
-        expect(scribedActOf(askOf(PutAsk, presence, flag), tagsOf(presence, revtokCmp, revseqCmp)), flag).to.eq(act)
+        for (const revseq of revseqsOf(revseqCmp)) {
+          expect(scribedActOf(askOf(PutAsk, presence, flag), tagsOf(presence, revtokCmp, revseq)), `${flag} at ${revseq}`).to.eq(act)
+        }
       }
     })
   }
@@ -100,7 +143,10 @@ describe("ManifestActs.scribeWriteAct(ask, manifest), a put, row by row of the p
 describe("ManifestActs.scribeWriteAct(ask, manifest), a del, row by row of the del table", () => {
   for (const [abbr, revtokCmp, revseqCmp, presence, act] of DelRows) {
     it(`${abbr}: ${act}`, () => {
-      expect(scribedActOf(askOf(DelAsk, presence, 'repl'), tagsOf(presence, revtokCmp, revseqCmp))).to.eq(act)
+      const ask = withCitedAm(DelAsk, citedAmOf(presence))
+      for (const revseq of revseqsOf(revseqCmp)) {
+        expect(scribedActOf(ask, tagsOf(presence, revtokCmp, revseq)), revseq).to.eq(act)
+      }
     })
   }
 })
@@ -108,7 +154,7 @@ describe("ManifestActs.scribeWriteAct(ask, manifest), a del, row by row of the d
 describe("ManifestActs.scribeWriteAct(ask, manifest), the life and liveness a matching revtok cites", () => {
   it("scribes clash where the ante row's lifepath is not the cited one", () => {
     expect(scribedActOf(askOf(PutAsk, 'live', 'repl'), tagsOf('live', 'eq', 'eq', { lifepath_eq: false }))).to.eq('clash')
-    expect(scribedActOf(askOf(DelAsk, 'live', 'repl'), tagsOf('live', 'eq', 'eq', { lifepath_eq: false }))).to.eq('clash')
+    expect(scribedActOf(withCitedAm(DelAsk, 'a'), tagsOf('live', 'eq', 'eq', { lifepath_eq: false }))).to.eq('clash')
   })
 
   it("scribes clash where the ante row is live and the ask cites a tombstone, or the reverse", () => {
@@ -134,7 +180,7 @@ describe("ManifestActs.scribeWriteAct(ask, manifest), a write the tables let thr
 
   it("scribes policied for a replacement that fails a storage policy it names, and the write where each it names is met", () => {
     const ask = { ...askOf(PutAsk, 'live', 'repl'), options: { policies: ['add_passkey', 'revoke_passkey'] } } as WriteAsk
-    const failed = { add_passkey: { ok: true }, revoke_passkey: { ok: false, message: "no passkey" } } as const
+    const failed = { add_passkey: { ok: true }, revoke_passkey: { ok: false, message: Phrases.PolicyPhrases.NoPasskeyStored } } as const
     const met    = { add_passkey: { ok: true }, revoke_passkey: { ok: true } } as const
     expect(scribedActOf(ask, tagsOf('live', 'eq', 'eq', { policies: failed }))).to.eq('policied')
     expect(scribedActOf(ask, tagsOf('live', 'eq', 'eq', { policies: met }))).to.eq('replaced')
@@ -144,5 +190,33 @@ describe("ManifestActs.scribeWriteAct(ask, manifest), a write the tables let thr
     const changed = { born_at_cmp: 'changed', lifetok_cmp: 'changed' } as const
     expect(scribedActOf(askOf(PutAsk, 'live', 'get'), tagsOf('live', 'eq', 'eq', changed))).to.eq('passed')
     expect(scribedActOf(askOf(PutAsk, 'live', 'repl'), tagsOf('live', 'neq', 'stale', changed))).to.eq('stale')
+  })
+})
+
+describe("ManifestActs.writeAnswerOf(ask, manifest), a policied write", () => {
+  const PoliciedAsk = { ...askOf(PutAsk, 'live', 'repl'), options: { policies: ['add_passkey'] } } as WriteAsk
+  const Failed      = { add_passkey: { ok: false, message: Phrases.PolicyPhrases.PasskeyStored } } as const
+  const RefusalCases = [
+    ["bad_record", Phrases.BornAtNotStored,                                        { born_at_cmp: "changed", lifetok_cmp: "changed", policies: Failed }, 'refuses bad_record for a changed born_at, before a failed storage policy or a changed lifetok'],
+    ["gate_issue", BigPhrases.gateIssue(Phrases.PolicyPhrases.PasskeyStored),       { lifetok_cmp: "changed", policies: Failed },                         'refuses gate_issue with a failed storage policy\'s message, before a changed lifetok'],
+    ["bad_record", Phrases.LifetokNotStored,                                       { lifetok_cmp: "changed", policies: { add_passkey: { ok: true } } },  'refuses bad_record for a changed lifetok'],
+  ] as const
+  for (const [refusalkind, message, overrides, blurb] of RefusalCases) {
+    it(blurb, () => {
+      const answer = writeAnsweredOf(PoliciedAsk, tagsOf('live', 'eq', 'eq', overrides), LiveBox)
+      const err    = refusalOf(answer)
+      expect(answer.act).to.eq('policied')
+      expect(err).to.deep.include({ refusalkind, message })
+      expect(Errors.rowsOfRefusal(err)).to.deep.equal({ dbhas: LiveBox })
+      expect(err.meta).to.deep.equal({ oplabel: 'writeThing', ask: answer.ask, act: 'policied' })
+    })
+  }
+
+  it("refuses gate_issue with each storage policy's message", () => {
+    for (const message of Object.values(Phrases.PolicyPhrases)) {
+      const answer = writeAnsweredOf(PoliciedAsk, tagsOf('live', 'eq', 'eq', { policies: { add_passkey: { ok: false, message } } }), LiveBox)
+      expect(answer.act, message).to.eq('policied')
+      expect(refusalOf(answer), message).to.deep.include({ refusalkind: 'gate_issue', message: BigPhrases.gateIssue(message) })
+    }
   })
 })

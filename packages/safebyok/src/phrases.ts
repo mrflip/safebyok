@@ -282,7 +282,7 @@ export const BanktokMissing = "The vault's storage handed back no banktok, the l
 export const AnswerOfOtherManifest = "The vaultDB made an answer that is not a copy of what its storage handed back: a bug in safebyok."
 // --
 
-// == [Storage policies]: PolicyPhrases
+// == [Storage policies]: PolicyPhrases, PhraseForRefusaltag
 
 /** The message of each refusal a storage policy makes, for a datastore that judges the policies in its own language (Postgres's `VaultFunctionsSql`). */
 export const PolicyPhrases = {
@@ -292,5 +292,17 @@ export const PolicyPhrases = {
   PasskeyNotAdded:   BigPhrases.PasskeyNotAdded,
   NoPasskeyStored:   BigPhrases.NoPasskeyStored,
   PasskeyNotRevoked: BigPhrases.PasskeyNotRevoked,
+} as const
+
+/** The message a `policied` write is refused with, by the name of its phrase: a changed born_at's, a changed lifetok's, or a storage policy's in {@link PolicyPhrases}. */
+export const PhraseForRefusaltag = {
+  BornAtNotStored,
+  LifetokNotStored,
+  ProvedWayinMoved:  BigPhrases.gateIssue(PolicyPhrases.ProvedWayinMoved),
+  OtherWayinMoved:   BigPhrases.gateIssue(PolicyPhrases.OtherWayinMoved),
+  PasskeyStored:     BigPhrases.gateIssue(PolicyPhrases.PasskeyStored),
+  PasskeyNotAdded:   BigPhrases.gateIssue(PolicyPhrases.PasskeyNotAdded),
+  NoPasskeyStored:   BigPhrases.gateIssue(PolicyPhrases.NoPasskeyStored),
+  PasskeyNotRevoked: BigPhrases.gateIssue(PolicyPhrases.PasskeyNotRevoked),
 } as const
 // --

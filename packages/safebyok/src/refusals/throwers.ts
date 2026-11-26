@@ -9,6 +9,7 @@ import { type ThingRecord } from '../shapes/shapes-thing'
 import { StoreLimitFloor } from '../shapes/shapes-vault-stats'
 import { type ListAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
 import type { DamagedThing } from '../shapes/shapes-answers'
+import type { Refusaltag } from '../shapes/shapes-manifest'
 import type { ProbeStepkind } from '../shapes/shapes-vault-probe'
 
 // == [Big's Throwers]: every thrower of safebyok-big, re-exported
@@ -92,15 +93,25 @@ export function bornAtNotNow(ask: WriteAsk): Errors.VaultError { return new Erro
 export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
 // --
 
-// == [Storing Throwers]: PoliciedMeta, gateIssue, storeQuotaTooSmall, storageCallRefused, bornAtNotStored, lifetokNotStored, rowOfOtherAddress, bankRootsMissing, banktokMissing, listParentNotLive, answerNotMade, writtenOfOtherAct, proposedNotWritten, tagsOfOtherRow, tagsOfOtherAsk, answerOfOtherManifest
+// == [Storing Throwers]: RefusalkindForRefusaltag, taggedRefusal, storeQuotaTooSmall, storageCallRefused, rowOfOtherAddress, bankRootsMissing, banktokMissing, listParentNotLive, answerNotMade, writtenOfOtherAct, proposedNotWritten, tagsOfOtherRow, tagsOfOtherAsk, answerOfOtherManifest
+
+/** The kind of refusal of a `policied` write, by the {@link Refusaltag} of its phrase. */
+export const RefusalkindForRefusaltag = {
+  BornAtNotStored:   'bad_record',
+  LifetokNotStored:  'bad_record',
+  ProvedWayinMoved:  'gate_issue',
+  OtherWayinMoved:   'gate_issue',
+  PasskeyStored:     'gate_issue',
+  PasskeyNotAdded:   'gate_issue',
+  NoPasskeyStored:   'gate_issue',
+  PasskeyNotRevoked: 'gate_issue',
+} as const satisfies Record<Refusaltag, Errors.Refusalkind>
 
 // Big types a refusal's meta.act as its own BadAct, which has no `policied`.
-/** Refusal meta with act `policied`, for a write the act tables allow but a storage policy, the born_at check or the lifetok check refuses. */
-export const PoliciedMeta = { act: 'policied' } as unknown as Errors.RefusalMeta
-
-/** A `gate_issue` refusal of a write over `ante`, saying `why`, with `meta` and the act `policied`. */
-export function gateIssue(ante: ThingRecord | null, why: string, meta: Errors.RefusalMeta = {}): Errors.VaultError {
-  return new Errors.VaultError('gate_issue', BigPhrases.gateIssue(why), { rows: { dbhas: ante }, meta: { ...meta, ...PoliciedMeta } })
+/** The refusal of a `policied` write `ask` over its `actual` row, null for none: the kind and phrase its `refusaltag` names, with the verb, the loggable ask and the act. */
+export function taggedRefusal(ask: WriteAsk, { act, actual, refusaltag }: Readonly<{ act: 'policied', actual: ThingRecord | null, refusaltag: Refusaltag }>): Errors.VaultError {
+  const meta = { oplabel: 'writeThing', ask: loggableAskOf(ask), act } as unknown as Errors.RefusalMeta
+  return new Errors.VaultError(RefusalkindForRefusaltag[refusaltag], Phrases.PhraseForRefusaltag[refusaltag], { rows: { dbhas: actual }, meta })
 }
 
 /** A `storage_blocked` refusal: the browser's `quota` of bytes for the page is under {@link StoreLimitFloor}, too little for a vault. */
@@ -111,16 +122,6 @@ export function storeQuotaTooSmall(quota: number): Errors.VaultError {
 /** A `storage_issue` refusal: the vault's storage refused the call `oplabel`, and would refuse it again. What it threw is the cause. */
 export function storageCallRefused(oplabel: string, thrown: unknown): Errors.VaultError {
   return new Errors.VaultError('storage_issue', Phrases.storageCallRefused(oplabel), { cause: sanitizeForeignError(thrown) })
-}
-
-/** A `bad_record` refusal of a write over `ante`, the live Thing whose born_at it changes, with `meta` and the act `policied`. */
-export function bornAtNotStored(ante: ThingRecord | null, meta: Errors.RefusalMeta = {}): Errors.VaultError {
-  return new Errors.VaultError('bad_record', Phrases.BornAtNotStored, { rows: { dbhas: ante }, meta: { ...meta, ...PoliciedMeta } })
-}
-
-/** A `bad_record` refusal of a write of the bank over `ante`, the live bank whose lifetok it changes, with `meta` and the act `policied`. */
-export function lifetokNotStored(ante: ThingRecord | null, meta: Errors.RefusalMeta = {}): Errors.VaultError {
-  return new Errors.VaultError('bad_record', Phrases.LifetokNotStored, { rows: { dbhas: ante }, meta: { ...meta, ...PoliciedMeta } })
 }
 
 /** A `storage_issue` refusal: storage answered a row at another address than asked, by the `fieldnames` that disagree. */

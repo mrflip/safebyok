@@ -9,8 +9,9 @@ import type { BankRoots, Tracked } from './shapes-asks'
 import type { DamagedThing } from './shapes-answers'
 import { type ReadTc, SeenChecks } from './shapes-vault-event'
 import type { VaultStats } from './shapes-vault-stats'
+import { PolicyPhrases } from '../phrases'
 
-// == [Tags]: ManifestChecks, PolicyVerdict, PolicyVerdicts, GetTags, WriteTags, RootTags, BirthTags, Presence, RevtokCmp, RevseqCmp, SameCmp, AnteWayins, TrackedRows
+// == [Tags]: ManifestChecks, PolicyVerdict, PolicyVerdicts, PolicyPhrase, PolicyTag, Refusaltag, GetTags, WriteTags, RootTags, BirthTags, Presence, RevtokCmp, RevseqCmp, SameCmp, AnteWayins, TrackedRows
 // Each tag spells the field it compares. A datastore makes them of the row it judged a write against, the ante row.
 
 /** The checks of what a datastore hands back: its tags, a listing's children, a birth's or a world's roots, a watch's {@link Received}, its `tracked` and its `read_tc`. Each refuses `storage_issue`. */
@@ -18,7 +19,7 @@ export const ManifestChecks = Validator.Checkers('storage_issue', ({ obj, arr, l
   const presence       = oneof(['void', 'gone', 'live'])
   const revtokCmp      = oneof(['birth', '=next', 'eq', 'neq'])
   const sameCmp        = oneof(['same', 'changed', 'moot'])
-  const policyVerdict  = discrim('ok', [obj({ ok: lit(true) }).strict(), obj({ ok: lit(false), message: str }).strict()])
+  const policyVerdict  = discrim('ok', [obj({ ok: lit(true) }).strict(), obj({ ok: lit(false), message: oneof(PolicyPhrases) }).strict()])
   const policyVerdicts = obj({ replace_passphrase: policyVerdict.optional(), add_passkey: policyVerdict.optional(), revoke_passkey: policyVerdict.optional() }).strict()
   const rootTags       = obj({
     /** The ante root's liveness: none (`void`), a tombstone (`gone`), or live. */
@@ -62,12 +63,21 @@ export const ManifestChecks = Validator.Checkers('storage_issue', ({ obj, arr, l
   }
 })
 
-/** A storage policy's verdict on one write: met, or the message saying why not. */
+/** A storage policy's verdict on one write: met, or the {@link PolicyPhrases} message saying why not. */
 export type PolicyVerdict = Readonly<Z.infer<typeof ManifestChecks.policyVerdict>>
 
 /** A verdict for each storage policy a write names. */
 export type PolicyVerdicts = Readonly<Z.infer<typeof ManifestChecks.policyVerdicts>>
 true satisfies Z.core.util.AssertEqual<keyof PolicyVerdicts, EX.StoragePolicy>
+
+/** The message of a storage policy's refusal: one of {@link PolicyPhrases}. */
+export type PolicyPhrase = (typeof PolicyPhrases)[PolicyTag]
+
+/** The name of a storage policy's refusal in {@link PolicyPhrases}. */
+export type PolicyTag = keyof typeof PolicyPhrases
+
+/** The name, in phrases.ts, of the phrase a `policied` write is refused with: a changed born_at's, a changed lifetok's, or a storage policy's. */
+export type Refusaltag = 'BornAtNotStored' | 'LifetokNotStored' | PolicyTag
 
 /** The tag the get table reads: the actual row's `presence`. */
 export type GetTags = Readonly<Z.infer<typeof ManifestChecks.getTags>>
@@ -227,10 +237,13 @@ export type ScribedGetManifest = CheckedGetManifest & (
   | { ok: false, act: 'void',    actual: null }
 )
 
-/** A write's checked manifest with the act the put or del table finds from its tags, or `policied` where a fixed field or a storage policy forbids the write, and whether it answers good. */
+/** A write's checked manifest with the act the put or del table finds from its tags, and whether it answers good;
+ * or `policied` where a fixed field or a storage policy forbids the write, with the {@link Refusaltag} of the phrase it is refused with.
+ */
 export type ScribedWriteManifest = CheckedWriteManifest & (
-  | { ok: true,  act: EX.PutAct | EX.DelAct,     actual: ThingRecord }
-  | { ok: false, act: EX.RefusedAct | 'policied', actual: ThingRecord | null }
+  | { ok: true,  act: EX.PutAct | EX.DelAct, actual: ThingRecord }
+  | { ok: false, act: EX.RefusedAct,         actual: ThingRecord | null }
+  | { ok: false, act: 'policied',            actual: ThingRecord | null, refusaltag: Refusaltag }
 )
 
 /** A listing's checked manifest with the act its parent's tags find, and whether it answers good. */
