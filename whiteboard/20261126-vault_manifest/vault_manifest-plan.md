@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1–5 filed; thread 4 rebased onto thread 5 (line `1 → 2 → 3 → 5 → 4`), proving the whole line; thread 6 **held** until the Coach's dispatch-table side quest reports and the Closer Look is triaged (the Coach: "don't change plans otherwise until we hear the report")
+* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9; thread 6 **held** for the dispatch-table side quest and the Closer Look triage
 
 ## Read first
 

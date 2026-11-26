@@ -71,3 +71,6 @@ The orchestrator's curated summary of what the threads have taught. Newer than t
 * *Orchestrator:* thread 4 rebased cleanly onto thread 5: the line is `1 → 2 → 3 → 5 → 4`.
 * The Coach relaxed "a datastore reads no check and no act table": "It's not strictly important that other repos emulate the action/implementation of PG, only that they share a common contract/interface." He asked for a side quest on a dispatch table keyed by the tags (an opus explorer, read-only); plans otherwise unchanged until it reports. Thread 6 waits for it and for the Closer Look triage.
 * The Closer Look (at 517463cf4) is in the doc's tab; its E1 (a write may land over an incompatible ante row) needs a ruling.
+* The line passes `pnpm justify` at f0ef7e1b9 (thread 4's tip, on thread 5); all five PRs out of draft.
+* The Coach, on refusals: "refusals might best come back from the adapter as a refusaltag matching a Phrases element, with a lookup table for refusalkind sent to a function that prepares an error with its loggable ask/manifest, the refusalkind and phrase". Folded into the side quest's brief.
+* Why Postgres 18: `uuidv7()` for every statement's `read_tc` and `tell_thing`'s (on main already); thread 4 added `RETURNING WITH (NEW AS written)` so the UPDATE's alias can be `ante` while its returned row is `written`: cosmetic, droppable if 18 ever bites.
