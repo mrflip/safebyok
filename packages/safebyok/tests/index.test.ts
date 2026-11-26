@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { HostErrorSanitizer } from 'safebyok-big'
-import { Errors, Logger } from 'safebyok-big/internals'
+import { EX, Errors, Logger } from 'safebyok-big/internals'
 import * as BigThrowers from 'safebyok-big/refusals/throwers'
 import * as BigStorage from 'safebyok-big/storage'
 import * as Browser from '../src/browser'
@@ -60,6 +60,11 @@ describe("safebyok/storage", () => {
     ] as const
     for (const exportname of exportnames) { expect(Storage, exportname).to.have.property(exportname).that.eq(BigStorage[exportname]) }
     expect(Storage.storageIssue).to.eq(BigThrowers.storageIssue)
+  })
+
+  it("re-exports safebyok-big's values of an ask's flags, of each verb's acts and of a refusal's kind, the very ones its checks accept", () => {
+    for (const exportname of ['badActVals', 'ifAbsentVals', 'refusedActVals', 'refusalkindVals'] as const) { expect(Storage, exportname).to.have.property(exportname).that.eq(BigStorage[exportname]) }
+    for (const exportname of ['delActVals', 'gotActVals', 'ifPresentVals', 'putActVals', 'putIfAbsentVals'] as const) { expect(Storage, exportname).to.have.property(exportname).that.eq(EX[exportname]) }
   })
 
   it("re-exports safebyok-big's IndexedDB transaction and versioned database, the very ones an IndexedDB store is written with", () => {
