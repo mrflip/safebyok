@@ -219,8 +219,8 @@ describe("ConvexVaultDB's component", () => {
     const box = TH.boxThingOf()
     const boxBirthAsk = TH.birthAskOf(box, Shell.childCited(TH.Life0))
     await TH.expectGood(convexVaultDB.tryWriteThing(boxBirthAsk))
-    const stored = await backend.run(async ({ db }) => await thingDocAt(db, TH.BoxScope))
-    expect(stored).to.deep.include(box)
+    const actual = await backend.run(async ({ db }) => await thingDocAt(db, TH.BoxScope))
+    expect(actual).to.deep.include(box)
   })
 
   it("refuses an ask that fails the core's checks, with the core's sentence", async () => {

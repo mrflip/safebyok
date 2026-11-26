@@ -222,12 +222,12 @@ describe("AdapterVaultDB.tryListThings(ask), a store that reports oddly", () => 
 })
 
 describe("AdapterVaultDB.tryBirthBank(ask), a store that reports oddly", () => {
-  it("answers a birth the datastore reports writing with the roots it wrote, and one over a live bank with the roots stored", async () => {
+  it("answers a birth the datastore reports writing with the roots it wrote, and one over a live bank with the actual roots", async () => {
     const born = new ScriptedVaultDB(() => birthManifestOf(TH.birthBankAskOf(), NoRoots, true))
     expect(await born.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ ok: true, act: 'born', val: bornRootsOf() })
-    const stored  = { bank: TH.bankThingOf({ revtok: TH.OtherRevtok }), gate: OtherGate, root: TH.rootBoxOf({ revtok: TH.OtherRevtok }) }
-    const passing = new ScriptedVaultDB(() => birthManifestOf(TH.birthBankAskOf(), stored, false))
-    expect(await passing.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ ok: true, act: 'passed', val: stored })
+    const actual  = { bank: TH.bankThingOf({ revtok: TH.OtherRevtok }), gate: OtherGate, root: TH.rootBoxOf({ revtok: TH.OtherRevtok }) }
+    const passing = new ScriptedVaultDB(() => birthManifestOf(TH.birthBankAskOf(), actual, false))
+    expect(await passing.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ ok: true, act: 'passed', val: actual })
   })
 
   it("refuses, as a broken store, a birth it reports writing with a root missing, or unwritten over a live bank with a root missing", async () => {

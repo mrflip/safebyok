@@ -26,13 +26,13 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
     expect(again).to.deep.include({ val: TH.gateThingOf() })
   })
 
-  const StoredCases = [
+  const PlantedCases = [
     ["damaged_row",   { ...TH.gateThingOf(), note: 'hi' },         'refuses a gate with a field this version does not know'],
     ["storage_issue", { ...TH.gateThingOf(), banklabel: 'other' }, 'refuses a gate filed at another scope as a broken store'],
     ["storage_issue", 'not a Thing',                               'refuses a Thing that is not an object as a broken store'],
   ] as const
 
-  for (const [refusalkind, raw, blurb] of StoredCases) {
+  for (const [refusalkind, raw, blurb] of PlantedCases) {
     it(blurb, async () => {
       const vaultDB = new MemoryVaultDB()
       vaultDB._cheat_things(TH.ThingBank).set('gate', raw)

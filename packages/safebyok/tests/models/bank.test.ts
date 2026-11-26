@@ -351,7 +351,7 @@ describe("bank.tellBadNews(badnews)", () => {
 })
 
 describe("bank.put(args)", () => {
-  it("writes the bank's next revision, answering the stored bank", async () => {
+  it("writes the bank's next revision, answering the actual bank", async () => {
     const { bank, device } = await TH.buildBornBank()
     const record = nextBankThingOf(bank)
     expect(await bank.put({ cited: bank.pickle(), record })).to.deep.equal(record)

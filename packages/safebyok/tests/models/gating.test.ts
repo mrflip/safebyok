@@ -68,16 +68,16 @@ describe("Bank.birth(device, cleartexts)", () => {
     expect(one.gate.revtok).to.not.eq(two.gate.revtok)
   })
 
-  it("refuses where a live bank is stored at its scope, making no bank and leaving the stored one unchanged", async () => {
+  it("refuses where a live bank is stored at its scope, making no bank and leaving the ante one unchanged", async () => {
     const device = TH.makeDevice()
-    const stored = await birth(device, { passphraseCleartext: TH.TestPassphrase })
+    const ante = await birth(device, { passphraseCleartext: TH.TestPassphrase })
     const births = TH.spyBirths(device)
     const err = await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase }), 'gate_made_elsewhere')
     expect(err.message).to.match(/another device/)
     expect(births.banks).to.be.empty
     const answer = await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)
     expect(answer).to.deep.include({ ok: true, act: 'passed' })
-    expect(answer.ok && answer.val.bank).to.deep.equal(stored.pickle())
+    expect(answer.ok && answer.val.bank).to.deep.equal(ante.pickle())
   })
 
   it("passes any refusal of the vaultDB on unchanged, making no bank", async () => {
@@ -144,7 +144,7 @@ describe("Bank.birth(device, cleartexts)", () => {
     expect(await bank.device.vault!.unsealBox(answer.val.root)).to.deep.include({ whisper: {} })
   })
 
-  // The vaultDB answers retcon, not passed, to a birth it stored already; passed on this bank is a vaultDB's answer alone.
+  // The vaultDB answers retcon, not passed, to a birth it wrote already; passed on this bank is a vaultDB's answer alone.
   it("unlocks where the vaultDB passes on this same bank, adopting the root box it answers", async () => {
     const device = TH.makeDevice()
     const tryBirthBank = device.vaultDB.tryBirthBank.bind(device.vaultDB)
@@ -159,7 +159,7 @@ describe("Bank.birth(device, cleartexts)", () => {
     expect(bank.rootBox).to.deep.equal(answer.ok && answer.val.root)
   })
 
-  it("evicts the lease it built where the bank stored is another's, or the vaultDB refuses", async () => {
+  it("evicts the lease it built where the actual bank is another's, or the vaultDB refuses", async () => {
     const device = TH.makeDevice()
     await birth(device, { passphraseCleartext: TH.TestPassphrase })
     const evict = vi.spyOn(Lease.prototype, 'evict')

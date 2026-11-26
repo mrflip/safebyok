@@ -47,7 +47,7 @@ export function readTcSpanAfter(read_tc: ReadTc): ReadTc {
 }
 
 /** Put `record` in `vaultDB`'s datastore as another device would, notifying no watcher. */
-export function cheatStored(vaultDB: MemoryVaultDB, record: SeenThing): void { vaultDB._cheat_things(TH.ThingBank).set(record.labelpath, record) }
+export function cheatPlant(vaultDB: MemoryVaultDB, record: SeenThing): void { vaultDB._cheat_things(TH.ThingBank).set(record.labelpath, record) }
 
 /** The item query of the box at `scope`, `TH.BoxScope` by default, or undefined for none. */
 export function itemQueryAt({ queryClient }: TSQWorld<MemoryVaultDB>, scope: ThingScope = TH.BoxScope) {

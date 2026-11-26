@@ -61,7 +61,7 @@ export function describeVaultDBStats({ fresh, bornBank, boxesBorn, rowsOf }: Vau
       }
     })
 
-    it("answers 'same' for each root stored at the revision the ask tracks, else the root stored", async () => {
+    it("answers 'same' for each root stored at the revision the ask tracks, else the actual root", async () => {
       const vaultDB = await bornBank()
       const track   = trackOf(bankThingOf(), gateThingOf(), rootBoxOf({ revseq: 3 }))
       expect(await vaultDB.tryStats(statsAskOf({ track }))).to.deep.include({ ok: true, tracked: { bank: 'same', gate: 'same', box: rootBoxOf() } })

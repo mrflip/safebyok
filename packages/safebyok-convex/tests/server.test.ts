@@ -29,8 +29,8 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['watchThings', (caller) => caller.query(fns.watchThings, { scope: TH.ThingBank, cursor: 0n })],
 ]
 
-/** Every Thing u1 has stored, as the component itself reports it. */
-async function storedIn(backend: Backend) {
+/** Every Thing of u1's, as the component itself reports it. */
+async function thingsIn(backend: Backend) {
   return await backend.withIdentity({ subject: 'u1' }).query(fns.watchThings, { scope: TH.ThingBank, cursor: 0n })
 }
 
@@ -54,13 +54,13 @@ describe("SafebyokVaultComponent.api, for the user a call names", () => {
 describe("SafebyokVaultComponent.api, for an ask naming another user", () => {
   it("refuses it as identity_revoked, before the core's checker sees it", async () => {
     const backend = await seeded()
-    const before = await storedIn(backend)
+    const before = await thingsIn(backend)
     const asOwner = backend.withIdentity({ subject: 'u1' })
     const theirs = { ...TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)), userid: 'u2' }
     expect(await TH.convexRefusalOf(asOwner.mutation(fns.writeThing, { ask: theirs }))).to.deep.equal({ kind: 'identity_revoked' })
     const misfit = { ...theirs, record: { ...theirs.record, revseq: 5 } }
     expect(await TH.convexRefusalOf(asOwner.mutation(fns.writeThing, { ask: misfit }))).to.deep.equal({ kind: 'identity_revoked' })
-    expect(await storedIn(backend)).to.deep.equal(before)
+    expect(await thingsIn(backend)).to.deep.equal(before)
   })
 })
 
@@ -68,17 +68,17 @@ describe("SafebyokVaultComponent.api, for anyone else", () => {
   for (const [fnname, call] of EveryCall) {
     it(`refuses ${fnname} when no one is signed in`, async () => {
       const backend = await seeded()
-      const before = await storedIn(backend)
+      const before = await thingsIn(backend)
       expect(await TH.convexRefusalOf(call(backend))).to.deep.equal({ kind: 'identity_revoked' })
-      expect(await storedIn(backend)).to.deep.equal(before)
+      expect(await thingsIn(backend)).to.deep.equal(before)
     })
 
     it(`refuses ${fnname} to a user it does not name`, async () => {
       const backend = await seeded()
-      const before = await storedIn(backend)
+      const before = await thingsIn(backend)
       const refusal = await TH.convexRefusalOf(call(backend.withIdentity({ subject: 'u2' })))
       expect(refusal).to.deep.equal({ kind: 'identity_revoked' })
-      expect(await storedIn(backend)).to.deep.equal(before)
+      expect(await thingsIn(backend)).to.deep.equal(before)
     })
   }
 

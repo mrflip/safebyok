@@ -8,7 +8,7 @@ import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { readAtOf, readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
-import { type TSQWorld, cheatStored, isObservedStale, itemQueryAt, listQueryAt, noticeOf, readTcSpanAfter, tsqWorldOf } from './vault-minder/tsq-world'
+import { type TSQWorld, cheatPlant, isObservedStale, itemQueryAt, listQueryAt, noticeOf, readTcSpanAfter, tsqWorldOf } from './vault-minder/tsq-world'
 
 /** The query key of the item of the box at `TH.BoxScope`. */
 const BoxKey = VaultTSQ.itemQueryKeyOf(TH.BoxScope)
@@ -213,7 +213,7 @@ describe("VaultTSQ.connect and disconnect", () => {
     const world = await worldWithBox()
     await world.vaultTSQ.listOnce('box')
     world.vaultTSQ.disconnect()
-    cheatStored(world.vaultDB, Box1)
+    cheatPlant(world.vaultDB, Box1)
     world.vaultTSQ.connect()
     expect(itemQueryAt(world)?.state.isInvalidated).to.eq(false)
     await world.vaultTSQ.listOnce('box')
@@ -225,7 +225,7 @@ describe("VaultTSQ.connect and disconnect", () => {
 describe("VaultTSQ's items", () => {
   it("hold a record deeply equal to their Thing's, which getOnce resolves", async () => {
     const world = await tsqWorldOf(new MemoryVaultDB())
-    cheatStored(world.vaultDB, Box0)
+    cheatPlant(world.vaultDB, Box0)
     const got = await world.vaultTSQ.getOnce(TH.BoxScope)
     expect(got).to.deep.equal(boxHeldIn(world)).and.deep.equal(Box0)
     expect(world.queryClient.getQueryData(BoxKey)).to.deep.equal(got)
@@ -234,7 +234,7 @@ describe("VaultTSQ's items", () => {
   it("hold null for a tombstone or nothing stored", async () => {
     const world = await tsqWorldOf(new MemoryVaultDB())
     expect(await world.vaultTSQ.getOnce(TH.BoxScope)).to.be.null
-    cheatStored(world.vaultDB, TH.boxTombOf(Box0))
+    cheatPlant(world.vaultDB, TH.boxTombOf(Box0))
     expect(await world.vaultTSQ.getOnce(TH.BoxScope, { staleTime: 0 })).to.be.null
     expect(Thing.isGone(boxHeldIn(world))).to.eq(true)
   })
@@ -242,9 +242,9 @@ describe("VaultTSQ's items", () => {
   it("show the refusal a newer record raises at the box's Thing as the item's error, its data kept", async () => {
     const world = await tsqWorldOf(new MemoryVaultDB(), (shell) => TH.RefusingThing.make(shell))
     const box2  = TH.nextOf(Box1)
-    cheatStored(world.vaultDB, box2)
+    cheatPlant(world.vaultDB, box2)
     expect(await world.vaultTSQ.getOnce(TH.BoxScope)).to.deep.equal(box2)
-    cheatStored(world.vaultDB, TH.nextOf(box2))
+    cheatPlant(world.vaultDB, TH.nextOf(box2))
     const err = await TH.expectRefusal(world.vaultTSQ.getOnce(TH.BoxScope, { staleTime: 0 }), 'unexpected_error')
     expect(itemQueryAt(world)?.state).to.deep.include({ status: 'error', error: err, data: box2 })
   })
@@ -252,13 +252,13 @@ describe("VaultTSQ's items", () => {
   it("refetch an observed item once where a notice brings a record its Thing refuses, showing the refusal as its error beside its data", async () => {
     const world    = await tsqWorldOf(new MemoryVaultDB(), (shell) => TH.RefusingThing.make(shell))
     const box2     = TH.nextOf(Box1)
-    cheatStored(world.vaultDB, box2)
+    cheatPlant(world.vaultDB, box2)
     const observer = new QueryObserver(world.queryClient, { queryKey: BoxKey })
     const stop     = observer.subscribe(noop)
     await TH.eventually(() => observer.getCurrentResult().data !== undefined)
     const asked    = vi.spyOn(world.vaultDB, 'tryGetThing')
     const box3     = TH.nextOf(box2)
-    cheatStored(world.vaultDB, box3)
+    cheatPlant(world.vaultDB, box3)
     world.notify(noticeOf(box3))
     await TH.eventually(() => observer.getCurrentResult().status === 'error')
     expect(observer.getCurrentResult()).to.deep.include({ data: box2, fetchStatus: 'idle' })
@@ -295,7 +295,7 @@ describe("VaultTSQ's items", () => {
     const world    = await worldWithBox()
     const observer = new QueryObserver(world.queryClient, { queryKey: BoxKey })
     const stop     = observer.subscribe(noop)
-    cheatStored(world.vaultDB, Reborn)
+    cheatPlant(world.vaultDB, Reborn)
     world.notify(noticeOf(TH.boxSparseOf(Reborn)))
     expect(observer.getCurrentResult()).to.deep.include({ data: null, fetchStatus: 'fetching' })
     await vi.waitFor(() => { expect(observer.getCurrentResult().data).to.deep.equal(boxHeldIn(world)).and.deep.equal(Reborn) })
@@ -333,7 +333,7 @@ describe("VaultTSQ.itemQueryOptions", () => {
     const observer = new QueryObserver(world.queryClient, world.vaultTSQ.itemQueryOptions(TH.BoxScope))
     const stop     = observer.subscribe(noop)
     expect(observer.getCurrentResult().data).to.eq(boxHeldIn(world))
-    cheatStored(world.vaultDB, Reborn)
+    cheatPlant(world.vaultDB, Reborn)
     world.notify(noticeOf(TH.boxSparseOf(Reborn)))
     expect(observer.getCurrentResult()).to.deep.include({ data: null, fetchStatus: 'fetching' })
     await vi.waitFor(() => { expect(observer.getCurrentResult().data).to.deep.equal(boxHeldIn(world)).and.deep.equal(Reborn) })
@@ -356,15 +356,15 @@ describe("VaultTSQ.itemQueryOptions", () => {
 describe("VaultTSQ, carrying over the old minder's promises", () => {
   it("has the record a putOnce wrote as the item before it resolves", async () => {
     const world  = await tsqWorldOf(new MemoryVaultDB())
-    const stored = await world.sorted.putOnce({ record: Box0, cited: Shell.childCited(TH.Life0) })
-    expect(world.queryClient.getQueryData(BoxKey)).to.deep.equal(boxHeldIn(world)).and.deep.equal(stored)
+    const actual = await world.sorted.putOnce({ record: Box0, cited: Shell.childCited(TH.Life0) })
+    expect(world.queryClient.getQueryData(BoxKey)).to.deep.equal(boxHeldIn(world)).and.deep.equal(actual)
   })
 
-  it("has a refused put's stored record as the item before the refusal is thrown", async () => {
+  it("has a refused put's actual record as the item before the refusal is thrown", async () => {
     const world = await worldWithBox()
-    cheatStored(world.vaultDB, Box1)
+    cheatPlant(world.vaultDB, Box1)
     const mine = TH.nextOf(Box0, { revtok: TH.revtokOf('mine') })
-    let item: unknown = 'stored'
+    let item: unknown = 'untouched'
     try { await world.sorted.putOnce({ record: mine }) } catch { item = world.queryClient.getQueryData(BoxKey) }
     expect(item).to.deep.equal(boxHeldIn(world)).and.deep.equal(Box1)
   })
@@ -395,7 +395,7 @@ describe("VaultTSQ.getOnce and listOnce", () => {
     const world = await tsqWorldOf(new MemoryVaultDB())
     const before = await world.vaultTSQ.listOnce('box')
     expect(Object.keys(before.items)).to.deep.equal([])
-    cheatStored(world.vaultDB, Box0)
+    cheatPlant(world.vaultDB, Box0)
     const kids = await world.vaultTSQ.listOnce('box')
     expect(Object.keys(kids.items)).to.deep.equal(['openai'])
     expect(world.queryClient.getQueryData(VaultTSQ.listQueryKeyOf(TH.RootScope))).to.deep.equal(kids)

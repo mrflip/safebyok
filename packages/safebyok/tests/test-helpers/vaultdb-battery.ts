@@ -56,7 +56,7 @@ export type VaultDBBatteryWorld = {
   /** A fresh vaultDB with a bank born in it, its three roots as `birthBankAskOf` makes them. */
   bornBank:  () => Promise<VaultDB>
   /** A fresh vaultDB with the main gate alone written in it, by a birth, and no bank. */
-  withGate:  (stored?: GateRecord) => Promise<VaultDB>
+  withGate:  (gate?: GateRecord) => Promise<VaultDB>
   /** Write `thing` into `vaultDB`, born under its parent's life at `parentLifepath`. */
   bornUnder: (vaultDB: VaultDB, thing: ThingRecord, parentLifepath: Lifepath) => Promise<void>
   /** Write each of `boxes` into `vaultDB`, born under the root box's life 0, and return them. */
@@ -89,9 +89,9 @@ function worldOf<DBT extends BatteryVaultDB>({ makeVaultDB, _cheat_rowsOf, watch
     await expectGood(vaultDB.tryBirthBank(birthBankAskOf()))
     return vaultDB
   }
-  async function withGate(stored: GateRecord = gateThingOf()): Promise<VaultDB> {
+  async function withGate(gate: GateRecord = gateThingOf()): Promise<VaultDB> {
     const vaultDB = await fresh()
-    await expectGood(vaultDB.tryWriteThing(birthAskOf(stored)))
+    await expectGood(vaultDB.tryWriteThing(birthAskOf(gate)))
     return vaultDB
   }
   async function boxesBorn(vaultDB: VaultDB, ...boxes: BoxRecord[]): Promise<BoxRecord[]> {

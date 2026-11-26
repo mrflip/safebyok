@@ -306,10 +306,10 @@ describe("AskChecks.getAsk and AskChecks.listAsk", () => {
 })
 
 describe("checkedWriteAsk(ask), of the main gate", () => {
-  const stored = TH.gateThingOf()
-  const next   = TH.nextGateOf(stored)
+  const ante   = TH.gateThingOf()
+  const next   = TH.nextGateOf(ante)
   // The helper builds an ask of any kind: this one is the gate's.
-  const good   = TH.replaceAskOf(stored, next)
+  const good   = TH.replaceAskOf(ante, next)
 
   it("accepts a birth and a replacement", () => {
     expect(checkedWriteAsk(TH.birthAskOf())).to.deep.equal(TH.birthAskOf())
@@ -318,11 +318,11 @@ describe("checkedWriteAsk(ask), of the main gate", () => {
 
   const lifeseq1 = Lifeseq.ofLifenum(1)
   const lifeseq2 = Lifeseq.ofLifenum(2)
-  const noTestimony = { revtok: stored.revtok, revseq: 0, am: 'a' as const, lifepath: stored.lifepath }
+  const noTestimony = { revtok: ante.revtok, revseq: 0, am: 'a' as const, lifepath: ante.lifepath }
   const BadRecordCases: readonly (readonly [WriteAsk, string, string])[] = [
     // the record does not follow the one cited:
     [{ ...good, record: { ...next, revseq: 2 } },                                    Phrases.RevseqNotNext,      'a revseq that skips one'],
-    [{ ...good, record: { ...next, revtok: stored.revtok } },                        Phrases.RevtokNotNew,       'a revtok that is not new'],
+    [{ ...good, record: { ...next, revtok: ante.revtok } },                        Phrases.RevtokNotNew,       'a revtok that is not new'],
     [TH.birthAskOf(TH.gateThingOf({ revtok: Shell.Cited.revtok })),                  Phrases.RevtokNotNew,       'the void revtok'],
     [{ ...good, record: { ...next, lifeseq: lifeseq2, lifepath: lifeseq2 } },        Phrases.LifeseqNotNext,     'a new life where am stays'],
     [TH.birthAskOf(TH.gateThingOf({ born_at: TH.T0 - 1 })),                          Phrases.BornAtNotNow,       'a birth born before it is written'],
@@ -342,7 +342,7 @@ describe("checkedWriteAsk(ask), of the main gate", () => {
     [{ ...good, cited: { revtok: TH.revtokOf('0'), revseq: 0 } } as never,                   'lifepath',                 'a citation of too little'],
     [{ ...good, cited: { ...noTestimony, am: 'x' } },                                Phrases.LifeseqParity,      'a citation whose am its lifepath belies'],
     [{ ...good, cited: { ...noTestimony, lifepath: `${Life0}/${Life0}` } },          Phrases.LifepathNotKept,    'a citation of another lifepath'],
-    [{ ...good, cited: { ...stored, wayins: {} } } as never,                        'wayins.main',              'a cited gate whose wayins fail'],
+    [{ ...good, cited: { ...ante, wayins: {} } } as never,                        'wayins.main',              'a cited gate whose wayins fail'],
   ]
 
   for (const [ask, said, blurb] of BadRecordCases) {

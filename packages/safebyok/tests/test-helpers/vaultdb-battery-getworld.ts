@@ -43,7 +43,7 @@ export function describeVaultDBGetWorld({ fresh, bornBank, rowsOf }: VaultDBBatt
       expect(await vaultDB.tryGetWorld(getWorldAskOf())).to.deep.include({ ok: true, act: 'got', val: { ...roots, gate: Shells.gate, root: Shells.root }, banktok: roots.bank.lifetok })
     })
 
-    it("answers 'same' for each root stored at the revision the ask tracks, else the root stored", async () => {
+    it("answers 'same' for each root stored at the revision the ask tracks, else the actual root", async () => {
       const vaultDB = await bornBank()
       const track   = trackOf(bankThingOf(), gateThingOf(), rootBoxOf({ revseq: 3 }))
       expect(await vaultDB.tryGetWorld(getWorldAskOf({ track }))).to.deep.include({ ok: true, tracked: { bank: 'same', gate: 'same', box: roots.root } })
