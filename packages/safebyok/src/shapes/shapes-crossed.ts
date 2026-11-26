@@ -1,5 +1,5 @@
-/** What a server's vaultDB answer carries across a wire to a client's vaultDB, for an adapter whose server runs a whole vaultDB: the checks of a refusal, of `tracked`, a birth's or world's roots and a listing, as they cross.
- * Each refuses `storage_issue`: to the client, the server is its storage, and one that sends a part that fails its check is out of step or broken.
+/** The parts of a vaultDB answer that cross a wire from a server's vaultDB to a client's: their checks, and a refusal's conversion to and from wire form.
+ * Each check refuses `storage_issue`. To the client, the server is its storage, and a part that fails its check means the server is out of step or broken.
  */
 
 import { isNull, omitBy } from 'es-toolkit'

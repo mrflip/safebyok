@@ -471,10 +471,12 @@ export function crossedGotOf(ask: GetAsk, act: string, raw: unknown): CrossedGot
   return isRefusedAct(tabled) ? { ok: false, act: tabled, record } : { ok: true, act: tabled, record }
 }
 
-/** A refusal's act and the Thing it names, checked: what a concrete adapter's refused report carries beside its banktok, tracked and read_tc. */
+/** The act and Thing of a refusal that crossed a wire, checked. */
 export type CrossedRefused = Readonly<{ act: EX.RefusedAct, record: ThingRecord | VoidSentinel }>
 
-/** The act and Thing a server's refusal of a write carried, checked: the Thing at the ask's scope, or the shell there, and `act` the refusal the act tables give it. */
+/** The act and Thing of a write's refusal that crossed a wire, checked.
+ * The Thing must be the one at the ask's scope, or its shell, and the act must be the refusal the act tables give over it. A mismatch refuses `storage_issue`.
+ */
 export function crossedRefusedWriteOf(ask: WriteAsk, act: string, raw: unknown): CrossedRefused {
   const record = crossedThingOf(ask, raw)
   const tabled = writeActOf(ask, BaseThing.isVoidSentinel(record) ? null : record)
@@ -482,7 +484,9 @@ export function crossedRefusedWriteOf(ask: WriteAsk, act: string, raw: unknown):
   return { act: tabled, record }
 }
 
-/** The act and Thing a server's refusal of a birth carried, checked: one of the three roots `puts` writes, stored or its shell, and `act` the refusal the put table gives its put. */
+/** The act and Thing of a birth's refusal that crossed a wire, checked.
+ * The Thing must be one of the three roots `puts` writes, or its shell, and the act must be the refusal the put table gives that root's put. A mismatch refuses `storage_issue`.
+ */
 export function crossedRefusedBirthOf(puts: BirthPuts, act: string, raw: unknown): CrossedRefused {
   const record = crossedNamedOf(puts[0], raw)
   const put    = puts.find(({ labelpath }) => (labelpath === record.labelpath))
@@ -544,8 +548,9 @@ export type CrossedListing = Readonly<{ val: unknown, parentage: unknown, deltas
 /** A listing that crossed a wire, checked: what a concrete adapter's good report of it carries beside its envelope. */
 export type CrossedListed = Pick<Extract<ListThingsActual, { ok: true }>, 'kids' | 'parentage' | 'deltas' | 'damaged_rows'>
 
-/** The listing a server's good answer to `ask` carried, checked: its live parent, its children and the damaged ones, each one label under the parent,
- * and its kids, which must be those the parent and children make, in labelpath order.
+/** The listing a server's good answer to `ask` carried, checked.
+ * Its parent must be live, and each child, sound or damaged, must be one label under it. The sound children must be in labelpath
+ * order, and its kids must be the ones its parent and children make. Anything else refuses `storage_issue`.
  */
 export function crossedListingOf(ask: ListAsk, crossed: CrossedListing): CrossedListed {
   const { val: { read_tc: _read_tc, ...kidsCrossed }, parentage, deltas: rawDeltas, damaged_rows } = CrossedChecks.listing.parse(crossed)
