@@ -67,14 +67,13 @@ call made before then refuses as `identity_revoked`.
 * **`getUserId` decides who may reach which bank.** Every call names the `userid` whose Things it reads or writes, and
   each function refuses a caller who is signed out (`getUserId` returns null, undefined or `''`) or signed in as anyone
   else, with `identity_revoked`. Use the same id your app gives the core as `userid`.
-* **Each call is one Convex query or mutation.** A write fetches the Thing at its scope, the nearest Thing above it, and
-  the bank, main gate and root box, and writes in the same mutation, so it is written only over the Thing it expected. Convex runs each
-  mutation as one serializable transaction.
+* **Each call is one Convex query or mutation.** A write reads the Thing at its scope and writes over it in the same
+  mutation, so it is written only over the Thing it cites. Convex runs each mutation as one serializable transaction.
 * **Each write is checked again on your deployment.** Anyone signed in can call these functions directly, so the
-  component checks each ask with the core's own checks, refusing one that fails them with `bad_record`, and decides
-  whether to write with the core's own classifier. The client classifies what the component fetched to the same answer,
-  and refuses `unexpected_error` should the two disagree on whether it wrote: a component out of step with the client's
-  copy of safebyok.
+  component checks each ask with the core's own checks, refusing one that fails them with `bad_record`, decides whether
+  to write with the core's own predicate, and hands back what it observed. The client answers from that alone, and
+  refuses `storage_issue` should it disagree with the component on whether it wrote: a component out of step with the
+  client's copy of safebyok.
 * **A watch hears every device's writes**, from a `watchThings` query kept open on the bank. Each result holds only
   the Things committed since the last, and the watch then subscribes again from the newest; it tells its listener of
   each Thing written after it started, once. It is Convex's reactive query throughout: nothing polls.
@@ -87,10 +86,12 @@ call made before then refuses as `identity_revoked`.
 
 ## What is stored
 
-One table inside the component, `things`: each Thing as the core wrote it, beside its `userid`, `banklabel` and
-`labelpath`, indexed `by_scope` on those three, so one range fetches the children of a Thing. Each also holds
-`commit_ts`, the timestamp Convex committed its last write at, indexed `by_commit` after `userid` and `banklabel`, so
-one range fetches what a bank's watch has not yet heard. A deleted Thing stays as its tombstone.
+Three tables inside the component, one for each kind of Thing: `bank_things`, `gate_things` and `box_things`, as
+`safebyok-postgres` has. Each document is a Thing as the core wrote it, a field for each of its fields; a field that is
+an object (a gate's `wayins`, a box's `sidecar` and `whisper_sealed`) is stored as it is. Each table is indexed
+`by_scope` on `userid`, `banklabel` and `labelpath`, so one range fetches the children of a Thing. Each document also
+holds `commit_ts`, the timestamp Convex committed its last write at, indexed `by_commit` after `userid` and `banklabel`,
+so one range of each table fetches what a bank's watch has not yet heard. A deleted Thing stays as its tombstone.
 
 **How big a bank can be.** `stats` reads every Thing of a bank in one query, within a Convex query's limits (32,000
 documents, 16 MiB read), as may a watch that comes back after long enough away, so a bank past that makes its stats
@@ -102,7 +103,9 @@ character outside printable ASCII, or runs past 1024 characters. A put of a box 
 depth, refuses `bad_record` before it is sent; the refusal's cause names the key, and nothing of the sidecar's values.
 To keep such keys, store them inside a string of your own, a JSON text, say.
 
-**Upgrading.** Until 1.0 there is no migration. A release that changes the table says so in its changelog. Coming from
+**Upgrading.** Until 1.0 there is no migration. A release that changes the tables says so in its changelog. Coming from
+an earlier `safebyok-convex`, whose one table was `things`: that table is not read, so its vaults read as absent. Export
+what you need, then clear `things` on the dashboard's Data page (pick the `safebyok` component) before you deploy. Coming from
 `safebyok-convex-big`, the old component's tables (`safebyok_banks`, `safebyok_gates`, `safebyok_vaults`,
 `safebyok_boxes`, `safebyok_tallies`) are not read: export what you need, then clear them on the dashboard's Data page
 (pick the `safebyok` component) before you deploy, since Convex refuses to drop a table that still has rows.
