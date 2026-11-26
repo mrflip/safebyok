@@ -188,12 +188,12 @@ listing holds only what the vaultDB answered. Written by core_first thread 3, 20
   - build a UUID version 7 from a sequence in SQL: a construction of our own, for a crossing.
 * workaround: none needed. The next list, or the next box new to the listing, lists it.
 
-Steps to reproduce: two lists of one parent on two pool connections, the first to make its `read_tc` running its
-statement second, after a box is written between the two statements.
+Steps to reproduce: two lists of one parent on two pool connections at once, a box written between their snapshots,
+and the list whose snapshot came first making its `uuidv7()` second.
 
-Reasoning for wontfix: a crossing of two lists and a write of milliseconds (CLAUDE.md, *Hours separate updates*), or a
-clock out of step; the listing still holds only what the vaultDB answered. Written by the core_first thread 3 reviewer,
-2026-11-22, awaiting a ruling.
+Reasoning for wontfix: a crossing of two lists and a write of milliseconds (CLAUDE.md, *Hours separate updates*); the
+listing still holds only what the vaultDB answered. Written by the core_first thread 3 reviewer, 2026-11-22, awaiting a
+ruling.
 
 ### A lock that lands while a draft's field is on its way shows the field on a locked bank
 
