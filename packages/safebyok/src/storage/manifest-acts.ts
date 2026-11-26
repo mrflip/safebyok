@@ -170,11 +170,8 @@ function listActOf({ presence }: GetTags): 'gotlive' | 'void' | 'gone' {
   return presence
 }
 
-/** The tags the put table reads. */
-type PutTableTags = Pick<WriteTags, 'presence' | 'revtok_cmp' | 'revseq_cmp' | 'lifepath_eq'>
-
 /** The act of a write of a live record: see the put table in `notes/answer-contract.md`. The first matching row wins. */
-export function putActOf(ask: WriteAsk, tags: PutTableTags): EX.PutAct | EX.RefusedAct {
+export function putActOf(ask: WriteAsk, tags: Pick<WriteTags, 'presence' | 'revtok_cmp' | 'revseq_cmp' | 'lifepath_eq'>): EX.PutAct | EX.RefusedAct {
   const { presence, revtok_cmp, revseq_cmp } = tags
   if (revtok_cmp === '=next')                                                           { return 'retcon' }
   if (revseq_cmp === 'ahead')                                                           { return 'ahead' }
