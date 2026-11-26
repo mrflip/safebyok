@@ -1,9 +1,10 @@
 # Thread 2: manifest_rest (2026-11-26)
 
-Branch `20261126-manifest_rest`, PR [#937](https://github.com/mrflip/safebyok/pull/937), stacked on [#934](https://github.com/mrflip/safebyok/pull/934) (thread 1, filed at `56c5fda59`). Proved: `safebyok` 2,412
-tests, typecheck and lint green; demos envman, knockknock and react typecheck. Red, as expected: `safebyok-indexeddb`,
-`safebyok-postgres`, `safebyok-convex` (threads 3, 4, 5 port them) and demo `dojo`, which imports safebyok-indexeddb
-(already red after thread 1).
+Branch `20261126-manifest_rest`, PR [#937](https://github.com/mrflip/safebyok/pull/937), stacked on [#934](https://github.com/mrflip/safebyok/pull/934) (thread 1, filed at `56c5fda59`). Proved: `pnpm justify` after the catch-up rebase:
+red only in `safebyok-indexeddb` (115 of 130 tests fail), `safebyok-postgres` (107 of 170) and `safebyok-convex` (149 of
+231), each also red in lint and typecheck; threads 3, 4 and 5 port them. Green elsewhere: `safebyok` 2,412 tests,
+`safebyok-react` 339, e2e 576, root 331, the demos (react 99, envman 24, knockknock 26), every `-big` package. Demo
+`dojo` imports safebyok-indexeddb and does not typecheck until thread 3 (justify does not typecheck it).
 
 * **Built**:
   - `AdapterVaultDB.tryListThings`, `tryBirthBank`, `tryGetWorld`, `tryStats` on thread 1's pipeline:
