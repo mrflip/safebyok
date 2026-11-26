@@ -9,25 +9,19 @@ import { VaultOperations } from '../src/index'
 import { VaultSchemaSdl, vaultResolvers } from '../src/server'
 import * as TH from './test-helpers'
 
-// == [Running]: overTheWire, runAsk, wireFormOf, watching
-
-/** Round-trip `val` through JSON, as the wire would. */
-function overTheWire(val: unknown): unknown {
-  const text = JSON.stringify(val)
-  return JSON.parse(text) as unknown
-}
+// == [Running]: runAsk, wireFormOf, watching
 
 /** Run `document` with `ask` against `schema` signed in as `userid`, and return its one root field's answer after a JSON round trip. */
 async function runAsk(schema: GraphQLSchema, document: string, ask: object, userid: DB.Userid | null = 'u1'): Promise<Record<string, unknown>> {
-  const result = await graphql({ schema, source: document, variableValues: { ask: overTheWire(ask) }, contextValue: { userid } satisfies TH.TestContext })
+  const result = await graphql({ schema, source: document, variableValues: { ask: TH.overTheWire(ask) }, contextValue: { userid } satisfies TH.TestContext })
   expect(result.errors, document).to.be.undefined
-  const [answer] = Object.values(overTheWire(result.data) as Record<string, unknown>)
+  const [answer] = Object.values(TH.overTheWire(result.data) as Record<string, unknown>)
   return answer as Record<string, unknown>
 }
 
 /** A vaultDB's answer as it should cross: less its ask, its refusal allowlisted, null for each field it lacks, its read_tc set aside. */
 function wireFormOf({ ask: _ask, ...answer }: { ask: unknown, ok: boolean, err?: DB.VaultError, read_tc: string }): unknown {
-  return readTcMasked(overTheWire({ val: null, dbhas: null, ...answer, err: answer.err ? DB.crossedErrOf(answer.err) : null }) as Record<string, unknown>)
+  return readTcMasked(TH.overTheWire({ val: null, dbhas: null, ...answer, err: answer.err ? DB.crossedErrOf(answer.err) : null }) as Record<string, unknown>)
 }
 
 /** `answer` with each read_tc it has set aside, its own and its listing's, once checked to be one. */
@@ -53,7 +47,7 @@ async function watching(schema: GraphQLSchema, context: TH.TestContext) {
       const next = await stream.next()
       if (next.done === true) { return null }
       expect(next.value.errors).to.be.undefined
-      return overTheWire(next.value.data?.['safebyokWatchThings']) as Record<string, unknown>
+      return TH.overTheWire(next.value.data?.['safebyokWatchThings']) as Record<string, unknown>
     },
   }
 }
@@ -172,7 +166,7 @@ describe("vaultResolvers", () => {
   it("sends a refusal as its kind, message and allowlisted meta, never its cause", async () => {
     const answer = await runAsk(TH.schemaOver(new UnreachableVaultDB()), VaultOperations.getThing, TH.getGateAskOf())
     const refusal = await TH.expectBad(new UnreachableVaultDB().tryGetThing(TH.getGateAskOf()))
-    expect(answer).to.deep.include({ ok: false, tracked: 'unread', err: overTheWire(DB.crossedErrOf(refusal)) })
+    expect(answer).to.deep.include({ ok: false, tracked: 'unread', err: TH.overTheWire(DB.crossedErrOf(refusal)) })
     expect(JSON.stringify(answer)).not.to.include('hunter2')
   })
 
@@ -190,7 +184,7 @@ describe("vaultResolvers", () => {
     const served = new DB.MemoryVaultDB()
     const tryGetThing = vi.spyOn(served, 'tryGetThing')
     const schema = makeExecutableSchema({ typeDefs: VaultSchemaSdl, resolvers: vaultResolvers({ vaultDB: served, getUserId: sessionStoreDown }) })
-    const result = await graphql({ schema, source: VaultOperations.getThing, variableValues: { ask: overTheWire(TH.getGateAskOf()) }, contextValue: {} })
+    const result = await graphql({ schema, source: VaultOperations.getThing, variableValues: { ask: TH.overTheWire(TH.getGateAskOf()) }, contextValue: {} })
     expect(result.errors).to.have.lengthOf(1)
     expect(tryGetThing).not.toHaveBeenCalled()
   })

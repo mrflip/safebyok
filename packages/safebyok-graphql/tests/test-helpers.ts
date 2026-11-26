@@ -16,7 +16,13 @@ import { VaultSchemaSdl, vaultResolvers } from '../src/server'
 // Re-export the core's test helpers, so a test here imports this one module as TH.
 export * from 'safebyok/testing'
 
-// == [The server]: TestContext, schemaOver
+// == [The server]: overTheWire, TestContext, schemaOver
+
+/** Round-trip `val` through JSON, as the wire would. */
+export function overTheWire(val: unknown): unknown {
+  const text = JSON.stringify(val)
+  return JSON.parse(text) as unknown
+}
 
 /** The test server's per-request context: the signed-in user's id, or null. */
 export type TestContext = { userid: Userid | null }

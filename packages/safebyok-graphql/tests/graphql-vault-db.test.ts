@@ -52,23 +52,17 @@ function watched(atOnce?: FakeResult) {
 async function servedOf(document: string, ask: object): Promise<Record<string, unknown>> {
   const memory = new DB.MemoryVaultDB()
   await TH.expectGood(memory.tryBirthBank(TH.birthBankAskOf()))
-  const result = await graphql({ schema: TH.schemaOver(memory), source: document, variableValues: { ask: overTheWire(ask) }, contextValue: { userid: 'u1' } })
-  const [answer] = Object.values(overTheWire(result.data) as Record<string, unknown>)
+  const result = await graphql({ schema: TH.schemaOver(memory), source: document, variableValues: { ask: TH.overTheWire(ask) }, contextValue: { userid: 'u1' } })
+  const [answer] = Object.values(TH.overTheWire(result.data) as Record<string, unknown>)
   return answer as Record<string, unknown>
 }
 
-/** Round-trip `val` through JSON, as the wire would. */
-function overTheWire(val: unknown): unknown {
-  const text = JSON.stringify(val)
-  return JSON.parse(text) as unknown
-}
-
 /** A refusal as it crosses, with no meta. */
-function crossedErrOf(refusalkind: DB.Refusalkind, message: string) { return { refusalkind, message, meta: null } }
+function bareCrossedErrOf(refusalkind: DB.Refusalkind, message: string) { return { refusalkind, message, meta: null } }
 
 const gotNotice     = { safebyokWatchThings: { __typename: 'SafebyokNotice', record: TH.gateThingOf(), banktok: TH.SenderKnows.banktok, read_tc: DB.readTcNow(), err: null, ended: false } }
-const troubleNotice = { safebyokWatchThings: { record: null, banktok: null, read_tc: null, err: crossedErrOf('storage_unavailable', 'The datastore hiccuped'), ended: false } }
-const revokedNotice = { safebyokWatchThings: { record: null, banktok: null, read_tc: null, err: crossedErrOf('identity_revoked', 'Signed out'), ended: true } }
+const troubleNotice = { safebyokWatchThings: { record: null, banktok: null, read_tc: null, err: bareCrossedErrOf('storage_unavailable', 'The datastore hiccuped'), ended: false } }
+const revokedNotice = { safebyokWatchThings: { record: null, banktok: null, read_tc: null, err: bareCrossedErrOf('identity_revoked', 'Signed out'), ended: true } }
 // --
 
 describe("GraphQLVaultDB's constructor", () => {
@@ -124,7 +118,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
 
   it("refuses an answer that is not one a server sends, as storage_issue", async () => {
     const served = await servedOf(VaultOperations.getThing, TH.getGateAskOf())
-    for (const malformed of [{ ok: true }, { ...served, act: 'gotsomething' }, { ...served, err: crossedErrOf('bad_record', 'No') }]) {
+    for (const malformed of [{ ok: true }, { ...served, act: 'gotsomething' }, { ...served, err: bareCrossedErrOf('bad_record', 'No') }]) {
       const { vaultDB } = fakeClient({ data: { safebyokGetThing: malformed } })
       await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
     }
@@ -159,7 +153,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
 
   it("refuses a refusal with an act no datastore reports, where the server's verb did not throw, as storage_issue", async () => {
     const served = await servedOf(VaultOperations.getThing, TH.getGateAskOf())
-    const unthrown = { ...served, ok: false, act: 'unclassified_storing', val: null, dbhas: TH.gateThingOf(), err: crossedErrOf('storage_issue', 'No') }
+    const unthrown = { ...served, ok: false, act: 'unclassified_storing', val: null, dbhas: TH.gateThingOf(), err: bareCrossedErrOf('storage_issue', 'No') }
     const { vaultDB } = fakeClient({ data: { safebyokGetThing: unthrown } })
     const err = await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
     expect(err.message).not.to.eq('No')
