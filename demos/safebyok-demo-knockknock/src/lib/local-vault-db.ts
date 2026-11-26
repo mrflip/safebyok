@@ -1,6 +1,6 @@
 /** A vaultDB in this tab's memory, saved to localStorage after each write, so a reload finds the vault again. Demo code: a real host stores its vault on its backend. */
 
-import { type BirthBankActual, type BirthBankAsk, type BirthPuts, type Labelpath, MemoryDatastore, MemoryVaultDB, type ThingWatchScope, type WriteAsk, type WriteManifest } from 'safebyok/storage'
+import { type BirthBankAsk, type BirthManifest, type BirthPuts, type Labelpath, MemoryDatastore, MemoryVaultDB, type ThingWatchScope, type WriteAsk, type WriteManifest } from 'safebyok/storage'
 
 /** The prefix of each bank's entry in localStorage. */
 const SavedPrefix = 'knockknock:vault:'
@@ -29,10 +29,10 @@ export class LocalStorageVaultDB extends MemoryVaultDB {
     return manifest
   }
 
-  protected override doBirthBank(ask: BirthBankAsk, puts: BirthPuts): BirthBankActual {
-    const actual = super.doBirthBank(ask, puts)
+  protected override doBirthBank(ask: BirthBankAsk, puts: BirthPuts): BirthManifest {
+    const manifest = super.doBirthBank(ask, puts)
     this.#save(ask)
-    return actual
+    return manifest
   }
 
   /** Save the Things of `scope`'s bank to storage. */
