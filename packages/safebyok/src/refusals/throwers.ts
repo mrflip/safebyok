@@ -2,6 +2,7 @@
 
 // The rules for a refusal, its thrower and its phrase are at the top of safebyok-big's refusals/throwers.ts.
 
+import { isNull, omitBy } from 'es-toolkit'
 import { Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
 import { sanitizeForeignError, unexpectedError } from 'safebyok-big/refusals/throwers'
 import * as Phrases from '../phrases'
@@ -117,12 +118,9 @@ export function storageCallRefused(oplabel: string, thrown: unknown): Errors.Vau
 // Ported from safebyok-big's shapes-bank-answers.ts.
 /** The refusal `crossed` stands for, as it crossed a wire: its meta what crossed, with `answered` laid over it, and `rows` handed to the answer. */
 export function vaultErrorOfCrossed({ refusalkind, message, meta }: CrossedErr, answered: Errors.RefusalMeta, rows: Errors.RefusalRows): Errors.VaultError {
-  const crossedMeta = withoutNulls(meta ?? {}) as Errors.RefusalMeta
+  const crossedMeta = omitBy(meta ?? {}, isNull) as Errors.RefusalMeta
   return new Errors.VaultError(refusalkind, message, { meta: { ...crossedMeta, ...answered }, rows })
 }
-
-/** The fields of `crossed` that are not null. */
-function withoutNulls(crossed: object): Record<string, unknown> { return Object.fromEntries(Object.entries(crossed).filter(([, field]) => field !== null)) }
 
 /** A `bad_record` refusal of a write over `stored`, the live Thing whose born_at it changes. */
 export function bornAtNotStored(stored: ThingRecord | null): Errors.VaultError {
