@@ -59,6 +59,14 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
     })
   }
 
+  it("adds a passkey wayin under an ask that names its storage policy twice", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const gate    = TH.gateThingOf()
+    const added   = TH.nextGateOf(gate, { wayins: TH.WithPasskey })
+    vaultDB._cheat_things(TH.ThingBank).set('gate', gate)
+    expect(await vaultDB.tryWriteThing(TH.replaceAskOf(gate, added, { policies: ["add_passkey", "add_passkey"] }))).to.deep.include({ ok: true, act: 'replaced' })
+  })
+
   it("refuses a listed child filed at another scope as a broken store", async () => {
     const vaultDB = new MemoryVaultDB()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))

@@ -51,7 +51,7 @@ function demandTagsOfActual(ask: WriteAsk, manifest: ScribedWriteManifest): void
 /** Refuse tags that disagree with the ask: a birth where it cites no shell, or verdicts for other storage policies than it names. */
 function demandTagsOfAsk({ cited, options }: WriteAsk, { revtok_cmp, policies }: WriteTags): void {
   const named = options?.policies ?? []
-  const isPoliciesExact = (Object.keys(policies).length === named.length) && named.every((policy) => policies[policy] !== undefined)
+  const isPoliciesExact = (Object.keys(policies).length === new Set(named).size) && named.every((policy) => policies[policy] !== undefined)
   const isBirthOfShell  = (revtok_cmp !== 'birth') || (cited.revtok === SX.VoidRevisionTok)
   if (! (isPoliciesExact && isBirthOfShell)) { throw Throwers.tagsOfOtherAsk() }
 }
