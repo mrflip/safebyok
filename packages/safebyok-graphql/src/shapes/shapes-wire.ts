@@ -4,7 +4,10 @@
 
 import * as DB from 'safebyok/storage'
 
-// == [Wire forms]: WireAnswer, WireNotice
+// == [Wire forms]: CrossedErrExtension, WireAnswer, WireNotice
+
+/** The key of a GraphQL error's `extensions` under which a refusal crosses, as `crossedErrOf` gives it, where the server could not serve the request. */
+export const CrossedErrExtension = 'safebyokErr'
 
 /** A vaultDB verb's answer as it crosses: the answer less its ask, its refusal reduced to what may cross, and null for each field the schema has and it lacks. */
 export type WireAnswer = Readonly<{

@@ -1,9 +1,16 @@
-/** A browser-side vaultDB that sends each verb to your GraphQL server, where `vaultResolvers` answers it from the server's own vaultDB. */
+/** A browser-side vaultDB that sends each verb to your GraphQL server, where `vaultResolvers` answers it from the server's own vaultDB.
+ *
+ * GraphQL only carries each answer, so a verb answers here as the server's vaultDB answered it. Where trouble lies decides how you meet it:
+ * - The server's vaultDB refused, or failed in its datastore (`storage_issue`, `unexpected_error` or any other kind): the bad answer it gave, as it gave it.
+ * - The server could not serve the request, as where its `getUserId` throws: a bad answer carrying that refusal, `unexpected_error` or the VaultError `getUserId` threw. A watch ends with it.
+ * - The request broke this package's rules, as a watch scope that fails its check, which only another client sends: likewise, carrying the refusal of the rule (`bad_record`).
+ * - GraphQL itself failed, as where the server serves some other schema: a bad answer of `unexpected_error`, which leaves the server's text behind. A request that fails in the network is `storage_unavailable`.
+ */
 
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import * as DB from 'safebyok/storage'
 import { Classifier } from 'safebyok/storage'
-import { WireChecks } from './shapes/shapes-wire'
+import { CrossedErrExtension, WireChecks } from './shapes/shapes-wire'
 import { networkTroubleOf, schemaNotServed, serverErred, watchEnded } from './refusals/throwers'
 import { VaultOperations } from './vault-operations'
 import * as Phrases from './phrases'
@@ -174,7 +181,7 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
 }
 // --
 
-// == [Answers]: CheckedAnswer, RefusedAnswer, besideOf, throwIfThrown, refusedActOf, fieldOf, troubleOf, hearNotice
+// == [Answers]: CheckedAnswer, RefusedAnswer, besideOf, throwIfThrown, refusedActOf, fieldOf, troubleOf, carriedErrOf, hearNotice
 
 /** What every answer carries, as its check read it. */
 type CheckedAnswer = Readonly<{ banktok: DB.Lifetok, tracked: unknown, read_tc: DB.ReadTc }>
@@ -206,8 +213,22 @@ function fieldOf({ error: err, data }: OperationResult<unknown>, fieldname: stri
   return (data as Record<string, unknown>)[fieldname]
 }
 
-/** The refusal for a failed operation: {@link networkTroubleOf} for a network failure, else {@link serverErred}. */
-function troubleOf(err: CombinedError): DB.VaultError { return (err.networkError === undefined) ? serverErred() : networkTroubleOf(err) }
+// A server's GraphQL error arrives among `graphQLErrors`; one that a subscription's `next` rejected with can arrive, in-process, as the `networkError`.
+/** The refusal for a failed operation: the one a GraphQL error carries across, checked; else {@link networkTroubleOf} for a network failure, else {@link serverErred}. */
+function troubleOf(err: CombinedError): DB.VaultError {
+  const carried = [...err.graphQLErrors, err.networkError].map((gqlErr) => carriedErrOf(gqlErr)).find((crossed) => crossed !== undefined)
+  if (carried !== undefined) {
+    const report = DB.CrossedChecks.err.safeParse(carried)
+    return report.success ? DB.refusedOverWire(report.data) : DB.storageIssue()
+  }
+  return (err.networkError === undefined) ? serverErred() : networkTroubleOf(err)
+}
+
+/** The refusal a GraphQL error carries under {@link CrossedErrExtension}, raw, or undefined where it carries none. */
+function carriedErrOf(gqlErr: unknown): unknown {
+  const extensions: unknown = (typeof gqlErr === 'object') && (gqlErr !== null) && ('extensions' in gqlErr) ? gqlErr.extensions : undefined
+  return ((typeof extensions === 'object') && (extensions !== null)) ? (extensions as Record<string, unknown>)[CrossedErrExtension] : undefined
+}
 
 /** Pass the Thing a notice in `result` carries to `receive`, or its trouble to `onBadNews`. Return the trouble where the notice is the watch's last, else null. */
 function hearNotice({ data }: OperationResult<unknown>, receive: (received: DB.Received) => void, onBadNews: (news: DB.VaultError) => void): DB.VaultError | null {

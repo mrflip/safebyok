@@ -7,9 +7,10 @@ import { makeExecutableSchema } from '@graphql-tools/schema'
 import * as DB from 'safebyok/storage'
 import { VaultOperations } from '../src/index'
 import { VaultSchemaSdl, vaultResolvers } from '../src/server'
+import { CrossedErrExtension } from '../src/shapes/shapes-wire'
 import * as TH from './test-helpers'
 
-// == [Running]: runAsk, wireFormOf, watching
+// == [Running]: runAsk, wireFormOf, watching, expectCarries
 
 /** Run `document` with `ask` against `schema` signed in as `userid`, and return its one root field's answer after a JSON round trip. */
 async function runAsk(schema: GraphQLSchema, document: string, ask: object, userid: DB.Userid | null = 'u1'): Promise<Record<string, unknown>> {
@@ -50,6 +51,13 @@ async function watching(schema: GraphQLSchema, context: TH.TestContext) {
       return TH.overTheWire(next.value.data?.['safebyokWatchThings']) as Record<string, unknown>
     },
   }
+}
+
+/** Expect `gqlErr` to be a GraphQL error carrying a refusal of `refusalkind`, and nothing of what getUserId threw. */
+function expectCarries(gqlErr: unknown, refusalkind: DB.Refusalkind): void {
+  const carried = (gqlErr as { extensions?: Record<string, unknown> }).extensions?.[CrossedErrExtension]
+  expect(DB.CrossedChecks.err.parse(carried)).to.have.property('refusalkind', refusalkind)
+  expect(JSON.stringify([String(gqlErr), carried])).not.to.include('session store')
 }
 // --
 
@@ -110,8 +118,13 @@ class EndingVaultDB extends DB.MemoryVaultDB {
 /** The stop of a watch that has nothing to stop. */
 function noUnwatching(): void { /* nothing to stop */ }
 
-/** A getUserId whose session store is down. */
+/** A getUserId whose session store is down. Its message has text that must never reach a browser. */
 function sessionStoreDown(): never { throw new Error('The session store is down') }
+
+/** vaultResolvers over `served`, signing each request in by `getUserId`. */
+function schemaSignedInBy(served: DB.VaultDB, getUserId: (context: never) => DB.Userid | null): GraphQLSchema {
+  return makeExecutableSchema({ typeDefs: VaultSchemaSdl, resolvers: vaultResolvers({ vaultDB: served, getUserId }) })
+}
 
 /** A getUserId that signs every request in as u1. */
 function signedInAsU1(): DB.Userid { return 'u1' }
@@ -189,13 +202,18 @@ describe("vaultResolvers", () => {
     expect(tryWriteThing).not.toHaveBeenCalled()
   })
 
-  it("leaves an error its getUserId throws to GraphQL, without calling its vaultDB", async () => {
+  it("fails with a GraphQL error carrying the refusal for what its getUserId throws, without calling its vaultDB", async () => {
     const served = new DB.MemoryVaultDB()
     const tryGetThing = vi.spyOn(served, 'tryGetThing')
-    const schema = makeExecutableSchema({ typeDefs: VaultSchemaSdl, resolvers: vaultResolvers({ vaultDB: served, getUserId: sessionStoreDown }) })
-    const result = await graphql({ schema, source: VaultOperations.getThing, variableValues: { ask: TH.overTheWire(TH.getGateAskOf()) }, contextValue: {} })
+    const result = await graphql({ schema: schemaSignedInBy(served, sessionStoreDown), source: VaultOperations.getThing, variableValues: { ask: TH.overTheWire(TH.getGateAskOf()) }, contextValue: {} })
     expect(result.errors).to.have.lengthOf(1)
+    expectCarries(result.errors?.[0], 'unexpected_error')
     expect(tryGetThing).not.toHaveBeenCalled()
+  })
+
+  it("carries a VaultError its getUserId throws as it is", async () => {
+    const result = await graphql({ schema: schemaSignedInBy(new DB.MemoryVaultDB(), () => { throw DB.storageUnavailable(new Error('The session store is down')) }), source: VaultOperations.getThing, variableValues: { ask: TH.overTheWire(TH.getGateAskOf()) }, contextValue: {} })
+    expectCarries(result.errors?.[0], 'storage_unavailable')
   })
 
   it("refuses a vaultDB or getUserId it cannot use", () => {
@@ -244,11 +262,20 @@ describe("vaultResolvers' watch", () => {
     expect(served.watching).to.eq(0)
   })
 
-  it("leaves a watch its vaultDB refuses to start to GraphQL", async () => {
+  it("fails a watch of a scope that fails its check with a GraphQL error carrying bad_record, without starting its vaultDB's", async () => {
     const served = new CountedVaultDB()
     const variableValues = { scope: { ...TH.ThingBank, banklabel: '' } }
     const result = await subscribe({ schema: TH.schemaOver(served), document: parse(VaultOperations.watchThings), variableValues, contextValue: { userid: 'u1' } })
     expect(result).to.have.property('errors').with.lengthOf(1)
+    expectCarries((result as { errors: unknown[] }).errors[0], 'bad_record')
+    expect(served.watching).to.eq(0)
+  })
+
+  it("fails a watch with a GraphQL error carrying the refusal for what its getUserId throws, without starting its vaultDB's", async () => {
+    const served = new CountedVaultDB()
+    const result = await subscribe({ schema: schemaSignedInBy(served, sessionStoreDown), document: parse(VaultOperations.watchThings), variableValues: { scope: { ...TH.ThingBank } }, contextValue: {} })
+    expect(result).to.have.property('errors').with.lengthOf(1)
+    expectCarries((result as { errors: unknown[] }).errors[0], 'unexpected_error')
     expect(served.watching).to.eq(0)
   })
 
@@ -269,14 +296,18 @@ describe("vaultResolvers' watch", () => {
     expect(served.stops).to.eq(1)
   })
 
-  it("stops its vaultDB's watch before leaving an error its getUserId throws mid-watch to GraphQL", async () => {
+  it("stops its vaultDB's watch, then fails with a GraphQL error carrying the refusal for what its getUserId throws mid-watch", async () => {
     const served = new GoingOnVaultDB()
     const session = { userid: 'u1', isDown: false }
     const getUserId = (context: typeof session) => (context.isDown ? sessionStoreDown() : context.userid)
-    const schema = makeExecutableSchema({ typeDefs: VaultSchemaSdl, resolvers: vaultResolvers({ vaultDB: served, getUserId }) })
-    const { stream } = await watching(schema, session)
+    const { stream } = await watching(schemaSignedInBy(served, getUserId), session)
     session.isDown = true
-    await expect(stream.next()).rejects.toThrow('The session store is down')
+    try {
+      await stream.next()
+      expect.unreachable('Expected the watch to fail')
+    } catch (err) {
+      expectCarries(err, 'unexpected_error')
+    }
     expect(served.stops).to.eq(1)
   })
 

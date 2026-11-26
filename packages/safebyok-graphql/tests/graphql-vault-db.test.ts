@@ -1,10 +1,12 @@
 /** GraphQLVaultDB on a client of its own: what it makes of a server's trouble, of an answer that is not what was asked, and of a watch's stream. */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Client, CombinedError } from '@urql/core'
 import { GraphQLError, graphql } from 'graphql'
 import * as DB from 'safebyok/storage'
+import { makeExecutableSchema } from '@graphql-tools/schema'
 import { GraphQLVaultDB, VaultOperations } from '../src/index'
+import { VaultSchemaSdl, vaultResolvers } from '../src/server'
 import * as Phrases from '../src/phrases'
 import * as TH from './test-helpers'
 
@@ -89,6 +91,26 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     expect(err.message).to.eq(Phrases.ServerErred)
     expect(err.cause).to.be.undefined
     expect(err.meta).to.deep.include({ oplabel: 'getThing' })
+  })
+
+  it("refuses with the refusal a GraphQL error carries across, as the server made it", async () => {
+    const crossed = { refusalkind: 'unexpected_error', message: 'Something unexpected went wrong', meta: { oplabel: null, act: null, capacity: null, fieldnames: null, labelpaths: null } }
+    for (const combined of [
+      new CombinedError({ graphQLErrors: [new GraphQLError(crossed.message, { extensions: { safebyokErr: crossed } })] }),
+      new CombinedError({ networkError: new GraphQLError(crossed.message, { extensions: { safebyokErr: crossed } }) }),
+    ]) {
+      const { vaultDB } = fakeClient({ error: combined })
+      const answer = await vaultDB.tryGetThing(TH.getGateAskOf())
+      const err = await TH.expectBad(answer, 'unexpected_error')
+      expect(answer).to.deep.include({ act: 'unclassified_storing', tracked: 'unread' })
+      expect(err.message).to.eq(crossed.message)
+    }
+  })
+
+  it("refuses a GraphQL error that carries a refusal it cannot read, as storage_issue", async () => {
+    const combined = new CombinedError({ graphQLErrors: [new GraphQLError('No', { extensions: { safebyokErr: { refusalkind: 'datastore_sad', message: 'No' } } })] })
+    const { vaultDB } = fakeClient({ error: combined })
+    await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
   })
 
   it("refuses a failed request with a cause that carries only the error's name, HTTP status and code", async () => {
@@ -227,6 +249,15 @@ describe("GraphQLVaultDB's watch", () => {
     expect(badnews[0]?.cause).to.include({ thrownName: 'TypeError' })
   })
 
+  it("ends with the refusal a GraphQL error carries across", async () => {
+    const crossed = { refusalkind: 'bad_record', message: 'A label is lowercase letters', meta: null }
+    const { streams, told, badnews } = watched()
+    streams[0]?.({ error: new CombinedError({ graphQLErrors: [new GraphQLError(crossed.message, { extensions: { safebyokErr: crossed } })] }), hasNext: false })
+    await Promise.resolve()
+    expect(told).to.deep.eq(['ended', 'bad_record'])
+    expect(badnews[0]?.message).to.eq(crossed.message)
+  })
+
   it("ends a GraphQL error once, with no cause, and stops the stream", async () => {
     const { streams, counts, told, badnews } = watched()
     streams[0]?.({ error: new CombinedError({ graphQLErrors: [new GraphQLError('Cannot query field')] }), hasNext: true })
@@ -255,5 +286,46 @@ describe("GraphQLVaultDB's watch", () => {
     expect(counts.unsubscribed).to.eq(1)
     stop()
     expect(told).to.have.lengthOf(2)
+  })
+})
+
+// == [A server of its own]: DamagedVaultDB, sessionStoreDown, browserOverSessionStoreDown
+
+/** A vaultDB whose datastore holds a Thing it cannot read. */
+class DamagedVaultDB extends DB.MemoryVaultDB {
+  protected override doGetThing(): DB.GotActual { throw DB.storageIssue() }
+}
+
+/** A getUserId whose session store is down. Its message has text that must never reach a browser. */
+function sessionStoreDown(): never { throw new Error('The session store at sessions.internal is down') }
+
+/** A browser over vaultResolvers whose getUserId fails, as where its session store is down. */
+function browserOverSessionStoreDown(): GraphQLVaultDB {
+  const resolvers = vaultResolvers({ vaultDB: new DB.MemoryVaultDB(), getUserId: sessionStoreDown })
+  return TH.browserOver(makeExecutableSchema({ typeDefs: VaultSchemaSdl, resolvers }))
+}
+// --
+
+describe("GraphQLVaultDB over vaultResolvers", () => {
+  it("answers the bad answer the server's vaultDB gave, as it gave it", async () => {
+    const served = await new DamagedVaultDB().tryGetThing(TH.getGateAskOf())
+    const answer = await TH.browserOver(TH.schemaOver(new DamagedVaultDB())).tryGetThing(TH.getGateAskOf())
+    const err = await TH.expectBad(answer, 'storage_issue')
+    const servedErr = await TH.expectBad(served, 'storage_issue')
+    expect(err.message).to.eq(servedErr.message)
+    expect(answer).to.deep.include({ act: served.act, tracked: served.tracked })
+  })
+
+  it("refuses a request the server could not serve with its refusal, never its cause", async () => {
+    const err = await TH.expectBad(browserOverSessionStoreDown().tryGetThing(TH.getGateAskOf()), 'unexpected_error')
+    expect(err.cause).to.be.undefined
+    expect(JSON.stringify([err.message, err.meta])).not.to.include('sessions.internal')
+  })
+
+  it("ends a watch the server could not serve, with its refusal", async () => {
+    const told: string[] = []
+    browserOverSessionStoreDown().watch(TH.ThingBank, () => { told.push('notice') }, (news) => { told.push(news.refusalkind) }, () => { told.push('ended') })
+    await vi.waitFor(() => { expect(told).to.have.lengthOf(2) })
+    expect(told).to.deep.eq(['ended', 'unexpected_error'])
   })
 })

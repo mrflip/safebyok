@@ -1,8 +1,8 @@
 /** The resolvers that serve `VaultSchemaSdl` over any vaultDB, each reaching only the bank of the user a request is signed in as. */
 
-import type { GraphQLScalarType } from 'graphql'
+import { GraphQLError, type GraphQLScalarType } from 'graphql'
 import * as DB from 'safebyok/storage'
-import type { WireAnswer, WireNotice } from './shapes/shapes-wire'
+import { type WireAnswer, type WireNotice, CrossedErrExtension } from './shapes/shapes-wire'
 import { safebyokJson } from './vault-schema'
 import * as Phrases from './phrases'
 
@@ -60,14 +60,19 @@ const vaultResolversOpts = DB.objCheck(({ custom, fn }) => ({
 }), 'bad_record')
 
 /** Make the resolvers for `VaultSchemaSdl`, once when your server starts.
- * A request reaches only the bank of the user it is signed in as: any other is answered `identity_revoked`. An error `getUserId` throws is left to GraphQL.
+ * A request reaches only the bank of the user it is signed in as: any other is answered `identity_revoked`.
+ * What the vaultDB answers crosses as it answered; a request the server cannot serve, as when `getUserId` throws, fails with a GraphQL error carrying the refusal. `GraphQLVaultDB` says how a client meets each.
  */
 export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): VaultResolvers<ContextT> {
   const { vaultDB, getUserId } = vaultResolversOpts.parse(opts)
 
   /** Return null if the request is signed in as `userid`, else the refusal to send back. */
   async function signinRefusalOf(context: ContextT, userid: DB.Userid): Promise<DB.VaultError | null> {
-    return ((await getUserId(context)) === userid) ? null : DB.identityRevoked()
+    let signedIn: DB.Userid | null
+    try {
+      signedIn = await getUserId(context)
+    } catch (err) { throw graphQLErrorOf(err) }
+    return (signedIn === userid) ? null : DB.identityRevoked()
   }
 
   /** Answer `given` by `verb` if `checkAsk` passes it and the request is signed in as its user, in wire form; else the refusal, as a verb that threw answers. */
@@ -84,7 +89,10 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
 
   /** Watch `scope` and yield its notices in wire form, for as long as the request stays signed in as its user. */
   async function watchNotices(context: ContextT, given: DB.ThingWatchScope): Promise<AsyncIterableIterator<WireNotice>> {
-    const scope = DB.AskChecks.thingWatchScope.parse(given)
+    let scope: DB.ThingWatchScope
+    try {
+      scope = DB.AskChecks.thingWatchScope.parse(given)
+    } catch (err) { throw graphQLErrorOf(err) }
     const refusal = await signinRefusalOf(context, scope.userid)
     if (refusal !== null) { return endingWith(refusal) }
     const reader = openWatch(vaultDB, scope)
@@ -93,8 +101,8 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
         const read = await reader.read()
         if (read.done) { return read }
         // Check the sign-in again at every notice. A session revoked after it subscribed gets one last notice carrying the
-        // refusal, and the stream is cancelled, so the read after that is done. An error getUserId throws is left to
-        // GraphQL, which calls no `return` after a `next` that rejects: the stream is cancelled first, so the watch ends.
+        // refusal, and the stream is cancelled, so the read after that is done. Where getUserId throws, the `next` rejects,
+        // and GraphQL calls no `return` after that: the stream is cancelled first, so the watch ends.
         let revoked: DB.VaultError | null
         try {
           revoked = await signinRefusalOf(context, scope.userid)
@@ -139,10 +147,16 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
 }
 // --
 
-// == [Helpers]: AnyAnswer, wireAnswerOf, refusedAnswerOf, goodNoticeOf, badNoticeOf, endingWith, openWatch
+// == [Helpers]: AnyAnswer, graphQLErrorOf, wireAnswerOf, refusedAnswerOf, goodNoticeOf, badNoticeOf, endingWith, openWatch
 
 /** Any vaultDB verb's answer. */
 type AnyAnswer = DB.GetThingAnswer | DB.WriteThingAnswer | DB.ListThingsAnswer | DB.BirthBankAnswer | DB.GetWorldAnswer | DB.StatsAnswer
+
+/** The GraphQL error for a request the server could not serve, carrying the refusal for `thrown` as it may cross. */
+function graphQLErrorOf(thrown: unknown): GraphQLError {
+  const crossed = DB.crossedErrOf(DB.refusalOfThrown(thrown))
+  return new GraphQLError(crossed.message, { extensions: { [CrossedErrExtension]: crossed } })
+}
 
 /** `answer` in wire form: less its ask, with its refusal reduced to what may cross, and null for each field the schema has and it lacks. */
 function wireAnswerOf({ ask: _ask, ...answer }: AnyAnswer): WireAnswer {
