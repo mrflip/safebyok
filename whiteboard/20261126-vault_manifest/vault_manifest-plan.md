@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. The side quest's tables and policy tags ruled in (2026-11-26): threads 8 and 9 run next, then 6 and 7
+* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Thread 8 ready (#942), in review; thread 9 building, stacked on it; then 6 and 7
 
 ## Read first
 
@@ -121,6 +121,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Depends on:* the line through thread 4 (`20261126-postgres_manifest`).
 *Look-ahead:* thread 9 makes the datastores' policy verdicts phrase tags fed to this builder: shape the builder to take a policy's phrase tag as it takes an act's.
 *Size:* medium.
+*Status:* ready 2026-11-26 at be7e9e6b5, PR #942; in review (opus, medium). Equivalence run in scratch: 984,960 write combinations, 0 mismatches. `Throwers.taggedRefusal` replaces `gateIssue`, `bornAtNotStored`, `lifetokNotStored`, `policiedRefusalOf`; `ListActs` added; `demandTagsOfAsk` removed (subsumed by `writtenTagsOf`).
 
 ### 9. policy_tags — policy verdicts come back as phrase tags
 
@@ -131,6 +132,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Depends on:* thread 8.
 *Look-ahead:* none.
 *Size:* medium.
+*Status:* building, cut from thread 8's tip (be7e9e6b5).
 
 ### 6. actual_words — "stored" sorted into actual, ante and stored
 
