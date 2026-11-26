@@ -209,7 +209,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     }
     expect(await ancestorAt('box/aa/bb')).to.eq('box/aa')
     expect(await ancestorAt('box/aab/cc')).to.eq('box')
-    expect(await ancestorAt('box/aa'), 'none where a Thing is stored at the scope').to.eq(null)
+    expect(await ancestorAt('box/aa'), 'none where a Thing is stored at the scope').to.be.null
     expect(await ancestorAt('box/ab')).to.eq('box')
     expect(await ancestorAt('box')).to.eq(null)
   })
