@@ -5,22 +5,20 @@
 import { isNull, omitBy } from 'es-toolkit'
 import type * as Z from 'zod'
 import { CX, EX, Errors, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/internals'
-import { Labelpath } from './primitives'
 import { type ThingRecord, type VoidSentinel, ThingChecks } from './shapes-thing'
 import { SeenChecks } from './shapes-vault-event'
+import type { Kids } from './shapes-answers'
 
 // == [Crossed parts]: CrossedChecks, CrossedErr, CrossedAct, CrossedAnswered, crossedErrOf, refusedOverWire
 // Ported from safebyok-big's shapes-bank-answers.ts, with the meta's `act` and `labelpaths` added.
 
 /** The checks of the parts of a vaultDB answer that cross a wire, each refusing `storage_issue`:
- * - `err`          -- a refusal, as {@link crossedErrOf} lets it cross: its kind, its message and an allowlisted meta, never its cause
- * - `answered`     -- what an answer says beside its refusal: its act, and the Thing it names
- * - `tracked`      -- the answer's `tracked`, each root's entry left raw, for the classifier
- * - `roots`        -- a birth's or a world's three roots, each left raw
- * - `listing`      -- a listing's `val` and the lists beside it, each Thing left raw
- * - `damagedThing` -- a child a listing found damaged
+ * - `err`               -- a refusal, as {@link crossedErrOf} lets it cross: its kind, its message and an allowlisted meta, never its cause
+ * - `answered`          -- what an answer says beside its refusal: its act, and the Thing it names
+ * - `kids`              -- a listing's `val`, its children by label left unchecked
+ * - `incompatibleThing` -- a child a listing found incompatible
  */
-export const CrossedChecks = Validator.Checkers('storage_issue', ({ obj, arr, str, unk, lit, oneof, custom }) => {
+export const CrossedChecks = Validator.Checkers('storage_issue', ({ obj, arr, str, lit, oneof, custom }) => {
   const act = oneof([...EX.badActVals, 'policied'])
   const err = obj({
     refusalkind: oneof(Errors.refusalkindVals),
@@ -34,21 +32,13 @@ export const CrossedChecks = Validator.Checkers('storage_issue', ({ obj, arr, st
       labelpaths: arr(str).nullable().default(null),
     }).strict().nullable().default(null),
   }).strict()
-  // A damaged child's labelpath is the one it is stored under: the classifier checks it is one under the listing's parent.
-  const damagedThing = ThingChecks.bankScope.extend({ labelpath: str, am: lit('d') }).strict()
   return {
     err,
     // Checked for its form alone: a client's check of the Thing at its scope has already read it whole.
-    answered: obj({ act: act.optional(), dbhas: ThingChecks.scopedCited.nullable().optional() }).strict(),
-    tracked:  obj({ bank: unk, [Labelpath.MainGate]: unk, [Labelpath.RootBox]: unk }).strict(),
-    roots:    obj({ bank: unk, gate: unk, root: unk }).strict(),
-    listing:  obj({
-      val:          obj({ modelkind: lit('kids'), parentpath: str, parentlife: str, items: custom<object>(CX.isPlainBag), gones: custom<object>(CX.isPlainBag), read_tc: SeenChecks.readTc }).strict(),
-      parentage:    arr(unk).length(1),
-      deltas:       arr(unk),
-      damaged_rows: arr(damagedThing),
-    }),
-    damagedThing,
+    answered:          obj({ act: act.optional(), dbhas: ThingChecks.scopedCited.nullable().optional() }).strict(),
+    kids:              obj({ modelkind: lit('kids'), parentpath: str, parentlife: str, items: custom<Kids['items']>(CX.isPlainBag), gones: custom<Kids['gones']>(CX.isPlainBag), read_tc: SeenChecks.readTc }).strict(),
+    // An incompatible child's labelpath is the one it is stored under, which may fail the labelpath check.
+    incompatibleThing: ThingChecks.bankScope.extend({ labelpath: str, am: lit('d') }).strict(),
   }
 })
 

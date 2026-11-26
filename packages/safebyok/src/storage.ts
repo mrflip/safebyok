@@ -19,7 +19,7 @@ export { type Adoptable, Thing } from './models/thing'
 export {
   type AnyAsk, type BankRoots, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAskDraft, type GetAsk, type GetWorldAsk, type StatsAsk, type WorldRoots, type ListAskDraft,
   type ListAsk, type LoggableAsk, type PutAskDraft, type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WriteAsk, type WriteAskFlags, AskChecks, RootLabelpaths, VoidTrack, birthPutsOf, checkedBirthBankAsk,
-  checkedWriteAsk, delAskOf, getAskOf, listAskOf, putAskOf,
+  checkedWriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf,
 } from './shapes/shapes-asks'
 // A datastore's contract (notes/vault-adapter-contract.md): the manifest each verb's step hands back, the tags in it, and the functions that make them in TypeScript.
 export * as ManifestTags from './storage/manifest-tags'
@@ -50,7 +50,7 @@ export { rowWeightOf, vaultStatsOf } from './storage/vault-stats'
 // The events a vaultDB's watcher is notified with.
 export {
   type Agekind, type Agerank, type ItemSeen, type Lifekind, type Liveness, type ReadTc, type SeenThing, type VaultAgedEvent, type VaultEvent, type VaultEventOf, type VaultEventkind, type VaultItemEvent, type VaultLifeEvent,
-  VaultDBSourcelabel, agekindVals, lifekindVals, livenessVals, vaultEventkindVals,
+  SeenChecks, VaultDBSourcelabel, agekindVals, lifekindVals, livenessVals, vaultEventkindVals,
 } from './shapes/shapes-vault-event'
 
 // From safebyok-big: what an adapter's `do*` methods answer and are named with, its throwers, and the checkers it checks its
@@ -65,7 +65,7 @@ export { VaultError, isVaultError, type Capacity, type RefusalFamily, type Refus
 export { fetchFailed, identityRevoked, sanitizeForeignError, storageFailed, storageRefusalOf, storageUnavailable, unexpectedError } from 'safebyok-big/storage'
 export { storageIssue } from 'safebyok-big/refusals/throwers'
 export { refusalOfThrown, storageCallRefused, storeQuotaTooSmall } from './refusals/throwers'
-// What crosses a wire, for an adapter whose server runs a whole vaultDB: a refusal, and the parts of an answer the classifier's `crossed*` functions read.
+// What crosses a wire, for an adapter whose server runs a whole vaultDB: a refusal, and the parts of an answer that have no check of their own.
 export { type CrossedAct, type CrossedAnswered, type CrossedErr, CrossedChecks, crossedErrOf, refusedOverWire } from './shapes/shapes-crossed'
 // An IndexedDB adapter's own: each call's one transaction, the row at a key within it, and the versioned database.
 export { dbprefixOf, inOneStep, rowAt, versionedShelfOf, type VersionedShelfSpec } from 'safebyok-big/storage'
