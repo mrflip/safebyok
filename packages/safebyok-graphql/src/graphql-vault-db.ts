@@ -223,11 +223,15 @@ function rowsOfCarried(ask: DB.ThingScope, carried: unknown): Pick<DB.GetManifes
   return { actual: null, ancestor: ancestorLivesOf(ask, WireChecks.shell.parse(carried)) }
 }
 
-/** The lives of the nearest Thing stored above `ask`'s scope, as `shell` names them, or null for none. */
-function ancestorLivesOf({ userid, banklabel, labelpath }: DB.ThingScope, shell: DB.VoidSentinel): DB.AncestorLives | null {
+// The shell's wire check takes the shell of any Thing; it must be the shell that `ask`'s scope has under the lives it names.
+/** The lives of the nearest Thing stored above `ask`'s scope, as `shell` names them, or null for none; refuses a `shell` that is no shell at `ask`'s scope under them. */
+function ancestorLivesOf(ask: DB.ThingScope, shell: DB.VoidSentinel): DB.AncestorLives | null {
+  const { userid, banklabel, labelpath } = ask
   const lifeseqs = shell.lifepath.split('/').filter((lifeseq) => lifeseq !== DB.Shell.VoidLifeseq)
-  if (lifeseqs.length === 0) { return null }
-  return { userid, banklabel, labelpath: labelpath.split('/').slice(0, lifeseqs.length).join('/'), lifepath: lifeseqs.join('/') }
+  const lives    = (lifeseqs.length === 0) ? null : { userid, banklabel, labelpath: labelpath.split('/').slice(0, lifeseqs.length).join('/'), lifepath: lifeseqs.join('/') }
+  const expected = DB.Shell.under(ask, lives)
+  if (Object.entries(expected).some(([ckey, val]) => (shell as Record<string, unknown>)[ckey] !== val)) { throw DB.storageIssue() }
+  return lives
 }
 
 /** The rows of a bank's three roots as an answer carries them, raw: each null where it is the shell. */

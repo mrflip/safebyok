@@ -204,6 +204,22 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     }
   })
 
+  const OtherShellCases = [
+    // a shell of the wrong Thing:
+    [DB.Shell.under({ ...TH.BoxScope, labelpath: 'box/anthropic' }, TH.rootBoxOf()), "a sibling's shell, well formed at its own scope"],
+    [DB.Shell.under(TH.RootScope, null),                                             "the shell of the Thing above the ask's, well formed at its own scope"],
+  ] as const
+
+  describe("a get's shell", () => {
+    for (const [dbhas, blurb] of OtherShellCases) {
+      it(`refuses ${blurb}, as storage_issue`, async () => {
+        const voided = await servedOf(VaultOperations.getThing, TH.getAskAt('box/openai'))
+        const { vaultDB } = fakeClient({ data: { safebyokGetThing: { ...voided, dbhas } } })
+        await TH.expectBad(vaultDB.tryGetThing(TH.getAskAt('box/openai')), 'storage_issue')
+      })
+    }
+  })
+
   it("answers a write's refusal with the act its own tables find for the Thing the server names", async () => {
     const refused = await servedOf(VaultOperations.writeThing, TH.birthAskOf())
     const gateNext = TH.nextGateOf(TH.gateThingOf())
