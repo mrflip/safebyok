@@ -9,30 +9,15 @@ import { type ReadTc, type VaultEvent, type VaultItemEvent, VaultDBSourcelabel }
 import {
   type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldAsk, type ListAsk, type StatsAsk, type ThingWatchScope, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
 } from '../shapes/shapes-asks'
-import {
-  type ActualBeside, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type GetThingAnswer, type GetWorldActual, type GetWorldAnswer, type ListThingsActual, type ListThingsAnswer,
-  type Received, type StatsActual, type StatsAnswer, type WriteThingAnswer, ActualChecks,
-} from '../shapes/shapes-answers'
-import type { GetManifest, WriteManifest } from '../shapes/shapes-manifest'
-import { type VaultStats, VaultStatsChecks } from '../shapes/shapes-vault-stats'
+import type { BadAnswer, BirthBankAnswer, GetThingAnswer, GetWorldAnswer, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
+import { type BirthManifest, type GetManifest, type ListManifest, type Received, type StatsManifest, type WorldManifest, type WriteManifest, ManifestChecks } from '../shapes/shapes-manifest'
 import { itemEventOf, readTcNow } from './agerank'
 import * as ManifestActs from './manifest-acts'
 import * as ThreeWay from './three-way'
-import type { BankFetched, BankRootsFetched, ThingsFetched } from './thing-classifier'
-import * as Classifier from './thing-classifier'
 import type { VaultDB } from './vault-db'
 import * as Throwers from '../refusals/throwers'
 
-// == [Answers]: besideOf, frozenAnswerOf, noticeOf
-
-// A concrete adapter's report is the module's entry: what the answer carries of it beside the record is read through its check.
-/** What the answer to `actual` carries beside its `val` or `dbhas`: its `banktok`, its `tracked` and its `read_tc`.
- * Throws `storage_issue` for a report whose banktok is no UUID, whose `tracked` is no object, or whose `read_tc` is no UUID version 7.
- */
-function besideOf(actual: ActualBeside): ActualBeside {
-  const { banktok, tracked, read_tc } = ActualChecks.beside.parse(actual)
-  return { banktok, tracked, read_tc }
-}
+// == [Answers]: frozenAnswerOf, noticeOf
 
 // Frozen once, here, so that a Thing or a cache may hold the very records an answer carries.
 /** `answer`, with every record it carries deeply frozen, and neither its ask nor its refusal. */
@@ -50,31 +35,13 @@ function noticeOf(record: ThingRecord, received: Lifetok, read_tc: ReadTc): Vaul
 // --
 
 // The datastore decides whether to write by its own predicate, this class finds the act from the datastore's tags, and
-// `demandWriteConsistency` requires the two to agree. The work done twice is what that check costs: never optimize it away.
+// `ThreeWay.demandWriteConsistency` requires the two to agree. The work done twice is what that check costs: never optimize it away.
 /** The base class of a vaultDB over a datastore: a subclass writes the `do*` calls, each one atomic step.
  * It checks each ask, and answers from what a `do*` call observes, per the act tables in `notes/answer-contract.md`.
  * Its watch notifies only what the datastore reports changing: nothing an answer carries.
  * Every record an answer or a notice carries is deeply frozen; an ask, and a record a caller hands it, never are.
  */
 export abstract class AdapterVaultDB implements VaultDB {
-
-  // == [Classifying]: classifyListThings, classifyBirthBank, classifyGetWorld, classifyStats
-  // Scaffolding: until thread 2 (manifest_rest), which gives these verbs manifests as get and write have.
-  // A subclass's `do*` calls these. Each is given the raw bank of the ask's bank, fetched in the same step, which its banktok is read from.
-
-  /** Classify a listing against the raw parent and the raw Things one label under it. */
-  protected classifyListThings(ask: ListAsk, fetched: ThingsFetched, bankFetched: BankFetched): ListThingsActual { return Classifier.classifyListThings(ask, fetched, bankFetched) }
-
-  /** Classify a bank's birth, by its three puts, against its raw bank, main gate and root box, each null for none. */
-  protected classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual { return Classifier.classifyBirthBank(puts, fetched) }
-
-  /** Classify a get of the world against its raw bank, main gate and root box, each null for none. */
-  protected classifyGetWorld(ask: GetWorldAsk, fetched: BankRootsFetched): GetWorldActual { return Classifier.classifyGetWorld(ask, fetched) }
-
-  /** Report a bank's storage stats beside its raw bank, fetched in the same step. */
-  protected classifyStats(ask: StatsAsk, fetched: BankFetched, stats: VaultStats): StatsActual { return Classifier.classifyStats(ask, fetched, stats) }
-  // --
-
 
   // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetWorld, tryStats, watch
   // Each verb's body is the plain path. Every throw in it lands in `answerForThrown`.
@@ -108,13 +75,13 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** The children of the Thing at `ask`'s scope ({@link VaultDB.tryListThings}). */
   async tryListThings(ask: ListAsk): Promise<ListThingsAnswer> {
     try {
-      const listAsk     = AskChecks.listAsk.parse(ask)
-      const loggableAsk = loggableAskOf(listAsk)
-      const actual      = await this.doListThings(listAsk)
-      const beside      = { ...besideOf(actual), ...ActualChecks.listed.parse(actual) }
-      return frozenAnswerOf<ListThingsAnswer>(actual.ok
-        ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, val: { ...actual.kids, read_tc: beside.read_tc } }
-        : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: actual.record, err: Throwers.listParentNotLive({ oplabel: 'listThings', ask: loggableAsk, act: actual.act }) })
+      const listAsk  = AskChecks.listAsk.parse(ask)
+      const manifest = await this.doListThings(listAsk)
+      ManifestActs.checkListObservations(listAsk, manifest)
+      ManifestActs.scribeListAct(listAsk, manifest)
+      const answer   = ManifestActs.listAnswerOf(listAsk, manifest)
+      ThreeWay.demandListConsistency(listAsk, manifest, answer)
+      return frozenAnswerOf(answer)
     } catch (err) { return { ...this.answerForThrown(err, 'listThings', ask), dbhas: null, parentage: [], deltas: [], damaged_rows: [] } }
   }
 
@@ -122,32 +89,36 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer> {
     try {
       const birthBankAsk = checkedBirthBankAsk(ask)
-      const loggableAsk  = loggableAskOf(birthBankAsk)
-      const actual       = await this.doBirthBank(birthBankAsk, birthPutsOf(birthBankAsk))
-      const beside       = besideOf(actual)
-      return frozenAnswerOf<BirthBankAnswer>(actual.ok
-        ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, val: actual.things }
-        : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: actual.record, err: Throwers.actRefused('vault', actual.act, { oplabel: 'birthBank', ask: loggableAsk }) })
+      const manifest     = await this.doBirthBank(birthBankAsk, birthPutsOf(birthBankAsk))
+      ManifestActs.checkBirthObservations(birthBankAsk, manifest)
+      ManifestActs.scribeBirthAct(birthBankAsk, manifest)
+      const answer       = ManifestActs.birthAnswerOf(birthBankAsk, manifest)
+      ThreeWay.demandBirthConsistency(birthBankAsk, manifest, answer)
+      return frozenAnswerOf(answer)
     } catch (err) { return this.answerForThrown(err, 'birthBank', ask) }
   }
 
   /** The bank's three roots, read in one step ({@link VaultDB.tryGetWorld}). */
   async tryGetWorld(ask: GetWorldAsk): Promise<GetWorldAnswer> {
     try {
-      const worldAsk    = AskChecks.getWorldAsk.parse(ask)
-      const loggableAsk = loggableAskOf(worldAsk)
-      const actual      = await this.doGetWorld(worldAsk)
-      return frozenAnswerOf<GetWorldAnswer>({ ok: true, ask: loggableAsk, act: actual.act, ...besideOf(actual), val: actual.things })
+      const worldAsk = AskChecks.getWorldAsk.parse(ask)
+      const manifest = await this.doGetWorld(worldAsk)
+      ManifestActs.checkWorldObservations(worldAsk, manifest)
+      const answer   = ManifestActs.worldAnswerOf(worldAsk, manifest)
+      ThreeWay.demandWorldConsistency(worldAsk, manifest, answer)
+      return frozenAnswerOf(answer)
     } catch (err) { return this.answerForThrown(err, 'getWorld', ask) }
   }
 
   /** A bank's storage stats, read in one step ({@link VaultDB.tryStats}). */
   async tryStats(ask: StatsAsk): Promise<StatsAnswer> {
     try {
-      const statsAsk    = AskChecks.statsAsk.parse(ask)
-      const loggableAsk = loggableAskOf(statsAsk)
-      const actual      = await this.doStats(statsAsk)
-      return frozenAnswerOf<StatsAnswer>({ ok: true, ask: loggableAsk, act: actual.act, ...besideOf(actual), val: VaultStatsChecks.vaultStats.parse(actual.stats) })
+      const statsAsk = AskChecks.statsAsk.parse(ask)
+      const manifest = await this.doStats(statsAsk)
+      ManifestActs.checkStatsObservations(statsAsk, manifest)
+      const answer   = ManifestActs.statsAnswerOf(statsAsk, manifest)
+      ThreeWay.demandStatsConsistency(statsAsk, manifest, answer)
+      return frozenAnswerOf(answer)
     } catch (err) { return this.answerForThrown(err, 'stats', ask) }
   }
 
@@ -163,8 +134,8 @@ export abstract class AdapterVaultDB implements VaultDB {
       const { record, banktok } = received
       let event: VaultItemEvent
       try {
-        const { read_tc = readTcNow() } = ActualChecks.received.parse(received)
-        event = noticeOf(deepFreeze(Classifier.watchedThingOf(bankScope, record)), ManifestActs.checkedBanktokOf(banktok), read_tc)
+        const { read_tc = readTcNow() } = ManifestChecks.received.parse(received)
+        event = noticeOf(deepFreeze(ManifestActs.checkedWatchedOf(bankScope, record)), ManifestActs.checkedBanktokOf(banktok), read_tc)
       } catch (err) {
         onBadNews(Outcome.storageRefusalOf(err))
         return
@@ -186,7 +157,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const err         = Outcome.storageRefusalOf(thrown)
       const loggableAsk = loggableAskOf(ask)
       Object.assign(err, { meta: { ...err.meta, oplabel, ask: loggableAsk } })
-      // Only the classifier sets rows.dbhas, to a Thing it has checked.
+      // Only a refusal made from a checked manifest sets rows.dbhas, to a Thing it has checked.
       const dbhas = (Errors.rowsOfRefusal(err).dbhas ?? null) as ThingRecord | null
       return frozenAnswerOf({ ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', banktok: SX.VoidLifeTok, tracked: 'unread', read_tc: readTcNow(), dbhas, err })
     } catch {
@@ -196,41 +167,26 @@ export abstract class AdapterVaultDB implements VaultDB {
   // --
 
   // == [Protected, for a subclass to write]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats, doWatch
-  // Each is one atomic step. A get and a write observe, and hand back a manifest: the datastore's tags and each row exactly
-  // as it stands at the step's last read (GetManifest, WriteManifest). A datastore that runs TypeScript makes its tags with
-  // `ManifestTags`; one that cannot makes the same comparisons in its own language. It reads no check and no act table: this
-  // class checks each row once, finds the act from the tags, and requires the datastore's write to agree with it.
-  //
-  // A write writes `ask.record` exactly where the datastore's own predicate allows: the ante row is the one cited, in the
-  // record's format and with the cited lifepath's lifeseq, the ask's flag lets it write over that row (`ifPresent` 'repl' over a live Thing, `ifAbsent` 'add' over a tombstone or
-  // none), a live record over a live Thing leaves its born_at the same, a write of the bank over a live bank its lifetok,
-  // and the gate it replaces meets each storage policy the ask names. The record carries every field, so a datastore may
-  // write it by replacing the row whole.
-  //
-  // The other verbs fetch, and hand what they fetched to the `classify*` call named in their doc block. Each also fetches
-  // the bank, main gate and root box, compares the ask's `track` with them (`ManifestTags.trackedOf` makes the comparison in
-  // TypeScript), and reads when it read them, its `read_tc`: `readTcNow()` in the step, or the datastore's own UUID version 7.
-  // A birth answers with `unwrittenBirthOf`, or where `born`, writes the three roots and reports them checked by
-  // `writtenRootsOf`, with the banktok, `tracked` and `read_tc` read after the write.
+  // Each is one atomic step that observes, and hands back a manifest: the datastore's tags and each row exactly as it stands
+  // at the step's last read, beside the bank's banktok, its `tracked` and its `read_tc`. `notes/vault-adapter-contract.md`
+  // says what each manifest holds, and when a write and a birth write. A datastore that runs TypeScript makes its tags with
+  // `ManifestTags`; one that cannot makes the same comparisons in its own language. It reads no check and no act table:
+  // this class checks each row once, finds the act from the tags, and requires the datastore's write to agree with it.
 
   /** In one step, read the Thing at `ask`'s scope, and hand back what was observed ({@link GetManifest}). */
   protected abstract doGetThing(ask: GetAsk): Helpers.Awaitable<GetManifest>
   /** In one step, write `ask.record` where the datastore's own predicate allows, and hand back what was observed ({@link WriteManifest}). */
   protected abstract doWriteThing(ask: WriteAsk): Helpers.Awaitable<WriteManifest>
-  /** In one step: fetch the raw parent at `ask`'s scope, each raw Thing one label under it, and its bank's raw roots, and return
-   * `this.classifyListThings(ask, fetched, bankFetched)`.
-   */
-  protected abstract doListThings(ask: ListAsk): Helpers.Awaitable<ListThingsActual>
-  /** In one step: fetch the raw bank, main gate and root box, return `this.classifyBirthBank(puts, fetched)`, and under `born` first
-   * write each put's record and report the three as written, checked by `writtenRootsOf`, with the banktok and `tracked` after the write.
-   */
-  protected abstract doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Helpers.Awaitable<BirthBankActual>
-  /** In one step, the same atomic unit as a get's: fetch the raw bank, main gate and root box, and return `this.classifyGetWorld(ask, fetched)`. */
-  protected abstract doGetWorld(ask: GetWorldAsk): Helpers.Awaitable<GetWorldActual>
-  /** In one step: fetch the raw bank, measure the bank's boxes and gates (`vaultStatsOf` measures raw rows), and return `this.classifyStats(ask, fetched, stats)`.
+  /** In one step, read the Thing at `ask`'s scope and each Thing one label under it, and hand back what was observed ({@link ListManifest}). */
+  protected abstract doListThings(ask: ListAsk): Helpers.Awaitable<ListManifest>
+  /** In one step, write the three `puts`' records where none of the bank's three roots is stored, and hand back what was observed ({@link BirthManifest}). */
+  protected abstract doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Helpers.Awaitable<BirthManifest>
+  /** In one step, read the bank's three roots, and hand back what was observed ({@link WorldManifest}). */
+  protected abstract doGetWorld(ask: GetWorldAsk): Helpers.Awaitable<WorldManifest>
+  /** In one step, measure the bank's boxes and gates, and hand back what was observed ({@link StatsManifest}).
    * Report the store's limits where it has them; `storeLimitsOf` caps each, and gives the cap for one it lacks.
    */
-  protected abstract doStats(ask: StatsAsk): Helpers.Awaitable<StatsActual>
+  protected abstract doStats(ask: StatsAsk): Helpers.Awaitable<StatsManifest>
   /** Start watching the datastore: call `receive` with each changed Thing, one at a time ({@link Received}), and `onBadNews` with any trouble,
    * whether or not it ends the watch. Return a function that stops it. Left unwritten, for a datastore with no watch, it calls neither.
    * Where the watch ends before its stop is called, call `onEnded` once, then `onBadNews` with why ({@link VaultDB.watch}).

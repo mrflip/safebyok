@@ -2,13 +2,11 @@
 
 import { type Errors, Helpers, Outcome, SX } from 'safebyok-big/internals'
 import { readTcNow } from './agerank'
-import type { Received } from '../shapes/shapes-answers'
-import type { GetManifest, WriteManifest } from '../shapes/shapes-manifest'
+import type { BankObserved, BirthManifest, GetManifest, ListManifest, Received, RootRows, StatsManifest, WorldManifest, WriteManifest } from '../shapes/shapes-manifest'
 import { Labelpath, Lifeseq } from '../shapes/primitives'
-import type { AnyAsk, BirthBankAsk, BirthPuts, GetAsk, ListAsk, StatsAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
-import type { VaultStats } from '../shapes/shapes-vault-stats'
+import type { ThingScope } from '../shapes/shapes-thing'
+import { type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldAsk, type ListAsk, type StatsAsk, type ThingWatchScope, type WriteAsk, RootLabelpaths } from '../shapes/shapes-asks'
 import * as ManifestTags from './manifest-tags'
-import type { BankFetched, BankRootsFetched, ThingsFetched } from './thing-classifier'
 import { vaultStatsOf } from './vault-stats'
 
 /** A watch: the bank it follows, the function called with each change, and the one called with any trouble. */
@@ -41,8 +39,8 @@ export class MemoryDatastore {
     return things
   }
 
-  /** A copy of the row at `ask`'s scope, or null for none. */
-  #rowAt(ask: GetAsk | WriteAsk): unknown { return structuredClone(this.#thingsOf(ask).get(ask.labelpath) ?? null) }
+  /** A copy of the row at `scope`, or null for none. */
+  #rowAt(scope: ThingScope): unknown { return structuredClone(this.#thingsOf(scope).get(scope.labelpath) ?? null) }
 
   /** Where `actual` is null, a copy of the nearest row above `ask`'s scope, or null for none; otherwise null, as it is read nowhere else. */
   #ancestorOf(ask: GetAsk | WriteAsk, actual: unknown): unknown {
@@ -52,18 +50,20 @@ export class MemoryDatastore {
     return (abovepath === undefined) ? null : structuredClone(things.get(abovepath))
   }
 
-  /** Copies of the raw roots of `ask`'s bank, each null for none, how they compare with what `ask` tracks, and when they were read. */
-  #rootsOf(ask: AnyAsk): BankRootsFetched {
-    const things  = this.#thingsOf(ask)
-    const fetched = structuredClone({ bank: things.get('bank') ?? null, gate: things.get(Labelpath.MainGate) ?? null, root: things.get(Labelpath.RootBox) ?? null })
-    const rows    = { bank: fetched.bank, [Labelpath.MainGate]: fetched.gate, [Labelpath.RootBox]: fetched.root }
-    return { ...fetched, tracked: ManifestTags.trackedOf(ask, rows), read_tc: readTcNow() }
+  /** Copies of the raw roots of `scope`'s bank, each null for none. */
+  #rootsOf(scope: ThingWatchScope): RootRows {
+    const { userid, banklabel } = scope
+    return {
+      bank: this.#rowAt({ userid, banklabel, labelpath: RootLabelpaths.bank }),
+      gate: this.#rowAt({ userid, banklabel, labelpath: RootLabelpaths.gate }),
+      root: this.#rowAt({ userid, banklabel, labelpath: RootLabelpaths.root }),
+    }
   }
 
   /** The banktok of `ask`'s bank as it now stands, its `tracked` for what `ask` tracks, and when they were read. */
-  #bankObservedOf(ask: AnyAsk): Pick<GetManifest, 'banktok' | 'tracked' | 'read_tc'> {
-    const { bank, tracked, read_tc } = this.#rootsOf(ask)
-    return { banktok: ManifestTags.banktokOf(bank), tracked, read_tc }
+  #bankObservedOf(ask: AnyAsk): BankObserved {
+    const { bank, gate, root } = this.#rootsOf(ask)
+    return { banktok: ManifestTags.banktokOf(bank), tracked: ManifestTags.trackedOf(ask, { bank, [Labelpath.MainGate]: gate, [Labelpath.RootBox]: root }), read_tc: readTcNow() }
   }
 
   // Each watcher is called on a later microtask, so nothing it does runs inside the write that notified it.
@@ -80,7 +80,7 @@ export class MemoryDatastore {
   }
   // --
 
-  // == [Verbs]: getThing, writeThing, listThings, birthRoots, getWorld, stats, watch
+  // == [Verbs]: getThing, writeThing, listThings, birthBank, getWorld, stats, watch
 
   /** The Thing at `ask`'s scope, observed in one step. */
   getThing(ask: GetAsk): GetManifest {
@@ -99,39 +99,36 @@ export class MemoryDatastore {
     return manifest
   }
 
-  /** Copies of the raw parent at `ask`'s scope (null for none) and of each Thing one label under it, with the bank's, in one step.
-   * Scaffolding: until thread 2 (manifest_rest), which hands back a manifest.
-   */
-  listThings(ask: ListAsk): ThingsFetched & BankFetched {
-    const things   = this.#thingsOf(ask)
+  // Like Postgres's, the listing reads the children whatever the parent: the vaultDB reads them only under a live one.
+  /** The Thing at `ask`'s scope, and each Thing one label under it, observed in one step. */
+  listThings(ask: ListAsk): ListManifest {
+    const actual   = this.#rowAt(ask)
     const under    = `${ask.labelpath}/`
-    const children = [...things]
+    const children = [...this.#thingsOf(ask)]
       .filter(([labelpath]) => labelpath.startsWith(under) && (! labelpath.includes('/', under.length)))
       .map(([labelpath, raw]) => ({ labelpath, raw: structuredClone(raw) }))
-    const { bank, tracked, read_tc } = this.#rootsOf(ask)
-    return { parent: structuredClone(things.get(ask.labelpath) ?? null), children, bank, tracked, read_tc }
+    return { tags: ManifestTags.getTagsOf(actual), actual, children, ...this.#bankObservedOf(ask) }
   }
 
-  /** Write a new bank's three roots, each put's record, and read them back, in one step.
-   * Scaffolding: until thread 2 (manifest_rest), which gives a birth its own predicate. Until then the vaultDB decides, from {@link getWorld}, whether to call it.
-   */
-  birthRoots(ask: BirthBankAsk, puts: BirthPuts): BankRootsFetched {
-    const things = this.#thingsOf(ask)
-    for (const { labelpath, record } of puts) { things.set(labelpath, structuredClone(record)) }
-    const written = this.#rootsOf(ask)
-    for (const row of [written.bank, written.gate, written.root]) { this.#notify(ask, row, ManifestTags.banktokOf(written.bank)) }
-    return written
+  /** Write a new bank's three roots, each put's record, where {@link isBirthWritable} allows, and observe the result, in one step. */
+  birthBank(ask: BirthBankAsk, puts: BirthPuts): BirthManifest {
+    const ante    = this.#rootsOf(ask)
+    const written = isBirthWritable(ante)
+    if (written) { for (const { labelpath, record } of puts) { this.#thingsOf(ask).set(labelpath, structuredClone(record)) } }
+    const actual   = this.#rootsOf(ask)
+    const manifest = { tags: ManifestTags.birthTagsOf(puts, ante, written), actual, ...this.#bankObservedOf(ask) }
+    if (written) { for (const row of [actual.bank, actual.gate, actual.root]) { this.#notify(ask, row, manifest.banktok) } }
+    return manifest
   }
 
-  /** Copies of the raw roots of `ask`'s bank, in one step. Scaffolding: until thread 2 (manifest_rest), which hands back a manifest. */
-  getWorld(ask: AnyAsk): BankRootsFetched { return this.#rootsOf(ask) }
+  /** The three roots of `ask`'s bank, observed in one step. */
+  getWorld(ask: GetWorldAsk): WorldManifest { return { actual: this.#rootsOf(ask), ...this.#bankObservedOf(ask) } }
 
   // Memory sets no limit of its own, so each is the cap.
-  /** The storage stats of `ask`'s bank, with the bank's raw row, in one step. Scaffolding: until thread 2 (manifest_rest), which hands back a manifest. */
-  stats(ask: StatsAsk): BankFetched & { stats: VaultStats } {
+  /** The storage stats of `ask`'s bank, observed in one step. */
+  stats(ask: StatsAsk): StatsManifest {
     const filed = [...this.#thingsOf(ask)].map(([labelpath, raw]) => ({ labelpath, raw }))
-    const { bank, tracked, read_tc } = this.#rootsOf(ask)
-    return { bank, tracked, read_tc, stats: vaultStatsOf(filed) }
+    return { stats: vaultStatsOf(filed), ...this.#bankObservedOf(ask) }
   }
 
   /** Watch `scope`'s bank: `receive` is called with each Thing written in it. Returns a function that stops it. */
@@ -143,7 +140,7 @@ export class MemoryDatastore {
   // --
 }
 
-// == [The write's predicate]: isWritable
+// == [The write's predicates]: isWritable, isBirthWritable
 
 /** True when the datastore writes `ask.record` over the raw `ante` row, by its own predicate, a copy of `VaultFunctionsSql`'s write functions:
  * - over no row, `INSERT … WHERE (cited.revtok = <the void revtok>) … ON CONFLICT DO NOTHING`, and the ask's `ifAbsent` is `'add'`
@@ -165,4 +162,7 @@ function isWritable(ask: WriteAsk, ante: unknown): boolean {
   const isPolicyMet   = Object.values(ManifestTags.policiesOf(ask, ante)).every((verdict) => verdict?.ok !== false)
   return isCited && isOfFormat && isLifeseqOwn && isFlagged && isBornAtSame && isLifetokSame && isPolicyMet
 }
+
+/** True when the datastore writes a birth's three roots over the raw `ante` roots, by its own predicate, a copy of `VaultFunctionsSql`'s `birth_roots`: where none of the three is stored. */
+function isBirthWritable(ante: RootRows): boolean { return (ante.bank === null) && (ante.gate === null) && (ante.root === null) }
 // --

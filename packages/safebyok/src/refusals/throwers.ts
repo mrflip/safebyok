@@ -147,8 +147,9 @@ export function tagsOfOtherRow(): Errors.VaultError { return new Errors.VaultErr
 /** A `storage_issue` refusal: the datastore's tags disagree with the write it was asked. */
 export function tagsOfOtherAsk(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.TagsOfOtherAsk) }
 
-/** A `storage_issue` refusal: the vaultDB's answer is not a copy of the datastore's manifest it was made from. */
-export function answerOfOtherManifest(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.AnswerOfOtherManifest) }
+// Only our own code can make an answer that does not copy its manifest: it is a bug, not trouble in storage.
+/** An `unexpected_error` refusal: the vaultDB's answer is not a copy of the datastore's manifest it was made from. */
+export function answerOfOtherManifest(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerOfOtherManifest) }
 // --
 
 // == [Minding Throwers]: notMinded, worldNotHeard, childrenStoredDamaged

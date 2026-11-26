@@ -1,19 +1,25 @@
-/** What `AdapterVaultDB` makes of a datastore's manifest of a get or a write: each row checked once, the act its tags find in the act tables of `notes/answer-contract.md`, and the answer. */
+/** What `AdapterVaultDB` makes of a datastore's manifest of each verb: each row checked once, the act its tags find in the act tables of `notes/answer-contract.md`, and the answer. */
 
+import { sortBy } from 'es-toolkit'
 import { CX, EX, type Errors, SX, Validator } from 'safebyok-big/internals'
+import { BaseThing } from '../models/base-thing'
 import { Labelpath, type Lifetok } from '../shapes/primitives'
-import { type ThingRecord, type ThingScope, PerKindChecks, Shell } from '../shapes/shapes-thing'
+import { type BoxSparse, type ThingRecord, type ThingScope, type VoidSentinel, PerKindChecks, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
-import { type AnyAsk, type GetAsk, type Track, type Tracked, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
-import type { GetThingAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import {
-  type CheckedGetManifest, type CheckedManifestRows, type CheckedWriteManifest, type GetManifest, type GetTags, type ScribedGetManifest, type ScribedWriteManifest, type WriteManifest, type WriteTags,
-  ManifestChecks,
+  type AnyAsk, type BirthBankAsk, type GetAsk, type GetWorldAsk, type ListAsk, type StatsAsk, type ThingWatchScope, type Track, type Tracked, type WorldRoots, type WriteAsk, RootLabelpaths, birthPutsOf, loggableAskOf,
+} from '../shapes/shapes-asks'
+import type { BirthBankAnswer, DamagedThing, GetThingAnswer, GetWorldAnswer, KidEntry, Kids, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
+import {
+  type BankObserved, type CheckedBankObserved, type CheckedBirthManifest, type CheckedGetManifest, type CheckedListManifest, type CheckedManifestRows, type CheckedRoots, type CheckedStatsManifest,
+  type CheckedWorldManifest, type CheckedWriteManifest, type BirthManifest, type GetManifest, type GetTags, type ListManifest, type ListedChild, type RootTags, type ScribedBirthManifest, type ScribedGetManifest,
+  type ScribedListManifest, type ScribedWriteManifest, type StatsManifest, type WorldManifest, type WriteManifest, type WriteTags, ManifestChecks,
 } from '../shapes/shapes-manifest'
+import { VaultStatsChecks } from '../shapes/shapes-vault-stats'
 import * as ManifestTags from './manifest-tags'
 import * as Throwers from '../refusals/throwers'
 
-// == [Observations]: checkGetObservations, checkWriteObservations, checkedRowsOf, checkedRowOf, checkedAncestorOf, checkedBanktokOf, checkedTrackedOf, trackedEntryOf
+// == [Observations]: checkGetObservations, checkWriteObservations, checkListObservations, checkBirthObservations, checkWorldObservations, checkStatsObservations, checkedRowsOf, checkedRowOf, checkedChildrenOf, checkedRootsOf, checkedRootOf, checkedAncestorOf, checkedBankObservedOf, checkedBanktokOf, checkedTrackedOf, trackedEntryOf, checkedWatchedOf
 // A row that fails its kind's checks is incompatible: a record our code would not write, which refuses `damaged_row`. A manifest
 // that is malformed, or a row that is no object, means the datastore or its concrete adapter is broken, and refuses `storage_issue`.
 
@@ -27,16 +33,32 @@ export function checkWriteObservations(ask: WriteAsk, manifest: WriteManifest): 
   Object.assign(manifest, { ...checkedRowsOf(ask, manifest), tags: ManifestChecks.writeTags.parse(manifest.tags) })
 }
 
+/** Check a listing's manifest in place: its tags, its parent, and where the parent is live, each child once, setting aside those that fail their kind's checks as `damaged_rows`. */
+export function checkListObservations(ask: ListAsk, manifest: ListManifest): asserts manifest is ListManifest & CheckedListManifest {
+  const actual = checkedRowOf(ask, manifest.actual)
+  const listed = (actual?.am === 'a') ? checkedChildrenOf(ask, manifest.children) : { children: [], damaged_rows: [] }
+  Object.assign(manifest, { ...checkedBankObservedOf(ask, manifest), tags: ManifestChecks.getTags.parse(manifest.tags), actual, ...listed })
+}
+
+/** Check a birth's manifest in place: its tags, and each root once. */
+export function checkBirthObservations(ask: BirthBankAsk, manifest: BirthManifest): asserts manifest is BirthManifest & CheckedBirthManifest {
+  Object.assign(manifest, { ...checkedBankObservedOf(ask, manifest), tags: ManifestChecks.birthTags.parse(manifest.tags), actual: checkedRootsOf(manifest.actual) })
+}
+
+/** Check a get of the world's manifest in place: each root once. */
+export function checkWorldObservations(ask: GetWorldAsk, manifest: WorldManifest): asserts manifest is WorldManifest & CheckedWorldManifest {
+  Object.assign(manifest, { ...checkedBankObservedOf(ask, manifest), actual: checkedRootsOf(manifest.actual) })
+}
+
+/** Check an ask for stats' manifest in place: its stats. */
+export function checkStatsObservations(ask: StatsAsk, manifest: StatsManifest): asserts manifest is StatsManifest & CheckedStatsManifest {
+  Object.assign(manifest, { ...checkedBankObservedOf(ask, manifest), stats: VaultStatsChecks.vaultStats.parse(manifest.stats) })
+}
+
 /** The rows of a get's or a write's manifest, each checked once. The ancestor is read only where there is no actual row. */
 function checkedRowsOf(ask: GetAsk | WriteAsk, manifest: GetManifest | WriteManifest): CheckedManifestRows {
   const actual = checkedRowOf(ask, manifest.actual)
-  return {
-    actual,
-    ancestor: (actual === null) ? checkedAncestorOf(ask, manifest.ancestor) : null,
-    banktok:  checkedBanktokOf(manifest.banktok),
-    tracked:  checkedTrackedOf(ask, manifest.tracked),
-    read_tc:  ManifestChecks.read_tc.parse(manifest.read_tc),
-  }
+  return { ...checkedBankObservedOf(ask, manifest), actual, ancestor: (actual === null) ? checkedAncestorOf(ask, manifest.ancestor) : null }
 }
 
 /** The raw `row` a datastore read at `labelpath`, checked by its kind but not its address, or null for none. */
@@ -44,6 +66,33 @@ function checkedRowOf({ labelpath }: Pick<ThingScope, 'labelpath'>, row: unknown
   if (row === null) { return null }
   if (! CX.isPlainBag(row)) { throw Throwers.storageIssue() }
   return ThingkindChecks.ofLabelpath(labelpath).stored.parse(row)
+}
+
+// A child is checked by the listing's modelkind, not by the labelpath it is listed at: `demandListConsistency` checks that.
+/** A listing's raw children, each checked by its kind but not its address: those that pass, and those that fail as `damaged_rows`. */
+function checkedChildrenOf({ userid, banklabel, modelkind }: ListAsk, children: unknown): Pick<CheckedListManifest, 'children' | 'damaged_rows'> {
+  const check = ThingkindChecks.byModelkind[modelkind].stored
+  const listed: ListedChild[] = []
+  const damaged_rows: DamagedThing[] = []
+  for (const { labelpath, raw } of ManifestChecks.children.parse(children)) {
+    if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
+    const childReport = check.safeParse(raw)
+    if (childReport.success) { listed.push({ labelpath, record: childReport.data }) } else { damaged_rows.push({ userid, banklabel, labelpath, am: 'd' }) }
+  }
+  return { children: listed, damaged_rows }
+}
+
+/** A birth's or a world's raw roots, each checked by its kind but not its address, null for none. */
+function checkedRootsOf(roots: unknown): CheckedRoots {
+  const rows = ManifestChecks.roots.parse(roots)
+  return { bank: checkedRootOf(BankChecks.stored, rows.bank), gate: checkedRootOf(GateChecks.stored, rows.gate), root: checkedRootOf(BoxChecks.stored, rows.root) }
+}
+
+/** The raw root `row`, checked by `check`, or null for none. */
+function checkedRootOf<RecordT>(check: Readonly<{ parse: (row: unknown) => RecordT }>, row: unknown): RecordT | null {
+  if (row === null) { return null }
+  if (! CX.isPlainBag(row)) { throw Throwers.storageIssue() }
+  return check.parse(row)
 }
 
 // The ancestor is found by a prefix of the scope, not by an address, and the shell is built from it: its address is checked here, where it is read.
@@ -56,6 +105,11 @@ function checkedAncestorOf({ userid, banklabel, labelpath }: ThingScope, row: un
   const fieldnames = Validator.disagreeingFieldnames(ancestor, { userid, banklabel, labelpath: abovepath })
   if (fieldnames.length > 0) { throw Throwers.rowOfOtherAddress(fieldnames) }
   return ancestor
+}
+
+/** What a manifest carries of the bank, each checked. */
+function checkedBankObservedOf(ask: AnyAsk, manifest: BankObserved): CheckedBankObserved {
+  return { banktok: checkedBanktokOf(manifest.banktok), tracked: checkedTrackedOf(ask, manifest.tracked), read_tc: ManifestChecks.read_tc.parse(manifest.read_tc) }
 }
 
 // A banktok is news, never the verdict: one that is no lifetok reads as the void lifetok, and the step's answer stands.
@@ -84,9 +138,22 @@ function trackedEntryOf<RecordT>(check: Readonly<{ parse: (row: unknown) => Reco
   if (! CX.isPlainBag(row)) { throw Throwers.storageIssue() }
   return check.parse(row)
 }
+
+// A watched Thing is read by no address: the datastore hands over what changed. Its labelpath is its own, and its bank the
+// watch's, so that one of another bank refuses.
+/** The raw Thing in a notice from a watch on `bankScope`, checked by its kind and its address. */
+export function checkedWatchedOf(bankScope: ThingWatchScope, raw: unknown): ThingRecord {
+  if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
+  const scopeReport = ThingChecks.thingScope.safeParse({ ...bankScope, labelpath: raw['labelpath'] })
+  if (! scopeReport.success) { throw Throwers.storageIssue() }
+  const watched: ThingRecord = ThingkindChecks.ofLabelpath(scopeReport.data.labelpath).stored.parse(raw)
+  const fieldnames = Validator.disagreeingFieldnames(watched, scopeReport.data)
+  if (fieldnames.length > 0) { throw Throwers.rowOfOtherAddress(fieldnames) }
+  return watched
+}
 // --
 
-// == [Tables]: getActOf, putActOf, delActOf, isLifeMismatch, isPolicied, policyFailureOf, isGoodAct, isRefusedAct, isWriteAct
+// == [Tables]: getActOf, listActOf, putActOf, rootActOf, delActOf, isLifeMismatch, isPolicied, policyFailureOf, isGoodAct, isRefusedAct, isWriteAct
 
 /** The act of a get: see the get table in `notes/answer-contract.md`. */
 function getActOf({ ifAbsent }: Pick<GetAsk, 'ifAbsent'>, { presence }: GetTags): EX.GotAct | 'void' | 'gone' {
@@ -95,8 +162,17 @@ function getActOf({ ifAbsent }: Pick<GetAsk, 'ifAbsent'>, { presence }: GetTags)
   return (ifAbsent === 'nil') ? 'gotgone' : 'gone'
 }
 
+/** The act of a listing: its parent's presence, and only a live parent lists. */
+function listActOf({ presence }: GetTags): 'gotlive' | 'void' | 'gone' {
+  if (presence === 'live') { return 'gotlive' }
+  return presence
+}
+
+/** The tags the put table reads. */
+type PutTableTags = Pick<WriteTags, 'presence' | 'revtok_cmp' | 'revseq_cmp' | 'lifepath_eq'>
+
 /** The act of a write of a live record: see the put table in `notes/answer-contract.md`. The first matching row wins. */
-export function putActOf(ask: WriteAsk, tags: WriteTags): EX.PutAct | EX.RefusedAct {
+export function putActOf(ask: WriteAsk, tags: PutTableTags): EX.PutAct | EX.RefusedAct {
   const { presence, revtok_cmp: revtokCmp, revseq_cmp: revseqCmp } = tags
   if (revtokCmp  === '=next')                                                         { return 'retcon' }
   if (revseqCmp  === 'ahead')                                                         { return 'ahead' }
@@ -123,9 +199,16 @@ function delActOf(ask: WriteAsk, tags: WriteTags): EX.DelAct | EX.RefusedAct {
   return (presence === 'gone') ? 'dubdel' : 'deleted'
 }
 
+// A root's put cites the shell, so its revseq is always a birth's. Its lifepath agreement is read only where its revtok is
+// the shell's, which a birth's revseq makes a clash already.
+/** The act of one root's put in a birth: see the put table in `notes/answer-contract.md`. */
+function rootActOf(put: WriteAsk, tags: RootTags): EX.PutAct | EX.RefusedAct {
+  return putActOf(put, { ...tags, revseq_cmp: 'birth', lifepath_eq: true })
+}
+
 // The lifepath stands where big's life tok stood: it names the Thing's life, and the lives above it.
 /** True when the ante row differs from the cited one in its life or its liveness. */
-function isLifeMismatch({ cited }: Pick<WriteAsk, 'cited'>, { presence, lifepath_eq }: WriteTags): boolean {
+function isLifeMismatch({ cited }: Pick<WriteAsk, 'cited'>, { presence, lifepath_eq }: Pick<WriteTags, 'presence' | 'lifepath_eq'>): boolean {
   return (! lifepath_eq) || ((presence === 'live') !== (cited.am === 'a'))
 }
 
@@ -154,8 +237,8 @@ export function isRefusedAct(act: string): act is EX.RefusedAct { return (EX.ref
 export function isWriteAct(act: string): act is EX.WriteAct { return (EX.writeActVals as readonly string[]).includes(act) }
 // --
 
-// == [Scribing]: scribeGetAct, scribeWriteAct
-// The act is the tags' alone. `actual` is typed to agree with it, and `demandGetConsistency` or `demandWriteConsistency`
+// == [Scribing]: scribeGetAct, scribeWriteAct, scribeListAct, scribeBirthAct
+// The act is the tags' alone. `actual` is typed to agree with it, and the verb's consistency function in `three-way.ts`
 // refuses a manifest whose row does not.
 
 /** Write onto a get's manifest the act the get table finds from its tags, and whether it answers good. */
@@ -170,9 +253,31 @@ export function scribeWriteAct(ask: WriteAsk, manifest: CheckedWriteManifest): a
   const act      = (isWriteAct(tableAct) && isPolicied(ask, manifest.tags)) ? 'policied' : tableAct
   Object.assign(manifest, { ok: isGoodAct(act), act })
 }
+
+/** Write onto a listing's manifest the act its parent's presence finds, and whether it answers good. */
+export function scribeListAct(_ask: ListAsk, manifest: CheckedListManifest): asserts manifest is ScribedListManifest {
+  const act = listActOf(manifest.tags)
+  Object.assign(manifest, { ok: (act === 'gotlive'), act })
+}
+
+// The bank's put passes over a live bank, whose gate and root box are stored with it: a live bank without both is a broken
+// state. Otherwise a birth writes all three roots or none, so it is born only where no root's put refuses.
+/** Write onto a birth's manifest the act the put table finds for its three roots, and whether it answers good: `passed` over a live bank, else the first root's refusal, else `born`. */
+export function scribeBirthAct(ask: BirthBankAsk, manifest: CheckedBirthManifest): asserts manifest is ScribedBirthManifest {
+  const [bankPut, gatePut, rootPut] = birthPutsOf(ask)
+  const { tags, actual } = manifest
+  if (rootActOf(bankPut, tags.bank) === 'passed') {
+    if ((actual.bank === null) || (actual.gate === null) || (actual.root === null)) { throw Throwers.bankRootsMissing() }
+    Object.assign(manifest, { ok: true, act: 'passed' })
+    return
+  }
+  const acts = { bank: rootActOf(bankPut, tags.bank), gate: rootActOf(gatePut, tags.gate), root: rootActOf(rootPut, tags.root) }
+  const refusedroot = (['bank', 'gate', 'root'] as const).find((rootkey) => isRefusedAct(acts[rootkey]))
+  if (refusedroot === undefined) { Object.assign(manifest, { ok: true, act: 'born' }) } else { Object.assign(manifest, { ok: false, act: acts[refusedroot], refusedroot }) }
+}
 // --
 
-// == [Answers]: getAnswerOf, writeAnswerOf, policiedRefusalOf
+// == [Answers]: getAnswerOf, writeAnswerOf, policiedRefusalOf, listAnswerOf, voidParentOf, listedOf, kidsOf, birthAnswerOf, worldAnswerOf, worldRootsOf, statsAnswerOf
 
 /** The answer to a get, stripped from its scribed manifest. Where there is no actual row, its `dbhas` is the shell under the ancestor. */
 export function getAnswerOf(ask: GetAsk, manifest: ScribedGetManifest): GetThingAnswer {
@@ -202,5 +307,74 @@ function policiedRefusalOf(ask: WriteAsk, { tags, actual }: ScribedWriteManifest
   if (tags.born_at_cmp === 'changed') { return Throwers.bornAtNotStored(actual, meta) }
   if (why !== null)                   { return Throwers.gateIssue(actual, why, meta) }
   return Throwers.lifetokNotStored(actual, meta)
+}
+
+/** The answer to a listing, stripped from its scribed manifest: the children of the parent's live life as a {@link Kids} value, the parent as its `parentage`,
+ * and each child of that life as its `deltas`, in labelpath order. Refused, its `dbhas` is the parent stored, or where none is, {@link voidParentOf}.
+ */
+export function listAnswerOf(ask: ListAsk, manifest: ScribedListManifest): ListThingsAnswer {
+  const { banktok, tracked, read_tc, damaged_rows } = manifest
+  const beside = { ask: loggableAskOf(ask), banktok, tracked, read_tc }
+  if (! manifest.ok) {
+    const err = Throwers.listParentNotLive({ oplabel: 'listThings', ask: beside.ask, act: manifest.act })
+    return { ok: false, ...beside, act: manifest.act, dbhas: manifest.actual ?? voidParentOf(ask), err, parentage: [], deltas: [], damaged_rows }
+  }
+  const parent = manifest.actual
+  // A child hangs off its parent's live lifepath: an earlier life's children are not its.
+  const lifepathUnder = `${parent.lifepath}/`
+  const living = manifest.children.map(({ record }) => record).filter((record) => record.lifepath.startsWith(lifepathUnder))
+  const deltas = sortBy(living, [(thing) => thing.labelpath]).map((thing) => listedOf(thing))
+  return { ok: true, ...beside, act: manifest.act, val: kidsOf(ask, parent, deltas, read_tc), parentage: [listedOf(parent)], deltas, damaged_rows }
+}
+
+// The listing reads nothing above its parent, so the shell's lives are known only at a root, which has nothing above it.
+/** The `dbhas` of a listing whose parent is not stored: the shell at a root, null below one. */
+export function voidParentOf(ask: ListAsk): VoidSentinel | null { return (Labelpath.parentOf(ask.labelpath) === '') ? Shell.under(ask, null) : null }
+
+/** `thing` as a listing carries it: a live box's sparse form, or any other Thing whole, a tombstone among them. */
+function listedOf(thing: ThingRecord): ThingRecord | BoxSparse {
+  return ((thing.am === 'a') && Labelpath.isOfModelkind(thing.labelpath, 'box')) ? BaseThing.sparseOf(thing) as BoxSparse : thing
+}
+
+// Object.fromEntries makes each label an own key, `__proto__` among them.
+/** The {@link Kids} value of `deltas`, the children of the live `parent` stored at the listing's scope, read at `read_tc`. */
+function kidsOf(ask: ListAsk, parent: ThingRecord, deltas: readonly (ThingRecord | BoxSparse)[], read_tc: Kids['read_tc']): Kids {
+  const entryOf = ({ label, lifeseq }: ThingRecord | BoxSparse): [string, KidEntry] => [label, { lifeseq }]
+  return {
+    modelkind:  'kids',
+    parentpath: ask.labelpath,
+    parentlife: parent.lifepath,
+    items:      Object.fromEntries(deltas.filter((delta) => delta.am === 'a').map((delta) => entryOf(delta))),
+    gones:      Object.fromEntries(deltas.filter((delta) => delta.am !== 'a').map((delta) => entryOf(delta))),
+    read_tc,
+  }
+}
+
+/** The answer to a birth, stripped from its scribed manifest: the three roots stored. Refused, its `dbhas` is the root that refused it, or the shell there for none. */
+export function birthAnswerOf(ask: BirthBankAsk, manifest: ScribedBirthManifest): BirthBankAnswer {
+  const { banktok, tracked, read_tc } = manifest
+  const beside = { ask: loggableAskOf(ask), banktok, tracked, read_tc }
+  if (manifest.ok) { return { ok: true, ...beside, act: manifest.act, val: manifest.actual } }
+  const err = Throwers.actRefused('vault', manifest.act, { oplabel: 'birthBank', ask: beside.ask })
+  return { ok: false, ...beside, act: manifest.act, dbhas: worldRootsOf(ask, manifest.actual)[manifest.refusedroot], err }
+}
+
+/** The answer to a get of the world, stripped from its checked manifest. */
+export function worldAnswerOf(ask: GetWorldAsk, manifest: CheckedWorldManifest): GetWorldAnswer {
+  const { banktok, tracked, read_tc } = manifest
+  return { ok: true, ask: loggableAskOf(ask), banktok, tracked, read_tc, act: 'got', val: worldRootsOf(ask, manifest.actual) }
+}
+
+// A root has nothing above it, so where none is stored its shell stands alone.
+/** The roots of `ask`'s bank, each the shell at its labelpath where none is stored. */
+export function worldRootsOf({ userid, banklabel }: ThingWatchScope, roots: CheckedRoots): WorldRoots {
+  const shellAt = (rootkey: keyof CheckedRoots): VoidSentinel => Shell.under({ userid, banklabel, labelpath: RootLabelpaths[rootkey] }, null)
+  return { bank: roots.bank ?? shellAt('bank'), gate: roots.gate ?? shellAt('gate'), root: roots.root ?? shellAt('root') }
+}
+
+/** The answer to an ask for stats, stripped from its checked manifest. */
+export function statsAnswerOf(ask: StatsAsk, manifest: CheckedStatsManifest): StatsAnswer {
+  const { banktok, tracked, read_tc } = manifest
+  return { ok: true, ask: loggableAskOf(ask), banktok, tracked, read_tc, act: 'got', val: manifest.stats }
 }
 // --

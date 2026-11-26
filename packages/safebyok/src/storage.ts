@@ -18,15 +18,16 @@ export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, typ
 export { type Adoptable, Thing } from './models/thing'
 export {
   type AnyAsk, type BankRoots, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAskDraft, type GetAsk, type GetWorldAsk, type StatsAsk, type WorldRoots, type ListAskDraft,
-  type ListAsk, type LoggableAsk, type PutAskDraft, type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WriteAsk, type WriteAskFlags, AskChecks, VoidTrack, birthPutsOf, checkedBirthBankAsk,
+  type ListAsk, type LoggableAsk, type PutAskDraft, type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WriteAsk, type WriteAskFlags, AskChecks, RootLabelpaths, VoidTrack, birthPutsOf, checkedBirthBankAsk,
   checkedWriteAsk, delAskOf, getAskOf, listAskOf, putAskOf,
 } from './shapes/shapes-asks'
-export * as Classifier from './storage/thing-classifier'
-// A datastore's contract: the manifest each get and write step hands back, the tags in it, and the functions that make them in TypeScript.
+// A datastore's contract (notes/vault-adapter-contract.md): the manifest each verb's step hands back, the tags in it, and the functions that make them in TypeScript.
 export * as ManifestTags from './storage/manifest-tags'
 export {
-  type CheckedGetManifest, type CheckedManifestRows, type CheckedWriteManifest, type GetManifest, type GetTags, type PolicyVerdict, type PolicyVerdicts, type Presence, type RevseqCmp, type RevtokCmp, type SameCmp,
-  type ScribedGetManifest, type ScribedWriteManifest, type WriteManifest, type WriteTags, ManifestChecks,
+  type BankObserved, type BirthManifest, type BirthTags, type CheckedBankObserved, type CheckedBirthManifest, type CheckedGetManifest, type CheckedListManifest, type CheckedManifestRows, type CheckedRoots,
+  type CheckedStatsManifest, type CheckedWorldManifest, type CheckedWriteManifest, type GetManifest, type GetTags, type ListManifest, type ListedChild, type PolicyVerdict, type PolicyVerdicts, type Presence,
+  type Received, type RevseqCmp, type RevtokCmp, type RootRows, type RootTags, type SameCmp, type ScribedBirthManifest, type ScribedGetManifest, type ScribedListManifest, type ScribedWriteManifest, type StatsManifest,
+  type WorldManifest, type WriteManifest, type WriteTags, ManifestChecks,
 } from './shapes/shapes-manifest'
 export { type AnteWayins, GatePolicies } from './storage/policies'
 export { VacantAgerank, readAtOf, readTcNow } from './storage/agerank'
@@ -38,8 +39,8 @@ export { DeviceDB } from './storage/device-db'
 export { MemoryDeviceDB } from './storage/memory-device-db'
 export { type DevicetokScopepath, type LeaseListener, type LeaseScopepath, DeviceDBChecks } from './shapes/shapes-device-db'
 export {
-  type Actual, type ActualBeside, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GetWorldActual, type GetWorldAnswer, type GoodAnswer, type GotActual,
-  type KidEntry, type Kids, type ListThingsActual, type ListThingsAnswer, type ListedBeside, type Received, type StatsActual, type StatsAnswer, type WriteThingAnswer, type WroteActual, ActualChecks,
+  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GetWorldAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside,
+  type StatsAnswer, type WriteThingAnswer,
 } from './shapes/shapes-answers'
 export { type VaultDB, isVaultDB } from './storage/vault-db'
 // A bank's storage stats, as `tryStats` answers them, and how a concrete adapter measures them.

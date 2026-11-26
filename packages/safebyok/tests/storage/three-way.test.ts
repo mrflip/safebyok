@@ -66,7 +66,7 @@ describe("ThreeWay.demandWriteConsistency(ask, manifest, answer)", () => {
     const { manifest, answer } = wroteOf(Birth, null, true)
     const doctored = [{ ...answer, val: OtherGate }, { ...answer, banktok: TH.OtherLifetok }, { ...answer, tracked: { ...manifest.tracked } }, { ...answer, read_tc: readTcNow() }]
     for (const otherAnswer of doctored) {
-      const err = TH.expectSyncRefusal(() => { ThreeWay.demandWriteConsistency(Birth, manifest, otherAnswer) }, 'storage_issue')
+      const err = TH.expectSyncRefusal(() => { ThreeWay.demandWriteConsistency(Birth, manifest, otherAnswer) }, 'unexpected_error')
       expect(err.message).to.eq(Phrases.AnswerOfOtherManifest)
     }
   })
@@ -100,7 +100,7 @@ describe("ThreeWay.demandGetConsistency(ask, manifest, answer)", () => {
 
   it("refuses an answer that does not copy the manifest", () => {
     const { manifest, answer } = gotOf(TH.getGateAskOf(), Gate)
-    const err = TH.expectSyncRefusal(() => { ThreeWay.demandGetConsistency(TH.getGateAskOf(), manifest, { ...answer, banktok: TH.OtherLifetok }) }, 'storage_issue')
+    const err = TH.expectSyncRefusal(() => { ThreeWay.demandGetConsistency(TH.getGateAskOf(), manifest, { ...answer, banktok: TH.OtherLifetok }) }, 'unexpected_error')
     expect(err.message).to.eq(Phrases.AnswerOfOtherManifest)
   })
 

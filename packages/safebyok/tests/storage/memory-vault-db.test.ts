@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { readTcNow } from '../../src/storage/agerank'
-import * as Classifier from '../../src/storage/thing-classifier'
 import { Shell } from '../../src/shapes/shapes-thing'
 import { StoreLimitCap, type VaultStats } from '../../src/shapes/shapes-vault-stats'
 import { rowWeightOf } from '../../src/storage/vault-stats'
@@ -79,14 +77,6 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
     const ask = TH.birthBankAskOf({ root: TH.boxThingOf() })
     await TH.expectBad(vaultDB.tryBirthBank(ask), 'bad_record')
     expect(vaultDB._cheat_things(TH.ThingBank).size).to.eq(0)
-  })
-})
-
-describe("Classifier.classifyListThings(ask, fetched, roots)", () => {
-  it("refuses, as a broken store, a child a store fetched from outside the parent", () => {
-    const child = { labelpath: 'box/aa/deep', raw: TH.boxThingOf('deep') }
-    const fetched = { parent: TH.rootBoxOf(), children: [child] }
-    TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), fetched, { bank: null, tracked: { bank: null, gate: null, box: null }, read_tc: readTcNow() }), 'storage_issue')
   })
 })
 

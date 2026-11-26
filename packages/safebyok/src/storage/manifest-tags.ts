@@ -1,12 +1,12 @@
-/** The tags a datastore makes of a get or a write, its `banktok` and its `tracked`, each from raw rows: a datastore's contract with `AdapterVaultDB`.
+/** The tags a datastore makes of each verb, its `banktok` and its `tracked`, each from raw rows: a datastore's contract with `AdapterVaultDB` (`notes/vault-adapter-contract.md`).
  * A datastore that runs TypeScript in its step makes its manifest's tags with these, over the rows it read; one that cannot
  * (Postgres) makes the same comparisons in its own language. Each reads raw fields, and never throws on a row that is no object.
  */
 
 import { CX, type EX, SX } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
-import type { AnyAsk, Track, WriteAsk } from '../shapes/shapes-asks'
-import type { GetTags, PolicyVerdict, PolicyVerdicts, Presence, RevseqCmp, RevtokCmp, SameCmp, WriteTags } from '../shapes/shapes-manifest'
+import type { AnyAsk, BirthPuts, Track, WriteAsk } from '../shapes/shapes-asks'
+import type { BirthTags, GetTags, PolicyVerdict, PolicyVerdicts, Presence, RevseqCmp, RevtokCmp, RootRows, RootTags, SameCmp, WriteTags } from '../shapes/shapes-manifest'
 import { type AnteWayins, GatePolicies } from './policies'
 
 // == [Fields]: fieldOf, banktokOf
@@ -19,7 +19,7 @@ export function fieldOf(row: unknown, fieldname: string): unknown { return CX.is
 export function banktokOf(bank: unknown): unknown { return (bank === null) ? SX.VoidLifeTok : fieldOf(bank, 'lifetok') }
 // --
 
-// == [Tags]: presenceOf, getTagsOf, writeTagsOf, revtokCmpOf, revseqCmpOf, bornAtCmpOf, lifetokCmpOf, policiesOf, policyVerdictOf, anteWayinsOf
+// == [Tags]: presenceOf, getTagsOf, writeTagsOf, birthTagsOf, rootTagsOf, revtokCmpOf, revseqCmpOf, bornAtCmpOf, lifetokCmpOf, policiesOf, policyVerdictOf, anteWayinsOf
 
 /** The liveness of the raw `row`: `'void'` for null, `'live'` where its `am` is `'a'`, else `'gone'`. */
 export function presenceOf(row: unknown): Presence {
@@ -43,6 +43,15 @@ export function writeTagsOf(ask: WriteAsk, ante: unknown, written: boolean): Wri
     written,
   }
 }
+
+/** The tags of a birth by its three `puts`, each root's judged against its raw `ante` root, null for none, beside whether the datastore wrote. */
+export function birthTagsOf([bankPut, gatePut, rootPut]: BirthPuts, ante: RootRows, written: boolean): BirthTags {
+  return { bank: rootTagsOf(bankPut, ante.bank), gate: rootTagsOf(gatePut, ante.gate), root: rootTagsOf(rootPut, ante.root), written }
+}
+
+// A birth's put cites the shell, so of the write tags its put table reads, only these two vary.
+/** The tags of one root's `put` over its raw `ante` root, null for none. */
+function rootTagsOf(put: WriteAsk, ante: unknown): RootTags { return { presence: presenceOf(ante), revtok_cmp: revtokCmpOf(put, ante) } }
 
 /** The ante row's revtok against the ask's: see {@link RevtokCmp}. */
 function revtokCmpOf({ cited, record }: WriteAsk, ante: unknown): RevtokCmp {

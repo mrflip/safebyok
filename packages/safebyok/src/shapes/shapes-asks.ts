@@ -10,7 +10,7 @@ import {
 } from './shapes-thing'
 import * as Throwers from '../refusals/throwers'
 
-// == [Asks]: RawChecks, loggableAsk, AskChecks, Track, VoidTrack, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, GetWorldAsk, WorldRoots, StatsAsk, ThingWatchScope, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
+// == [Asks]: RawChecks, loggableAsk, AskChecks, Track, VoidTrack, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, RootLabelpaths, GetWorldAsk, WorldRoots, StatsAsk, ThingWatchScope, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
 type Kinded   = { modelkind: Thingkind, labelpath: Labelpath }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
@@ -92,7 +92,7 @@ const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => 
 
 /** The checks of a vaultDB ask, its records aside, of a watch's scope and handlers, and of the part of an ask that is safe to log.
  * A write or birth ask's records are checked by {@link checkedWriteAsk} and {@link checkedBirthBankAsk}.
- * Every ask carries `banktok`, the lifetok its sender has of the bank's life: a vaultDB checks it, and nothing more. Only a get, of a Thing or of the world, and an ask for stats may carry the void lifetok.
+ * Every ask carries `banktok`, the lifetok its sender has of the bank's life: a vaultDB checks its form, and compares it with nothing stored. Only a get, of a Thing or of the world, and an ask for stats may carry the void lifetok.
  */
 export const AskChecks = Object.freeze({ ...RawChecks, loggableAsk })
 
@@ -126,6 +126,8 @@ export type BoxWriteAsk  = WriteAskFlags & Readonly<{ modelkind: 'box',  cited: 
 export type WriteAsk<RecordT extends ThingRecord = ThingRecord> = Extract<BankWriteAsk | GateWriteAsk | BoxWriteAsk, { record: RecordT }>
 /** A bank's three roots: the bank, its main gate and its root box. */
 export type BankRoots       = Readonly<{ bank: BankRecord, gate: GateRecord, root: BoxRecord }>
+/** Where each of a bank's three roots is stored, by its key in {@link BankRoots}. */
+export const RootLabelpaths = Object.freeze({ bank: 'bank', gate: Labelpath.MainGate, root: Labelpath.RootBox } as const satisfies Record<keyof BankRoots, Labelpath>)
 /** An ask to write a new bank's first Things in one step: the bank, its main gate and its root box. */
 export type BirthBankAsk    = Readonly<Omit<Z.infer<typeof AskChecks.birthBankAsk>, keyof BankRoots> & BankRoots>
 /** An ask for a bank's three roots, read in one step. */
