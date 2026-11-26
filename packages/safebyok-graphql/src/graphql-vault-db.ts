@@ -77,7 +77,7 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
     const answer = WireChecks.wroteAnswer.parse(thingAnswerDrop(await this.#runMutation(VaultOperations.writeThing, 'safebyokWriteThing', { ask })))
     if (! answer.ok) {
       throwIfThrown(ask, answer)
-      return { ...besideOf(ask, answer), ok: false, act: refusedActOf(answer.act), record: Classifier.crossedThingOf(ask, answer.dbhas) }
+      return { ...besideOf(ask, answer), ok: false, ...Classifier.crossedRefusedWriteOf(ask, answer.act, answer.dbhas) }
     }
     return { ...besideOf(ask, answer), ok: true, act: answer.act, record: Classifier.crossedWrittenOf(ask, answer.val) }
   }
@@ -99,7 +99,7 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
     const answer = WireChecks.rootsAnswer.parse(rootsAnswerDrop(await this.#runMutation(VaultOperations.birthBank, 'safebyokBirthBank', { ask })))
     if (! answer.ok) {
       throwIfThrown(ask, answer)
-      return { ...besideOf(ask, answer), ok: false, act: refusedActOf(answer.act), record: Classifier.crossedNamedOf(ask, answer.dbhas) }
+      return { ...besideOf(ask, answer), ok: false, ...Classifier.crossedRefusedBirthOf(puts, answer.act, answer.dbhas) }
     }
     return { ...besideOf(ask, answer), ok: true, act: answer.act, things: Classifier.crossedRootsOf(puts, answer.val) }
   }
@@ -181,7 +181,7 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
 }
 // --
 
-// == [Answers]: CheckedAnswer, RefusedAnswer, besideOf, throwIfThrown, refusedActOf, fieldOf, troubleOf, carriedErrOf, hearNotice
+// == [Answers]: CheckedAnswer, RefusedAnswer, besideOf, throwIfThrown, fieldOf, troubleOf, carriedErrOf, hearNotice
 
 /** What every answer carries, as its check read it. */
 type CheckedAnswer = Readonly<{ banktok: DB.Lifetok, tracked: unknown, read_tc: DB.ReadTc }>
@@ -198,12 +198,6 @@ function besideOf(ask: DB.AnyAsk, { banktok, tracked, read_tc }: CheckedAnswer):
 /** Where `answer` is that of a verb that threw, throw its refusal again, naming its act and the Thing stored it names, checked. */
 function throwIfThrown(ask: DB.AnyAsk, { act, tracked, dbhas, err }: RefusedAnswer): void {
   if (tracked === 'unread') { throw DB.refusedOverWire(err, { act, dbhas: (dbhas === null) ? null : Classifier.crossedNamedOf(ask, dbhas) }) }
-}
-
-/** `act`, a refused answer's act from a verb that did not throw, which must be one a datastore's report has. */
-function refusedActOf(act: DB.BadAct): DB.RefusedAct {
-  if (! (DB.refusedActVals as readonly string[]).includes(act)) { throw DB.storageIssue() }
-  return act as DB.RefusedAct
 }
 
 /** Return the `fieldname` field of an operation's result, or throw the refusal for a failed operation. */

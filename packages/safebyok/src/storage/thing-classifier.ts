@@ -440,7 +440,7 @@ export function unwrittenBirthOf(puts: BirthPuts, fetched: BankRootsFetched): Bi
 }
 // --
 
-// == [Things crossed]: CrossedThingChecks, crossedThingOf, CrossedGot, crossedGotOf, crossedWrittenOf, crossedNamedOf, crossedTrackedOf, crossedRootsOf, crossedWorldOf, CrossedListing, CrossedListed, crossedListingOf, crossedChildOf, crossedListedOf, recordOrShellOf
+// == [Things crossed]: CrossedThingChecks, crossedThingOf, CrossedGot, crossedGotOf, CrossedRefused, crossedRefusedWriteOf, crossedRefusedBirthOf, crossedWrittenOf, crossedNamedOf, crossedTrackedOf, crossedRootsOf, crossedWorldOf, CrossedListing, CrossedListed, crossedListingOf, crossedChildOf, crossedListedOf, recordOrShellOf
 // What a server's vaultDB answered, carried across a wire to a client's vaultDB, for an adapter whose server runs a whole
 // vaultDB. The server classified it; the client reads each Thing again, at the ask's scope, before it reaches a report.
 // Each refuses `storage_issue`: to the client, the server is its storage, and a Thing that fails here, damaged or not, means it is out of step or broken.
@@ -469,6 +469,27 @@ export function crossedGotOf(ask: GetAsk, act: string, raw: unknown): CrossedGot
   const tabled = getActOf(ask, BaseThing.isVoidSentinel(record) ? null : record)
   if (tabled !== act) { throw Throwers.storageIssue() }
   return isRefusedAct(tabled) ? { ok: false, act: tabled, record } : { ok: true, act: tabled, record }
+}
+
+/** A refusal's act and the Thing it names, checked: what a concrete adapter's refused report carries beside its banktok, tracked and read_tc. */
+export type CrossedRefused = Readonly<{ act: EX.RefusedAct, record: ThingRecord | VoidSentinel }>
+
+/** The act and Thing a server's refusal of a write carried, checked: the Thing at the ask's scope, or the shell there, and `act` the refusal the act tables give it. */
+export function crossedRefusedWriteOf(ask: WriteAsk, act: string, raw: unknown): CrossedRefused {
+  const record = crossedThingOf(ask, raw)
+  const tabled = writeActOf(ask, BaseThing.isVoidSentinel(record) ? null : record)
+  if ((tabled !== act) || ! isRefusedAct(tabled)) { throw Throwers.storageIssue() }
+  return { act: tabled, record }
+}
+
+/** The act and Thing a server's refusal of a birth carried, checked: one of the three roots `puts` writes, stored or its shell, and `act` the refusal the put table gives its put. */
+export function crossedRefusedBirthOf(puts: BirthPuts, act: string, raw: unknown): CrossedRefused {
+  const record = crossedNamedOf(puts[0], raw)
+  const put    = puts.find(({ labelpath }) => (labelpath === record.labelpath))
+  if (put === undefined) { throw Throwers.storageIssue() }
+  const tabled = putActOf(put, BaseThing.isVoidSentinel(record) ? null : record)
+  if ((tabled !== act) || ! isRefusedAct(tabled)) { throw Throwers.storageIssue() }
+  return { act: tabled, record }
 }
 
 /** The Thing a server's answer reports writing at `scope`, checked. */
