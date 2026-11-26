@@ -1,0 +1,126 @@
+# vault_manifest: plan
+
+* **Date:** 2026-11-26 · **Mode:** YOLO · **Issued by:** the Coach (Philip), in a design talk, then `/sprint YOLO /turbochat`
+* **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
+* **At once:** 3 threads
+* **Status:** planned; thread 1 starting
+
+## Read first
+
+* `whiteboard/20261126-vault_manifest/vault_manifest-design.md`, whole. It is the design; this plan schedules it.
+* `notes/answer-contract.md`, *Rules* > *Revisions* and *Operations* (the get, put and del tables): the tags are its columns.
+* `notes/gallant.md`: `#pass-it-whole`, `#no-bouncing`, `#impossible-is-a-broken-system`, `#use-what-you-parse`, `#callee-parses`.
+* `VOCABULARY.md`: *Verbs, by how precise they are* and *Words safebyok does not use*; the *storage, datastore* and *damaged* rows.
+* `notes/transition.md`, before exporting from the new core or reaching for something big has.
+
+## Ground rules
+
+* **The new core's code is the contract** (the Coach, 2026-11-26: "The code in safebyok is your reference for contract, if those differ: I'm happy with how it is operating. (But do still report if it differs from your first principles reasoning or one of our docs)"). A thread changes how an answer is made, never what a working vaultDB answers, except where the design says so. A difference from a doc or from your own reasoning is reported, in your thread file's *Open matters*.
+* **Readability and correctness are paramount, not compute, not LOC** (the Coach). Count branches; one plain straight-line function per verb.
+* **Validate the ask once, at the entry**; past it, helpers take `ask` or `(ask, manifest)` (or a `Pick`) and neither re-validate nor null-check what the types exclude.
+* **A datastore reads no check and no act table**; the base class never looks inside a datastore. The overlap between the datastore's write predicate and the base class's act is what the three-way check costs: never optimize it away.
+* **Words**: actual, ante, proposed, stored, manifest, incompatible, as the design's *Words* table has them. `store` is not a noun; no keep/kept/hold. `WriteAsk.record` keeps its name.
+* **Red, then mended.** Threads 1 and 2 change `AdapterVaultDB`'s `do*` signatures, so `safebyok-indexeddb`, `safebyok-postgres` and `safebyok-convex` fail to typecheck until threads 3, 4 and 5 port them. A worker on 1 or 2 is ready when `packages/safebyok` passes and `pnpm justify` is red only in those three packages; its PR body names what is red and the threads that mend it. Threads 3 to 5 bring `pnpm justify` back to green.
+
+## Threads
+
+The Coach issued the design rather than numbered threads. Each thread quotes the Coach's words that bear on it, verbatim, then the orchestrator's gloss.
+
+### 1. manifest_things — the Manifest, and get and write on it
+
+> "1. Tag the result (lifeseq ahead, behind, equal; lifetok eq/ne;... op; presence) in the backing store onto a partial Actual object 2. in the parent class, Use those tags to cleanly accrue properties onto Actual and finally dispatch to a function that strips it to an answer. 3. Validate the ask at the start, and out of the db. Most methods should have ask or (ask, actual) (or a pick if it's more readable to be specific) -- meaning they don't need to revalidate and definitely don't need to nullcheck"
+>
+> "The returned record (Val or dbhas) should always be the actual row exactly as it sits in the db at the final read snapshot (close of the transaction, preferably)."
+>
+> "I propose the carrier of the tags, data and metadata be a Manifest (rather than Actual as I just proposed); wherever reasonable, its structure should resemble the Answer."
+>
+> "For policies you'll want a Record<PolicyTag, {ok:false,message:string}|{ok:true}> with each policy in the ask answered."
+>
+> "I know it's gauche function to write on ones arguments, but using the manifest as an accumulator may work cleanly -- the method to determine an act scribes it on the manifest directly so that the caller isn't doing spread surgery or using a mutable variable."
+>
+> "Is MemoryVaultStore the one that returns a manifest and then MemoryVaultDB is calling "functions" on it as Postgres and Convex do? I like that a lot. Make clear that the MemoryVaultStore is infallible as far as our code is concerned; a record that fails validation ("damaged") should really be regarded as incompatible."
+>
+> "Move the redundant verification of the ask against the manifest, and consistency checks within each into a demandThreeWayConsistency(ask, manifest, answer) method. That doesn't mean move every safety check, or even every repeated check. It means that if the one line were commented out, you'd say the precondition, postcondition and any intermediate checks were conservatively prudent; with the call you'd say "overkill, but justifiably for a nascent code base""
+
+*Gloss.* Touches `packages/safebyok/src/shapes/` (a new `shapes-manifest.ts`: `WriteTags`, `PolicyVerdict`, `GetManifest`, `WriteManifest` and their scribed narrowings), `src/storage/` (the shared tag functions, likely `manifest-tags.ts`; the act scribing and answer functions for get and write; `demandThreeWayConsistency`; `adapter-vault-db.ts`'s `tryGetThing` and `tryWriteThing` and their abstract `do*`; a new `memory-datastore.ts` and a slimmed `memory-vault-db.ts`), `src/refusals/throwers.ts`, `src/phrases.ts`, and the vaultDB battery and `tests/storage/`. `MemoryDatastore` gets all six functions now; its list, birth, world and stats return today's fetched shapes until thread 2 (each marked "Scaffolding: until thread 2 (manifest_rest)"). The born_at, lifetok and policy `demand*` throwers become tags and scribed `policied` acts. `StoredCited` and the `stored*` picks go where get and write were their only readers. Tests: the battery must pass unchanged in what it expects of answers; add unit tests of `scribeWriteAct` row by row against the put and del tables (PV1…DL9, as the new core's code reads them), and of `demandThreeWayConsistency` with a doctored manifest per check.
+*Levels:* worker `thread-worker-400k`; review `high` on `opus`; style pass `opus` (it sets the words every later thread copies).
+*Depends on:* nothing; cut from `origin/main`.
+*Look-ahead:* thread 2 copies its pattern for the other verbs, and threads 3–5 implement its `do*` contract: keep the manifest types and the tag functions exported from `safebyok/storage`, documented as a datastore's contract.
+*Size:* large; the largest in the sprint. If it nears its cap, stop after the write verb and report what remains.
+
+### 2. manifest_rest — list, birth, world and stats on the Manifest
+
+> "Postgres should actually be your model, one transaction handing back a Manifest in whole"
+>
+> "The line about outcome deserves more nuance. The adapter records all *observations* of the transaction and snapshot. That tells you what *it* based its actions on. The VaultDB prepares an answer based solely on those observations. Finally, the parent class does three way consistency of the answer, manifest and ask."
+>
+> "Banktok is aspirational right now but will later on hard scope every record"
+
+*Gloss.* The rest of `AdapterVaultDB`'s verbs (`tryListThings`, `tryBirthBank`, `tryGetWorld`, `tryStats`) and their `MemoryDatastore` functions, on thread 1's pattern; removes the Scaffolding thread 1 left and whatever of `thing-classifier.ts` and the `Actual` types and `ActualChecks` nothing reads any more (the module may be renamed for what it becomes). Writes the new core's adapter contract, the three roles of the design, as a new note (`notes/vault-adapter-contract.md` is a fair name) that `notes/answer-contract.md`'s *Adapter contract* points to as safebyok-big's. Fixes the doc drift the design lists: `BadAct`'s doc block (lifetok refuses `policied` too) and `AskChecks`'s "a vaultDB checks it, and nothing more" of banktok.
+*Levels:* defaults; review `medium`.
+*Depends on:* thread 1; cut from its tip once it is ready.
+*Look-ahead:* threads 3–5 port to the contract note this thread writes.
+*Size:* medium.
+
+### 3. idb_manifest — IndexedDB onto the Manifest
+
+> "then work on Convex. Memory is weird and confusing because I haven't drawn a sharp enough line for you"
+
+*Gloss.* `packages/safebyok-indexeddb/src/idb-vault-db.ts`: each `do*`'s transaction body becomes its datastore function, returning a manifest as `MemoryDatastore` does. Its own tests and the battery over it pass.
+*Levels:* worker `sonnet`; review `low`.
+*Depends on:* thread 2.
+*Look-ahead:* none.
+*Size:* small.
+
+### 4. postgres_manifest — Postgres hands back a Manifest whole
+
+> "There should not in general be an assumption of a separate read (your two types) -- the Postgres adapter should actually be your model, one transaction handing back a Manifest in whole"
+>
+> "Is Postgres storing a thing in columns or a json blob? In all stores that have the notion it should be a s columns (whisper_sealed, sidecar and wayins are blobs)." (It is columns already.)
+
+*Gloss.* `packages/safebyok-postgres/src/`: each statement returns a manifest. The write functions in `vault-functions.ts` return the tags (constants on the written branch, worked out over the read-back row on the unwritten one) and the policies as a jsonb object of verdicts whose messages come from the same phrases as `storage/policies.ts`; `vault-queries.ts` returns tags for the reads; the ancestor subquery runs only where it is read. `postgres-vault-db.ts` loses `mayWrite`, `writtenActOf` and the TS re-run of the act tables after a refusal; each `do*` is one statement. Every check stays in the SQL (the design, *Per datastore*). No `SqlRevision` bump before 1.0 (`vault-functions.ts`'s header).
+*Levels:* review `high` on `opus`: the SQL is the trust boundary behind GraphQL.
+*Depends on:* thread 2.
+*Look-ahead:* thread 5 copies its manifest shape over Convex.
+*Size:* medium-large.
+
+### 5. convex_manifest — Convex in typed tables, onto the Manifest
+
+> "I agree -- postgres columns sounds right. Convex should be restructured."
+
+*Gloss.* `packages/safebyok-convex/src/component/` (`schema.ts`, `things.ts`, `validators.ts`) and `src/convex-vault-db.ts`: one table per kind with a typed field per column, as Postgres's tables have, `v.any()` only where Postgres has jsonb; each mutation and query returns a manifest, its tags worked out in TypeScript inside the Convex transaction as `MemoryDatastore` does. A stored-format change before 1.0: no migration, and the changeset says a host's existing Convex vaults read as absent. The watch's `by_commit` cursor works across the three tables.
+*Levels:* defaults; review `medium`.
+*Depends on:* thread 2.
+*Look-ahead:* none.
+*Size:* medium-large: if the table split and the manifest port will not fit one context, split the table restructure into a thread of its own and report.
+
+### 6. actual_words — "stored" sorted into actual, ante and stored
+
+> "I asked because I think agents are taking an ambiguity: the "stored" record is not "the one that was stored", it is "the one that the store now holds". That means you always get the ground truth of the data store, and it's the same rule for every read or write. The best term instead, I propose, is "actual record" rather than "stored record"."
+>
+> "Record: what do you think of proposed or asked for the value in the ask, ante or prior for what is in the data store at the start, and actual for what is returned?"
+
+*Gloss.* A manual sweep of the remaining uses of "stored" (about 500 bare uses at the start of the sprint) in `packages/safebyok/src` and the three adapters, sorting each into actual, ante, proposed or stored (at rest) by the design's *Words* table; renames of identifiers that carry the word in the wrong sense; and VOCABULARY.md rows for **actual**, **ante**, **manifest** and **proposed**. No behaviour changes.
+*Levels:* style pass `opus`; review `medium`.
+*Depends on:* threads 3, 4 and 5 (they rewrite the same files); cut from the top of the restacked line.
+*Look-ahead:* thread 7 renames "damaged" in the same prose.
+*Size:* medium, mechanical but judgment per use.
+
+### 7. incompatible_row — the refusal kind renamed
+
+> "Agree on renaming damaged row. incompat_row or incompatible_row? 16 chars is a lot."
+
+*Gloss.* The name waits on the Coach's Open Matters row (Rec: `incompatible_row`). A new refusal kind in safebyok-big's errors (broadening big, as CLAUDE.md allows), used by the new core and its adapters in place of `damaged_row`, with `damaged_rows`, `DamagedThing` and VOCABULARY.md's *damaged* row renamed to match; `damaged_whisper` stays, since a whisper that will not unseal is damage. Big's own use of `damaged_row` stays. A public refusal kind changes: the changeset says so.
+*Levels:* worker `sonnet`; review `low`.
+*Depends on:* thread 6.
+*Look-ahead:* none.
+*Size:* small-medium, mechanical.
+
+## Line
+
+`1 → 2 → 3 → 4 → 5 → 6 → 7`, the sprint PR on top. Threads 3, 4 and 5 run side by side from thread 2's tip and are restacked into the line before thread 6 is cut.
+
+## For the Coach
+
+* Threads 1 and 2 land red in `safebyok-indexeddb`, `safebyok-postgres` and `safebyok-convex`; merge the line through thread 5 together.
+* Thread 7's name: Open Matters.
