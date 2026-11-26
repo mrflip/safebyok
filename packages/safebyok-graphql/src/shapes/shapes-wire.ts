@@ -19,14 +19,14 @@ export type WireAnswer = Readonly<{
 }> & Partial<DB.ListedBeside>
 
 /** One notice of a watch as it crosses: a changed Thing, its bank's banktok and when it was read; or, with those null, the trouble the watch met.
- * `ended` is true on the last notice of a watch that ended itself, which carries why.
+ * `isEnded` is true on the last notice of a watch that ended itself, which carries why.
  */
 export type WireNotice = Readonly<{
   record:  DB.VaultItemEvent['val'] | null
   banktok: DB.Lifetok | null
   read_tc: DB.ReadTc | null
   err:     DB.CrossedErr | null
-  ended:   boolean
+  isEnded: boolean
 }>
 // --
 
@@ -50,8 +50,8 @@ export const WireChecks = DB.Checkers('storage_issue', ({ obj, lit, oneof, unk, 
     worldAnswer: discrim('ok', [goodOf(['got']), refused]),
     statsAnswer: discrim('ok', [goodOf(['got']), refused]),
     notice:      union([
-      obj({ record: unk, banktok, read_tc, err: lit(null), ended: lit(false) }),
-      obj({ record: lit(null), banktok: lit(null), read_tc: lit(null), err: DB.CrossedChecks.err, ended: bool }),
+      obj({ record: unk, banktok, read_tc, err: lit(null), isEnded: lit(false) }),
+      obj({ record: lit(null), banktok: lit(null), read_tc: lit(null), err: DB.CrossedChecks.err, isEnded: bool }),
     ]),
   }
 })

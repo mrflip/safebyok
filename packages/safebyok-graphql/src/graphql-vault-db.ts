@@ -61,15 +61,17 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
   /** Get the Thing at the ask's scope from the server. */
   protected async doGetThing(ask: DB.GetAsk): Promise<DB.GotActual> {
     const answer = WireChecks.gotAnswer.parse(thingAnswerDrop(await this.#runQuery(VaultOperations.getThing, 'safebyokGetThing', { ask })))
-    if (! answer.ok) { return refusedActualOf(ask, answer) }
-    const record = Classifier.crossedThingOf(ask, (answer.act === 'gotlive') ? answer.val : answer.dbhas)
-    return { ...besideOf(ask, answer), ok: true, act: answer.act, record }
+    if (! answer.ok) { throwIfThrown(ask, answer) }
+    return { ...besideOf(ask, answer), ...Classifier.crossedGotOf(ask, answer.act, (answer.act === 'gotlive') ? answer.val : answer.dbhas) }
   }
 
   /** Write the ask's record on the server. */
   protected async doWriteThing(ask: DB.WriteAsk): Promise<DB.WroteActual> {
     const answer = WireChecks.wroteAnswer.parse(thingAnswerDrop(await this.#runMutation(VaultOperations.writeThing, 'safebyokWriteThing', { ask })))
-    if (! answer.ok) { return refusedActualOf(ask, answer) }
+    if (! answer.ok) {
+      throwIfThrown(ask, answer)
+      return { ...besideOf(ask, answer), ok: false, act: refusedActOf(answer.act), record: Classifier.crossedThingOf(ask, answer.dbhas) }
+    }
     return { ...besideOf(ask, answer), ok: true, act: answer.act, record: Classifier.crossedWrittenOf(ask, answer.val) }
   }
 
@@ -172,7 +174,7 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
 }
 // --
 
-// == [Answers]: CheckedAnswer, RefusedAnswer, besideOf, refusedActualOf, throwIfThrown, refusedActOf, fieldOf, troubleOf, hearNotice
+// == [Answers]: CheckedAnswer, RefusedAnswer, besideOf, throwIfThrown, refusedActOf, fieldOf, troubleOf, hearNotice
 
 /** What every answer carries, as its check read it. */
 type CheckedAnswer = Readonly<{ banktok: DB.Lifetok, tracked: unknown, read_tc: DB.ReadTc }>
@@ -185,16 +187,10 @@ function besideOf(ask: DB.AnyAsk, { banktok, tracked, read_tc }: CheckedAnswer):
   return { banktok, tracked: Classifier.crossedTrackedOf(ask, tracked), read_tc }
 }
 
-/** The report of a get or a write the server refused, with the Thing stored at the ask's scope, or the shell there; or where the server's verb threw, throw what it threw. */
-function refusedActualOf(ask: DB.GetAsk | DB.WriteAsk, answer: RefusedAnswer): DB.ActualBeside & { ok: false, act: DB.RefusedAct, record: DB.ThingRecord | DB.VoidSentinel } {
-  throwIfThrown(ask, answer)
-  return { ...besideOf(ask, answer), ok: false, act: refusedActOf(answer.act), record: Classifier.crossedThingOf(ask, answer.dbhas) }
-}
-
 // A verb that threw answers `tracked: 'unread'`, and only it: its refusal is thrown again, with its act and the Thing it names.
 /** Where `answer` is that of a verb that threw, throw its refusal again, naming its act and the Thing stored it names, checked. */
 function throwIfThrown(ask: DB.AnyAsk, { act, tracked, dbhas, err }: RefusedAnswer): void {
-  if (tracked === 'unread') { throw DB.vaultErrorOfCrossed(err, { act } as DB.RefusalMeta, { dbhas: (dbhas === null) ? null : Classifier.crossedNamedOf(ask, dbhas) }) }
+  if (tracked === 'unread') { throw DB.refusedOverWire(err, { act, dbhas: (dbhas === null) ? null : Classifier.crossedNamedOf(ask, dbhas) }) }
 }
 
 /** `act`, a refused answer's act from a verb that did not throw, which must be one a datastore's report has. */
@@ -226,8 +222,8 @@ function hearNotice({ data }: OperationResult<unknown>, receive: (received: DB.R
     receive({ record: notice.record, banktok: notice.banktok, read_tc: notice.read_tc })
     return null
   }
-  const news = DB.vaultErrorOfCrossed(notice.err, {}, {})
-  if (notice.ended) { return news }
+  const news = DB.refusedOverWire(notice.err)
+  if (notice.isEnded) { return news }
   onBadNews(news)
   return null
 }

@@ -60,9 +60,9 @@ async function servedOf(document: string, ask: object): Promise<Record<string, u
 /** A refusal as it crosses, with no meta. */
 function bareCrossedErrOf(refusalkind: DB.Refusalkind, message: string) { return { refusalkind, message, meta: null } }
 
-const gotNotice     = { safebyokWatchThings: { __typename: 'SafebyokNotice', record: TH.gateThingOf(), banktok: TH.SenderKnows.banktok, read_tc: DB.readTcNow(), err: null, ended: false } }
-const troubleNotice = { safebyokWatchThings: { record: null, banktok: null, read_tc: null, err: bareCrossedErrOf('storage_unavailable', 'The datastore hiccuped'), ended: false } }
-const revokedNotice = { safebyokWatchThings: { record: null, banktok: null, read_tc: null, err: bareCrossedErrOf('identity_revoked', 'Signed out'), ended: true } }
+const gotNotice     = { safebyokWatchThings: { __typename: 'SafebyokNotice', record: TH.gateThingOf(), banktok: TH.SenderKnows.banktok, read_tc: DB.readTcNow(), err: null, isEnded: false } }
+const troubleNotice = { safebyokWatchThings: { record: null, banktok: null, read_tc: null, err: bareCrossedErrOf('storage_unavailable', 'The datastore hiccuped'), isEnded: false } }
+const revokedNotice = { safebyokWatchThings: { record: null, banktok: null, read_tc: null, err: bareCrossedErrOf('identity_revoked', 'Signed out'), isEnded: true } }
 // --
 
 describe("GraphQLVaultDB's constructor", () => {
@@ -129,6 +129,22 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     for (const val of [TH.rootBoxOf(), TH.gateThingOf({ userid: 'u2' })]) {
       const { vaultDB } = fakeClient({ data: { safebyokGetThing: { ...served, val } } })
       await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
+    }
+  })
+
+  it("refuses a get whose act does not fit the Thing it carries, as storage_issue", async () => {
+    const voided = await servedOf(VaultOperations.getThing, TH.getAskAt('box/openai'))
+    const failed = await servedOf(VaultOperations.getThing, TH.getAskAt('box/openai', 'fail'))
+    expect([voided['act'], failed['act']]).to.deep.eq(['gotvoid', 'void'])
+    const misfits = [
+      [TH.getAskAt('box/openai'),         { ...voided, act: 'gotlive', val: voided['dbhas'] }],
+      [TH.getAskAt('box/openai'),         { ...voided, dbhas: TH.boxThingOf() }],
+      [TH.getAskAt('box/openai'),         { ...voided, act: 'gotgone' }],
+      [TH.getAskAt('box/openai', 'fail'), { ...failed, dbhas: TH.boxThingOf() }],
+    ] as const
+    for (const [ask, misfit] of misfits) {
+      const { vaultDB } = fakeClient({ data: { safebyokGetThing: misfit } })
+      await TH.expectBad(vaultDB.tryGetThing(ask), 'storage_issue')
     }
   })
 

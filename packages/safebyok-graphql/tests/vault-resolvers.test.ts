@@ -180,6 +180,15 @@ describe("vaultResolvers", () => {
     expect(Object.getPrototypeOf(ask.options)).to.eq(Object.prototype)
   })
 
+  it("refuses an ask its vaultDB would refuse as bad_record, as the vaultDB does, without calling it", async () => {
+    const served = await bornMemory(new DB.MemoryVaultDB())
+    const tryWriteThing = vi.spyOn(served, 'tryWriteThing')
+    const gate = TH.gateThingOf()
+    const answer = await runAsk(TH.schemaOver(served), VaultOperations.writeThing, { ...TH.replaceAskOf(gate, TH.nextGateOf(gate)), options: null })
+    expect(answer).to.deep.include({ ok: false }).and.to.have.nested.property('err.refusalkind', 'bad_record')
+    expect(tryWriteThing).not.toHaveBeenCalled()
+  })
+
   it("leaves an error its getUserId throws to GraphQL, without calling its vaultDB", async () => {
     const served = new DB.MemoryVaultDB()
     const tryGetThing = vi.spyOn(served, 'tryGetThing')
@@ -204,7 +213,7 @@ describe("vaultResolvers' watch", () => {
     expect(served.watching).to.eq(1)
     await TH.expectGood(served.tryWriteThing(boxBirthAskOf()))
     const notice = (await nextNotice())!
-    expect(notice).to.deep.include({ err: null, ended: false, banktok: TH.SenderKnows.banktok })
+    expect(notice).to.deep.include({ err: null, isEnded: false, banktok: TH.SenderKnows.banktok })
     expect(notice['record']).to.deep.include({ labelpath: TH.BoxScope.labelpath })
     expect(notice['read_tc']).to.match(TH.ReadTcPattern)
     await stream.return(undefined)
@@ -217,11 +226,11 @@ describe("vaultResolvers' watch", () => {
       const session: TH.TestContext = { userid: 'u1' }
       const { nextNotice } = await watching(TH.schemaOver(served), session)
       await TH.expectGood(served.tryWriteThing(boxBirthAskOf()))
-      expect(await nextNotice()).to.have.property('ended', false)
+      expect(await nextNotice()).to.have.property('isEnded', false)
       session.userid = revoked
       await TH.expectGood(served.tryWriteThing(boxBirthAskOf('anthropic')))
       const last = await nextNotice()
-      expect(last).to.deep.include({ record: null, ended: true }).and.to.have.nested.property('err.refusalkind', 'identity_revoked')
+      expect(last).to.deep.include({ record: null, isEnded: true }).and.to.have.nested.property('err.refusalkind', 'identity_revoked')
       expect(await nextNotice()).to.be.null
       expect(served.watching).to.eq(0)
     }
@@ -230,7 +239,7 @@ describe("vaultResolvers' watch", () => {
   it("ends a refused watch after one marked notice, without starting its vaultDB's", async () => {
     const served = new CountedVaultDB()
     const { nextNotice } = await watching(TH.schemaOver(served), { userid: 'u2' })
-    expect(await nextNotice()).to.deep.include({ ended: true }).and.to.have.nested.property('err.refusalkind', 'identity_revoked')
+    expect(await nextNotice()).to.deep.include({ isEnded: true }).and.to.have.nested.property('err.refusalkind', 'identity_revoked')
     expect(await nextNotice()).to.be.null
     expect(served.watching).to.eq(0)
   })
@@ -246,7 +255,7 @@ describe("vaultResolvers' watch", () => {
   it("ends with the bad news that ended its vaultDB's watch, marked, and without its cause", async () => {
     const { nextNotice } = await watching(TH.schemaOver(new EndingVaultDB()), { userid: 'u1' })
     const last = await nextNotice()
-    expect(last).to.deep.include({ ended: true }).and.to.have.nested.property('err.refusalkind', 'storage_unavailable')
+    expect(last).to.deep.include({ isEnded: true }).and.to.have.nested.property('err.refusalkind', 'storage_unavailable')
     expect(JSON.stringify(last)).not.to.include('hunter2')
     expect(await nextNotice()).to.be.null
   })
@@ -254,9 +263,20 @@ describe("vaultResolvers' watch", () => {
   it("sends bad news its vaultDB's watch goes on after, unmarked, until it is left", async () => {
     const served = new GoingOnVaultDB()
     const { stream, nextNotice } = await watching(TH.schemaOver(served), { userid: 'u1' })
-    expect(await nextNotice()).to.deep.include({ ended: false }).and.to.have.nested.property('err.message', 'The first bad news.')
-    expect(await nextNotice()).to.deep.include({ ended: false }).and.to.have.nested.property('err.message', 'The second bad news.')
+    expect(await nextNotice()).to.deep.include({ isEnded: false }).and.to.have.nested.property('err.message', 'The first bad news.')
+    expect(await nextNotice()).to.deep.include({ isEnded: false }).and.to.have.nested.property('err.message', 'The second bad news.')
     await stream.return(undefined)
+    expect(served.stops).to.eq(1)
+  })
+
+  it("stops its vaultDB's watch before leaving an error its getUserId throws mid-watch to GraphQL", async () => {
+    const served = new GoingOnVaultDB()
+    const session = { userid: 'u1', isDown: false }
+    const getUserId = (context: typeof session) => (context.isDown ? sessionStoreDown() : context.userid)
+    const schema = makeExecutableSchema({ typeDefs: VaultSchemaSdl, resolvers: vaultResolvers({ vaultDB: served, getUserId }) })
+    const { stream } = await watching(schema, session)
+    session.isDown = true
+    await expect(stream.next()).rejects.toThrow('The session store is down')
     expect(served.stops).to.eq(1)
   })
 
@@ -265,7 +285,7 @@ describe("vaultResolvers' watch", () => {
     const session: TH.TestContext = { userid: 'u1' }
     const { nextNotice } = await watching(TH.schemaOver(served), session)
     session.userid = null
-    expect(await nextNotice()).to.deep.include({ ended: true }).and.to.have.nested.property('err.refusalkind', 'identity_revoked')
+    expect(await nextNotice()).to.deep.include({ isEnded: true }).and.to.have.nested.property('err.refusalkind', 'identity_revoked')
     expect(await nextNotice()).to.be.null
     expect(served.stops).to.eq(1)
   })

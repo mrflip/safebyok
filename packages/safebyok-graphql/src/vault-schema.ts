@@ -182,13 +182,13 @@ type SafebyokStatsAnswer {${answerFields}
   val:     SafebyokStats
 }
 
-"""One change a watch heard: the Thing, its bank's banktok and when it was read; or, with those null, the trouble the watch met. ended is true on the last notice of a watch that ended itself, which says why."""
+"""One change a watch heard: the Thing, its bank's banktok and when it was read; or, with those null, the trouble the watch met. isEnded is true on the last notice of a watch that ended itself, which says why."""
 type SafebyokNotice {
   record:  SafebyokJson
   banktok: String
   read_tc: String
   err:     SafebyokErr
-  ended:   Boolean!
+  isEnded: Boolean!
 }
 
 # Operations

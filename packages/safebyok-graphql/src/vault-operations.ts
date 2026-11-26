@@ -40,6 +40,6 @@ export const VaultOperations = Object.freeze({
 }`,
 
   watchThings: `subscription SafebyokWatchThings($scope: SafebyokWatchScope!) {
-  safebyokWatchThings(scope: $scope) { record banktok read_tc ${err} ended }
+  safebyokWatchThings(scope: $scope) { record banktok read_tc ${err} isEnded }
 }`,
 })

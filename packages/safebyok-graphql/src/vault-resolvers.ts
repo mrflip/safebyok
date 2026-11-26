@@ -70,25 +70,38 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
     return ((await getUserId(context)) === userid) ? null : DB.identityRevoked()
   }
 
-  /** Answer `ask` by `verb` if the request is signed in as its user, in wire form; else the sign-in refusal, as a verb that threw answers. */
-  async function serveSignedIn<AskT extends DB.AnyAsk>(context: ContextT, ask: AskT, verb: (ask: AskT) => Promise<AnyAnswer>): Promise<WireAnswer> {
+  /** Answer `given` by `verb` if `checkAsk` passes it and the request is signed in as its user, in wire form; else the refusal, as a verb that threw answers. */
+  async function serveSignedIn<AskT extends DB.AnyAsk>(context: ContextT, given: AskT, checkAsk: (given: unknown) => AskT, verb: (ask: AskT) => Promise<AnyAnswer>): Promise<WireAnswer> {
+    // graphql-js builds an input object with a null prototype: the check's parse gives it back as plain objects, which the vaultDB's checks take.
+    let ask: AskT
+    try {
+      ask = checkAsk(given)
+    } catch (err) { return refusedAnswerOf(DB.refusalOfThrown(err)) }
     const refusal = await signinRefusalOf(context, ask.userid)
     if (refusal !== null) { return refusedAnswerOf(refusal) }
-    return wireAnswerOf(await verb(plainAskOf(ask)))
+    return wireAnswerOf(await verb(ask))
   }
 
   /** Watch `scope` and yield its notices in wire form, for as long as the request stays signed in as its user. */
-  async function watchNotices(context: ContextT, scope: DB.ThingWatchScope): Promise<AsyncIterableIterator<WireNotice>> {
+  async function watchNotices(context: ContextT, given: DB.ThingWatchScope): Promise<AsyncIterableIterator<WireNotice>> {
+    const scope = DB.AskChecks.thingWatchScope.parse(given)
     const refusal = await signinRefusalOf(context, scope.userid)
     if (refusal !== null) { return endingWith(refusal) }
-    const reader = openWatch(vaultDB, { userid: scope.userid, banklabel: scope.banklabel })
+    const reader = openWatch(vaultDB, scope)
     const iterator: AsyncIterableIterator<WireNotice> = {
       next: async () => {
         const read = await reader.read()
         if (read.done) { return read }
         // Check the sign-in again at every notice. A session revoked after it subscribed gets one last notice carrying the
-        // refusal, and the stream is cancelled, so the read after that is done.
-        const revoked = await signinRefusalOf(context, scope.userid)
+        // refusal, and the stream is cancelled, so the read after that is done. An error getUserId throws is left to
+        // GraphQL, which calls no `return` after a `next` that rejects: the stream is cancelled first, so the watch ends.
+        let revoked: DB.VaultError | null
+        try {
+          revoked = await signinRefusalOf(context, scope.userid)
+        } catch (err) {
+          await reader.cancel()
+          throw err
+        }
         if (revoked !== null) {
           await reader.cancel()
           return { done: false, value: badNoticeOf(revoked, true) }
@@ -107,14 +120,14 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
   return {
     SafebyokJson: safebyokJson,
     Query: {
-      safebyokGetThing:   async (_parent, { ask }, context) => await serveSignedIn(context, ask, async (plain) => await vaultDB.tryGetThing(plain)),
-      safebyokListThings: async (_parent, { ask }, context) => await serveSignedIn(context, ask, async (plain) => await vaultDB.tryListThings(plain)),
-      safebyokGetWorld:   async (_parent, { ask }, context) => await serveSignedIn(context, ask, async (plain) => await vaultDB.tryGetWorld(plain)),
-      safebyokStats:      async (_parent, { ask }, context) => await serveSignedIn(context, ask, async (plain) => await vaultDB.tryStats(plain)),
+      safebyokGetThing:   async (_parent, { ask }, context) => await serveSignedIn(context, ask, (given) => DB.AskChecks.getAsk.parse(given), async (checked) => await vaultDB.tryGetThing(checked)),
+      safebyokListThings: async (_parent, { ask }, context) => await serveSignedIn(context, ask, (given) => DB.AskChecks.listAsk.parse(given), async (checked) => await vaultDB.tryListThings(checked)),
+      safebyokGetWorld:   async (_parent, { ask }, context) => await serveSignedIn(context, ask, (given) => DB.AskChecks.getWorldAsk.parse(given), async (checked) => await vaultDB.tryGetWorld(checked)),
+      safebyokStats:      async (_parent, { ask }, context) => await serveSignedIn(context, ask, (given) => DB.AskChecks.statsAsk.parse(given), async (checked) => await vaultDB.tryStats(checked)),
     },
     Mutation: {
-      safebyokWriteThing: async (_parent, { ask }, context) => await serveSignedIn(context, ask, async (plain) => await vaultDB.tryWriteThing(plain)),
-      safebyokBirthBank:  async (_parent, { ask }, context) => await serveSignedIn(context, ask, async (plain) => await vaultDB.tryBirthBank(plain)),
+      safebyokWriteThing: async (_parent, { ask }, context) => await serveSignedIn(context, ask, DB.checkedWriteAsk, async (checked) => await vaultDB.tryWriteThing(checked)),
+      safebyokBirthBank:  async (_parent, { ask }, context) => await serveSignedIn(context, ask, DB.checkedBirthBankAsk, async (checked) => await vaultDB.tryBirthBank(checked)),
     },
     Subscription: {
       safebyokWatchThings: {
@@ -126,17 +139,10 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
 }
 // --
 
-// == [Helpers]: AnyAnswer, plainAskOf, wireAnswerOf, refusedAnswerOf, goodNoticeOf, badNoticeOf, endingWith, openWatch
+// == [Helpers]: AnyAnswer, wireAnswerOf, refusedAnswerOf, goodNoticeOf, badNoticeOf, endingWith, openWatch
 
 /** Any vaultDB verb's answer. */
 type AnyAnswer = DB.GetThingAnswer | DB.WriteThingAnswer | DB.ListThingsAnswer | DB.BirthBankAnswer | DB.GetWorldAnswer | DB.StatsAnswer
-
-// graphql-js builds an input object with a null prototype, which the core's checks refuse: each is copied to a plain object.
-/** `ask` as plain objects: the ask, and its options where it has them. */
-function plainAskOf<AskT extends DB.AnyAsk>(ask: AskT): AskT {
-  const options = ('options' in ask) && (ask.options !== undefined) ? { options: { ...ask.options, policies: [...ask.options.policies] } } : {}
-  return { ...ask, ...options }
-}
 
 /** `answer` in wire form: less its ask, with its refusal reduced to what may cross, and null for each field the schema has and it lacks. */
 function wireAnswerOf({ ask: _ask, ...answer }: AnyAnswer): WireAnswer {
@@ -152,10 +158,10 @@ function refusedAnswerOf(refusal: DB.VaultError): WireAnswer {
 }
 
 /** The notice in wire form for an item event: its Thing, its bank's banktok, and when it was read. */
-function goodNoticeOf({ val, banktok, read_tc }: DB.VaultItemEvent): WireNotice { return { record: val, banktok, read_tc, err: null, ended: false } }
+function goodNoticeOf({ val, banktok, read_tc }: DB.VaultItemEvent): WireNotice { return { record: val, banktok, read_tc, err: null, isEnded: false } }
 
 /** The notice in wire form for the trouble a watch met, and whether the watch ended with it. */
-function badNoticeOf(refusal: DB.VaultError, isEnded: boolean): WireNotice { return { record: null, banktok: null, read_tc: null, err: DB.crossedErrOf(refusal), ended: isEnded } }
+function badNoticeOf(refusal: DB.VaultError, isEnded: boolean): WireNotice { return { record: null, banktok: null, read_tc: null, err: DB.crossedErrOf(refusal), isEnded } }
 
 /** The iterator for a watch refused before it started: it yields one notice carrying the refusal, then ends. */
 function endingWith(refusal: DB.VaultError): AsyncIterableIterator<WireNotice> {
