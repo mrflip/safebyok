@@ -79,7 +79,7 @@ function noticedRecordsOver(vaultDB: ScriptedVaultDB): VaultItemEvent['val'][] {
 }
 
 /** A step that throws a refusal. */
-function thrower(): never { throw Throwers.gateIssue(TH.gateThingOf(), "a test") }
+function thrower(): never { throw Throwers.gateIssue(TH.gateThingOf(), 'a test') }
 
 /** A value that throws on any look at it: what a broken backend might throw, or a broken host might ask. */
 const Booby = new Proxy({}, { get() { throw new Error('boom') }, getPrototypeOf() { throw new Error('boom') }, has() { throw new Error('boom') } })
