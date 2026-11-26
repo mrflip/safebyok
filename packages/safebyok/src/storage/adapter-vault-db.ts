@@ -1,27 +1,29 @@
 /** The `AdapterVaultDB` base class: a concrete adapter extends it by writing the `do*` calls. */
 
 import { deepFreeze, noop } from 'es-toolkit'
-import { type EX, Errors, Outcome, SX, type Helpers } from 'safebyok-big/internals'
+import { Errors, Outcome, SX, type Helpers } from 'safebyok-big/internals'
 import { bulletproofHandlerOf } from '../helpers/bulletproof'
 import type { Lifetok } from '../shapes/primitives'
-import type { ThingRecord, VoidSentinel } from '../shapes/shapes-thing'
-import type { TombstoneOf } from '../shapes/shapes-sealers'
+import type { ThingRecord } from '../shapes/shapes-thing'
 import { type ReadTc, type VaultEvent, type VaultItemEvent, VaultDBSourcelabel } from '../shapes/shapes-vault-event'
 import {
-  type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldAsk, type ListAsk, type LoggableAsk, type StatsAsk, type ThingWatchScope, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
+  type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldAsk, type ListAsk, type StatsAsk, type ThingWatchScope, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
 } from '../shapes/shapes-asks'
 import {
-  type Actual, type ActualBeside, type Answer, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type GetThingAnswer, type GetWorldActual, type GetWorldAnswer, type GotActual, type ListThingsActual, type ListThingsAnswer,
-  type Received, type StatsActual, type StatsAnswer, type WriteThingAnswer, type WroteActual, ActualChecks,
+  type ActualBeside, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type GetThingAnswer, type GetWorldActual, type GetWorldAnswer, type ListThingsActual, type ListThingsAnswer,
+  type Received, type StatsActual, type StatsAnswer, type WriteThingAnswer, ActualChecks,
 } from '../shapes/shapes-answers'
+import type { GetManifest, WriteManifest } from '../shapes/shapes-manifest'
 import { type VaultStats, VaultStatsChecks } from '../shapes/shapes-vault-stats'
 import { itemEventOf, readTcNow } from './agerank'
-import type { AboveFetched, BankFetched, BankRootsFetched, ThingsFetched } from './thing-classifier'
+import { checkGetObservations, checkWriteObservations, checkedBanktokOf, getAnswerOf, scribeGetAct, scribeWriteAct, writeAnswerOf } from './manifest-acts'
+import { demandGetConsistency, demandWriteConsistency } from './three-way'
+import type { BankFetched, BankRootsFetched, ThingsFetched } from './thing-classifier'
 import * as Classifier from './thing-classifier'
 import type { VaultDB } from './vault-db'
 import * as Throwers from '../refusals/throwers'
 
-// == [Answers]: besideOf, answerOf, frozenAnswerOf, noticeOf
+// == [Answers]: besideOf, frozenAnswerOf, noticeOf
 
 // A concrete adapter's report is the module's entry: what the answer carries of it beside the record is read through its check.
 /** What the answer to `actual` carries beside its `val` or `dbhas`: its `banktok`, its `tracked` and its `read_tc`.
@@ -30,28 +32,6 @@ import * as Throwers from '../refusals/throwers'
 function besideOf(actual: ActualBeside): ActualBeside {
   const { banktok, tracked, read_tc } = ActualChecks.beside.parse(actual)
   return { banktok, tracked, read_tc }
-}
-
-/** The answer a verb gives for its concrete adapter's report: `record` becomes `val` when good, `dbhas` when refused.
- * A get that finds no live Thing answers a `val` of null, with the tombstone or the shell as its `dbhas`.
- * Throws `storage_issue` if a good report has no record.
- */
-function answerOf(actual: GotActual, oplabel: string, loggableAsk: LoggableAsk): GetThingAnswer
-function answerOf(actual: WroteActual, oplabel: string, loggableAsk: LoggableAsk): WriteThingAnswer
-// A concrete adapter's report is the module's entry, so the null its types exclude is still checked for.
-function answerOf(actual: Actual<EX.GoodAct, ThingRecord | VoidSentinel | null>, oplabel: string, loggableAsk: LoggableAsk): Answer<ThingRecord | null, EX.GoodAct> | GetThingAnswer {
-  const { record } = actual
-  const beside = besideOf(actual)
-  if (! actual.ok) {
-    const err = Throwers.actRefused('vault', actual.act, { oplabel, ask: loggableAsk })
-    return { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: record, err }
-  }
-  // Every good act finds or writes a Thing, or for nothing stored the shell: a concrete adapter that reports none is broken.
-  if (record === null) { throw Throwers.storageIssue() }
-  const good = { ok: true, ask: loggableAsk, ...beside } as const
-  if (actual.act === 'gotvoid') { return { ...good, act: actual.act, val: null, dbhas: record as VoidSentinel } }
-  if (actual.act === 'gotgone') { return { ...good, act: actual.act, val: null, dbhas: record as TombstoneOf<ThingRecord> } }
-  return { ...good, act: actual.act, val: record as ThingRecord }
 }
 
 // Frozen once, here, so that a Thing or a cache may hold the very records an answer carries.
@@ -69,23 +49,18 @@ function noticeOf(record: ThingRecord, received: Lifetok, read_tc: ReadTc): Vaul
 }
 // --
 
+// The datastore decides whether to write by its own predicate, this class finds the act from the datastore's tags, and
+// `demandWriteConsistency` requires the two to agree. The work done twice is what that check costs: never optimize it away.
 /** The base class of a vaultDB over a datastore: a subclass writes the `do*` calls, each one atomic step.
- * It checks each ask, and classifies what a `do*` call fetches per the act tables in `notes/answer-contract.md`.
+ * It checks each ask, and answers from what a `do*` call observes, per the act tables in `notes/answer-contract.md`.
  * Its watch notifies only what the datastore reports changing: nothing an answer carries.
  * Every record an answer or a notice carries is deeply frozen; an ask, and a record a caller hands it, never are.
  */
 export abstract class AdapterVaultDB implements VaultDB {
 
-  // == [Classifying]: classifyGetThing, classifyWriteThing, classifyListThings, classifyBirthBank, classifyGetWorld
-  // A subclass's `do*` calls these. A concrete adapter that reaches some of the verdict itself overrides them to read it. Each
-  // is given the raw bank of the ask's bank, fetched in the same step, which its banktok is read from; a get and a write, also
-  // the nearest Thing stored above the ask's scope ({@link AboveFetched}).
-
-  /** Classify a get against the raw Thing fetched at its scope, null for none, and the raw bank and nearest Thing stored above it, which gives the shell's lifepath where none is stored. */
-  protected classifyGetThing(ask: GetAsk, raw: unknown, above: AboveFetched): GotActual { return Classifier.classifyGetThing(ask, raw, above) }
-
-  /** Classify a write against the raw Thing fetched at its scope, null for none, and the raw bank and nearest Thing stored above it, checking the born_at and storage policies of a replace, and a bank write's lifetok. */
-  protected classifyWriteThing(ask: WriteAsk, raw: unknown, above: AboveFetched): WroteActual { return Classifier.classifyWriteThing(ask, raw, above) }
+  // == [Classifying]: classifyListThings, classifyBirthBank, classifyGetWorld, classifyStats
+  // Scaffolding: until thread 2 (manifest_rest), which gives these verbs manifests as get and write have.
+  // A subclass's `do*` calls these. Each is given the raw bank of the ask's bank, fetched in the same step, which its banktok is read from.
 
   /** Classify a listing against the raw parent and the raw Things one label under it. */
   protected classifyListThings(ask: ListAsk, fetched: ThingsFetched, bankFetched: BankFetched): ListThingsActual { return Classifier.classifyListThings(ask, fetched, bankFetched) }
@@ -108,19 +83,25 @@ export abstract class AdapterVaultDB implements VaultDB {
   async tryGetThing(ask: GetAsk): Promise<GetThingAnswer> {
     try {
       const thingGetAsk = AskChecks.getAsk.parse(ask)
-      const loggableAsk = loggableAskOf(thingGetAsk)
-      const actual      = await this.doGetThing(thingGetAsk) // has act and ok, but no err yet
-      return frozenAnswerOf(answerOf(actual, 'getThing', loggableAsk))
+      const manifest    = await this.doGetThing(thingGetAsk)
+      checkGetObservations(thingGetAsk, manifest)
+      scribeGetAct(thingGetAsk, manifest)
+      const answer      = getAnswerOf(thingGetAsk, manifest)
+      demandGetConsistency(thingGetAsk, manifest, answer)
+      return frozenAnswerOf(answer)
     } catch (err) { return this.answerForThrown(err, 'getThing', ask) }
   }
 
   /** Write `ask.record` over the Thing `ask.cited` ({@link VaultDB.tryWriteThing}). */
   async tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer> {
     try {
-      const writeAsk    = checkedWriteAsk(ask)
-      const loggableAsk = loggableAskOf(writeAsk)
-      const actual      = await this.doWriteThing(writeAsk) // has act and ok, but no err yet
-      return frozenAnswerOf(answerOf(actual, 'writeThing', loggableAsk))
+      const writeAsk = checkedWriteAsk(ask)
+      const manifest = await this.doWriteThing(writeAsk)
+      checkWriteObservations(writeAsk, manifest)
+      scribeWriteAct(writeAsk, manifest)
+      const answer   = writeAnswerOf(writeAsk, manifest)
+      demandWriteConsistency(writeAsk, manifest, answer)
+      return frozenAnswerOf(answer)
     } catch (err) { return this.answerForThrown(err, 'writeThing', ask) }
   }
 
@@ -183,7 +164,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       let event: VaultItemEvent
       try {
         const { read_tc = readTcNow() } = ActualChecks.received.parse(received)
-        event = noticeOf(deepFreeze(Classifier.watchedThingOf(bankScope, record)), banktok, read_tc)
+        event = noticeOf(deepFreeze(Classifier.watchedThingOf(bankScope, record)), checkedBanktokOf(banktok), read_tc)
       } catch (err) {
         onBadNews(Outcome.storageRefusalOf(err))
         return
@@ -215,33 +196,27 @@ export abstract class AdapterVaultDB implements VaultDB {
   // --
 
   // == [Protected, for a subclass to write]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats, doWatch
-  // Each is one atomic step: fetch the Thing at the ask's scope, classify it, and when `isWriteAct(act)` is true, write
-  // `ask.record` and report the Thing the datastore reports writing, checked by `writtenThingOf`, in place of the one
-  // fetched. A datastore that can run code of its own may run the whole step there. The step also fetches the bank, main
-  // gate and root box, compares the ask's `track` with them, and reports that as the answer's `tracked` (`trackedFetchedOf`
-  // makes the comparison in TypeScript). The bank it fetches gives the answer's `banktok`, and carries when the step read
-  // it, its `read_tc`: `readTcNow()` in the step, or the datastore's own UUID version 7. After a write, the report's
-  // banktok, `tracked` and `read_tc` are those read after the write.
+  // Each is one atomic step. A get and a write observe, and hand back a manifest: the datastore's tags and each row exactly
+  // as it stands at the step's last read (GetManifest, WriteManifest). A datastore that runs TypeScript makes its tags with
+  // `ManifestTags`; one that cannot makes the same comparisons in its own language. It reads no check and no act table: this
+  // class checks each row once, finds the act from the tags, and requires the datastore's write to agree with it.
   //
-  // A write checks only its preconditions of the Thing stored: the revision cited, the born_at a live Thing leaves unchanged,
-  // the lifetok a write of the bank over a live bank keeps, and the storage policies it names (`classifyWriteThing` reads no
-  // more). Where several refusals apply at once, any one of them may be the answer: all else equal the likelier is
-  // preferred, and `damaged_row` is the least likely, but no code is written to rank them. The record carries every field,
-  // so a concrete adapter may write it by replacing the Thing stored whole.
+  // A write writes `ask.record` exactly where the datastore's own predicate allows: the ante row is the one cited, the
+  // ask's flag lets it write over that row (`ifPresent` 'repl' over a live Thing, `ifAbsent` 'add' over a tombstone or
+  // none), a live record over a live Thing leaves its born_at the same, a write of the bank over a live bank its lifetok,
+  // and the gate it replaces meets each storage policy the ask names. The record carries every field, so a datastore may
+  // write it by replacing the row whole.
   //
-  // A concrete adapter that makes the checks in the statement that writes reports, beside a refusal, the Thing as it now stands and a
-  // verdict for each check of the Thing stored that the act tables cannot name. It then answers in this order: the act
-  // tables over the Thing read back (`storedCitedOf`, `writeActOf`), answering any act but a write with `unwrittenWriteOf`;
-  // under a write act, each failed verdict's own refusal (`demandBornAtKept`, `demandLifetokKept`, `demandPolicies`); and
-  // `storage_issue` where no verdict explains the refusal. A birth answers with `unwrittenBirthOf`, or `storage_issue`
-  // where it finds a write.
+  // The other verbs fetch, and hand what they fetched to the `classify*` call named in their doc block. Each also fetches
+  // the bank, main gate and root box, compares the ask's `track` with them (`ManifestTags.trackedOf` makes the comparison in
+  // TypeScript), and reads when it read them, its `read_tc`: `readTcNow()` in the step, or the datastore's own UUID version 7.
+  // A birth answers with `unwrittenBirthOf`, or where `born`, writes the three roots and reports them checked by
+  // `writtenRootsOf`, with the banktok, `tracked` and `read_tc` read after the write.
 
-  /** In one step: fetch the Thing at `ask`'s scope, its bank's raw roots and the nearest Thing stored above it, and return `this.classifyGetThing(ask, raw, above)`. */
-  protected abstract doGetThing(ask: GetAsk): Helpers.Awaitable<GotActual>
-  /** In one step: fetch the Thing at `ask`'s scope, its bank's raw roots and the nearest Thing stored above it, classify, and if the act
-   * is a write, write `ask.record` and report the Thing written, with its banktok and `tracked` after the write.
-   */
-  protected abstract doWriteThing(ask: WriteAsk): Helpers.Awaitable<WroteActual>
+  /** In one step, read the Thing at `ask`'s scope, and hand back what was observed ({@link GetManifest}). */
+  protected abstract doGetThing(ask: GetAsk): Helpers.Awaitable<GetManifest>
+  /** In one step, write `ask.record` where the datastore's own predicate allows, and hand back what was observed ({@link WriteManifest}). */
+  protected abstract doWriteThing(ask: WriteAsk): Helpers.Awaitable<WriteManifest>
   /** In one step: fetch the raw parent at `ask`'s scope, each raw Thing one label under it, and its bank's raw roots, and return
    * `this.classifyListThings(ask, fetched, bankFetched)`.
    */

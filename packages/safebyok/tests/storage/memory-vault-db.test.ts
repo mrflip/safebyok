@@ -66,18 +66,20 @@ describe("Classifier.classifyListThings(ask, fetched, roots)", () => {
   })
 })
 
-describe("Classifier.classifyGetThing(ask, raw, above) and Classifier.classifyWriteThing(ask, raw, above), over nothing stored", () => {
-  const OverNothing = [
-    ['storage_issue', TH.boxThingOf('open'),              'refuses, as a broken store, an ancestor a store fetched that is not above the scope'],
-    ['storage_issue', 'not a Thing',                      'refuses, as a broken store, an ancestor that is not an object'],
-    ['damaged_row',   { ...TH.rootBoxOf(), revseq: -2 },  'refuses, as a damaged row, an ancestor whose revision fails its checks'],
+describe("MemoryVaultDB, a row planted above a scope where nothing is stored", () => {
+  const AboveCases = [
+    ['storage_issue', TH.boxThingOf('open'),              'refuses, as a broken store, a row above the scope that names a labelpath not above it'],
+    ['storage_issue', 'not a Thing',                      'refuses, as a broken store, a row above the scope that is not an object'],
+    ['damaged_row',   { ...TH.rootBoxOf(), revseq: -2 },  'refuses, as a damaged row, a row above the scope whose revision fails its checks'],
   ] as const
+  const voidPut = { ...TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)), ifAbsent: 'fail' } as const
 
-  for (const [refusalkind, ancestor, blurb] of OverNothing) {
-    it(blurb, () => {
-      const above = { bank: null, tracked: { bank: null, gate: null, box: null }, read_tc: readTcNow(), ancestor }
-      TH.expectSyncRefusal(() => Classifier.classifyGetThing(TH.getAskAt('box/openai'), null, above), refusalkind)
-      TH.expectSyncRefusal(() => Classifier.classifyWriteThing({ ...TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)), ifAbsent: 'fail' }, null, above), refusalkind)
+  for (const [refusalkind, ancestor, blurb] of AboveCases) {
+    it(blurb, async () => {
+      const vaultDB = new MemoryVaultDB()
+      vaultDB._cheat_things(TH.ThingBank).set('box', ancestor)
+      await TH.expectBad(vaultDB.tryGetThing(TH.getAskAt('box/openai')), refusalkind)
+      await TH.expectBad(vaultDB.tryWriteThing(voidPut), refusalkind)
     })
   }
 })

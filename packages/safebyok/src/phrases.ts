@@ -249,7 +249,7 @@ export function probeStepRefused(stepkind: string): string {
 export const ProbePutNotGot = "Storage answered the probe's get without the revision its put had just written: storage lost the write, or answered from a replica or cache that lags behind it."
 // --
 
-// == [Storing]: StoreQuotaTooSmall, storageCallRefused
+// == [Storing]: StoreQuotaTooSmall, storageCallRefused, WrittenOfOtherAct, ProposedNotWritten, TagsOfOtherRow, TagsOfOtherAsk, AnswerOfOtherManifest
 
 /** An IndexedDB store opened where the browser offers the page `quota` bytes, fewer than the `least` a vault needs. */
 export function StoreQuotaTooSmall(quota: number, least: number): string {
@@ -260,4 +260,19 @@ export function StoreQuotaTooSmall(quota: number, least: number): string {
 export function storageCallRefused(oplabel: string): string {
   return `The vault's storage refused ${oplabel}: trying again is unlikely to help. Its logs have the request, and this refusal's cause has what it answered.`
 }
+
+/** The datastore's write disagrees with the act its tags find. */
+export const WrittenOfOtherAct = "The vault's storage wrote where its own comparisons find no write, or wrote nothing where they find one: the storage adapter needs mending."
+
+/** The row the datastore wrote is not the record proposed. */
+export const ProposedNotWritten = "The vault's storage reported writing a row without the revision, life or liveness of the record it was asked to write: the storage adapter needs mending."
+
+/** The datastore's tags are not those of its row. */
+export const TagsOfOtherRow = "The vault's storage reported comparisons that are not those of the row it handed back: the storage adapter needs mending."
+
+/** The datastore's tags disagree with the ask. */
+export const TagsOfOtherAsk = "The vault's storage reported comparisons that disagree with the write asked of it: the storage adapter needs mending."
+
+/** The vaultDB's answer is not its manifest's. */
+export const AnswerOfOtherManifest = "The vaultDB made an answer that is not a copy of what its storage handed back: a bug in safebyok."
 // --

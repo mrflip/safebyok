@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { type EX, Errors, SX } from 'safebyok-big/internals'
+import { Errors, SX } from 'safebyok-big/internals'
 import { AnswerNotMade } from '../../src/phrases'
 import { AdapterVaultDB } from '../../src/storage/adapter-vault-db'
-import type { Actual, BirthBankActual, GetWorldActual, GotActual, ListThingsActual, Received, StatsActual } from '../../src/shapes/shapes-answers'
+import type { BirthBankActual, GetWorldActual, ListThingsActual, Received, StatsActual } from '../../src/shapes/shapes-answers'
+import type { GetManifest, WriteManifest } from '../../src/shapes/shapes-manifest'
+import * as ManifestTags from '../../src/storage/manifest-tags'
 import type { BirthBankAsk, GetAsk, GetWorldAsk, ListAsk, StatsAsk, ThingWatchScope, WriteAsk } from '../../src/shapes/shapes-asks'
 import { StoreLimitCap, StoreLimitFloor, StoreLimitLeastBoxes } from '../../src/shapes/shapes-vault-stats'
 import { Thing } from '../../src/models/thing'
@@ -12,32 +14,45 @@ import * as Throwers from '../../src/refusals/throwers'
 import { readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
 
-/** A concrete adapter whose every step does what the test hands it: throws, or reports what it is given, with the void banktok, each root `'same'` in `tracked` and a `read_tc` made now unless it gives them. */
+/** A concrete adapter whose every step does what the test hands it: throws, or reports what it is given, with the void banktok, each root `'same'` in `tracked` and a `read_tc` made now unless it gives them.
+ * A get and a write report what `manifestStep` gives, with no ancestor unless it gives one; the other verbs, what `step` gives.
+ */
 class ScriptedVaultDB extends AdapterVaultDB {
   receive: ((received: Received) => void) | null = null
   onEnded: (() => void) | null = null
   readonly step: () => object
+  readonly manifestStep: () => object
 
-  constructor(step: () => object) {
+  constructor(step: () => object, manifestStep: () => object = step) {
     super()
     this.step = step
+    this.manifestStep = manifestStep
   }
 
-  /** What the step reports, with the void banktok, each root `'same'` in `tracked` and a `read_tc` made now unless it gives them. */
-  #report(): unknown { return { banktok: SX.VoidLifeTok, tracked: { bank: 'same', gate: 'same', box: 'same' }, read_tc: readTcNow(), ...this.step() } }
+  /** What `step` reports, with the void banktok, each root `'same'` in `tracked` and a `read_tc` made now unless it gives them. */
+  #report(step: () => object): unknown { return { banktok: SX.VoidLifeTok, tracked: { bank: 'same', gate: 'same', box: 'same' }, read_tc: readTcNow(), ancestor: null, ...step() } }
 
-  protected doGetThing(_ask: GetAsk): GotActual { return this.#report() as GotActual }
-  protected doWriteThing(_ask: WriteAsk): Actual<EX.PutAct | EX.DelAct> { return this.#report() as Actual<EX.PutAct | EX.DelAct> }
-  protected doListThings(_ask: ListAsk): ListThingsActual { return this.#report() as ListThingsActual }
-  protected doBirthBank(_ask: BirthBankAsk): BirthBankActual { return this.#report() as BirthBankActual }
-  protected doGetWorld(_ask: GetWorldAsk): GetWorldActual { return this.#report() as GetWorldActual }
-  protected doStats(_ask: StatsAsk): StatsActual { return this.#report() as StatsActual }
+  protected doGetThing(_ask: GetAsk): GetManifest { return this.#report(this.manifestStep) as GetManifest }
+  protected doWriteThing(_ask: WriteAsk): WriteManifest { return this.#report(this.manifestStep) as WriteManifest }
+  protected doListThings(_ask: ListAsk): ListThingsActual { return this.#report(this.step) as ListThingsActual }
+  protected doBirthBank(_ask: BirthBankAsk): BirthBankActual { return this.#report(this.step) as BirthBankActual }
+  protected doGetWorld(_ask: GetWorldAsk): GetWorldActual { return this.#report(this.step) as GetWorldActual }
+  protected doStats(_ask: StatsAsk): StatsActual { return this.#report(this.step) as StatsActual }
   protected override doWatch(_scope: ThingWatchScope, receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void, onEnded: () => void): () => void {
     this.receive = receive
     this.onEnded = onEnded
     return () => { this.receive = null }
   }
 }
+
+/** A get's manifest whose actual row is `actual`, null for none, with its tags made from that row. */
+function getManifestOf(actual: unknown): object { return { tags: ManifestTags.getTagsOf(actual), actual } }
+
+/** A write's manifest of `ask` over the `ante` row, null for none, with its tags made from that row: the ask's record where `written`, else the ante row. */
+function writeManifestOf(ask: WriteAsk, ante: unknown, written: boolean): object { return { tags: ManifestTags.writeTagsOf(ask, ante, written), actual: written ? ask.record : ante } }
+
+/** A live gate at another revision than the one `TH.birthAskOf()` would write: a birth over it is stale. */
+const OtherGate = TH.gateThingOf({ revtok: TH.OtherRevtok })
 
 /** The records of the notices a watcher of the test bank gets over `vaultDB`. */
 function noticedRecordsOver(vaultDB: ScriptedVaultDB): VaultItemEvent['val'][] {
@@ -109,23 +124,36 @@ describe("AdapterVaultDB, a step that throws", () => {
 })
 
 describe("AdapterVaultDB.tryGetThing(ask), a store that reports oddly", () => {
-  it("refuses a good get that reports no record, gotvoid's void sentinel included, as a broken store", async () => {
-    for (const act of ['gotlive', 'gotgone', 'gotvoid'] as const) {
-      const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act, record: null }))
+  it("refuses, as a broken store, a get whose tags are not those of its row", async () => {
+    const live = TH.gateThingOf()
+    for (const manifest of [{ tags: { presence: 'live' }, actual: null }, { tags: { presence: 'void' }, actual: live }, { tags: { presence: 'gone' }, actual: live }]) {
+      const vaultDB = new ScriptedVaultDB(() => manifest)
       await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
     }
   })
 
-  it("answers gotvoid with the void sentinel a concrete adapter reports as its dbhas", async () => {
-    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', record: Shell.of(TH.GateScope) }))
+  it("answers gotvoid with the shell as its dbhas where there is no row", async () => {
+    const vaultDB = new ScriptedVaultDB(() => getManifestOf(null))
     expect(await vaultDB.tryGetThing(TH.getGateAskOf())).to.deep.include({ ok: true, act: 'gotvoid', val: null, dbhas: Shell.of(TH.GateScope) })
+  })
+
+  it("refuses, as a broken store, tags of another shape", async () => {
+    const vaultDB = new ScriptedVaultDB(() => ({ tags: { presence: 'here' }, actual: null }))
+    await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
   })
 })
 
 describe("AdapterVaultDB.tryWriteThing(ask), a store that reports oddly", () => {
-  it("refuses a good write that reports no Thing as a broken store", async () => {
-    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'born', record: null }))
+  it("refuses, as a broken store, a write it reports making with no row", async () => {
+    const vaultDB = new ScriptedVaultDB(() => ({ ...writeManifestOf(TH.birthAskOf(), null, true), actual: null }))
     await TH.expectBad(vaultDB.tryWriteThing(TH.birthAskOf()), 'storage_issue')
+  })
+
+  it("answers the row the datastore reports writing, not the ask's record", async () => {
+    const ask     = TH.birthAskOf()
+    const written = { ...ask.record, written_at: ask.record.written_at + 1 }
+    const vaultDB = new ScriptedVaultDB(() => ({ ...writeManifestOf(ask, null, true), actual: written }))
+    expect(await vaultDB.tryWriteThing(ask)).to.deep.include({ ok: true, act: 'born', val: written })
   })
 })
 
@@ -158,24 +186,24 @@ describe("AdapterVaultDB.tryStats(ask), a store that reports oddly", () => {
 describe("AdapterVaultDB, the read_tc of an answer", () => {
   it("answers the read_tc a concrete adapter reports, good or refused, from a get, a write or a birth", async () => {
     const read_tc = readTcNow()
-    const reports = [{ ok: true, act: 'gotvoid', read_tc, record: Shell.of(TH.GateScope) }, { ok: false, act: 'stale', read_tc, record: TH.gateThingOf() }] as const
-    for (const report of reports) {
-      const vaultDB = new ScriptedVaultDB(() => report)
+    for (const manifest of [getManifestOf(null), getManifestOf(TH.gateThingOf())]) {
+      const vaultDB = new ScriptedVaultDB(() => ({ ...manifest, read_tc }))
       expect(await vaultDB.tryGetThing(TH.getGateAskOf())).to.deep.include({ read_tc })
     }
-    const refusing = new ScriptedVaultDB(() => reports[1])
-    expect(await refusing.tryWriteThing(TH.birthAskOf())).to.deep.include({ read_tc })
+    const refusing = new ScriptedVaultDB(() => ({ ok: false, act: 'stale', read_tc, record: TH.gateThingOf() }), () => ({ ...writeManifestOf(TH.birthAskOf(), OtherGate, false), read_tc }))
+    expect(await refusing.tryWriteThing(TH.birthAskOf())).to.deep.include({ ok: false, act: 'stale', read_tc })
     expect(await refusing.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ read_tc })
   })
 
   it("refuses, as a broken store, a report from a get, a write, a list or a birth with no read_tc, or one that is no UUID version 7", async () => {
     for (const read_tc of [undefined, crypto.randomUUID(), readTcNow().toUpperCase(), 7]) {
-      const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', read_tc, record: Shell.of(TH.GateScope) }))
+      const getting = new ScriptedVaultDB(() => ({ ...getManifestOf(null), read_tc }))
+      const writing = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', read_tc, record: Shell.of(TH.GateScope) }), () => ({ ...writeManifestOf(TH.birthAskOf(), null, true), read_tc }))
       const listing = new ScriptedVaultDB(() => ({ ok: false, act: 'gone', read_tc, parentage: [], deltas: [], damaged_rows: [] }))
-      await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
-      await TH.expectBad(vaultDB.tryWriteThing(TH.birthAskOf()), 'storage_issue')
+      await TH.expectBad(getting.tryGetThing(TH.getGateAskOf()), 'storage_issue')
+      await TH.expectBad(writing.tryWriteThing(TH.birthAskOf()), 'storage_issue')
       await TH.expectBad(listing.tryListThings(TH.listAskAt('box')), 'storage_issue')
-      await TH.expectBad(vaultDB.tryBirthBank(TH.birthBankAskOf()), 'storage_issue')
+      await TH.expectBad(writing.tryBirthBank(TH.birthBankAskOf()), 'storage_issue')
     }
   })
 
@@ -186,10 +214,24 @@ describe("AdapterVaultDB, the read_tc of an answer", () => {
     expect(await vaultDB.tryListThings(TH.listAskAt('box'))).to.deep.include({ read_tc, val: { ...kids, read_tc } })
   })
 
-  it("refuses, as a broken store, a report whose banktok is no UUID, or whose tracked is no object", async () => {
-    for (const report of [{ banktok: 'a banktok' }, { banktok: null }, { tracked: undefined }, { tracked: null }, { tracked: 'same' }]) {
-      const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', record: Shell.of(TH.GateScope), ...report }))
+  it("refuses, as a broken store, a get whose tracked is no object", async () => {
+    for (const report of [{ tracked: undefined }, { tracked: null }, { tracked: 'same' }]) {
+      const vaultDB = new ScriptedVaultDB(() => ({ ...getManifestOf(null), ...report }))
       await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
+    }
+  })
+
+  it("refuses, as a broken store, a listing whose banktok is no UUID", async () => {
+    for (const report of [{ banktok: 'a banktok' }, { banktok: null }]) {
+      const vaultDB = new ScriptedVaultDB(() => ({ ok: false, act: 'gone', parentage: [], deltas: [], damaged_rows: [], ...report }))
+      await TH.expectBad(vaultDB.tryListThings(TH.listAskAt('box')), 'storage_issue')
+    }
+  })
+
+  it("answers the void lifetok to a get whose banktok is no lifetok", async () => {
+    for (const report of [{ banktok: 'a banktok' }, { banktok: null }, { banktok: undefined }]) {
+      const vaultDB = new ScriptedVaultDB(() => ({ ...getManifestOf(null), ...report }))
+      expect(await vaultDB.tryGetThing(TH.getGateAskOf())).to.deep.include({ ok: true, banktok: SX.VoidLifeTok })
     }
   })
 })
@@ -197,18 +239,18 @@ describe("AdapterVaultDB, the read_tc of an answer", () => {
 describe("AdapterVaultDB, the banktok of an answer", () => {
   it("answers the banktok a concrete adapter reports, good or refused, from a get, a write, a list or a birth", async () => {
     const refused = { ok: false, act: 'stale', banktok: TH.OtherLifetok, record: TH.gateThingOf() } as const
-    const vaultDB = new ScriptedVaultDB(() => refused)
+    const vaultDB = new ScriptedVaultDB(() => refused, () => ({ ...writeManifestOf(TH.birthAskOf(), OtherGate, false), banktok: TH.OtherLifetok }))
     const listing = new ScriptedVaultDB(() => ({ ...refused, parentage: [], deltas: [], damaged_rows: [] }))
-    const good    = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', banktok: TH.OtherLifetok, record: Shell.of(TH.GateScope) }))
+    const good    = new ScriptedVaultDB(() => ({ ...getManifestOf(null), banktok: TH.OtherLifetok }))
     const answers = [
-      await vaultDB.tryGetThing(TH.getGateAskOf()), await vaultDB.tryWriteThing(TH.birthAskOf()), await listing.tryListThings(TH.listAskAt('box')),
+      await good.tryGetThing(TH.getGateAskOf()), await vaultDB.tryWriteThing(TH.birthAskOf()), await listing.tryListThings(TH.listAskAt('box')),
       await vaultDB.tryBirthBank(TH.birthBankAskOf()), await good.tryGetThing(TH.getGateAskOf()),
     ]
     expect(answers.map((answer) => answer.banktok)).to.deep.equal(Array.from({ length: 5 }, () => TH.OtherLifetok))
   })
 
   it("answers the void lifetok as its banktok where a concrete adapter reports it, and where the verb throws", async () => {
-    const bankless  = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', record: Shell.of(TH.GateScope) }))
+    const bankless  = new ScriptedVaultDB(() => getManifestOf(null))
     const throwing  = new ScriptedVaultDB(() => { throw new Error('connection reset') })
     const answers   = [
       await bankless.tryGetThing(TH.getGateAskOf()), await throwing.tryGetThing(TH.getGateAskOf()), await throwing.tryListThings(TH.listAskAt('box')),
@@ -326,13 +368,13 @@ describe("AdapterVaultDB, what a watcher is notified of from a verb's answer", (
     const parentage = [Thing.sparseOf(TH.rootBoxOf())]
     const deltas    = [Thing.sparseOf(TH.boxThingOf('anthropic')), Thing.sparseOf(TH.boxThingOf('openai'))]
     const kids      = { modelkind: 'kids', parentpath: 'box', parentlife: TH.rootBoxOf().lifepath, items: {}, gones: {} }
-    const steps: (() => unknown)[] = [
-      () => ({ ok: false, act: 'stale', record: TH.gateThingOf() }),
-      () => ({ ok: true, act: 'born', record: TH.gateThingOf() }),
-      () => { throw Throwers.gateIssue(TH.gateThingOf(), 'a test') },
+    const steps: [() => unknown, () => unknown][] = [
+      [() => ({ ok: false, act: 'stale', record: TH.gateThingOf() }), () => writeManifestOf(TH.birthAskOf(), OtherGate, false)],
+      [() => ({ ok: true, act: 'born', record: TH.gateThingOf() }), () => writeManifestOf(TH.birthAskOf(), null, true)],
+      [() => { throw Throwers.gateIssue(TH.gateThingOf(), 'a test') }, () => { throw Throwers.gateIssue(TH.gateThingOf(), 'a test') }],
     ]
-    for (const step of steps) {
-      const vaultDB = new ScriptedVaultDB(step as () => object)
+    for (const [step, manifestStep] of steps) {
+      const vaultDB = new ScriptedVaultDB(step as () => object, manifestStep as () => object)
       const noticedRecords = noticedRecordsOver(vaultDB)
       await vaultDB.tryGetThing(TH.getGateAskOf())
       await vaultDB.tryWriteThing(TH.birthAskOf())

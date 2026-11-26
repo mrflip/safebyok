@@ -92,15 +92,15 @@ export function bornAtNotNow(ask: WriteAsk): Errors.VaultError { return new Erro
 export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
 // --
 
-// == [Storing Throwers]: PoliciedMeta, gateIssue, storeQuotaTooSmall, storageCallRefused, bornAtNotStored, lifetokNotStored, rowOfOtherAddress, bankRootsMissing, listParentNotLive, answerNotMade
+// == [Storing Throwers]: PoliciedMeta, gateIssue, storeQuotaTooSmall, storageCallRefused, bornAtNotStored, lifetokNotStored, rowOfOtherAddress, bankRootsMissing, listParentNotLive, answerNotMade, writtenOfOtherAct, proposedNotWritten, tagsOfOtherRow, tagsOfOtherAsk, answerOfOtherManifest
 
 // Big types a refusal's meta.act as its own BadAct, which has no `policied`.
 /** Refusal meta with act `policied`, for a write the act tables allow but a storage policy, the born_at check or the lifetok check refuses. */
 export const PoliciedMeta = { act: 'policied' } as unknown as Errors.RefusalMeta
 
-/** A `gate_issue` refusal of a write over `stored`, saying `why`. */
-export function gateIssue(stored: ThingRecord | null, why: string): Errors.VaultError {
-  return new Errors.VaultError('gate_issue', BigPhrases.gateIssue(why), { rows: { dbhas: stored }, meta: PoliciedMeta })
+/** A `gate_issue` refusal of a write over `stored`, saying `why`, with `meta` and the act `policied`. */
+export function gateIssue(stored: ThingRecord | null, why: string, meta: Errors.RefusalMeta = {}): Errors.VaultError {
+  return new Errors.VaultError('gate_issue', BigPhrases.gateIssue(why), { rows: { dbhas: stored }, meta: { ...meta, ...PoliciedMeta } })
 }
 
 /** A `storage_blocked` refusal: the browser's `quota` of bytes for the page is under {@link StoreLimitFloor}, too little for a vault. */
@@ -113,14 +113,14 @@ export function storageCallRefused(oplabel: string, thrown: unknown): Errors.Vau
   return new Errors.VaultError('storage_issue', Phrases.storageCallRefused(oplabel), { cause: sanitizeForeignError(thrown) })
 }
 
-/** A `bad_record` refusal of a write over `stored`, the live Thing whose born_at it changes. */
-export function bornAtNotStored(stored: ThingRecord | null): Errors.VaultError {
-  return new Errors.VaultError('bad_record', Phrases.BornAtNotStored, { rows: { dbhas: stored }, meta: PoliciedMeta })
+/** A `bad_record` refusal of a write over `stored`, the live Thing whose born_at it changes, with `meta` and the act `policied`. */
+export function bornAtNotStored(stored: ThingRecord | null, meta: Errors.RefusalMeta = {}): Errors.VaultError {
+  return new Errors.VaultError('bad_record', Phrases.BornAtNotStored, { rows: { dbhas: stored }, meta: { ...meta, ...PoliciedMeta } })
 }
 
-/** A `bad_record` refusal of a write of the bank over `stored`, the live bank whose lifetok it changes. */
-export function lifetokNotStored(stored: ThingRecord | null): Errors.VaultError {
-  return new Errors.VaultError('bad_record', Phrases.LifetokNotStored, { rows: { dbhas: stored }, meta: PoliciedMeta })
+/** A `bad_record` refusal of a write of the bank over `stored`, the live bank whose lifetok it changes, with `meta` and the act `policied`. */
+export function lifetokNotStored(stored: ThingRecord | null, meta: Errors.RefusalMeta = {}): Errors.VaultError {
+  return new Errors.VaultError('bad_record', Phrases.LifetokNotStored, { rows: { dbhas: stored }, meta: { ...meta, ...PoliciedMeta } })
 }
 
 /** A `storage_issue` refusal: storage answered a row at another address than asked, by the `fieldnames` that disagree. */
@@ -134,6 +134,21 @@ export function listParentNotLive(meta: Errors.RefusalMeta): Errors.VaultError {
 
 /** An `unexpected_error` refusal: a vaultDB could not make the answer for a failure. */
 export function answerNotMade(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerNotMade) }
+
+/** A `storage_issue` refusal: the datastore wrote where the act its tags find is no write, or wrote nothing where it is one. */
+export function writtenOfOtherAct(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.WrittenOfOtherAct) }
+
+/** A `storage_issue` refusal: the row the datastore wrote lacks the revision, life or liveness of the record the write proposed. */
+export function proposedNotWritten(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.ProposedNotWritten) }
+
+/** A `storage_issue` refusal: the datastore's tags are not those of the row it handed back. */
+export function tagsOfOtherRow(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.TagsOfOtherRow) }
+
+/** A `storage_issue` refusal: the datastore's tags disagree with the write it was asked. */
+export function tagsOfOtherAsk(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.TagsOfOtherAsk) }
+
+/** A `storage_issue` refusal: the vaultDB's answer is not a copy of the datastore's manifest it was made from. */
+export function answerOfOtherManifest(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.AnswerOfOtherManifest) }
 // --
 
 // == [Minding Throwers]: notMinded, worldNotHeard, childrenStoredDamaged

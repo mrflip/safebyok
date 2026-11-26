@@ -12,14 +12,13 @@ import { type Thingkind, PerKindChecks, policiesByModelkind } from './shapes-thi
 // sit below this module and read their checks where they are made.
 
 /** The checks of the bank's Thing: its record, its citation and what is stored of it, the storage policies it may name (none), and its labelpath.
- * Also its `shell`, its lifetok, as a write over the bank stored reads it (`storedLifetok`), its `stamp`, and `birthAsk`, the ask that writes a new bank's first Things: it leaves its three records unchecked, for `BankChecks.record`, `GateChecks.record` and `BoxChecks.record`.
+ * Also its `shell`, its `stamp`, and `birthAsk`, the ask that writes a new bank's first Things: it leaves its three records unchecked, for `BankChecks.record`, `GateChecks.record` and `BoxChecks.record`.
  */
 export const BankChecks = Object.freeze({
   record:        PerKindChecks.bankThing,
   shell:         PerKindChecks.bankShell,
   cited:         PerKindChecks.bankCited,
   stored:        PerKindChecks.bankThing.refusingAs('damaged_row'),
-  storedLifetok: PerKindChecks.storedLifetok,
   policies:      policiesByModelkind.bank,
   labelpath:     PerKindChecks.bankLabelpath,
   stamp:         StampChecks.bankStamp,
@@ -27,7 +26,7 @@ export const BankChecks = Object.freeze({
 })
 
 /** The checks of a gate's Thing: its record, its citation and what is stored of it, the storage policies it may name, and its labelpath.
- * Also its `shell`, its wayins, the wayins as a write under a storage policy reads them of the gate stored, its `stamp`, and its `stampedGate`.
+ * Also its `shell`, its wayins, its `stamp`, and its `stampedGate`.
  */
 export const GateChecks = Object.freeze({
   record:        PerKindChecks.gateThing,
@@ -37,7 +36,6 @@ export const GateChecks = Object.freeze({
   policies:      policiesByModelkind.gate,
   labelpath:     PerKindChecks.gateLabelpath,
   wayins:        PerKindChecks.wayins,
-  storedWayins:  PerKindChecks.storedWayins,
   stamp:         StampChecks.gateStamp,
   stampedGate:   StampChecks.stampedGate,
 })

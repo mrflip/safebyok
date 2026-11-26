@@ -165,8 +165,8 @@ export type GetWorldActual = ActualBeside & { ok: true, act: 'got', things: Worl
 export type StatsActual = ActualBeside & { ok: true, act: 'got', stats: VaultStats }
 
 /** A change a concrete adapter's `doWatch` passes to `receive`: the changed Thing, raw, with the `banktok` of its bank as the datastore last read it.
- * Watchers are notified of the Thing alone, with that banktok: a bank that changed is a change of its own.
+ * Watchers are notified of the Thing alone, with that banktok, or the void lifetok where it is no lifetok: a bank that changed is a change of its own.
  * `read_tc` is the datastore's raw UUID version 7 of when it read the Thing. A datastore that makes none leaves it out, and the notice is read when it arrives.
  */
-export type Received = Pick<ActualBeside, 'banktok'> & { record: unknown, read_tc?: unknown }
+export type Received = { record: unknown, banktok: unknown, read_tc?: unknown }
 // --

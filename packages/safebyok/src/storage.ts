@@ -5,10 +5,11 @@
 import { EX } from 'safebyok-big/internals'
 
 export { AdapterVaultDB } from './storage/adapter-vault-db'
-export { type Watcher, MemoryVaultDB } from './storage/memory-vault-db'
+export { MemoryVaultDB } from './storage/memory-vault-db'
+export { type Watcher, MemoryDatastore } from './storage/memory-datastore'
 export { type Banklabel, type BoxLabelpath, type Devicetok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
-  type AnyThingRecord, type BankRecord, type BoxRecord, type BoxSparse, type GateRecord, type Modelkind, type Sealed, type Sparse, type StoredCited, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind,
+  type AnyThingRecord, type BankRecord, type BoxRecord, type BoxSparse, type GateRecord, type Modelkind, type Sealed, type Sparse, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind,
   type VoidSentinel, type Wayins, Shell, ThingChecks, ThingFormat, thingkindVals,
 } from './shapes/shapes-thing'
 export { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from './shapes/shapes-thingkinds'
@@ -21,6 +22,13 @@ export {
   checkedWriteAsk, delAskOf, getAskOf, listAskOf, putAskOf,
 } from './shapes/shapes-asks'
 export * as Classifier from './storage/thing-classifier'
+// A datastore's contract: the manifest each get and write step hands back, the tags in it, and the functions that make them in TypeScript.
+export * as ManifestTags from './storage/manifest-tags'
+export {
+  type CheckedGetManifest, type CheckedManifestRows, type CheckedWriteManifest, type GetManifest, type GetTags, type PolicyVerdict, type PolicyVerdicts, type Presence, type RevseqCmp, type RevtokCmp, type SameCmp,
+  type ScribedGetManifest, type ScribedWriteManifest, type WriteManifest, type WriteTags, ManifestChecks,
+} from './shapes/shapes-manifest'
+export { type AnteWayins, GatePolicies } from './storage/policies'
 export { VacantAgerank, readAtOf, readTcNow } from './storage/agerank'
 export {
   type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseRecord, type LeaseScope, type LeaseStamp, type LeaseTombstone, LeaseFormat, LeaseLabelpath, LeaseLifeRoot, StampChecks, leaseLifepathOf,
