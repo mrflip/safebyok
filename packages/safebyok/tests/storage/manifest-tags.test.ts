@@ -4,7 +4,7 @@ import * as ManifestTags from '../../src/storage/manifest-tags'
 import * as TH from '../test-helpers'
 
 describe("ManifestTags, over the raw rows in a datastore", () => {
-  it("never throws on a row that is no object, and finds it a tombstone that cites nothing", () => {
+  it("reads a row that is no object as a tombstone that cites nothing", () => {
     for (const row of ['not a Thing', 42, true, []]) {
       expect(ManifestTags.presenceOf(row)).to.eq('gone')
       expect(ManifestTags.writeTagsOf(TH.birthAskOf(), row, false)).to.deep.include({ presence: 'gone', revtok_cmp: 'neq', revseq_cmp: 'birth', lifepath_eq: false })
@@ -17,12 +17,17 @@ describe("ManifestTags, over the raw rows in a datastore", () => {
     expect(ManifestTags.writeTagsOf(ask, { ...gate, revseq: 'zero' }, false)).to.deep.include({ revtok_cmp: 'eq', revseq_cmp: 'ahead' })
   })
 
-  it("judges a storage policy only over a live gate, and judges a gate whose wayins are no object as having none", () => {
+  it("judges a storage policy only over a live gate", () => {
     const gate = TH.gateThingOf()
     const ask  = TH.replaceAskOf(gate, TH.nextGateOf(gate, { wayins: { ...gate.wayins, passkey0: TH.Passkey0Wayin } }), { policies: ['add_passkey'] })
     expect(ManifestTags.writeTagsOf(ask, null, false).policies).to.deep.equal({ add_passkey: { ok: true } })
     expect(ManifestTags.writeTagsOf(ask, { ...gate, am: 'x' }, false).policies).to.deep.equal({ add_passkey: { ok: true } })
     expect(ManifestTags.writeTagsOf(ask, gate, false).policies).to.deep.equal({ add_passkey: { ok: true } })
+  })
+
+  it("judges a gate whose wayins are no object as having none", () => {
+    const gate = TH.gateThingOf()
+    const ask  = TH.replaceAskOf(gate, TH.nextGateOf(gate, { wayins: { ...gate.wayins, passkey0: TH.Passkey0Wayin } }), { policies: ['add_passkey'] })
     expect(ManifestTags.writeTagsOf(ask, { ...gate, wayins: 'none' }, false).policies.add_passkey).to.deep.equal({ ok: false, refusaltag: 'PasskeyStored' })
   })
 
@@ -43,7 +48,7 @@ describe("ManifestTags, over the raw rows in a datastore", () => {
     }
   })
 
-  it("gives the void lifetok for no bank row, the lifetok as it stands otherwise, and null for a row without one", () => {
+  it("gives a bank row's lifetok as it stands, the void lifetok for no row, and null for a row without one", () => {
     expect(ManifestTags.banktokOf(null)).to.eq(SX.VoidLifeTok)
     expect(ManifestTags.banktokOf(TH.bankThingOf())).to.eq(TH.bankThingOf().lifetok)
     expect(ManifestTags.banktokOf({ lifetok: 7 })).to.eq(7)

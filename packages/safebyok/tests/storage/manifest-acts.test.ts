@@ -30,7 +30,7 @@ function tagsOf(presence: WriteTags['presence'], revtok_cmp: WriteTags['revtok_c
   return { presence, revtok_cmp, revseq_cmp, lifepath_eq: true, born_at_cmp: 'moot', lifetok_cmp: 'moot', policies: {}, written: false, ...overrides }
 }
 
-/** What every manifest here carries beside its tags and rows: the void banktok, each root the same as tracked, and a read_tc made now. */
+/** The bank's part of every manifest here: the void banktok, each root the same as tracked, and a read_tc made now. */
 function besideOf() { return { banktok: SX.VoidLifeTok, tracked: { bank: 'same', gate: 'same', box: 'same' }, read_tc: readTcNow() } as const }
 
 /** The answer `writeAnswerOf` makes of a checked manifest of `tags` over the `actual` row, scribed for `ask`. */
@@ -178,11 +178,15 @@ describe("ManifestActs.scribeWriteAct(ask, manifest), a write the tables let thr
     })
   }
 
-  it("scribes policied for a replacement that fails a storage policy it names, and the write where each it names is met", () => {
+  it("scribes policied for a replacement that fails a storage policy it names", () => {
     const ask = { ...askOf(PutAsk, 'live', 'repl'), options: { policies: ['add_passkey', 'revoke_passkey'] } } as WriteAsk
     const failed = { add_passkey: { ok: true }, revoke_passkey: { ok: false, refusaltag: 'NoPasskeyStored' } } as const
-    const met    = { add_passkey: { ok: true }, revoke_passkey: { ok: true } } as const
     expect(scribedActOf(ask, tagsOf('live', 'eq', 'eq', { policies: failed }))).to.eq('policied')
+  })
+
+  it("scribes the replacement where each storage policy it names is met", () => {
+    const ask = { ...askOf(PutAsk, 'live', 'repl'), options: { policies: ['add_passkey', 'revoke_passkey'] } } as WriteAsk
+    const met = { add_passkey: { ok: true }, revoke_passkey: { ok: true } } as const
     expect(scribedActOf(ask, tagsOf('live', 'eq', 'eq', { policies: met }))).to.eq('replaced')
   })
 

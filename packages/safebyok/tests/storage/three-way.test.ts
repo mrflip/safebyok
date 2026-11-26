@@ -12,7 +12,7 @@ import * as ThreeWay from '../../src/storage/three-way'
 import { readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
 
-/** What every manifest here carries beside its tags and rows: the void banktok, each root the same as tracked, and a read_tc made now. */
+/** The bank's part of every manifest here: the void banktok, each root the same as tracked, and a read_tc made now. */
 function besideOf() { return { banktok: SX.VoidLifeTok, tracked: { bank: 'same', gate: 'same', box: 'same' }, read_tc: readTcNow() } }
 
 /** A sound write's manifest and answer: `ask` over the `ante` row, written or not, checked, scribed and answered. `doctor` changes the manifest before the answer is made. */
@@ -170,15 +170,14 @@ describe("ThreeWay.demandListConsistency(ask, manifest, answer)", () => {
     }
   })
 
-  it("refuses a child listed more than one label under the parent, or a parent at another address", () => {
-    const doctors = [
-      (manifest: ListManifest) => { manifest.children = [{ labelpath: 'box/aa/deep', raw: TH.boxThingOf('aa', { labelpath: 'box/aa/deep' }) }] },
-      (manifest: ListManifest) => { manifest.actual = TH.rootBoxOf({ banklabel: 'other' }) },
-    ]
-    for (const doctor of doctors) {
-      const { manifest, answer } = listedOf(TH.rootBoxOf(), [], doctor)
-      TH.expectSyncRefusal(() => { ThreeWay.demandListConsistency(ListBox, manifest, answer) }, 'storage_issue')
-    }
+  it("refuses a child listed more than one label under the parent", () => {
+    const { manifest, answer } = listedOf(TH.rootBoxOf(), [], (doctored: ListManifest) => { doctored.children = [{ labelpath: 'box/aa/deep', raw: TH.boxThingOf('aa', { labelpath: 'box/aa/deep' }) }] })
+    TH.expectSyncRefusal(() => { ThreeWay.demandListConsistency(ListBox, manifest, answer) }, 'storage_issue')
+  })
+
+  it("refuses a parent at another address than asked", () => {
+    const { manifest, answer } = listedOf(TH.rootBoxOf(), [], (doctored: ListManifest) => { doctored.actual = TH.rootBoxOf({ banklabel: 'other' }) })
+    TH.expectSyncRefusal(() => { ThreeWay.demandListConsistency(ListBox, manifest, answer) }, 'storage_issue')
   })
 })
 
@@ -190,15 +189,16 @@ describe("ThreeWay.demandBirthConsistency(ask, manifest, answer)", () => {
     }
   })
 
-  it("refuses a birth written without a root's proposed revision, or unwritten with tags that are not its roots'", () => {
-    const cases = [
-      [Phrases.ProposedNotWritten, bornOf(NoRoots, true, (doctored) => { doctored.actual = { ...doctored.actual, root: TH.rootBoxOf({ revtok: TH.OtherRevtok }) } })],
-      [Phrases.TagsOfOtherRow,     bornOf({ ...NoRoots, gate: OtherGate }, false, (doctored) => { doctored.actual = { ...doctored.actual, root: TH.boxTombOf(TH.rootBoxOf()) } })],
-    ] as const
-    for (const [message, { manifest, answer }] of cases) {
-      const err = TH.expectSyncRefusal(() => { ThreeWay.demandBirthConsistency(BirthBank, manifest, answer) }, 'storage_issue')
-      expect(err.message).to.eq(message)
-    }
+  it("refuses a birth written without a root's proposed revision", () => {
+    const { manifest, answer } = bornOf(NoRoots, true, (doctored) => { doctored.actual = { ...doctored.actual, root: TH.rootBoxOf({ revtok: TH.OtherRevtok }) } })
+    const err = TH.expectSyncRefusal(() => { ThreeWay.demandBirthConsistency(BirthBank, manifest, answer) }, 'storage_issue')
+    expect(err.message).to.eq(Phrases.ProposedNotWritten)
+  })
+
+  it("refuses an unwritten birth whose tags are not its roots'", () => {
+    const { manifest, answer } = bornOf({ ...NoRoots, gate: OtherGate }, false, (doctored) => { doctored.actual = { ...doctored.actual, root: TH.boxTombOf(TH.rootBoxOf()) } })
+    const err = TH.expectSyncRefusal(() => { ThreeWay.demandBirthConsistency(BirthBank, manifest, answer) }, 'storage_issue')
+    expect(err.message).to.eq(Phrases.TagsOfOtherRow)
   })
 
   it("refuses an answer that does not copy the manifest: its roots, or its refusal's dbhas", () => {
@@ -213,21 +213,27 @@ describe("ThreeWay.demandBirthConsistency(ask, manifest, answer)", () => {
 })
 
 describe("ThreeWay.demandWorldConsistency(ask, manifest, answer)", () => {
-  it("passes a sound get of the world, and refuses an answer that does not copy it, or a root at another address", () => {
+  it("passes a sound get of the world", () => {
     const { manifest, answer } = worldOf({ ...NoRoots, gate: Gate })
     expect(() => { ThreeWay.demandWorldConsistency(TH.getWorldAskOf(), manifest, answer) }).not.to.throw()
+  })
+
+  it("refuses an answer that does not copy the manifest", () => {
+    const { manifest, answer } = worldOf({ ...NoRoots, gate: Gate })
     const err = TH.expectSyncRefusal(() => { ThreeWay.demandWorldConsistency(TH.getWorldAskOf(), manifest, { ...answer, val: { ...NoRoots, gate: OtherGate } } as unknown as GetWorldAnswer) }, 'unexpected_error')
     expect(err.message).to.eq(Phrases.AnswerOfOtherManifest)
-    const elsewhere = worldOf({ ...NoRoots, gate: TH.gateThingOf({ banklabel: 'other' }) })
-    TH.expectSyncRefusal(() => { ThreeWay.demandWorldConsistency(TH.getWorldAskOf(), elsewhere.manifest, elsewhere.answer) }, 'storage_issue')
+  })
+
+  it("refuses a root at another address than asked", () => {
+    const { manifest, answer } = worldOf({ ...NoRoots, gate: TH.gateThingOf({ banklabel: 'other' }) })
+    TH.expectSyncRefusal(() => { ThreeWay.demandWorldConsistency(TH.getWorldAskOf(), manifest, answer) }, 'storage_issue')
   })
 })
 
 describe("ThreeWay.demandStatsConsistency(ask, manifest, answer)", () => {
   it("refuses an answer that does not copy the manifest's stats, banktok or read_tc", () => {
-    const raw: StatsManifest = { stats: { box: { count: 0, live_count: 0, size: 0 }, gate: { count: 0, live_count: 0, size: 0 }, max: { count: 100, size: 1e6 } }, ...besideOf() }
-    ManifestActs.checkStatsObservations(TH.statsAskOf(), raw)
-    const manifest = raw
+    const manifest: StatsManifest = { stats: { box: { count: 0, live_count: 0, size: 0 }, gate: { count: 0, live_count: 0, size: 0 }, max: { count: 100, size: 1e6 } }, ...besideOf() }
+    ManifestActs.checkStatsObservations(TH.statsAskOf(), manifest)
     const answer   = ManifestActs.statsAnswerOf(TH.statsAskOf(), manifest)
     expect(() => { ThreeWay.demandStatsConsistency(TH.statsAskOf(), manifest, answer) }).not.to.throw()
     for (const otherAnswer of [{ ...answer, banktok: TH.OtherLifetok }, { ...answer, read_tc: readTcNow() }, { ...answer, val: { ...manifest.stats, max: { count: 1, size: 1 } } }]) {
