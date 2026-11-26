@@ -2,7 +2,7 @@
 
 import { GraphQLError, type GraphQLScalarType } from 'graphql'
 import * as DB from 'safebyok/storage'
-import { type WireAnswer, type WireNotice, CrossedErrExtension } from './shapes/shapes-wire'
+import { type AnyAnswer, type WireAnswer, type WireNotice, CrossedErrExtension } from './shapes/shapes-wire'
 import { safebyokJson } from './vault-schema'
 import * as Phrases from './phrases'
 
@@ -149,10 +149,7 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
 }
 // --
 
-// == [Helpers]: AnyAnswer, graphQLErrorOf, wireAnswerOf, refusedAnswerOf, goodNoticeOf, badNoticeOf, endingWith, openWatch
-
-/** Any vaultDB verb's answer. */
-type AnyAnswer = DB.GetThingAnswer | DB.WriteThingAnswer | DB.ListThingsAnswer | DB.BirthBankAnswer | DB.GetWorldAnswer | DB.StatsAnswer
+// == [Helpers]: graphQLErrorOf, wireAnswerOf, refusedAnswerOf, goodNoticeOf, badNoticeOf, endingWith, openWatch
 
 /** The GraphQL error for a request the server could not serve, carrying the refusal for `thrown` as it may cross. */
 function graphQLErrorOf(thrown: unknown): GraphQLError {

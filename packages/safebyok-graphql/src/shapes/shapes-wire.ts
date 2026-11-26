@@ -6,10 +6,13 @@ import type * as Z from 'zod'
 import * as DB from 'safebyok/storage'
 import * as Throwers from '../refusals/throwers'
 
-// == [Wire forms]: CrossedErrExtension, WireAnswer, WireNotice
+// == [Wire forms]: CrossedErrExtension, AnyAnswer, WireAnswer, WireNotice
 
 /** The key of a GraphQL error's `extensions` under which a refusal crosses, as `crossedErrOf` gives it, where the server could not serve the request. */
 export const CrossedErrExtension = 'safebyokErr'
+
+/** Any vaultDB verb's answer. */
+export type AnyAnswer = DB.GetThingAnswer | DB.WriteThingAnswer | DB.ListThingsAnswer | DB.BirthBankAnswer | DB.GetWorldAnswer | DB.StatsAnswer
 
 /** A vaultDB verb's answer as it crosses: the answer less its ask, its refusal reduced to what may cross, and null for each field the schema has and it lacks. */
 export type WireAnswer = Readonly<{

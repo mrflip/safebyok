@@ -10,7 +10,7 @@
 
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import * as DB from 'safebyok/storage'
-import { type CheckedAnswer, type CheckedNotice, CrossedErrExtension, WireChecks, checkGotAt, checkListedAt, checkRootsAt, checkStatsAt, checkWatchedAt } from './shapes/shapes-wire'
+import { type AnyAnswer, type CheckedAnswer, type CheckedNotice, CrossedErrExtension, WireChecks, checkGotAt, checkListedAt, checkRootsAt, checkStatsAt, checkWatchedAt } from './shapes/shapes-wire'
 import { networkTroubleOf, schemaNotServed, serverErred, watchEnded } from './refusals/throwers'
 import { VaultOperations } from './vault-operations'
 import * as Phrases from './phrases'
@@ -183,10 +183,7 @@ export class GraphQLVaultDB implements DB.VaultDB {
 }
 // --
 
-// == [Answers]: AnyAnswer, answerOf, answerForThrown, noEnding, fieldOf, troubleOf, carriedErrOf, hearNotice, notify
-
-/** Any vaultDB verb's answer. */
-type AnyAnswer = DB.GetThingAnswer | DB.WriteThingAnswer | DB.ListThingsAnswer | DB.BirthBankAnswer | DB.GetWorldAnswer | DB.StatsAnswer
+// == [Answers]: answerOf, answerForThrown, noEnding, fieldOf, troubleOf, carriedErrOf, hearNotice, notify
 
 // A record crosses checked for its scope and citation alone, and is typed here as the answer has it: whoever reads it
 // checks the rest where a Thing takes it, as for an answer from any vaultDB.
