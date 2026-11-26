@@ -174,7 +174,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 
 ## Line
 
-*Orchestrator:* now `1 → 2 → 3 → 5 → 4 → 8 → 9 → 6 → 7 → 10`, the sprint PR on top. Was `1 → 2 → 3 → 4 → 5 → 6 → 7`. Threads 3, 4 and 5 run side by side from thread 2's tip and are restacked into the line before thread 6 is cut. *Orchestrator:* thread 5 rebased onto thread 3 (`1 → 2 → 3 → 5`), so only thread 4 needs restacking: `1 → 2 → 3 → 4 → 5` or `… → 3 → 5 → 4`, whichever conflicts less (both touch `safebyok/storage`'s exports). **A Closer Look** (`.claude/skills/sprint/closer-look.md`) runs once threads 3, 4 and 5 have all filed, before thread 6 is cut (the Coach, 2026-11-26).
+*Orchestrator:* now `1 → 2 → 3 → 5 → 4 → 8 → 9 → 6 → 7 → 10`, stacked on adapter_port's line (`#932 → #935 → #936 → #938 → #913`; the Coach: "stack yours on theirs"), the sprint PR on top. Was `1 → 2 → 3 → 4 → 5 → 6 → 7`. Threads 3, 4 and 5 run side by side from thread 2's tip and are restacked into the line before thread 6 is cut. *Orchestrator:* thread 5 rebased onto thread 3 (`1 → 2 → 3 → 5`), so only thread 4 needs restacking: `1 → 2 → 3 → 4 → 5` or `… → 3 → 5 → 4`, whichever conflicts less (both touch `safebyok/storage`'s exports). **A Closer Look** (`.claude/skills/sprint/closer-look.md`) runs once threads 3, 4 and 5 have all filed, before thread 6 is cut (the Coach, 2026-11-26).
 
 ## For the Coach
 
