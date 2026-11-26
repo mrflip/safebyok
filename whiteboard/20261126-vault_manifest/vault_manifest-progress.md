@@ -52,3 +52,10 @@ The orchestrator's curated summary of what the threads have taught. Newer than t
 * `IdbDatastore` (`packages/safebyok-indexeddb/src/idb-datastore.ts`, unexported): one `DB.inOneStep` transaction per verb, a manifest back; the quota refusal, the bell and the BroadcastChannel watch live there; a ring follows a commit whose `tags.written` is true. `idb-vault-db.ts` is the options check and one line per `do*`.
 * `isWritable` and `isBirthWritable` are exported from `safebyok/storage`: a datastore running TypeScript in its step (Convex, thread 5) reuses them rather than copying.
 * The dojo demo needed no change; it was red only through safebyok-indexeddb.
+
+### Thread 4, postgres_manifest (ready, #940)
+
+* Each SQL tag function in `vault-functions.ts` names the TypeScript function it copies; the ask's flags are a clause of the write predicate; banktok copies `ManifestTags.banktokOf` (void lifetok for no bank row; key always kept).
+* `PolicyPhrases` exported from `safebyok/storage`: one copy of each policy message, filling the SQL.
+* Hosts upgrading drop every `safebyok_a010501_r000_*` function first (the changeset's snippet); no `SqlRevision` bump before 1.0.
+* *Orchestrator:* a network outage (EAI_AGAIN, ~06:06Z) stopped threads 4 and 5 and thread 3's push; resumed with SendMessage, no work lost.

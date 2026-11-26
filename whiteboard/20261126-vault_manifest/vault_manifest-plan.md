@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1 and 2 filed (#934, #937, drafts); thread 3 filing (#939); thread 4 building; thread 5 building (cut from thread 2's filed tip)
+* **Status:** threads 1–3 filed (#934, #937, #939, drafts); thread 4 ready (#940), in review (high, opus); thread 5 building (resumed after the 06:06Z network outage)
 
 ## Read first
 
@@ -76,6 +76,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Depends on:* thread 2. *Orchestrator:* takes the dojo demo too (it imports safebyok-indexeddb).
 *Look-ahead:* none.
 *Size:* small.
+*Status:* filed 2026-11-26 at 517463cf4 (PR #939).
 *Review:* fixed (sonnet, low): three doc blocks trimmed. Left: `isWritable` doc blocks and `written` → `isWritten` → thread 6; `readTc` order stands.
 
 ### 4. postgres_manifest — Postgres hands back a Manifest whole
@@ -89,6 +90,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Depends on:* thread 2.
 *Look-ahead:* thread 5 copies its manifest shape over Convex.
 *Size:* medium-large.
+*Status:* ready 2026-11-26, PR #940; cut off once by the network outage while proving, resumed. Deviations: the policy clause applies over any live gate (as the TypeScript); a missing wayins key fails a policy in SQL, passes in TypeScript (incompatible rows only); a write function out of step refuses `storage_issue` (three-way) not `unexpected_error`; the write functions' signatures change, so the changeset tells hosts to drop every `safebyok_a010501_r000_*` function before rerunning; `PolicyPhrases` exported.
 
 ### 5. convex_manifest — Convex in typed tables, onto the Manifest
 
