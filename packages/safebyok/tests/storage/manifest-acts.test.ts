@@ -50,10 +50,10 @@ function refusalOf(answer: WriteThingAnswer): Errors.VaultError {
 function scribedActOf(ask: WriteAsk, tags: WriteTags): string { return writeAnsweredOf(ask, tags).act }
 
 /** Each revseq comparison, for a row whose revseq is "@": the act is the same at every one. */
-const EveryRevseq = ["birth", "eq", "stale", "ahead"] as const
+const EveryRevseq = ['birth', 'eq', 'stale', 'ahead'] as const
 
 /** The revseq comparisons a row of a table names: "@" for every one. */
-function revseqsOf(revseqCmp: WriteTags['revseq_cmp'] | "@"): readonly WriteTags['revseq_cmp'][] { return (revseqCmp === "@") ? EveryRevseq : [revseqCmp] }
+function revseqsOf(revseqCmp: WriteTags['revseq_cmp'] | '@'): readonly WriteTags['revseq_cmp'][] { return (revseqCmp === '@') ? EveryRevseq : [revseqCmp] }
 
 // Each row of the get table of notes/answer-contract.md. A flag of "@" is every flag.
 const GetRows = [
