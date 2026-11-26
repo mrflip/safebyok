@@ -44,7 +44,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const { stats, ...bankFetched } = this.#datastore.stats(ask)
     return this.classifyStats(ask, bankFetched, stats)
   }
-  // --
 
   protected override doWatch(scope: ThingWatchScope, receive: Watcher['receive'], onBadNews: Watcher['onBadNews']): () => void { return this.#datastore.watch(scope, receive, onBadNews) }
+  // --
 }
