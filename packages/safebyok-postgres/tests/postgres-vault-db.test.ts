@@ -2,13 +2,14 @@
 
 import { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from 'vitest'
-import { type ThingScope, type Thingkind, type VaultError, Labelpath, Lifeseq, ThingFormat, VoidLifeTok, VoidTrack, readAtOf } from 'safebyok/storage'
+import {
+  type ThingRecord, type ThingScope, type Thingkind, type VaultError, type WriteAsk, Labelpath, Lifeseq, ManifestTags, ThingFormat, VoidLifeTok, VoidTrack, putAskOf, readAtOf,
+} from 'safebyok/storage'
 import * as VT from 'safebyok/testing'
-import * as Phrases from '../src/phrases'
 import { thingsChannelOf } from '../src/notifications'
-import { type PostgresListen, PostgresVaultDB } from '../src/postgres-vault-db'
+import { type PostgresListen, PostgresVaultDB, writeParamsOf } from '../src/postgres-vault-db'
 import { TableVersion, VaultFunctionNames, VaultFunctionsSql } from '../src/vault-functions'
-import { GetThingSql } from '../src/vault-queries'
+import { GetThingSql, WriteThingSql } from '../src/vault-queries'
 import { VaultTablesSql } from '../src/vault-tables'
 import * as TH from './test-helpers'
 
@@ -142,29 +143,44 @@ afterAll(async () => {
 VT.describeVaultDBBattery('PostgresVaultDB', { makeVaultDB, _cheat_rowsOf: rowsOf })
 
 describe("PostgresVaultDB, what only Postgres can show", () => {
-  it("reports, called past the adapter, the verdict of each check of the gate stored that refused its write", async () => {
-    await makeVaultDB()
-    const db = await database()
+  // AdapterVaultDB makes an unwritten write's tags again of its actual row, so the battery proves those; a written write's
+  // are made in SQL alone, of the ante row its WHERE pinned, and only this compares them with ManifestTags'.
+  it("makes, called past the adapter, the tags ManifestTags makes of the ante row, whether it writes or not", async () => {
+    const db   = await database()
+    const box  = VT.boxThingOf()
+    const tomb = VT.boxTombOf(box)
     const gate = VT.gateThingOf()
-    await plant(VT.GateScope, gate)
-    const write = `SELECT ok, born_at_ok, policies_ok FROM ${VaultFunctionNames.write_gate}($1::text::jsonb, $2::text::jsonb, $3::text[])`
-    const moved = VT.nextGateOf(gate, { born_at: gate.born_at + 1 })
-    const added = VT.nextGateOf(gate)
-    const cases = [[moved, [], { ok: false, born_at_ok: false, policies_ok: true }], [added, ['add_passkey'], { ok: false, born_at_ok: true, policies_ok: false }]] as const
-    for (const [record, policies, verdicts] of cases) {
-      const { rows } = await db.query(write, [JSON.stringify(record), JSON.stringify(gate), policies])
-      expect(rows).to.deep.equal([verdicts])
-    }
-  })
-
-  it("reports, called past the adapter, the verdict of the bank's lifetok check that refused its write", async () => {
-    await makeVaultDB()
-    const db = await database()
+    const pkey = VT.gateThingOf({ wayins: VT.WithPasskey })
     const bank = VT.bankThingOf()
-    await plant(VT.BankScope, bank)
-    const write = `SELECT ok, born_at_ok, lifetok_ok FROM ${VaultFunctionNames.write_bank}($1::text::jsonb, $2::text::jsonb)`
-    const { rows } = await db.query(write, [JSON.stringify(VT.nextOf(bank, { lifetok: VT.OtherLifetok })), JSON.stringify(bank)])
-    expect(rows).to.deep.equal([{ ok: false, born_at_ok: true, lifetok_ok: false }])
+    const otherMain = { ...VT.MainOnly, main: VT.OtherMainWayin }
+    const cases: [ante: ThingRecord | null, ask: WriteAsk, written: boolean][] = [
+      [null, VT.birthAskOf(), true],
+      [box,  VT.replaceAskOf(box, VT.nextOf(box)), true],
+      [box,  VT.delAskFor(box, tomb), true],
+      [tomb, putAskOf({ cited: tomb, record: VT.boxRebornOf(tomb), ...VT.SenderKnows }), true],
+      [bank, VT.replaceAskOf(bank, VT.nextOf(bank)), true],
+      [gate, VT.replaceAskOf(gate, VT.nextGateOf(gate, { wayins: VT.WithPasskey }), { policies: ['add_passkey'] }), true],
+      [pkey, VT.replaceAskOf(pkey, VT.nextGateOf(pkey, { wayins: VT.MainOnly }), { policies: ['revoke_passkey'] }), true],
+      [gate, VT.replaceAskOf(gate, VT.nextGateOf(gate, { wayins: otherMain }), { policies: ['replace_passphrase'] }), true],
+      [null, VT.replaceAskOf(box, VT.nextOf(box)), false],
+      [box,  VT.birthAskOf(box), false],
+      [box,  VT.replaceAskOf({ ...box, revtok: VT.OtherRevtok }, VT.nextOf(box)), false],
+      [box,  VT.replaceAskOf({ ...box, revseq: box.revseq + 1 }, VT.nextOf(box, { revseq: box.revseq + 2 })), false],
+      [box,  putAskOf({ cited: box, record: VT.nextOf(box), ifPresent: 'fail', ...VT.SenderKnows }), false],
+      [tomb, VT.delAskFor(tomb, VT.boxTombOf(tomb)), false],
+      [bank, VT.replaceAskOf(bank, VT.nextOf(bank, { lifetok: VT.OtherLifetok })), false],
+      [gate, VT.replaceAskOf(gate, VT.nextGateOf(gate, { born_at: gate.born_at + 1 })), false],
+      [pkey, VT.replaceAskOf(pkey, VT.nextGateOf(pkey), { policies: ['add_passkey'] }), false],
+      [gate, VT.replaceAskOf(gate, VT.nextGateOf(gate), { policies: ['add_passkey', 'revoke_passkey'] }), false],
+      [gate, VT.replaceAskOf(gate, VT.nextGateOf(gate, { wayins: VT.WithPasskey }), { policies: ['revoke_passkey', 'replace_passphrase'] }), false],
+      [gate, VT.replaceAskOf({ ...gate, wayins: otherMain }, VT.nextGateOf(gate, { wayins: otherMain }), { policies: ['replace_passphrase'] }), false],
+    ]
+    for (const [ante, ask, written] of cases) {
+      await makeVaultDB()
+      if (ante !== null) { await plant(ask, ante) }
+      const { rows } = await db.query<{ tags: unknown }>(WriteThingSql[ask.modelkind], writeParamsOf(ask))
+      expect(rows[0]?.tags, `${ask.labelpath} citing ${ask.cited.revtok}`).to.deep.equal(ManifestTags.writeTagsOf(ask, ante, written))
+    }
   })
 
   it("refuses in its write function, called past the adapter, a write citing a revision not stored, and one that skips a life", async () => {
@@ -172,17 +188,17 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     const db = await database()
     const box = VT.boxThingOf()
     await plant({ ...VT.ThingBank, labelpath: box.labelpath }, box)
-    const write = `SELECT ok, thing FROM ${VaultFunctionNames.write_box}($1::text::jsonb, $2::text::jsonb)`
+    const write = `SELECT tags->'written' AS written, actual FROM ${VaultFunctionNames.write_box}($1::text::jsonb, $2::text::jsonb, 'add', 'repl')`
     const stale = { ...box, revtok: VT.OtherRevtok }
     const skips = VT.nextOf(box, { lifeseq: Lifeseq.ofLifenum(2), lifepath: Lifeseq.ofLifenum(2) })
     for (const [record, cited] of [[VT.nextOf(box), stale], [skips, box]]) {
       const { rows } = await db.query(write, [JSON.stringify(record), JSON.stringify(cited)])
-      expect(rows).to.deep.equal([{ ok: false, thing: box }])
+      expect(rows).to.deep.equal([{ written: false, actual: box }])
     }
   })
 
   // A labelpath is at most two deep, so only a root is ever above a scope the adapter asks for: these call the statement past it.
-  it("reports, called past the adapter, the Thing stored above a scope with the longest labelpath that, with a '/', begins the scope's", async () => {
+  it("reports, called past the adapter, where none is stored at a scope, the Thing stored above it with the longest labelpath that, with a '/', begins the scope's", async () => {
     await makeVaultDB()
     const db = await database()
     await plant(VT.RootScope, VT.rootBoxOf())
@@ -193,7 +209,8 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     }
     expect(await ancestorAt('box/aa/bb')).to.eq('box/aa')
     expect(await ancestorAt('box/aab/cc')).to.eq('box')
-    expect(await ancestorAt('box/aa')).to.eq('box')
+    expect(await ancestorAt('box/aa'), 'none where a Thing is stored at the scope').to.eq(null)
+    expect(await ancestorAt('box/ab')).to.eq('box')
     expect(await ancestorAt('box')).to.eq(null)
   })
 
@@ -227,16 +244,19 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     const { rows: tables } = await db.query("SELECT relname, relrowsecurity FROM pg_class WHERE relname LIKE 'safebyok\\_%' AND relkind = 'r' ORDER BY relname")
     expect(tables).to.deep.equal(['safebyok_bank_things', 'safebyok_box_things', 'safebyok_gate_things'].map((relname) => ({ relname, relrowsecurity: true })))
     const { write_bank, write_gate, write_box, birth_roots, tell_thing } = VaultFunctionNames
-    const writers = [`${write_bank}(jsonb, jsonb)`, `${write_gate}(jsonb, jsonb, text[])`, `${write_box}(jsonb, jsonb)`, `${birth_roots}(jsonb, jsonb, jsonb)`, `${tell_thing}(jsonb, jsonb)`]
+    const writers = [`${write_bank}(jsonb, jsonb, text, text)`, `${write_gate}(jsonb, jsonb, text, text, text[])`, `${write_box}(jsonb, jsonb, text, text)`, `${birth_roots}(jsonb, jsonb, jsonb)`, `${tell_thing}(jsonb, jsonb)`]
     const { rows: grants } = await db.query("SELECT bool_or(has_function_privilege('public', writer, 'EXECUTE')) AS any FROM unnest($1::text[]) AS writer", [writers])
     expect(grants).to.deep.equal([{ any: false }])
   })
 
-  it("reports a birth whose function stored nothing, though the classifier finds a write, as an unexpected error", async () => {
-    const vaultDB = new PostgresVaultDB({ client: answeringClient({ ok: false, bank: null, gate: null, root: null, tracked: null }) })
+  it("refuses with storage_issue a birth whose statement wrote nothing where its tags find a birth, as functions of another version may", async () => {
+    const unborn  = { presence: 'void', revtok_cmp: 'birth' }
+    const vaultDB = new PostgresVaultDB({ client: answeringClient({
+      tags: { bank: unborn, gate: unborn, root: unborn, written: false }, actual: { bank: null, gate: null, root: null },
+      banktok: VoidLifeTok, tracked: { bank: null, gate: null, box: null }, read_tc: '01a211fc-16bf-7000-83c6-d6e7d25156a2',
+    }) })
     const answer  = await vaultDB.tryBirthBank(VT.birthBankAskOf())
-    expect(answer).to.have.nested.property('err.refusalkind', 'unexpected_error')
-    expect(answer).to.have.nested.property('err.cause.message', Phrases.StoredNothing)
+    expect(answer).to.have.nested.property('err.refusalkind', 'storage_issue')
   })
 
   it("refuses a verb with storage_issue where its statement fails in a way a retry would not mend, keeping the driver's code", async () => {
@@ -386,7 +406,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
 
   it("answers with the read_tc of the row Postgres returns", async () => {
     const read_tc = '01a211fc-16bf-7000-83c6-d6e7d25156a2'
-    const vaultDB = new PostgresVaultDB({ client: answeringClient({ bank: null, gate: null, root: null, tracked: { bank: null, gate: null, box: null }, read_tc }) })
+    const vaultDB = new PostgresVaultDB({ client: answeringClient({ actual: { bank: null, gate: null, root: null }, banktok: VoidLifeTok, tracked: { bank: null, gate: null, box: null }, read_tc }) })
     const answer  = await vaultDB.tryGetWorld({ ...VT.ThingBank, op: 'getworld', track: VoidTrack, banktok: VoidLifeTok })
     expect(answer.read_tc).to.eq(read_tc)
   })
