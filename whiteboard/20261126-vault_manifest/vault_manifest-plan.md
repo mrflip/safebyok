@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Threads 8 and 9 filed (#942, #943); thread 6 filed (#944); thread 7 filed (#945); thread 10 building
+* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Threads 8 and 9 filed (#942, #943); thread 6 filed (#944); thread 7 filed (#945); restacked onto #913 (merged); thread 10 in review (#946); thread 11 (graphql_manifest) next
 
 ## Read first
 
@@ -172,9 +172,19 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Look-ahead:* none.
 *Size:* small-medium.
 
+### 11. graphql_manifest — GraphQLVaultDB onto the Manifest
+
+> "stack yours on theirs, you have a better handle on what's modern. Revert or integrate as makes sense, their run was less supervised"
+
+*Gloss.* *Orchestrator:* the restack onto adapter_port left `safebyok-graphql` red from #934: `GraphQLVaultDB`'s `do*` return the old `*Actual` reports through the classifier's `crossed*Of` functions, which went with the classifier; `shapes-wire.ts` builds on the gone `ActualChecks`; `vault-resolvers.ts` names `damaged_rows`. To `GraphQLVaultDB` the server is its datastore: each `do*` builds the verb's manifest from what the server answered (the row it carried, through `ManifestTags`, as `MemoryDatastore` does: a written write's tags by `writtenTagsOf`, a refused one's by `writeTagsOf` over its `dbhas`), so `AdapterVaultDB`'s checks and three-way do what the `crossed*Of` functions did by hand. Keep the wire as it is if that holds; a wire change is reported. `shapes-crossed.ts` (`crossedErrOf`, `refusedOverWire`, `CrossedChecks`) keeps what is still used and loses the rest. The adapter_port tests of the crossed functions were dropped at the restack (#934, "Scaffolding: until thread 11"); this thread's tests cover the same refusals through the manifest. Brings `pnpm justify` back to green.
+*Levels:* worker `thread-worker-400k`; review `medium` (opus).
+*Depends on:* thread 10.
+*Look-ahead:* none.
+*Size:* medium.
+
 ## Line
 
-*Orchestrator:* now `1 → 2 → 3 → 5 → 4 → 8 → 9 → 6 → 7 → 10`, stacked on adapter_port's line (`#932 → #935 → #936 → #938 → #913`; the Coach: "stack yours on theirs"), the sprint PR on top. Was `1 → 2 → 3 → 4 → 5 → 6 → 7`. Threads 3, 4 and 5 run side by side from thread 2's tip and are restacked into the line before thread 6 is cut. *Orchestrator:* thread 5 rebased onto thread 3 (`1 → 2 → 3 → 5`), so only thread 4 needs restacking: `1 → 2 → 3 → 4 → 5` or `… → 3 → 5 → 4`, whichever conflicts less (both touch `safebyok/storage`'s exports). **A Closer Look** (`.claude/skills/sprint/closer-look.md`) runs once threads 3, 4 and 5 have all filed, before thread 6 is cut (the Coach, 2026-11-26).
+*Orchestrator:* now `1 → 2 → 3 → 5 → 4 → 8 → 9 → 6 → 7 → 10 → 11`, restacked onto adapter_port's line, merged as #913 (the Coach: "stack yours on theirs"); `safebyok-graphql` red from #934 until thread 11, the sprint PR on top. Was `1 → 2 → 3 → 4 → 5 → 6 → 7`. Threads 3, 4 and 5 run side by side from thread 2's tip and are restacked into the line before thread 6 is cut. *Orchestrator:* thread 5 rebased onto thread 3 (`1 → 2 → 3 → 5`), so only thread 4 needs restacking: `1 → 2 → 3 → 4 → 5` or `… → 3 → 5 → 4`, whichever conflicts less (both touch `safebyok/storage`'s exports). **A Closer Look** (`.claude/skills/sprint/closer-look.md`) runs once threads 3, 4 and 5 have all filed, before thread 6 is cut (the Coach, 2026-11-26).
 
 ## For the Coach
 
