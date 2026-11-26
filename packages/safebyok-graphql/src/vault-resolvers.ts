@@ -155,7 +155,7 @@ function refusedAnswerOf(refusal: DB.VaultError): WireAnswer {
 function goodNoticeOf({ val, banktok, read_tc }: DB.VaultItemEvent): WireNotice { return { record: val, banktok, read_tc, err: null, ended: false } }
 
 /** The notice in wire form for the trouble a watch met, and whether the watch ended with it. */
-function badNoticeOf(refusal: DB.VaultError, ended: boolean): WireNotice { return { record: null, banktok: null, read_tc: null, err: DB.crossedErrOf(refusal), ended } }
+function badNoticeOf(refusal: DB.VaultError, isEnded: boolean): WireNotice { return { record: null, banktok: null, read_tc: null, err: DB.crossedErrOf(refusal), ended: isEnded } }
 
 /** The iterator for a watch refused before it started: it yields one notice carrying the refusal, then ends. */
 function endingWith(refusal: DB.VaultError): AsyncIterableIterator<WireNotice> {
