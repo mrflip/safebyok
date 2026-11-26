@@ -1,6 +1,6 @@
 /** A vaultDB in this tab's memory, saved to localStorage after each write, so a reload finds the vault again. Demo code: a real host stores its vault on its backend. */
 
-import { type Actual, type BirthBankActual, type BirthBankAsk, type BirthPuts, type DelAct, type Labelpath, MemoryVaultDB, type PutAct, type ThingWatchScope, type WriteAsk } from 'safebyok/storage'
+import { type BirthBankActual, type BirthBankAsk, type BirthPuts, type Labelpath, MemoryDatastore, MemoryVaultDB, type ThingWatchScope, type WriteAsk, type WriteManifest } from 'safebyok/storage'
 
 /** The prefix of each bank's entry in localStorage. */
 const SavedPrefix = 'knockknock:vault:'
@@ -23,10 +23,10 @@ export class LocalStorageVaultDB extends MemoryVaultDB {
     }
   }
 
-  protected override doWriteThing(ask: WriteAsk): Actual<PutAct | DelAct> {
-    const actual = super.doWriteThing(ask)
+  protected override doWriteThing(ask: WriteAsk): WriteManifest {
+    const manifest = super.doWriteThing(ask)
     this.#save(ask)
-    return actual
+    return manifest
   }
 
   protected override doBirthBank(ask: BirthBankAsk, puts: BirthPuts): BirthBankActual {
@@ -38,7 +38,7 @@ export class LocalStorageVaultDB extends MemoryVaultDB {
   /** Save the Things of `scope`'s bank to storage. */
   #save({ userid, banklabel }: ThingWatchScope): void {
     const saved: SavedBank = { userid, banklabel, things: [...this._cheat_things({ userid, banklabel })] }
-    this.#storage.setItem(`${SavedPrefix}${MemoryVaultDB.ckeyOf({ userid, banklabel })}`, JSON.stringify(saved))
+    this.#storage.setItem(`${SavedPrefix}${MemoryDatastore.ckeyOf({ userid, banklabel })}`, JSON.stringify(saved))
   }
 }
 
