@@ -274,7 +274,7 @@ export function scribeBirthAct(ask: BirthBankAsk, manifest: CheckedBirthManifest
     return
   }
   const acts = { bank: rootActOf(bankPut, tags.bank), gate: rootActOf(gatePut, tags.gate), root: rootActOf(rootPut, tags.root) }
-  const refusedroot = (['bank', 'gate', 'root'] as const).find((rootkey) => isRefusedAct(acts[rootkey]))
+  const refusedroot = (['bank', 'gate', 'root'] as const).find((rootckey) => isRefusedAct(acts[rootckey]))
   if (refusedroot === undefined) { Object.assign(manifest, { ok: true, act: 'born' }) } else { Object.assign(manifest, { ok: false, act: acts[refusedroot], refusedroot }) }
 }
 // --
@@ -370,7 +370,7 @@ export function worldAnswerOf(ask: GetWorldAsk, manifest: CheckedWorldManifest):
 // A root has nothing above it, so where none is stored its shell stands alone.
 /** The roots of `ask`'s bank, each the shell at its labelpath where none is stored. */
 export function worldRootsOf({ userid, banklabel }: ThingWatchScope, roots: CheckedRoots): WorldRoots {
-  const shellAt = (rootkey: keyof CheckedRoots): VoidSentinel => Shell.under({ userid, banklabel, labelpath: RootLabelpaths[rootkey] }, null)
+  const shellAt = (rootckey: keyof CheckedRoots): VoidSentinel => Shell.under({ userid, banklabel, labelpath: RootLabelpaths[rootckey] }, null)
   return { bank: roots.bank ?? shellAt('bank'), gate: roots.gate ?? shellAt('gate'), root: roots.root ?? shellAt('root') }
 }
 

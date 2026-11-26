@@ -58,7 +58,7 @@ export function demandBirthConsistency(ask: BirthBankAsk, manifest: ScribedBirth
   if (manifest.tags.written !== ManifestActs.isWriteAct(manifest.act)) { throw Throwers.writtenOfOtherAct() }
   const puts = birthPutsOf(ask)
   if (manifest.tags.written) {
-    for (const [{ record }, rootkey] of [[puts[0], 'bank'], [puts[1], 'gate'], [puts[2], 'root']] as const) { demandProposedWritten(record, manifest.actual[rootkey]) }
+    for (const [{ record }, rootckey] of [[puts[0], 'bank'], [puts[1], 'gate'], [puts[2], 'root']] as const) { demandProposedWritten(record, manifest.actual[rootckey]) }
   } else if (! isEqual(ManifestTags.birthTagsOf(puts, manifest.actual, false), manifest.tags)) { throw Throwers.tagsOfOtherRow() }
   const copy = {
     carried:  answer.ok ? answer.val : answer.dbhas,
