@@ -61,7 +61,7 @@ export function demandBirthConsistency(ask: BirthBankAsk, manifest: ScribedBirth
   } else if (! isEqual(ManifestTags.birthTagsOf(puts, manifest.actual, false), manifest.tags)) { throw Throwers.tagsOfOtherRow() }
   const copy = {
     carried:  answer.ok ? answer.val : answer.dbhas,
-    expected: manifest.ok ? manifest.actual : ManifestActs.worldRootsOf(ask, manifest.actual)[manifest.refusedroot],
+    expected: manifest.ok ? manifest.actual : ManifestActs.worldRootsOf(ask, manifest.actual)[manifest.refusedrootckey],
   }
   demandSharedConsistency(ask, manifest, answer, copy, rootRowsOf(manifest.actual))
 }

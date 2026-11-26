@@ -60,8 +60,8 @@ function getThingSqlOf(table: string): string {
          CASE WHEN (actual IS NULL) THEN ${ancestorSqlOf(table, { userid: '$1::text', banklabel: '$2::text', labelpath: '$3::text' })} END AS ancestor,
          ${bankObservedSqlOf('$4')}
   FROM (SELECT (
-    SELECT ${VaultFunctionNames.thing_record}(to_jsonb(stored)) FROM ${table} AS stored
-    WHERE  (stored.userid, stored.banklabel, stored.labelpath) = ($1::text, $2::text, $3::text)
+    SELECT ${VaultFunctionNames.thing_record}(to_jsonb(thing)) FROM ${table} AS thing
+    WHERE  (thing.userid, thing.banklabel, thing.labelpath) = ($1::text, $2::text, $3::text)
   ) AS actual, ${VaultFunctionNames.world}($1::text, $2::text) AS world, ${VaultFunctionNames.root_box}($1::text, $2::text) AS root) AS observed
 `
 }
@@ -71,8 +71,8 @@ function listThingsSqlOf(table: string): string {
   return `
   SELECT jsonb_build_object('presence', ${VaultFunctionNames.presence_of}(actual)) AS tags, actual, children, ${bankObservedSqlOf('$4')}
   FROM (SELECT (
-    SELECT ${VaultFunctionNames.thing_record}(to_jsonb(stored)) FROM ${table} AS stored
-    WHERE  (stored.userid, stored.banklabel, stored.labelpath) = ($1::text, $2::text, $3::text)
+    SELECT ${VaultFunctionNames.thing_record}(to_jsonb(thing)) FROM ${table} AS thing
+    WHERE  (thing.userid, thing.banklabel, thing.labelpath) = ($1::text, $2::text, $3::text)
   ) AS actual, COALESCE((
     SELECT jsonb_agg(jsonb_build_object('labelpath', child.labelpath, 'raw', ${VaultFunctionNames.thing_record}(to_jsonb(child))) ORDER BY child.labelpath)
     FROM   ${table} AS child
@@ -94,9 +94,9 @@ export const GetWorldSql = `
 /** The SQL of a subquery for the stats of a bank's ($1 userid, $2 banklabel) Things in `table`: how many it stores, how many are live, and their size in bytes. */
 function thingkindStatsSqlOf(table: string): string {
   return `(
-    SELECT jsonb_build_object('count', count(*), 'live_count', count(*) FILTER (WHERE stored.am = 'a'), 'size', COALESCE(sum(pg_column_size(stored)), 0))
-    FROM   ${table} AS stored
-    WHERE  (stored.userid, stored.banklabel) = ($1::text, $2::text)
+    SELECT jsonb_build_object('count', count(*), 'live_count', count(*) FILTER (WHERE thing.am = 'a'), 'size', COALESCE(sum(pg_column_size(thing)), 0))
+    FROM   ${table} AS thing
+    WHERE  (thing.userid, thing.banklabel) = ($1::text, $2::text)
   )`
 }
 

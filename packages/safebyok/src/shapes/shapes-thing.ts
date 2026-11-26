@@ -139,7 +139,7 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
     lifetok:        uuid(Phrases.LifetokShape),
   }).strict()
   // A bank's lifetok alone: the check of a banktok.
-  const storedLifetok = obj({ lifetok: bankBase.shape.lifetok })
+  const banktok      = bankBase.shape.lifetok
   const gateBase     = obj({
     ...sparse.shape,
     labelpath:      gateLabelpath,
@@ -246,7 +246,7 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
   const boxShell     = shellAt(boxLabelpath)
   const boxRecordOrShell = union([boxRecord, boxShell])
   return {
-    bankLabelpath, gateLabelpath, boxLabelpath, wayins, storedLifetok, bankShell, gateShell, boxShell,
+    bankLabelpath, gateLabelpath, boxLabelpath, wayins, banktok, bankShell, gateShell, boxShell,
     bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse, boxSealable, boxLiveSealable, boxRecord, boxRecordOrShell,
   }
 }))
@@ -257,7 +257,7 @@ export const policiesByModelkind = Object.freeze({ bank: [], gate: EX.storagePol
 /** The check of a host's {@link VaultDB}, by {@link isVaultDB}. */
 const vaultDBShape = Validator.Checker(({ custom }) => custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected), 'bad_record')
 
-/** The checks of a Thing's fields, of its citation, of what a write reads of the Thing stored, and of a host's vaultDB.
+/** The checks of a Thing's fields, of its citation, of what a write reads of the ante Thing, and of a host's vaultDB.
  * Also `ThingFormat`, the `fmt` of every Thing, and `thingkindVals`, the kinds.
  */
 export const ThingChecks = Object.freeze({ ...GenericChecks, vaultDBShape, ThingFormat, thingkindVals })

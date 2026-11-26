@@ -136,7 +136,7 @@ compares names. Each time is a `bigint` in UTC epoch milliseconds. Your own SQL 
 writing to `PostgresVaultDB`.
 
 A deleted Thing leaves its tombstone in place: the same row, its `am` `'x'` where a live row's is `'a'`. Each write is
-one statement, which takes effect only if the stored row still has the revision the write cites, and waits only on a
+one statement, which takes effect only if the row still has the revision the write cites, and waits only on a
 writer of the same row. No table has a foreign key.
 
 Row-level security is on with no policy, so of the roles you grant the tables to, only their owner, the role your server

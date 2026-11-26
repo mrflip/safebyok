@@ -21,7 +21,7 @@ export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: Loggabl
 /** A refused answer's act: big's, or `policied` for a write that a storage policy, a changed born_at or a changed lifetok refuses. */
 export type BadAct = EX.BadAct | 'policied'
 
-/** A vaultDB verb's refused answer: its `err` and `act`, the Thing found stored (`dbhas`), the loggable part of its `ask`, and when its step read the datastore (`read_tc`).
+/** A vaultDB verb's refused answer: its `err` and `act`, the actual Thing (`dbhas`), the loggable part of its `ask`, and when its step read the datastore (`read_tc`).
  * Where nothing is stored at the ask's scope, `dbhas` is the shell there, under the nearest Thing stored above it (see {@link GetThingAnswer}).
  * `banktok` is as for a {@link GoodAnswer}.
  * If the verb threw, `banktok` is the void lifetok, `tracked` is `'unread'`, `read_tc` is when it was refused, and `dbhas` is the Thing the refusal names, or null where it names none.
@@ -43,14 +43,14 @@ export type GetThingAnswer   =
   | (GoodAnswer<null, 'gotvoid'> & { dbhas: VoidSentinel })
   | BadAnswer
 /** The answer to `tryWriteThing`: the Thing the concrete adapter reports writing, or under `passed` the live Thing it found.
- * Refused, its `dbhas` is the Thing stored, or where none is, the shell there, as for {@link GetThingAnswer}.
+ * Refused, its `dbhas` is the actual Thing, or where none is, the shell there, as for {@link GetThingAnswer}.
  */
 export type WriteThingAnswer = Answer<ThingRecord, EX.PutAct | EX.DelAct>
 
 /** A child Thing that fails its kind's checks: its scope, and `am: 'd'`. */
 export type DamagedThing = Readonly<ThingScope & { am: 'd' }>
 
-/** One child in a {@link Kids} value: the lifeseq of its life stored. */
+/** One child in a {@link Kids} value: the lifeseq of its actual life. */
 export type KidEntry = Readonly<{ lifeseq: Lifeseq }>
 
 // Keyed by label, not labelpath. JavaScript orders an object's keys that look like whole numbers first, so a reader that
@@ -86,7 +86,7 @@ export type ListThingsAnswer<RecordT extends ThingRecord = ThingRecord> =
   | (GoodAnswer<Kids, 'gotlive'> & ListedBeside<RecordT>)
   | (BadAnswer & ListedBeside<RecordT>)
 
-/** The answer to `tryBirthBank`: the three roots written (`born`), or found already stored (`passed`). Refused, its `dbhas` is the root stored that refused it. */
+/** The answer to `tryBirthBank`: the three roots written (`born`), or found already stored (`passed`). Refused, its `dbhas` is the actual root that refused it. */
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
 
 /** The answer to `tryGetWorld`: the bank's three roots ({@link WorldRoots}), under the act `got`. Only a verb that threw refuses it. */

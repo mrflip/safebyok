@@ -75,7 +75,7 @@ true satisfies Z.core.util.AssertEqual<keyof PolicyVerdicts, EX.StoragePolicy>
 export type PolicyTag = keyof typeof PolicyPhrases
 
 /** The name, in phrases.ts, of the phrase a `policied` write is refused with: a changed born_at's, a changed lifetok's, or a storage policy's. */
-export type Refusaltag = 'BornAtNotStored' | 'LifetokNotStored' | PolicyTag
+export type Refusaltag = 'BornAtMoved' | 'LifetokMoved' | PolicyTag
 
 /** The tag the get table reads: the actual row's `presence`. */
 export type GetTags = Readonly<Z.infer<typeof ManifestChecks.getTags>>
@@ -251,10 +251,10 @@ export type ScribedListManifest = CheckedListManifest & (
   | { ok: false, act: 'void',    actual: null }
 )
 
-/** A birth's checked manifest with the act its roots' tags find, and whether it answers good: refused, `refusedroot` names the root whose put refused. */
+/** A birth's checked manifest with the act its roots' tags find, and whether it answers good: refused, `refusedrootckey` names the root whose put refused. */
 export type ScribedBirthManifest = CheckedBirthManifest & (
   | { ok: true,  act: 'born' | 'passed', actual: BankRoots }
-  | { ok: false, act: EX.RefusedAct,     refusedroot: keyof BankRoots }
+  | { ok: false, act: EX.RefusedAct,     refusedrootckey: keyof BankRoots }
 )
 
 /** A change a concrete adapter's `doWatch` passes to `receive`.

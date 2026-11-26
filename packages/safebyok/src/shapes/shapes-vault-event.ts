@@ -163,7 +163,7 @@ export const SeenChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom
   const itemEvent = item.and(obj({
     eventkind:   lit('item'),
     sourcelabel: ThingChecks.label,
-    banktok:     PerKindChecks.storedLifetok.shape.lifetok,
+    banktok:     PerKindChecks.banktok,
     agerank:     str,
     agerankWas:  str,
   }))

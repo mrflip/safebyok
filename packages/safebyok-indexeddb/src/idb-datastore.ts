@@ -105,10 +105,10 @@ export class IdbDatastore {
   async writeThing(ask: WriteAsk): Promise<WriteManifest> {
     const manifest = await DB.inOneStep(this.#shelf, 'readwrite', async (store): Promise<WriteManifest> => {
       const ante    = await rowAt(store, ask)
-      const written = DB.isWritable(ask, ante)
-      if (written) { store.put(ask.record, thingScopepathOf(ask)) }
+      const isWritten = DB.isWritable(ask, ante)
+      if (isWritten) { store.put(ask.record, thingScopepathOf(ask)) }
       const actual = await rowAt(store, ask)
-      return { tags: DB.ManifestTags.writeTagsOf(ask, ante, written), actual, ancestor: await ancestorOf(store, ask, actual), ...(await bankObservedOf(store, ask)) }
+      return { tags: DB.ManifestTags.writeTagsOf(ask, ante, isWritten), actual, ancestor: await ancestorOf(store, ask, actual), ...(await bankObservedOf(store, ask)) }
     })
     if (manifest.tags.written) { this.#ring([{ scope: ask, received: { record: manifest.actual, banktok: manifest.banktok } }]) }
     return manifest
@@ -128,10 +128,10 @@ export class IdbDatastore {
   async birthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthManifest> {
     const manifest = await DB.inOneStep(this.#shelf, 'readwrite', async (store): Promise<BirthManifest> => {
       const ante    = await rootsOf(store, ask)
-      const written = DB.isBirthWritable(ante)
-      if (written) { for (const put of puts) { store.put(put.record, thingScopepathOf(put)) } }
+      const isWritten = DB.isBirthWritable(ante)
+      if (isWritten) { for (const put of puts) { store.put(put.record, thingScopepathOf(put)) } }
       const actual = await rootsOf(store, ask)
-      return { tags: DB.ManifestTags.birthTagsOf(puts, ante, written), actual, ...(await bankObservedOf(store, ask)) }
+      return { tags: DB.ManifestTags.birthTagsOf(puts, ante, isWritten), actual, ...(await bankObservedOf(store, ask)) }
     })
     if (manifest.tags.written) {
       const { bank, gate, root } = manifest.actual

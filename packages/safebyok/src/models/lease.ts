@@ -167,7 +167,7 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
     return Lease.make(Lease.makeNextRecord(this.#record!, { ends_at }), { gate: this.#gate })
   }
 
-  /** Stow this lease's record, its keys with it, in `deviceDB`, where it is newer than the record stored there. Refuses as `deviceDB.stowLease` does, and once this lease is evicted. */
+  /** Stow this lease's record, its keys with it, in `deviceDB`, where it is newer than the ante record there. Refuses as `deviceDB.stowLease` does, and once this lease is evicted. */
   async stow(deviceDB: DeviceDB): Promise<void> {
     Checks.stowArgs.parse({ deviceDB })
     this.demandEnabled()

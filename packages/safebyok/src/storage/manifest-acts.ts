@@ -118,7 +118,7 @@ function checkedBankObservedOf(ask: AnyAsk, manifest: BankObserved): CheckedBank
 // Unspecified for a damaged row: notes/wontfix.md.
 /** A banktok a datastore read, or the void lifetok where it is no lifetok. */
 export function banktokOrVoidOf(banktok: unknown): Lifetok {
-  const banktokReport = PerKindChecks.storedLifetok.shape.lifetok.safeParse(banktok)
+  const banktokReport = PerKindChecks.banktok.safeParse(banktok)
   return banktokReport.success ? banktokReport.data : SX.VoidLifeTok
 }
 
@@ -223,9 +223,9 @@ function rootActOf(put: WriteAsk, tags: RootTags): EX.PutAct | EX.DelAct | EX.Re
  */
 function refusaltagOf(ask: WriteAsk, tags: WriteTags): Refusaltag | null {
   const policyTag = policyFailureOf(ask, tags)
-  if (tags.born_at_cmp === 'changed') { return 'BornAtNotStored' }
+  if (tags.born_at_cmp === 'changed') { return 'BornAtMoved' }
   if (policyTag !== null)             { return policyTag }
-  return (tags.lifetok_cmp === 'changed') ? 'LifetokNotStored' : null
+  return (tags.lifetok_cmp === 'changed') ? 'LifetokMoved' : null
 }
 
 /** The refusal tag of the first storage policy `ask` names that refuses it, or null where each is met. */
@@ -290,8 +290,8 @@ export function scribeBirthAct(ask: BirthBankAsk, manifest: CheckedBirthManifest
     Object.assign(manifest, { ok: true, act: 'passed' })
     return
   }
-  const refusedroot = (['bank', 'gate', 'root'] as const).find((rootckey) => isRefusedAct(acts[rootckey]))
-  if (refusedroot === undefined) { Object.assign(manifest, { ok: true, act: 'born' }) } else { Object.assign(manifest, { ok: false, act: acts[refusedroot], refusedroot }) }
+  const refusedrootckey = (['bank', 'gate', 'root'] as const).find((rootckey) => isRefusedAct(acts[rootckey]))
+  if (refusedrootckey === undefined) { Object.assign(manifest, { ok: true, act: 'born' }) } else { Object.assign(manifest, { ok: false, act: acts[refusedrootckey], refusedrootckey }) }
 }
 // --
 
@@ -319,7 +319,7 @@ export function writeAnswerOf(ask: WriteAsk, manifest: ScribedWriteManifest): Wr
 }
 
 /** The answer to a listing, stripped from its scribed manifest: the children of the parent's live life as a {@link Kids} value, the parent as its `parentage`,
- * and each child of that life as its `deltas`, in labelpath order. Refused, its `dbhas` is the parent stored, or where none is, {@link voidParentOf}.
+ * and each child of that life as its `deltas`, in labelpath order. Refused, its `dbhas` is the actual parent, or where none is, {@link voidParentOf}.
  */
 export function listAnswerOf(ask: ListAsk, manifest: ScribedListManifest): ListThingsAnswer {
   const { banktok, tracked, read_tc, damaged_rows } = manifest
@@ -346,7 +346,7 @@ function listedOf(thing: ThingRecord): ThingRecord | BoxSparse {
 }
 
 // Object.fromEntries makes each label an own key, `__proto__` among them.
-/** The {@link Kids} value of `deltas`, the children of the live `parent` stored at the listing's scope, read at `read_tc`. */
+/** The {@link Kids} value of `deltas`, the children of the live `parent` at the listing's scope, read at `read_tc`. */
 function kidsOf(ask: ListAsk, parent: ThingRecord, deltas: readonly (ThingRecord | BoxSparse)[], read_tc: Kids['read_tc']): Kids {
   const entryOf = ({ label, lifeseq }: ThingRecord | BoxSparse): [string, KidEntry] => [label, { lifeseq }]
   return {
@@ -359,13 +359,13 @@ function kidsOf(ask: ListAsk, parent: ThingRecord, deltas: readonly (ThingRecord
   }
 }
 
-/** The answer to a birth, stripped from its scribed manifest: the three roots stored. Refused, its `dbhas` is the root that refused it, or the shell there for none. */
+/** The answer to a birth, stripped from its scribed manifest: the three actual roots. Refused, its `dbhas` is the root that refused it, or the shell there for none. */
 export function birthAnswerOf(ask: BirthBankAsk, manifest: ScribedBirthManifest): BirthBankAnswer {
   const { banktok, tracked, read_tc } = manifest
   const beside = { ask: loggableAskOf(ask), banktok, tracked, read_tc }
   if (manifest.ok) { return { ok: true, ...beside, act: manifest.act, val: manifest.actual } }
   const err = Throwers.actRefused('vault', manifest.act, { oplabel: 'birthBank', ask: beside.ask })
-  return { ok: false, ...beside, act: manifest.act, dbhas: worldRootsOf(ask, manifest.actual)[manifest.refusedroot], err }
+  return { ok: false, ...beside, act: manifest.act, dbhas: worldRootsOf(ask, manifest.actual)[manifest.refusedrootckey], err }
 }
 
 /** The answer to a get of the world, stripped from its checked manifest. */

@@ -14,13 +14,13 @@ import type { VaultEvent } from '../shapes/shapes-vault-event'
 export interface VaultDB {
   /** The Thing at `ask`'s scope. */
   tryGetThing(ask: GetAsk): Promise<GetThingAnswer>
-  /** Write `ask.record` over the Thing stored, if it matches `ask.cited`.
-   * - The write is stored when its preconditions hold: the exact revision cited and, for a put that replaces a live Thing, the
-   *   born_at left unchanged and the storage policies it names. Nothing else of the Thing stored is checked.
+  /** Write `ask.record` over the ante Thing, if it matches `ask.cited`.
+   * - The record is written when its preconditions hold: the exact revision cited and, for a put that replaces a live Thing, the
+   *   born_at left unchanged and the storage policies it names. Nothing else of the ante Thing is checked.
    * - Where several refusals apply at once, the answer is one of them, but which is unspecified, and may differ between concrete adapters
-   *   and between versions. A Thing stored too damaged to check the preconditions against may refuse `damaged_row`,
+   *   and between versions. An ante Thing too damaged to check the preconditions against may refuse `damaged_row`,
    *   `storage_issue`, or the failed precondition's own refusal.
-   * - The record carries every field, so a concrete adapter may write it by replacing the Thing stored whole.
+   * - The record carries every field, so a concrete adapter may write it by replacing the ante Thing whole.
    */
   tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer>
   /** The children of the Thing at `ask`'s scope, read in one step. */

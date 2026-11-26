@@ -91,11 +91,11 @@ export class MemoryDatastore {
   /** Write `ask.record` where {@link isWritable} allows, and observe the result, in one step. */
   writeThing(ask: WriteAsk): WriteManifest {
     const ante    = this.#rowAt(ask)
-    const written = isWritable(ask, ante)
-    if (written) { this.#thingsOf(ask).set(ask.labelpath, structuredClone(ask.record)) }
+    const isWritten = isWritable(ask, ante)
+    if (isWritten) { this.#thingsOf(ask).set(ask.labelpath, structuredClone(ask.record)) }
     const actual   = this.#rowAt(ask)
-    const manifest = { tags: ManifestTags.writeTagsOf(ask, ante, written), actual, ancestor: this.#ancestorOf(ask, actual), ...this.#bankObservedOf(ask) }
-    if (written) { this.#notify(ask, actual, manifest.banktok) }
+    const manifest = { tags: ManifestTags.writeTagsOf(ask, ante, isWritten), actual, ancestor: this.#ancestorOf(ask, actual), ...this.#bankObservedOf(ask) }
+    if (isWritten) { this.#notify(ask, actual, manifest.banktok) }
     return manifest
   }
 
@@ -113,11 +113,11 @@ export class MemoryDatastore {
   /** Write a new bank's three roots, each put's record, where {@link isBirthWritable} allows, and observe the result, in one step. */
   birthBank(ask: BirthBankAsk, puts: BirthPuts): BirthManifest {
     const ante    = this.#rootsOf(ask)
-    const written = isBirthWritable(ante)
-    if (written) { for (const { labelpath, record } of puts) { this.#thingsOf(ask).set(labelpath, structuredClone(record)) } }
+    const isWritten = isBirthWritable(ante)
+    if (isWritten) { for (const { labelpath, record } of puts) { this.#thingsOf(ask).set(labelpath, structuredClone(record)) } }
     const actual   = this.#rootsOf(ask)
-    const manifest = { tags: ManifestTags.birthTagsOf(puts, ante, written), actual, ...this.#bankObservedOf(ask) }
-    if (written) { for (const row of [actual.bank, actual.gate, actual.root]) { this.#notify(ask, row, manifest.banktok) } }
+    const manifest = { tags: ManifestTags.birthTagsOf(puts, ante, isWritten), actual, ...this.#bankObservedOf(ask) }
+    if (isWritten) { for (const row of [actual.bank, actual.gate, actual.root]) { this.#notify(ask, row, manifest.banktok) } }
     return manifest
   }
 

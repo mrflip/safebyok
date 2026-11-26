@@ -159,7 +159,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       const vaultDB = await withGate(stored)
       const answer = await vaultDB.tryWriteThing(replaceAskOf(stored, nextGateOf(stored, { born_at: T0 + 1 })))
       const err = await expectBad(Promise.resolve(answer), 'bad_record')
-      expect(err.message).to.include(Phrases.BornAtNotStored)
+      expect(err.message).to.include(Phrases.BornAtMoved)
       expect(answer).to.deep.include({ act: 'policied', dbhas: stored })
     })
 
@@ -294,7 +294,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
         const vaultDB = await bornBank()
         const answer = await vaultDB.tryWriteThing(ask)
         const err = await expectBad(Promise.resolve(answer), 'bad_record')
-        expect(err.message).to.include(Phrases.LifetokNotStored)
+        expect(err.message).to.include(Phrases.LifetokMoved)
         expect(answer).to.deep.include({ act: 'policied', dbhas: stored })
         expect(await gotAt(vaultDB, 'bank')).to.deep.equal(stored)
       })

@@ -32,7 +32,7 @@ export function presenceOf(row: unknown): Presence {
 export function getTagsOf(actual: unknown): GetTags { return { presence: presenceOf(actual) } }
 
 /** The tags of a write `ask` judged against the raw `ante` row, null for none, beside whether the datastore wrote. */
-export function writeTagsOf(ask: WriteAsk, ante: unknown, written: boolean): WriteTags {
+export function writeTagsOf(ask: WriteAsk, ante: unknown, isWritten: boolean): WriteTags {
   return {
     presence:    presenceOf(ante),
     revtok_cmp:  revtokCmpOf(ask, ante),
@@ -41,7 +41,7 @@ export function writeTagsOf(ask: WriteAsk, ante: unknown, written: boolean): Wri
     born_at_cmp: bornAtCmpOf(ask, ante),
     lifetok_cmp: lifetokCmpOf(ask, ante),
     policies:    policiesOf(ask, ante),
-    written,
+    written:     isWritten,
   }
 }
 
@@ -62,8 +62,8 @@ export function writtenTagsOf(ask: WriteAsk): WriteTags {
 }
 
 /** The tags of a birth by its three `puts`, each root's judged against its raw `ante` root, null for none, beside whether the datastore wrote. */
-export function birthTagsOf([bankPut, gatePut, rootPut]: BirthPuts, ante: RootRows, written: boolean): BirthTags {
-  return { bank: rootTagsOf(bankPut, ante.bank), gate: rootTagsOf(gatePut, ante.gate), root: rootTagsOf(rootPut, ante.root), written }
+export function birthTagsOf([bankPut, gatePut, rootPut]: BirthPuts, ante: RootRows, isWritten: boolean): BirthTags {
+  return { bank: rootTagsOf(bankPut, ante.bank), gate: rootTagsOf(gatePut, ante.gate), root: rootTagsOf(rootPut, ante.root), written: isWritten }
 }
 
 // A birth's put cites the shell, so of the write tags its put table reads, only these two vary.

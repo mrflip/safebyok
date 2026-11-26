@@ -132,14 +132,14 @@ export const VaultFunctionsSql = `-- safebyok-postgres: the functions PostgresVa
 -- only the statement that writes a row sees the row it writes over: the checks sit in its WHERE, so when it waits on
 -- another writer of the row, Postgres checks them again against the row that writer left.
 --
--- Each write function stores its record in one statement, which waits only on a writer of the same row. It does not
--- throw when it stores nothing. It returns one row: the write's tags (made of the ante row, the row the write was judged
--- against, as ManifestTags.writeTagsOf makes them), the actual row (the row written, or where it stored nothing, the row
+-- Each write function writes its record in one statement, which waits only on a writer of the same row. It does not
+-- throw when it writes nothing. It returns one row: the write's tags (made of the ante row, the row the write was judged
+-- against, as ManifestTags.writeTagsOf makes them), the actual row (the row written, or where it wrote nothing, the row
 -- as it now stands, which the tags are then made of), the bank's world (the bank and main gate rows, each null for none)
--- and its root box row (null for none). When it stored the record, the world and root box are read just after, in the
--- same transaction; when it stored nothing, in the statement that reads the row back.
+-- and its root box row (null for none). When it wrote the record, the world and root box are read just after, in the
+-- same transaction; when it wrote nothing, in the statement that reads the row back.
 --
--- A function that stores a record notifies the user's channel in the same transaction (see ${VaultFunctionNames.tell_thing}).
+-- A function that writes a record notifies the user's channel in the same transaction (see ${VaultFunctionNames.tell_thing}).
 --
 -- The functions run with the caller's privileges, and only their owner, the role that ran this file, may call them.
 
@@ -187,7 +187,7 @@ LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   )
 $$;
 
--- Notify the user's channel, safebyok_things_<userid>, of a Thing just stored, with its bank's row, null for none.
+-- Notify the user's channel, safebyok_things_<userid>, of a Thing just written, with its bank's row, null for none.
 -- The notice is a JSON object with the Thing's scope under at, when Postgres read it under read_tc (a UUID version 7),
 -- the Thing under thing, and the bank row under bank.
 -- Postgres refuses a notice of 8000 bytes or more. A notice that is too large drops the bank row first, then the Thing.
@@ -399,16 +399,16 @@ LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   )
 $$;
 
--- Each kind's write function: store proposed_record over the row cited_record cites, or over the shell where none is
+-- Each kind's write function: write proposed_record over the row cited_record cites, or over the shell where none is
 -- stored, where the ask's flags if_absent and if_present allow it and every check holds of the ante row.
 ${writeFunctionOf({ kind: 'bank', table: 'safebyok_bank_things', body: ['lifetok'], lifetoked: true, policied: false })}
 ${writeFunctionOf({ kind: 'gate', table: 'safebyok_gate_things', body: ['wayins', 'auth', 'sigs', 'meta'], lifetoked: false, policied: true })}
 ${writeFunctionOf({ kind: 'box', table: 'safebyok_box_things', body: ['sidecar', 'whisper_sealed'], lifetoked: false, policied: false })}
 
--- Store a bank's three roots, its bank, main gate and root box, where none of the three is stored. One statement writes
+-- Write a bank's three roots, its bank, main gate and root box, where none of the three is stored. One statement writes
 -- all three or none. Two births racing for one bank both pass the check that none is stored; the one that commits second
--- stores no bank, so it stores nothing, and answers what the first stored. The gate and root box are stored only beside a
--- bank stored by the same statement: where another writer stored either first, the statement fails whole.
+-- writes no bank, so it writes nothing, and answers what the first wrote. The gate and root box are written only beside a
+-- bank written by the same statement: where another writer wrote either first, the statement fails whole.
 -- Returns the birth's tags, and the three rows as they now stand, each null for none. Written, the three ante roots were
 -- none; unwritten, the three are read back, and the tags made of those same rows.
 CREATE OR REPLACE FUNCTION ${VaultFunctionNames.birth_roots}(bank_record jsonb, gate_record jsonb, root_record jsonb)
@@ -438,10 +438,10 @@ BEGIN
     ON CONFLICT DO NOTHING  -- variation approved for birth calls: a birth is an ensure, so a conflict is the present case, which the read below answers
     RETURNING ${VaultFunctionNames.thing_record}(to_jsonb(written)) AS written
   ), gated AS (
-    INSERT INTO safebyok_gate_things AS written SELECT (new_gate).* FROM banked  -- only once the bank is stored; a conflict here fails the whole statement
+    INSERT INTO safebyok_gate_things AS written SELECT (new_gate).* FROM banked  -- only once the bank is written; a conflict here fails the whole statement
     RETURNING ${VaultFunctionNames.thing_record}(to_jsonb(written)) AS written
   ), rooted AS (
-    INSERT INTO safebyok_box_things  AS written SELECT (new_root).* FROM banked  -- only once the bank is stored; a conflict here fails the whole statement
+    INSERT INTO safebyok_box_things  AS written SELECT (new_root).* FROM banked  -- only once the bank is written; a conflict here fails the whole statement
     RETURNING ${VaultFunctionNames.thing_record}(to_jsonb(written)) AS written
   )
   SELECT (SELECT written FROM banked), (SELECT written FROM gated), (SELECT written FROM rooted)

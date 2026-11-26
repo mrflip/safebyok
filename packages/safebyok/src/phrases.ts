@@ -172,10 +172,10 @@ export const LifeseqNotNext = "A write's record has the cited lifeseq when am st
 export const BornAtNotNow = "A write over a tombstone or none is a birth: its born_at is its written_at."
 
 /** A write over a live Thing that changes its born_at. */
-export const BornAtNotStored = "A write over a live Thing leaves the stored Thing's born_at unchanged."
+export const BornAtMoved = "A write over a live Thing leaves its born_at unchanged."
 
 /** A write of the bank over a live bank that changes its lifetok. */
-export const LifetokNotStored = "A write of the bank over a live bank keeps the stored bank's lifetok."
+export const LifetokMoved = "A write of the bank over a live bank leaves its lifetok unchanged."
 
 /** A deleted main gate. */
 export const MainGateDeleted = "The main gate is never deleted: its record is always live (am: 'a')."
@@ -296,8 +296,8 @@ export const PolicyPhrases = {
 
 /** The message a `policied` write is refused with, by the name of its phrase: a changed born_at's, a changed lifetok's, or a storage policy's in {@link PolicyPhrases}. */
 export const PhraseForRefusaltag = {
-  BornAtNotStored,
-  LifetokNotStored,
+  BornAtMoved,
+  LifetokMoved,
   ProvedWayinMoved:  BigPhrases.gateIssue(PolicyPhrases.ProvedWayinMoved),
   OtherWayinMoved:   BigPhrases.gateIssue(PolicyPhrases.OtherWayinMoved),
   PasskeyStored:     BigPhrases.gateIssue(PolicyPhrases.PasskeyStored),

@@ -64,10 +64,10 @@ export const writeThing = mutation({
   handler: async (ctx, { ask: sent }): Promise<Observed<WriteManifest>> => {
     const ask     = askFor(() => DB.checkedWriteAsk(sent))
     const ante    = await rowAt(ctx.db, ask)
-    const written = DB.isWritable(ask, ante)
-    if (written) { await writeAt(ctx.db, ask) }
+    const isWritten = DB.isWritable(ask, ante)
+    if (isWritten) { await writeAt(ctx.db, ask) }
     const actual = await rowAt(ctx.db, ask)
-    return { tags: DB.ManifestTags.writeTagsOf(ask, ante, written), actual, ancestor: await ancestorOf(ctx.db, ask, actual), ...(await bankObservedOf(ctx.db, ask)) }
+    return { tags: DB.ManifestTags.writeTagsOf(ask, ante, isWritten), actual, ancestor: await ancestorOf(ctx.db, ask, actual), ...(await bankObservedOf(ctx.db, ask)) }
   },
 })
 
@@ -79,9 +79,9 @@ export const birthBank = mutation({
     const ask     = askFor(() => DB.checkedBirthBankAsk(sent))
     const puts    = DB.birthPutsOf(ask)
     const ante    = await rootsOf(ctx.db, ask)
-    const written = DB.isBirthWritable(ante)
-    if (written) { for (const put of puts) { await writeAt(ctx.db, put) } }
-    return { tags: DB.ManifestTags.birthTagsOf(puts, ante, written), actual: await rootsOf(ctx.db, ask), ...(await bankObservedOf(ctx.db, ask)) }
+    const isWritten = DB.isBirthWritable(ante)
+    if (isWritten) { for (const put of puts) { await writeAt(ctx.db, put) } }
+    return { tags: DB.ManifestTags.birthTagsOf(puts, ante, isWritten), actual: await rootsOf(ctx.db, ask), ...(await bankObservedOf(ctx.db, ask)) }
   },
 })
 // --

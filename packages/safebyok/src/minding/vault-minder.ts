@@ -202,7 +202,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return (refusal === null) ? answer : ownRefusedAnswerOf(answer, refusal)
   }
 
-  /** Write `args.record` over `args.cited` once, resolving the record the vaultDB reports stored. */
+  /** Write `args.record` over `args.cited` once, resolving the actual record the vaultDB reports. */
   async putOnce<RecordT extends ThingRecord>(args: PutOnceArgs<RecordT>): Promise<RecordT> {
     const answer = await this.tryPutOnce(args)
     if (! answer.ok) { throw answer.err }
@@ -218,7 +218,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return (refusal === null) ? answer : ownRefusedAnswerOf(answer, refusal)
   }
 
-  /** Write the tombstone `args.record` over `args.cited` once, resolving the tombstone the vaultDB reports stored. */
+  /** Write the tombstone `args.record` over `args.cited` once, resolving the actual tombstone the vaultDB reports. */
   async delOnce<RecordT extends ThingRecord>(args: DelOnceArgs<RecordT>): Promise<RecordT> {
     const answer = await this.tryDelOnce(args)
     if (! answer.ok) { throw answer.err }

@@ -22,7 +22,7 @@ function leaseShelfOf(dbName: string | undefined): UseStore {
 /** The name of the IndexedDB database an IdbDeviceDB of `dbName` opens. */
 export function leaseDatabasenameOf(dbName?: string): string { return `${dbprefixOf(dbName)}:lease-v${LeaseDBVersion}` }
 
-/** The name of the BroadcastChannel that tells every tab of the lease records stored in the database of `dbName`. */
+/** The name of the BroadcastChannel that tells every tab of the lease records stowed in the database of `dbName`. */
 export function leaseBellnameOf(dbName?: string): string { return `${dbprefixOf(dbName)}:lease` }
 
 /** Where the lease record at `scope` is filed: one for each gate. */

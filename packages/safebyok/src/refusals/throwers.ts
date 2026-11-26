@@ -97,8 +97,8 @@ export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new 
 
 /** The kind of refusal of a `policied` write, by the {@link Refusaltag} of its phrase. */
 export const RefusalkindForRefusaltag = {
-  BornAtNotStored:   'bad_record',
-  LifetokNotStored:  'bad_record',
+  BornAtMoved:   'bad_record',
+  LifetokMoved:  'bad_record',
   ProvedWayinMoved:  'gate_issue',
   OtherWayinMoved:   'gate_issue',
   PasskeyStored:     'gate_issue',

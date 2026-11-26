@@ -162,7 +162,7 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
     const vaultMinder = device.world.demandVaultMinder()
     const answer = await vaultMinder.tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gateRecord, root, track: vaultMinder.knownRoots, banktok: bankRecord.lifetok })
     if (! answer.ok) { throw answer.err }
-    // The user must hear that their passphrase was not set: the bank stored is another's.
+    // The user must hear that their passphrase was not set: the actual bank is another's.
     if (answer.val.bank.revtok !== bankRecord.revtok) { throw Throwers.gateMadeElsewhere() }
     const bank = device.world.demandRootsLive()
     friend.attachLease(lease)

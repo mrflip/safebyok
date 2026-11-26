@@ -197,9 +197,9 @@ describe("ManifestActs.writeAnswerOf(ask, manifest), a policied write", () => {
   const PoliciedAsk = { ...askOf(PutAsk, 'live', 'repl'), options: { policies: ['add_passkey'] } } as WriteAsk
   const Failed      = { add_passkey: { ok: false, refusaltag: 'PasskeyStored' } } as const
   const RefusalCases = [
-    ["bad_record", Phrases.BornAtNotStored,                                        { born_at_cmp: "changed", lifetok_cmp: "changed", policies: Failed }, 'refuses bad_record for a changed born_at, before a failed storage policy or a changed lifetok'],
+    ["bad_record", Phrases.BornAtMoved,                                        { born_at_cmp: "changed", lifetok_cmp: "changed", policies: Failed }, 'refuses bad_record for a changed born_at, before a failed storage policy or a changed lifetok'],
     ["gate_issue", BigPhrases.gateIssue(Phrases.PolicyPhrases.PasskeyStored),       { lifetok_cmp: "changed", policies: Failed },                         'refuses gate_issue with a failed storage policy\'s message, before a changed lifetok'],
-    ["bad_record", Phrases.LifetokNotStored,                                       { lifetok_cmp: "changed", policies: { add_passkey: { ok: true } } },  'refuses bad_record for a changed lifetok'],
+    ["bad_record", Phrases.LifetokMoved,                                       { lifetok_cmp: "changed", policies: { add_passkey: { ok: true } } },  'refuses bad_record for a changed lifetok'],
   ] as const
   for (const [refusalkind, message, overrides, blurb] of RefusalCases) {
     it(blurb, () => {
