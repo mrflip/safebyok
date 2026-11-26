@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Threads 8 and 9 filed (#942, #943); thread 6 in review (#944); then 7 and 10
+* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Threads 8 and 9 filed (#942, #943); thread 6 filed (#944); thread 7 in review (#945); thread 10 building
 
 ## Read first
 
@@ -157,6 +157,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 
 *Gloss.* The name is `incompatible_row` (the Coach, 2026-11-26, Open Matters: "change all damaged_row checks to incompatible_row. I agree this is incompatible_row"). A new refusal kind in safebyok-big's errors (broadening big, as CLAUDE.md allows), used by the new core and its adapters in place of `damaged_row`, with `damaged_rows`, `DamagedThing` and VOCABULARY.md's *damaged* row renamed to match; `damaged_whisper` stays, since a whisper that will not unseal is damage. Big's own use of `damaged_row` stays. A public refusal kind changes: the changeset says so.
 *Levels:* worker `sonnet`; review `low`.
+*Status:* ready at 1450bd91d, PR #945; in review (sonnet, low). Big gains the kind only; one safebyok-react test runs on the new core and was renamed too; `am: 'd'` keeps its letter; VOCABULARY's row drops "never indicates format drift" (orchestrator confirmed, Cleanup).
 *Depends on:* thread 6.
 *Look-ahead:* none.
 *Size:* small-medium, mechanical.
@@ -164,7 +165,8 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 ### 10. sprint_tidy — the sprint's doc blocks and leftovers
 
 *Orchestrator:* no Coach text of its own; gathered from the reviews. A documentarian pass over the files the sprint changed (thread 2's review: "What a ..." first lines, steps listed in doc blocks, the listing copy check's doc block, two-behaviour test titles, a leftover `const manifest = raw`; `isWritable`/`isBirthWritable`'s doc blocks for the datastores that share them); the stale eslint config comments naming the deleted `storage/classifier.ts` (safebyok-indexeddb's and the dojo demo's); the Postgres header's privilege sentence and the README's "beside the old ones"; the battery's damaged-bank case made real for Postgres and Convex (thread 5's review: it is hollow there). Also from thread 6's report and review: widen VOCABULARY's **ante** and **actual** rows to name the deviceDB's stow (`stowLease`, `Lease.stow`), as the Coach's "same rule for every read or write" reads; doc blocks still saying "no Thing stored" where a row a step carries is meant; "store" as noun and verb ("the store's limits", "the deviceDB stores"; the exported `StoreLimits` named, not renamed, without a ruling), and `notes/` where it says "stored" for actual or ante (`vault-adapter-contract.md`, `wontfix.md`, `storage-policies.md`). No behaviour change but the battery case.
-*Levels:* worker `thread-worker`; review `low`.
+*Levels:* worker `thread-worker-400k` (*Orchestrator:* four kinds of work across the line's files); review `low`.
+*Status:* building, cut from thread 7's tip (1450bd91d).
 *Depends on:* thread 7.
 *Look-ahead:* none.
 *Size:* small-medium.
