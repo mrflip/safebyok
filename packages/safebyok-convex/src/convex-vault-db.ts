@@ -201,7 +201,7 @@ const ConvexBankLimits = DB.storeLimitsOf({ count: 32_000, size: 16_777_216 })
 // == [Helpers]: runOrRefuse, refusalOf, refusalOfCrossed, storedOutOfStep, demandStorableKeys, demandUnwritten, checkedWritten, latestOf, noop
 
 // Accepts a thunk because ConvexReactClient.query can throw synchronously, before it returns a promise.
-/** Run `thunk`, converting anything it throws into a safebyok refusal. */
+/** Run `thunk`, rethrowing any failure as a VaultError. */
 async function runOrRefuse<ValT>(oplabel: string, thunk: () => Promise<ValT>): Promise<ValT> {
   try {
     return await thunk()
