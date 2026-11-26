@@ -121,7 +121,8 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Depends on:* the line through thread 4 (`20261126-postgres_manifest`).
 *Look-ahead:* thread 9 makes the datastores' policy verdicts phrase tags fed to this builder: shape the builder to take a policy's phrase tag as it takes an act's.
 *Size:* medium.
-*Status:* ready 2026-11-26 at be7e9e6b5, PR #942; in review (opus, medium). Equivalence run in scratch: 984,960 write combinations, 0 mismatches. `Throwers.taggedRefusal` replaces `gateIssue`, `bornAtNotStored`, `lifetokNotStored`, `policiedRefusalOf`; `ListActs` added; `demandTagsOfAsk` removed (subsumed by `writtenTagsOf`).
+*Review:* fixed (opus, medium), 5 fixes (scribeWriteAct's policied branch, doc blocks one fact a sentence, a test's impossible birth refusal, two test nits). `demandTagsOfAsk`'s removal holds. Left: the throwers header's "a new refusal gets a new thrower" → the later 18-thrower ruling; "tag" meaning two things → Open Matters; `FlagActs` beside its tables (stands).
+*Status:* reviewed at a1b017830, filing; PR #942. Equivalence run in scratch: 984,960 write combinations, 0 mismatches. `Throwers.taggedRefusal` replaces `gateIssue`, `bornAtNotStored`, `lifetokNotStored`, `policiedRefusalOf`; `ListActs` added; `demandTagsOfAsk` removed (subsumed by `writtenTagsOf`).
 
 ### 9. policy_tags — policy verdicts come back as phrase tags
 
@@ -132,7 +133,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Depends on:* thread 8.
 *Look-ahead:* none.
 *Size:* medium.
-*Status:* building, cut from thread 8's tip (be7e9e6b5).
+*Status:* ready at 8fc85c578, PR #943; in review (opus, medium). The verdict is `{ ok: true } | { ok: false, refusaltag }`; MemoryDatastore, IdbDatastore and Convex needed no edit (they build through `ManifestTags`).
 
 ### 6. actual_words — "stored" sorted into actual, ante and stored
 
@@ -143,6 +144,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Gloss.* *Orchestrator:* also the stale eslint config comments naming the deleted `storage/classifier.ts` (safebyok-indexeddb's and the dojo demo's; thread 3); a documentarian pass over the sprint's files (thread 2's review: "What a ..." first lines, steps listed in doc blocks, the listing copy check's doc block, `refusedroot` → `refusedrootckey`, two-behaviour test titles, a leftover `const manifest = raw`); the local `written` → `isWritten` in every datastore (STYLE's boolean rule; thread 3's review); `isWritable`/`isBirthWritable`'s doc blocks for the datastores that share them. A manual sweep of the remaining uses of "stored" (about 500 bare uses at the start of the sprint) in `packages/safebyok/src` and the three adapters, sorting each into actual, ante, proposed or stored (at rest) by the design's *Words* table; renames of identifiers that carry the word in the wrong sense; and VOCABULARY.md rows for **actual**, **ante**, **manifest** and **proposed**. No behaviour changes.
 *Levels:* style pass `opus`; review `medium`.
 *Depends on:* threads 3, 4 and 5 (they rewrite the same files); *Orchestrator:* now thread 9, the top of the line.
+*Orchestrator:* the documentarian pass, the eslint comments and the other tidying items move to thread 10, after thread 7, so thread 6 is the "stored" sweep, the VOCABULARY rows, and the renames `written` → `isWritten`, `refusedroot` → `refusedrootckey` (and `PolicyTag` → `PolicyRefusaltag` if the Coach takes that Rec).
 *Look-ahead:* thread 7 renames "damaged" in the same prose.
 *Size:* medium, mechanical but judgment per use.
 
@@ -156,9 +158,17 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Look-ahead:* none.
 *Size:* small-medium, mechanical.
 
+### 10. sprint_tidy — the sprint's doc blocks and leftovers
+
+*Orchestrator:* no Coach text of its own; gathered from the reviews. A documentarian pass over the files the sprint changed (thread 2's review: "What a ..." first lines, steps listed in doc blocks, the listing copy check's doc block, two-behaviour test titles, a leftover `const manifest = raw`; `isWritable`/`isBirthWritable`'s doc blocks for the datastores that share them); the stale eslint config comments naming the deleted `storage/classifier.ts` (safebyok-indexeddb's and the dojo demo's); the Postgres header's privilege sentence and the README's "beside the old ones"; the battery's damaged-bank case made real for Postgres and Convex (thread 5's review: it is hollow there). No behaviour change but the battery case.
+*Levels:* worker `thread-worker`; review `low`.
+*Depends on:* thread 7.
+*Look-ahead:* none.
+*Size:* small-medium.
+
 ## Line
 
-*Orchestrator:* now `1 → 2 → 3 → 5 → 4 → 8 → 9 → 6 → 7`, the sprint PR on top. Was `1 → 2 → 3 → 4 → 5 → 6 → 7`. Threads 3, 4 and 5 run side by side from thread 2's tip and are restacked into the line before thread 6 is cut. *Orchestrator:* thread 5 rebased onto thread 3 (`1 → 2 → 3 → 5`), so only thread 4 needs restacking: `1 → 2 → 3 → 4 → 5` or `… → 3 → 5 → 4`, whichever conflicts less (both touch `safebyok/storage`'s exports). **A Closer Look** (`.claude/skills/sprint/closer-look.md`) runs once threads 3, 4 and 5 have all filed, before thread 6 is cut (the Coach, 2026-11-26).
+*Orchestrator:* now `1 → 2 → 3 → 5 → 4 → 8 → 9 → 6 → 7 → 10`, the sprint PR on top. Was `1 → 2 → 3 → 4 → 5 → 6 → 7`. Threads 3, 4 and 5 run side by side from thread 2's tip and are restacked into the line before thread 6 is cut. *Orchestrator:* thread 5 rebased onto thread 3 (`1 → 2 → 3 → 5`), so only thread 4 needs restacking: `1 → 2 → 3 → 4 → 5` or `… → 3 → 5 → 4`, whichever conflicts less (both touch `safebyok/storage`'s exports). **A Closer Look** (`.claude/skills/sprint/closer-look.md`) runs once threads 3, 4 and 5 have all filed, before thread 6 is cut (the Coach, 2026-11-26).
 
 ## For the Coach
 
