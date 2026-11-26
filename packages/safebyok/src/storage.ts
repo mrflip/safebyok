@@ -54,9 +54,9 @@ export const { delActVals, gotActVals, ifPresentVals, putActVals, putIfAbsentVal
 export { VaultError, isVaultError, type Capacity, type RefusalFamily, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'
 export { fetchFailed, identityRevoked, sanitizeForeignError, storageFailed, storageRefusalOf, storageUnavailable, unexpectedError } from 'safebyok-big/storage'
 export { storageIssue } from 'safebyok-big/refusals/throwers'
-export { storageCallRefused, storeQuotaTooSmall, vaultErrorOfCrossed } from './refusals/throwers'
+export { refusalOfThrown, storageCallRefused, storeQuotaTooSmall } from './refusals/throwers'
 // What crosses a wire, for an adapter whose server runs a whole vaultDB: a refusal, and the parts of an answer the classifier's `crossed*` functions read.
-export { type CrossedErr, CrossedChecks, crossedErrOf } from './shapes/shapes-crossed'
+export { type CrossedAct, type CrossedAnswered, type CrossedErr, CrossedChecks, crossedErrOf, refusedOverWire } from './shapes/shapes-crossed'
 // An IndexedDB store's own: each call's one transaction, the row at a key within it, and the versioned database.
 export { dbprefixOf, inOneStep, rowAt, versionedShelfOf, type VersionedShelfSpec } from 'safebyok-big/storage'
 export { Checker, Checkers, objCheck, type AssertEqual, type CheckerInput, type ConsistencyRefusal, type ObjCheckOpts, type Refusing, type Story } from 'safebyok-big/storage'

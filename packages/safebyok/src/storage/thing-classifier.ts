@@ -440,7 +440,7 @@ export function unwrittenBirthOf(puts: BirthPuts, fetched: BankRootsFetched): Bi
 }
 // --
 
-// == [Things crossed]: CrossedThingChecks, crossedThingOf, crossedWrittenOf, crossedNamedOf, crossedTrackedOf, crossedRootsOf, crossedWorldOf, CrossedListing, CrossedListed, crossedListingOf, crossedChildOf, crossedListedOf, recordOrShellOf
+// == [Things crossed]: CrossedThingChecks, crossedThingOf, CrossedGot, crossedGotOf, crossedWrittenOf, crossedNamedOf, crossedTrackedOf, crossedRootsOf, crossedWorldOf, CrossedListing, CrossedListed, crossedListingOf, crossedChildOf, crossedListedOf, recordOrShellOf
 // What a server's vaultDB answered, carried across a wire to a client's vaultDB, for an adapter whose server runs a whole
 // vaultDB. The server classified it; the client reads each Thing again, at the ask's scope, before it reaches a report.
 // Each refuses `storage_issue`: to the client, the server is its storage, and a Thing that fails here, damaged or not, means it is out of step or broken.
@@ -455,6 +455,20 @@ const CrossedThingChecks = Object.freeze({
 /** The Thing a server's answer carried at `scope`, or the shell there, checked. */
 export function crossedThingOf(scope: ThingScope, raw: unknown): ThingRecord | VoidSentinel {
   return recordOrShellOf<ThingRecord>(CrossedThingChecks[Labelpath.modelkindOf(scope.labelpath)], scope, raw)
+}
+
+/** A get's act and Thing that crossed a wire, checked: what a concrete adapter's report of it carries beside its banktok, tracked and read_tc. */
+export type CrossedGot = Readonly<
+  | { ok: true,  act: EX.GotAct,     record: ThingRecord | VoidSentinel }
+  | { ok: false, act: 'void' | 'gone', record: ThingRecord | VoidSentinel }
+>
+
+/** The act and Thing a server's answer to a get carried, checked: the Thing at the ask's scope, or the shell there, and `act` the one the get table gives it. */
+export function crossedGotOf(ask: GetAsk, act: string, raw: unknown): CrossedGot {
+  const record = crossedThingOf(ask, raw)
+  const tabled = getActOf(ask, BaseThing.isVoidSentinel(record) ? null : record)
+  if (tabled !== act) { throw Throwers.storageIssue() }
+  return isRefusedAct(tabled) ? { ok: false, act: tabled, record } : { ok: true, act: tabled, record }
 }
 
 /** The Thing a server's answer reports writing at `scope`, checked. */
