@@ -119,7 +119,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 
 ## Line
 
-`1 → 2 → 3 → 4 → 5 → 6 → 7`, the sprint PR on top. Threads 3, 4 and 5 run side by side from thread 2's tip and are restacked into the line before thread 6 is cut.
+`1 → 2 → 3 → 4 → 5 → 6 → 7`, the sprint PR on top. Threads 3, 4 and 5 run side by side from thread 2's tip and are restacked into the line before thread 6 is cut. **A Closer Look** (`.claude/skills/sprint/closer-look.md`) runs once threads 3, 4 and 5 have all filed, before thread 6 is cut (the Coach, 2026-11-26).
 
 ## For the Coach
 

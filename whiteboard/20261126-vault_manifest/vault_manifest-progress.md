@@ -13,6 +13,8 @@ The orchestrator's curated summary of what the threads have taught. Newer than t
 * Tags spell their fieldname; `'same'` rather than `'kept'`.
 * The address check moves into `demandThreeWayConsistency` ("for comfort").
 * Banktok: aspirational; will later hard-scope every record. No comparison now.
+* All seven Open Matters rows ruled (took the Recs). Open Matters is read again only once new rows are added.
+* A Closer Look runs once threads 3, 4 and 5 have filed.
 
 ## Orchestrator's YOLO calls
 
