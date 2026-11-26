@@ -161,12 +161,14 @@ export function checkedWatchedOf(bankScope: ThingWatchScope, raw: unknown): Thin
 // grid of its *Revisions* section; where they match, or are stale, the act is then found by the op, the presence of the ante
 // row, and the flag that applies over it: `ifPresent` over a live row, `ifAbsent` over a tombstone or none.
 
-/** The act of a write by the flag that applies, as the put and del tables find it: the flags a write may carry there, and no others. */
+/** One cell of the put or del table: the act of a write by the flag that applies. */
 type FlagActs = Readonly<Record<EX.PutIfAbsent | EX.IfPresent, EX.PutAct | EX.DelAct | EX.RefusedAct>>
 
 // A cited shell's revtok comes only with its revseq, so a `birth` revtok meets a `birth` revseq alone: its other cells are
 // those the put table's first matching row finds.
-/** How the ante row's revision stands to the cited one, by `revtok_cmp` then `revseq_cmp`: `match` and `stale` leave the act to the flags, and each other is the act. */
+/** How the ante row's revision stands to the cited one, by `revtok_cmp` then `revseq_cmp`.
+ * A `match` or a `stale` is looked up again by the flag that applies; any other grade is the act itself.
+ */
 const RevisionGrid = {
   'birth': { birth: 'match',  eq: 'match',  stale: 'match',  ahead: 'ahead' },
   '=next': { birth: 'retcon', eq: 'retcon', stale: 'retcon', ahead: 'retcon' },
@@ -201,7 +203,7 @@ const ListActs = { void: 'void', gone: 'gone', live: 'gotlive' } as const satisf
 const PolicyTagForPhrase = invert(PolicyPhrases)
 
 // Each cell is keyed by the flags that reach it: a put's `ifAbsent` is add or fail (`AskChecks.writeAsk`), and a del's flags
-// are fixed at fail and repl. Its type is read as every flag's, so that the flag that applies can look it up.
+// are fixed at fail and repl. The lookup casts a cell to every flag's record, since a checked ask never carries another.
 /** The act the put or del table finds from a write's revisions, the ante row's presence and life, and the flag that applies. */
 function writeTableActOf(ask: WriteAsk, tags: Pick<WriteTags, 'presence' | 'revtok_cmp' | 'revseq_cmp' | 'lifepath_eq'>): EX.PutAct | EX.DelAct | EX.RefusedAct {
   // The lifepath stands where big's life tok stood: it names the Thing's life, and the lives above it.
@@ -221,7 +223,9 @@ function rootActOf(put: WriteAsk, tags: RootTags): EX.PutAct | EX.DelAct | EX.Re
   return writeTableActOf(put, { ...tags, revseq_cmp: 'birth', lifepath_eq: true })
 }
 
-/** The name of the phrase refusing a write that changes a field fixed for the Thing's life, or fails a storage policy `ask` names: a changed born_at's first, then the first failed policy's, then a changed lifetok's; null where none applies. */
+/** The name of the phrase a write is refused with where it changes a field fixed for the Thing's life or fails a storage policy `ask` names, or null.
+ * A changed born_at wins over a failed policy, and a failed policy over a changed lifetok.
+ */
 function refusaltagOf(ask: WriteAsk, tags: WriteTags): Refusaltag | null {
   const policyPhrase = policyFailureOf(ask, tags)
   if (tags.born_at_cmp === 'changed') { return 'BornAtNotStored' }
@@ -259,8 +263,8 @@ export function scribeGetAct(ask: GetAsk, manifest: CheckedGetManifest): asserts
   Object.assign(manifest, { ok: isGoodAct(act), act })
 }
 
-/** Write onto a write's manifest the act the put or del table finds from its tags, and whether it answers good;
- * or `policied`, where that act writes but a fixed field or a storage policy forbids it, with the name of the phrase it is refused with.
+/** Write onto a write's manifest the act the put or del table finds from its tags, and whether it answers good.
+ * Where that act writes but a fixed field or a storage policy forbids it, the act is `policied`, beside the name of the phrase it is refused with.
  */
 export function scribeWriteAct(ask: WriteAsk, manifest: CheckedWriteManifest): asserts manifest is ScribedWriteManifest {
   const act        = writeTableActOf(ask, manifest.tags)

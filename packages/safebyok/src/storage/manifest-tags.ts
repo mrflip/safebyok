@@ -47,7 +47,7 @@ export function writeTagsOf(ask: WriteAsk, ante: unknown, written: boolean): Wri
 
 // The write predicate pins the ante row's revtok, revseq, lifepath and liveness to the cited ones, or citing the shell finds no
 // row; holds its born_at and lifetok to the record's; and meets each storage policy. So the ask alone makes the tags.
-/** The tags of a write `ask` that the datastore wrote: those {@link writeTagsOf} makes of the ante row its write predicate let through. */
+/** The tags of a written write, made of its `ask` alone: those {@link writeTagsOf} makes of any ante row the write predicate lets through. */
 export function writtenTagsOf(ask: WriteAsk): WriteTags {
   const isLive = (ask.cited.am === 'a')
   const fixed  = {

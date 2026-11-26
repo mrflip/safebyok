@@ -108,7 +108,7 @@ export const RefusalkindForRefusaltag = {
 } as const satisfies Record<Refusaltag, Errors.Refusalkind>
 
 // Big types a refusal's meta.act as its own BadAct, which has no `policied`.
-/** The refusal of a `policied` write `ask` over its `actual` row, null for none: the kind and phrase its `refusaltag` names, with the verb, the loggable ask and the act. */
+/** The refusal of a `policied` write, of the kind and phrase its `refusaltag` names, with its `actual` row, null for none, as `dbhas`. */
 export function taggedRefusal(ask: WriteAsk, { act, actual, refusaltag }: Readonly<{ act: 'policied', actual: ThingRecord | null, refusaltag: Refusaltag }>): Errors.VaultError {
   const meta = { oplabel: 'writeThing', ask: loggableAskOf(ask), act } as unknown as Errors.RefusalMeta
   return new Errors.VaultError(RefusalkindForRefusaltag[refusaltag], Phrases.PhraseForRefusaltag[refusaltag], { rows: { dbhas: actual }, meta })

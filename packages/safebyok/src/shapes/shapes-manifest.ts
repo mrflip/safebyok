@@ -237,8 +237,8 @@ export type ScribedGetManifest = CheckedGetManifest & (
   | { ok: false, act: 'void',    actual: null }
 )
 
-/** A write's checked manifest with the act the put or del table finds from its tags, and whether it answers good;
- * or `policied` where a fixed field or a storage policy forbids the write, with the {@link Refusaltag} of the phrase it is refused with.
+/** A write's checked manifest with the act the put or del table finds from its tags, and whether it answers good.
+ * Where a fixed field or a storage policy forbids the write, the act is `policied`, beside the {@link Refusaltag} of the phrase it is refused with.
  */
 export type ScribedWriteManifest = CheckedWriteManifest & (
   | { ok: true,  act: EX.PutAct | EX.DelAct, actual: ThingRecord }
