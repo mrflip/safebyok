@@ -1,6 +1,6 @@
 # Thread 2: manifest_rest (2026-11-26)
 
-Branch `20261126-manifest_rest`, PR #TBD, stacked on #934 (thread 1, filed at `56c5fda59`). Proved: `safebyok` 2,412
+Branch `20261126-manifest_rest`, PR [#937](https://github.com/mrflip/safebyok/pull/937), stacked on [#934](https://github.com/mrflip/safebyok/pull/934) (thread 1, filed at `56c5fda59`). Proved: `safebyok` 2,412
 tests, typecheck and lint green; demos envman, knockknock and react typecheck. Red, as expected: `safebyok-indexeddb`,
 `safebyok-postgres`, `safebyok-convex` (threads 3, 4, 5 port them) and demo `dojo`, which imports safebyok-indexeddb
 (already red after thread 1).
