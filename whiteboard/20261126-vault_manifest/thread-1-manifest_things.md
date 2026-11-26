@@ -1,6 +1,6 @@
 # Thread 1: manifest_things (2026-11-26)
 
-Branch `20261126-manifest_things`, PR (see below), cut from origin/main. Proved: `packages/safebyok` lint, typecheck,
+Branch `20261126-manifest_things`, PR [#934](https://github.com/mrflip/safebyok/pull/934), cut from origin/main. Proved: `packages/safebyok` lint, typecheck,
 test (2,392 tests, 39 files) green. Red by design: `safebyok-indexeddb`, `safebyok-postgres`, `safebyok-convex`
 typechecks (their `doGetThing`/`doWriteThing` still return the old `GotActual`/`WroteActual`, and they call the
 classifier functions that went); threads 3 (idb), 4 (postgres) and 5 (convex) mend them.
