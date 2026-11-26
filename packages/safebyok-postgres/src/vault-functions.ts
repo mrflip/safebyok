@@ -116,7 +116,8 @@ END $$;
 }
 
 /** The SQL that creates the functions PostgresVaultDB calls: `await pool.query(VaultFunctionsSql)`, after `VaultTablesSql`. */
-export const VaultFunctionsSql = `-- safebyok-postgres: the functions PostgresVaultDB calls to write a Thing. For Postgres 14 or later.
+export const VaultFunctionsSql = `-- safebyok-postgres: the functions PostgresVaultDB calls to write a Thing. For Postgres 18 or later:
+-- they call uuidv7(), and each write function's UPDATE names its written row with RETURNING WITH (NEW AS ...).
 -- Run it after the tables, and again with each upgrade of safebyok-postgres. Each name carries the version of the tables
 -- the function is built for and its own revision, so an upgrade adds its functions beside the old ones, which stay;
 -- running the same version again replaces its own.
