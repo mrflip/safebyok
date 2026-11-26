@@ -122,7 +122,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Look-ahead:* thread 9 makes the datastores' policy verdicts phrase tags fed to this builder: shape the builder to take a policy's phrase tag as it takes an act's.
 *Size:* medium.
 *Review:* fixed (opus, medium), 5 fixes (scribeWriteAct's policied branch, doc blocks one fact a sentence, a test's impossible birth refusal, two test nits). `demandTagsOfAsk`'s removal holds. Left: the throwers header's "a new refusal gets a new thrower" → the later 18-thrower ruling; "tag" meaning two things → Open Matters; `FlagActs` beside its tables (stands).
-*Status:* reviewed at a1b017830, filing; PR #942. Equivalence run in scratch: 984,960 write combinations, 0 mismatches. `Throwers.taggedRefusal` replaces `gateIssue`, `bornAtNotStored`, `lifetokNotStored`, `policiedRefusalOf`; `ListActs` added; `demandTagsOfAsk` removed (subsumed by `writtenTagsOf`).
+*Status:* filed 2026-11-26 at a1b017830; PR #942 out of draft. Equivalence run in scratch: 984,960 write combinations, 0 mismatches. `Throwers.taggedRefusal` replaces `gateIssue`, `bornAtNotStored`, `lifetokNotStored`, `policiedRefusalOf`; `ListActs` added; `demandTagsOfAsk` removed (subsumed by `writtenTagsOf`).
 
 ### 9. policy_tags — policy verdicts come back as phrase tags
 
