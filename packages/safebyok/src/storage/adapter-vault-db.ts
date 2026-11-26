@@ -21,16 +21,16 @@ import * as Throwers from '../refusals/throwers'
 
 // Frozen once, here, so that a Thing or a cache may hold the very records an answer carries.
 /** `answer`, with every record it carries deeply frozen, and neither its ask nor its refusal. */
-function frozenAnswerOf<AnswerT extends { ask: unknown, err?: unknown }>(answer: AnswerT): AnswerT {
+export function frozenAnswerOf<AnswerT extends { ask: unknown, err?: unknown }>(answer: AnswerT): AnswerT {
   const { ask: _ask, err: _err, ...carried } = answer
   for (const val of Object.values(carried)) { deepFreeze(val) }
   return answer
 }
 
-/** The `item` notice for `record`, read at `read_tc`, from this vaultDB, with the vacant agerank, and the lifetok of `record` where it is the bank, else `received` */
-function noticeOf(record: ThingRecord, received: Lifetok, read_tc: ReadTc): VaultItemEvent {
+/** The `item` notice for `record`, deeply frozen, read at `read_tc`, from a vaultDB, with the vacant agerank, and the lifetok of `record` where it is the bank, else `received`. */
+export function noticeOf(record: ThingRecord, received: Lifetok, read_tc: ReadTc): VaultItemEvent {
   const banktok = ('lifetok' in record) ? record.lifetok : received
-  return itemEventOf(record, { sourcelabel: VaultDBSourcelabel, read_tc, banktok })
+  return itemEventOf(deepFreeze(record), { sourcelabel: VaultDBSourcelabel, read_tc, banktok })
 }
 // --
 
@@ -135,7 +135,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       let event: VaultItemEvent
       try {
         const { read_tc = readTcNow() } = ManifestChecks.received.parse(received)
-        event = noticeOf(deepFreeze(ManifestActs.checkedWatchedOf(bankScope, record)), ManifestActs.banktokOrVoidOf(banktok), read_tc)
+        event = noticeOf(ManifestActs.checkedWatchedOf(bankScope, record), ManifestActs.banktokOrVoidOf(banktok), read_tc)
       } catch (err) {
         onBadNews(Outcome.storageRefusalOf(err))
         return

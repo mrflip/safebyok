@@ -4,7 +4,7 @@
 // each stays one binding across both packages.
 import { EX } from 'safebyok-big/internals'
 
-export { AdapterVaultDB } from './storage/adapter-vault-db'
+export { AdapterVaultDB, frozenAnswerOf, noticeOf } from './storage/adapter-vault-db'
 export { MemoryVaultDB } from './storage/memory-vault-db'
 export { type Watcher, MemoryDatastore, isBirthWritable, isWritable } from './storage/memory-datastore'
 export { type Banklabel, type BoxLabelpath, type Devicetok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
