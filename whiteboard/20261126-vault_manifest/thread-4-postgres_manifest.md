@@ -1,8 +1,8 @@
 # Thread 4: postgres_manifest (2026-11-26)
 
-Branch `20261126-postgres_manifest`, PR [#940](https://github.com/mrflip/safebyok/pull/940), stacked on [#937](https://github.com/mrflip/safebyok/pull/937). Proved so far:
-`safebyok-postgres` 168 of 168 tests (the battery over PGlite and what only Postgres can show), typecheck and lint
-clean; `safebyok`'s storage tests 374 of 374, typecheck and lint clean. `pnpm justify` not yet run.
+Branch `20261126-postgres_manifest`, PR [#940](https://github.com/mrflip/safebyok/pull/940), stacked on [#937](https://github.com/mrflip/safebyok/pull/937) (rebased onto its filed tip, `f8c6fa0b0`). Proved:
+`safebyok-postgres` 168 of 168 tests (the battery over PGlite and what only Postgres can show), typecheck, lint and
+build clean; `pnpm justify` after the catch-up rebase: red only in `safebyok-indexeddb` (115 of 130 tests, lint, typecheck: thread 3, cut beside this) and `safebyok-convex` (149 of 231, lint, typecheck: thread 5); green elsewhere: `safebyok` 2,412, `safebyok-react` 339, e2e 576, root 331, demos (react 99, envman 24, knockknock 26), every `-big` package.
 
 * **Built**:
   - `vault-functions.ts`: each write function `write_<kind>(proposed_record, cited_record, if_absent, if_present[, policies])`
@@ -19,7 +19,8 @@ clean; `safebyok`'s storage tests 374 of 374, typecheck and lint clean. `pnpm ju
     and `lifepath_kept`'s parameters are renamed `ante_*`.
   - `vault-queries.ts`: each statement returns the verb's manifest columns: `tags`, `actual`, `ancestor` (get and write,
     in a `CASE WHEN (actual IS NULL)`, so the subquery runs only where read), `children`, `banktok`
-    (`COALESCE(world->'bank'->>'lifetok', <void>)`), `tracked`, `read_tc` (`bankObservedSqlOf`). Stats returns `box`
+    (`ManifestTags.banktokOf`: the void lifetok where the bank is JSON null, else the bank row's `lifetok`, null where it
+    has none, so the key is never dropped), `tracked`, `read_tc` (`bankObservedSqlOf`). Stats returns `box`
     and `gate`; TypeScript adds `max: storeLimitsOf()`.
   - `postgres-vault-db.ts`: `mayWrite`, `writtenActOf`, `FetchedThing`, `#fetchThing` and the TS re-run of the act tables
     after a refusal are gone; every `do*` is one `#queryRow` (stats spreads the limits in). `writeParamsOf(ask)` is
@@ -60,6 +61,10 @@ clean; `safebyok`'s storage tests 374 of 374, typecheck and lint clean. `pnpm ju
   - `vault-functions.ts`'s header said safebyok "is private and a published package never imports it at runtime", but
     `postgres-vault-db.ts` already did; the file now imports `PolicyPhrases` at runtime, and the sentence is cut.
   - The ancestor test called past the adapter now expects none where a Thing is stored at the scope.
+
+  - Thread 2's filed contract (port the predicate clause by clause; a banktok stays keyed, null where a transport drops
+    undefined): the SQL's banktok was a `COALESCE` that read a lifetok-less bank row as the void lifetok; it now copies
+    `banktokOf`. Such a row cannot be stored (`lifetok` is `NOT NULL`), so nothing answers differently.
 
 * **Discoveries**:
   - Postgres 18's `RETURNING WITH (NEW AS written)` lets the `UPDATE` alias be `ante` in the `WHERE` and the written row
