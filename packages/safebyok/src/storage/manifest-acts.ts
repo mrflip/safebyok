@@ -183,9 +183,9 @@ export function putActOf(ask: WriteAsk, tags: PutTableTags): EX.PutAct | EX.Refu
   // The flag that applies: `ifPresent` over a live Thing, `ifAbsent` over a tombstone or none.
   const opflag = (presence === 'live') ? ask.ifPresent : ask.ifAbsent
   if (revtok_cmp === 'neq')                                                             { return ((presence === 'live') && (opflag === 'get')) ? 'passed' : 'stale' }
-  if (presence   === 'void')                                                           { return (opflag === 'add') ? 'born'   : 'void' }
-  if (presence   === 'gone')                                                           { return (opflag === 'add') ? 'reborn' : 'gone' }
-  if (opflag     === 'repl')                                                           { return 'replaced' }
+  if (presence   === 'void')                                                            { return (opflag === 'add') ? 'born'   : 'void' }
+  if (presence   === 'gone')                                                            { return (opflag === 'add') ? 'reborn' : 'gone' }
+  if (opflag     === 'repl')                                                            { return 'replaced' }
   return (opflag === 'get') ? 'passed' : 'camped'
 }
 
@@ -197,7 +197,7 @@ function delActOf(ask: WriteAsk, tags: WriteTags): EX.DelAct | EX.RefusedAct {
   if ((revtok_cmp === 'eq')  && ((revseq_cmp !== 'eq') || isLifeMismatch(ask, tags)))   { return 'clash' }
   if ((revtok_cmp === 'neq') && (revseq_cmp === 'eq'))                                  { return 'forked' }
   if (revtok_cmp === 'neq')                                                             { return (presence === 'gone') ? 'gone' : 'stale' }
-  if (presence   === 'void')                                                           { return 'void' }
+  if (presence   === 'void')                                                            { return 'void' }
   return (presence === 'gone') ? 'dubdel' : 'deleted'
 }
 
