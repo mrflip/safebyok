@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** thread 1 filed (#934, draft until threads 3–5 mend the red); thread 2 building, stacked on #934
+* **Status:** thread 1 filed (#934, draft); thread 2 ready (#937), in review; threads 3 and 4 building, from thread 2's tip; thread 5 waits for thread 2 to file (cap of 3)
 
 ## Read first
 
@@ -64,6 +64,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Depends on:* thread 1; cut from its tip once it is ready.
 *Look-ahead:* threads 3–5 port to the contract note this thread writes.
 *Size:* medium.
+*Status:* ready 2026-11-26, PR #937; four compactions (the last just before its readiness check). Built `demandSharedConsistency` per the Coach's ruling and thread 1's review directives; `notes/vault-adapter-contract.md`. Narrowed m1 to a missing banktok key (my call: accept).
 
 ### 3. idb_manifest — IndexedDB onto the Manifest
 
@@ -71,7 +72,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 
 *Gloss.* `packages/safebyok-indexeddb/src/idb-vault-db.ts`: each `do*`'s transaction body becomes its datastore function, returning a manifest as `MemoryDatastore` does. Its own tests and the battery over it pass.
 *Levels:* worker `sonnet`; review `low`.
-*Depends on:* thread 2.
+*Depends on:* thread 2. *Orchestrator:* takes the dojo demo too (it imports safebyok-indexeddb).
 *Look-ahead:* none.
 *Size:* small.
 
@@ -82,7 +83,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 > "Is Postgres storing a thing in columns or a json blob? In all stores that have the notion it should be a s columns (whisper_sealed, sidecar and wayins are blobs)." (It is columns already.)
 
 *Gloss.* `packages/safebyok-postgres/src/`: each statement returns a manifest. The write functions in `vault-functions.ts` return the tags (constants on the written branch, worked out over the read-back row on the unwritten one) and the policies as a jsonb object of verdicts whose messages come from the same phrases as `storage/policies.ts`; `vault-queries.ts` returns tags for the reads; the ancestor subquery runs only where it is read. `postgres-vault-db.ts` loses `mayWrite`, `writtenActOf` and the TS re-run of the act tables after a refusal; each `do*` is one statement. Every check stays in the SQL (the design, *Per datastore*). No `SqlRevision` bump before 1.0 (`vault-functions.ts`'s header).
-*Levels:* review `high` on `opus`: the SQL is the trust boundary behind GraphQL.
+*Levels:* worker `thread-worker-400k` (*Orchestrator:* thread 2 compacted four times at medium size); review `high` on `opus`: the SQL is the trust boundary behind GraphQL.
 *Depends on:* thread 2.
 *Look-ahead:* thread 5 copies its manifest shape over Convex.
 *Size:* medium-large.
@@ -92,7 +93,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 > "I agree -- postgres columns sounds right. Convex should be restructured."
 
 *Gloss.* `packages/safebyok-convex/src/component/` (`schema.ts`, `things.ts`, `validators.ts`) and `src/convex-vault-db.ts`: one table per kind with a typed field per column, as Postgres's tables have, `v.any()` only where Postgres has jsonb; each mutation and query returns a manifest, its tags worked out in TypeScript inside the Convex transaction as `MemoryDatastore` does. A stored-format change before 1.0: no migration, and the changeset says a host's existing Convex vaults read as absent. The watch's `by_commit` cursor works across the three tables.
-*Levels:* defaults; review `medium`.
+*Levels:* worker `thread-worker-400k` (*Orchestrator:* as thread 4); review `medium`.
 *Depends on:* thread 2.
 *Look-ahead:* none.
 *Size:* medium-large: if the table split and the manifest port will not fit one context, split the table restructure into a thread of its own and report.

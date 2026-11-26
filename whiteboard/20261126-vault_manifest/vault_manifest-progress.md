@@ -39,3 +39,10 @@ The orchestrator's curated summary of what the threads have taught. Newer than t
 * *Orchestrator:* thread 1's review found MemoryDatastore's write predicate narrower than Postgres's `WHERE` (no `fmt`, no `lifeseq_ok`): a datastore's predicate copies its model's `WHERE` clause by clause, every ante field it reads. Threads 3 and 5 check theirs against `writeFunctionOf` the same way.
 * *Orchestrator:* a `policied` refusal is a scribed act, not a throw, so it carries the step's real banktok, tracked and read_tc (kept, YOLO; Coach row).
 * *Orchestrator:* filing a red-by-ruling thread: `scripts/file-thread --prove` with lint, typecheck and test over every package but safebyok-indexeddb, safebyok-postgres, safebyok-convex and the dojo demo (which typechecks against safebyok-indexeddb's source). Threads 1 and 2 file this way; their PRs stay drafts until threads 3–5 make the line green.
+
+### Thread 2, manifest_rest (ready, #937)
+
+* Every verb on the manifest; each `demand*Consistency` calls `demandSharedConsistency`. `notes/vault-adapter-contract.md` is the datastore author's one document; `MemoryDatastore` the TypeScript reference.
+* A manifest with no `banktok` key refuses `storage_issue`; a present-but-malformed banktok answers void (a damaged bank row's `ManifestTags.banktokOf` is undefined).
+* `TrackedRows` exported top level from `safebyok/storage`.
+* *Orchestrator:* thread 2 compacted four times at medium size: the manifest work is context-heavy. Threads 4 and 5 run on `thread-worker-400k`.
