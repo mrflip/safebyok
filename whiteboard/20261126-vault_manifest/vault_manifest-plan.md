@@ -185,6 +185,22 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Review:* fixed (opus, medium), 4 fixes (`isWriteAct` exported for `GraphQLVaultDB`'s rebuilt copy; one phrases import; header and doc blocks; five two-behaviour titles). Significant, to the Coach: the core's contract accepts a sparse live box in a listing and `AncestorLives` from every datastore (two broken-row shapes answer differently; no working one). Minor: a carried shell's scope unchecked → rework (`Shell.under` equality); incompatible rows' bank rebuilt from the ask (left); test tables without blurbs.
 *Status:* filed 2026-11-26 at 1323380e5 (rework: a carried shell must equal `Shell.under(ask, lives)`); PR #947 out of draft; the line is green. Wire: a listing's answer drops its kids; `SafebyokKids` gone; `SafebyokIncompatibleThing`.
 
+### 12. policies_note — notes/storage-policies.md for the new core
+
+> "Take over the file, this is one of the last pieces before big goes away"
+
+*Gloss.* *Orchestrator:* rewrite `notes/storage-policies.md` (today big's alone) for the new core: `GatePolicies`, `ManifestTags.policiesOf`, the refusaltag verdict, the one refusal builder, Postgres's SQL copies, Convex and IndexedDB through `ManifestTags`; drop big's description; fix VOCABULARY's **options** row. Docs only.
+*Levels:* worker `thread-worker` (opus); review `low`.
+*Depends on:* thread 11.
+*Status:* building.
+
+### 13. graphql_strict (pending the Coach) — the core's contract strict again
+
+> "There's no compatibility requirement on GraphQL, not sure why it's driving the bus"
+
+*Gloss.* *Orchestrator:* revert #947's loosening of the core (`listed`, `AncestorLives`) and give GraphQL what it needs by changing the wire instead: the server sends what a datastore would, or `GraphQLVaultDB` forwards the server's answers checked by shape. An explorer is weighing the two; the Coach rules (Open Matters, TOP).
+*Depends on:* thread 12.
+
 ## Line
 
 *Orchestrator:* now `1 → 2 → 3 → 5 → 4 → 8 → 9 → 6 → 7 → 10 → 11`, restacked onto adapter_port's line, merged as #913 (the Coach: "stack yours on theirs"); `safebyok-graphql` red from #934 until thread 11, the sprint PR on top. Was `1 → 2 → 3 → 4 → 5 → 6 → 7`. Threads 3, 4 and 5 run side by side from thread 2's tip and are restacked into the line before thread 6 is cut. *Orchestrator:* thread 5 rebased onto thread 3 (`1 → 2 → 3 → 5`), so only thread 4 needs restacking: `1 → 2 → 3 → 4 → 5` or `… → 3 → 5 → 4`, whichever conflicts less (both touch `safebyok/storage`'s exports). **A Closer Look** (`.claude/skills/sprint/closer-look.md`) runs once threads 3, 4 and 5 have all filed, before thread 6 is cut (the Coach, 2026-11-26).
