@@ -7,7 +7,7 @@ on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin. Up to 3 th
 
 Sprint doc: https://claude.ai/artifact/LdbJqWk27MHUvdCNQGBFTK (doc 9ef98d92-eb17-4e25-8ee6-e23d6871618e; tabs: Open Matters 6e187ae9-478a body b6bb67df-8264, State enum f88d13eb-9fff; Cleanup 23302d02-ef2b body f42312cf-406e; Progress 91b99d7f-31f1 body 3eb8062d-a469; Resolved 3c0c907f-62db body 9e44ff2c-c3ac). Bookmark rev: Open Matters 2.
 
-Status: A–F merged to main (0a860f282). D1 #932 filed on main, green, ready. G `postgres_listen` building from main. #913 (this plan) to restack onto main at wrap-up. Base synced at 0befbc37d (stale). Cleanup adds: D1 doc blocks (review minor 9); refused write and birth acts unchecked against dbhas (D1 follow-up).
+Status: A–F merged to main (0a860f282). Line: main → #932 D1 (ready) → #935 G (filed, restacked on #932) → H `adapter_tidy` (building) → documentarian → #913. Base synced at 0befbc37d (stale).
 ready. D waits on the Coach's yes to C's design.
 
 ## Read first
@@ -144,6 +144,13 @@ Depends on: B's rework batch (E3's Postgres edits are on #923). Size: medium. Le
 > yes write, in a new pr … postgres go ahead but in a new thread after all of your prs are filed
 
 Gloss. `safebyok-postgres` exports a `PostgresListen` built for node-postgres's `Client` (a dedicated connection, LISTEN/UNLISTEN, notification routing by channel, reporting a failed UNLISTEN as news), replacing the README's recipe; D's server can use it. Cut only after every other sprint PR has filed. Depends on: all of A–F and D1 filed. Size: small. Levels: review `low`.
+
+### H. `adapter_tidy`: the sprint's cleanup items
+
+Gloss. *Orchestrator:* the open items of *Cleanup → Finally* at wrap-up, as one PR: unicorn `^80` in
+`safebyok-postgres-big`; the `notes/wontfix.md` row on Postgres before 18; `isPostgresQueryable`'s message to
+`phrases.ts`; refused write and birth acts checked against `dbhas` in `GraphQLVaultDB` (D1 follow-up). Cut from G.
+Size: small. Levels: review `low`. A documentarian PR on the sprint's flagged doc blocks follows it.
 
 ## For the Coach
 
