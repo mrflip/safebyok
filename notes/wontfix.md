@@ -601,3 +601,23 @@ notice carries only sealed records. The guards that covered it were removed at t
 guards", 2026-11-25), by adapter_port thread B's rework; thread F's watch ends once, for `onEnded`. Widened to GraphQL's ending by adapter_port thread D1's
 rework (2026-11-26), with the demonstration the Coach asked for. See also *A get, a put, … or a notice that lands across a
 disconnect or a disable*, for what the VaultMinder does with such a notice.
+
+### A Postgres watch started while another's first LISTEN on its channel is under way, then stopped, can leave a third deaf
+
+* current outcome: `makePostgresListen` sends a LISTEN for each watch that asks for a channel it holds no watch on, and
+  keeps the watch once its LISTEN returns. Where two watches ask for one such channel at once, and the first is stopped
+  before the second's LISTEN returns, the first's UNLISTEN runs after the second's LISTEN: the second watch is kept,
+  and hears nothing until a later watch on the channel LISTENs again.
+* alternatives:
+  - count the LISTENs under way, and send no UNLISTEN while one is: a second state kept per channel, for a crossing.
+  - have every watch on a channel await one shared LISTEN: a pending promise kept, and cleared on failure, for a
+    crossing.
+* workaround: none needed: a watch is a hint, and the VaultMinder's next fetch reads what was written.
+
+Steps to reproduce: on a `makePostgresListen` no watch has used, start two watches on one user's banks at once, and stop
+the first as soon as its watch is notified it is listening, before the second's LISTEN has returned. A write to that
+user is not heard by the second.
+
+Reasoning for wontfix: a watch starts and stops when a device connects or disconnects, a few times a day, and a LISTEN is
+in flight for milliseconds (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). Nothing is written to the
+bankDB, and nothing secret is held. Written by adapter_port thread G (postgres_listen), 2026-11-26.
