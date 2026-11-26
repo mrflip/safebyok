@@ -1,6 +1,6 @@
 # Thread 4: postgres_manifest (2026-11-26)
 
-Branch `20261126-postgres_manifest`, PR (draft, number in the report), stacked on [#937](https://github.com/mrflip/safebyok/pull/937). Proved so far:
+Branch `20261126-postgres_manifest`, PR [#940](https://github.com/mrflip/safebyok/pull/940), stacked on [#937](https://github.com/mrflip/safebyok/pull/937). Proved so far:
 `safebyok-postgres` 168 of 168 tests (the battery over PGlite and what only Postgres can show), typecheck and lint
 clean; `safebyok`'s storage tests 374 of 374, typecheck and lint clean. `pnpm justify` not yet run.
 
