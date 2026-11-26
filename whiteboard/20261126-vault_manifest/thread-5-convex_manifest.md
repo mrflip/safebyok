@@ -1,6 +1,6 @@
 # Thread 5: convex_manifest (2026-11-26)
 
-Branch `20261126-convex_manifest`, PR (draft, opened at the first push), stacked on
+Branch `20261126-convex_manifest`, PR [#941](https://github.com/mrflip/safebyok/pull/941), stacked on
 [#939](https://github.com/mrflip/safebyok/pull/939) (thread 3, `20261126-idb_manifest` at `517463cf4`; sprintbase
 recorded). Proved so far: `pnpm --filter safebyok-convex` lint, typecheck, test (232 of 232); `pnpm --filter safebyok
 test` (2,412). `pnpm justify` not yet run.
