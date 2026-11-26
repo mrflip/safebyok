@@ -49,10 +49,10 @@ export function describeVaultDBGetWorld({ fresh, bornBank, rowsOf }: VaultDBBatt
       expect(await vaultDB.tryGetWorld(getWorldAskOf({ track }))).to.deep.include({ ok: true, tracked: { bank: 'same', gate: 'same', box: roots.root } })
     })
 
-    it("refuses damaged_row for a root that fails its checks", async () => {
+    it("refuses incompatible_row for a root that fails its checks", async () => {
       const vaultDB = await bornBank()
       await rowsOf(vaultDB).plant(GateScope, { ...gateThingOf(), wayins: { main: {}, passkey0: null } })
-      await expectBad(vaultDB.tryGetWorld(getWorldAskOf()), 'damaged_row')
+      await expectBad(vaultDB.tryGetWorld(getWorldAskOf()), 'incompatible_row')
     })
 
     it("refuses an ask with a labelpath", async () => {

@@ -8,7 +8,7 @@ import type { BankRoots, LoggableAsk, Tracked, WorldRoots } from './shapes-asks'
 import type { ReadTc } from './shapes-vault-event'
 import type { VaultStats } from './shapes-vault-stats'
 
-// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer, GetWorldAnswer, StatsAnswer
+// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, IncompatibleThing, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer, GetWorldAnswer, StatsAnswer
 // No check reads an answer whole: `AdapterVaultDB` makes each of parts it has checked, and a reader checks each record it
 // keeps where a Thing takes it.
 
@@ -48,7 +48,7 @@ export type GetThingAnswer   =
 export type WriteThingAnswer = Answer<ThingRecord, EX.PutAct | EX.DelAct>
 
 /** A child Thing that fails its kind's checks: its scope, and `am: 'd'`. */
-export type DamagedThing = Readonly<ThingScope & { am: 'd' }>
+export type IncompatibleThing = Readonly<ThingScope & { am: 'd' }>
 
 /** One child in a {@link Kids} value: the lifeseq of its life as the list read it. */
 export type KidEntry = Readonly<{ lifeseq: Lifeseq }>
@@ -70,12 +70,12 @@ export type Kids = Readonly<{
 /** What a listing answer carries beside its `val` or `dbhas`, each empty when refused. A live box is carried sparse, and any other Thing whole:
  * - `parentage`    -- the parent
  * - `deltas`       -- each child the `val` names, in labelpath order
- * - `damaged_rows` -- each child that fails its kind's checks
+ * - `incompatible_rows` -- each child that fails its kind's checks
  */
 export type ListedBeside<RecordT extends ThingRecord = ThingRecord> = {
   parentage:    readonly (RecordT | SparseOf<RecordT>)[]
   deltas:       readonly (RecordT | SparseOf<RecordT>)[]
-  damaged_rows: readonly DamagedThing[]
+  incompatible_rows: readonly IncompatibleThing[]
 }
 
 /** The answer to `tryListThings`: the live parent's children as a {@link Kids} value, whose `read_tc` is the answer's.

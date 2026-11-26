@@ -195,8 +195,8 @@ export const DelFlagsFixed = "A del's flags are fixed, ifAbsent 'fail' and ifPre
 /** A write naming a storage policy its kind lacks. */
 export const PolicyNotOwn = "Only a gate's writes name storage policies: a bank and a box have none."
 
-/** A bank stored without one of its roots, or with one damaged. */
-export const BankRootsMissing = "A bank is stored without its main gate or its root box, or with its bank or main gate damaged: the store needs mending by hand."
+/** A bank stored without one of its roots, or with one incompatible. */
+export const BankRootsMissing = "A bank is stored without its main gate or its root box, or with its bank or main gate incompatible: the store needs mending by hand."
 
 /** A list whose parent holds a tombstone or nothing. */
 export const ListParentNotLive = "The Thing listed is not stored live: it was never stored, or was deleted, and has no children."
@@ -204,7 +204,7 @@ export const ListParentNotLive = "The Thing listed is not stored live: it was ne
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: QueryClientExpected, VaultTSQExpected, ListOfBoxes, NotMinded, WorldNotHeard, StaleTimeShape, ChildrenStoredDamaged
+// == [Minding]: QueryClientExpected, VaultTSQExpected, ListOfBoxes, NotMinded, WorldNotHeard, StaleTimeShape, ChildrenIncompatible
 
 /** A VaultTSQ made without a TanStack Query client. */
 export const QueryClientExpected = 'Expected a TanStack Query QueryClient: an object with setQueryDefaults, setMutationDefaults, getQueryData, setQueryData, query, invalidateQueries and resetQueries.'
@@ -224,8 +224,8 @@ export const WorldNotHeard = "This bank's root box is not known live on this dev
 /** A staleTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
 export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
 
-/** Children a list found stored damaged, and left out of its answer. */
-export const ChildrenStoredDamaged = "Some of the Things this list found are stored damaged, so it left them out: the refusal's meta.labelpaths names each one. They were left as they are in storage."
+/** Children a list found incompatible, and left out of its answer. */
+export const ChildrenIncompatible = "Some of the Things this list found are incompatible, so it left them out: the refusal's meta.labelpaths names each one. They were left as they are in storage."
 // --
 
 // == [Telling the host]: LeaseAnnounced, StageCrossed, WatchEnded

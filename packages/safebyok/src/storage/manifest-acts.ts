@@ -9,7 +9,7 @@ import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/sh
 import {
   type AnyAsk, type BirthBankAsk, type GetAsk, type GetWorldAsk, type ListAsk, type StatsAsk, type ThingWatchScope, type Track, type Tracked, type WorldRoots, type WriteAsk, RootLabelpaths, birthPutsOf, loggableAskOf,
 } from '../shapes/shapes-asks'
-import type { BirthBankAnswer, DamagedThing, GetThingAnswer, GetWorldAnswer, KidEntry, Kids, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
+import type { BirthBankAnswer, IncompatibleThing, GetThingAnswer, GetWorldAnswer, KidEntry, Kids, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import {
   type BankObserved, type CheckedBankObserved, type CheckedBirthManifest, type CheckedGetManifest, type CheckedListManifest, type CheckedManifestRows, type CheckedRoots, type CheckedStatsManifest,
   type CheckedWorldManifest, type CheckedWriteManifest, type BirthManifest, type GetManifest, type ListManifest, type ListedChild, type PolicyTag, type Presence, type Refusaltag, type RevseqCmp, type RevtokCmp, type RootTags, type ScribedBirthManifest, type ScribedGetManifest,
@@ -20,7 +20,7 @@ import * as ManifestTags from './manifest-tags'
 import * as Throwers from '../refusals/throwers'
 
 // == [Observations]: checkGetObservations, checkWriteObservations, checkListObservations, checkBirthObservations, checkWorldObservations, checkStatsObservations, checkedRowsOf, checkedRowOf, checkedChildrenOf, checkedRootsOf, checkedRootOf, checkedAncestorOf, checkedBankObservedOf, banktokOrVoidOf, checkedTrackedOf, trackedEntryOf, checkedWatchedOf
-// A row that fails its kind's checks is incompatible: a record our code would not write, which refuses `damaged_row`. A manifest
+// A row that fails its kind's checks is incompatible: a record our code would not write, which refuses `incompatible_row`. A manifest
 // that is malformed, or a row that is no object, means the datastore or its concrete adapter is broken, and refuses `storage_issue`.
 
 /** Check a get's manifest in place: its tags, and each row once. */
@@ -33,10 +33,10 @@ export function checkWriteObservations(ask: WriteAsk, manifest: WriteManifest): 
   Object.assign(manifest, { ...checkedRowsOf(ask, manifest), tags: ManifestChecks.writeTags.parse(manifest.tags) })
 }
 
-/** Check a listing's manifest in place: its tags, its parent, and where the parent is live, each child once, setting aside those that fail their kind's checks as `damaged_rows`. */
+/** Check a listing's manifest in place: its tags, its parent, and where the parent is live, each child once, setting aside those that fail their kind's checks as `incompatible_rows`. */
 export function checkListObservations(ask: ListAsk, manifest: ListManifest): asserts manifest is ListManifest & CheckedListManifest {
   const actual = checkedRowOf(ask, manifest.actual)
-  const listed = (actual?.am === 'a') ? checkedChildrenOf(ask, manifest.children) : { children: [], damaged_rows: [] }
+  const listed = (actual?.am === 'a') ? checkedChildrenOf(ask, manifest.children) : { children: [], incompatible_rows: [] }
   Object.assign(manifest, { ...checkedBankObservedOf(ask, manifest), tags: ManifestChecks.getTags.parse(manifest.tags), actual, ...listed })
 }
 
@@ -69,17 +69,17 @@ function checkedRowOf({ labelpath }: Pick<ThingScope, 'labelpath'>, row: unknown
 }
 
 // A child is checked by the listing's modelkind, not by the labelpath it is listed at: `demandListConsistency` checks that.
-/** A listing's raw children, each checked by its kind but not its address: those that pass, and those that fail as `damaged_rows`. */
-function checkedChildrenOf({ userid, banklabel, modelkind }: ListAsk, children: unknown): Pick<CheckedListManifest, 'children' | 'damaged_rows'> {
+/** A listing's raw children, each checked by its kind but not its address: those that pass, and those that fail as `incompatible_rows`. */
+function checkedChildrenOf({ userid, banklabel, modelkind }: ListAsk, children: unknown): Pick<CheckedListManifest, 'children' | 'incompatible_rows'> {
   const check = ThingkindChecks.byModelkind[modelkind].stored
   const listed: ListedChild[] = []
-  const damaged_rows: DamagedThing[] = []
+  const incompatible_rows: IncompatibleThing[] = []
   for (const { labelpath, raw } of ManifestChecks.children.parse(children)) {
     if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
     const childReport = check.safeParse(raw)
-    if (childReport.success) { listed.push({ labelpath, record: childReport.data }) } else { damaged_rows.push({ userid, banklabel, labelpath, am: 'd' }) }
+    if (childReport.success) { listed.push({ labelpath, record: childReport.data }) } else { incompatible_rows.push({ userid, banklabel, labelpath, am: 'd' }) }
   }
-  return { children: listed, damaged_rows }
+  return { children: listed, incompatible_rows }
 }
 
 /** A birth's or a world's raw roots, each checked by its kind but not its address, null for none. */
@@ -107,7 +107,7 @@ function checkedAncestorOf({ userid, banklabel, labelpath }: ThingScope, row: un
   return ancestor
 }
 
-// A manifest with no banktok is a datastore that forgot it; one whose banktok is no lifetok read a damaged bank row, whose own check speaks for it.
+// A manifest with no banktok is a datastore that forgot it; one whose banktok is no lifetok read an incompatible bank row, whose own check speaks for it.
 /** What a manifest carries of the bank, each checked. */
 function checkedBankObservedOf(ask: AnyAsk, manifest: BankObserved): CheckedBankObserved {
   if (! ('banktok' in manifest)) { throw Throwers.banktokMissing() }
@@ -115,7 +115,7 @@ function checkedBankObservedOf(ask: AnyAsk, manifest: BankObserved): CheckedBank
 }
 
 // A banktok is news, never the verdict: one that is no lifetok reads as the void lifetok, and the step's answer stands.
-// Unspecified for a damaged row: notes/wontfix.md.
+// Unspecified for an incompatible row: notes/wontfix.md.
 /** A banktok a datastore read, or the void lifetok where it is no lifetok. */
 export function banktokOrVoidOf(banktok: unknown): Lifetok {
   const banktokReport = PerKindChecks.banktok.safeParse(banktok)
@@ -322,18 +322,18 @@ export function writeAnswerOf(ask: WriteAsk, manifest: ScribedWriteManifest): Wr
  * and each child of that life as its `deltas`, in labelpath order. Refused, its `dbhas` is the actual parent, or where none is, {@link voidParentOf}.
  */
 export function listAnswerOf(ask: ListAsk, manifest: ScribedListManifest): ListThingsAnswer {
-  const { banktok, tracked, read_tc, damaged_rows } = manifest
+  const { banktok, tracked, read_tc, incompatible_rows } = manifest
   const beside = { ask: loggableAskOf(ask), banktok, tracked, read_tc }
   if (! manifest.ok) {
     const err = Throwers.listParentNotLive({ oplabel: 'listThings', ask: beside.ask, act: manifest.act })
-    return { ok: false, ...beside, act: manifest.act, dbhas: manifest.actual ?? voidParentOf(ask), err, parentage: [], deltas: [], damaged_rows }
+    return { ok: false, ...beside, act: manifest.act, dbhas: manifest.actual ?? voidParentOf(ask), err, parentage: [], deltas: [], incompatible_rows }
   }
   const parent = manifest.actual
   // A child hangs off its parent's live lifepath: an earlier life's children are not its.
   const lifepathUnder = `${parent.lifepath}/`
   const living = manifest.children.map(({ record }) => record).filter((record) => record.lifepath.startsWith(lifepathUnder))
   const deltas = sortBy(living, [(thing) => thing.labelpath]).map((thing) => listedOf(thing))
-  return { ok: true, ...beside, act: manifest.act, val: kidsOf(ask, parent, deltas, read_tc), parentage: [listedOf(parent)], deltas, damaged_rows }
+  return { ok: true, ...beside, act: manifest.act, val: kidsOf(ask, parent, deltas, read_tc), parentage: [listedOf(parent)], deltas, incompatible_rows }
 }
 
 // The listing reads nothing above its parent, so the shell's lives are known only at a root, which has nothing above it.

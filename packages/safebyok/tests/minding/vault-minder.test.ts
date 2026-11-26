@@ -415,7 +415,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     for (const userOrBank of [{ banklabel: 'other' }, { userid: 'u2' }]) {
       await TH.expectBad(vaultDB.tryGetThing({ ...TH.getGateAskOf(), ...userOrBank }), 'bad_record')
       await TH.expectBad(vaultDB.tryWriteThing({ ...TH.birthAskOf(), ...userOrBank }), 'bad_record')
-      expect(await vaultDB.tryListThings({ ...TH.listAskAt('box'), ...userOrBank })).to.deep.include({ ok: false, dbhas: null, parentage: [], deltas: [], damaged_rows: [] })
+      expect(await vaultDB.tryListThings({ ...TH.listAskAt('box'), ...userOrBank })).to.deep.include({ ok: false, dbhas: null, parentage: [], deltas: [], incompatible_rows: [] })
       await TH.expectBad(vaultDB.tryBirthBank({ ...TH.birthBankAskOf(), ...userOrBank }), 'bad_record')
     }
     for (const spy of asked) { expect(spy).not.toHaveBeenCalled() }
@@ -953,7 +953,7 @@ describe("VaultMinder.tryListOnce(labelpath) and listOnce(labelpath)", () => {
     expect(vaultDB.thingAt(box)?.pickle()).to.deep.equal(tomb)
   })
 
-  it("tell each listener's onBadNews of a child stored damaged, and list the rest", async () => {
+  it("tell each listener's onBadNews of an incompatible child, and list the rest", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     cheatPlant(inner, TH.boxThingOf())
@@ -961,7 +961,7 @@ describe("VaultMinder.tryListOnce(labelpath) and listOnce(labelpath)", () => {
     const { badNews } = heardOf(vaultDB)
     const answer = await vaultDB.tryListOnce('box')
     expect(answer).to.deep.include({ ok: true })
-    expect(badNews.map((news) => [news.refusalkind, news.meta?.labelpaths])).to.deep.equal([['damaged_row', ['box/bad']]])
+    expect(badNews.map((news) => [news.refusalkind, news.meta?.labelpaths])).to.deep.equal([['incompatible_row', ['box/bad']]])
   })
 
   it("answer, or throw, the vaultDB's refusal", async () => {

@@ -40,7 +40,7 @@ export { DeviceDB } from './storage/device-db'
 export { MemoryDeviceDB } from './storage/memory-device-db'
 export { type DevicetokScopepath, type LeaseListener, type LeaseScopepath, DeviceDBChecks } from './shapes/shapes-device-db'
 export {
-  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GetWorldAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside,
+  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type IncompatibleThing, type GetThingAnswer, type GetWorldAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside,
   type StatsAnswer, type WriteThingAnswer,
 } from './shapes/shapes-answers'
 export { type VaultDB, isVaultDB } from './storage/vault-db'

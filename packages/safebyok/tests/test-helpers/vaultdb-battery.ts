@@ -18,7 +18,7 @@ import { describeVaultDBStats } from './vaultdb-battery-stats'
 
 // == [The hooks a vaultDB hands the battery]: VaultDBRowCheats, BatteryVaultDB, VaultDBBatteryOpts
 
-/** A vaultDB's stored Things, past its verbs: the cheat the battery plants a damaged Thing with, or removes one with. */
+/** A vaultDB's stored Things, past its verbs: the cheat the battery plants an incompatible Thing with, or removes one with. */
 export type VaultDBRowCheats = {
   /** Stores `raw` as the Thing at `scope`, unchecked. A concrete adapter that cannot write `raw` throws. */
   plant:  (scope: ThingScope, raw: unknown) => Helpers.Awaitable<void>

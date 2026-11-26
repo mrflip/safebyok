@@ -5,7 +5,7 @@ import type { Thingkind } from 'safebyok/storage'
 
 // A table for each kind of Thing, with a field for each of the Thing's fields, as safebyok-postgres has a column for each
 // (`VaultTablesSql`); a field that is an object is `v.any()`, where Postgres has jsonb. The component checks a Thing only
-// with the core's own checks, so a Thing the core would call damaged, but of these types, is stored and returned unchanged.
+// with the core's own checks, so a Thing the core would call incompatible, but of these types, is stored and returned unchanged.
 // The index `by_scope` sorts a bank's Things of a kind by labelpath, so the Things below one form a single range. Each write
 // stamps its document with Convex's commit timestamp, which rises in commit order, so the Things of a bank committed after
 // a given time are a single range of each table's index `by_commit`.

@@ -300,8 +300,8 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       })
     }
 
-    // Each of these asks tracks the damaged row at its revision, so the answer's tracked is 'same' there, and never the damaged row.
-    it("carries a bank damaged outside its lifetok forward, under a put that keeps the lifetok", async () => {
+    // Each of these asks tracks the incompatible row at its revision, so the answer's tracked is 'same' there, and never the incompatible row.
+    it("carries a bank incompatible outside its lifetok forward, under a put that keeps the lifetok", async () => {
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant(BankScope, { ...ante, auth: { stray: true } })
       const next = nextOf(ante)
@@ -327,20 +327,20 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
   })
 
   describe("a Thing stored that fails its checks", () => {
-    // Which refusal a write over a damaged Thing meets is unspecified: see tryWriteThing.
-    it("refuses a damaged gate as damaged to a get, and refuses a write over it", async () => {
+    // Which refusal a write over an incompatible Thing meets is unspecified: see tryWriteThing.
+    it("refuses an incompatible gate as incompatible to a get, and refuses a write over it", async () => {
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant(GateScope, { ...gateThingOf(), wayins: { main: {}, passkey0: null } })
-      await expectBad(vaultDB.tryGetThing(getGateAskOf()), 'damaged_row')
+      await expectBad(vaultDB.tryGetThing(getGateAskOf()), 'incompatible_row')
       expect(await vaultDB.tryWriteThing(birthAskOf())).to.deep.include({ ok: false })
     })
 
-    it("carries a gate damaged outside its wayins forward, under the storage policy it meets", async () => {
+    it("carries a gate incompatible outside its wayins forward, under the storage policy it meets", async () => {
       const vaultDB = await fresh()
       const ante = gateThingOf()
       await rowsOf(vaultDB).plant(GateScope, { ...ante, auth: { stray: true } })
       const next = nextGateOf(ante, { wayins: { main: OtherMainWayin, passkey0: null } })
-      // The ask tracks the damaged gate at its revision, so the answer's tracked is 'same' there, and never the damaged row.
+      // The ask tracks the incompatible gate at its revision, so the answer's tracked is 'same' there, and never the incompatible row.
       const ask  = { ...replaceAskOf(ante, next, { policies: ['replace_passphrase'] }), track: trackOf(Shell.Cited, ante, Shell.Cited) }
       expect(await vaultDB.tryWriteThing(ask)).to.deep.include({ ok: true, act: 'replaced', val: next })
       expect(await gotAt(vaultDB, 'gate')).to.deep.equal(next)
@@ -412,13 +412,13 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       await expectBad(vaultDB.tryWriteThing(ask as never), 'bad_record')
     })
 
-    it("refuses a damaged box as damaged, to a get", async () => {
+    it("refuses an incompatible box as incompatible, to a get", async () => {
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant({ ...ThingBank, labelpath: box.labelpath }, { ...box, whisper_sealed: {} })
-      await expectBad(vaultDB.tryGetThing(getAskAt(box.labelpath)), 'damaged_row')
+      await expectBad(vaultDB.tryGetThing(getAskAt(box.labelpath)), 'incompatible_row')
     })
 
-    it("carries a box damaged in its body forward, under a write that cites it exactly", async () => {
+    it("carries a box incompatible in its body forward, under a write that cites it exactly", async () => {
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant({ ...ThingBank, labelpath: box.labelpath }, { ...box, whisper_sealed: {} })
       const next = nextOf(box)

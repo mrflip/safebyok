@@ -121,11 +121,11 @@ describe("AdapterVaultDB, a step that throws", () => {
     expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing' })
   })
 
-  it("answers a listing that throws with no children, no parentage, no deltas, no damaged rows, and a read_tc of when it was refused", async () => {
+  it("answers a listing that throws with no children, no parentage, no deltas, no incompatible rows, and a read_tc of when it was refused", async () => {
     const vaultDB = new ScriptedVaultDB(() => { throw new Error('connection reset') })
     const answer = await vaultDB.tryListThings(TH.listAskAt('box'))
     await TH.expectBad(Promise.resolve(answer), 'storage_unavailable')
-    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', dbhas: null, parentage: [], deltas: [], damaged_rows: [] })
+    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', dbhas: null, parentage: [], deltas: [], incompatible_rows: [] })
     expect(answer.read_tc).to.match(TH.ReadTcPattern)
   })
 
@@ -191,19 +191,19 @@ describe("AdapterVaultDB.tryWriteThing(ask), a store that reports oddly", () => 
 })
 
 describe("AdapterVaultDB.tryListThings(ask), a store that reports oddly", () => {
-  it("lists each child of the parent's life, sorted by labelpath, as damaged each that fails its kind's checks, and leaves out a child of an earlier life", async () => {
+  it("lists each child of the parent's life, sorted by labelpath, as incompatible each that fails its kind's checks, and leaves out a child of an earlier life", async () => {
     const earlier = TH.boxThingOf('aaa', { lifepath: `${TH.lifepathPlus(TH.Life0, 1)}/${TH.Life0}` })
-    const damaged = { ...TH.boxThingOf('bad'), whisper_sealed: 'not sealed' }
-    const vaultDB = new ScriptedVaultDB(() => listManifestOf(TH.rootBoxOf(), [TH.boxThingOf('openai'), earlier, damaged, TH.boxThingOf('anthropic')]))
+    const incompatible = { ...TH.boxThingOf('bad'), whisper_sealed: 'not sealed' }
+    const vaultDB = new ScriptedVaultDB(() => listManifestOf(TH.rootBoxOf(), [TH.boxThingOf('openai'), earlier, incompatible, TH.boxThingOf('anthropic')]))
     const answer  = await vaultDB.tryListThings(TH.listAskAt('box'))
     expect(answer.ok).to.equal(true)
     expect(answer.deltas.map(({ labelpath }) => labelpath)).to.deep.equal(['box/anthropic', 'box/openai'])
-    expect(answer.damaged_rows.map(({ labelpath }) => labelpath)).to.deep.equal(['box/bad'])
+    expect(answer.incompatible_rows.map(({ labelpath }) => labelpath)).to.deep.equal(['box/bad'])
   })
 
   it("reads no child under a parent that is not live", async () => {
     const vaultDB = new ScriptedVaultDB(() => listManifestOf(TH.boxTombOf(TH.rootBoxOf()), [TH.boxThingOf('openai'), { labelpath: 'box/aa/deep' }]))
-    expect(await vaultDB.tryListThings(TH.listAskAt('box'))).to.deep.include({ ok: false, act: 'gone', parentage: [], deltas: [], damaged_rows: [] })
+    expect(await vaultDB.tryListThings(TH.listAskAt('box'))).to.deep.include({ ok: false, act: 'gone', parentage: [], deltas: [], incompatible_rows: [] })
   })
 
   it("refuses, as a broken store, a child reported more than one label under the parent, or a child whose record is at another labelpath than reported", async () => {
@@ -256,11 +256,11 @@ describe("AdapterVaultDB.tryGetWorld(ask), a store that reports oddly", () => {
     expect(answer).to.deep.include({ ok: true, act: 'got', val: { bank: Shell.of(TH.BankScope), gate: TH.gateThingOf(), root: Shell.of(TH.RootScope) } })
   })
 
-  it("refuses, as a broken store, a root at another address, and as a damaged row one that fails its kind's checks", async () => {
+  it("refuses, as a broken store, a root at another address, and as an incompatible row one that fails its kind's checks", async () => {
     const elsewhere = new ScriptedVaultDB(() => ({ actual: { ...NoRoots, gate: { ...TH.gateThingOf(), banklabel: 'other' } } }))
     await TH.expectBad(elsewhere.tryGetWorld(TH.getWorldAskOf()), 'storage_issue')
-    const damaged = new ScriptedVaultDB(() => ({ actual: { ...NoRoots, gate: { ...TH.gateThingOf(), wayins: 'none' } } }))
-    await TH.expectBad(damaged.tryGetWorld(TH.getWorldAskOf()), 'damaged_row')
+    const incompatible = new ScriptedVaultDB(() => ({ actual: { ...NoRoots, gate: { ...TH.gateThingOf(), wayins: 'none' } } }))
+    await TH.expectBad(incompatible.tryGetWorld(TH.getWorldAskOf()), 'incompatible_row')
   })
 })
 
@@ -409,7 +409,7 @@ describe("AdapterVaultDB.watch(scope, onNotice, onBadNews, onEnded)", () => {
     vaultDB.receive?.({ record: 'not a Thing', banktok: SX.VoidLifeTok })
     vaultDB.receive?.({ record: TH.gateThingOf(), banktok: SX.VoidLifeTok })
     expect(TH.maskedReadTcsOf(events)).to.deep.equal([TH.itemEventOf(TH.gateThingOf())])
-    expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['damaged_row', 'storage_issue'])
+    expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['incompatible_row', 'storage_issue'])
   })
 
   it("notifies of each change as one notice of its Thing, with the banktok received beside it", () => {

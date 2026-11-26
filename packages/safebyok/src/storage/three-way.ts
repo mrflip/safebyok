@@ -40,7 +40,7 @@ export function demandWriteConsistency(ask: WriteAsk, manifest: ScribedWriteMani
  */
 export function demandListConsistency(ask: ListAsk, manifest: ScribedListManifest, answer: ListThingsAnswer): void {
   if (! isEqual(ManifestTags.getTagsOf(manifest.actual), manifest.tags)) { throw Throwers.tagsOfOtherRow() }
-  const listedpaths = [...manifest.children, ...manifest.damaged_rows].map(({ labelpath }) => labelpath)
+  const listedpaths = [...manifest.children, ...manifest.incompatible_rows].map(({ labelpath }) => labelpath)
   if (listedpaths.some((labelpath) => ! isChildLabelpath(ask, labelpath))) { throw Throwers.rowOfOtherAddress(['labelpath']) }
   const copy = {
     carried:  answer.ok ? answer.val.parentlife : answer.dbhas,

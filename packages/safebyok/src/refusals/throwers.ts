@@ -8,7 +8,7 @@ import * as Phrases from '../phrases'
 import { type ThingRecord } from '../shapes/shapes-thing'
 import { StoreLimitFloor } from '../shapes/shapes-vault-stats'
 import { type ListAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
-import type { DamagedThing } from '../shapes/shapes-answers'
+import type { IncompatibleThing } from '../shapes/shapes-answers'
 import type { Refusaltag } from '../shapes/shapes-manifest'
 import type { ProbeStepkind } from '../shapes/shapes-vault-probe'
 
@@ -156,7 +156,7 @@ export function tagsOfOtherAsk(): Errors.VaultError { return new Errors.VaultErr
 export function answerOfOtherManifest(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerOfOtherManifest) }
 // --
 
-// == [Minding Throwers]: notMinded, worldNotHeard, childrenStoredDamaged
+// == [Minding Throwers]: notMinded, worldNotHeard, childrenIncompatible
 
 /** The refusal of a box's item asked of a vault TSQ for a Thing other than a box under the root box. */
 export function notMinded(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.NotMinded) }
@@ -164,9 +164,9 @@ export function notMinded(): Errors.VaultError { return new Errors.VaultError('b
 /** The refusal of a bank's root box read while its world holds none live. */
 export function worldNotHeard(): Errors.VaultError { return new Errors.VaultError('record_conflict', Phrases.WorldNotHeard) }
 
-/** The bad news of `damaged_rows`, the children a list for `ask` found stored damaged and left out, each named by its labelpath. */
-export function childrenStoredDamaged(ask: ListAsk, damaged_rows: readonly DamagedThing[]): Errors.VaultError {
-  return new Errors.VaultError('damaged_row', Phrases.ChildrenStoredDamaged, { meta: { ask: loggableAskOf(ask), labelpaths: damaged_rows.map(({ labelpath }) => labelpath) } })
+/** The bad news of `incompatible_rows`, the children a list for `ask` found incompatible and left out, each named by its labelpath. */
+export function childrenIncompatible(ask: ListAsk, incompatible_rows: readonly IncompatibleThing[]): Errors.VaultError {
+  return new Errors.VaultError('incompatible_row', Phrases.ChildrenIncompatible, { meta: { ask: loggableAskOf(ask), labelpaths: incompatible_rows.map(({ labelpath }) => labelpath) } })
 }
 // --
 

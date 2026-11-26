@@ -27,9 +27,9 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
   })
 
   const PlantedCases = [
-    ["damaged_row",   { ...TH.gateThingOf(), note: 'hi' },         'refuses a gate with a field this version does not know'],
-    ["storage_issue", { ...TH.gateThingOf(), banklabel: 'other' }, 'refuses a gate filed at another scope as a broken store'],
-    ["storage_issue", 'not a Thing',                               'refuses a Thing that is not an object as a broken store'],
+    ["incompatible_row", { ...TH.gateThingOf(), note: 'hi' },         'refuses a gate with a field this version does not know'],
+    ["storage_issue",    { ...TH.gateThingOf(), banklabel: 'other' }, 'refuses a gate filed at another scope as a broken store'],
+    ["storage_issue",    'not a Thing',                               'refuses a Thing that is not an object as a broken store'],
   ] as const
 
   for (const [refusalkind, raw, blurb] of PlantedCases) {
@@ -42,8 +42,8 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
   }
 
   const UnwrittenCases = [
-    [{ ...TH.gateThingOf(), fmt: 'other' },            'writes nothing over a gate of another format, cited exactly, and refuses it as damaged'],
-    [{ ...TH.gateThingOf(), lifeseq: '0000000002' },  'writes nothing over a gate whose lifeseq is not the last of its lifepath, cited exactly, and refuses it as damaged'],
+    [{ ...TH.gateThingOf(), fmt: 'other' },            'writes nothing over a gate of another format, cited exactly, and refuses it as an incompatible row'],
+    [{ ...TH.gateThingOf(), lifeseq: '0000000002' },  'writes nothing over a gate whose lifeseq is not the last of its lifepath, cited exactly, and refuses it as an incompatible row'],
   ] as const
 
   for (const [raw, blurb] of UnwrittenCases) {
@@ -52,7 +52,7 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
       const gate    = TH.gateThingOf()
       const ask     = TH.replaceAskOf(gate, TH.nextOf(gate))
       vaultDB._cheat_things(TH.ThingBank).set('gate', raw)
-      await TH.expectBad(vaultDB.tryWriteThing(ask), 'damaged_row')
+      await TH.expectBad(vaultDB.tryWriteThing(ask), 'incompatible_row')
       expect(vaultDB._cheat_things(TH.ThingBank).get('gate')).to.deep.equal(raw)
     })
   }
@@ -82,9 +82,9 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
 
 describe("MemoryVaultDB, a row planted above a scope where nothing is stored", () => {
   const AboveCases = [
-    ["storage_issue", TH.boxThingOf('open'),              'refuses, as a broken store, a row above the scope that names a labelpath not above it'],
-    ["storage_issue", "not a Thing",                      'refuses, as a broken store, a row above the scope that is not an object'],
-    ["damaged_row",   { ...TH.rootBoxOf(), revseq: -2 },  'refuses, as a damaged row, a row above the scope whose revision fails its checks'],
+    ["storage_issue",    TH.boxThingOf('open'),               'refuses, as a broken store, a row above the scope that names a labelpath not above it'],
+    ["storage_issue",    "not a Thing",                       'refuses, as a broken store, a row above the scope that is not an object'],
+    ["incompatible_row", { ...TH.rootBoxOf(), revseq: -2 },   'refuses, as an incompatible row, a row above the scope whose revision fails its checks'],
   ] as const
   const voidPut = { ...TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)), ifAbsent: 'fail' } as const
 

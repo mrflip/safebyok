@@ -142,7 +142,7 @@ export type AnyAsk          = GetAsk | ListAsk | WriteAsk | BirthBankAsk | GetWo
 export type BirthPuts       = readonly [BankWriteAsk, GateWriteAsk, BoxWriteAsk]
 /** The scope of a watch: a bank. */
 export type ThingWatchScope = Readonly<Z.infer<typeof AskChecks.thingWatchScope>>
-// Unspecified for a missing or damaged row: notes/wontfix.md.
+// Unspecified for a missing or incompatible row: notes/wontfix.md.
 /** For each Thing an ask tracks, `'same'` if the actual Thing is at the revseq and lifepath tracked, else the actual Thing. */
 export type Tracked         = Readonly<{ bank: BankRecord | 'same', [Labelpath.MainGate]: GateRecord | 'same', [Labelpath.RootBox]: BoxRecord | 'same' }>
 

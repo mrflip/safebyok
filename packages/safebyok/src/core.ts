@@ -26,7 +26,7 @@ export type { AddPasskeyGating, BirthGating, Gating, ReplacePassphraseGating, Re
 export { vacateHanded } from './models/gating'
 export { type Banklabel, type BoxLabelpath, type Devicetok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
-  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GetWorldAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside,
+  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type IncompatibleThing, type GetThingAnswer, type GetWorldAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside,
   type WriteThingAnswer,
 } from './shapes/shapes-answers'
 export { type VaultDB, isVaultDB } from './storage/vault-db'

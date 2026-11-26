@@ -6,7 +6,7 @@ import type { Labelpath, Lifetok } from './primitives'
 import type { BankRecord, BoxRecord, GateRecord, ThingRecord } from './shapes-thing'
 import type { TombstoneOf } from './shapes-sealers'
 import type { BankRoots, Tracked } from './shapes-asks'
-import type { DamagedThing } from './shapes-answers'
+import type { IncompatibleThing } from './shapes-answers'
 import { type ReadTc, SeenChecks } from './shapes-vault-event'
 import type { VaultStats } from './shapes-vault-stats'
 import { PolicyPhrases } from '../phrases'
@@ -214,8 +214,8 @@ export type CheckedGetManifest = CheckedManifestRows & { tags: GetTags }
 /** A write's manifest, its tags and each row checked. */
 export type CheckedWriteManifest = CheckedManifestRows & { tags: WriteTags }
 
-/** A listing's manifest, its tags and each row checked: its children, where the parent is live, those that pass their kind's checks and, as `damaged_rows`, those that fail. */
-export type CheckedListManifest = CheckedBankObserved & { tags: GetTags, actual: ThingRecord | null, children: readonly ListedChild[], damaged_rows: readonly DamagedThing[] }
+/** A listing's manifest, its tags and each row checked: its children, where the parent is live, those that pass their kind's checks and, as `incompatible_rows`, those that fail. */
+export type CheckedListManifest = CheckedBankObserved & { tags: GetTags, actual: ThingRecord | null, children: readonly ListedChild[], incompatible_rows: readonly IncompatibleThing[] }
 
 /** A birth's manifest, its tags and each root checked. */
 export type CheckedBirthManifest = CheckedBankObserved & { tags: BirthTags, actual: CheckedRoots }

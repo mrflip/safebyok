@@ -6,7 +6,7 @@ import { type FiledRaw, type StoreLimits, type VaultStats, storeLimitsOf } from 
 
 // == [Measuring]: vaultStatsOf, rowWeightOf
 
-// A row is measured as stored, unchecked: a damaged row takes space too, and counts as no live Thing.
+// A row is measured as stored, unchecked: an incompatible row takes space too, and counts as no live Thing.
 /** The stats of a bank's boxes and gates from each of its raw rows, with `limits` capped ({@link storeLimitsOf}). The bank's own row is not counted. */
 export function vaultStatsOf(filed: Iterable<FiledRaw>, limits: Partial<StoreLimits> = {}): VaultStats {
   const box  = { count: 0, live_count: 0, size: 0 }

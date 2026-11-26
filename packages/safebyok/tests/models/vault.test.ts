@@ -1001,7 +1001,7 @@ describe("vault.sealBox(donor, publicProps, secretProps) and vault.unsealBox(box
   })
 
   const DonorCases = [
-    [() => ({ ...TH.boxShellOf(), am: 'd' }),                'a donor of a damaged row'],
+    [() => ({ ...TH.boxShellOf(), am: 'd' }),                'a donor of an incompatible row'],
     [() => ({ ...TH.boxShellOf(), revseq: 0 }),              'half the shell: its revseq moved, its revtok and lifeseq not'],
     [() => ({ ...TH.boxShellOf(), labelpath: 'gate/main' }), 'a donor of another kind'],
     [() => ({ ...TH.boxShellOf(), revseq: -2 }),             'a revseq below the shell'],

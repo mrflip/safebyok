@@ -190,7 +190,7 @@ export class World {
     this.align()
   }
 
-  // Each root is told apart, so a damaged one is news, and the rest still reach their Things.
+  // Each root is told apart, so an incompatible one is news, and the rest still reach their Things.
   /** Hand `vaultMinder` each root `shelf` keeps of the device's bank, read when the shelf says it was. */
   #seedFromShelf(vaultMinder: VaultMinder, shelf: RootShelf): void {
     const roots   = peekRoots(shelf, this.#device.scope)

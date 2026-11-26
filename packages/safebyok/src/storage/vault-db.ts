@@ -18,7 +18,7 @@ export interface VaultDB {
    * - The record is written when its preconditions hold: the exact revision cited and, for a put that replaces a live Thing, the
    *   born_at left unchanged and the storage policies it names. Nothing else of the ante Thing is checked.
    * - Where several refusals apply at once, the answer is one of them, but which is unspecified, and may differ between concrete adapters
-   *   and between versions. An ante Thing too damaged to check the preconditions against may refuse `damaged_row`,
+   *   and between versions. An ante Thing that fails its checks, so that no precondition can be checked against it, may refuse `incompatible_row`,
    *   `storage_issue`, or the failed precondition's own refusal.
    * - The record carries every field, so a concrete adapter may write it by replacing the ante Thing whole.
    */

@@ -82,7 +82,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const answer   = ManifestActs.listAnswerOf(listAsk, manifest)
       ThreeWay.demandListConsistency(listAsk, manifest, answer)
       return frozenAnswerOf(answer)
-    } catch (err) { return { ...this.answerForThrown(err, 'listThings', ask), dbhas: null, parentage: [], deltas: [], damaged_rows: [] } }
+    } catch (err) { return { ...this.answerForThrown(err, 'listThings', ask), dbhas: null, parentage: [], deltas: [], incompatible_rows: [] } }
   }
 
   /** Write a new bank's three roots (bank, main gate, root box), or answer the roots already stored ({@link VaultDB.tryBirthBank}). */
