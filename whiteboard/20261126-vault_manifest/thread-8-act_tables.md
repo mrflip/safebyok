@@ -1,7 +1,7 @@
 # Thread 8: act_tables (2026-11-26)
 
-Branch `20261126-act_tables`, PR #942, stacked on #940. Proved: `safebyok` 2,424 tests, lint and typecheck clean;
-`safebyok-postgres` 168, `safebyok-convex` 232, `safebyok-indexeddb` 130, each typecheck clean. `pnpm justify`: pending.
+Branch `20261126-act_tables`, PR #942, stacked on #940. Proved: `pnpm justify` green after the catch-up onto #940
+(`safebyok` 2,424, `safebyok-postgres` 168, `safebyok-convex` 232, `safebyok-indexeddb` 130, `safebyok-react` 339, e2e 576, root 331, every `-big` package and demo).
 
 * **Built**
   * **The act tables** (decomposition B), in `packages/safebyok/src/storage/manifest-acts.ts`, section `[Tables]`:
@@ -43,6 +43,8 @@ Branch `20261126-act_tables`, PR #942, stacked on #940. Proved: `safebyok` 2,424
     only for a broken datastore: every datastore we ship already sends `PolicyPhrases`.
   * **`PolicyTagForPhrase = invert(PolicyPhrases)`** is marked "Scaffolding: until thread 9 (`policy_tags`)".
     Thread 9 has datastores send the tag, so the lookup goes.
+  * `safebyok/storage` exports the new types `PolicyPhrase`, `PolicyTag` and `Refusaltag`, because the exported
+    `GatePolicies` and `ScribedWriteManifest` name them (the forgotten-exports check requires it).
   * `RefusalkindForRefusaltag` sits in throwers.ts beside the builder, and `PhraseForRefusaltag` in phrases.ts,
     per *Layout*.
 
