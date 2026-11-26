@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Errors, SX } from 'safebyok-big/internals'
-import { AnswerNotMade } from '../../src/phrases'
+import * as Phrases from '../../src/phrases'
 import { AdapterVaultDB } from '../../src/storage/adapter-vault-db'
 import type { BirthManifest, GetManifest, ListManifest, Received, RootRows, StatsManifest, WorldManifest, WriteManifest } from '../../src/shapes/shapes-manifest'
 import * as ManifestTags from '../../src/storage/manifest-tags'
@@ -12,21 +12,26 @@ import * as Throwers from '../../src/refusals/throwers'
 import { readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
 
-/** A concrete adapter whose every step does what the test hands it: throws, or reports the manifest `step` gives, with the void banktok, each root `'same'` in `tracked`,
- * a `read_tc` made now and no ancestor unless it gives them.
+/** A concrete adapter whose every step does what the test hands it: throws, or reports the manifest `step` gives, with each root `'same'` in `tracked`,
+ * a `read_tc` made now, no ancestor and, unless `isBanktokless`, the void banktok, unless it gives them.
  */
 class ScriptedVaultDB extends AdapterVaultDB {
   receive: ((received: Received) => void) | null = null
   onEnded: (() => void) | null = null
   readonly step: () => object
+  readonly isBanktokless: boolean
 
-  constructor(step: () => object) {
+  constructor(step: () => object, isBanktokless = false) {
     super()
     this.step = step
+    this.isBanktokless = isBanktokless
   }
 
-  /** What `step` reports, with the void banktok, each root `'same'` in `tracked`, a `read_tc` made now and no ancestor unless it gives them. */
-  #report(): unknown { return { banktok: SX.VoidLifeTok, tracked: { bank: 'same', gate: 'same', box: 'same' }, read_tc: readTcNow(), ancestor: null, ...this.step() } }
+  /** What `step` reports, with the defaults above unless it gives them. */
+  #report(): unknown {
+    const banktok = this.isBanktokless ? {} : { banktok: SX.VoidLifeTok }
+    return { ...banktok, tracked: { bank: 'same', gate: 'same', box: 'same' }, read_tc: readTcNow(), ancestor: null, ...this.step() }
+  }
 
   protected doGetThing(_ask: GetAsk): GetManifest { return this.#report() as GetManifest }
   protected doWriteThing(_ask: WriteAsk): WriteManifest { return this.#report() as WriteManifest }
@@ -109,7 +114,7 @@ describe("AdapterVaultDB, a step that throws", () => {
     const vaultDB = new ScriptedVaultDB(() => { throw Booby }) // eslint-disable-line @typescript-eslint/only-throw-error
     const answer = await vaultDB.tryGetThing(TH.getGateAskOf())
     const err = await TH.expectBad(Promise.resolve(answer), 'unexpected_error')
-    expect(err.message).to.eq(AnswerNotMade)
+    expect(err.message).to.eq(Phrases.AnswerNotMade)
     expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing' })
   })
 
@@ -134,7 +139,7 @@ describe("AdapterVaultDB, a step that throws", () => {
     const vaultDB = new ScriptedVaultDB(() => getManifestOf(null))
     const answer = await vaultDB.tryWriteThing(Booby as never)
     expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', ask: {} })
-    expect(answer.ok ? null : answer.err.message).to.eq(AnswerNotMade)
+    expect(answer.ok ? null : answer.err.message).to.eq(Phrases.AnswerNotMade)
   })
 })
 
@@ -312,7 +317,7 @@ describe("AdapterVaultDB, the read_tc of an answer", () => {
     }
   })
 
-  it("answers the void lifetok to a get, a listing, a birth, a get of the world or stats whose banktok is no lifetok", async () => {
+  it("answers the void lifetok to a get, a listing, a birth or a get of the world whose banktok is no lifetok", async () => {
     for (const report of [{ banktok: 'a banktok' }, { banktok: null }, { banktok: undefined }]) {
       const answers = [
         await new ScriptedVaultDB(() => ({ ...getManifestOf(null), ...report })).tryGetThing(TH.getGateAskOf()),
@@ -321,6 +326,21 @@ describe("AdapterVaultDB, the read_tc of an answer", () => {
         await new ScriptedVaultDB(() => ({ actual: NoRoots, ...report })).tryGetWorld(TH.getWorldAskOf()),
       ]
       expect(answers.map(({ ok, banktok }) => ({ ok, banktok }))).to.deep.equal(Array.from({ length: 4 }, () => ({ ok: true, banktok: SX.VoidLifeTok })))
+    }
+  })
+
+  it("refuses, as a broken store, a report from a get, a write, a listing, a birth, a get of the world or stats with no banktok", async () => {
+    const answers = [
+      new ScriptedVaultDB(() => getManifestOf(null), true).tryGetThing(TH.getGateAskOf()),
+      new ScriptedVaultDB(() => writeManifestOf(TH.birthAskOf(), null, true), true).tryWriteThing(TH.birthAskOf()),
+      new ScriptedVaultDB(() => listManifestOf(TH.rootBoxOf()), true).tryListThings(TH.listAskAt('box')),
+      new ScriptedVaultDB(() => birthManifestOf(TH.birthBankAskOf(), NoRoots, true), true).tryBirthBank(TH.birthBankAskOf()),
+      new ScriptedVaultDB(() => ({ actual: NoRoots }), true).tryGetWorld(TH.getWorldAskOf()),
+      new ScriptedVaultDB(() => ({ stats: {} }), true).tryStats(TH.statsAskOf()),
+    ]
+    for (const answer of answers) {
+      const err = await TH.expectBad(answer, 'storage_issue')
+      expect(err.message).to.eq(Phrases.BanktokMissing)
     }
   })
 })

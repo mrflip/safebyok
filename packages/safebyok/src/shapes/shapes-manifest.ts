@@ -10,7 +10,7 @@ import type { DamagedThing } from './shapes-answers'
 import { type ReadTc, SeenChecks } from './shapes-vault-event'
 import type { VaultStats } from './shapes-vault-stats'
 
-// == [Tags]: ManifestChecks, PolicyVerdict, PolicyVerdicts, GetTags, WriteTags, RootTags, BirthTags, Presence, RevtokCmp, RevseqCmp, SameCmp
+// == [Tags]: ManifestChecks, PolicyVerdict, PolicyVerdicts, GetTags, WriteTags, RootTags, BirthTags, Presence, RevtokCmp, RevseqCmp, SameCmp, AnteWayins, TrackedRows
 // Each tag spells the field it compares. A datastore makes them of the row it judged a write against, the ante row.
 
 /** The checks of what a datastore hands back: its tags, a listing's children, a birth's or a world's roots, a watch's {@link Received}, its `tracked` and its `read_tc`. Each refuses `storage_issue`. */
@@ -102,54 +102,91 @@ export type RevseqCmp = WriteTags['revseq_cmp']
 
 /** Whether a write leaves a field the same, changes it, or is a write the field's rule does not judge (`'moot'`). */
 export type SameCmp = WriteTags['born_at_cmp']
+
+/** The wayins of the ante gate as a datastore read them, each field unchecked: what a storage policy judges. */
+export type AnteWayins = Readonly<Record<string, unknown>>
+
+/** The raw bank, main gate and root box a datastore read, each null for none, under its key in a `track`: what `tracked` is made of. */
+export type TrackedRows = Readonly<{ bank: unknown, [Labelpath.MainGate]: unknown, [Labelpath.RootBox]: unknown }>
 // --
 
 // == [Manifests]: BankObserved, GetManifest, WriteManifest, ListManifest, RootRows, BirthManifest, WorldManifest, StatsManifest, CheckedBankObserved, CheckedManifestRows, CheckedRoots, ListedChild, CheckedGetManifest, CheckedWriteManifest, CheckedListManifest, CheckedBirthManifest, CheckedWorldManifest, CheckedStatsManifest, ScribedGetManifest, ScribedWriteManifest, ScribedListManifest, ScribedBirthManifest, Received
 // A datastore hands back a manifest; `AdapterVaultDB` then writes onto it, step by step, until it reads as the answer.
 // `notes/vault-adapter-contract.md` is the datastore author's account of each.
 
-/** What every manifest carries of the bank, each read in the step, after any write:
- * - `banktok`  -- the bank row's lifetok, the void lifetok for none
- * - `tracked`  -- for each of the bank, main gate and root box, `'same'` where it stands at the revseq and lifepath the ask tracks, else the row, null for none
- * - `read_tc`  -- when the step read: `readTcNow()` in the step, or the datastore's own UUID version 7
- */
-export type BankObserved = { banktok: unknown, tracked: unknown, read_tc: unknown }
+/** What every manifest carries of the bank, each read in the step, after any write. */
+export interface BankObserved {
+  /** The bank row's lifetok, the void lifetok where there is no bank row. */
+  banktok: unknown
+  /** For each of the bank, main gate and root box, by its key in the ask's `track`: `'same'` where it stands at the revseq and lifepath the ask tracks, else the row, null for none. */
+  tracked: unknown
+  /** When the step read: `readTcNow()` in the step, or the datastore's own UUID version 7. */
+  read_tc: unknown
+}
 
-/** What a datastore observed in one atomic step of a get, each row exactly as it stands at the step's last read, beside {@link BankObserved}.
- * - `tags`     -- the get's {@link GetTags}
- * - `actual`   -- the row at the ask's scope, null for none
- * - `ancestor` -- where `actual` is null, the nearest row above the scope, live or a tombstone, null for none: it gives the shell's lifepath. Read nowhere else.
- *
+/** What a datastore observed in one atomic step of a get, each row exactly as it stands at the step's last read.
  * The vaultDB writes onto the manifest it is handed, so hand it a new one each step.
  */
-export type GetManifest = BankObserved & { tags: GetTags, actual: unknown, ancestor: unknown }
+export interface GetManifest extends BankObserved {
+  /** The get's tags, made of `actual`. */
+  tags: GetTags
+  /** The row at the ask's scope, null for none. */
+  actual: unknown
+  /** Where `actual` is null, the nearest row above the scope, live or a tombstone, null for none: it gives the shell's lifepath. Read nowhere else. */
+  ancestor: unknown
+}
 
-/** What a datastore observed in one atomic step of a write, each row exactly as it stands at the step's last read: as for a {@link GetManifest}, with {@link WriteTags}.
- * `actual` is the row written where the datastore wrote, else the ante row.
+/** What a datastore observed in one atomic step of a write, each row exactly as it stands at the step's last read.
+ * The vaultDB writes onto the manifest it is handed, so hand it a new one each step.
  */
-export type WriteManifest = BankObserved & { tags: WriteTags, actual: unknown, ancestor: unknown }
+export interface WriteManifest extends BankObserved {
+  /** The write's tags, made of the ante row, the row the write was judged against, and whether the datastore wrote. */
+  tags: WriteTags
+  /** The row written where the datastore wrote, else the ante row; null for none. */
+  actual: unknown
+  /** Where `actual` is null, the nearest row above the scope, live or a tombstone, null for none: it gives the shell's lifepath. Read nowhere else. */
+  ancestor: unknown
+}
 
-/** What a datastore observed in one atomic step of a listing, beside {@link BankObserved}.
- * - `tags`     -- the parent's {@link GetTags}
- * - `actual`   -- the parent, the row at the ask's scope, null for none
- * - `children` -- each row one label under the ask's labelpath, as `{ labelpath, raw }`: the labelpath it is stored at, and the row. The vaultDB reads them only where the parent is live, so `[]` serves where it is not.
- */
-export type ListManifest = BankObserved & { tags: GetTags, actual: unknown, children: unknown }
+/** What a datastore observed in one atomic step of a listing. */
+export interface ListManifest extends BankObserved {
+  /** The parent's tags, made of `actual`. */
+  tags: GetTags
+  /** The parent, the row at the ask's scope, null for none. */
+  actual: unknown
+  /** Each row one label under the ask's labelpath, as `{ labelpath, raw }`: the labelpath it is stored at, and the row. The vaultDB reads them only where the parent is live, so `[]` serves where it is not. */
+  children: unknown
+}
 
-/** A bank's three roots as a datastore read them, each null for none, by its key in {@link BankRoots}. */
-export type RootRows = { bank: unknown, gate: unknown, root: unknown }
+/** A bank's three roots as a datastore read them, by its key in {@link BankRoots}. */
+export interface RootRows {
+  /** The bank row, null for none. */
+  bank: unknown
+  /** The main gate, null for none. */
+  gate: unknown
+  /** The root box, null for none. */
+  root: unknown
+}
 
-/** What a datastore observed in one atomic step of a birth, beside {@link BankObserved}.
- * - `tags`   -- the birth's {@link BirthTags}, each root's made of it before any write
- * - `actual` -- the three roots after any write ({@link RootRows})
- */
-export type BirthManifest = BankObserved & { tags: BirthTags, actual: RootRows }
+/** What a datastore observed in one atomic step of a birth. */
+export interface BirthManifest extends BankObserved {
+  /** The birth's tags: each root's, made of it before any write, and whether the datastore wrote. */
+  tags: BirthTags
+  /** The three roots after any write. */
+  actual: RootRows
+}
 
-/** What a datastore observed in one atomic step of a get of the world: its three roots ({@link RootRows}), beside {@link BankObserved}. */
-export type WorldManifest = BankObserved & { actual: RootRows }
+/** What a datastore observed in one atomic step of a get of the world. */
+export interface WorldManifest extends BankObserved {
+  /** The bank's three roots. */
+  actual: RootRows
+}
 
-/** What a datastore observed in one atomic step of an ask for stats: the bank's raw {@link VaultStats}, beside {@link BankObserved}. */
-export type StatsManifest = BankObserved & { stats: unknown }
+/** What a datastore observed in one atomic step of an ask for stats. */
+export interface StatsManifest extends BankObserved {
+  /** The bank's {@link VaultStats}, raw. */
+  stats: unknown
+}
 
 /** What a manifest carries of the bank, checked. */
 export type CheckedBankObserved = { banktok: Lifetok, tracked: Tracked, read_tc: ReadTc }
@@ -209,9 +246,15 @@ export type ScribedBirthManifest = CheckedBirthManifest & (
   | { ok: false, act: EX.RefusedAct,     refusedroot: keyof BankRoots }
 )
 
-/** A change a concrete adapter's `doWatch` passes to `receive`: the changed Thing, raw, with the `banktok` of its bank as the datastore last read it.
- * Watchers are notified of the Thing alone, with that banktok, or the void lifetok where it is no lifetok: a bank that changed is a change of its own.
- * `read_tc` is the datastore's raw UUID version 7 of when it read the Thing. A datastore that makes none leaves it out, and the notice is read when it arrives.
+/** A change a concrete adapter's `doWatch` passes to `receive`.
+ * Watchers are notified of the Thing alone, with `banktok`, or the void lifetok where it is no lifetok: a bank that changed is a change of its own.
  */
-export type Received = { record: unknown, banktok: unknown, read_tc?: unknown }
+export interface Received {
+  /** The changed Thing, raw. */
+  record: unknown
+  /** The lifetok of the Thing's bank as the datastore last read it. */
+  banktok: unknown
+  /** The datastore's raw UUID version 7 of when it read the Thing. A datastore that makes none leaves it out, and the notice is read when it arrives. */
+  read_tc?: unknown
+}
 // --

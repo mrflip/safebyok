@@ -3,13 +3,11 @@
 import { isEqual, omit } from 'es-toolkit'
 import { type EX, Phrases as BigPhrases } from 'safebyok-big/internals'
 import type { GateWriteAsk } from '../shapes/shapes-asks'
+import type { AnteWayins } from '../shapes/shapes-manifest'
 
-// == [Policies]: AnteWayins, GatePolicies
+// == [Policies]: GatePolicies
 // Each judges a write that replaces the live gate. Each line is one row of its policy's table in notes/storage-policies.md,
 // in the same order, less big's registered_at row: every live-over-live write leaves its born_at the same.
-
-/** The wayins of the ante row as a datastore read them: each field unchecked. */
-export type AnteWayins = Readonly<Record<string, unknown>>
 
 /** The storage policies, each a check of a gate write ask against the wayins of the live gate it replaces. Each returns why it refuses, or null to allow the write. */
 export const GatePolicies = {

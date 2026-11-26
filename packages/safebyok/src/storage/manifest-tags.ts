@@ -6,8 +6,8 @@
 import { CX, type EX, SX } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
 import type { AnyAsk, BirthPuts, Track, WriteAsk } from '../shapes/shapes-asks'
-import type { BirthTags, GetTags, PolicyVerdict, PolicyVerdicts, Presence, RevseqCmp, RevtokCmp, RootRows, RootTags, SameCmp, WriteTags } from '../shapes/shapes-manifest'
-import { type AnteWayins, GatePolicies } from './policies'
+import type { AnteWayins, BirthTags, GetTags, PolicyVerdict, PolicyVerdicts, Presence, RevseqCmp, RevtokCmp, RootRows, RootTags, SameCmp, TrackedRows, WriteTags } from '../shapes/shapes-manifest'
+import { GatePolicies } from './policies'
 
 // == [Fields]: fieldOf, banktokOf
 // A row in a datastore is our code's, or a test's plant: read it field by field, and judge none of it here.
@@ -105,11 +105,8 @@ function anteWayinsOf(ante: unknown): AnteWayins {
 }
 // --
 
-// == [Tracked]: TrackedRows, trackedOf, trackedRowOf
+// == [Tracked]: trackedOf, trackedRowOf
 // A datastore compares what an ask tracks with the bank, main gate and root box it read, in the step that read them.
-
-/** The raw bank, main gate and root box a datastore read, each null for none, under its key in a `track`. */
-export type TrackedRows = Readonly<{ bank: unknown, [Labelpath.MainGate]: unknown, [Labelpath.RootBox]: unknown }>
 
 /** A manifest's `tracked`: for each root `ask` tracks, `'same'` where its raw row has the revseq and lifepath tracked, else the raw row. */
 export function trackedOf({ track }: AnyAsk, rows: TrackedRows): TrackedRows {

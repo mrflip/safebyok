@@ -19,7 +19,7 @@ import { VaultStatsChecks } from '../shapes/shapes-vault-stats'
 import * as ManifestTags from './manifest-tags'
 import * as Throwers from '../refusals/throwers'
 
-// == [Observations]: checkGetObservations, checkWriteObservations, checkListObservations, checkBirthObservations, checkWorldObservations, checkStatsObservations, checkedRowsOf, checkedRowOf, checkedChildrenOf, checkedRootsOf, checkedRootOf, checkedAncestorOf, checkedBankObservedOf, checkedBanktokOf, checkedTrackedOf, trackedEntryOf, checkedWatchedOf
+// == [Observations]: checkGetObservations, checkWriteObservations, checkListObservations, checkBirthObservations, checkWorldObservations, checkStatsObservations, checkedRowsOf, checkedRowOf, checkedChildrenOf, checkedRootsOf, checkedRootOf, checkedAncestorOf, checkedBankObservedOf, banktokOrVoidOf, checkedTrackedOf, trackedEntryOf, checkedWatchedOf
 // A row that fails its kind's checks is incompatible: a record our code would not write, which refuses `damaged_row`. A manifest
 // that is malformed, or a row that is no object, means the datastore or its concrete adapter is broken, and refuses `storage_issue`.
 
@@ -107,15 +107,17 @@ function checkedAncestorOf({ userid, banklabel, labelpath }: ThingScope, row: un
   return ancestor
 }
 
+// A manifest with no banktok is a datastore that forgot it; one whose banktok is no lifetok read a damaged bank row, whose own check speaks for it.
 /** What a manifest carries of the bank, each checked. */
 function checkedBankObservedOf(ask: AnyAsk, manifest: BankObserved): CheckedBankObserved {
-  return { banktok: checkedBanktokOf(manifest.banktok), tracked: checkedTrackedOf(ask, manifest.tracked), read_tc: ManifestChecks.read_tc.parse(manifest.read_tc) }
+  if (! ('banktok' in manifest)) { throw Throwers.banktokMissing() }
+  return { banktok: banktokOrVoidOf(manifest.banktok), tracked: checkedTrackedOf(ask, manifest.tracked), read_tc: ManifestChecks.read_tc.parse(manifest.read_tc) }
 }
 
 // A banktok is news, never the verdict: one that is no lifetok reads as the void lifetok, and the step's answer stands.
 // Unspecified for a damaged row: notes/wontfix.md.
 /** A banktok a datastore read, or the void lifetok where it is no lifetok. */
-export function checkedBanktokOf(banktok: unknown): Lifetok {
+export function banktokOrVoidOf(banktok: unknown): Lifetok {
   const banktokReport = PerKindChecks.storedLifetok.shape.lifetok.safeParse(banktok)
   return banktokReport.success ? banktokReport.data : SX.VoidLifeTok
 }
@@ -173,29 +175,29 @@ type PutTableTags = Pick<WriteTags, 'presence' | 'revtok_cmp' | 'revseq_cmp' | '
 
 /** The act of a write of a live record: see the put table in `notes/answer-contract.md`. The first matching row wins. */
 export function putActOf(ask: WriteAsk, tags: PutTableTags): EX.PutAct | EX.RefusedAct {
-  const { presence, revtok_cmp: revtokCmp, revseq_cmp: revseqCmp } = tags
-  if (revtokCmp  === '=next')                                                         { return 'retcon' }
-  if (revseqCmp  === 'ahead')                                                         { return 'ahead' }
-  if ((revtokCmp === 'eq')  && ((revseqCmp !== 'eq') || isLifeMismatch(ask, tags)))  { return 'clash' }
-  if ((revtokCmp === 'neq') && (revseqCmp === 'eq'))                                  { return 'forked' }
+  const { presence, revtok_cmp, revseq_cmp } = tags
+  if (revtok_cmp === '=next')                                                           { return 'retcon' }
+  if (revseq_cmp === 'ahead')                                                           { return 'ahead' }
+  if ((revtok_cmp === 'eq')  && ((revseq_cmp !== 'eq') || isLifeMismatch(ask, tags)))   { return 'clash' }
+  if ((revtok_cmp === 'neq') && (revseq_cmp === 'eq'))                                  { return 'forked' }
   // The flag that applies: `ifPresent` over a live Thing, `ifAbsent` over a tombstone or none.
   const opflag = (presence === 'live') ? ask.ifPresent : ask.ifAbsent
-  if (revtokCmp  === 'neq')                                                           { return ((presence === 'live') && (opflag === 'get')) ? 'passed' : 'stale' }
-  if (presence   === 'void')                                                          { return (opflag === 'add') ? 'born'   : 'void' }
-  if (presence   === 'gone')                                                          { return (opflag === 'add') ? 'reborn' : 'gone' }
-  if (opflag     === 'repl')                                                          { return 'replaced' }
+  if (revtok_cmp === 'neq')                                                             { return ((presence === 'live') && (opflag === 'get')) ? 'passed' : 'stale' }
+  if (presence   === 'void')                                                           { return (opflag === 'add') ? 'born'   : 'void' }
+  if (presence   === 'gone')                                                           { return (opflag === 'add') ? 'reborn' : 'gone' }
+  if (opflag     === 'repl')                                                           { return 'replaced' }
   return (opflag === 'get') ? 'passed' : 'camped'
 }
 
 /** The act of a write of a tombstone: see the del table in `notes/answer-contract.md`. The first matching row wins. */
 function delActOf(ask: WriteAsk, tags: WriteTags): EX.DelAct | EX.RefusedAct {
-  const { presence, revtok_cmp: revtokCmp, revseq_cmp: revseqCmp } = tags
-  if (revtokCmp  === '=next')                                                         { return 'retcon' }
-  if (revseqCmp  === 'ahead')                                                         { return 'ahead' }
-  if ((revtokCmp === 'eq')  && ((revseqCmp !== 'eq') || isLifeMismatch(ask, tags)))  { return 'clash' }
-  if ((revtokCmp === 'neq') && (revseqCmp === 'eq'))                                  { return 'forked' }
-  if (revtokCmp  === 'neq')                                                           { return (presence === 'gone') ? 'gone' : 'stale' }
-  if (presence   === 'void')                                                          { return 'void' }
+  const { presence, revtok_cmp, revseq_cmp } = tags
+  if (revtok_cmp === '=next')                                                           { return 'retcon' }
+  if (revseq_cmp === 'ahead')                                                           { return 'ahead' }
+  if ((revtok_cmp === 'eq')  && ((revseq_cmp !== 'eq') || isLifeMismatch(ask, tags)))   { return 'clash' }
+  if ((revtok_cmp === 'neq') && (revseq_cmp === 'eq'))                                  { return 'forked' }
+  if (revtok_cmp === 'neq')                                                             { return (presence === 'gone') ? 'gone' : 'stale' }
+  if (presence   === 'void')                                                           { return 'void' }
   return (presence === 'gone') ? 'dubdel' : 'deleted'
 }
 

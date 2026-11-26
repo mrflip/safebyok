@@ -92,7 +92,7 @@ export function bornAtNotNow(ask: WriteAsk): Errors.VaultError { return new Erro
 export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
 // --
 
-// == [Storing Throwers]: PoliciedMeta, gateIssue, storeQuotaTooSmall, storageCallRefused, bornAtNotStored, lifetokNotStored, rowOfOtherAddress, bankRootsMissing, listParentNotLive, answerNotMade, writtenOfOtherAct, proposedNotWritten, tagsOfOtherRow, tagsOfOtherAsk, answerOfOtherManifest
+// == [Storing Throwers]: PoliciedMeta, gateIssue, storeQuotaTooSmall, storageCallRefused, bornAtNotStored, lifetokNotStored, rowOfOtherAddress, bankRootsMissing, banktokMissing, listParentNotLive, answerNotMade, writtenOfOtherAct, proposedNotWritten, tagsOfOtherRow, tagsOfOtherAsk, answerOfOtherManifest
 
 // Big types a refusal's meta.act as its own BadAct, which has no `policied`.
 /** Refusal meta with act `policied`, for a write the act tables allow but a storage policy, the born_at check or the lifetok check refuses. */
@@ -128,6 +128,9 @@ export function rowOfOtherAddress(fieldnames: readonly string[]): Errors.VaultEr
 
 /** A `storage_issue` refusal: a live bank is stored without its main gate or its root box. */
 export function bankRootsMissing(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.BankRootsMissing) }
+
+/** A `storage_issue` refusal: the datastore handed back a manifest with no banktok. */
+export function banktokMissing(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.BanktokMissing) }
 
 /** An `absent_thing` refusal of a list whose parent holds a tombstone or nothing, which has no children. `meta` names its act, its oplabel and its ask. */
 export function listParentNotLive(meta: Errors.RefusalMeta): Errors.VaultError { return new Errors.VaultError('absent_thing', Phrases.ListParentNotLive, { meta }) }

@@ -135,7 +135,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       let event: VaultItemEvent
       try {
         const { read_tc = readTcNow() } = ManifestChecks.received.parse(received)
-        event = noticeOf(deepFreeze(ManifestActs.checkedWatchedOf(bankScope, record)), ManifestActs.checkedBanktokOf(banktok), read_tc)
+        event = noticeOf(deepFreeze(ManifestActs.checkedWatchedOf(bankScope, record)), ManifestActs.banktokOrVoidOf(banktok), read_tc)
       } catch (err) {
         onBadNews(Outcome.storageRefusalOf(err))
         return

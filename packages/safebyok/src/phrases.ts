@@ -249,7 +249,7 @@ export function probeStepRefused(stepkind: string): string {
 export const ProbePutNotGot = "Storage answered the probe's get without the revision its put had just written: storage lost the write, or answered from a replica or cache that lags behind it."
 // --
 
-// == [Storing]: StoreQuotaTooSmall, storageCallRefused, WrittenOfOtherAct, ProposedNotWritten, TagsOfOtherRow, TagsOfOtherAsk, AnswerOfOtherManifest
+// == [Storing]: StoreQuotaTooSmall, storageCallRefused, WrittenOfOtherAct, ProposedNotWritten, TagsOfOtherRow, TagsOfOtherAsk, BanktokMissing, AnswerOfOtherManifest
 
 /** An IndexedDB store opened where the browser offers the page `quota` bytes, fewer than the `least` a vault needs. */
 export function StoreQuotaTooSmall(quota: number, least: number): string {
@@ -272,6 +272,9 @@ export const TagsOfOtherRow = "The vault's storage reported comparisons that are
 
 /** The datastore's tags disagree with the ask. */
 export const TagsOfOtherAsk = "The vault's storage reported comparisons that disagree with the write asked of it: the storage adapter needs mending."
+
+/** The datastore's manifest has no banktok. */
+export const BanktokMissing = "The vault's storage handed back no banktok, the lifetok of the bank it read: the storage adapter needs mending."
 
 /** The vaultDB's answer is not its manifest's. */
 export const AnswerOfOtherManifest = "The vaultDB made an answer that is not a copy of what its storage handed back: a bug in safebyok."
