@@ -55,7 +55,7 @@ const EveryRevseq = ['birth', 'eq', 'stale', 'ahead'] as const
 /** The revseq comparisons a row of a table names: "@" for every one. */
 function revseqsOf(revseqCmp: WriteTags['revseq_cmp'] | '@'): readonly WriteTags['revseq_cmp'][] { return (revseqCmp === '@') ? EveryRevseq : [revseqCmp] }
 
-// Each row of the get table of notes/answer-contract.md. A flag of "@" is every flag.
+// Each row of the get table of notes/answer-contract.md.
 const GetRows = [
   ["GV1", ["nil"],         "void", "gotvoid"],
   ["GV2", ["fail"],        "void", "void"],
