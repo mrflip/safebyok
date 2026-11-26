@@ -119,8 +119,7 @@ END $$;
 export const VaultFunctionsSql = `-- safebyok-postgres: the functions PostgresVaultDB calls to write a Thing. For Postgres 18 or later:
 -- they call uuidv7(), and each write function's UPDATE names its written row with RETURNING WITH (NEW AS ...).
 -- Run it after the tables, and again with each upgrade of safebyok-postgres. Each name carries the version of the tables
--- the function is built for and its own revision, so an upgrade adds its functions beside the old ones, which stay;
--- running the same version again replaces its own.
+-- the function is built for and its own revision; running the same version again replaces its own.
 --
 -- Do not change the locking semantics: no transaction block (BEGIN ... COMMIT), no row lock (SELECT ... FOR UPDATE).
 -- Discuss first.
@@ -141,7 +140,8 @@ export const VaultFunctionsSql = `-- safebyok-postgres: the functions PostgresVa
 --
 -- A function that writes a record notifies the user's channel in the same transaction (see ${VaultFunctionNames.tell_thing}).
 --
--- The functions run with the caller's privileges, and only their owner, the role that ran this file, may call them.
+-- The functions run with the caller's privileges. Only their owner, the role that ran this file, may call the ones that
+-- write a Thing or notify a watch, or thing_record.
 
 -- Convert a row to the Thing it was stored from, dropping the columns that are null. Returns null for no row.
 -- Only top-level nulls are dropped: a null inside wayins is part of the Thing.

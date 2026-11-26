@@ -27,11 +27,12 @@ it refuses (SQLSTATE `23514`) is one safebyok could not have read back.
 `PostgresVaultDB` needs **Postgres 18 or later**: each statement it runs dates its read with Postgres's own `uuidv7()`,
 so the time an answer was read is the database's, never the device's.
 
-`VaultFunctionsSql` is the SQL of the functions `PostgresVaultDB` calls to write a Thing, for Postgres 18 or later. Run
-it after the tables, and **again with each upgrade of this package**. Each function's name carries the version of the
-tables it is built for and its own revision, so an upgrade adds its functions beside the old ones, and running the same
-version again replaces its own. They run with the caller's privileges, and only their owner, the role that ran the SQL,
-may call them. So run both as the role your server connects as, or grant that role `EXECUTE`.
+`VaultFunctionsSql` is the SQL of the functions `PostgresVaultDB` calls, for Postgres 18 or later. Run it after the
+tables, and **again with each upgrade of this package**, which replaces the functions it made. Until 1.0 a function
+keeps its name across releases: a release that changes a function's arguments or result says so in its changelog, and
+you drop that function first, since Postgres will not replace it in place. The functions run with the caller's
+privileges, and only their owner, the role that ran the SQL, may call the ones that write a Thing or notify a watch. So
+run both as the role your server connects as, or grant that role `EXECUTE` on them.
 
 ```ts
 import { VaultFunctionsSql, VaultTablesSql } from 'safebyok-postgres'
