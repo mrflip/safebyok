@@ -3,7 +3,8 @@
 * **Date:** 2026-11-26 · **Mode:** YOLO · **Issued by:** the Coach (Philip), in a design talk, then `/sprint YOLO /turbochat`
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
-* **Status:** planned; thread 1 starting
+* **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
+* **Status:** thread 1 building (cut 2026-11-26 from origin/main, `/workspace/byok-manifest_things`)
 
 ## Read first
 
