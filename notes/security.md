@@ -42,6 +42,11 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-26 (policy_tags, thread 9 of sprint `vault_manifest`, branch `20261126-policy_tags`): **In the new core, `packages/safebyok`, a datastore no longer hands back a storage policy's refusal as a message string; it names the refusal by a tag, and safebyok makes the error's message from its own table. This supersedes the act_tables entry above, which said a verdict's message must be one of `PolicyPhrases`.**
+  Verdict: `{ ok: true } | { ok: false, refusaltag }`, the `refusaltag` a key of `PolicyPhrases` (`src/phrases.ts`), such as `'PasskeyStored'`. The manifest check (`ManifestChecks.policyVerdict`, `src/shapes/shapes-manifest.ts`) is `.strict()` and refuses `storage_issue` for a refusaltag that is not one of those keys, or for any other field on the verdict.
+  Message: made by `PhraseForRefusaltag` through `Throwers.taggedRefusal` (`src/refusals/throwers.ts`, `src/storage/manifest-acts.ts`), so no text a datastore returns (Postgres's SQL, Convex, IndexedDB) reaches an error message the host sees or logs. What a host sees is unchanged: the same refusal kind (`gate_issue`) and message.
+  Where: `src/storage/policies.ts`, `src/storage/manifest-tags.ts`, and the policy functions in `packages/safebyok-postgres/src/vault-functions.ts`, which now return the tag.
+
 * 2026-11-26 (act_tables, thread 8 of sprint `vault_manifest`, branch `20261126-act_tables`): **In the new core, `packages/safebyok`, a write's act is looked up in tables (`src/storage/manifest-acts.ts`: `RevisionGrid`, `MatchActs`, `StaleActs`, `GetActs`, `ListActs`) rather than derived by an if-tree, and a policied write's refusal is built by one function, `Throwers.taggedRefusal` (`src/refusals/throwers.ts`); a datastore's report of a write is now held against the ask in two more ways.**
   Acts: checked once against the old if-tree over every combination of its inputs, and no answer changed.
   Refusals: `taggedRefusal` takes a refusaltag, and the refusal kind and phrase come from lookup tables. The error carries what the old throwers' carried: `loggableAskOf(ask)` (which leaves out sealed material), the act, and the stored row as `dbhas` (sealed). No new material enters an error object.
