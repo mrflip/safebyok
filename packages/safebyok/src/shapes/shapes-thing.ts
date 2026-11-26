@@ -100,7 +100,6 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
   // A checked record shows its fields in this order, for a reader's eye alone: nothing stored, compared or bound into a
   // ctx takes its order from an object's keys (STYLE.md, *Order comes from an explicit list*).
   const sparse       = obj({ ...thingScope.shape, label, ...revisioned, fmt: lit(ThingFormat) })
-  // What a write reads of the Thing stored before it carries its record forward: the rest of the row goes unread.
   // AdapterVaultDB checks only the shape of a sealed part: what is inside is the sealer's.
   const sealed       = obj({
     /** The part's own key, fresh for each seal, wrapped under the bankKey. */

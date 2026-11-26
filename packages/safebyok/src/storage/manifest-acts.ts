@@ -39,7 +39,7 @@ function checkedRowsOf(ask: GetAsk | WriteAsk, manifest: GetManifest | WriteMani
   }
 }
 
-/** The raw `row` a datastore read at `scope`, checked by its kind but not its address, or null for none. */
+/** The raw `row` a datastore read at `labelpath`, checked by its kind but not its address, or null for none. */
 function checkedRowOf({ labelpath }: Pick<ThingScope, 'labelpath'>, row: unknown): ThingRecord | null {
   if (row === null) { return null }
   if (! CX.isPlainBag(row)) { throw Throwers.storageIssue() }

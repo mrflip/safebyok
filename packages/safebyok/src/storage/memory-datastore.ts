@@ -14,7 +14,7 @@ import { vaultStatsOf } from './vault-stats'
 /** A watch: the bank it follows, the function called with each change, and the one called with any trouble. */
 export type Watcher = { scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: Errors.VaultError) => void }
 
-// It holds only what our code wrote, or what a test planted through `_cheat_things`, and it never throws. A row that fails
+// Its rows are only what our code wrote, or what a test planted through `_cheat_things`, and it never throws. A row that fails
 // its kind's checks was not damaged here: it is incompatible, a record our code would not write.
 /** The datastore of a vaultDB in this tab's memory, gone when the tab closes. It reads no check and no act table: each function hands back clones of the rows it read, and its tags. */
 export class MemoryDatastore {

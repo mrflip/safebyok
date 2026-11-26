@@ -3,7 +3,7 @@ import { SX } from 'safebyok-big/internals'
 import * as ManifestTags from '../../src/storage/manifest-tags'
 import * as TH from '../test-helpers'
 
-describe("ManifestTags, over rows a datastore holds", () => {
+describe("ManifestTags, over the raw rows in a datastore", () => {
   it("never throws on a row that is no object, and finds it a tombstone that cites nothing", () => {
     for (const row of ['not a Thing', 42, true, []]) {
       expect(ManifestTags.presenceOf(row)).to.eq('gone')

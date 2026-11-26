@@ -10,7 +10,7 @@ import type { GetTags, PolicyVerdict, PolicyVerdicts, Presence, RevseqCmp, Revto
 import { type AnteWayins, GatePolicies } from './policies'
 
 // == [Fields]: fieldOf, banktokOf
-// A row a datastore holds is our code's, or a test's plant: read it field by field, and judge none of it here.
+// A row in a datastore is our code's, or a test's plant: read it field by field, and judge none of it here.
 
 /** The field `fieldname` of the raw `row`: undefined where the row has none, or is no object. */
 export function fieldOf(row: unknown, fieldname: string): unknown { return CX.isPlainBag(row) ? row[fieldname] : undefined }
