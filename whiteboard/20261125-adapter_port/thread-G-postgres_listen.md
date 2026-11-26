@@ -1,6 +1,6 @@
 # Thread G: postgres_listen (2026-11-26)
 
-Branch `20261126-postgres_listen`, PR #PRNUM, on main. Proved: safebyok-postgres's tests (179, 9 of them new), typecheck
+Branch `20261126-postgres_listen`, PR [#935](https://github.com/mrflip/safebyok/pull/935), on main. Proved: safebyok-postgres's tests (179, 9 of them new), typecheck
 and lint while building; `pnpm justify` after the catch-up (see the PR's **Tests:** line).
 
 * **Built**:
