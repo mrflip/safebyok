@@ -88,10 +88,11 @@ call made before then refuses as `identity_revoked`.
 
 Three tables inside the component, one for each kind of Thing: `bank_things`, `gate_things` and `box_things`, as
 `safebyok-postgres` has. Each document is a Thing as the core wrote it, a field for each of its fields; a field that is
-an object (a gate's `wayins`, a box's `sidecar` and `whisper_sealed`) is stored as it is. Each table is indexed
-`by_scope` on `userid`, `banklabel` and `labelpath`, so one range fetches the children of a Thing. Each document also
-holds `commit_ts`, the timestamp Convex committed its last write at, indexed `by_commit` after `userid` and `banklabel`,
-so one range of each table fetches what a bank's watch has not yet heard. A deleted Thing stays as its tombstone.
+an object (a gate's `wayins`, `auth`, `sigs` and `meta`, a box's `sidecar` and `whisper_sealed`) is stored as it is.
+Each table is indexed `by_scope` on `userid`, `banklabel` and `labelpath`, so one range fetches the children of a
+Thing. Each document also holds `commit_ts`, the timestamp Convex committed its last write at, indexed `by_commit`
+after `userid` and `banklabel`, so one range of each table fetches what a bank's watch has not yet heard. A deleted
+Thing stays as its tombstone.
 
 **How big a bank can be.** `stats` reads every Thing of a bank in one query, within a Convex query's limits (32,000
 documents, 16 MiB read), as may a watch that comes back after long enough away, so a bank past that makes its stats
