@@ -8,7 +8,7 @@ import type { AnteWayins, PolicyTag } from '../shapes/shapes-manifest'
 // == [Policies]: GatePolicies
 
 // Each judges a write that replaces the live gate. Each line is one row of its policy's table in notes/storage-policies.md,
-// in the same order, less big's registered_at row: every live-over-live write leaves its born_at the same.
+// in the same order.
 
 /** The storage policies, each a check of a gate write ask against the wayins of the live gate it replaces. Each returns the {@link PolicyTag} of its refusal, or null to allow the write. */
 export const GatePolicies = {

@@ -279,10 +279,9 @@ LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   END
 $$;
 
--- The storage policies, one function each, as notes/storage-policies.md lists them, less big's registered_at check: the
--- write function checks born_at for every live-over-live write. Each is a copy of safebyok's GatePolicies, check for
--- check and tag for tag, and returns the tag of its refusal, or null where it allows the write. A gate's passkey0 is
--- an object, or JSON null for none.
+-- The storage policies, one function each, as notes/storage-policies.md lists them. Each is a copy of safebyok's
+-- GatePolicies, check for check and tag for tag, and returns the tag of its refusal, or null where it allows the write.
+-- A gate's passkey0 is an object, or JSON null for none.
 
 -- Why a write that names replace_passphrase refuses: it must replace the passphrase wayin the gating proved against, and nothing else.
 CREATE OR REPLACE FUNCTION ${VaultFunctionNames.replace_passphrase_refusal}(ante_wayins jsonb, cited_wayins jsonb, proposed_wayins jsonb) RETURNS text
