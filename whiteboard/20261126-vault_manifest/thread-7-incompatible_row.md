@@ -1,6 +1,6 @@
 # Thread 7: incompatible_row (2026-11-26)
 
-Branch `20261126-incompatible_row`, PR #TBD, stacked on #944. Proved: `safebyok` typecheck, lint and 2,425 tests green; `safebyok-big` 2,952 tests green; see the PR for `pnpm justify`.
+Branch `20261126-incompatible_row`, PR #945, stacked on #944. Proved: `safebyok` typecheck, lint and 2,425 tests green; `safebyok-big` 2,952 tests green; see the PR for `pnpm justify`.
 
 * **Built**
   * **The kind.** `incompatible_row` is in `safebyok-big`'s `refusalkindVals` (beside `damaged_row`) and `RefusalFamilyForKind` (`bad_news`), with a row in `errors.test.ts`'s family table. Big's own throwers and classifier still throw `damaged_row`. This is the "new refusal kind" broadening `notes/transition.md` allows, and it changes nothing big does.
