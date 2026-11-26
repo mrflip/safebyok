@@ -291,7 +291,7 @@ export default defineConfig([
       'unicorn/prefer-ternary': 'off',
       // A decision table reads best flat: a row a line, each with its tests and its answer. The
       // rule counts every `&&` and early return against such a function, and the way to satisfy
-      // it is helpers that hide the rows (`storage/classifier.ts`).
+      // it is helpers that hide the rows.
       'sonarjs/cognitive-complexity': 'off',
       // Written for JavaScript, where a return type is only what the code happens to return. Here
       // it is declared, and a declared union (`WhisperJson`) is the contract, not an accident.
