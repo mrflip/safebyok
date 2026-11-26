@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Threads 8 and 9 filed (#942, #943); thread 6 filed (#944); thread 7 filed (#945); restacked onto #913 (merged); thread 10 filed (#946); threads 1–11 filed, the line `#934 → … → #947` green and out of draft; the sprint PR #933 joins on top at wrap-up
+* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Threads 8 and 9 filed (#942, #943); thread 6 filed (#944); thread 7 filed (#945); restacked onto #913 (merged); thread 10 filed (#946); thread 11 being redone as a forwarding pipe (#947, the line red in safebyok-graphql until it lands); thread 12 (#948) waits on it; then wrap-up
 
 ## Read first
 
@@ -183,7 +183,9 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Look-ahead:* none.
 *Size:* medium.
 *Review:* fixed (opus, medium), 4 fixes (`isWriteAct` exported for `GraphQLVaultDB`'s rebuilt copy; one phrases import; header and doc blocks; five two-behaviour titles). Significant, to the Coach: the core's contract accepts a sparse live box in a listing and `AncestorLives` from every datastore (two broken-row shapes answer differently; no working one). Minor: a carried shell's scope unchecked → rework (`Shell.under` equality); incompatible rows' bank rebuilt from the ask (left); test tables without blurbs.
-*Status:* filed 2026-11-26 at 1323380e5 (rework: a carried shell must equal `Shell.under(ask, lives)`); PR #947 out of draft; the line is green. Wire: a listing's answer drops its kids; `SafebyokKids` gone; `SafebyokIncompatibleThing`.
+*Status:* filed 2026-11-26 at 1323380e5 (rework: a carried shell must equal `Shell.under(ask, lives)`); PR #947 out of draft; the line is green.
+*Orchestrator:* redone in place (the Coach: "yes, let's stick with the non-transforming pipe" ... "let's not put this big a change through a write-rewrite within itself"): the branch reset to #946's tip, `GraphQLVaultDB` implements `VaultDB` and forwards the server's answers, checked by shape and scope ("it doesn't have to be blind, only transparent"); the core's contract is not loosened. The first attempt is at tag `20261126-graphql_manifest-pipe-prerewrite`. #947 force-pushed with a lease when ready.
+*Status (redo):* building. Wire: a listing's answer drops its kids; `SafebyokKids` gone; `SafebyokIncompatibleThing`.
 
 ### 12. policies_note — notes/storage-policies.md for the new core
 
@@ -192,14 +194,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Gloss.* *Orchestrator:* rewrite `notes/storage-policies.md` (today big's alone) for the new core: `GatePolicies`, `ManifestTags.policiesOf`, the refusaltag verdict, the one refusal builder, Postgres's SQL copies, Convex and IndexedDB through `ManifestTags`; drop big's description; fix VOCABULARY's **options** row. Docs only.
 *Levels:* worker `thread-worker` (opus); review `low`.
 *Depends on:* thread 11.
-*Status:* building.
-
-### 13. graphql_strict (pending the Coach) — the core's contract strict again
-
-> "There's no compatibility requirement on GraphQL, not sure why it's driving the bus"
-
-*Gloss.* *Orchestrator:* revert #947's loosening of the core (`listed`, `AncestorLives`) and give GraphQL what it needs by changing the wire instead: the server sends what a datastore would, or `GraphQLVaultDB` forwards the server's answers checked by shape. An explorer is weighing the two; the Coach rules (Open Matters, TOP).
-*Depends on:* thread 12.
+*Status:* built (#948), paused at the Coach's hold, resumed to fix its GraphQL sentence; files after the redone #947.
 
 ## Line
 
