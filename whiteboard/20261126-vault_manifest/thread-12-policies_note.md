@@ -1,6 +1,6 @@
 # Thread 12: policies_note (2026-11-26)
 
-Branch `20261126-policies_note`, PR #TBD, stacked on #947. Proved: pending.
+Branch `20261126-policies_note`, PR #948, stacked on #947. Proved: pending.
 
 * **Built**: `notes/storage-policies.md` rewritten for the new core: the three gate policies' tables, row for row with
   `GatePolicies` (`packages/safebyok/src/storage/policies.ts`) and Postgres's `*_refusal` functions; where a policy is
