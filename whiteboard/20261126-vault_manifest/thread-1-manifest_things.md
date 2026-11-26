@@ -1,9 +1,10 @@
 # Thread 1: manifest_things (2026-11-26)
 
-Branch `20261126-manifest_things`, PR [#934](https://github.com/mrflip/safebyok/pull/934), cut from origin/main. Proved: `packages/safebyok` lint, typecheck,
-test (2,392 tests, 39 files) green. Red by design: `safebyok-indexeddb`, `safebyok-postgres`, `safebyok-convex`
-typechecks (their `doGetThing`/`doWriteThing` still return the old `GotActual`/`WroteActual`, and they call the
-classifier functions that went); threads 3 (idb), 4 (postgres) and 5 (convex) mend them.
+Branch `20261126-manifest_things`, PR [#934](https://github.com/mrflip/safebyok/pull/934), cut from origin/main. Proved: `pnpm justify` after the catch-up rebase: red only in
+`safebyok-indexeddb` (115 of 130 tests fail), `safebyok-postgres` (78 of 170) and `safebyok-convex` (149 of 231), each
+also red in lint and typecheck (their `doGetThing`/`doWriteThing` still return the old `GotActual`/`WroteActual`, and they
+call the classifier functions that went); threads 3 (idb), 4 (postgres) and 5 (convex) mend them. Green elsewhere:
+`safebyok` 2,392 tests, `safebyok-react` 339, e2e 576, the demos (react 99, envman 24, knockknock 26), every `-big` package.
 
 * **Built**:
   - `src/shapes/shapes-manifest.ts`: `ManifestChecks` (tag, `tracked`, `read_tc` checks, `storage_issue`), `PolicyVerdict(s)`,
@@ -43,6 +44,8 @@ classifier functions that went); threads 3 (idb), 4 (postgres) and 5 (convex) me
   - `MemoryDatastore.birthRoots` writes unconditionally; `MemoryVaultDB.doBirthBank` decides from `getWorld` +
     `classifyBirthBank` (Scaffolding until thread 2).
 * **Deviations**:
+  - Pulled forward: the envman and knockknock demos' `LocalStorageVaultDB` overrides `doWriteThing`, so it now returns a
+    `WriteManifest`, and takes its ckey from `MemoryDatastore.ckeyOf` (`MemoryVaultDB.ckeyOf` went with the rows).
   - The ancestor's address is checked where it is read (`checkedAncestorOf`), not in three-way: the shell is built
     from it, and `Shell.under` would otherwise refuse `bad_record` first.
   - Answers that change, all on a broken or incompatible state: `policied` answers carry the step's banktok, tracked
