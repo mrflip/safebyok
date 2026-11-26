@@ -5,7 +5,7 @@
  * - The server could not serve the request, as when its `getUserId` throws: the VaultError `getUserId` threw, or else `unexpected_error`. A watch ends with it.
  * - The request broke this package's rules, as a watch scope that fails its check (only another client sends one): the rule's refusal, `bad_record`.
  * - GraphQL itself failed, as when the server serves another schema: `unexpected_error`, without the server's error text. A request that fails in the network gets `storage_unavailable`.
- * - The server's answer disagrees with what it carries, as a server of another version's may: `storage_issue`, as from a broken datastore. A refusal whose act alone disagrees answers the act this vaultDB finds for the Thing it carries.
+ * - The server's answer disagrees with the Thing it carries, as a server of another version may send: `storage_issue`, or `incompatible_row` where the Thing is of another kind than the ask's, as from a broken datastore. Where only a refusal's act disagrees, the verb answers the act this vaultDB finds for that Thing.
  */
 
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
@@ -189,7 +189,7 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
 }
 // --
 
-// == [Answers]: CheckedAnswer, RefusedAnswer, PresenceOfAct, NoRoots, observedOf, presenceTagsOf, isShell, rowOf, rowsOfCarried, ancestorLivesOf, rootRowsOf, namedRootsOf, throwIfThrown, fieldOf, troubleOf, carriedErrOf, hearNotice
+// == [Answers]: CheckedAnswer, RefusedAnswer, PresenceForAct, NoRoots, observedOf, presenceTagsOf, isShell, rowOf, rowsOfCarried, ancestorLivesOf, rootRowsOf, namedRootsOf, throwIfThrown, fieldOf, troubleOf, carriedErrOf, hearNotice
 
 /** What every answer carries, as its check read it. */
 type CheckedAnswer = Readonly<{ act: string, banktok: unknown, tracked: unknown, read_tc: unknown }>
@@ -197,18 +197,18 @@ type CheckedAnswer = Readonly<{ act: string, banktok: unknown, tracked: unknown,
 /** A refused answer, as its check read it. */
 type RefusedAnswer = CheckedAnswer & Readonly<{ ok: false, act: DB.CrossedAct, err: DB.CrossedErr }>
 
-/** The presence of the row a get's or a listing's act names. Any other act names none, and its tags refuse. */
-const PresenceOfAct: Readonly<Partial<Record<string, DB.Presence>>> = { gotlive: 'live', gotgone: 'gone', gotvoid: 'void', gone: 'gone', void: 'void' }
+/** The presence of the row a get's or a listing's act names. */
+const PresenceForAct: Readonly<Partial<Record<string, DB.Presence>>> = { gotlive: 'live', gotgone: 'gone', gotvoid: 'void', gone: 'gone', void: 'void' }
 
 /** A bank's three roots where none is stored. */
 const NoRoots: DB.RootRows = { bank: null, gate: null, root: null }
 
-/** What a manifest observes of the bank, as `answer` carries it: its banktok, its tracked and its read_tc. */
+/** The banktok, tracked and read_tc of a checked answer, as a manifest observes them. */
 function observedOf({ banktok, tracked, read_tc }: CheckedAnswer): DB.BankObserved { return { banktok, tracked, read_tc } }
 
 // An act that names no presence leaves it undefined, and AdapterVaultDB's check of the tags refuses them.
 /** A get's or a listing's tags: the presence its act names. */
-function presenceTagsOf(act: string): DB.GetTags { return { presence: PresenceOfAct[act] } as DB.GetTags }
+function presenceTagsOf(act: string): DB.GetTags { return { presence: PresenceForAct[act] } as DB.GetTags }
 
 /** True when `carried` is the shell, the void sentinel, which stands for no row: told by its revseq. */
 function isShell(carried: unknown): boolean { return DB.ManifestTags.fieldOf(carried, 'revseq') === DB.Shell.Cited.revseq }
@@ -217,13 +217,13 @@ function isShell(carried: unknown): boolean { return DB.ManifestTags.fieldOf(car
 function rowOf(carried: unknown): unknown { return isShell(carried) ? null : carried }
 
 // The shell names the lives above its scope, which are all of an ancestor that the shell is built from.
-/** What `carried`, a Thing an answer carries at `ask`'s scope, stands for: the row itself; or where it is the shell, no row, and the ancestor's lives it names. */
+/** The actual row and ancestor that `carried`, the Thing an answer carries at `ask`'s scope, stands for. */
 function rowsOfCarried(ask: DB.ThingScope, carried: unknown): Pick<DB.GetManifest, 'actual' | 'ancestor'> {
   if (! isShell(carried)) { return { actual: carried, ancestor: null } }
   return { actual: null, ancestor: ancestorLivesOf(ask, WireChecks.shell.parse(carried)) }
 }
 
-/** The lives of the nearest Thing stored above `ask`'s scope, as `shell` names them: the stored lifeseqs of its lifepath, under as many labels of the ask's labelpath. Null for none. */
+/** The lives of the nearest Thing stored above `ask`'s scope, as `shell` names them, or null for none. */
 function ancestorLivesOf({ userid, banklabel, labelpath }: DB.ThingScope, shell: DB.VoidSentinel): DB.AncestorLives | null {
   const lifeseqs = shell.lifepath.split('/').filter((lifeseq) => lifeseq !== DB.Shell.VoidLifeseq)
   if (lifeseqs.length === 0) { return null }
