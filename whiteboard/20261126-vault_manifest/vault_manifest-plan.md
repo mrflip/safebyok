@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1–3 filed (#934, #937, #939, drafts); thread 4 in review (#940; reviewer resumed after a stall); thread 5 ready (#941, stacked on #939), in review; Closer Look running at 517463cf4 (the Coach asked early)
+* **Status:** threads 1–3 filed (#934, #937, #939, drafts); thread 4 in review (#940; reviewer resumed after a stall); thread 5 ready (#941, stacked on #939), in review; Closer Look done at 517463cf4 (tab `05583f4e-9aa9`, body `b4c7c47f-af71`), awaiting the Coach's replies; nothing scheduled from it before triage
 
 ## Read first
 
