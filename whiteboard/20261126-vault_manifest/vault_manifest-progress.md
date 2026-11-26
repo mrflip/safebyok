@@ -35,3 +35,4 @@ The orchestrator's curated summary of what the threads have taught. Newer than t
 * The ancestor is checked whole, address and all, when read: the shell is built from it. Open Matters.
 * *Orchestrator:* a three-way check only our code can fail refuses `unexpected_error` (thread 2 switches `answerOfOtherManifest`).
 * The demos' `LocalStorageVaultDB` overrides `doWriteThing`; it takes its ckey from `MemoryDatastore.ckeyOf`.
+* Ruled: one consistency function per verb, each calling a shared function for the checks every verb shares (thread 2 builds it, and moves thread 1's onto it). The ancestor stays checked whole when read. Every `damaged_row` check becomes `incompatible_row` (thread 7).
