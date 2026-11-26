@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1–3 filed (#934, #937, #939, drafts); thread 4 filed (#940, at d2b6998a8, beside thread 3); thread 5 ready (#941, stacked on #939), in review; Closer Look done at 517463cf4 (tab `05583f4e-9aa9`, body `b4c7c47f-af71`), awaiting the Coach's replies; nothing scheduled from it before triage
+* **Status:** threads 1–5 filed; thread 4 rebased onto thread 5 (line `1 → 2 → 3 → 5 → 4`), proving the whole line; thread 6 **held** until the Coach's dispatch-table side quest reports and the Closer Look is triaged (the Coach: "don't change plans otherwise until we hear the report")
 
 ## Read first
 
@@ -103,7 +103,8 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Depends on:* thread 2.
 *Look-ahead:* none.
 *Size:* medium-large: if the table split and the manifest port will not fit one context, split the table restructure into a thread of its own and report.
-*Status:* ready 2026-11-26, PR #941, rebased onto thread 3 (517463cf4). Three tables mirroring Postgres's; the watch reads `by_commit` across all three; `banktokOf` returns null (the directive); read_tc stays client-stamped (thread E's reason); the damaged-bank plant drops fields the table lacks; a write disagreement refuses `storage_issue`.
+*Review:* fixed (opus, medium), 2 fixes (validators' doc blocks, README's field list). Cross-table watch cursor sound; client `read_tc` sound; the timeouts were load. Left: the damaged-bank battery case hollow for Convex and Postgres → thread 6; `banktok: null` on the watch's first empty result (stands).
+*Status:* filed 2026-11-26 at f82c00e20. Ready was PR #941, rebased onto thread 3 (517463cf4). Three tables mirroring Postgres's; the watch reads `by_commit` across all three; `banktokOf` returns null (the directive); read_tc stays client-stamped (thread E's reason); the damaged-bank plant drops fields the table lacks; a write disagreement refuses `storage_issue`.
 
 ### 6. actual_words — "stored" sorted into actual, ante and stored
 

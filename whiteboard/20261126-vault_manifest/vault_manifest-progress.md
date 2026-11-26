@@ -59,3 +59,15 @@ The orchestrator's curated summary of what the threads have taught. Newer than t
 * `PolicyPhrases` exported from `safebyok/storage`: one copy of each policy message, filling the SQL.
 * Hosts upgrading drop every `safebyok_a010501_r000_*` function first (the changeset's snippet); no `SqlRevision` bump before 1.0.
 * *Orchestrator:* a network outage (EAI_AGAIN, ~06:06Z) stopped threads 4 and 5 and thread 3's push; resumed with SendMessage, no work lost.
+
+### Thread 5, convex_manifest (filed, #941)
+
+* Three tables mirroring Postgres's; each Convex function hands back a manifest via `ManifestTags`, `isWritable`, `isBirthWritable`. The watch reads `by_commit` across the three tables from one snapshot (no skip, no repeat).
+* `ManifestTags.banktokOf` returns null for a bank row without a lifetok; the contract's "send null" line is gone.
+* `read_tc` stays client-stamped (a Convex query's clock is frozen at its start; a cached result can return).
+
+### After the threads (2026-11-26)
+
+* *Orchestrator:* thread 4 rebased cleanly onto thread 5: the line is `1 → 2 → 3 → 5 → 4`.
+* The Coach relaxed "a datastore reads no check and no act table": "It's not strictly important that other repos emulate the action/implementation of PG, only that they share a common contract/interface." He asked for a side quest on a dispatch table keyed by the tags (an opus explorer, read-only); plans otherwise unchanged until it reports. Thread 6 waits for it and for the Closer Look triage.
+* The Closer Look (at 517463cf4) is in the doc's tab; its E1 (a write may land over an incompatible ante row) needs a ruling.
