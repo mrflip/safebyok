@@ -14,7 +14,7 @@ export function refusalOf(oplabel: string, thrown: unknown): VaultError {
   return isTransient(thrown) ? DB.storageUnavailable(causeOf(thrown)) : DB.storageCallRefused(oplabel, causeOf(thrown))
 }
 
-/** True for a failure a retry may mend: a transient SQLSTATE, a socket's system error, or one of pg's own connection failures. */
+/** True for a failure a retry may mend. */
 function isTransient(thrown: unknown): boolean {
   const code = codeOf(thrown)
   if (code !== undefined) { return TransientSqlstate.test(code) || TransientSystemCodes.has(code) }
@@ -28,7 +28,8 @@ function causeOf(thrown: unknown): Error {
   return Object.assign(new Error(DB.sanitizeForeignError(thrown).message), (code === undefined) ? {} : { code })
 }
 
-/** The `code` of `thrown`, a SQLSTATE such as 40001 or a system error such as ECONNRESET, or undefined for none. Only a code of capitals, digits and underbars is read, so it cannot quote a row. */
+// Only a code of capitals, digits and underbars is read, so it cannot quote a row.
+/** The `code` of `thrown`, such as SQLSTATE 40001 or ECONNRESET, or undefined for none. */
 function codeOf(thrown: unknown): string | undefined {
   const code: unknown = ((typeof thrown === 'object') && (thrown !== null) && ('code' in thrown)) ? thrown.code : undefined
   return ((typeof code === 'string') && /^[0-9A-Z][0-9A-Z_]{0,39}$/.test(code)) ? code : undefined

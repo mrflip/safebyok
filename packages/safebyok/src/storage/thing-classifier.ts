@@ -440,7 +440,7 @@ export function unwrittenBirthOf(puts: BirthPuts, fetched: BankRootsFetched): Bi
 }
 // --
 
-// == [Things crossed]: CrossedThingChecks, crossedThingOf, CrossedGot, crossedGotOf, crossedWrittenOf, crossedNamedOf, crossedTrackedOf, crossedRootsOf, crossedWorldOf, CrossedListing, CrossedListed, crossedListingOf, crossedChildOf, crossedListedOf, recordOrShellOf
+// == [Things crossed]: CrossedThingChecks, crossedThingOf, CrossedGot, crossedGotOf, CrossedRefused, crossedRefusedWriteOf, crossedRefusedBirthOf, crossedWrittenOf, crossedNamedOf, crossedTrackedOf, crossedRootsOf, crossedWorldOf, CrossedListing, CrossedListed, crossedListingOf, crossedChildOf, crossedListedOf, recordOrShellOf
 // What a server's vaultDB answered, carried across a wire to a client's vaultDB, for an adapter whose server runs a whole
 // vaultDB. The server classified it; the client reads each Thing again, at the ask's scope, before it reaches a report.
 // Each refuses `storage_issue`: to the client, the server is its storage, and a Thing that fails here, damaged or not, means it is out of step or broken.
@@ -469,6 +469,31 @@ export function crossedGotOf(ask: GetAsk, act: string, raw: unknown): CrossedGot
   const tabled = getActOf(ask, BaseThing.isVoidSentinel(record) ? null : record)
   if (tabled !== act) { throw Throwers.storageIssue() }
   return isRefusedAct(tabled) ? { ok: false, act: tabled, record } : { ok: true, act: tabled, record }
+}
+
+/** The act and Thing of a refusal that crossed a wire, checked. */
+export type CrossedRefused = Readonly<{ act: EX.RefusedAct, record: ThingRecord | VoidSentinel }>
+
+/** The act and Thing of a write's refusal that crossed a wire, checked.
+ * The Thing must be the one at the ask's scope, or its shell, and the act must be the refusal the act tables give over it. A mismatch refuses `storage_issue`.
+ */
+export function crossedRefusedWriteOf(ask: WriteAsk, act: string, raw: unknown): CrossedRefused {
+  const record = crossedThingOf(ask, raw)
+  const tabled = writeActOf(ask, BaseThing.isVoidSentinel(record) ? null : record)
+  if ((tabled !== act) || ! isRefusedAct(tabled)) { throw Throwers.storageIssue() }
+  return { act: tabled, record }
+}
+
+/** The act and Thing of a birth's refusal that crossed a wire, checked.
+ * The Thing must be one of the three roots `puts` writes, or its shell, and the act must be the refusal the put table gives that root's put. A mismatch refuses `storage_issue`.
+ */
+export function crossedRefusedBirthOf(puts: BirthPuts, act: string, raw: unknown): CrossedRefused {
+  const record = crossedNamedOf(puts[0], raw)
+  const put    = puts.find(({ labelpath }) => (labelpath === record.labelpath))
+  if (put === undefined) { throw Throwers.storageIssue() }
+  const tabled = putActOf(put, BaseThing.isVoidSentinel(record) ? null : record)
+  if ((tabled !== act) || ! isRefusedAct(tabled)) { throw Throwers.storageIssue() }
+  return { act: tabled, record }
 }
 
 /** The Thing a server's answer reports writing at `scope`, checked. */
@@ -523,8 +548,9 @@ export type CrossedListing = Readonly<{ val: unknown, parentage: unknown, deltas
 /** A listing that crossed a wire, checked: what a concrete adapter's good report of it carries beside its envelope. */
 export type CrossedListed = Pick<Extract<ListThingsActual, { ok: true }>, 'kids' | 'parentage' | 'deltas' | 'damaged_rows'>
 
-/** The listing a server's good answer to `ask` carried, checked: its live parent, its children and the damaged ones, each one label under the parent,
- * and its kids, which must be those the parent and children make, in labelpath order.
+/** The listing a server's good answer to `ask` carried, checked.
+ * Its parent must be live, and each child, sound or damaged, must be one label under it. The sound children must be in labelpath
+ * order, and its kids must be the ones its parent and children make. Anything else refuses `storage_issue`.
  */
 export function crossedListingOf(ask: ListAsk, crossed: CrossedListing): CrossedListed {
   const { val: { read_tc: _read_tc, ...kidsCrossed }, parentage, deltas: rawDeltas, damaged_rows } = CrossedChecks.listing.parse(crossed)

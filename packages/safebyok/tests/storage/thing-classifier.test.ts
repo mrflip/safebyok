@@ -66,6 +66,52 @@ describe("Classifier.crossedGotOf", () => {
   })
 })
 
+describe("Classifier.crossedRefusedWriteOf", () => {
+  const replaceBox = TH.replaceAskOf(box, TH.nextOf(box))
+  const boxAhead   = TH.nextOf(TH.nextOf(box))
+
+  it("takes a write's refusal where the act tables give it for the Thing", () => {
+    expect(Classifier.crossedRefusedWriteOf(replaceBox, 'stale', boxAhead)).to.deep.eq({ act: 'stale', record: boxAhead })
+    expect(Classifier.crossedRefusedWriteOf(replaceBox, 'ahead', boxShell)).to.deep.eq({ act: 'ahead', record: boxShell })
+    expect(Classifier.crossedRefusedWriteOf(TH.birthAskOf(), 'retcon', gate)).to.deep.eq({ act: 'retcon', record: gate })
+  })
+
+  it("refuses an act the Thing does not fit, an act that is no refusal, or a Thing not at the ask's scope", () => {
+    const MisfitCases = [
+      [replaceBox,       'stale',  boxShell,                 'the shell called stale'],
+      [replaceBox,       'ahead',  boxAhead,                 'a later box called ahead'],
+      [TH.birthAskOf(),  'born',   Shell.of(TH.GateScope),   'a birth the act tables write, as a refusal'],
+      [replaceBox,       'stale',  TH.boxThingOf('anthropic'), 'a box at another labelpath'],
+      [TH.birthAskOf(),  'retcon', TH.gateThingOf(ofU2),     "the gate of another user's bank"],
+    ] as const
+    for (const [ask, act, raw, blurb] of MisfitCases) {
+      expectStorageIssue(() => Classifier.crossedRefusedWriteOf(ask, act, raw), blurb)
+    }
+  })
+})
+
+describe("Classifier.crossedRefusedBirthOf", () => {
+  const puts     = birthPutsOf(TH.birthBankAskOf())
+  const gateNext = TH.nextGateOf(gate)
+
+  it("takes a birth's refusal where the put table gives it for the root it names", () => {
+    expect(Classifier.crossedRefusedBirthOf(puts, 'stale', gateNext)).to.deep.eq({ act: 'stale', record: gateNext })
+    expect(Classifier.crossedRefusedBirthOf(puts, 'retcon', TH.rootBoxOf())).to.deep.eq({ act: 'retcon', record: TH.rootBoxOf() })
+  })
+
+  it("refuses an act the root does not fit, an act that is no refusal, or a Thing that is no root of the bank", () => {
+    const MisfitCases = [
+      ['clash',  gateNext,                 'a later gate called clash'],
+      ['born',   Shell.of(TH.GateScope),   'a root the put table writes, as a refusal'],
+      ['stale',  TH.boxThingOf(),          'a box that is no root'],
+      ['stale',  TH.nextGateOf(TH.gateThingOf(ofU2)), "the gate of another user's bank"],
+    ] as const
+    for (const [act, raw, blurb] of MisfitCases) {
+      expectStorageIssue(() => Classifier.crossedRefusedBirthOf(puts, act, raw), blurb)
+    }
+  })
+})
+
 describe("Classifier.crossedWrittenOf", () => {
   it("takes the Thing written at the scope", () => {
     expect(Classifier.crossedWrittenOf(TH.GateScope, gate)).to.deep.eq(gate)

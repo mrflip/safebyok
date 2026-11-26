@@ -37,6 +37,8 @@ async function storedIn(backend: Backend) {
 describe("SafebyokVaultComponent.api, for the user a call names", () => {
   for (const [fnname, call] of EveryCall) {
     it(`serves ${fnname}`, async () => {
+      // SafebyokVaultComponent @example
+      // GetUserId @example
       const backend = await seeded()
       await expect(call(backend.withIdentity({ subject: 'u1' }))).resolves.not.toThrow()
     })

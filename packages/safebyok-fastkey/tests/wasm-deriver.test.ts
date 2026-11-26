@@ -209,14 +209,14 @@ const Openai = 'box/openai'
 /** A device of the test world deriving through `keyDeriver`, over `vaultDB` or a fresh one. */
 function deviceOf(keyDeriver: KeyDeriver, vaultDB?: VaultDB): Device { return TH.makeDevice({}, { keyDeriver, ...(vaultDB && { vaultDB }) }) }
 
-/** Birth the test world's bank on a device deriving through `keyDeriver`, put {@link FakeWhisper} in a box, and return the vaultDB it is stored in. */
+/** Store {@link FakeWhisper} in a new bank whose passphrase key `keyDeriver` derives, and return its vaultDB. */
 async function storeFakeBox(keyDeriver: KeyDeriver): Promise<VaultDB> {
   const { device, vault } = await TH.buildBornVault({ device: deviceOf(keyDeriver) })
   await vault.putBoxOnce(Openai, { sidecar: {} }, { whisper: FakeWhisper })
   return device.vaultDB
 }
 
-/** Sign `device` in, unlock its bank by the test passphrase, and check that the box the other device stored unseals to {@link FakeWhisper}. */
+/** Expect `device` to unlock with the test passphrase, and unseal the stored box to {@link FakeWhisper}. */
 async function expectBoxUnseals(device: Device): Promise<void> {
   await device.signin(TH.WorldScope.userid)
   await device.bank!.gate.unlock({ passphraseCleartext: TH.TestPassphrase })

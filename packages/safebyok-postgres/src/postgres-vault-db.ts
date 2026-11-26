@@ -5,6 +5,7 @@ import {
   type ThingkindStats, type ReadTc, type Received, type ThingWatchScope, type VaultError, type WriteAct, type WriteAsk, type WroteActual, AdapterVaultDB, Classifier, Shell, VoidLifeTok, VoidTrack, getAskOf, isVaultError, objCheck, storeLimitsOf,
 } from 'safebyok/storage'
 import { type ThingNotification, thingNotificationOf, thingsChannelOf } from './notifications'
+import * as Phrases from './phrases'
 import { refusalOf, storedNothing } from './refusals'
 import { BirthRootsSql, GetThingSql, GetWorldSql, ListThingsSql, StatsSql, WriteThingSql } from './vault-queries'
 
@@ -29,7 +30,7 @@ function isPostgresQueryable(candidate: unknown): candidate is PostgresQueryable
 
 // `custom` and `fn` return the client and the listen they are given, so a driver's methods keep their `this`.
 const postgresVaultDBOpts = objCheck(({ custom, fn }) => ({
-  client: custom<PostgresQueryable>(isPostgresQueryable, 'Expected a client with a query function'),
+  client: custom<PostgresQueryable>(isPostgresQueryable, Phrases.ClientExpected),
   listen: fn<PostgresListen>().optional(),
 }), 'bad_record')
 // --

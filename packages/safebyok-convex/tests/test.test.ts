@@ -16,6 +16,7 @@ describe("register", () => {
   })
 
   it("serves a host app's re-exported functions, as defineTestApp's component helper", async () => {
+    // register @example
     const { api, createTest } = TH.vaultHostWith(() => 'u1')
     const backend = createTest()
     await backend.mutation(api.safebyokVault.birthBank, birthArgs)

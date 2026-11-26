@@ -21,7 +21,7 @@ import * as CVX from './validators'
 
 // == [Gets]: getThing, listThings, getWorld
 
-/** Fetch the Thing at the ask's scope, the nearest Thing stored above it, and the bank and how its roots compare with the ask's track, in one snapshot. */
+/** Fetch the stored Things a get is classified against, in one snapshot. */
 export const getThing = query({
   args:    CVX.askArgs,
   returns: CVX.thingFetched,
@@ -32,7 +32,7 @@ export const getThing = query({
   },
 })
 
-/** Fetch the parent at the ask's scope, each Thing one label under it, and the bank and how its roots compare with the ask's track, in one snapshot. */
+/** Fetch the stored Things a listing is classified against, in one snapshot. */
 export const listThings = query({
   args:    CVX.askArgs,
   returns: CVX.thingsFetched,
@@ -53,7 +53,9 @@ export const getWorld = query({
 
 // == [Writes]: writeThing, birthBank
 
-/** Classify a write against the Thing at its scope, and write its record over that Thing if the act is a write. */
+/** Classify a write, and store its record if the act is a write, in one transaction.
+ * Returns the Things as fetched before any write, and `written`: what was stored, or null if nothing was.
+ */
 export const writeThing = mutation({
   args:    CVX.askArgs,
   returns: CVX.thingWritten,
@@ -69,7 +71,9 @@ export const writeThing = mutation({
   },
 })
 
-/** Classify a bank's birth against its bank, main gate and root box, and write the three if it is born. */
+/** Classify a bank's birth, and store its three roots if the act is a write, in one transaction.
+ * Returns the roots as fetched before any write, and `written`: what was stored, or null if nothing was.
+ */
 export const birthBank = mutation({
   args:    CVX.askArgs,
   returns: CVX.rootsWritten,
@@ -164,7 +168,7 @@ async function rawAt(db: DatabaseReader, scope: ThingScope): Promise<unknown> {
   return doc?.thing ?? null
 }
 
-/** The raw bank, main gate and root box of `ask`'s bank, and how they compare with what `ask` tracks. */
+/** The raw roots of `ask`'s bank, and how each compares with what `ask` tracks. */
 async function rootsIn(db: DatabaseReader, ask: AnyAsk) {
   const { userid, banklabel } = ask
   const [bank, gate, root] = await Promise.all([
@@ -175,7 +179,7 @@ async function rootsIn(db: DatabaseReader, ask: AnyAsk) {
   return { bank, gate, root, tracked: DB.Classifier.trackedFetchedOf(ask, { bank, [DB.Labelpath.MainGate]: gate, [DB.Labelpath.RootBox]: root }) }
 }
 
-/** The raw bank of `ask`'s bank, how its roots compare with what `ask` tracks, and the nearest Thing stored above its scope. */
+/** The raw nearest Thing stored above `ask`'s scope, with its bank and `tracked`. */
 async function aboveIn(db: DatabaseReader, ask: AnyAsk & ThingScope) {
   const { userid, banklabel } = ask
   const [{ bank, tracked }, ...ancestors] = await Promise.all([
@@ -187,7 +191,7 @@ async function aboveIn(db: DatabaseReader, ask: AnyAsk & ThingScope) {
 
 // The index sorts a bank's labelpaths, so the Things below `scope` are the one range from `<labelpath>/` up to `<labelpath>0`,
 // '0' being the character after '/'. A child is one label under it: no '/' past the prefix.
-/** Each raw Thing one label under `scope`, beside its labelpath. */
+/** The raw children of `scope`, with their labelpaths. */
 async function childrenIn(db: DatabaseReader, { userid, banklabel, labelpath }: ThingScope) {
   const under = `${labelpath}/`
   const docs: ThingDoc[] = await db.query('things')
@@ -214,7 +218,8 @@ async function committedAfterIn(db: DatabaseReader, { userid, banklabel }: Thing
   return { things, bank, cursor: docs.at(-1)?.commit_ts ?? cursor }
 }
 
-/** Write `thing` at `scope`, over the document there or as a new one, stamped with the commit's timestamp, and return the Thing then stored. */
+// Every write stamps `commit_ts`, the commit's timestamp, which `watchThings` reads from.
+/** Store `thing` at `scope`, and return it as read back. */
 async function writeAt(db: DatabaseWriter, scope: ThingScope, thing: unknown): Promise<unknown> {
   const { userid, banklabel, labelpath } = scope
   const doc = { userid, banklabel, labelpath, thing, commit_ts: db.vars.commitTs }

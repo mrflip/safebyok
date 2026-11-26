@@ -170,6 +170,42 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     }
   })
 
+  it("refuses a write's refusal whose act does not fit the Thing it names, as storage_issue", async () => {
+    const refused = await servedOf(VaultOperations.writeThing, TH.birthAskOf())
+    expect(refused).to.deep.include({ ok: false, act: 'retcon', dbhas: TH.gateThingOf() })
+    const { vaultDB } = fakeClient({ data: { safebyokWriteThing: refused } })
+    expect(await vaultDB.tryWriteThing(TH.birthAskOf())).to.deep.include({ ok: false, act: 'retcon', dbhas: TH.gateThingOf() })
+    const misfits = [
+      { ...refused, act: 'stale' },
+      { ...refused, act: 'born' },
+      { ...refused, dbhas: TH.nextGateOf(TH.gateThingOf()) },
+      { ...refused, dbhas: DB.Shell.of(TH.GateScope) },
+    ]
+    for (const misfit of misfits) {
+      const { vaultDB: misfitDB } = fakeClient({ data: { safebyokWriteThing: misfit } })
+      await TH.expectBad(misfitDB.tryWriteThing(TH.birthAskOf()), 'storage_issue')
+    }
+  })
+
+  it("refuses a birth's refusal whose act does not fit the root it names, as storage_issue", async () => {
+    // A birth over a live bank passes, so its refusal is made from the answer that passed.
+    const passed   = await servedOf(VaultOperations.birthBank, TH.birthBankAskOf())
+    const gateNext = TH.nextGateOf(TH.gateThingOf())
+    const refused  = { ...passed, ok: false, act: 'stale', val: null, dbhas: gateNext, err: bareCrossedErrOf('bad_record', 'Stale') }
+    const { vaultDB } = fakeClient({ data: { safebyokBirthBank: refused } })
+    expect(await vaultDB.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ ok: false, act: 'stale', dbhas: gateNext })
+    const misfits = [
+      { ...refused, act: 'clash' },
+      { ...refused, act: 'born' },
+      { ...refused, dbhas: TH.boxThingOf() },
+      { ...refused, dbhas: DB.Shell.of(TH.GateScope) },
+    ]
+    for (const misfit of misfits) {
+      const { vaultDB: misfitDB } = fakeClient({ data: { safebyokBirthBank: misfit } })
+      await TH.expectBad(misfitDB.tryBirthBank(TH.birthBankAskOf()), 'storage_issue')
+    }
+  })
+
   it("answers a good answer as the server's vaultDB did", async () => {
     const served = await servedOf(VaultOperations.getThing, TH.getGateAskOf())
     const { vaultDB } = fakeClient({ data: { safebyokGetThing: { __typename: 'SafebyokThingAnswer', ...served } } })
