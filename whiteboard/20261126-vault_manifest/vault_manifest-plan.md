@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1–3 filed (#934, #937, #939, drafts); thread 4 ready (#940), in review (high, opus); thread 5 building (resumed after the 06:06Z network outage)
+* **Status:** threads 1–3 filed (#934, #937, #939, drafts); thread 4 in review (#940; reviewer resumed after a stall); thread 5 ready (#941, stacked on #939), in review; Closer Look running at 517463cf4 (the Coach asked early)
 
 ## Read first
 
@@ -101,6 +101,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Depends on:* thread 2.
 *Look-ahead:* none.
 *Size:* medium-large: if the table split and the manifest port will not fit one context, split the table restructure into a thread of its own and report.
+*Status:* ready 2026-11-26, PR #941, rebased onto thread 3 (517463cf4). Three tables mirroring Postgres's; the watch reads `by_commit` across all three; `banktokOf` returns null (the directive); read_tc stays client-stamped (thread E's reason); the damaged-bank plant drops fields the table lacks; a write disagreement refuses `storage_issue`.
 
 ### 6. actual_words — "stored" sorted into actual, ante and stored
 
@@ -126,7 +127,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 
 ## Line
 
-`1 → 2 → 3 → 4 → 5 → 6 → 7`, the sprint PR on top. Threads 3, 4 and 5 run side by side from thread 2's tip and are restacked into the line before thread 6 is cut. **A Closer Look** (`.claude/skills/sprint/closer-look.md`) runs once threads 3, 4 and 5 have all filed, before thread 6 is cut (the Coach, 2026-11-26).
+`1 → 2 → 3 → 4 → 5 → 6 → 7`, the sprint PR on top. Threads 3, 4 and 5 run side by side from thread 2's tip and are restacked into the line before thread 6 is cut. *Orchestrator:* thread 5 rebased onto thread 3 (`1 → 2 → 3 → 5`), so only thread 4 needs restacking: `1 → 2 → 3 → 4 → 5` or `… → 3 → 5 → 4`, whichever conflicts less (both touch `safebyok/storage`'s exports). **A Closer Look** (`.claude/skills/sprint/closer-look.md`) runs once threads 3, 4 and 5 have all filed, before thread 6 is cut (the Coach, 2026-11-26).
 
 ## For the Coach
 
