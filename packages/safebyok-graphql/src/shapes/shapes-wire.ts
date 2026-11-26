@@ -4,7 +4,7 @@
 
 import type * as Z from 'zod'
 import * as DB from 'safebyok/storage'
-import { thingOutOfReach } from '../refusals/throwers'
+import * as Throwers from '../refusals/throwers'
 
 // == [Wire forms]: CrossedErrExtension, WireAnswer, WireNotice
 
@@ -122,7 +122,7 @@ export function checkListedAt(ask: DB.ListAsk, answer: ListChecked): void {
   checkThingAt(ask, ask.labelpath, answer.ok ? (answer.parentage[0] ?? null) : answer.dbhas)
   for (const child of [...answer.deltas, ...answer.incompatible_rows]) {
     ScopeChecks.bankScope.parseConsistent(child, ask)
-    if (DB.Labelpath.parentOf(child.labelpath) !== ask.labelpath) { throw thingOutOfReach(child.labelpath) }
+    if (DB.Labelpath.parentOf(child.labelpath) !== ask.labelpath) { throw Throwers.thingOutOfReach(child.labelpath) }
   }
 }
 
@@ -158,7 +158,7 @@ function checkThingAt(ask: DB.AnyAsk, labelpath: string, record: Scoped | null):
 function checkRootAt(ask: DB.AnyAsk, record: Scoped | null): void {
   if (record === null) { return }
   ScopeChecks.bankScope.parseConsistent(record, ask)
-  if (! RootLabelpathList.includes(record.labelpath)) { throw thingOutOfReach(record.labelpath) }
+  if (! RootLabelpathList.includes(record.labelpath)) { throw Throwers.thingOutOfReach(record.labelpath) }
 }
 
 /** Refuse an answer's `tracked` where a root it carries does not sit at that root's labelpath in `ask`'s bank. */
