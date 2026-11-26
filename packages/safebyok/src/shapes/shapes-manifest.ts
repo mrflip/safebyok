@@ -9,7 +9,6 @@ import type { BankRoots, Tracked } from './shapes-asks'
 import type { IncompatibleThing } from './shapes-answers'
 import { type ReadTc, SeenChecks } from './shapes-vault-event'
 import type { VaultStats } from './shapes-vault-stats'
-import { PolicyPhrases } from '../phrases'
 import * as Phrases from '../phrases'
 
 // == [Tags]: ManifestChecks, PolicyVerdict, PolicyVerdicts, PolicyTag, Refusaltag, GetTags, WriteTags, RootTags, BirthTags, Presence, RevtokCmp, RevseqCmp, SameCmp, AnteWayins, TrackedRows, AncestorLives
@@ -20,7 +19,7 @@ export const ManifestChecks = Validator.Checkers('storage_issue', ({ obj, arr, l
   const presence       = oneof(['void', 'gone', 'live'])
   const revtokCmp      = oneof(['birth', '=next', 'eq', 'neq'])
   const sameCmp        = oneof(['same', 'changed', 'moot'])
-  const policyTag      = oneof(Object.keys(PolicyPhrases) as PolicyTag[])
+  const policyTag      = oneof(Object.keys(Phrases.PolicyPhrases) as PolicyTag[])
   const policyVerdict  = discrim('ok', [obj({ ok: lit(true) }).strict(), obj({ ok: lit(false), refusaltag: policyTag }).strict()])
   const policyVerdicts = obj({ replace_passphrase: policyVerdict.optional(), add_passkey: policyVerdict.optional(), revoke_passkey: policyVerdict.optional() }).strict()
   const rootTags       = obj({
@@ -67,15 +66,15 @@ export const ManifestChecks = Validator.Checkers('storage_issue', ({ obj, arr, l
   }
 })
 
-/** A storage policy's verdict on one write: met, or the tag of the {@link PolicyPhrases} message saying why not. */
+/** A storage policy's verdict on one write: met, or the tag of the {@link Phrases.PolicyPhrases} message saying why not. */
 export type PolicyVerdict = Readonly<Z.infer<typeof ManifestChecks.policyVerdict>>
 
 /** A verdict for each storage policy a write names. */
 export type PolicyVerdicts = Readonly<Z.infer<typeof ManifestChecks.policyVerdicts>>
 true satisfies Z.core.util.AssertEqual<keyof PolicyVerdicts, EX.StoragePolicy>
 
-/** The name of a storage policy's refusal in {@link PolicyPhrases}. */
-export type PolicyTag = keyof typeof PolicyPhrases
+/** The name of a storage policy's refusal in {@link Phrases.PolicyPhrases}. */
+export type PolicyTag = keyof typeof Phrases.PolicyPhrases
 
 /** The name, in phrases.ts, of the phrase a `policied` write is refused with: a changed born_at's, a changed lifetok's, or a storage policy's. */
 export type Refusaltag = 'BornAtMoved' | 'LifetokMoved' | PolicyTag
