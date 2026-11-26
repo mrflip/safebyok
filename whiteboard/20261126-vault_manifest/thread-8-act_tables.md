@@ -1,6 +1,6 @@
 # Thread 8: act_tables (2026-11-26)
 
-Branch `20261126-act_tables`, PR #TBD, stacked on #940. Proved: `safebyok` 2,424 tests, lint and typecheck clean;
+Branch `20261126-act_tables`, PR #942, stacked on #940. Proved: `safebyok` 2,424 tests, lint and typecheck clean;
 `safebyok-postgres` 168, `safebyok-convex` 232, `safebyok-indexeddb` 130, each typecheck clean. `pnpm justify`: pending.
 
 * **Built**
