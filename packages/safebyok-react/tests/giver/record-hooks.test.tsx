@@ -280,7 +280,7 @@ describe("useBoxList over the vault TSQ's own listing", () => {
 
   it("shows a list refused as its error", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
-    world.vaultDB.tryListThings = (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', banktok: VoidLifeTok, tracked: 'unread', read_tc: readTcNow(), dbhas: null, parentage: [], deltas: [], damaged_rows: [], err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
+    world.vaultDB.tryListThings = (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', banktok: VoidLifeTok, tracked: 'unread', read_tc: readTcNow(), dbhas: null, parentage: [], deltas: [], incompatible_rows: [], err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
     function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
     const { result } = renderHook(() => world.Bank.useBoxList(), { wrapper: Wrapper })
     await waitFor(() => { expect(result.current.isError).to.eq(true) })
@@ -329,7 +329,7 @@ describe("useGate, mounted twice", () => {
     await waitFor(() => { expect(onBadNews).toHaveBeenCalled() })
     // The host's handler is called on a later turn: give a second report one to land.
     await new Promise((resolve) => { setTimeout(resolve, 0) })
-    expect(onBadNews.mock.calls.map(([{ news }]) => [news.refusalkind, news.meta?.labelpaths])).to.deep.equal([['damaged_row', ['box/bad']]])
+    expect(onBadNews.mock.calls.map(([{ news }]) => [news.refusalkind, news.meta?.labelpaths])).to.deep.equal([['incompatible_row', ['box/bad']]])
   })
 })
 
