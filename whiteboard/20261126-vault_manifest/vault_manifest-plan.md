@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Thread 8 ready (#942), in review; thread 9 building, stacked on it; then 6 and 7
+* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Threads 8 and 9 filed (#942, #943); thread 6 in review (#944); then 7 and 10
 
 ## Read first
 
@@ -148,6 +148,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Orchestrator:* the documentarian pass, the eslint comments and the other tidying items move to thread 10, after thread 7, so thread 6 is the "stored" sweep, the VOCABULARY rows, and the renames `written` → `isWritten`, `refusedroot` → `refusedrootckey` (and `PolicyTag` → `PolicyRefusaltag` if the Coach takes that Rec).
 *Look-ahead:* thread 7 renames "damaged" in the same prose.
 *Size:* medium, mechanical but judgment per use.
+*Status:* ready at bc4adb0dd, PR #944; in review (sonnet, medium, opus style pass). Bare "stored" 540 → 309; `Refusaltag` values `BornAtMoved`, `LifetokMoved` (phrases reworded); `PerKindChecks.banktok`, `checkedLeaseOf`, `cheatPlant`; the deviceDB's "stored lease" kept as at-rest.
 
 ### 7. incompatible_row — the refusal kind renamed
 
@@ -161,7 +162,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 
 ### 10. sprint_tidy — the sprint's doc blocks and leftovers
 
-*Orchestrator:* no Coach text of its own; gathered from the reviews. A documentarian pass over the files the sprint changed (thread 2's review: "What a ..." first lines, steps listed in doc blocks, the listing copy check's doc block, two-behaviour test titles, a leftover `const manifest = raw`; `isWritable`/`isBirthWritable`'s doc blocks for the datastores that share them); the stale eslint config comments naming the deleted `storage/classifier.ts` (safebyok-indexeddb's and the dojo demo's); the Postgres header's privilege sentence and the README's "beside the old ones"; the battery's damaged-bank case made real for Postgres and Convex (thread 5's review: it is hollow there). No behaviour change but the battery case.
+*Orchestrator:* no Coach text of its own; gathered from the reviews. A documentarian pass over the files the sprint changed (thread 2's review: "What a ..." first lines, steps listed in doc blocks, the listing copy check's doc block, two-behaviour test titles, a leftover `const manifest = raw`; `isWritable`/`isBirthWritable`'s doc blocks for the datastores that share them); the stale eslint config comments naming the deleted `storage/classifier.ts` (safebyok-indexeddb's and the dojo demo's); the Postgres header's privilege sentence and the README's "beside the old ones"; the battery's damaged-bank case made real for Postgres and Convex (thread 5's review: it is hollow there). Also from thread 6's report: "store" as noun and verb ("the store's limits", "the deviceDB stores"; the exported `StoreLimits` named, not renamed, without a ruling), and `notes/` where it says "stored" for actual or ante (`vault-adapter-contract.md`, `wontfix.md`, `storage-policies.md`). No behaviour change but the battery case.
 *Levels:* worker `thread-worker`; review `low`.
 *Depends on:* thread 7.
 *Look-ahead:* none.
