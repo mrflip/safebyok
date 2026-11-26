@@ -36,7 +36,7 @@ describe("fakeDeployment", () => {
     const deployment = deploy()
     const client = deployment.client('u1')
     await client.mutation(deployment.api.safebyokVault.birthBank, birthBankArgs)
-    expect(await client.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.include({ bank })
+    expect(await client.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.nested.include({ 'actual.bank': bank })
   })
 
   it("connects a client of any other kind that its caller constructs", async () => {
@@ -46,7 +46,7 @@ describe("fakeDeployment", () => {
       return { inner, close: () => inner.close() }
     })
     await made.inner.mutation(deployment.api.safebyokVault.birthBank, birthBankArgs)
-    expect(await made.inner.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.include({ bank })
+    expect(await made.inner.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.nested.include({ 'actual.bank': bank })
   })
 
   it("closes a client its caller constructed with the rest", async () => {
@@ -140,7 +140,7 @@ describe("fakeDeployment", () => {
   it("runs the backend directly as a subject", async () => {
     const deployment = deploy()
     await deployment._cheat_backendAs('u1').mutation(deployment.api.safebyokVault.birthBank, birthBankArgs)
-    expect(await deployment._cheat_backendAs('u1').query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.include({ bank })
+    expect(await deployment._cheat_backendAs('u1').query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.nested.include({ 'actual.bank': bank })
   })
 
   it("runs the backend directly as no one", async () => {
@@ -180,10 +180,10 @@ describe("fakeDeployment", () => {
     const heard = vi.fn()
     client.onUpdate(deployment.api.safebyokVault.watchThings, watchThingsArgs, heard)
     await vi.waitFor(() => { expect(heard).toHaveBeenCalledTimes(1) })
-    expect(await client.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.include({ bank: null })
+    expect(await client.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.nested.include({ 'actual.bank': null })
     const answer = await deployment._cheat_arrange((backend) => backend.withIdentity({ subject: 'u1' }).mutation(deployment.api.safebyokVault.birthBank, birthBankArgs))
-    expect(answer).to.deep.nested.include({ bank: null, 'written.bank': bank })
+    expect(answer).to.deep.nested.include({ 'tags.written': true, 'actual.bank': bank })
     expect(heard.mock.calls.at(-1)?.[0]).to.have.property('things').that.deep.includes({ labelpath: 'bank', raw: bank })
-    expect(await client.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.include({ bank })
+    expect(await client.query(deployment.api.safebyokVault.getWorld, worldAsked)).to.deep.nested.include({ 'actual.bank': bank })
   })
 })

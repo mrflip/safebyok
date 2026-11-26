@@ -23,11 +23,8 @@ export const SafebyokVaultComponentAdvice = 'Hand it components.safebyok from yo
 export const SafebyokVaultApiAdvice = 'Hand it { getUserId }, a function answering who is signed in: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null.'
 // --
 
-// == [Answers]: SidecarKeyRefused, StoredOutOfStep
+// == [Answers]: SidecarKeyRefused
 
 /** Message for a box whose sidecar holds a key Convex refuses to store. */
 export const SidecarKeyRefused = "A key in this box's sidecar is one Convex will not store: it starts with `$`, holds a character outside printable ASCII, or runs past 1024 characters. Rename the key, or keep such keys inside a string of your own. This refusal's cause names the key."
-
-/** Message for a component and a client that disagree on whether a write was stored. */
-export const StoredOutOfStep = 'The component stored the record where this copy of safebyok found no write, or stored nothing where it found one.'
 // --

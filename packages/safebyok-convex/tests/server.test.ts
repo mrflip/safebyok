@@ -47,7 +47,7 @@ describe("SafebyokVaultComponent.api, for the user a call names", () => {
   it("hands back the component's answers as they came", async () => {
     const backend = await seeded()
     const fetched = await backend.withIdentity({ subject: 'u1' }).query(fns.getThing, { ask: TH.getGateAskOf() })
-    expect(fetched).to.deep.include({ thing: TH.gateThingOf(), bank: TH.bankThingOf() })
+    expect(fetched).to.deep.include({ actual: TH.gateThingOf(), banktok: TH.bankThingOf().lifetok })
   })
 })
 
@@ -113,7 +113,7 @@ describe("SafebyokVaultComponent.api, with the host's getUserId", () => {
     })
     const caller = host.createTest().withIdentity({ subject: 'u1' })
     const ask = TH.getWorldAskOf()
-    expect(await caller.query(host.api.safebyokVault.getWorld, { ask: { ...ask, userid: 'user|u1' } })).to.deep.include({ bank: null })
+    expect(await caller.query(host.api.safebyokVault.getWorld, { ask: { ...ask, userid: 'user|u1' } })).to.deep.nested.include({ 'actual.bank': null })
     const refusal = await TH.convexRefusalOf(caller.query(host.api.safebyokVault.getWorld, { ask }))
     expect(refusal).to.deep.equal({ kind: 'identity_revoked' })
   })
@@ -121,7 +121,7 @@ describe("SafebyokVaultComponent.api, with the host's getUserId", () => {
   it("calls getUserId as a method, keeping its this", async () => {
     const { app, component } = TH.installedVaultComponent()
     const host = app.defineModules({ safebyokVault: component.api(new SignedInAs('u1')) })
-    expect(await host.createTest().query(host.api.safebyokVault.getWorld, { ask: TH.getWorldAskOf() })).to.deep.include({ bank: null })
+    expect(await host.createTest().query(host.api.safebyokVault.getWorld, { ask: TH.getWorldAskOf() })).to.deep.nested.include({ 'actual.bank': null })
   })
 })
 
