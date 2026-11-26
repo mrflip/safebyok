@@ -7,7 +7,7 @@ import type { GetManifest, WriteManifest } from '../shapes/shapes-manifest'
 import { Labelpath } from '../shapes/primitives'
 import type { AnyAsk, BirthBankAsk, BirthPuts, GetAsk, ListAsk, StatsAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
 import type { VaultStats } from '../shapes/shapes-vault-stats'
-import { banktokOf, fieldOf, getTagsOf, policiesOf, trackedOf, writeTagsOf } from './manifest-tags'
+import * as ManifestTags from './manifest-tags'
 import type { BankFetched, BankRootsFetched, ThingsFetched } from './thing-classifier'
 import { vaultStatsOf } from './vault-stats'
 
@@ -57,13 +57,13 @@ export class MemoryDatastore {
     const things  = this.#thingsOf(ask)
     const fetched = structuredClone({ bank: things.get('bank') ?? null, gate: things.get(Labelpath.MainGate) ?? null, root: things.get(Labelpath.RootBox) ?? null })
     const rows    = { bank: fetched.bank, [Labelpath.MainGate]: fetched.gate, [Labelpath.RootBox]: fetched.root }
-    return { ...fetched, tracked: trackedOf(ask, rows), read_tc: readTcNow() }
+    return { ...fetched, tracked: ManifestTags.trackedOf(ask, rows), read_tc: readTcNow() }
   }
 
   /** The banktok of `ask`'s bank as it now stands, its `tracked` for what `ask` tracks, and when they were read. */
   #bankObservedOf(ask: AnyAsk): Pick<GetManifest, 'banktok' | 'tracked' | 'read_tc'> {
     const { bank, tracked, read_tc } = this.#rootsOf(ask)
-    return { banktok: banktokOf(bank), tracked, read_tc }
+    return { banktok: ManifestTags.banktokOf(bank), tracked, read_tc }
   }
 
   // Each watcher is called on a later microtask, so nothing it does runs inside the write that notified it.
@@ -85,7 +85,7 @@ export class MemoryDatastore {
   /** The Thing at `ask`'s scope, observed in one step. */
   getThing(ask: GetAsk): GetManifest {
     const actual = this.#rowAt(ask)
-    return { tags: getTagsOf(actual), actual, ancestor: this.#ancestorOf(ask, actual), ...this.#bankObservedOf(ask) }
+    return { tags: ManifestTags.getTagsOf(actual), actual, ancestor: this.#ancestorOf(ask, actual), ...this.#bankObservedOf(ask) }
   }
 
   /** Write `ask.record` where {@link isWritable} allows, and observe the result, in one step. */
@@ -94,7 +94,7 @@ export class MemoryDatastore {
     const written = isWritable(ask, ante)
     if (written) { this.#thingsOf(ask).set(ask.labelpath, structuredClone(ask.record)) }
     const actual   = this.#rowAt(ask)
-    const manifest = { tags: writeTagsOf(ask, ante, written), actual, ancestor: this.#ancestorOf(ask, actual), ...this.#bankObservedOf(ask) }
+    const manifest = { tags: ManifestTags.writeTagsOf(ask, ante, written), actual, ancestor: this.#ancestorOf(ask, actual), ...this.#bankObservedOf(ask) }
     if (written) { this.#notify(ask, actual, manifest.banktok) }
     return manifest
   }
@@ -119,7 +119,7 @@ export class MemoryDatastore {
     const things = this.#thingsOf(ask)
     for (const { labelpath, record } of puts) { things.set(labelpath, structuredClone(record)) }
     const written = this.#rootsOf(ask)
-    for (const row of [written.bank, written.gate, written.root]) { this.#notify(ask, row, banktokOf(written.bank)) }
+    for (const row of [written.bank, written.gate, written.root]) { this.#notify(ask, row, ManifestTags.banktokOf(written.bank)) }
     return written
   }
 
@@ -154,12 +154,12 @@ export class MemoryDatastore {
  */
 function isWritable(ask: WriteAsk, ante: unknown): boolean {
   if (ante === null) { return (ask.cited.revtok === SX.VoidRevisionTok) && (ask.ifAbsent === 'add') }
-  const isLive        = (fieldOf(ante, 'am') === 'a')
-  const isCited       = (fieldOf(ante, 'revtok') === ask.cited.revtok) && (fieldOf(ante, 'am') === ask.cited.am) && (fieldOf(ante, 'lifepath') === ask.cited.lifepath) && (fieldOf(ante, 'revseq') === ask.record.revseq - 1)
+  const isLive        = (ManifestTags.fieldOf(ante, 'am') === 'a')
+  const isCited       = (ManifestTags.fieldOf(ante, 'revtok') === ask.cited.revtok) && (ManifestTags.fieldOf(ante, 'am') === ask.cited.am) && (ManifestTags.fieldOf(ante, 'lifepath') === ask.cited.lifepath) && (ManifestTags.fieldOf(ante, 'revseq') === ask.record.revseq - 1)
   const isFlagged     = isLive ? (ask.ifPresent === 'repl') : (ask.ifAbsent === 'add')
-  const isBornAtSame  = (fieldOf(ante, 'am') !== ask.record.am) || (fieldOf(ante, 'born_at') === ask.record.born_at)
-  const isLifetokSame = (ask.modelkind !== 'bank') || (! isLive) || (fieldOf(ante, 'lifetok') === ask.record.lifetok)
-  const isPolicyMet   = Object.values(policiesOf(ask, ante)).every((verdict) => verdict?.ok !== false)
+  const isBornAtSame  = (ManifestTags.fieldOf(ante, 'am') !== ask.record.am) || (ManifestTags.fieldOf(ante, 'born_at') === ask.record.born_at)
+  const isLifetokSame = (ask.modelkind !== 'bank') || (! isLive) || (ManifestTags.fieldOf(ante, 'lifetok') === ask.record.lifetok)
+  const isPolicyMet   = Object.values(ManifestTags.policiesOf(ask, ante)).every((verdict) => verdict?.ok !== false)
   return isCited && isFlagged && isBornAtSame && isLifetokSame && isPolicyMet
 }
 // --

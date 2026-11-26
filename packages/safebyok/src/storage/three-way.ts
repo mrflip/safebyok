@@ -7,8 +7,8 @@ import { type ThingRecord, type ThingScope, Shell } from '../shapes/shapes-thing
 import type { GetAsk, WriteAsk } from '../shapes/shapes-asks'
 import type { GetThingAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import type { CheckedManifestRows, ScribedGetManifest, ScribedWriteManifest, WriteTags } from '../shapes/shapes-manifest'
-import { getTagsOf, writeTagsOf } from './manifest-tags'
-import { isWriteAct } from './manifest-acts'
+import * as ManifestTags from './manifest-tags'
+import * as ManifestActs from './manifest-acts'
 import * as Throwers from '../refusals/throwers'
 
 // == [Three-way]: demandGetConsistency, demandWriteConsistency, demandProposedWritten, demandTagsOfActual, demandTagsOfAsk, demandAnswerCopied, demandRowsAtAddress
@@ -18,7 +18,7 @@ import * as Throwers from '../refusals/throwers'
 
 /** Refuse a get whose ask, manifest and answer disagree: tags that are not the actual row's, an answer that is not the manifest's, or a row at another address. */
 export function demandGetConsistency(ask: GetAsk, manifest: ScribedGetManifest, answer: GetThingAnswer): void {
-  if (! isEqual(getTagsOf(manifest.actual), manifest.tags)) { throw Throwers.tagsOfOtherRow() }
+  if (! isEqual(ManifestTags.getTagsOf(manifest.actual), manifest.tags)) { throw Throwers.tagsOfOtherRow() }
   demandAnswerCopied(ask, manifest, answer)
   demandRowsAtAddress(ask, manifest)
 }
@@ -27,7 +27,7 @@ export function demandGetConsistency(ask: GetAsk, manifest: ScribedGetManifest, 
  * the proposed revision, tags that are not the unwritten row's or disagree with the ask, an answer that is not the manifest's, or a row at another address.
  */
 export function demandWriteConsistency(ask: WriteAsk, manifest: ScribedWriteManifest, answer: WriteThingAnswer): void {
-  if (manifest.tags.written !== isWriteAct(manifest.act)) { throw Throwers.writtenOfOtherAct() }
+  if (manifest.tags.written !== ManifestActs.isWriteAct(manifest.act)) { throw Throwers.writtenOfOtherAct() }
   if (manifest.tags.written) { demandProposedWritten(ask, manifest.actual) } else { demandTagsOfActual(ask, manifest) }
   demandTagsOfAsk(ask, manifest.tags)
   demandAnswerCopied(ask, manifest, answer)
@@ -45,7 +45,7 @@ function demandProposedWritten({ record }: WriteAsk, actual: ThingRecord | null)
 // Unwritten, the ante row is the actual row, so its tags are made again from the row as checked.
 /** Refuse an unwritten write's tags where they are not the actual row's. */
 function demandTagsOfActual(ask: WriteAsk, manifest: ScribedWriteManifest): void {
-  if (! isEqual(writeTagsOf(ask, manifest.actual, false), manifest.tags)) { throw Throwers.tagsOfOtherRow() }
+  if (! isEqual(ManifestTags.writeTagsOf(ask, manifest.actual, false), manifest.tags)) { throw Throwers.tagsOfOtherRow() }
 }
 
 /** Refuse tags that disagree with the ask: a birth where it cites no shell, or verdicts for other storage policies than it names. */

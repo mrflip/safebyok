@@ -16,8 +16,8 @@ import {
 import type { GetManifest, WriteManifest } from '../shapes/shapes-manifest'
 import { type VaultStats, VaultStatsChecks } from '../shapes/shapes-vault-stats'
 import { itemEventOf, readTcNow } from './agerank'
-import { checkGetObservations, checkWriteObservations, checkedBanktokOf, getAnswerOf, scribeGetAct, scribeWriteAct, writeAnswerOf } from './manifest-acts'
-import { demandGetConsistency, demandWriteConsistency } from './three-way'
+import * as ManifestActs from './manifest-acts'
+import * as ThreeWay from './three-way'
 import type { BankFetched, BankRootsFetched, ThingsFetched } from './thing-classifier'
 import * as Classifier from './thing-classifier'
 import type { VaultDB } from './vault-db'
@@ -84,10 +84,10 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const thingGetAsk = AskChecks.getAsk.parse(ask)
       const manifest    = await this.doGetThing(thingGetAsk)
-      checkGetObservations(thingGetAsk, manifest)
-      scribeGetAct(thingGetAsk, manifest)
-      const answer      = getAnswerOf(thingGetAsk, manifest)
-      demandGetConsistency(thingGetAsk, manifest, answer)
+      ManifestActs.checkGetObservations(thingGetAsk, manifest)
+      ManifestActs.scribeGetAct(thingGetAsk, manifest)
+      const answer      = ManifestActs.getAnswerOf(thingGetAsk, manifest)
+      ThreeWay.demandGetConsistency(thingGetAsk, manifest, answer)
       return frozenAnswerOf(answer)
     } catch (err) { return this.answerForThrown(err, 'getThing', ask) }
   }
@@ -97,10 +97,10 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const writeAsk = checkedWriteAsk(ask)
       const manifest = await this.doWriteThing(writeAsk)
-      checkWriteObservations(writeAsk, manifest)
-      scribeWriteAct(writeAsk, manifest)
-      const answer   = writeAnswerOf(writeAsk, manifest)
-      demandWriteConsistency(writeAsk, manifest, answer)
+      ManifestActs.checkWriteObservations(writeAsk, manifest)
+      ManifestActs.scribeWriteAct(writeAsk, manifest)
+      const answer   = ManifestActs.writeAnswerOf(writeAsk, manifest)
+      ThreeWay.demandWriteConsistency(writeAsk, manifest, answer)
       return frozenAnswerOf(answer)
     } catch (err) { return this.answerForThrown(err, 'writeThing', ask) }
   }
@@ -164,7 +164,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       let event: VaultItemEvent
       try {
         const { read_tc = readTcNow() } = ActualChecks.received.parse(received)
-        event = noticeOf(deepFreeze(Classifier.watchedThingOf(bankScope, record)), checkedBanktokOf(banktok), read_tc)
+        event = noticeOf(deepFreeze(Classifier.watchedThingOf(bankScope, record)), ManifestActs.checkedBanktokOf(banktok), read_tc)
       } catch (err) {
         onBadNews(Outcome.storageRefusalOf(err))
         return

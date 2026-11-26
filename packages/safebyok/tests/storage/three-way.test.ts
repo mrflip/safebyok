@@ -4,9 +4,9 @@ import * as Phrases from '../../src/phrases'
 import type { GetThingAnswer, WriteThingAnswer } from '../../src/shapes/shapes-answers'
 import type { GetAsk, WriteAsk } from '../../src/shapes/shapes-asks'
 import type { GetManifest, ScribedGetManifest, ScribedWriteManifest, WriteManifest } from '../../src/shapes/shapes-manifest'
-import { checkGetObservations, checkWriteObservations, getAnswerOf, scribeGetAct, scribeWriteAct, writeAnswerOf } from '../../src/storage/manifest-acts'
-import { getTagsOf, writeTagsOf } from '../../src/storage/manifest-tags'
-import { demandGetConsistency, demandWriteConsistency } from '../../src/storage/three-way'
+import * as ManifestActs from '../../src/storage/manifest-acts'
+import * as ManifestTags from '../../src/storage/manifest-tags'
+import * as ThreeWay from '../../src/storage/three-way'
 import { readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
 
@@ -15,20 +15,20 @@ function besideOf() { return { banktok: SX.VoidLifeTok, tracked: { bank: 'same',
 
 /** A sound write's manifest and answer: `ask` over the `ante` row, written or not, checked, scribed and answered. `doctor` changes the manifest before the answer is made. */
 function wroteOf(ask: WriteAsk, ante: unknown, written: boolean, doctor: (manifest: WriteManifest) => void = () => undefined): { manifest: ScribedWriteManifest, answer: WriteThingAnswer } {
-  const manifest: WriteManifest = { tags: writeTagsOf(ask, ante, written), actual: written ? structuredClone(ask.record) : ante, ancestor: null, ...besideOf() }
+  const manifest: WriteManifest = { tags: ManifestTags.writeTagsOf(ask, ante, written), actual: written ? structuredClone(ask.record) : ante, ancestor: null, ...besideOf() }
   doctor(manifest)
-  checkWriteObservations(ask, manifest)
-  scribeWriteAct(ask, manifest)
-  return { manifest, answer: writeAnswerOf(ask, manifest) }
+  ManifestActs.checkWriteObservations(ask, manifest)
+  ManifestActs.scribeWriteAct(ask, manifest)
+  return { manifest, answer: ManifestActs.writeAnswerOf(ask, manifest) }
 }
 
 /** A sound get's manifest and answer over the `actual` row, checked, scribed and answered. `doctor` changes the manifest before the answer is made. */
 function gotOf(ask: GetAsk, actual: unknown, doctor: (manifest: GetManifest) => void = () => undefined): { manifest: ScribedGetManifest, answer: GetThingAnswer } {
-  const manifest: GetManifest = { tags: getTagsOf(actual), actual, ancestor: null, ...besideOf() }
+  const manifest: GetManifest = { tags: ManifestTags.getTagsOf(actual), actual, ancestor: null, ...besideOf() }
   doctor(manifest)
-  checkGetObservations(ask, manifest)
-  scribeGetAct(ask, manifest)
-  return { manifest, answer: getAnswerOf(ask, manifest) }
+  ManifestActs.checkGetObservations(ask, manifest)
+  ManifestActs.scribeGetAct(ask, manifest)
+  return { manifest, answer: ManifestActs.getAnswerOf(ask, manifest) }
 }
 
 const Gate      = TH.gateThingOf()
@@ -37,11 +37,11 @@ const Birth     = TH.birthAskOf()
 const Replace   = TH.replaceAskOf(Gate, TH.nextGateOf(Gate))
 const AddOver   = { ...Replace, ifAbsent: 'add' } as const
 
-describe("demandWriteConsistency(ask, manifest, answer)", () => {
+describe("ThreeWay.demandWriteConsistency(ask, manifest, answer)", () => {
   it("passes a sound write, written or not", () => {
     for (const [ask, ante, written] of [[Birth, null, true], [Birth, OtherGate, false], [Replace, Gate, true], [Replace, null, false]] as const) {
       const { manifest, answer } = wroteOf(ask, ante, written)
-      expect(() => { demandWriteConsistency(ask, manifest, answer) }).not.to.throw()
+      expect(() => { ThreeWay.demandWriteConsistency(ask, manifest, answer) }).not.to.throw()
     }
   })
 
@@ -57,7 +57,7 @@ describe("demandWriteConsistency(ask, manifest, answer)", () => {
   for (const [message, ask, ante, written, doctor, blurb] of DoctoredCases) {
     it(blurb, () => {
       const { manifest, answer } = wroteOf(ask, ante, written, doctor)
-      const err = TH.expectSyncRefusal(() => { demandWriteConsistency(ask, manifest, answer) }, 'storage_issue')
+      const err = TH.expectSyncRefusal(() => { ThreeWay.demandWriteConsistency(ask, manifest, answer) }, 'storage_issue')
       expect(err.message).to.eq(message)
     })
   }
@@ -66,7 +66,7 @@ describe("demandWriteConsistency(ask, manifest, answer)", () => {
     const { manifest, answer } = wroteOf(Birth, null, true)
     const doctored = [{ ...answer, val: OtherGate }, { ...answer, banktok: TH.OtherLifetok }, { ...answer, tracked: { ...manifest.tracked } }, { ...answer, read_tc: readTcNow() }]
     for (const otherAnswer of doctored) {
-      const err = TH.expectSyncRefusal(() => { demandWriteConsistency(Birth, manifest, otherAnswer) }, 'storage_issue')
+      const err = TH.expectSyncRefusal(() => { ThreeWay.demandWriteConsistency(Birth, manifest, otherAnswer) }, 'storage_issue')
       expect(err.message).to.eq(Phrases.AnswerOfOtherManifest)
     }
   })
@@ -79,33 +79,33 @@ describe("demandWriteConsistency(ask, manifest, answer)", () => {
     ]
     for (const doctor of doctors) {
       const { manifest, answer } = wroteOf(Birth, OtherGate, false, doctor)
-      TH.expectSyncRefusal(() => { demandWriteConsistency(Birth, manifest, answer) }, 'storage_issue')
+      TH.expectSyncRefusal(() => { ThreeWay.demandWriteConsistency(Birth, manifest, answer) }, 'storage_issue')
     }
   })
 })
 
-describe("demandGetConsistency(ask, manifest, answer)", () => {
+describe("ThreeWay.demandGetConsistency(ask, manifest, answer)", () => {
   it("passes a sound get, of a row or of none", () => {
     for (const actual of [Gate, null]) {
       const { manifest, answer } = gotOf(TH.getGateAskOf(), actual)
-      expect(() => { demandGetConsistency(TH.getGateAskOf(), manifest, answer) }).not.to.throw()
+      expect(() => { ThreeWay.demandGetConsistency(TH.getGateAskOf(), manifest, answer) }).not.to.throw()
     }
   })
 
   it("refuses tags that are not those of the row handed back", () => {
     const { manifest, answer } = gotOf(TH.getGateAskOf(), Gate, (doctored) => { doctored.tags = { presence: 'gone' } })
-    const err = TH.expectSyncRefusal(() => { demandGetConsistency(TH.getGateAskOf(), manifest, answer) }, 'storage_issue')
+    const err = TH.expectSyncRefusal(() => { ThreeWay.demandGetConsistency(TH.getGateAskOf(), manifest, answer) }, 'storage_issue')
     expect(err.message).to.eq(Phrases.TagsOfOtherRow)
   })
 
   it("refuses an answer that does not copy the manifest", () => {
     const { manifest, answer } = gotOf(TH.getGateAskOf(), Gate)
-    const err = TH.expectSyncRefusal(() => { demandGetConsistency(TH.getGateAskOf(), manifest, { ...answer, banktok: TH.OtherLifetok }) }, 'storage_issue')
+    const err = TH.expectSyncRefusal(() => { ThreeWay.demandGetConsistency(TH.getGateAskOf(), manifest, { ...answer, banktok: TH.OtherLifetok }) }, 'storage_issue')
     expect(err.message).to.eq(Phrases.AnswerOfOtherManifest)
   })
 
   it("refuses a row at another address than asked", () => {
     const { manifest, answer } = gotOf(TH.getGateAskOf(), TH.gateThingOf({ banklabel: 'other' }))
-    TH.expectSyncRefusal(() => { demandGetConsistency(TH.getGateAskOf(), manifest, answer) }, 'storage_issue')
+    TH.expectSyncRefusal(() => { ThreeWay.demandGetConsistency(TH.getGateAskOf(), manifest, answer) }, 'storage_issue')
   })
 })

@@ -10,7 +10,7 @@ import {
   type CheckedGetManifest, type CheckedManifestRows, type CheckedWriteManifest, type GetManifest, type GetTags, type ScribedGetManifest, type ScribedWriteManifest, type WriteManifest, type WriteTags,
   ManifestChecks,
 } from '../shapes/shapes-manifest'
-import { fieldOf } from './manifest-tags'
+import * as ManifestTags from './manifest-tags'
 import * as Throwers from '../refusals/throwers'
 
 // == [Observations]: checkGetObservations, checkWriteObservations, checkedRowsOf, checkedRowOf, checkedAncestorOf, checkedBanktokOf, checkedTrackedOf, trackedEntryOf
@@ -50,7 +50,7 @@ function checkedRowOf({ labelpath }: Pick<ThingScope, 'labelpath'>, row: unknown
 /** The nearest row above `scope`, checked by its kind and its address, or null for none. */
 function checkedAncestorOf({ userid, banklabel, labelpath }: ThingScope, row: unknown): ThingRecord | null {
   if (row === null) { return null }
-  const abovepath = fieldOf(row, 'labelpath')
+  const abovepath = ManifestTags.fieldOf(row, 'labelpath')
   if ((typeof abovepath !== 'string') || (! labelpath.startsWith(`${abovepath}/`))) { throw Throwers.rowOfOtherAddress(['labelpath']) }
   const ancestor: ThingRecord = ThingkindChecks.ofLabelpath(abovepath).stored.parse(row)
   const fieldnames = Validator.disagreeingFieldnames(ancestor, { userid, banklabel, labelpath: abovepath })

@@ -12,8 +12,8 @@ import { type BoxSparse, type ThingRecord, type ThingScope, type VoidSentinel, S
 import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
 import { BaseThing } from '../models/base-thing'
 import { type AnyAsk, type BankRoots, type BirthPuts, type GetWorldAsk, type ListAsk, type StatsAsk, type ThingWatchScope, type Track, type Tracked, type WorldRoots, type WriteAsk } from '../shapes/shapes-asks'
-import { isRefusedAct, putActOf } from './manifest-acts'
-import { trackedOf as trackedRowsOf, writeTagsOf } from './manifest-tags'
+import * as ManifestActs from './manifest-acts'
+import * as ManifestTags from './manifest-tags'
 import * as Throwers from '../refusals/throwers'
 
 // == [Things stored]: RowOfOtherScope, StoredCheck, storedOf, writtenOf, storedThingOf, writtenThingOf, writtenRootsOf, listedThingOf, watchedThingOf, BankRootsFetched, BankFetched, banktokOf
@@ -173,7 +173,7 @@ export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): B
   if (unwritten !== null) { return unwritten }
   const [bankPut, gatePut, rootPut] = puts
   const things = { bank: bankPut.record, gate: gatePut.record, root: rootPut.record }
-  const tracked = trackedOf(bankPut, trackedRowsOf(bankPut, { bank: things.bank, [Labelpath.MainGate]: things.gate, [Labelpath.RootBox]: things.root }))
+  const tracked = trackedOf(bankPut, ManifestTags.trackedOf(bankPut, { bank: things.bank, [Labelpath.MainGate]: things.gate, [Labelpath.RootBox]: things.root }))
   return { ok: true, act: 'born', banktok: things.bank.lifetok, tracked, read_tc: fetched.read_tc, things }
 }
 
@@ -218,7 +218,7 @@ export function unwrittenBirthOf(puts: BirthPuts, fetched: BankRootsFetched): Bi
   }
   for (const [put, raw] of [[bankPut, fetched.bank], [gatePut, fetched.gate], [rootPut, fetched.root]] as const) {
     const act = birthPutActOf(put, raw)
-    if (! isRefusedAct(act)) { continue }
+    if (! ManifestActs.isRefusedAct(act)) { continue }
     // A root has nothing above it, so where none is stored its shell stands alone.
     const record = storedThingOf(put, raw) ?? Shell.under(put, null)
     return { ok: false, act, banktok: banktokOf(bankPut, fetched.bank), tracked: trackedOf(bankPut, fetched.tracked), read_tc: fetched.read_tc, record }
@@ -227,5 +227,5 @@ export function unwrittenBirthOf(puts: BirthPuts, fetched: BankRootsFetched): Bi
 }
 
 /** The put table's act for one root's put of a birth, over the raw row fetched at its scope. */
-function birthPutActOf(put: WriteAsk, raw: unknown): EX.PutAct | EX.RefusedAct { return putActOf(put, writeTagsOf(put, raw, false)) }
+function birthPutActOf(put: WriteAsk, raw: unknown): EX.PutAct | EX.RefusedAct { return ManifestActs.putActOf(put, ManifestTags.writeTagsOf(put, raw, false)) }
 // --

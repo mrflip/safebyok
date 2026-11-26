@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import type { CheckedWriteManifest, WriteTags } from '../../src/shapes/shapes-manifest'
 import type { WriteAsk } from '../../src/shapes/shapes-asks'
-import { scribeWriteAct } from '../../src/storage/manifest-acts'
+import * as ManifestActs from '../../src/storage/manifest-acts'
 import { readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
 
@@ -31,7 +31,7 @@ function tagsOf(presence: WriteTags['presence'], revtok_cmp: WriteTags['revtok_c
 /** The act `scribeWriteAct` writes onto a checked manifest of `tags`, for `ask`. */
 function scribedActOf(ask: WriteAsk, tags: WriteTags): string {
   const manifest: CheckedWriteManifest = { tags, actual: null, ancestor: null, banktok: SX.VoidLifeTok, tracked: { bank: 'same', gate: 'same', box: 'same' }, read_tc: readTcNow() }
-  scribeWriteAct(ask, manifest)
+  ManifestActs.scribeWriteAct(ask, manifest)
   return manifest.act
 }
 
@@ -87,7 +87,7 @@ const DelRows = [
   ["DL9", "eq",    "eq",    "live", "deleted"],
 ] as const
 
-describe("scribeWriteAct(ask, manifest), a put, row by row of the put table", () => {
+describe("ManifestActs.scribeWriteAct(ask, manifest), a put, row by row of the put table", () => {
   for (const [abbr, revtokCmp, revseqCmp, flags, presence, act] of PutRows) {
     it(`${abbr}: ${act}`, () => {
       for (const flag of flags) {
@@ -97,7 +97,7 @@ describe("scribeWriteAct(ask, manifest), a put, row by row of the put table", ()
   }
 })
 
-describe("scribeWriteAct(ask, manifest), a del, row by row of the del table", () => {
+describe("ManifestActs.scribeWriteAct(ask, manifest), a del, row by row of the del table", () => {
   for (const [abbr, revtokCmp, revseqCmp, presence, act] of DelRows) {
     it(`${abbr}: ${act}`, () => {
       expect(scribedActOf(askOf(DelAsk, presence, 'repl'), tagsOf(presence, revtokCmp, revseqCmp))).to.eq(act)
@@ -105,7 +105,7 @@ describe("scribeWriteAct(ask, manifest), a del, row by row of the del table", ()
   }
 })
 
-describe("scribeWriteAct(ask, manifest), the life and liveness a matching revtok cites", () => {
+describe("ManifestActs.scribeWriteAct(ask, manifest), the life and liveness a matching revtok cites", () => {
   it("scribes clash where the ante row's lifepath is not the cited one", () => {
     expect(scribedActOf(askOf(PutAsk, 'live', 'repl'), tagsOf('live', 'eq', 'eq', { lifepath_eq: false }))).to.eq('clash')
     expect(scribedActOf(askOf(DelAsk, 'live', 'repl'), tagsOf('live', 'eq', 'eq', { lifepath_eq: false }))).to.eq('clash')
@@ -119,7 +119,7 @@ describe("scribeWriteAct(ask, manifest), the life and liveness a matching revtok
   })
 })
 
-describe("scribeWriteAct(ask, manifest), a write the tables let through and its fixed fields or policies forbid", () => {
+describe("ManifestActs.scribeWriteAct(ask, manifest), a write the tables let through and its fixed fields or policies forbid", () => {
   const PoliciedCases = [
     ["policied", PutAsk, { born_at_cmp: 'changed' },                                     'scribes policied for a replacement that changes the born_at'],
     ["policied", PutAsk, { lifetok_cmp: 'changed' },                                     'scribes policied for a replacement that changes the lifetok'],
