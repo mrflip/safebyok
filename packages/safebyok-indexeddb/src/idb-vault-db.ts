@@ -17,7 +17,7 @@ export type IdbVaultDBOpts = { dbName?: string | undefined }
 const idbVaultDBOpts = DB.objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_record')
 // --
 
-/** A vaultDB stored in this browser's IndexedDB: each `do*` hands its ask to one function of its {@link IdbDatastore}. Its watches receive the writes made in every tab. */
+/** A vaultDB stored in this browser's IndexedDB. Its watches receive the writes made in every tab. */
 export class IdbVaultDB extends DB.AdapterVaultDB {
   // == [Props]: #datastore
 

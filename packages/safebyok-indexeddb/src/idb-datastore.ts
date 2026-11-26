@@ -46,7 +46,7 @@ function shelfRefusingSmallQuota(shelf: UseStore): UseStore {
 /** The raw row at `scope` in `store`'s transaction, or null for none. */
 async function rowAt(store: IDBObjectStore, scope: ThingScope): Promise<unknown> { return await DB.rowAt(store, thingScopepathOf(scope)) }
 
-/** Where `actual` is null, the nearest row above `ask`'s scope in `store`'s transaction, or null for none; otherwise null, as it is read nowhere else. */
+/** The nearest row above `ask`'s scope in `store`'s transaction, read only where `actual` is null; otherwise null. */
 async function ancestorOf(store: IDBObjectStore, ask: GetAsk | WriteAsk, actual: unknown): Promise<unknown> {
   if (actual !== null) { return null }
   const { userid, banklabel } = ask
@@ -73,9 +73,9 @@ async function bankObservedOf(store: IDBObjectStore, ask: AnyAsk): Promise<BankO
 }
 // --
 
-// Its rows are only what our code wrote, or what a test planted: it never judges one. Each call is one IndexedDB transaction, which ends at
+// The rows are only what our code wrote, or what a test planted: the datastore never judges one. Each call is one IndexedDB transaction, which ends at
 // an await on anything but its own requests, so the quota is read before a transaction begins.
-/** The datastore of a vaultDB in this browser's IndexedDB. It reads no check and no act table: each function hands back the rows it read, and its tags. */
+/** The datastore of a vaultDB in this browser's IndexedDB. */
 export class IdbDatastore {
   // == [Props]: #shelf, #bellname
 
