@@ -1,6 +1,6 @@
 # Thread 6: actual_words (2026-11-26)
 
-Branch `20261126-actual_words`, PR #TBD, stacked on #943. Proved: see the PR's **Tests:** line.
+Branch `20261126-actual_words`, PR #944, stacked on #943. Proved: package tests and typecheck green before the catch-up (`safebyok` 2,425, `safebyok-postgres` 168, `safebyok-convex` 232, `safebyok-indexeddb` 130); `pnpm justify` after it, see the PR.
 
 * **Built**
   * **The sweep.** Bare "stored" in `packages/safebyok/{src,tests}` and the three adapters went from 540 to 309
