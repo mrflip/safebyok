@@ -179,12 +179,13 @@ listing holds only what the vaultDB answered. Written by core_first thread 3, 20
 
 ### Two Postgres lists whose `read_tc` order is not the order of their reads
 
-* current outcome: `PostgresVaultDB` makes a list's `read_tc` in JavaScript, on the server that runs it, just before its
-  statement. Two lists over a pool, or on servers whose clocks disagree, can carry `read_tc`s in the other order from
-  their snapshots. The vault TSQ compares no `read_tc`: it keeps the listing its last list answered.
+* current outcome: `PostgresVaultDB` dates a list's `read_tc` with Postgres 18's `uuidv7()`, in the statement that
+  lists. `uuidv7()` is monotonic within a connection only: two lists on two pool connections, running at once, can carry
+  `read_tc`s in the other order from their snapshots. The vault TSQ compares no `read_tc`: it keeps the listing its last
+  list answered.
 * alternatives:
-  - Postgres 18's `uuidv7()` in the statement: the package supports Postgres before 18.
-  - build a UUID version 7 from the datastore's clock in SQL: a construction of our own, for a crossing.
+  - take each list's snapshot and `read_tc` under one lock: a lock on every list, for a crossing.
+  - build a UUID version 7 from a sequence in SQL: a construction of our own, for a crossing.
 * workaround: none needed. The next list, or the next box new to the listing, lists it.
 
 Steps to reproduce: two lists of one parent on two pool connections, the first to make its `read_tc` running its
