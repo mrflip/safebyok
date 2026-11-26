@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** thread 1 filed (#934, draft); thread 2 in review (#937); thread 3 reviewed (fixed), files after thread 2; thread 4 building; thread 5 waits for thread 2 to file
+* **Status:** threads 1 and 2 filed (#934, #937, drafts); thread 3 filing (#939); thread 4 building; thread 5 building (cut from thread 2's filed tip)
 
 ## Read first
 
@@ -64,7 +64,8 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Depends on:* thread 1; cut from its tip once it is ready.
 *Look-ahead:* threads 3–5 port to the contract note this thread writes.
 *Size:* medium.
-*Status:* ready 2026-11-26, PR #937; four compactions (the last just before its readiness check). Built `demandSharedConsistency` per the Coach's ruling and thread 1's review directives; `notes/vault-adapter-contract.md`. Narrowed m1 to a missing banktok key (my call: accept).
+*Review:* fixed (opus, medium), 7 fixes (style; `scribeBirthAct`'s double act; `PutTableTags` inlined; the contract note's write-predicate, banktok and refusal-table text). Left: banktok key presence → thread 5 (`banktokOf` returns null); a self-contradicting listing manifest answers `storage_unavailable` → Open Matters; doc and naming leftovers → thread 6; the rest stand.
+*Status:* filed 2026-11-26 at f8c6fa0b0; ready was PR #937; four compactions (the last just before its readiness check). Built `demandSharedConsistency` per the Coach's ruling and thread 1's review directives; `notes/vault-adapter-contract.md`. Narrowed m1 to a missing banktok key (my call: accept).
 
 ### 3. idb_manifest — IndexedDB onto the Manifest
 
@@ -105,7 +106,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 >
 > "Record: what do you think of proposed or asked for the value in the ask, ante or prior for what is in the data store at the start, and actual for what is returned?"
 
-*Gloss.* *Orchestrator:* also the stale eslint config comments naming the deleted `storage/classifier.ts` (safebyok-indexeddb's and the dojo demo's; thread 3); the local `written` → `isWritten` in every datastore (STYLE's boolean rule; thread 3's review); `isWritable`/`isBirthWritable`'s doc blocks for the datastores that share them. A manual sweep of the remaining uses of "stored" (about 500 bare uses at the start of the sprint) in `packages/safebyok/src` and the three adapters, sorting each into actual, ante, proposed or stored (at rest) by the design's *Words* table; renames of identifiers that carry the word in the wrong sense; and VOCABULARY.md rows for **actual**, **ante**, **manifest** and **proposed**. No behaviour changes.
+*Gloss.* *Orchestrator:* also the stale eslint config comments naming the deleted `storage/classifier.ts` (safebyok-indexeddb's and the dojo demo's; thread 3); a documentarian pass over the sprint's files (thread 2's review: "What a ..." first lines, steps listed in doc blocks, the listing copy check's doc block, `refusedroot` → `refusedrootckey`, two-behaviour test titles, a leftover `const manifest = raw`); the local `written` → `isWritten` in every datastore (STYLE's boolean rule; thread 3's review); `isWritable`/`isBirthWritable`'s doc blocks for the datastores that share them. A manual sweep of the remaining uses of "stored" (about 500 bare uses at the start of the sprint) in `packages/safebyok/src` and the three adapters, sorting each into actual, ante, proposed or stored (at rest) by the design's *Words* table; renames of identifiers that carry the word in the wrong sense; and VOCABULARY.md rows for **actual**, **ante**, **manifest** and **proposed**. No behaviour changes.
 *Levels:* style pass `opus`; review `medium`.
 *Depends on:* threads 3, 4 and 5 (they rewrite the same files); cut from the top of the restacked line.
 *Look-ahead:* thread 7 renames "damaged" in the same prose.
