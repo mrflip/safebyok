@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9; thread 6 **held** for the dispatch-table side quest and the Closer Look triage
+* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. The side quest's tables and policy tags ruled in (2026-11-26): threads 8 and 9 run next, then 6 and 7
 
 ## Read first
 
@@ -19,7 +19,7 @@
 * **The new core's code is the contract** (the Coach, 2026-11-26: "The code in safebyok is your reference for contract, if those differ: I'm happy with how it is operating. (But do still report if it differs from your first principles reasoning or one of our docs)"). A thread changes how an answer is made, never what a working vaultDB answers, except where the design says so. A difference from a doc or from your own reasoning is reported, in your thread file's *Open matters*.
 * **Readability and correctness are paramount, not compute, not LOC** (the Coach). Count branches; one plain straight-line function per verb.
 * **Validate the ask once, at the entry**; past it, helpers take `ask` or `(ask, manifest)` (or a `Pick`) and neither re-validate nor null-check what the types exclude.
-* **A datastore reads no check and no act table**; the base class never looks inside a datastore. The overlap between the datastore's write predicate and the base class's act is what the three-way check costs: never optimize it away.
+* **Datastores share a contract, not an implementation** (the Coach, 2026-11-26: "It's not strictly important that other repos emulate the action/implementation of PG, only that they share a common contract/interface."). The base class never looks inside a datastore. The datastore's write predicate (`isWritable`, `isBirthWritable`, Postgres's `WHERE`) stays a clause-by-clause hand copy, never a table lookup; its overlap with the base class's act is what the three-way check costs: never optimize it away.
 * **Words**: actual, ante, proposed, stored, manifest, incompatible, as the design's *Words* table has them. `store` is not a noun; no keep/kept/hold. `WriteAsk.record` keeps its name.
 * **Red, then mended.** Threads 1 and 2 change `AdapterVaultDB`'s `do*` signatures, so `safebyok-indexeddb`, `safebyok-postgres` and `safebyok-convex` fail to typecheck until threads 3, 4 and 5 port them. A worker on 1 or 2 is ready when `packages/safebyok` passes and `pnpm justify` is red only in those three packages; its PR body names what is red and the threads that mend it. Threads 3 to 5 bring `pnpm justify` back to green.
 
@@ -106,6 +106,32 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Review:* fixed (opus, medium), 2 fixes (validators' doc blocks, README's field list). Cross-table watch cursor sound; client `read_tc` sound; the timeouts were load. Left: the damaged-bank battery case hollow for Convex and Postgres → thread 6; `banktok: null` on the watch's first empty result (stands).
 *Status:* filed 2026-11-26 at f82c00e20. Ready was PR #941, rebased onto thread 3 (517463cf4). Three tables mirroring Postgres's; the watch reads `by_commit` across all three; `banktokOf` returns null (the directive); read_tc stays client-stamped (thread E's reason); the damaged-bank plant drops fields the table lacks; a write disagreement refuses `storage_issue`.
 
+### 8. act_tables — the act decided by tables, refusals by tag
+
+> "I'd actually be quire pleased to use a dispatch table if it simplified: looking up 'put-eq-moot-neq...': { ok: false, act: "...", thrower: <thrower func>, ... } would significantly reduce the complexity."
+>
+> "refusals might best come back from the adapter as a refusaltag matching a Phrases element, with a lookup table for refusalkind sent to a function that prepares an error with its loggable ask/manifest, the refusalkind and phrase"
+>
+> "important for the table opus to not axiomatize "one table" -- there are a few ways to decompose it (operation and present/absent are key) -- and definitely there are a few places where a table can make it simpler"
+>
+> "go ahead woth it all, great news, and yes policy tags"
+
+*Gloss.* *Orchestrator:* the side quest's decomposition B, from `whiteboard/20261126-vault_manifest/dispatch/split-tables.ts` (its sketch) and `dispatch/split.test.ts` (the equivalence test that checked it against the old tree on all 67,392 tag combinations; run it once against the tables before the old tree goes): in `packages/safebyok/src/storage/manifest-acts.ts`, `RevisionGrid` (revtok_cmp × revseq_cmp → match, stale, retcon, clash, forked, ahead), `MatchActs[op][presence][flag]`, `StaleActs[op][presence][flag]`, `GetActs[presence][ifAbsent]`, the policied map and `brokenOf`, leaving about eleven branches. Port the equivalence test as a test of the tables against the answer contract's get, put and del tables (not against the old tree, which goes). The base class scribes a refusaltag beside the act, naming a `Phrases` element; a lookup gives its refusal kind; one function builds the error with the refusal kind, the phrase and the loggable ask and manifest. It replaces the three policied throwers and `policiedRefusalOf`; export big's `RefusalkindForVaultAct` through `safebyok-big/internals` if the lookup needs it (`notes/transition.md`). Other throwers stay as they are (moving 18 of the 39 onto the builder is a later ruling). Two checks: a written manifest's tags cross-checked against `written` in three-way (presence `live` + revtok `birth` + `written` now passes as `replaced`; broken state only); and a listing manifest whose tags contradict its row refuses `storage_issue`, not `storage_unavailable`, the check moving into `check*Observations` (Closer Look E2). No answer of a working vaultDB changes.
+*Levels:* worker `thread-worker` (judgment); review `medium`.
+*Depends on:* the line through thread 4 (`20261126-postgres_manifest`).
+*Look-ahead:* thread 9 makes the datastores' policy verdicts phrase tags fed to this builder: shape the builder to take a policy's phrase tag as it takes an act's.
+*Size:* medium.
+
+### 9. policy_tags — policy verdicts come back as phrase tags
+
+> "go ahead woth it all, great news, and yes policy tags"
+
+*Gloss.* *Orchestrator:* each datastore returns a policy's verdict as a tag naming its `PolicyPhrases` element (`{ ok: false, phrasetag }`, or the shape thread 8's builder settles) rather than a message string; the base class builds the message and the error through thread 8's builder. Touches `notes/vault-adapter-contract.md`, `shapes-manifest.ts`'s policies type and its check, `MemoryDatastore`, `IdbDatastore`, Postgres's `vault-functions.ts` (the SQL no longer filled with `PolicyPhrases`' messages) and Convex's `things.ts`. A contract change for adapter authors: the changeset says so.
+*Levels:* worker `thread-worker-400k` (four adapters); review `medium`.
+*Depends on:* thread 8.
+*Look-ahead:* none.
+*Size:* medium.
+
 ### 6. actual_words — "stored" sorted into actual, ante and stored
 
 > "I asked because I think agents are taking an ambiguity: the "stored" record is not "the one that was stored", it is "the one that the store now holds". That means you always get the ground truth of the data store, and it's the same rule for every read or write. The best term instead, I propose, is "actual record" rather than "stored record"."
@@ -114,7 +140,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 
 *Gloss.* *Orchestrator:* also the stale eslint config comments naming the deleted `storage/classifier.ts` (safebyok-indexeddb's and the dojo demo's; thread 3); a documentarian pass over the sprint's files (thread 2's review: "What a ..." first lines, steps listed in doc blocks, the listing copy check's doc block, `refusedroot` → `refusedrootckey`, two-behaviour test titles, a leftover `const manifest = raw`); the local `written` → `isWritten` in every datastore (STYLE's boolean rule; thread 3's review); `isWritable`/`isBirthWritable`'s doc blocks for the datastores that share them. A manual sweep of the remaining uses of "stored" (about 500 bare uses at the start of the sprint) in `packages/safebyok/src` and the three adapters, sorting each into actual, ante, proposed or stored (at rest) by the design's *Words* table; renames of identifiers that carry the word in the wrong sense; and VOCABULARY.md rows for **actual**, **ante**, **manifest** and **proposed**. No behaviour changes.
 *Levels:* style pass `opus`; review `medium`.
-*Depends on:* threads 3, 4 and 5 (they rewrite the same files); cut from the top of the restacked line.
+*Depends on:* threads 3, 4 and 5 (they rewrite the same files); *Orchestrator:* now thread 9, the top of the line.
 *Look-ahead:* thread 7 renames "damaged" in the same prose.
 *Size:* medium, mechanical but judgment per use.
 
@@ -130,7 +156,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 
 ## Line
 
-`1 → 2 → 3 → 4 → 5 → 6 → 7`, the sprint PR on top. Threads 3, 4 and 5 run side by side from thread 2's tip and are restacked into the line before thread 6 is cut. *Orchestrator:* thread 5 rebased onto thread 3 (`1 → 2 → 3 → 5`), so only thread 4 needs restacking: `1 → 2 → 3 → 4 → 5` or `… → 3 → 5 → 4`, whichever conflicts less (both touch `safebyok/storage`'s exports). **A Closer Look** (`.claude/skills/sprint/closer-look.md`) runs once threads 3, 4 and 5 have all filed, before thread 6 is cut (the Coach, 2026-11-26).
+*Orchestrator:* now `1 → 2 → 3 → 5 → 4 → 8 → 9 → 6 → 7`, the sprint PR on top. Was `1 → 2 → 3 → 4 → 5 → 6 → 7`. Threads 3, 4 and 5 run side by side from thread 2's tip and are restacked into the line before thread 6 is cut. *Orchestrator:* thread 5 rebased onto thread 3 (`1 → 2 → 3 → 5`), so only thread 4 needs restacking: `1 → 2 → 3 → 4 → 5` or `… → 3 → 5 → 4`, whichever conflicts less (both touch `safebyok/storage`'s exports). **A Closer Look** (`.claude/skills/sprint/closer-look.md`) runs once threads 3, 4 and 5 have all filed, before thread 6 is cut (the Coach, 2026-11-26).
 
 ## For the Coach
 
