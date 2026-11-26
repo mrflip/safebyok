@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Threads 8 and 9 filed (#942, #943); thread 6 filed (#944); thread 7 in review (#945); thread 10 building
+* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Threads 8 and 9 filed (#942, #943); thread 6 filed (#944); thread 7 filed (#945); thread 10 building
 
 ## Read first
 
@@ -158,7 +158,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Gloss.* The name is `incompatible_row` (the Coach, 2026-11-26, Open Matters: "change all damaged_row checks to incompatible_row. I agree this is incompatible_row"). A new refusal kind in safebyok-big's errors (broadening big, as CLAUDE.md allows), used by the new core and its adapters in place of `damaged_row`, with `damaged_rows`, `DamagedThing` and VOCABULARY.md's *damaged* row renamed to match; `damaged_whisper` stays, since a whisper that will not unseal is damage. Big's own use of `damaged_row` stays. A public refusal kind changes: the changeset says so.
 *Levels:* worker `sonnet`; review `low`.
 *Review:* clean (sonnet, low); minor nits left (big's doc block names the new core; import order).
-*Status:* reviewed at 1450bd91d, filing; PR #945. Big gains the kind only; one safebyok-react test runs on the new core and was renamed too; `am: 'd'` keeps its letter; VOCABULARY's row drops "never indicates format drift" (orchestrator confirmed, Cleanup).
+*Status:* filed 2026-11-26 at 1450bd91d; PR #945 out of draft. Big gains the kind only; one safebyok-react test runs on the new core and was renamed too; `am: 'd'` keeps its letter; VOCABULARY's row drops "never indicates format drift" (orchestrator confirmed, Cleanup).
 *Depends on:* thread 6.
 *Look-ahead:* none.
 *Size:* small-medium, mechanical.
