@@ -201,8 +201,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   // `ManifestTags`; one that cannot makes the same comparisons in its own language. It reads no check and no act table: this
   // class checks each row once, finds the act from the tags, and requires the datastore's write to agree with it.
   //
-  // A write writes `ask.record` exactly where the datastore's own predicate allows: the ante row is the one cited, the
-  // ask's flag lets it write over that row (`ifPresent` 'repl' over a live Thing, `ifAbsent` 'add' over a tombstone or
+  // A write writes `ask.record` exactly where the datastore's own predicate allows: the ante row is the one cited, in the
+  // record's format and with the cited lifepath's lifeseq, the ask's flag lets it write over that row (`ifPresent` 'repl' over a live Thing, `ifAbsent` 'add' over a tombstone or
   // none), a live record over a live Thing leaves its born_at the same, a write of the bank over a live bank its lifetok,
   // and the gate it replaces meets each storage policy the ask names. The record carries every field, so a datastore may
   // write it by replacing the row whole.

@@ -43,6 +43,22 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
     })
   }
 
+  const UnwrittenCases = [
+    [{ ...TH.gateThingOf(), fmt: 'other' },            'writes nothing over a gate of another format, cited exactly, and refuses it as damaged'],
+    [{ ...TH.gateThingOf(), lifeseq: '0000000002' },  'writes nothing over a gate whose lifeseq is not the last of its lifepath, cited exactly, and refuses it as damaged'],
+  ] as const
+
+  for (const [raw, blurb] of UnwrittenCases) {
+    it(blurb, async () => {
+      const vaultDB = new MemoryVaultDB()
+      const gate    = TH.gateThingOf()
+      const ask     = TH.replaceAskOf(gate, TH.nextOf(gate))
+      vaultDB._cheat_things(TH.ThingBank).set('gate', raw)
+      await TH.expectBad(vaultDB.tryWriteThing(ask), 'damaged_row')
+      expect(vaultDB._cheat_things(TH.ThingBank).get('gate')).to.deep.equal(raw)
+    })
+  }
+
   it("refuses a listed child filed at another scope as a broken store", async () => {
     const vaultDB = new MemoryVaultDB()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))

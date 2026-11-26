@@ -4,7 +4,7 @@ import { type Errors, Helpers, Outcome, SX } from 'safebyok-big/internals'
 import { readTcNow } from './agerank'
 import type { Received } from '../shapes/shapes-answers'
 import type { GetManifest, WriteManifest } from '../shapes/shapes-manifest'
-import { Labelpath } from '../shapes/primitives'
+import { Labelpath, Lifeseq } from '../shapes/primitives'
 import type { AnyAsk, BirthBankAsk, BirthPuts, GetAsk, ListAsk, StatsAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
 import type { VaultStats } from '../shapes/shapes-vault-stats'
 import * as ManifestTags from './manifest-tags'
@@ -147,8 +147,9 @@ export class MemoryDatastore {
 
 /** True when the datastore writes `ask.record` over the raw `ante` row, by its own predicate, a copy of `VaultFunctionsSql`'s write functions:
  * - over no row, `INSERT … WHERE (cited.revtok = <the void revtok>) … ON CONFLICT DO NOTHING`, and the ask's `ifAbsent` is `'add'`
- * - over a row, the `UPDATE`'s `WHERE`: `stored.revtok = cited.revtok`, `stored.am = cited.am`, `stored.lifepath = cited.lifepath`, and
- *   `stored.revseq = (proposed.revseq - 1)`; its born_at check, `(stored.am <> proposed.am) OR (stored.born_at = proposed.born_at)`; its
+ * - over a row, the `UPDATE`'s `WHERE`: `stored.revtok = cited.revtok`, `stored.am = cited.am`, `stored.lifepath = cited.lifepath`,
+ *   `stored.revseq = (proposed.revseq - 1)` and `stored.fmt = proposed.fmt`; its `lifeseq_ok` over `stored.lifeseq`, which past the ask's
+ *   checks is the stored lifeseq being the cited lifepath's last; its born_at check, `(stored.am <> proposed.am) OR (stored.born_at = proposed.born_at)`; its
  *   lifetok check, `(stored.am <> 'a') OR (stored.lifetok = proposed.lifetok)`, the bank's alone; and its storage policies, the gate's alone
  * - and the flag the ask's TypeScript checked before the SQL ran: `ifPresent` `'repl'` over a live row, `ifAbsent` `'add'` over a tombstone
  */
@@ -156,10 +157,12 @@ function isWritable(ask: WriteAsk, ante: unknown): boolean {
   if (ante === null) { return (ask.cited.revtok === SX.VoidRevisionTok) && (ask.ifAbsent === 'add') }
   const isLive        = (ManifestTags.fieldOf(ante, 'am') === 'a')
   const isCited       = (ManifestTags.fieldOf(ante, 'revtok') === ask.cited.revtok) && (ManifestTags.fieldOf(ante, 'am') === ask.cited.am) && (ManifestTags.fieldOf(ante, 'lifepath') === ask.cited.lifepath) && (ManifestTags.fieldOf(ante, 'revseq') === ask.record.revseq - 1)
+  const isOfFormat    = (ManifestTags.fieldOf(ante, 'fmt') === ask.record.fmt)
+  const isLifeseqOwn  = (ManifestTags.fieldOf(ante, 'lifeseq') === Lifeseq.ofLifepath(ask.cited.lifepath))
   const isFlagged     = isLive ? (ask.ifPresent === 'repl') : (ask.ifAbsent === 'add')
   const isBornAtSame  = (ManifestTags.fieldOf(ante, 'am') !== ask.record.am) || (ManifestTags.fieldOf(ante, 'born_at') === ask.record.born_at)
   const isLifetokSame = (ask.modelkind !== 'bank') || (! isLive) || (ManifestTags.fieldOf(ante, 'lifetok') === ask.record.lifetok)
   const isPolicyMet   = Object.values(ManifestTags.policiesOf(ask, ante)).every((verdict) => verdict?.ok !== false)
-  return isCited && isFlagged && isBornAtSame && isLifetokSame && isPolicyMet
+  return isCited && isOfFormat && isLifeseqOwn && isFlagged && isBornAtSame && isLifetokSame && isPolicyMet
 }
 // --
