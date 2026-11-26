@@ -26,3 +26,12 @@ The orchestrator's curated summary of what the threads have taught. Newer than t
 ## Threads
 
 (none yet)
+
+### Thread 1, manifest_things (ready, #934)
+
+* `doGetThing`/`doWriteThing` return `GetManifest`/`WriteManifest` (`src/shapes/shapes-manifest.ts`); datastores build tags with `ManifestTags`, exported from `safebyok/storage`.
+* `Received.banktok` is `unknown`; the watch checks it with `checkedBanktokOf`, so an adapter's watch need not call `Classifier.banktokOf`.
+* One consistency function per verb (`demandGetConsistency`, `demandWriteConsistency`): Open Matters.
+* The ancestor is checked whole, address and all, when read: the shell is built from it. Open Matters.
+* *Orchestrator:* a three-way check only our code can fail refuses `unexpected_error` (thread 2 switches `answerOfOtherManifest`).
+* The demos' `LocalStorageVaultDB` overrides `doWriteThing`; it takes its ckey from `MemoryDatastore.ckeyOf`.

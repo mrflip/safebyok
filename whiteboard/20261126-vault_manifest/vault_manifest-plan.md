@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** thread 1 building (cut 2026-11-26 from origin/main, `/workspace/byok-manifest_things`)
+* **Status:** thread 1 ready, PR #934, in review (high, opus); thread 2 building, stacked on #934 (`/workspace/byok-manifest_rest`)
 
 ## Read first
 
@@ -48,6 +48,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Depends on:* nothing; cut from `origin/main`.
 *Look-ahead:* thread 2 copies its pattern for the other verbs, and threads 3–5 implement its `do*` contract: keep the manifest types and the tag functions exported from `safebyok/storage`, documented as a datastore's contract.
 *Size:* large; the largest in the sprint. If it nears its cap, stop after the write verb and report what remains.
+*Status:* ready 2026-11-26, PR #934; one compaction (~366k), just before its readiness check. Red only in the three adapters. Deviations: one consistency check per verb; the ancestor checked whole, address and all, when read; a `policied` refusal carries the step's real banktok, tracked and read_tc; a write over an incompatible row is written where its cited revision matches (the reviewer weighs it); a void get under an incompatible ancestor refuses `damaged_row`; the demos pulled forward.
 
 ### 2. manifest_rest — list, birth, world and stats on the Manifest
 
