@@ -228,7 +228,7 @@ function refusaltagOf(ask: WriteAsk, tags: WriteTags): Refusaltag | null {
   return (tags.lifetok_cmp === 'changed') ? 'LifetokNotStored' : null
 }
 
-/** The refusal's tag of the first storage policy `ask` names that refuses it, by its verdict in `tags`, or null where each is met. */
+/** The refusal tag of the first storage policy `ask` names that refuses it, or null where each is met. */
 function policyFailureOf({ options }: WriteAsk, { policies }: WriteTags): PolicyTag | null {
   const named = options?.policies ?? []
   for (const policy of named) {
