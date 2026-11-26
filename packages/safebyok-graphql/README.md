@@ -72,8 +72,9 @@ Hand it to the core wherever a `VaultDB` is asked for.
 One vaultDB serves every request. **`getUserId(context)`** returns the user your own auth signed in
 for this request, or null. Each operation names the bank it reaches, by its ask's `userid`, and the
 resolvers serve it only when that is the signed-in user's bank. Any other request is answered
-`identity_revoked`, and the vaultDB is not called. An error `getUserId` throws is left to your
-GraphQL server, as any resolver's error is.
+`identity_revoked`, and the vaultDB is not called. Where `getUserId` throws, the operation fails
+with a GraphQL error carrying the refusal for it (see *What crosses the wire*): `unexpected_error`,
+with none of the error's text, or the VaultError it threw.
 
 A watch calls `getUserId` again at each change it would send. Once that returns anyone other than
 the user it subscribed as, its last notice is the `identity_revoked` refusal and the stream ends. A
@@ -100,17 +101,23 @@ Each operation takes the verb's ask, typed, and returns an object with the field
 everything else is typed. The browser half checks each Thing at the ask's scope, as the core
 checks what a datastore reads.
 
-**A refusal is the answer's `err` field, never a GraphQL error.** It carries its `refusalkind`, its
+**A refusal of the vaultDB's is the answer's `err` field, never a GraphQL error.** It carries its `refusalkind`, its
 message, and in `meta` the `oplabel` it refused, its `act`, the `capacity` of a `vault_full`, and the
 `fieldnames` and `labelpaths` it names. The browser answers it as the server's vaultDB did, throwing
 it again where that verb threw. **Nothing else of a refusal is sent**, not its cause, its ask or the
 rows it names, so a driver's message stays on your server.
 
+A request the resolvers cannot serve, where `getUserId` throws, or one that breaks the package's
+rules, as a watch scope that fails its check (which only another client sends, and which is refused
+`bad_record`), fails with a GraphQL error instead. Its `extensions.safebyokErr` is the refusal, in
+the same form as `err`.
+
 In the browser:
 
 * a failed fetch is `storage_unavailable`, its cause naming only the error, the HTTP status and a
   code such as `ECONNREFUSED`, never a message or a response's body;
-* a GraphQL error, or a result that lacks the operation's field, is `unexpected_error`, with no cause;
+* a GraphQL error carrying a refusal under `extensions.safebyokErr` is that refusal;
+* any other GraphQL error, or a result that lacks the operation's field, is `unexpected_error`, with no cause;
 * an answer the core's checks refuse is `storage_issue`.
 
 ### A watch
@@ -119,7 +126,7 @@ Each change to the bank's Things arrives as a notice. Bad news the server's watc
 notice too, and the watch goes on. When the watch ends, by a notice the server marks as its last, by
 the stream closing, or by an error, the core's `onEnded` is called, then `onBadNews` once with why:
 the refusal the server sent, `storage_unavailable` for a closed stream or a failed fetch, or
-`unexpected_error` for a GraphQL error. The watch does not subscribe again. Over a WebSocket exchange
+for a GraphQL error the refusal it carries, else `unexpected_error`. The watch does not subscribe again. Over a WebSocket exchange
 (urql's `subscriptionExchange` with graphql-ws), a stream that ends before its first result, or on a
 graphql-ws error, sends no closing result, so its end goes unreported.
 
