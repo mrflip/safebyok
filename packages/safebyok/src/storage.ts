@@ -58,7 +58,9 @@ export {
 export { VoidLifeTok, storagePolicyVals, type Awaitable, type DelAct, type GoodAct, type GotAct, type PutAct, type StoragePolicy, type WriteAct } from 'safebyok-big/storage'
 export type { IfAbsent, IfPresent, PutIfAbsent, RefusedAct } from 'safebyok-big/internals'
 // The values of an ask's flags, of each verb's acts and of a refusal's kind, for an adapter that names them on a wire.
-export { badActVals, ifAbsentVals, refusedActVals, refusalkindVals, writeActVals } from 'safebyok-big/storage'
+export { badActVals, ifAbsentVals, refusedActVals, refusalkindVals } from 'safebyok-big/storage'
+// Whether an act is one a datastore writes under, for an adapter whose server names the act it answered.
+export { isWriteAct } from './storage/manifest-acts'
 /** The values of a put's `ifPresent` and `ifAbsent`, and of a get's, a put's and a del's acts. */
 export const { delActVals, gotActVals, ifPresentVals, putActVals, putIfAbsentVals } = EX
 export { VaultError, isVaultError, type Capacity, type RefusalFamily, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'

@@ -81,7 +81,7 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
     const answer = WireChecks.wroteAnswer.parse(thingAnswerDrop(await this.#runMutation(VaultOperations.writeThing, 'safebyokWriteThing', { ask })))
     if (! answer.ok) { throwIfThrown(answer) }
     const rows = rowsOfCarried(ask, answer.ok ? answer.val : answer.dbhas)
-    const tags = isWrittenAct(answer.act) ? DB.ManifestTags.writtenTagsOf(ask) : DB.ManifestTags.writeTagsOf(ask, rows.actual, false)
+    const tags = DB.isWriteAct(answer.act) ? DB.ManifestTags.writtenTagsOf(ask) : DB.ManifestTags.writeTagsOf(ask, rows.actual, false)
     return { tags, ...rows, ...observedOf(answer) }
   }
 
@@ -108,7 +108,7 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
       return { tags: DB.ManifestTags.birthTagsOf(puts, named, false), actual: named, ...observedOf(answer) }
     }
     const actual    = rootRowsOf(answer.val)
-    const isWritten = isWrittenAct(answer.act)
+    const isWritten = DB.isWriteAct(answer.act)
     return { tags: DB.ManifestTags.birthTagsOf(puts, isWritten ? NoRoots : actual, isWritten), actual, ...observedOf(answer) }
   }
 
@@ -189,7 +189,7 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
 }
 // --
 
-// == [Answers]: CheckedAnswer, RefusedAnswer, PresenceOfAct, NoRoots, observedOf, presenceTagsOf, isWrittenAct, isShell, rowOf, rowsOfCarried, ancestorLivesOf, rootRowsOf, namedRootsOf, throwIfThrown, fieldOf, troubleOf, carriedErrOf, hearNotice
+// == [Answers]: CheckedAnswer, RefusedAnswer, PresenceOfAct, NoRoots, observedOf, presenceTagsOf, isShell, rowOf, rowsOfCarried, ancestorLivesOf, rootRowsOf, namedRootsOf, throwIfThrown, fieldOf, troubleOf, carriedErrOf, hearNotice
 
 /** What every answer carries, as its check read it. */
 type CheckedAnswer = Readonly<{ act: string, banktok: unknown, tracked: unknown, read_tc: unknown }>
@@ -209,9 +209,6 @@ function observedOf({ banktok, tracked, read_tc }: CheckedAnswer): DB.BankObserv
 // An act that names no presence leaves it undefined, and AdapterVaultDB's check of the tags refuses them.
 /** A get's or a listing's tags: the presence its act names. */
 function presenceTagsOf(act: string): DB.GetTags { return { presence: PresenceOfAct[act] } as DB.GetTags }
-
-/** True when the server wrote: its act is a write's. */
-function isWrittenAct(act: string): boolean { return (DB.writeActVals as readonly string[]).includes(act) }
 
 /** True when `carried` is the shell, the void sentinel, which stands for no row: told by its revseq. */
 function isShell(carried: unknown): boolean { return DB.ManifestTags.fieldOf(carried, 'revseq') === DB.Shell.Cited.revseq }
