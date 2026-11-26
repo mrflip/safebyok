@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** thread 1 filed (#934, draft); thread 2 ready (#937), in review; threads 3 and 4 building, from thread 2's tip; thread 5 waits for thread 2 to file (cap of 3)
+* **Status:** thread 1 filed (#934, draft); thread 2 in review (#937); thread 3 ready (#939), in review; thread 4 building; thread 5 waits for thread 2 to file
 
 ## Read first
 
@@ -104,7 +104,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 >
 > "Record: what do you think of proposed or asked for the value in the ask, ante or prior for what is in the data store at the start, and actual for what is returned?"
 
-*Gloss.* A manual sweep of the remaining uses of "stored" (about 500 bare uses at the start of the sprint) in `packages/safebyok/src` and the three adapters, sorting each into actual, ante, proposed or stored (at rest) by the design's *Words* table; renames of identifiers that carry the word in the wrong sense; and VOCABULARY.md rows for **actual**, **ante**, **manifest** and **proposed**. No behaviour changes.
+*Gloss.* *Orchestrator:* also the stale eslint config comments naming the deleted `storage/classifier.ts` (safebyok-indexeddb's and the dojo demo's; thread 3). A manual sweep of the remaining uses of "stored" (about 500 bare uses at the start of the sprint) in `packages/safebyok/src` and the three adapters, sorting each into actual, ante, proposed or stored (at rest) by the design's *Words* table; renames of identifiers that carry the word in the wrong sense; and VOCABULARY.md rows for **actual**, **ante**, **manifest** and **proposed**. No behaviour changes.
 *Levels:* style pass `opus`; review `medium`.
 *Depends on:* threads 3, 4 and 5 (they rewrite the same files); cut from the top of the restacked line.
 *Look-ahead:* thread 7 renames "damaged" in the same prose.

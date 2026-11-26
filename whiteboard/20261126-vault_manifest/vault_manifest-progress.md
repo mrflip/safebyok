@@ -46,3 +46,9 @@ The orchestrator's curated summary of what the threads have taught. Newer than t
 * A manifest with no `banktok` key refuses `storage_issue`; a present-but-malformed banktok answers void (a damaged bank row's `ManifestTags.banktokOf` is undefined).
 * `TrackedRows` exported top level from `safebyok/storage`.
 * *Orchestrator:* thread 2 compacted four times at medium size: the manifest work is context-heavy. Threads 4 and 5 run on `thread-worker-400k`.
+
+### Thread 3, idb_manifest (ready, #939)
+
+* `IdbDatastore` (`packages/safebyok-indexeddb/src/idb-datastore.ts`, unexported): one `DB.inOneStep` transaction per verb, a manifest back; the quota refusal, the bell and the BroadcastChannel watch live there; a ring follows a commit whose `tags.written` is true. `idb-vault-db.ts` is the options check and one line per `do*`.
+* `isWritable` and `isBirthWritable` are exported from `safebyok/storage`: a datastore running TypeScript in its step (Convex, thread 5) reuses them rather than copying.
+* The dojo demo needed no change; it was red only through safebyok-indexeddb.
