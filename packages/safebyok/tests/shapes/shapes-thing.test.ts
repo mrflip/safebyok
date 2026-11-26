@@ -6,7 +6,7 @@ import {
 } from '../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
 import { Thing } from '../../src/models/thing'
-import { type Tracked, type WriteAsk, AskChecks, VoidTrack, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../../src/shapes/shapes-asks'
+import { type Tracked, type WriteAsk, AskChecks, VoidTrack, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { Labelpath, Lifeseq } from '../../src/shapes/primitives'
 import type { LiveOf, ShellOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
 import * as Phrases from '../../src/phrases'
@@ -435,6 +435,22 @@ describe("checkedBirthBankAsk(ask)", () => {
   it("refuses a field it does not accept, and a root of another bank", () => {
     TH.expectSyncRefusal(() => checkedBirthBankAsk({ ...TH.birthBankAskOf(), extra: 1 }), 'bad_record')
     TH.expectSyncRefusal(() => checkedBirthBankAsk(TH.birthBankAskOf({ gate: TH.gateThingOf({ banklabel: 'other' }) })), 'bad_record')
+  })
+})
+
+describe("birthPutsOf(ask)", () => {
+  it("makes a birth's three puts, of the bank, the main gate and the root box, each a write ask that passes its check", () => {
+    const ask  = TH.birthBankAskOf()
+    const puts = birthPutsOf(ask)
+    expect(puts.map((put) => [put.labelpath, put.record])).to.deep.eq([['bank', ask.bank], ['gate', ask.gate], ['box', ask.root]])
+    for (const put of puts) {
+      expect(checkedWriteAsk(put), put.labelpath).to.deep.eq(put)
+      expect(put, put.labelpath).to.deep.include({ userid: ask.userid, banklabel: ask.banklabel, track: ask.track, banktok: ask.banktok, cited: Shell.Cited, ifAbsent: 'add' })
+    }
+  })
+
+  it("gets a bank already stored, where it refuses a gate or a root box already there", () => {
+    expect(birthPutsOf(TH.birthBankAskOf()).map((put) => put.ifPresent)).to.deep.eq(['get', 'fail', 'fail'])
   })
 })
 

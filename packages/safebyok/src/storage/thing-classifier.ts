@@ -1,12 +1,13 @@
 /** Classify a vaultDB ask against the Thing stored, by big's act tables in `notes/answer-contract.md`. */
 
-import { sortBy } from 'es-toolkit'
+import { isEqual, sortBy } from 'es-toolkit'
 import { CX, EX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/internals'
 import { policyRefusalOf } from './policies'
 import { Labelpath, type Lifetok } from '../shapes/primitives'
 import type { BirthBankActual, DamagedThing, GetWorldActual, GotActual, KidEntry, Kids, ListThingsActual, StatsActual, WroteActual } from '../shapes/shapes-answers'
 import type { VaultStats } from '../shapes/shapes-vault-stats'
 import type { ReadTc } from '../shapes/shapes-vault-event'
+import { CrossedChecks } from '../shapes/shapes-crossed'
 import { type BoxSparse, type StoredCited, type ThingCited, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
 import { BaseThing } from '../models/base-thing'
@@ -328,7 +329,7 @@ function isChildLabelpath(ask: ListAsk, labelpath: Labelpath): boolean {
 
 // Object.fromEntries makes each label an own key, `__proto__` among them.
 /** The {@link Kids} value of `deltas`, the children of the live `parent` stored at the listing's scope, but for its `read_tc`, which is the report's. */
-function kidsOf(ask: ListAsk, parent: ThingRecord, deltas: readonly (ThingRecord | BoxSparse)[]): Omit<Kids, 'read_tc'> {
+function kidsOf(ask: ListAsk, parent: Pick<ThingRecord, 'lifepath'>, deltas: readonly (ThingRecord | BoxSparse)[]): Omit<Kids, 'read_tc'> {
   const entryOf = ({ label, lifeseq }: ThingRecord | BoxSparse): [string, KidEntry] => [label, { lifeseq }]
   return {
     modelkind:  'kids',
@@ -436,5 +437,126 @@ export function unwrittenBirthOf(puts: BirthPuts, fetched: BankRootsFetched): Bi
     return { ok: false, act, banktok: banktokOf(bankPut, fetched.bank), tracked: trackedOf(bankPut, fetched.tracked), read_tc: fetched.read_tc, record }
   }
   return null
+}
+// --
+
+// == [Things crossed]: CrossedThingChecks, crossedThingOf, CrossedGot, crossedGotOf, crossedWrittenOf, crossedNamedOf, crossedTrackedOf, crossedRootsOf, crossedWorldOf, CrossedListing, CrossedListed, crossedListingOf, crossedChildOf, crossedListedOf, recordOrShellOf
+// What a server's vaultDB answered, carried across a wire to a client's vaultDB, for an adapter whose server runs a whole
+// vaultDB. The server classified it; the client reads each Thing again, at the ask's scope, before it reaches a report.
+// Each refuses `storage_issue`: to the client, the server is its storage, and a Thing that fails here, damaged or not, means it is out of step or broken.
+
+/** Each kind's checks of a Thing that crossed a wire, whole, as its shell, or for a live box, sparse. */
+const CrossedThingChecks = Object.freeze({
+  bank: { record: BankChecks.record.refusingAs('storage_issue'), shell: BankChecks.shell.refusingAs('storage_issue') },
+  gate: { record: GateChecks.record.refusingAs('storage_issue'), shell: GateChecks.shell.refusingAs('storage_issue') },
+  box:  { record: BoxChecks.record.refusingAs('storage_issue'),  shell: BoxChecks.shell.refusingAs('storage_issue'), sparse: BoxChecks.sparse.refusingAs('storage_issue') },
+})
+
+/** The Thing a server's answer carried at `scope`, or the shell there, checked. */
+export function crossedThingOf(scope: ThingScope, raw: unknown): ThingRecord | VoidSentinel {
+  return recordOrShellOf<ThingRecord>(CrossedThingChecks[Labelpath.modelkindOf(scope.labelpath)], scope, raw)
+}
+
+/** A get's act and Thing that crossed a wire, checked: what a concrete adapter's report of it carries beside its banktok, tracked and read_tc. */
+export type CrossedGot = Readonly<
+  | { ok: true,  act: EX.GotAct,     record: ThingRecord | VoidSentinel }
+  | { ok: false, act: 'void' | 'gone', record: ThingRecord | VoidSentinel }
+>
+
+/** The act and Thing a server's answer to a get carried, checked: the Thing at the ask's scope, or the shell there, and `act` the one the get table gives it. */
+export function crossedGotOf(ask: GetAsk, act: string, raw: unknown): CrossedGot {
+  const record = crossedThingOf(ask, raw)
+  const tabled = getActOf(ask, BaseThing.isVoidSentinel(record) ? null : record)
+  if (tabled !== act) { throw Throwers.storageIssue() }
+  return isRefusedAct(tabled) ? { ok: false, act: tabled, record } : { ok: true, act: tabled, record }
+}
+
+/** The Thing a server's answer reports writing at `scope`, checked. */
+export function crossedWrittenOf(scope: ThingScope, raw: unknown): ThingRecord {
+  return writtenOf<ThingRecord>(CrossedThingChecks[Labelpath.modelkindOf(scope.labelpath)].record, scope, raw)
+}
+
+/** The Thing, or the shell, that a server's refusal names in `bankScope`'s bank, at the labelpath it carries, checked. */
+export function crossedNamedOf({ userid, banklabel }: ThingWatchScope, raw: unknown): ThingRecord | VoidSentinel {
+  const labelpath = CX.isPlainBag(raw) ? raw['labelpath'] : undefined
+  const scopeReport = ThingChecks.thingScope.safeParse({ userid, banklabel, labelpath })
+  if (! scopeReport.success) { throw Throwers.rowOfOtherAddress(['labelpath']) }
+  return crossedThingOf(scopeReport.data, raw)
+}
+
+/** The `tracked` a server's answer to `ask` carried, checked: for each root, `'same'` or the Thing stored there. */
+export function crossedTrackedOf({ userid, banklabel }: AnyAsk, raw: unknown): Tracked {
+  const crossed = CrossedChecks.tracked.parse(raw)
+  const entryOf = <RecordT extends ThingRecord>(check: StoredCheck<RecordT>, labelpath: Labelpath, entry: unknown): RecordT | 'same' => (
+    (entry === 'same') ? 'same' : writtenOf(check, { userid, banklabel, labelpath }, entry)
+  )
+  return {
+    bank:                 entryOf(CrossedThingChecks.bank.record, 'bank', crossed.bank),
+    [Labelpath.MainGate]: entryOf(CrossedThingChecks.gate.record, Labelpath.MainGate, crossed[Labelpath.MainGate]),
+    [Labelpath.RootBox]:  entryOf(CrossedThingChecks.box.record,  Labelpath.RootBox,  crossed[Labelpath.RootBox]),
+  }
+}
+
+/** The three roots a server's answer to a birth's `puts` reports, written or already stored, checked. */
+export function crossedRootsOf([bankPut, gatePut, rootPut]: BirthPuts, raw: unknown): BankRoots {
+  const crossed = CrossedChecks.roots.parse(raw)
+  return {
+    bank: writtenOf(CrossedThingChecks.bank.record, bankPut, crossed.bank),
+    gate: writtenOf(CrossedThingChecks.gate.record, gatePut, crossed.gate),
+    root: writtenOf(CrossedThingChecks.box.record,  rootPut, crossed.root),
+  }
+}
+
+/** The three roots a server's answer to a get of the world carried, each the Thing stored or the shell there, checked. */
+export function crossedWorldOf({ userid, banklabel }: GetWorldAsk, raw: unknown): WorldRoots {
+  const crossed = CrossedChecks.roots.parse(raw)
+  return {
+    bank: recordOrShellOf(CrossedThingChecks.bank, { userid, banklabel, labelpath: 'bank' }, crossed.bank),
+    gate: recordOrShellOf(CrossedThingChecks.gate, { userid, banklabel, labelpath: Labelpath.MainGate }, crossed.gate),
+    root: recordOrShellOf(CrossedThingChecks.box,  { userid, banklabel, labelpath: Labelpath.RootBox }, crossed.root),
+  }
+}
+
+/** What a server's good answer to a listing carried: its `val` and the lists beside it, raw. */
+export type CrossedListing = Readonly<{ val: unknown, parentage: unknown, deltas: unknown, damaged_rows: unknown }>
+
+/** A listing that crossed a wire, checked: what a concrete adapter's good report of it carries beside its envelope. */
+export type CrossedListed = Pick<Extract<ListThingsActual, { ok: true }>, 'kids' | 'parentage' | 'deltas' | 'damaged_rows'>
+
+/** The listing a server's good answer to `ask` carried, checked: its live parent, its children and the damaged ones, each one label under the parent,
+ * and its kids, which must be those the parent and children make, in labelpath order.
+ */
+export function crossedListingOf(ask: ListAsk, crossed: CrossedListing): CrossedListed {
+  const { val: { read_tc: _read_tc, ...kidsCrossed }, parentage, deltas: rawDeltas, damaged_rows } = CrossedChecks.listing.parse(crossed)
+  const parent = crossedListedOf(ask, parentage[0])
+  if (parent.am !== 'a') { throw Throwers.storageIssue() }
+  const deltas = rawDeltas.map((raw) => crossedChildOf(ask, parent, raw))
+  for (const damaged of damaged_rows) {
+    if (! isChildLabelpath(ask, Validator.checkedConsistent(damaged, { userid: ask.userid, banklabel: ask.banklabel }, RowOfOtherScope).labelpath)) { throw Throwers.rowOfOtherAddress(['labelpath']) }
+  }
+  const kids = kidsOf(ask, parent, deltas)
+  if (! isEqual(kidsCrossed, kids) || ! isEqual(deltas, sortBy(deltas, [(thing) => thing.labelpath]))) { throw Throwers.storageIssue() }
+  return { kids, parentage: [parent], deltas, damaged_rows }
+}
+
+/** A child a listing of `ask` carried, checked: one label under the parent, and in the parent's live life. */
+function crossedChildOf(ask: ListAsk, parent: Pick<ThingRecord, 'lifepath'>, raw: unknown): ThingRecord | BoxSparse {
+  const labelpath = CX.isPlainBag(raw) ? raw['labelpath'] : undefined
+  if ((typeof labelpath !== 'string') || (! isChildLabelpath(ask, labelpath))) { throw Throwers.rowOfOtherAddress(['labelpath']) }
+  const child = crossedListedOf({ userid: ask.userid, banklabel: ask.banklabel, labelpath }, raw)
+  if (! child.lifepath.startsWith(`${parent.lifepath}/`)) { throw Throwers.storageIssue() }
+  return child
+}
+
+/** A Thing a listing carried at `scope`, checked: a live box sparse, any other Thing whole. */
+function crossedListedOf(scope: ThingScope, raw: unknown): ThingRecord | BoxSparse {
+  const isSparse = Labelpath.isOfModelkind(scope.labelpath, 'box') && CX.isPlainBag(raw) && (raw['am'] === 'a')
+  return isSparse ? writtenOf<BoxSparse>(CrossedThingChecks.box.sparse, scope, raw) : crossedWrittenOf(scope, raw)
+}
+
+/** The Thing at `scope`, checked by `checks.record`, or where it carries the void revseq, the shell there, checked by `checks.shell`. */
+function recordOrShellOf<RecordT extends ThingRecord>(checks: { record: StoredCheck<RecordT>, shell: StoredCheck<object> }, scope: ThingScope, raw: unknown): RecordT | VoidSentinel {
+  const isShell = CX.isPlainBag(raw) && (raw['revseq'] === SX.VoidRevisionSeq)
+  return isShell ? writtenOf(checks.shell, scope, raw) as VoidSentinel : writtenOf(checks.record, scope, raw)
 }
 // --

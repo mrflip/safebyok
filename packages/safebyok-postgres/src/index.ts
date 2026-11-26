@@ -2,5 +2,7 @@
 export { PostgresVaultDB } from './postgres-vault-db'
 export type { PostgresListen, PostgresQueryable, PostgresVaultDBOpts } from './postgres-vault-db'
 export { thingsChannelOf } from './notifications'
+export { makePostgresListen } from './postgres-listen'
+export type { PostgresListenClient } from './postgres-listen'
 export { VaultFunctionsSql } from './vault-functions'
 export { VaultTablesSql } from './vault-tables'

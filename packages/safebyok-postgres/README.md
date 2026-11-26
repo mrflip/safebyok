@@ -86,40 +86,25 @@ channel, and so can read the Things a notification carries: the same ciphertext 
 
 `listen(channel, onNotify)` passes the text of each notification on that channel to `onNotify`, unchanged, and returns
 a function that stops listening. LISTEN needs a connection of its own for as long as it listens, so share one among
-every watch. This recipe LISTENs on a channel the first time a watch asks for it and **never UNLISTENs**: the stop
-function it returns only drops that watch's handler.
+every watch. **`makePostgresListen(client)`** makes that listen on a `pg` `Client` you connect for it: it LISTENs on a
+channel the first time a watch asks for it, passes each notification to every watch on its channel, and UNLISTENs once
+the last of them stops.
 
 ```ts
-import { Client, escapeIdentifier } from 'pg'
-import { type PostgresListen } from 'safebyok-postgres'
+import { Client, Pool } from 'pg'
+import { PostgresVaultDB, makePostgresListen } from 'safebyok-postgres'
 
+const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 const listener = new Client({ connectionString: process.env.DATABASE_URL })
-// Without this handler, a dropped connection crashes the process. With it, every watch goes quiet until you listen again.
+// Without this handler, a dropped connection crashes the process. With it, every watch goes quiet and each new watch
+// ends: connect a new Client, and make a new vaultDB with it.
 listener.on('error', (err) => { console.warn('safebyok listener lost:', err.message) })
 await listener.connect()
-const listenersOf = new Map<string, Set<(text: string) => void>>()
-listener.on('notification', ({ channel, payload = '' }) => {
-  const listeners = listenersOf.get(channel) ?? []
-  for (const onNotify of listeners) { onNotify(payload) }
-})
-
-const listen: PostgresListen = async (channel, onNotify) => {
-  const listeners = listenersOf.get(channel) ?? new Set()
-  if (! listenersOf.has(channel)) {
-    listenersOf.set(channel, listeners)
-    // A userid may contain capitals and punctuation, which LISTEN accepts only in a quoted identifier.
-    try {
-      await listener.query(`LISTEN ${escapeIdentifier(channel)}`)
-    } catch (err) {
-      listenersOf.delete(channel)  // so the next watch on this channel LISTENs again
-      throw err
-    }
-  }
-  listeners.add(onNotify)
-  return () => listeners.delete(onNotify)
-}
-const vaultDB = new PostgresVaultDB({ client: pool, listen })
+const vaultDB = new PostgresVaultDB({ client: pool, listen: makePostgresListen(listener) })
 ```
+
+A failed LISTEN ends the watch that asked for it, and a failed UNLISTEN reaches the stopped watch's `onBadNews`, as below;
+the next watch on that channel LISTENs again. For another driver, write a `listen` of your own to the same contract.
 
 A write made just after a watch's first LISTEN can go unheard, as can any notification while the listener is
 reconnecting. A watch is only a hint: a device that misses one learns of the write when it next fetches. A PGlite's own

@@ -574,14 +574,16 @@ Reasoning for wontfix: the softlock is the same act in every tab, and `#lock-is-
 the default handler logs it at the level for news. Suppressing it in the acting tab would cost a branch on each gate
 verb for a line in the host's log. Ruled by the Coach, 2026-11-25, written by lease_shelf thread 12.
 
-### A Convex or Postgres watch's result, notice or failure that lands after its watch is stopped
+### A Convex, Postgres or GraphQL watch's result, notice, failure or ending that lands after its watch is stopped
 
 * current outcome: `ConvexVaultDB`'s and `PostgresVaultDB`'s watches check nothing once stopped. A result Convex
   pushes, or a failure it reports, after the stop function has run still reaches the watch's `onNotice` or
   `onBadNews`. A Postgres notice heard while its UNLISTEN is under way is fetched and notified as any other, and so
   is one whose fetch was in flight at the stop, and one heard after a failed fetch has ended the watch, until its
   UNLISTEN is done. A Postgres watch ends once: the flag that calls `onEnded` once and unlistens once also drops a
-  second fetch's failure, and one that lands after the stop.
+  second fetch's failure, and one that lands after the stop. A `GraphQLVaultDB` watch tells its ending, `onEnded`
+  then `onBadNews`, one microtask after its stream ends, so that it comes after `watch` returns where urql ends the
+  stream inside `subscribe()`; a stop called within that microtask does not hold the ending back.
 * alternatives:
   - a flag each handler checks before it delivers: a state checked on every notice, for a crossing.
   - wait for UNLISTEN, or the unsubscribe, before the stop function returns: a stop that waits on the network.
@@ -589,10 +591,33 @@ verb for a line in the host's log. Ruled by the Coach, 2026-11-25, written by le
   again.
 
 Steps to reproduce: watch a bank over `PostgresVaultDB`; have a write's notice arrive, and stop the watch while its
-fetch is in flight: the fetch's Thing is notified after the stop.
+fetch is in flight: the fetch's Thing is notified after the stop. For GraphQL:
+`packages/safebyok-graphql/tests/wontfix/ending-after-stop.test.ts`, a urql client whose stream ends inside
+`subscribe()`, and the watch stopped as soon as `watch` returns.
 
 Reasoning for wontfix: a stop comes when a device disconnects, a few times a day, and a notice or its fetch is in flight
 for milliseconds (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). Nothing is written to the bankDB, and a
 notice carries only sealed records. The guards that covered it were removed at the Coach's word ("E3 remove the
-guards", 2026-11-25), by adapter_port thread B's rework; thread F's watch ends once, for `onEnded`. See also *A get, a put, … or a notice that lands across a
+guards", 2026-11-25), by adapter_port thread B's rework; thread F's watch ends once, for `onEnded`. Widened to GraphQL's ending by adapter_port thread D1's
+rework (2026-11-26), with the demonstration the Coach asked for. See also *A get, a put, … or a notice that lands across a
 disconnect or a disable*, for what the VaultMinder does with such a notice.
+
+### A Postgres watch started while another's first LISTEN on its channel is under way, then stopped, can leave a third deaf
+
+* current outcome: `makePostgresListen` sends a LISTEN for each watch that asks for a channel it holds no watch on, and
+  keeps the watch once its LISTEN returns. Where two watches ask for one such channel at once, and the first is stopped
+  before the second's LISTEN returns, the first's UNLISTEN runs after the second's LISTEN: the second watch is kept,
+  and hears nothing until a later watch on the channel LISTENs again.
+* alternatives:
+  - count the LISTENs under way, and send no UNLISTEN while one is: a second state kept per channel, for a crossing.
+  - have every watch on a channel await one shared LISTEN: a pending promise kept, and cleared on failure, for a
+    crossing.
+* workaround: none needed: a watch is a hint, and the VaultMinder's next fetch reads what was written.
+
+Steps to reproduce: on a `makePostgresListen` no watch has used, start two watches on one user's banks at once, and stop
+the first as soon as its watch is notified it is listening, before the second's LISTEN has returned. A write to that
+user is not heard by the second.
+
+Reasoning for wontfix: a watch starts and stops when a device connects or disconnects, a few times a day, and a LISTEN is
+in flight for milliseconds (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). Nothing is written to the
+bankDB, and nothing secret is held. Written by adapter_port thread G (postgres_listen), 2026-11-26.
