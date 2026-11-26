@@ -74,7 +74,7 @@ function refusedConnection(): Error { return Object.assign(new Error('connect EC
 
 /** A vaultDB whose datastore refuses the connection on a get. */
 class UnreachableVaultDB extends DB.MemoryVaultDB {
-  protected override doGetThing(): DB.GotActual { throw refusedConnection() }
+  protected override doGetThing(): DB.GetManifest { throw refusedConnection() }
 }
 
 /** A MemoryVaultDB that counts the watches it has running in `watching`. */
