@@ -1,0 +1,5 @@
+---
+"safebyok-graphql": minor
+---
+
+GraphQLVaultDB reads each server answer as a datastore's manifest, checked by AdapterVaultDB as any datastore's is. The wire changes: a listing's answer no longer carries its kids (val), the client makes them again from its parentage and deltas; damaged_rows is now incompatible_rows, of type SafebyokIncompatibleThing; SafebyokKids and SafebyokDamagedThing are gone. Serve this version's VaultSchemaSdl with this version's client. A working server answers as before. A server out of step now refuses as a broken datastore does: a row of another kind than the ask's refuses incompatible_row where it refused storage_issue, and a refusal whose act alone disagrees with the Thing it carries answers the act the client finds for that Thing, where it refused storage_issue. A refusal the server's verb threw no longer carries a Thing (its dbhas is null), as none does in the new core. safebyok, private, gains AncestorLives, a listed check on each kind, and writeActVals among its storage exports, and loses CrossedChecks' tracked, roots, listing and damagedThing.

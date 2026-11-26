@@ -50,11 +50,22 @@ function watched(atOnce?: FakeResult) {
   return { streams, counts, told, badnews, stop }
 }
 
-/** The answer a server over a MemoryVaultDB with the test bank born sends for `ask` by `document`, as it crosses. */
-async function servedOf(document: string, ask: object): Promise<Record<string, unknown>> {
+/** The answer a server over a MemoryVaultDB with the test bank born, and a box of each of `labels` under its root box, sends for `ask` by `document`, as it crosses. */
+async function servedOf(document: string, ask: object, labels: readonly string[] = []): Promise<Record<string, unknown>> {
   const memory = new DB.MemoryVaultDB()
   await TH.expectGood(memory.tryBirthBank(TH.birthBankAskOf()))
+  for (const label of labels) {
+    const birth = TH.birthAskOf(TH.boxThingOf(label), DB.Shell.childCited(TH.Life0))
+    await TH.expectGood(memory.tryWriteThing(birth))
+  }
   const result = await graphql({ schema: TH.schemaOver(memory), source: document, variableValues: { ask: TH.overTheWire(ask) }, contextValue: { userid: 'u1' } })
+  const [answer] = Object.values(TH.overTheWire(result.data) as Record<string, unknown>)
+  return answer as Record<string, unknown>
+}
+
+/** The answer a server over an empty MemoryVaultDB sends for the test bank's birth, as it crosses. */
+async function servedBirth(): Promise<Record<string, unknown>> {
+  const result = await graphql({ schema: TH.schemaOver(new DB.MemoryVaultDB()), source: VaultOperations.birthBank, variableValues: { ask: TH.overTheWire(TH.birthBankAskOf()) }, contextValue: { userid: 'u1' } })
   const [answer] = Object.values(TH.overTheWire(result.data) as Record<string, unknown>)
   return answer as Record<string, unknown>
 }
@@ -146,11 +157,12 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     }
   })
 
-  it("refuses a Thing at a scope other than the ask's, as storage_issue", async () => {
+  it("refuses a Thing of another kind than the ask's as incompatible_row, and one at another address as storage_issue", async () => {
     const served = await servedOf(VaultOperations.getThing, TH.getGateAskOf())
-    for (const val of [TH.rootBoxOf(), TH.gateThingOf({ userid: 'u2' })]) {
+    const cases = [[TH.rootBoxOf(), 'incompatible_row'], [TH.gateThingOf({ userid: 'u2' }), 'storage_issue']] as const
+    for (const [val, refusalkind] of cases) {
       const { vaultDB } = fakeClient({ data: { safebyokGetThing: { ...served, val } } })
-      await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
+      await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), refusalkind)
     }
   })
 
@@ -163,6 +175,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
       [TH.getAskAt('box/openai'),         { ...voided, dbhas: TH.boxThingOf() }],
       [TH.getAskAt('box/openai'),         { ...voided, act: 'gotgone' }],
       [TH.getAskAt('box/openai', 'fail'), { ...failed, dbhas: TH.boxThingOf() }],
+      [TH.getAskAt('box/openai', 'fail'), { ...failed, act: 'stale' }],
     ] as const
     for (const [ask, misfit] of misfits) {
       const { vaultDB } = fakeClient({ data: { safebyokGetThing: misfit } })
@@ -170,40 +183,158 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     }
   })
 
-  it("refuses a write's refusal whose act does not fit the Thing it names, as storage_issue", async () => {
-    const refused = await servedOf(VaultOperations.writeThing, TH.birthAskOf())
-    expect(refused).to.deep.include({ ok: false, act: 'retcon', dbhas: TH.gateThingOf() })
-    const { vaultDB } = fakeClient({ data: { safebyokWriteThing: refused } })
-    expect(await vaultDB.tryWriteThing(TH.birthAskOf())).to.deep.include({ ok: false, act: 'retcon', dbhas: TH.gateThingOf() })
+  it("answers the shell a server names under the lives above it", async () => {
+    const voided = await servedOf(VaultOperations.getThing, TH.getAskAt('box/openai'))
+    expect(voided['dbhas']).to.deep.eq(DB.Shell.under(TH.BoxScope, TH.rootBoxOf()))
+    const { vaultDB } = fakeClient({ data: { safebyokGetThing: voided } })
+    expect(await vaultDB.tryGetThing(TH.getAskAt('box/openai'))).to.deep.include({ ok: true, act: 'gotvoid', dbhas: voided['dbhas'] })
+  })
+
+  it("refuses a shell that is no shell of the ask's labelpath, as storage_issue", async () => {
+    const voided = await servedOf(VaultOperations.getThing, TH.getAskAt('box/openai'))
+    const shell  = voided['dbhas'] as DB.VoidSentinel
     const misfits = [
-      { ...refused, act: 'stale' },
-      { ...refused, act: 'born' },
-      { ...refused, dbhas: TH.nextGateOf(TH.gateThingOf()) },
-      { ...refused, dbhas: DB.Shell.of(TH.GateScope) },
+      { ...shell, lifepath: `${TH.Life0}/${TH.Life0}/${DB.Shell.VoidLifeseq}` },
+      { ...shell, lifepath: 7 },
+      { ...shell, labelpath: 'box/openai/x', label: 'x', lifepath: `${TH.Life0}/${TH.Life0}/${DB.Shell.VoidLifeseq}` },
     ]
-    for (const misfit of misfits) {
-      const { vaultDB: misfitDB } = fakeClient({ data: { safebyokWriteThing: misfit } })
-      await TH.expectBad(misfitDB.tryWriteThing(TH.birthAskOf()), 'storage_issue')
+    for (const dbhas of misfits) {
+      const { vaultDB } = fakeClient({ data: { safebyokGetThing: { ...voided, dbhas } } })
+      await TH.expectBad(vaultDB.tryGetThing(TH.getAskAt('box/openai')), 'storage_issue')
     }
   })
 
-  it("refuses a birth's refusal whose act does not fit the root it names, as storage_issue", async () => {
-    // A birth over a live bank passes, so its refusal is made from the answer that passed.
-    const passed   = await servedOf(VaultOperations.birthBank, TH.birthBankAskOf())
+  it("answers a write's refusal with the act its own tables find for the Thing the server names", async () => {
+    const refused = await servedOf(VaultOperations.writeThing, TH.birthAskOf())
     const gateNext = TH.nextGateOf(TH.gateThingOf())
-    const refused  = { ...passed, ok: false, act: 'stale', val: null, dbhas: gateNext, err: bareCrossedErrOf('bad_record', 'Stale') }
-    const { vaultDB } = fakeClient({ data: { safebyokBirthBank: refused } })
-    expect(await vaultDB.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ ok: false, act: 'stale', dbhas: gateNext })
+    expect(refused).to.deep.include({ ok: false, act: 'retcon', dbhas: TH.gateThingOf() })
+    const cases = [
+      [refused,                         'retcon', TH.gateThingOf()],
+      [{ ...refused, act: 'stale' },    'retcon', TH.gateThingOf()],
+      [{ ...refused, dbhas: gateNext }, 'stale',  gateNext],
+    ] as const
+    for (const [answer, act, dbhas] of cases) {
+      const { vaultDB } = fakeClient({ data: { safebyokWriteThing: answer } })
+      expect(await vaultDB.tryWriteThing(TH.birthAskOf())).to.deep.include({ ok: false, act, dbhas })
+    }
+  })
+
+  it("refuses a write the server says it did not make where its tables would, or made where the Thing does not show it, as storage_issue", async () => {
+    const refused = await servedOf(VaultOperations.writeThing, TH.birthAskOf())
+    const written = { ...refused, ok: true, act: 'born', dbhas: null, err: null }
     const misfits = [
-      { ...refused, act: 'clash' },
+      { ...refused, act: 'born' },
+      { ...refused, dbhas: DB.Shell.of(TH.GateScope) },
+      { ...written, val: TH.nextGateOf(TH.gateThingOf()) },
+      { ...written, val: DB.Shell.of(TH.GateScope) },
+    ]
+    for (const misfit of misfits) {
+      const { vaultDB } = fakeClient({ data: { safebyokWriteThing: misfit } })
+      await TH.expectBad(vaultDB.tryWriteThing(TH.birthAskOf()), 'storage_issue')
+    }
+  })
+
+  it("answers a birth's refusal with the act its own tables find for the root the server names", async () => {
+    // A birth over the same bank again is refused as retcon, so a stale refusal is made from that answer.
+    const retconned = await servedOf(VaultOperations.birthBank, TH.birthBankAskOf())
+    const gateNext  = TH.nextGateOf(TH.gateThingOf())
+    const refused   = { ...retconned, act: 'stale', dbhas: gateNext }
+    expect(retconned).to.deep.include({ ok: false, act: 'retcon' })
+    for (const answer of [refused, { ...refused, act: 'clash' }]) {
+      const { vaultDB } = fakeClient({ data: { safebyokBirthBank: answer } })
+      expect(await vaultDB.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ ok: false, act: 'stale', dbhas: gateNext })
+    }
+  })
+
+  it("refuses a birth whose act its roots do not fit, as storage_issue", async () => {
+    const born    = await servedBirth()
+    const roots   = born['val'] as DB.RootRows
+    const refused = { ...born, ok: false, act: 'stale', val: null, dbhas: TH.nextGateOf(TH.gateThingOf()), err: bareCrossedErrOf('bad_record', 'Stale') }
+    const passed  = { ...born, act: 'passed', val: { ...roots, bank: TH.nextOf(TH.bankThingOf()) } }
+    expect(born).to.deep.include({ ok: true, act: 'born' })
+    const misfits = [
       { ...refused, act: 'born' },
       { ...refused, dbhas: TH.boxThingOf() },
       { ...refused, dbhas: DB.Shell.of(TH.GateScope) },
+      { ...born, val: { ...roots, gate: TH.nextGateOf(TH.gateThingOf()) } },
+      { ...born, val: { ...roots, root: DB.Shell.of(TH.RootScope) } },
+      { ...born, val: { ...roots, root: TH.rootBoxOf({ userid: 'u2' }) } },
+      { ...born, val: { bank: roots.bank, gate: roots.gate } },
+      { ...passed, val: { ...passed.val, root: DB.Shell.of(TH.RootScope) } },
     ]
     for (const misfit of misfits) {
-      const { vaultDB: misfitDB } = fakeClient({ data: { safebyokBirthBank: misfit } })
-      await TH.expectBad(misfitDB.tryBirthBank(TH.birthBankAskOf()), 'storage_issue')
+      const { vaultDB } = fakeClient({ data: { safebyokBirthBank: misfit } })
+      await TH.expectBad(vaultDB.tryBirthBank(TH.birthBankAskOf()), 'storage_issue')
     }
+  })
+
+  it("answers a world's roots as the server sent them, the shell where none is stored", async () => {
+    const served = await servedOf(VaultOperations.getWorld, TH.getWorldAskOf())
+    const shells = { bank: DB.Shell.of(TH.BankScope), gate: DB.Shell.of(TH.GateScope), root: DB.Shell.of(TH.RootScope) }
+    for (const val of [served['val'], shells]) {
+      const { vaultDB } = fakeClient({ data: { safebyokGetWorld: { ...served, val } } })
+      const roots = await TH.expectGood(vaultDB.tryGetWorld(TH.getWorldAskOf()))
+      expect(roots).to.deep.eq(val)
+    }
+    const otherBank = { ...shells, bank: TH.bankThingOf({ userid: 'u2' }) }
+    const { vaultDB } = fakeClient({ data: { safebyokGetWorld: { ...served, val: otherBank } } })
+    await TH.expectBad(vaultDB.tryGetWorld(TH.getWorldAskOf()), 'storage_issue')
+  })
+
+  it("refuses a tracked with a root missing or a root not its own, as storage_issue", async () => {
+    const served = await servedOf(VaultOperations.getThing, TH.getGateAskOf())
+    const tracked = served['tracked'] as Record<string, unknown>
+    const misfits = [
+      { bank: tracked['bank'], gate: tracked['gate'] },
+      { ...tracked, gate: TH.gateThingOf({ userid: 'u2' }) },
+      { ...tracked, bank: 'different' },
+    ]
+    for (const misfit of misfits) {
+      const { vaultDB } = fakeClient({ data: { safebyokGetThing: { ...served, tracked: misfit } } })
+      await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
+    }
+  })
+
+  it("answers a listing from the parent and children the server sent, in labelpath order", async () => {
+    const served = await servedOf(VaultOperations.listThings, TH.listAskAt('box'), ['anthropic', 'openai'])
+    const deltas = served['deltas'] as object[]
+    for (const answer of [served, { ...served, deltas: deltas.toReversed() }]) {
+      const { vaultDB } = fakeClient({ data: { safebyokListThings: answer } })
+      const listing = await vaultDB.tryListThings(TH.listAskAt('box'))
+      expect(listing).to.deep.include({ ok: true, deltas, incompatible_rows: [] })
+      expect(listing).to.have.nested.property('val.items').that.has.keys('anthropic', 'openai')
+    }
+  })
+
+  it("answers a child the server could not read among incompatible_rows", async () => {
+    const served = await servedOf(VaultOperations.listThings, TH.listAskAt('box'), ['anthropic', 'openai'])
+    const [first, second] = served['deltas'] as [object, DB.BoxSparse]
+    const incompatible = { ...TH.ThingBank, labelpath: second.labelpath, am: 'd' }
+    const { vaultDB } = fakeClient({ data: { safebyokListThings: { ...served, deltas: [first], incompatible_rows: [incompatible] } } })
+    expect(await vaultDB.tryListThings(TH.listAskAt('box'))).to.deep.include({ ok: true, deltas: [first], incompatible_rows: [incompatible] })
+  })
+
+  it("refuses a listing whose children are not the parent's, or whose act its parent does not fit, as storage_issue", async () => {
+    const served = await servedOf(VaultOperations.listThings, TH.listAskAt('box'), ['anthropic', 'openai'])
+    const [first, second] = served['deltas'] as [object, DB.BoxSparse]
+    const misfits = [
+      { ...served, deltas: [first, { ...second, userid: 'u2' }] },
+      { ...served, deltas: [first, { ...second, labelpath: 'box/openai/x', label: 'x' }] },
+      { ...served, deltas: [first, TH.gateThingOf()] },
+      { ...served, incompatible_rows: [{ ...TH.ThingBank, labelpath: 'gate', am: 'd' }] },
+      { ...served, parentage: [] },
+      { ...served, ok: false, act: 'gone', dbhas: (served['parentage'] as object[])[0], err: bareCrossedErrOf('bad_record', 'Gone') },
+    ]
+    for (const misfit of misfits) {
+      const { vaultDB } = fakeClient({ data: { safebyokListThings: misfit } })
+      await TH.expectBad(vaultDB.tryListThings(TH.listAskAt('box')), 'storage_issue')
+    }
+  })
+
+  it("refuses a listing whose parent is of another kind, as incompatible_row", async () => {
+    const served = await servedOf(VaultOperations.listThings, TH.listAskAt('box'), ['openai'])
+    const { vaultDB } = fakeClient({ data: { safebyokListThings: { ...served, parentage: [TH.gateThingOf()] } } })
+    await TH.expectBad(vaultDB.tryListThings(TH.listAskAt('box')), 'incompatible_row')
   })
 
   it("answers a good answer as the server's vaultDB did", async () => {
@@ -213,14 +344,14 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     expect(record).to.deep.eq(TH.gateThingOf())
   })
 
-  it("answers a refusal the server's verb threw as it did there, with its act and the Thing it names", async () => {
+  it("answers a refusal the server's verb threw as it did there, with its act", async () => {
     const served = await servedOf(VaultOperations.writeThing, TH.birthAskOf())
     const err = { refusalkind: 'bad_record', message: 'A storage policy refused it', meta: { oplabel: 'writeThing', act: 'policied', capacity: null, fieldnames: ['wayins'], labelpaths: null } }
-    const thrown = { ...served, ok: false, act: 'policied', tracked: 'unread', val: null, dbhas: TH.gateThingOf(), err }
+    const thrown = { ...served, ok: false, act: 'policied', tracked: 'unread', val: null, dbhas: null, err }
     const { vaultDB } = fakeClient({ data: { safebyokWriteThing: thrown } })
     const answer = await vaultDB.tryWriteThing(TH.birthAskOf())
     const refusal = await TH.expectBad(answer, 'bad_record')
-    expect(answer).to.deep.include({ act: 'policied', dbhas: TH.gateThingOf() })
+    expect(answer).to.deep.include({ act: 'policied', dbhas: null })
     expect(refusal.message).to.eq('A storage policy refused it')
     expect(refusal.meta).to.deep.include({ act: 'policied', fieldnames: ['wayins'] })
   })
@@ -329,7 +460,7 @@ describe("GraphQLVaultDB's watch", () => {
 
 /** A vaultDB whose datastore holds a Thing it cannot read. */
 class DamagedVaultDB extends DB.MemoryVaultDB {
-  protected override doGetThing(): DB.GotActual { throw DB.storageIssue() }
+  protected override doGetThing(): DB.GetManifest { throw DB.storageIssue() }
 }
 
 /** A getUserId whose session store is down. Its message has text that must never reach a browser. */

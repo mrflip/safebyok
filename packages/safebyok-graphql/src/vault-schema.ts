@@ -119,30 +119,19 @@ type SafebyokThingAnswer {${answerFields}
   val:     SafebyokJson
 }
 
-"""The children of one live life of a Thing, by label: the live ones in items, the tombstones in gones."""
-type SafebyokKids {
-  modelkind:  String!
-  parentpath: String!
-  parentlife: String!
-  items:      SafebyokJson!
-  gones:      SafebyokJson!
-  read_tc:    String!
-}
-
 """A child that fails its kind's checks: its scope."""
-type SafebyokDamagedThing {
+type SafebyokIncompatibleThing {
   userid:    String!
   banklabel: String!
   labelpath: String!
   am:        String!
 }
 
-"""The answer to a listing: its children, the parent and each child as stored, and the children that fail their checks. Each list is empty when refused."""
+"""The answer to a listing: the parent and each child of its live life as stored, and the children that fail their checks. Each list is empty when refused."""
 type SafebyokListAnswer {${answerFields}
-  val:          SafebyokKids
-  parentage:    [SafebyokJson!]!
-  deltas:       [SafebyokJson!]!
-  damaged_rows: [SafebyokDamagedThing!]!
+  parentage:         [SafebyokJson!]!
+  deltas:            [SafebyokJson!]!
+  incompatible_rows: [SafebyokIncompatibleThing!]!
 }
 
 """A bank's three roots."""

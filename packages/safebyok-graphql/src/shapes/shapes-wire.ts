@@ -35,27 +35,31 @@ export type WireNotice = Readonly<{
 
 // == [Checks]: WireChecks
 
-// The Things an answer carries are left raw here: the classifier's `crossed*` functions check each against the ask.
+// The Things an answer carries, its banktok, its tracked and its read_tc are left raw here: `GraphQLVaultDB` hands them on
+// in a manifest, and `AdapterVaultDB` checks them there as it checks any datastore's. A listing's kids are not sent: the
+// client makes them again from the parent and the children.
 /** The checks of what crosses, each refusing `storage_issue`, by the verb whose answer it reads:
  * - `gotAnswer`, `wroteAnswer`, `listAnswer`, `rootsAnswer`, `worldAnswer`, `statsAnswer` -- a good answer of the verb's acts, or any refused one
  * - `notice` -- a watch's notice: a Thing with its banktok and read_tc, or a refusal
+ * - `shell` -- the shell an answer carries where nothing is stored, of any kind
  */
-export const WireChecks = DB.Checkers('storage_issue', ({ obj, lit, oneof, unk, discrim, union, bool }) => {
-  const { banktok, read_tc } = DB.ActualChecks.beside.shape
-  const refused = obj({ ok: lit(false), act: oneof([...DB.badActVals, 'policied']), banktok, tracked: unk, read_tc, dbhas: unk, err: DB.CrossedChecks.err })
-  const goodOf = <const ActsT extends readonly [string, ...string[]]>(acts: ActsT) => obj({ ok: lit(true), act: oneof(acts), banktok, tracked: unk, read_tc, val: unk, dbhas: unk, err: lit(null) })
-  const listed = { parentage: unk, deltas: unk, damaged_rows: unk }
+export const WireChecks = DB.Checkers('storage_issue', ({ obj, arr, lit, str, oneof, unk, discrim, union, bool, tuple }) => {
+  const refused = obj({ ok: lit(false), act: oneof([...DB.badActVals, 'policied']), banktok: unk, tracked: unk, read_tc: unk, dbhas: unk, err: DB.CrossedChecks.err })
+  const goodOf = <const ActsT extends readonly [string, ...string[]]>(acts: ActsT) => obj({ ok: lit(true), act: oneof(acts), banktok: unk, tracked: unk, read_tc: unk, val: unk, dbhas: unk, err: lit(null) })
+  const incompatibleThing = obj({ userid: str, banklabel: str, labelpath: str, am: lit('d') }).strict()
+  const listed = { parentage: tuple([unk]), deltas: arr(unk), incompatible_rows: arr(incompatibleThing) }
   return {
     gotAnswer:   discrim('ok', [goodOf(DB.gotActVals), refused]),
     wroteAnswer: discrim('ok', [goodOf([...DB.putActVals, ...DB.delActVals]), refused]),
-    listAnswer:  discrim('ok', [goodOf(['gotlive']).extend(listed), refused]),
+    listAnswer:  discrim('ok', [goodOf(['gotlive']).omit({ val: true }).extend(listed), refused]),
     rootsAnswer: discrim('ok', [goodOf(['born', 'passed']), refused]),
     worldAnswer: discrim('ok', [goodOf(['got']), refused]),
     statsAnswer: discrim('ok', [goodOf(['got']), refused]),
     notice:      union([
-      obj({ record: unk, banktok, read_tc, err: lit(null), isEnded: lit(false) }),
+      obj({ record: unk, banktok: unk, read_tc: unk, err: lit(null), isEnded: lit(false) }),
       obj({ record: lit(null), banktok: lit(null), read_tc: lit(null), err: DB.CrossedChecks.err, isEnded: bool }),
     ]),
+    shell:       union([DB.BankChecks.shell, DB.GateChecks.shell, DB.BoxChecks.shell]),
   }
 })
 // --

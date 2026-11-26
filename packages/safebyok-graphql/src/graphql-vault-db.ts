@@ -5,11 +5,11 @@
  * - The server could not serve the request, as when its `getUserId` throws: the VaultError `getUserId` threw, or else `unexpected_error`. A watch ends with it.
  * - The request broke this package's rules, as a watch scope that fails its check (only another client sends one): the rule's refusal, `bad_record`.
  * - GraphQL itself failed, as when the server serves another schema: `unexpected_error`, without the server's error text. A request that fails in the network gets `storage_unavailable`.
+ * - The server's answer disagrees with what it carries, as a server of another version's may: `storage_issue`, as from a broken datastore. A refusal whose act alone disagrees answers the act this vaultDB finds for the Thing it carries.
  */
 
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import * as DB from 'safebyok/storage'
-import { Classifier } from 'safebyok/storage'
 import { CrossedErrExtension, WireChecks } from './shapes/shapes-wire'
 import { networkTroubleOf, schemaNotServed, serverErred, watchEnded } from './refusals/throwers'
 import { VaultOperations } from './vault-operations'
@@ -44,7 +44,7 @@ true satisfies DB.AssertEqual<GraphQLVaultDBOpts, DB.CheckerInput<typeof graphQL
 // == [The vaultDB]: GraphQLVaultDB
 
 /** A vaultDB that sends each verb to your GraphQL server: `new GraphQLVaultDB({ client })`.
- * The server answers from its own vaultDB, and this one checks every Thing the answer carries against the ask, as it would a datastore's.
+ * The server answers from its own vaultDB, and this one checks what the answer carries against the ask, as it checks a datastore's manifest.
  */
 export class GraphQLVaultDB extends DB.AdapterVaultDB {
   // == [Props]: #client
@@ -62,66 +62,74 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
   // --
 
   // == [Verbs]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats
-  // Each sends its ask and reads the server's answer back into the report a datastore would make. A refusal the server's
-  // verb threw is thrown again here, so it answers as it did there.
+  // To this vaultDB the server is its datastore. Each verb sends its ask, and hands back as its manifest what the server
+  // answered: the rows the answer carries, and the tags the server's act names, or where an act names no tags of its own,
+  // those made of the rows as a datastore makes them. A refusal the server's verb threw is thrown again here, so it answers
+  // as it did there.
 
   /** Get the Thing at the ask's scope from the server. */
-  protected async doGetThing(ask: DB.GetAsk): Promise<DB.GotActual> {
+  protected async doGetThing(ask: DB.GetAsk): Promise<DB.GetManifest> {
     const answer = WireChecks.gotAnswer.parse(thingAnswerDrop(await this.#runQuery(VaultOperations.getThing, 'safebyokGetThing', { ask })))
-    if (! answer.ok) { throwIfThrown(ask, answer) }
-    return { ...besideOf(ask, answer), ...Classifier.crossedGotOf(ask, answer.act, (answer.act === 'gotlive') ? answer.val : answer.dbhas) }
+    if (! answer.ok) { throwIfThrown(answer) }
+    const carried = (answer.act === 'gotlive') ? answer.val : answer.dbhas
+    return { tags: presenceTagsOf(answer.act), ...rowsOfCarried(ask, carried), ...observedOf(answer) }
   }
 
+  // A written write's tags are those its ask alone makes; an unwritten one's ante row is the row the server carried.
   /** Write the ask's record on the server. */
-  protected async doWriteThing(ask: DB.WriteAsk): Promise<DB.WroteActual> {
+  protected async doWriteThing(ask: DB.WriteAsk): Promise<DB.WriteManifest> {
     const answer = WireChecks.wroteAnswer.parse(thingAnswerDrop(await this.#runMutation(VaultOperations.writeThing, 'safebyokWriteThing', { ask })))
-    if (! answer.ok) {
-      throwIfThrown(ask, answer)
-      return { ...besideOf(ask, answer), ok: false, ...Classifier.crossedRefusedWriteOf(ask, answer.act, answer.dbhas) }
-    }
-    return { ...besideOf(ask, answer), ok: true, act: answer.act, record: Classifier.crossedWrittenOf(ask, answer.val) }
+    if (! answer.ok) { throwIfThrown(answer) }
+    const rows = rowsOfCarried(ask, answer.ok ? answer.val : answer.dbhas)
+    const tags = isWrittenAct(answer.act) ? DB.ManifestTags.writtenTagsOf(ask) : DB.ManifestTags.writeTagsOf(ask, rows.actual, false)
+    return { tags, ...rows, ...observedOf(answer) }
   }
 
+  // The children of a listing the server refused are never read, so none are handed back. A child the server could not
+  // read crosses as its scope alone, which fails every kind's checks, so this vaultDB answers it as incompatible again.
   /** List the children of the live Thing at the ask's scope from the server. */
-  protected async doListThings(ask: DB.ListAsk): Promise<DB.ListThingsActual> {
+  protected async doListThings(ask: DB.ListAsk): Promise<DB.ListManifest> {
     const answer = WireChecks.listAnswer.parse(listAnswerDrop(await this.#runQuery(VaultOperations.listThings, 'safebyokListThings', { ask })))
     if (! answer.ok) {
-      throwIfThrown(ask, answer)
-      if ((answer.act !== 'void') && (answer.act !== 'gone')) { throw DB.storageIssue() }
-      const record = (answer.dbhas === null) ? null : Classifier.crossedThingOf(ask, answer.dbhas)
-      return { ...besideOf(ask, answer), ok: false, act: answer.act, record, parentage: [], deltas: [], damaged_rows: [] }
+      throwIfThrown(answer)
+      return { tags: presenceTagsOf(answer.act), actual: rowOf(answer.dbhas), children: [], ...observedOf(answer) }
     }
-    return { ...besideOf(ask, answer), ok: true, act: answer.act, ...Classifier.crossedListingOf(ask, answer) }
+    const children = [...answer.deltas, ...answer.incompatible_rows].map((raw) => ({ labelpath: DB.ManifestTags.fieldOf(raw, 'labelpath'), raw }))
+    return { tags: presenceTagsOf(answer.act), actual: answer.parentage[0], children, ...observedOf(answer) }
   }
 
+  // A birth writes only where it read none of the three roots.
   /** Write a new bank's three roots on the server. */
-  protected async doBirthBank(ask: DB.BirthBankAsk, puts: DB.BirthPuts): Promise<DB.BirthBankActual> {
+  protected async doBirthBank(ask: DB.BirthBankAsk, puts: DB.BirthPuts): Promise<DB.BirthManifest> {
     const answer = WireChecks.rootsAnswer.parse(rootsAnswerDrop(await this.#runMutation(VaultOperations.birthBank, 'safebyokBirthBank', { ask })))
     if (! answer.ok) {
-      throwIfThrown(ask, answer)
-      return { ...besideOf(ask, answer), ok: false, ...Classifier.crossedRefusedBirthOf(puts, answer.act, answer.dbhas) }
+      throwIfThrown(answer)
+      const named = namedRootsOf(answer.dbhas)
+      return { tags: DB.ManifestTags.birthTagsOf(puts, named, false), actual: named, ...observedOf(answer) }
     }
-    return { ...besideOf(ask, answer), ok: true, act: answer.act, things: Classifier.crossedRootsOf(puts, answer.val) }
+    const actual    = rootRowsOf(answer.val)
+    const isWritten = isWrittenAct(answer.act)
+    return { tags: DB.ManifestTags.birthTagsOf(puts, isWritten ? NoRoots : actual, isWritten), actual, ...observedOf(answer) }
   }
 
   /** Get the bank's three roots from the server. */
-  protected async doGetWorld(ask: DB.GetWorldAsk): Promise<DB.GetWorldActual> {
+  protected async doGetWorld(ask: DB.GetWorldAsk): Promise<DB.WorldManifest> {
     const answer = WireChecks.worldAnswer.parse(rootsAnswerDrop(await this.#runQuery(VaultOperations.getWorld, 'safebyokGetWorld', { ask })))
     if (! answer.ok) {
-      throwIfThrown(ask, answer)
+      throwIfThrown(answer)
       throw DB.storageIssue()
     }
-    return { ...besideOf(ask, answer), ok: true, act: answer.act, things: Classifier.crossedWorldOf(ask, answer.val) }
+    return { actual: rootRowsOf(answer.val), ...observedOf(answer) }
   }
 
-  /** Get the bank's storage stats from the server. `AdapterVaultDB` checks them. */
-  protected async doStats(ask: DB.StatsAsk): Promise<DB.StatsActual> {
+  /** Get the bank's storage stats from the server. */
+  protected async doStats(ask: DB.StatsAsk): Promise<DB.StatsManifest> {
     const answer = WireChecks.statsAnswer.parse(statsAnswerDrop(await this.#runQuery(VaultOperations.stats, 'safebyokStats', { ask })))
     if (! answer.ok) {
-      throwIfThrown(ask, answer)
+      throwIfThrown(answer)
       throw DB.storageIssue()
     }
-    return { ...besideOf(ask, answer), ok: true, act: answer.act, stats: answer.val as DB.VaultStats }
+    return { stats: answer.val, ...observedOf(answer) }
   }
   // --
 
@@ -181,23 +189,68 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
 }
 // --
 
-// == [Answers]: CheckedAnswer, RefusedAnswer, besideOf, throwIfThrown, fieldOf, troubleOf, carriedErrOf, hearNotice
+// == [Answers]: CheckedAnswer, RefusedAnswer, PresenceOfAct, NoRoots, observedOf, presenceTagsOf, isWrittenAct, isShell, rowOf, rowsOfCarried, ancestorLivesOf, rootRowsOf, namedRootsOf, throwIfThrown, fieldOf, troubleOf, carriedErrOf, hearNotice
 
 /** What every answer carries, as its check read it. */
-type CheckedAnswer = Readonly<{ banktok: DB.Lifetok, tracked: unknown, read_tc: DB.ReadTc }>
+type CheckedAnswer = Readonly<{ act: string, banktok: unknown, tracked: unknown, read_tc: unknown }>
 
 /** A refused answer, as its check read it. */
-type RefusedAnswer = CheckedAnswer & Readonly<{ ok: false, act: DB.BadAct, dbhas: unknown, err: DB.CrossedErr }>
+type RefusedAnswer = CheckedAnswer & Readonly<{ ok: false, act: DB.CrossedAct, err: DB.CrossedErr }>
 
-/** What a report carries beside its act, read from `answer`: its banktok and read_tc, and its `tracked` checked against `ask`. */
-function besideOf(ask: DB.AnyAsk, { banktok, tracked, read_tc }: CheckedAnswer): DB.ActualBeside {
-  return { banktok, tracked: Classifier.crossedTrackedOf(ask, tracked), read_tc }
+/** The presence of the row a get's or a listing's act names. Any other act names none, and its tags refuse. */
+const PresenceOfAct: Readonly<Partial<Record<string, DB.Presence>>> = { gotlive: 'live', gotgone: 'gone', gotvoid: 'void', gone: 'gone', void: 'void' }
+
+/** A bank's three roots where none is stored. */
+const NoRoots: DB.RootRows = { bank: null, gate: null, root: null }
+
+/** What a manifest observes of the bank, as `answer` carries it: its banktok, its tracked and its read_tc. */
+function observedOf({ banktok, tracked, read_tc }: CheckedAnswer): DB.BankObserved { return { banktok, tracked, read_tc } }
+
+// An act that names no presence leaves it undefined, and AdapterVaultDB's check of the tags refuses them.
+/** A get's or a listing's tags: the presence its act names. */
+function presenceTagsOf(act: string): DB.GetTags { return { presence: PresenceOfAct[act] } as DB.GetTags }
+
+/** True when the server wrote: its act is a write's. */
+function isWrittenAct(act: string): boolean { return (DB.writeActVals as readonly string[]).includes(act) }
+
+/** True when `carried` is the shell, the void sentinel, which stands for no row: told by its revseq. */
+function isShell(carried: unknown): boolean { return DB.ManifestTags.fieldOf(carried, 'revseq') === DB.Shell.Cited.revseq }
+
+/** The row `carried` stands for: itself, or null where it is the shell. */
+function rowOf(carried: unknown): unknown { return isShell(carried) ? null : carried }
+
+// The shell names the lives above its scope, which are all of an ancestor that the shell is built from.
+/** What `carried`, a Thing an answer carries at `ask`'s scope, stands for: the row itself; or where it is the shell, no row, and the ancestor's lives it names. */
+function rowsOfCarried(ask: DB.ThingScope, carried: unknown): Pick<DB.GetManifest, 'actual' | 'ancestor'> {
+  if (! isShell(carried)) { return { actual: carried, ancestor: null } }
+  return { actual: null, ancestor: ancestorLivesOf(ask, WireChecks.shell.parse(carried)) }
+}
+
+/** The lives of the nearest Thing stored above `ask`'s scope, as `shell` names them: the stored lifeseqs of its lifepath, under as many labels of the ask's labelpath. Null for none. */
+function ancestorLivesOf({ userid, banklabel, labelpath }: DB.ThingScope, shell: DB.VoidSentinel): DB.AncestorLives | null {
+  const lifeseqs = shell.lifepath.split('/').filter((lifeseq) => lifeseq !== DB.Shell.VoidLifeseq)
+  if (lifeseqs.length === 0) { return null }
+  return { userid, banklabel, labelpath: labelpath.split('/').slice(0, lifeseqs.length).join('/'), lifepath: lifeseqs.join('/') }
+}
+
+/** The rows of a bank's three roots as an answer carries them, raw: each null where it is the shell. */
+function rootRowsOf(roots: unknown): DB.RootRows {
+  const rootOf = (rootckey: keyof DB.RootRows): unknown => rowOf(DB.ManifestTags.fieldOf(roots, rootckey))
+  return { bank: rootOf('bank'), gate: rootOf('gate'), root: rootOf('root') }
+}
+
+// The roots before the one a refusal names held nothing, or that root's put would have passed or refused first; the roots after it are not read.
+/** A refused birth's roots: the root `dbhas` names, at its labelpath, and none at the others. */
+function namedRootsOf(dbhas: unknown): DB.RootRows {
+  const named  = rowOf(dbhas)
+  const rootOf = (rootckey: keyof DB.RootRows): unknown => ((DB.ManifestTags.fieldOf(named, 'labelpath') === DB.RootLabelpaths[rootckey]) ? named : null)
+  return { bank: rootOf('bank'), gate: rootOf('gate'), root: rootOf('root') }
 }
 
 // The server answers `tracked: 'unread'` for a verb that threw, and for no other answer.
-/** Rethrow the refusal of a server verb that threw, with its act and the Thing it names. */
-function throwIfThrown(ask: DB.AnyAsk, { act, tracked, dbhas, err }: RefusedAnswer): void {
-  if (tracked === 'unread') { throw DB.refusedOverWire(err, { act, dbhas: (dbhas === null) ? null : Classifier.crossedNamedOf(ask, dbhas) }) }
+/** Rethrow the refusal of a server verb that threw, with its act. */
+function throwIfThrown({ act, tracked, err }: RefusedAnswer): void {
+  if (tracked === 'unread') { throw DB.refusedOverWire(err, { act }) }
 }
 
 /** Return the `fieldname` field of an operation's result, or throw the refusal for a failed operation. */
@@ -265,7 +318,7 @@ const dropTypename = (bag: unknown, nested: Record<string, Drop> = {}): unknown 
 const errDrop: Drop = (err) => dropTypename(err, { meta: dropTypename })
 const thingAnswerDrop: Drop = (answer) => dropTypename(answer, { err: errDrop })
 const listAnswerDrop: Drop = (answer) => dropTypename(answer, {
-  err: errDrop, val: dropTypename, damaged_rows: (rows) => (Array.isArray(rows) ? rows.map((row) => dropTypename(row)) : rows),
+  err: errDrop, incompatible_rows: (rows) => (Array.isArray(rows) ? rows.map((row) => dropTypename(row)) : rows),
 })
 const rootsAnswerDrop: Drop = (answer) => dropTypename(answer, { err: errDrop, val: dropTypename })
 const statsAnswerDrop: Drop = (answer) => dropTypename(answer, { err: errDrop, val: (stats) => dropTypename(stats, { box: dropTypename, gate: dropTypename, max: dropTypename }) })

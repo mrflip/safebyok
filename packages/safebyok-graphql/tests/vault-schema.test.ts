@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { buildSchema, getNamedType, isEnumType, isInputObjectType, isLeafType, isObjectType, parse, validate } from 'graphql'
 import type { GraphQLField, GraphQLInputType, GraphQLNamedType, GraphQLOutputType, GraphQLSchema } from 'graphql'
 import type * as Z from 'zod'
-import { AskChecks, CrossedChecks, VaultStatsChecks } from 'safebyok/storage'
+import { AskChecks, ManifestChecks, VaultStatsChecks } from 'safebyok/storage'
 import { VaultOperations } from '../src/index'
 import { VaultSchemaSdl } from '../src/server'
 import { WireChecks } from '../src/shapes/shapes-wire'
@@ -144,9 +144,7 @@ const InputChecks = [
 
 // The check the core reads each typed part of an answer with, where the answer's own check reads it raw.
 const TypeChecks = [
-  ['SafebyokKids',         CrossedChecks.listing.shape.val],
-  ['SafebyokDamagedThing', CrossedChecks.damagedThing],
-  ['SafebyokRoots',        CrossedChecks.roots],
+  ['SafebyokRoots',        ManifestChecks.roots],
   ['SafebyokStats',        VaultStatsChecks.vaultStats],
 ] as const
 // --
@@ -196,7 +194,7 @@ describe("the schema walk", () => {
   })
 
   it("finds a typed part of an answer that lacks a field the core reads", () => {
-    const shorted = buildSchema(VaultSchemaSdl.replace(/(type SafebyokKids \{[^}]*?)\n {2}parentlife: +String!/u, '$1'))
-    expect(schemaDriftOf(shorted).join('\n')).to.include('SafebyokKids: SafebyokKids lacks parentlife')
+    const shorted = buildSchema(VaultSchemaSdl.replace(/(type SafebyokStoreLimits \{[^}]*?)\n {2}size: +Float!/u, '$1'))
+    expect(schemaDriftOf(shorted).join('\n')).to.include('SafebyokStoreLimits lacks size')
   })
 })

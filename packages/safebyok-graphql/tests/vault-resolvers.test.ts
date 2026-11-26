@@ -20,17 +20,18 @@ async function runAsk(schema: GraphQLSchema, document: string, ask: object, user
   return answer as Record<string, unknown>
 }
 
-/** A vaultDB's answer as it should cross: less its ask, its refusal allowlisted, null for each field it lacks, its read_tc set aside. */
+/** A vaultDB's answer as it should cross: less its ask and a listing's kids, its refusal allowlisted, null for each field it lacks, its read_tc set aside. */
 function wireFormOf({ ask: _ask, ...answer }: { ask: unknown, ok: boolean, err?: DB.VaultError, read_tc: string }): unknown {
-  return readTcMasked(TH.overTheWire({ val: null, dbhas: null, ...answer, err: answer.err ? DB.crossedErrOf(answer.err) : null }) as Record<string, unknown>)
+  const wire: Record<string, unknown> = { val: null, dbhas: null, ...answer, err: answer.err ? DB.crossedErrOf(answer.err) : null }
+  // A listing's kids do not cross: the client makes them again from its parentage and deltas.
+  if (Object.hasOwn(answer, 'parentage')) { delete wire['val'] }
+  return readTcMasked(TH.overTheWire(wire) as Record<string, unknown>)
 }
 
-/** `answer` with each read_tc it has set aside, its own and its listing's, once checked to be one. */
+/** `answer` with its read_tc set aside, once checked to be one. */
 function readTcMasked(answer: Record<string, unknown>): Record<string, unknown> {
-  const listing = answer['val'] as Record<string, unknown> | null
   expect(answer['read_tc']).to.match(TH.ReadTcPattern)
-  if ((listing === null) || ! Object.hasOwn(listing, 'read_tc')) { return { ...answer, read_tc: TH.AnyReadTc } }
-  return { ...answer, read_tc: TH.AnyReadTc, val: { ...listing, read_tc: TH.AnyReadTc } }
+  return { ...answer, read_tc: TH.AnyReadTc }
 }
 
 /** The ask that births the box `label` under the born root box. */
@@ -74,7 +75,7 @@ function refusedConnection(): Error { return Object.assign(new Error('connect EC
 
 /** A vaultDB whose datastore refuses the connection on a get. */
 class UnreachableVaultDB extends DB.MemoryVaultDB {
-  protected override doGetThing(): DB.GotActual { throw refusedConnection() }
+  protected override doGetThing(): DB.GetManifest { throw refusedConnection() }
 }
 
 /** A MemoryVaultDB that counts the watches it has running in `watching`. */

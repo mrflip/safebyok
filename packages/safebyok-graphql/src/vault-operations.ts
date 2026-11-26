@@ -15,8 +15,7 @@ export const VaultOperations = Object.freeze({
   listThings: `query SafebyokListThings($ask: SafebyokListAsk!) {
   safebyokListThings(ask: $ask) {
     ${answerFields}
-    val { modelkind parentpath parentlife items gones read_tc }
-    parentage deltas damaged_rows { userid banklabel labelpath am }
+    parentage deltas incompatible_rows { userid banklabel labelpath am }
   }
 }`,
 

@@ -169,7 +169,7 @@ function wireAnswerOf({ ask: _ask, ...answer }: AnyAnswer): WireAnswer {
 function refusedAnswerOf(refusal: DB.VaultError): WireAnswer {
   return {
     ok: false, act: 'unclassified_storing', banktok: DB.VoidLifeTok, tracked: 'unread', read_tc: DB.readTcNow(), val: null, dbhas: null,
-    err: DB.crossedErrOf(refusal), parentage: [], deltas: [], damaged_rows: [],
+    err: DB.crossedErrOf(refusal), parentage: [], deltas: [], incompatible_rows: [],
   }
 }
 
