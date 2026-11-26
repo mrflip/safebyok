@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** thread 1 filed (#934, draft); thread 2 in review (#937); thread 3 ready (#939), in review; thread 4 building; thread 5 waits for thread 2 to file
+* **Status:** thread 1 filed (#934, draft); thread 2 in review (#937); thread 3 reviewed (fixed), files after thread 2; thread 4 building; thread 5 waits for thread 2 to file
 
 ## Read first
 
@@ -75,6 +75,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 *Depends on:* thread 2. *Orchestrator:* takes the dojo demo too (it imports safebyok-indexeddb).
 *Look-ahead:* none.
 *Size:* small.
+*Review:* fixed (sonnet, low): three doc blocks trimmed. Left: `isWritable` doc blocks and `written` → `isWritten` → thread 6; `readTc` order stands.
 
 ### 4. postgres_manifest — Postgres hands back a Manifest whole
 
@@ -104,7 +105,7 @@ The Coach issued the design rather than numbered threads. Each thread quotes the
 >
 > "Record: what do you think of proposed or asked for the value in the ask, ante or prior for what is in the data store at the start, and actual for what is returned?"
 
-*Gloss.* *Orchestrator:* also the stale eslint config comments naming the deleted `storage/classifier.ts` (safebyok-indexeddb's and the dojo demo's; thread 3). A manual sweep of the remaining uses of "stored" (about 500 bare uses at the start of the sprint) in `packages/safebyok/src` and the three adapters, sorting each into actual, ante, proposed or stored (at rest) by the design's *Words* table; renames of identifiers that carry the word in the wrong sense; and VOCABULARY.md rows for **actual**, **ante**, **manifest** and **proposed**. No behaviour changes.
+*Gloss.* *Orchestrator:* also the stale eslint config comments naming the deleted `storage/classifier.ts` (safebyok-indexeddb's and the dojo demo's; thread 3); the local `written` → `isWritten` in every datastore (STYLE's boolean rule; thread 3's review); `isWritable`/`isBirthWritable`'s doc blocks for the datastores that share them. A manual sweep of the remaining uses of "stored" (about 500 bare uses at the start of the sprint) in `packages/safebyok/src` and the three adapters, sorting each into actual, ante, proposed or stored (at rest) by the design's *Words* table; renames of identifiers that carry the word in the wrong sense; and VOCABULARY.md rows for **actual**, **ante**, **manifest** and **proposed**. No behaviour changes.
 *Levels:* style pass `opus`; review `medium`.
 *Depends on:* threads 3, 4 and 5 (they rewrite the same files); cut from the top of the restacked line.
 *Look-ahead:* thread 7 renames "damaged" in the same prose.
