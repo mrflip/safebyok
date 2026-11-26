@@ -268,12 +268,12 @@ export function scribeListAct(_ask: ListAsk, manifest: CheckedListManifest): ass
 export function scribeBirthAct(ask: BirthBankAsk, manifest: CheckedBirthManifest): asserts manifest is ScribedBirthManifest {
   const [bankPut, gatePut, rootPut] = birthPutsOf(ask)
   const { tags, actual } = manifest
-  if (rootActOf(bankPut, tags.bank) === 'passed') {
+  const acts = { bank: rootActOf(bankPut, tags.bank), gate: rootActOf(gatePut, tags.gate), root: rootActOf(rootPut, tags.root) }
+  if (acts.bank === 'passed') {
     if ((actual.bank === null) || (actual.gate === null) || (actual.root === null)) { throw Throwers.bankRootsMissing() }
     Object.assign(manifest, { ok: true, act: 'passed' })
     return
   }
-  const acts = { bank: rootActOf(bankPut, tags.bank), gate: rootActOf(gatePut, tags.gate), root: rootActOf(rootPut, tags.root) }
   const refusedroot = (['bank', 'gate', 'root'] as const).find((rootckey) => isRefusedAct(acts[rootckey]))
   if (refusedroot === undefined) { Object.assign(manifest, { ok: true, act: 'born' }) } else { Object.assign(manifest, { ok: false, act: acts[refusedroot], refusedroot }) }
 }
