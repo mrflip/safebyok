@@ -41,7 +41,8 @@ export function makePostgresListen(client: PostgresListenClient): PostgresListen
     const identifier = listener.escapeIdentifier(channel)
     if (! onNotifiesOf.has(channel)) { await listener.query(`LISTEN ${identifier}`) }
     const onNotifies = onNotifiesOf.get(channel) ?? new Set()
-    onNotifiesOf.set(channel, onNotifies.add(onNotify))
+    onNotifies.add(onNotify)
+    onNotifiesOf.set(channel, onNotifies)
     return async () => {
       onNotifies.delete(onNotify)
       if (onNotifies.size > 0) { return }
