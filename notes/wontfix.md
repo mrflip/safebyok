@@ -69,19 +69,19 @@ Reasoning for wontfix: storage is the ground truth, and the cache a copy. The st
 refuses a write that cites another, so a conflict is found where it can be settled, not in the cache. Ruled by the Coach,
 2026-11-15, vault_minder.
 
-### The value in `tracked`, and the `banktok`, of a missing or damaged record
+### The value in `tracked`, and the `banktok`, of a missing or incompatible record
 
-The answer to an ask that tracks a root stored missing or damaged is unspecified behavior.
+The answer to an ask that tracks a root stored missing or incompatible is unspecified behavior.
 
 * current outcome: unspecified. As the code stands, an ask that tracks a root at another revision than the row stored is
-  refused: `damaged_row` where the row fails its checks, `storage_issue` where none is stored. An ask that tracks the
-  damaged row's own revision is told `'same'` for it, and the step's answer stands; where that row is the bank, the
+  refused: `incompatible_row` where the row fails its checks, `storage_issue` where none is stored. An ask that tracks the
+  incompatible row's own revision is told `'same'` for it, and the step's answer stands; where that row is the bank, the
   answer's `banktok` is the void lifetok. No caller checks for either case, and none may: no guard, no null, no refusal
   of its own, and no test of the value in `tracked`.
 * alternatives:
   - a sentinel for either case (null, a refusal kind, a left-out key): it extends the contract, so every caller must
     then handle it, and the handling cascades into code that second-guesses the store.
-  - refuse every ask over a damaged root, whatever it tracks: every step would check rows it does not otherwise read,
+  - refuse every ask over an incompatible root, whatever it tracks: every step would check rows it does not otherwise read,
     for a case storage should never produce.
 * workaround: reload the page, or restart the system.
 

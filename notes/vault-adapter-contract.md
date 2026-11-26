@@ -51,7 +51,7 @@ Each read in the step, after any write.
 
 - **`banktok`**: the bank row's lifetok, the void lifetok (`SX.VoidLifeTok`) where there is no bank row, and null where
   the row has no lifetok (`ManifestTags.banktokOf`). A manifest without the key refuses `storage_issue` (`Phrases.BanktokMissing`). A banktok
-  that is no lifetok, as a damaged bank row's is, reads as the void lifetok, and the step's answer stands: the banktok is
+  that is no lifetok, as an incompatible bank row's is, reads as the void lifetok, and the step's answer stands: the banktok is
   news, never the verdict.
 - **`tracked`**: for each of the bank (`bank`), the main gate (`gate`) and the root box (`box`), by its key in the ask's
   `track`, `'same'` where its row stands at the revseq and lifepath the ask tracks, else the raw row, null for none
@@ -87,7 +87,7 @@ A row is what the datastore stores at a scope, raw, as our code wrote it: every 
 - `children`: each row one label under the ask's labelpath, of every life, as `{ labelpath, raw }`: the labelpath it is
   stored at, and the row. The vaultDB reads them only under a live parent, so a datastore may read them whatever the
   parent (Postgres and memory do), or hand back `[]` where it is not live. A child that fails its kind's checks is
-  answered among `damaged_rows`, not refused; one of an earlier life is dropped by the vaultDB.
+  answered among `incompatible_rows`, not refused; one of an earlier life is dropped by the vaultDB.
 
 **Birth** (`BirthManifest`):
 
@@ -169,7 +169,7 @@ unwritten. The order and timing of notifications against reads, writes and other
 | a manifest whose tags, children, roots, `tracked` or `read_tc` are malformed          | `storage_issue`                            |
 | a row, child or root that is no object                                                | `storage_issue`                            |
 | no `banktok` key                                                                      | `storage_issue`                            |
-| a row that fails its kind's checks, a record our code would not write                 | `damaged_row`; a listing child goes to `damaged_rows` |
+| a row that fails its kind's checks, a record our code would not write                 | `incompatible_row`; a listing child goes to `incompatible_rows` |
 | tags that are not those of the row handed back (unwritten, for a write or a birth)    | `storage_issue`                            |
 | `written` where the act is no write, or the reverse                                   | `storage_issue`                            |
 | a written row without the record's revtok, revseq, lifepath or liveness               | `storage_issue`                            |
