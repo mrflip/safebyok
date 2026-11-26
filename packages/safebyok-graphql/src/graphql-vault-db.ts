@@ -144,12 +144,10 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
       // When a stream over fetch closes, its final result repeats the previous notice. Do not hear it twice.
       const isHeard = (result.data === heardData)
       heardData = result.data
-      if (! isHeard) {
-        const ending = hearNotice(result, receive, onBadNews)
-        if (ending !== null) {
-          end(ending)
-          return
-        }
+      const ending = isHeard ? null : hearNotice(result, receive, onBadNews)
+      if (ending !== null) {
+        end(ending)
+        return
       }
       if (! result.hasNext) { end(watchEnded()) }
     })
