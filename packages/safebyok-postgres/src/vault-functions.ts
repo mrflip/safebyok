@@ -371,7 +371,7 @@ $$;
 -- The tags of a write that wrote, of proposed citing cited. Its WHERE pinned the ante row's revtok, am and lifepath to the
 -- cited ones, and its revseq to the proposed one's less one, which past the vaultDB's checks of the ask is the cited one's;
 -- or, citing the shell, found no row. It held the ante row's born_at and lifetok to the proposed ones, and met each storage
--- policy. So each tag is the one ${VaultFunctionNames.write_tags_of} would make of that ante row.
+-- policy. So each tag is the one ${VaultFunctionNames.write_tags_of} would make of that ante row: ManifestTags.writtenTagsOf.
 CREATE OR REPLACE FUNCTION ${VaultFunctionNames.written_tags_of}(modelkind text, proposed jsonb, cited jsonb, policies text[]) RETURNS jsonb
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT jsonb_build_object(

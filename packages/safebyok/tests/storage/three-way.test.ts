@@ -83,6 +83,8 @@ describe("ThreeWay.demandWriteConsistency(ask, manifest, answer)", () => {
     [Phrases.TagsOfOtherRow,     Birth,   OtherGate, false, (manifest: WriteManifest) => { manifest.actual = null },                                       'refuses unwritten tags that are not those of the row handed back'],
     [Phrases.TagsOfOtherAsk,     Birth,   null,      true,  (manifest: WriteManifest) => { manifest.tags = { ...manifest.tags, policies: { add_passkey: { ok: true } } } }, 'refuses a verdict for a storage policy the ask does not name'],
     [Phrases.TagsOfOtherAsk,     AddOver, Gate,      true,  (manifest: WriteManifest) => { manifest.tags = { ...manifest.tags, revtok_cmp: 'birth', presence: 'void' } }, 'refuses a birth the datastore reports where the ask cites no shell'],
+    [Phrases.TagsOfOtherAsk,     Replace, Gate,      true,  (manifest: WriteManifest) => { manifest.tags = { ...manifest.tags, revtok_cmp: 'birth' } },                      'refuses written tags that are not those of a write the ask lets through: a birth over a live row'],
+    [Phrases.TagsOfOtherAsk,     Replace, Gate,      true,  (manifest: WriteManifest) => { manifest.tags = { ...manifest.tags, lifetok_cmp: 'same' } },                       'refuses written tags that are not those of a write the ask lets through: a gate\'s lifetok judged'],
   ] as const
 
   for (const [message, ask, ante, written, doctor, blurb] of DoctoredCases) {

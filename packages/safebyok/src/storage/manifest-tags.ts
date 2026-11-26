@@ -20,7 +20,7 @@ export function fieldOf(row: unknown, fieldname: string): unknown { return CX.is
 export function banktokOf(bank: unknown): unknown { return (bank === null) ? SX.VoidLifeTok : (fieldOf(bank, 'lifetok') ?? null) }
 // --
 
-// == [Tags]: presenceOf, getTagsOf, writeTagsOf, birthTagsOf, rootTagsOf, revtokCmpOf, revseqCmpOf, bornAtCmpOf, lifetokCmpOf, policiesOf, policyVerdictOf, anteWayinsOf
+// == [Tags]: presenceOf, getTagsOf, writeTagsOf, writtenTagsOf, birthTagsOf, rootTagsOf, revtokCmpOf, revseqCmpOf, bornAtCmpOf, lifetokCmpOf, policiesOf, policyVerdictOf, anteWayinsOf
 
 /** The liveness of the raw `row`: `'void'` for null, `'live'` where its `am` is `'a'`, else `'gone'`. */
 export function presenceOf(row: unknown): Presence {
@@ -43,6 +43,22 @@ export function writeTagsOf(ask: WriteAsk, ante: unknown, written: boolean): Wri
     policies:    policiesOf(ask, ante),
     written,
   }
+}
+
+// The write predicate pins the ante row's revtok, revseq, lifepath and liveness to the cited ones, or citing the shell finds no
+// row; holds its born_at and lifetok to the record's; and meets each storage policy. So the ask alone makes the tags.
+/** The tags of a write `ask` that the datastore wrote: those {@link writeTagsOf} makes of the ante row its write predicate let through. */
+export function writtenTagsOf(ask: WriteAsk): WriteTags {
+  const isLive = (ask.cited.am === 'a')
+  const fixed  = {
+    lifepath_eq: true,
+    born_at_cmp: (isLive && (ask.record.am === 'a')) ? 'same' : 'moot',
+    lifetok_cmp: (isLive && (ask.modelkind === 'bank')) ? 'same' : 'moot',
+    policies:    Object.fromEntries((ask.options?.policies ?? []).map((policy) => [policy, { ok: true }])),
+    written:     true,
+  } as const
+  if (ask.cited.revseq === SX.VoidRevisionSeq) { return { presence: 'void', revtok_cmp: 'birth', revseq_cmp: 'birth', ...fixed } }
+  return { presence: isLive ? 'live' : 'gone', revtok_cmp: 'eq', revseq_cmp: 'eq', ...fixed }
 }
 
 /** The tags of a birth by its three `puts`, each root's judged against its raw `ante` root, null for none, beside whether the datastore wrote. */

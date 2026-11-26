@@ -139,7 +139,8 @@ of those goes uncaught; where the datastore writes and the act tables find no wr
   - for the bank over a live bank, its `lifetok` is the record's;
   - for a gate over a live gate, each storage policy the ask names is met (`ManifestTags.policiesOf`).
 
-Written, the row the datastore hands back carries the record's `revtok`, `revseq`, `lifepath` and `am`.
+Written, the row the datastore hands back carries the record's `revtok`, `revseq`, `lifepath` and `am`, and its tags are those
+the predicate let through, which the ask alone makes (`ManifestTags.writtenTagsOf`; Postgres's `written_tags_of`).
 
 ## The birth predicate
 
@@ -172,7 +173,7 @@ unwritten. The order and timing of notifications against reads, writes and other
 | tags that are not those of the row handed back (unwritten, for a write or a birth)    | `storage_issue`                            |
 | `written` where the act is no write, or the reverse                                   | `storage_issue`                            |
 | a written row without the record's revtok, revseq, lifepath or liveness               | `storage_issue`                            |
-| policy verdicts for other policies than the ask names; `revtok_cmp` `birth` where the ask cites no shell | `storage_issue`         |
+| written tags that are not those of a write the ask lets through (`ManifestTags.writtenTagsOf`): a birth where the ask cites no shell, a verdict for another policy than it names, among them | `storage_issue` |
 | a row, child, root or tracked row at another address than it was read at; a listing child not one label under the parent, or of another modelkind than the listing's | `storage_issue` |
 | a birth over a live bank whose main gate or root box is missing                      | `storage_issue`                            |
 

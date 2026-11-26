@@ -26,6 +26,23 @@ describe("ManifestTags, over the raw rows in a datastore", () => {
     expect(ManifestTags.writeTagsOf(ask, { ...gate, wayins: 'none' }, false).policies.add_passkey).to.deep.include({ ok: false })
   })
 
+  it("makes a written write's tags of its ask alone: those of the ante row its write predicate lets through", () => {
+    const gate = TH.gateThingOf()
+    const bank = TH.bankThingOf()
+    const box  = TH.boxThingOf()
+    const tomb = TH.boxTombOf(box)
+    const writes = [
+      [TH.birthAskOf(),                                                                                                       null],
+      [TH.replaceAskOf(gate, TH.nextGateOf(gate, { wayins: { ...gate.wayins, passkey0: TH.Passkey0Wayin } }), { policies: ['add_passkey'] }), gate],
+      [TH.replaceAskOf(bank, TH.nextOf(bank)),                                                                               bank],
+      [TH.delAskFor(box, tomb),                                                                                               box],
+      [TH.birthAskOf(TH.nextOf(tomb, { am: 'a' }), tomb),                                                                     tomb],
+    ] as const
+    for (const [ask, ante] of writes) {
+      expect(ManifestTags.writtenTagsOf(ask), ask.labelpath).to.deep.equal(ManifestTags.writeTagsOf(ask, ante, true))
+    }
+  })
+
   it("gives the void lifetok for no bank row, the lifetok as it stands otherwise, and null for a row without one", () => {
     expect(ManifestTags.banktokOf(null)).to.eq(SX.VoidLifeTok)
     expect(ManifestTags.banktokOf(TH.bankThingOf())).to.eq(TH.bankThingOf().lifetok)

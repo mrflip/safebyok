@@ -3,7 +3,7 @@
  */
 
 import { isEqual, pick } from 'es-toolkit'
-import { SX, Validator } from 'safebyok-big/internals'
+import { Validator } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
 import { type ThingRecord, type ThingScope, Shell } from '../shapes/shapes-thing'
 import { type BirthBankAsk, type GetAsk, type GetWorldAsk, type ListAsk, type StatsAsk, type ThingWatchScope, type Tracked, type WriteAsk, RootLabelpaths, birthPutsOf } from '../shapes/shapes-asks'
@@ -27,12 +27,11 @@ export function demandGetConsistency(ask: GetAsk, manifest: ScribedGetManifest, 
 }
 
 /** Refuse a write whose ask, manifest and answer disagree: a datastore that wrote where the act is no write or the reverse, a row written without
- * the proposed revision, tags that are not the unwritten row's or disagree with the ask, an answer that is not the manifest's, or a row at another address.
+ * the proposed revision, tags that are not the unwritten row's or not those of a write the ask let through, an answer that is not the manifest's, or a row at another address.
  */
 export function demandWriteConsistency(ask: WriteAsk, manifest: ScribedWriteManifest, answer: WriteThingAnswer): void {
   if (manifest.tags.written !== ManifestActs.isWriteAct(manifest.act)) { throw Throwers.writtenOfOtherAct() }
-  if (manifest.tags.written) { demandProposedWritten(ask.record, manifest.actual) } else { demandTagsOfActual(ask, manifest) }
-  demandTagsOfAsk(ask, manifest.tags)
+  if (manifest.tags.written) { demandProposedWritten(ask.record, manifest.actual); demandTagsOfWritten(ask, manifest.tags) } else { demandTagsOfActual(ask, manifest) }
   demandSharedConsistency(ask, manifest, answer, recordCopyOf(ask, manifest, answer), [[manifest.actual, ask.labelpath]])
 }
 
@@ -118,7 +117,7 @@ function trackedRowsOf(tracked: Tracked): RowAt[] {
 }
 // --
 
-// == [Per verb]: ProposedPins, demandProposedWritten, demandTagsOfActual, demandTagsOfAsk, isChildLabelpath
+// == [Per verb]: ProposedPins, demandProposedWritten, demandTagsOfActual, demandTagsOfWritten, isChildLabelpath
 
 /** The fields a written row carries of the proposed record: its revision, its life and its liveness. */
 const ProposedPins = ['revtok', 'revseq', 'lifepath', 'am'] as const
@@ -134,12 +133,9 @@ function demandTagsOfActual(ask: WriteAsk, manifest: ScribedWriteManifest): void
   if (! isEqual(ManifestTags.writeTagsOf(ask, manifest.actual, false), manifest.tags)) { throw Throwers.tagsOfOtherRow() }
 }
 
-/** Refuse tags that disagree with the ask: a birth where it cites no shell, or verdicts for other storage policies than it names. */
-function demandTagsOfAsk({ cited, options }: WriteAsk, { revtok_cmp, policies }: WriteTags): void {
-  const named = options?.policies ?? []
-  const isPoliciesExact = (Object.keys(policies).length === new Set(named).size) && named.every((policy) => policies[policy] !== undefined)
-  const isBirthOfShell  = (revtok_cmp !== 'birth') || (cited.revtok === SX.VoidRevisionTok)
-  if (! (isPoliciesExact && isBirthOfShell)) { throw Throwers.tagsOfOtherAsk() }
+/** Refuse a written write's tags where they are not those of the write its ask lets through. */
+function demandTagsOfWritten(ask: WriteAsk, tags: WriteTags): void {
+  if (! isEqual(ManifestTags.writtenTagsOf(ask), tags)) { throw Throwers.tagsOfOtherAsk() }
 }
 
 /** True when `labelpath` is one label under the listing's parent, of the listing's modelkind. */
