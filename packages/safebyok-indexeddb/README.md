@@ -4,7 +4,7 @@ A `VaultDB` for safebyok that keeps a bank's Things in this browser's
 [IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API). The Things are what any backend would have, ciphertext and a few unencrypted fields; nothing in them unlocks a
 bank without its passphrase or passkey.
 
-It replaces the IndexedDB store built on safebyok-big, now the private `safebyok-indexeddb-big`. Its database has another name, so it reads nothing that store wrote.
+It replaces the IndexedDB vaultDB built on safebyok-big, now the private `safebyok-indexeddb-big`. Its database has another name, so it reads nothing that one wrote.
 
 ## Use
 

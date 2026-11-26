@@ -25,7 +25,7 @@ const ThingChecks = `
   CHECK (array_length(string_to_array(lifepath, '/'), 1) = array_length(string_to_array(labelpath, '/'), 1)),`
 
 /** The SQL that creates PostgresVaultDB's three tables, one per kind of Thing: `await pool.query(VaultTablesSql)`. */
-export const VaultTablesSql = `-- safebyok-postgres: the three tables PostgresVaultDB stores its Things in, one per kind. For Postgres 14 or later;
+export const VaultTablesSql = `-- safebyok-postgres: the three tables PostgresVaultDB writes its Things to, one per kind. For Postgres 14 or later;
 -- VaultFunctionsSql and PostgresVaultDB need Postgres 18.
 -- Safe to run again: it creates only what is missing.
 --

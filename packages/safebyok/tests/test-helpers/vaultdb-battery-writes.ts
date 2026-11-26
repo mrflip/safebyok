@@ -140,7 +140,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       ["retcon", replaceAskOf(ante, next),                                        'resends a write that already landed'],
       ["forked", replaceAskOf({ ...next, revtok: revtokOf('fork') }, nextGateOf(next)), 'expects the ante revseq under another revtok'],
       // the caller is ahead of the datastore, or confused:
-      ["ahead",  replaceAskOf(later, nextGateOf(later)),                          'expects a revision the store has not reached'],
+      ["ahead",  replaceAskOf(later, nextGateOf(later)),                          'expects a revision the datastore has not reached'],
       ["clash",  replaceAskOf({ ...next, ...otherLife }, { ...nextGateOf(next), ...otherLife }), 'expects the ante revtok in another life'],
       ["camped", { ...replaceAskOf(next, nextGateOf(next)), ifPresent: 'fail' as const }, 'finds the live gate it expects under ifPresent fail'],
       ["stale",  birthAskOf(gateThingOf({ revtok: OtherRevtok })),               'births a gate over a live one'],

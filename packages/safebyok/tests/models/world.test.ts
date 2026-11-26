@@ -465,7 +465,7 @@ async function twoTabs(opts: Partial<DeviceOpts> = {}): Promise<TwoTabs> {
 /** Let what is under way finish: every promise settled, every timer due now run. */
 async function settle(): Promise<void> { await vi.advanceTimersByTimeAsync(0) }
 
-/** The lease record `deviceDB` stores for {@link TH.WorldScope}'s main gate. */
+/** The lease record `deviceDB` has for {@link TH.WorldScope}'s main gate. */
 async function storedLeaseOf(deviceDB: MemoryDeviceDB): Promise<LeaseRecord | null> { return await deviceDB.peekLease(TH.WorldLeaseScope) }
 
 /** A device of another browser over `vaultDB`, its own deviceDB, unlocked, whose passphrase it then replaces: a gate change the tabs of `vaultDB` hear of. */

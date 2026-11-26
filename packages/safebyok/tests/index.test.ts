@@ -67,7 +67,7 @@ describe("safebyok/storage", () => {
     for (const exportname of ['delActVals', 'gotActVals', 'ifPresentVals', 'putActVals', 'putIfAbsentVals'] as const) { expect(Storage, exportname).to.have.property(exportname).that.eq(EX[exportname]) }
   })
 
-  it("re-exports safebyok-big's IndexedDB transaction and versioned database, the very ones an IndexedDB store is written with", () => {
+  it("re-exports safebyok-big's IndexedDB transaction and versioned database, the very ones an IndexedDB adapter is written with", () => {
     for (const exportname of ['dbprefixOf', 'inOneStep', 'rowAt', 'versionedShelfOf'] as const) { expect(Storage, exportname).to.have.property(exportname).that.eq(BigStorage[exportname]) }
   })
 })

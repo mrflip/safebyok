@@ -91,7 +91,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return { answer, refusal: this.#tellAnswer(answer, rootsOf(answer), gotRecordsOf(answer)) }
   }
 
-  /** {@link VaultDB.tryWriteThing}: a write refused over nothing stored tells the shell its answer carries. */
+  /** {@link VaultDB.tryWriteThing}: a write refused where there is no actual row tells the shell its answer carries. */
   async tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer> {
     const { answer } = await this.#doTryWriteThing(ask)
     return answer

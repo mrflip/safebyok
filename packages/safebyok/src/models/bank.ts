@@ -121,7 +121,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp, Adoptable<Bank
 
   // == [Methods]: put
 
-  /** Write `ask.record`, this bank's next revision, over `ask.cited`. Resolves the bank's Thing the store reports writing, which the bank in the device's world then models. */
+  /** Write `ask.record`, this bank's next revision, over `ask.cited`. Resolves the bank's Thing the vaultDB reports writing, which the bank in the device's world then models. */
   async put(ask: Omit<PutAskDraft<BankRecord>, 'track' | 'banktok'>): Promise<BankRecord> {
     this.demandEnabled()
     this.demandLive()

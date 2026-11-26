@@ -29,7 +29,7 @@ export function makeTwin(idbVaultDB: IdbVaultDB): IdbVaultDB {
   return twin
 }
 
-/** Unchecked access to the Things `idbVaultDB` stores, on a connection of its own: plant, remove or read one raw. */
+/** Unchecked access to the Things `idbVaultDB` has, on a connection of its own: plant, remove or read one raw. */
 export function _cheat_idbThingsOf(idbVaultDB: IdbVaultDB) {
   const shelf = createStore(databasenameOf(dbNameIn(idbVaultDB)), 'things')
   return {

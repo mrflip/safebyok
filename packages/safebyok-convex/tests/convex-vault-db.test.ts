@@ -64,7 +64,7 @@ async function plantIn(db: ComponentDb, scope: ThingScope, raw: unknown): Promis
   await db.insert(table, { ...Object.fromEntries(fields), commit_ts: db.vars.commitTs } as never)
 }
 
-/** The cheat into what `convexVaultDB` stores. Each plants through `_cheat_arrange`, so the clients hear of it as of a write from elsewhere. */
+/** The cheat into what `convexVaultDB` has. Each plants through `_cheat_arrange`, so the clients hear of it as of a write from elsewhere. */
 function _cheat_convexThingsOf(convexVaultDB: ConvexVaultDB): TH.VaultDBRowCheats {
   const { deployment } = madeOf(convexVaultDB)
   const run: ComponentBackend['run'] = async (fn) => await deployment._cheat_arrange(async (backend) => await backend.run(fn))
@@ -113,7 +113,7 @@ function flipWritten(convexVaultDB: ConvexVaultDB): void {
   onTestFinished(() => { spy.mockRestore() })
 }
 
-/** The labelpath of each Thing the deployment stores, table by table, in order. */
+/** The labelpath of each Thing the deployment has, table by table, in order. */
 async function thingLabelpathsOf(convexVaultDB: ConvexVaultDB): Promise<Record<string, string[]>> {
   return await madeOf(convexVaultDB).deployment._cheat_backendAs(null).run(async ({ db }) => {
     const labelpathsIn = async (table: TableNames): Promise<string[]> => {
@@ -193,13 +193,13 @@ describe("ConvexVaultDB against a component out of step with it", () => {
 })
 
 describe("ConvexVaultDB's component", () => {
-  it("stores one document for each Thing a bank is born with, each in the table of its kind", async () => {
+  it("writes one document for each Thing a bank is born with, each in the table of its kind", async () => {
     const convexVaultDB = makeConvexVaultDB()
     await TH.expectGood(convexVaultDB.tryBirthBank(TH.birthBankAskOf()))
     expect(await thingLabelpathsOf(convexVaultDB)).to.deep.equal({ bank_things: ['bank'], gate_things: ['gate'], box_things: ['box'] })
   })
 
-  it("stores each of a Thing's fields as a field of its document, beside the commit timestamp", async () => {
+  it("writes each of a Thing's fields as a field of its document, beside the commit timestamp", async () => {
     const convexVaultDB = makeConvexVaultDB()
     await TH.expectGood(convexVaultDB.tryBirthBank(TH.birthBankAskOf()))
     const backend = madeOf(convexVaultDB).deployment._cheat_backendAs(null)
@@ -282,7 +282,7 @@ const SidecarKeyCases: readonly (readonly [BoxRecord['sidecar'], string])[] = [
   [{ teams: [{ $lead: "ada" }] },     'refuses such a key in an object within an array'],
 ]
 
-describe("ConvexVaultDB's put of a box whose sidecar Convex would not store", () => {
+describe("ConvexVaultDB's put of a box whose sidecar Convex would refuse", () => {
   for (const [sidecar, blurb] of SidecarKeyCases) {
     it(blurb, async () => {
       const convexVaultDB = makeConvexVaultDB()

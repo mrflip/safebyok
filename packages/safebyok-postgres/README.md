@@ -1,7 +1,7 @@
 # safebyok-postgres
 
 safebyok's vaultDB in [Postgres](https://www.postgresql.org): the SQL that makes three tables and the functions that
-write to them, and **`PostgresVaultDB`**, which stores a bank's Things there from your server. Your database has
+write to them, and **`PostgresVaultDB`**, which reads and writes a bank's Things there from your server. Your database has
 ciphertext and the few unencrypted fields a row is found by. It never sees a whisper, a passphrase, or any key that
 could decipher one.
 
@@ -142,8 +142,8 @@ writer of the same row. No table has a foreign key.
 
 Row-level security is on with no policy, so of the roles you grant the tables to, only their owner, the role your server
 connects as, can reach the rows. A superuser, or a role that bypasses row-level security, can reach them too. A
-notification is not a table: any role that may connect can LISTEN on any user's channel and hear the Things each write
-stores.
+notification is not a table: any role that may connect can LISTEN on any user's channel and hear each Thing
+written.
 
 **You own the database's roles, and are responsible for its row-level security** and for who may connect and LISTEN:
 this package grants nothing and creates no role or policy.

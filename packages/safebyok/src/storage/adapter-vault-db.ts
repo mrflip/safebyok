@@ -85,7 +85,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { return { ...this.answerForThrown(err, 'listThings', ask), dbhas: null, parentage: [], deltas: [], incompatible_rows: [] } }
   }
 
-  /** Write a new bank's three roots (bank, main gate, root box), or answer the roots already stored ({@link VaultDB.tryBirthBank}). */
+  /** Write a new bank's three roots (bank, main gate, root box), or answer the actual roots of a bank already live ({@link VaultDB.tryBirthBank}). */
   async tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer> {
     try {
       const birthBankAsk = checkedBirthBankAsk(ask)
@@ -179,12 +179,12 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doWriteThing(ask: WriteAsk): Helpers.Awaitable<WriteManifest>
   /** In one step, read the Thing at `ask`'s scope and each Thing one label under it, and hand back what was observed ({@link ListManifest}). */
   protected abstract doListThings(ask: ListAsk): Helpers.Awaitable<ListManifest>
-  /** In one step, write the three `puts`' records where none of the bank's three roots is stored, and hand back what was observed ({@link BirthManifest}). */
+  /** In one step, write the three `puts`' records where the ante roots are all null, and hand back what was observed ({@link BirthManifest}). */
   protected abstract doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Helpers.Awaitable<BirthManifest>
   /** In one step, read the bank's three roots, and hand back what was observed ({@link WorldManifest}). */
   protected abstract doGetWorld(ask: GetWorldAsk): Helpers.Awaitable<WorldManifest>
   /** In one step, measure the bank's boxes and gates, and hand back what was observed ({@link StatsManifest}).
-   * Report the store's limits where it has them; `storeLimitsOf` caps each, and gives the cap for one it lacks.
+   * Report the datastore's limits where it has them; `storeLimitsOf` caps each, and gives the cap for one it lacks.
    */
   protected abstract doStats(ask: StatsAsk): Helpers.Awaitable<StatsManifest>
   /** Start watching the datastore: call `receive` with each changed Thing, one at a time ({@link Received}), and `onBadNews` with any trouble,

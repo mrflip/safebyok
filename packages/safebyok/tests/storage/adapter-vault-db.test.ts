@@ -146,8 +146,8 @@ describe("AdapterVaultDB, a step that throws", () => {
   })
 })
 
-describe("AdapterVaultDB.tryGetThing(ask), a store that reports oddly", () => {
-  it("refuses, as a broken store, a get whose tags are not those of its row", async () => {
+describe("AdapterVaultDB.tryGetThing(ask), a datastore that reports oddly", () => {
+  it("refuses, as a broken datastore, a get whose tags are not those of its row", async () => {
     const live = TH.gateThingOf()
     for (const manifest of [{ tags: { presence: 'live' }, actual: null }, { tags: { presence: 'void' }, actual: live }, { tags: { presence: 'gone' }, actual: live }]) {
       const vaultDB = new ScriptedVaultDB(() => manifest)
@@ -160,14 +160,14 @@ describe("AdapterVaultDB.tryGetThing(ask), a store that reports oddly", () => {
     expect(await vaultDB.tryGetThing(TH.getGateAskOf())).to.deep.include({ ok: true, act: 'gotvoid', val: null, dbhas: Shell.of(TH.GateScope) })
   })
 
-  it("refuses, as a broken store, tags of another shape", async () => {
+  it("refuses, as a broken datastore, tags of another shape", async () => {
     const vaultDB = new ScriptedVaultDB(() => ({ tags: { presence: 'here' }, actual: null }))
     await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
   })
 })
 
-describe("AdapterVaultDB.tryWriteThing(ask), a store that reports oddly", () => {
-  it("refuses, as a broken store, a storage policy's verdict whose refusal is not a tag of PolicyPhrases", async () => {
+describe("AdapterVaultDB.tryWriteThing(ask), a datastore that reports oddly", () => {
+  it("refuses, as a broken datastore, a storage policy's verdict whose refusal is not a tag of PolicyPhrases", async () => {
     const gate     = TH.gateThingOf()
     const ask      = TH.replaceAskOf(gate, TH.nextGateOf(gate), { policies: ['add_passkey'] })
     const manifest = { tags: ManifestTags.writeTagsOf(ask, gate, false), actual: gate }
@@ -177,7 +177,7 @@ describe("AdapterVaultDB.tryWriteThing(ask), a store that reports oddly", () => 
     }
   })
 
-  it("refuses, as a broken store, a write it reports making with no row", async () => {
+  it("refuses, as a broken datastore, a write it reports making with no row", async () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ...writeManifestOf(TH.birthAskOf(), null, true), actual: null }))
     await TH.expectBad(vaultDB.tryWriteThing(TH.birthAskOf()), 'storage_issue')
   })
@@ -190,7 +190,7 @@ describe("AdapterVaultDB.tryWriteThing(ask), a store that reports oddly", () => 
   })
 })
 
-describe("AdapterVaultDB.tryListThings(ask), a store that reports oddly", () => {
+describe("AdapterVaultDB.tryListThings(ask), a datastore that reports oddly", () => {
   it("lists each child of the parent's life, sorted by labelpath, as incompatible each that fails its kind's checks, and leaves out a child of an earlier life", async () => {
     const earlier = TH.boxThingOf('aaa', { lifepath: `${TH.lifepathPlus(TH.Life0, 1)}/${TH.Life0}` })
     const incompatible = { ...TH.boxThingOf('bad'), whisper_sealed: 'not sealed' }
@@ -206,7 +206,7 @@ describe("AdapterVaultDB.tryListThings(ask), a store that reports oddly", () => 
     expect(await vaultDB.tryListThings(TH.listAskAt('box'))).to.deep.include({ ok: false, act: 'gone', parentage: [], deltas: [], incompatible_rows: [] })
   })
 
-  it("refuses, as a broken store, a child reported more than one label under the parent, or a child whose record is at another labelpath than reported", async () => {
+  it("refuses, as a broken datastore, a child reported more than one label under the parent, or a child whose record is at another labelpath than reported", async () => {
     const deep  = TH.boxThingOf('aa', { labelpath: 'box/aa/deep' })
     const moved = { labelpath: 'box/anthropic', raw: TH.boxThingOf('openai') }
     for (const children of [[{ labelpath: deep.labelpath, raw: deep }], [moved]]) {
@@ -215,13 +215,13 @@ describe("AdapterVaultDB.tryListThings(ask), a store that reports oddly", () => 
     }
   })
 
-  it("refuses, as a broken store, a listing whose tags are not those of its parent", async () => {
+  it("refuses, as a broken datastore, a listing whose tags are not those of its parent", async () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ...listManifestOf(TH.rootBoxOf()), tags: { presence: 'gone' } }))
     await TH.expectBad(vaultDB.tryListThings(TH.listAskAt('box')), 'storage_issue')
   })
 })
 
-describe("AdapterVaultDB.tryBirthBank(ask), a store that reports oddly", () => {
+describe("AdapterVaultDB.tryBirthBank(ask), a datastore that reports oddly", () => {
   it("answers a birth the datastore reports writing with the roots it wrote, and one over a live bank with the actual roots", async () => {
     const born = new ScriptedVaultDB(() => birthManifestOf(TH.birthBankAskOf(), NoRoots, true))
     expect(await born.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ ok: true, act: 'born', val: bornRootsOf() })
@@ -230,7 +230,7 @@ describe("AdapterVaultDB.tryBirthBank(ask), a store that reports oddly", () => {
     expect(await passing.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ ok: true, act: 'passed', val: actual })
   })
 
-  it("refuses, as a broken store, a birth it reports writing with a root missing, or unwritten over a live bank with a root missing", async () => {
+  it("refuses, as a broken datastore, a birth it reports writing with a root missing, or unwritten over a live bank with a root missing", async () => {
     const written  = { ...birthManifestOf(TH.birthBankAskOf(), NoRoots, true), actual: { ...bornRootsOf(), root: null } }
     const unrooted = birthManifestOf(TH.birthBankAskOf(), { bank: TH.bankThingOf({ revtok: TH.OtherRevtok }), gate: null, root: null }, false)
     for (const manifest of [written, unrooted]) {
@@ -239,7 +239,7 @@ describe("AdapterVaultDB.tryBirthBank(ask), a store that reports oddly", () => {
     }
   })
 
-  it("refuses, as a broken store, a birth whose tags are not those of its roots, or that it reports writing where the act is no write", async () => {
+  it("refuses, as a broken datastore, a birth whose tags are not those of its roots, or that it reports writing where the act is no write", async () => {
     const otherTags = { ...birthManifestOf(TH.birthBankAskOf(), { ...NoRoots, gate: OtherGate }, false), actual: NoRoots }
     const wroteOver = { ...birthManifestOf(TH.birthBankAskOf(), { ...NoRoots, gate: OtherGate }, false), tags: ManifestTags.birthTagsOf(birthPutsOf(TH.birthBankAskOf()), { ...NoRoots, gate: OtherGate }, true) }
     for (const manifest of [otherTags, wroteOver]) {
@@ -249,14 +249,14 @@ describe("AdapterVaultDB.tryBirthBank(ask), a store that reports oddly", () => {
   })
 })
 
-describe("AdapterVaultDB.tryGetWorld(ask), a store that reports oddly", () => {
+describe("AdapterVaultDB.tryGetWorld(ask), a datastore that reports oddly", () => {
   it("answers each root stored, and the shell of each that is not", async () => {
     const vaultDB = new ScriptedVaultDB(() => ({ actual: { ...NoRoots, gate: TH.gateThingOf() } }))
     const answer  = await vaultDB.tryGetWorld(TH.getWorldAskOf())
     expect(answer).to.deep.include({ ok: true, act: 'got', val: { bank: Shell.of(TH.BankScope), gate: TH.gateThingOf(), root: Shell.of(TH.RootScope) } })
   })
 
-  it("refuses, as a broken store, a root at another address, and as an incompatible row one that fails its kind's checks", async () => {
+  it("refuses, as a broken datastore, a root at another address, and as an incompatible row one that fails its kind's checks", async () => {
     const elsewhere = new ScriptedVaultDB(() => ({ actual: { ...NoRoots, gate: { ...TH.gateThingOf(), banklabel: 'other' } } }))
     await TH.expectBad(elsewhere.tryGetWorld(TH.getWorldAskOf()), 'storage_issue')
     const incompatible = new ScriptedVaultDB(() => ({ actual: { ...NoRoots, gate: { ...TH.gateThingOf(), wayins: 'none' } } }))
@@ -264,7 +264,7 @@ describe("AdapterVaultDB.tryGetWorld(ask), a store that reports oddly", () => {
   })
 })
 
-describe("AdapterVaultDB.tryStats(ask), a store that reports oddly", () => {
+describe("AdapterVaultDB.tryStats(ask), a datastore that reports oddly", () => {
   const Counted = { count: 2, live_count: 1, size: 300 }
   const statsOf = (overrides: object) => ({ box: Counted, gate: Counted, max: { count: StoreLimitCap, size: StoreLimitCap }, ...overrides })
 
@@ -279,7 +279,7 @@ describe("AdapterVaultDB.tryStats(ask), a store that reports oddly", () => {
     expect(await vaultDB.tryStats(TH.statsAskOf())).to.deep.include({ ok: true, val: stats })
   })
 
-  it("refuses, as a broken store, stats with a field missing, a count that is no whole number, or a limit of Infinity, past the cap, or under two boxes or the floor in bytes", async () => {
+  it("refuses, as a broken datastore, stats with a field missing, a count that is no whole number, or a limit of Infinity, past the cap, or under two boxes or the floor in bytes", async () => {
     for (const stats of [statsOf({ gate: undefined }), statsOf({ box: { ...Counted, size: 1.5 } }), statsOf({ box: { ...Counted, live_count: -1 } }),
       statsOf({ max: { count: Infinity, size: StoreLimitCap } }), statsOf({ max: { count: StoreLimitCap, size: StoreLimitCap + 1 } }),
       statsOf({ max: { count: StoreLimitLeastBoxes - 1, size: StoreLimitCap } }), statsOf({ max: { count: StoreLimitCap, size: StoreLimitFloor - 1 } }),
@@ -303,7 +303,7 @@ describe("AdapterVaultDB, the read_tc of an answer", () => {
     expect(await birthing.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ ok: false, act: 'stale', read_tc })
   })
 
-  it("refuses, as a broken store, a report from a get, a write, a list or a birth with no read_tc, or one that is no UUID version 7", async () => {
+  it("refuses, as a broken datastore, a report from a get, a write, a list or a birth with no read_tc, or one that is no UUID version 7", async () => {
     for (const read_tc of [undefined, crypto.randomUUID(), readTcNow().toUpperCase(), 7]) {
       const getting  = new ScriptedVaultDB(() => ({ ...getManifestOf(null), read_tc }))
       const writing  = new ScriptedVaultDB(() => ({ ...writeManifestOf(TH.birthAskOf(), null, true), read_tc }))
@@ -323,7 +323,7 @@ describe("AdapterVaultDB, the read_tc of an answer", () => {
     expect(await vaultDB.tryListThings(TH.listAskAt('box'))).to.deep.include({ read_tc, val: { ...kids, read_tc } })
   })
 
-  it("refuses, as a broken store, a get whose tracked is no object", async () => {
+  it("refuses, as a broken datastore, a get whose tracked is no object", async () => {
     for (const report of [{ tracked: undefined }, { tracked: null }, { tracked: 'same' }]) {
       const vaultDB = new ScriptedVaultDB(() => ({ ...getManifestOf(null), ...report }))
       await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
@@ -342,7 +342,7 @@ describe("AdapterVaultDB, the read_tc of an answer", () => {
     }
   })
 
-  it("refuses, as a broken store, a report from a get, a write, a listing, a birth, a get of the world or stats with no banktok", async () => {
+  it("refuses, as a broken datastore, a report from a get, a write, a listing, a birth, a get of the world or stats with no banktok", async () => {
     const answers = [
       new ScriptedVaultDB(() => getManifestOf(null), true).tryGetThing(TH.getGateAskOf()),
       new ScriptedVaultDB(() => writeManifestOf(TH.birthAskOf(), null, true), true).tryWriteThing(TH.birthAskOf()),
@@ -449,7 +449,7 @@ describe("AdapterVaultDB.watch(scope, onNotice, onBadNews, onEnded)", () => {
     expect(isMadeOnArrival).to.be.true
   })
 
-  it("sends a Thing whose read_tc is no UUID version 7 to onBadNews, as a broken store", () => {
+  it("sends a Thing whose read_tc is no UUID version 7 to onBadNews, as a broken datastore", () => {
     const vaultDB = new ScriptedVaultDB(() => getManifestOf(null))
     const events: VaultEvent[] = []
     const badNews: Errors.VaultError[] = []

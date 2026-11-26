@@ -1,6 +1,6 @@
 // safebyok/storage: what a storage adapter is written against. The vaultDB, where every kind is a Thing, its memory
-// store, the asks it is given and the answers it gives; the deviceDB, which has each gate's lease record, and its memory
-// store; and from safebyok-big the acts, throwers and checkers an adapter's own code reaches for, re-exported so that
+// vaultDB, the asks it is given and the answers it gives; the deviceDB, which has each gate's lease record, and its memory
+// deviceDB; and from safebyok-big the acts, throwers and checkers an adapter's own code reaches for, re-exported so that
 // each stays one binding across both packages.
 import { EX } from 'safebyok-big/internals'
 
@@ -35,7 +35,7 @@ export { VacantAgerank, readAtOf, readTcNow } from './storage/agerank'
 export {
   type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseRecord, type LeaseScope, type LeaseStamp, type LeaseTombstone, LeaseFormat, LeaseLabelpath, LeaseLifeRoot, StampChecks, leaseLifepathOf,
 } from './shapes/shapes-stamps'
-// The deviceDB, which has each gate's lease record on this device, and its memory store. The IndexedDB store is on `safebyok/browser`.
+// The deviceDB, which has each gate's lease record on this device, and its memory deviceDB. The IndexedDB deviceDB is on `safebyok/browser`.
 export { DeviceDB } from './storage/device-db'
 export { MemoryDeviceDB } from './storage/memory-device-db'
 export { type DevicetokScopepath, type LeaseListener, type LeaseScopepath, DeviceDBChecks } from './shapes/shapes-device-db'
@@ -67,6 +67,6 @@ export { storageIssue } from 'safebyok-big/refusals/throwers'
 export { refusalOfThrown, storageCallRefused, storeQuotaTooSmall } from './refusals/throwers'
 // What crosses a wire, for an adapter whose server runs a whole vaultDB: a refusal, and the parts of an answer the classifier's `crossed*` functions read.
 export { type CrossedAct, type CrossedAnswered, type CrossedErr, CrossedChecks, crossedErrOf, refusedOverWire } from './shapes/shapes-crossed'
-// An IndexedDB store's own: each call's one transaction, the row at a key within it, and the versioned database.
+// An IndexedDB adapter's own: each call's one transaction, the row at a key within it, and the versioned database.
 export { dbprefixOf, inOneStep, rowAt, versionedShelfOf, type VersionedShelfSpec } from 'safebyok-big/storage'
 export { Checker, Checkers, objCheck, type AssertEqual, type CheckerInput, type ConsistencyRefusal, type ObjCheckOpts, type Refusing, type Story } from 'safebyok-big/storage'

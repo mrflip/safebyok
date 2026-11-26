@@ -97,14 +97,14 @@ function checkedLeaseOf(raw: unknown): LeaseRecord {
   return leaseReport.data
 }
 
-/** True when `record` replaces `raw`, the ante lease record: none is stored, it fails its checks, or `record` is newer by life and revision. */
+/** True when `record` replaces `raw`, the ante lease record: there is none, it fails its checks, or `record` is newer by life and revision. */
 function isReplaced(raw: unknown, record: LeaseRecord): boolean {
   if (raw === null) { return true }
   const leaseReport = StampChecks.leaseRecord.safeParse(raw)
   return (! leaseReport.success) || (BaseThing.cmp(leaseReport.data, record) > 0)
 }
 
-/** True when `raw`, the ante devicetok, is replaced by a fresh one: none is stored, or it fails its check. */
+/** True when `raw`, the ante devicetok, is replaced by a fresh one: there is none, or it fails its check. */
 function isDevicetokReplaced(raw: unknown): boolean { return ! BankishChecks.devicetok.safeParse(raw).success }
 
 /** The refusal for a verb's throw: a refusal as it is, anything else as `storage_unavailable`, with nothing of it but its `name`. */

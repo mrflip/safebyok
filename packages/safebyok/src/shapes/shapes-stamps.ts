@@ -71,7 +71,7 @@ function isLifepathOwn({ lifeseq, lifepath }: { lifeseq: string, lifepath: strin
 /** True when a live lease's labelpath is the one {@link LeaseLabelpath.of} gives its gate's labelpath. */
 function isOfItsGate({ labelpath, gate_labelpath }: { labelpath: string, gate_labelpath: Labelpath }): boolean { return labelpath === LeaseLabelpath.of(gate_labelpath) }
 
-/** The checks of a lease's stamp, of the lease record a deviceDB stores, live or a tombstone, and of its shell. */
+/** The checks of a lease's stamp, of the lease record a deviceDB has, live or a tombstone, and of its shell. */
 const LeaseChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, discrim, union, custom, epochMillis, bank_key_lease_wrapped }) => {
   const { userid, banklabel, lifeseq, born_at, lifetok } = PlainChecks.bankStamp.shape
   const leaseStamp  = obj({
@@ -133,7 +133,7 @@ const LeaseChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, discrim,
  * Anything carrying a stamp's fields passes, such as a Bank, a Gate or its Thing, and its other fields are dropped.
  * The lease's stamp has its bank's stamp under `bank_` names, cites the gate the lease was granted under, and is bound into the wrap of its bankKey.
  * Its `born_at` is that of the lease it renews, or its `proved_at` where it renews none.
- * A lease record is what a deviceDB stores for a gate, Thing-shaped at its own `lease/<label>`, its lifepath `0000000000/` and its lifeseq.
+ * A lease record is what a deviceDB has for a gate, Thing-shaped at its own `lease/<label>`, its lifepath `0000000000/` and its lifeseq.
  * Live, it adds the stamp, the leaseKey, the bankKey wrapped under it, when the lease ends and the gate revision it cites; a tombstone has its Thing fields alone.
  * Also `LeaseFormat`, the `fmt` a lease carries.
  */
@@ -145,9 +145,9 @@ export type LeaseScope     = Z.infer<typeof StampChecks.leaseScope>
 export type LeaseStamp     = Z.infer<typeof StampChecks.leaseStamp>
 /** The parts of a lease that are safe to show: its {@link LeaseStamp}. */
 export type LeaseSparse    = LeaseStamp
-/** A gate's lease as a deviceDB stores it, live (its life even) or a tombstone (odd), with every Thing field. See {@link StampChecks}. */
+/** A gate's lease as a deviceDB stows it, live (its life even) or a tombstone (odd), with every Thing field. See {@link StampChecks}. */
 export type LeaseRecord    = Z.infer<typeof StampChecks.leaseRecord>
-/** A lease record's tombstone, which a lock stores in place of the live record: its Thing fields, and no keys. */
+/** A lease record's tombstone, which a lock stows in place of the live record: its Thing fields, and no keys. */
 export type LeaseTombstone = TombstoneOf<LeaseRecord>
 // Picked field by field, so that a field added to the stamp joins the loggable only when chosen.
 /** What a log wants of a lease: its scope, the bank and gate it was granted under, when, by which wayin, and whether it is evicted.

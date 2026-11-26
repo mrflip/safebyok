@@ -120,7 +120,7 @@ export class Vault {
 
   // == [Stats]: stats, tryStats
 
-  /** The bank's storage stats, read from the vaultDB once: how many boxes and gates it stores, live and in all, their size in bytes, and the store's limits.
+  /** The bank's storage stats, read from the vaultDB once: how many boxes and gates it has, live and in all, their size in bytes, and the datastore's limits.
    * Needs no unlock. Nothing refuses a write for being over a limit.
    * @example
    *   const { box, gate, max } = await vault.stats()

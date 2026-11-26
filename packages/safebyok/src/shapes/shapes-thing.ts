@@ -354,7 +354,7 @@ export const Shell = Object.freeze({
   VoidLifeseq,
   /** A root's shell lifepath: the shell's lifeseq alone. */
   RootVoidLifepath: VoidLifeseq,
-  /** The citation for a root's birth: the shell, the void sentinel for no Thing stored. */
+  /** The citation for a root's birth: the shell, the void sentinel, which cites no row. */
   Cited: Object.freeze<ThingCited>({ revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifepath: VoidLifeseq }),
   /** The citation for the birth of a child of the Thing at `parentLifepath`: the shell, at the parent's lifepath then the shell's lifeseq. */
   childCited(parentLifepath: Lifepath): ThingCited {

@@ -29,7 +29,7 @@ export function leaseBellnameOf(dbName?: string): string { return `${dbprefixOf(
 export function scopepathOf({ userid, banklabel, labelpath }: LeaseScope): LeaseScopepath { return [userid, banklabel, labelpath] }
 
 // It never meets a lease record's scopepath, which has three parts.
-/** Where the devicetok of the user `userid` is filed, in the same store as the lease records: one for each user. */
+/** Where the devicetok of the user `userid` is filed, in the same object store as the lease records: one for each user. */
 export function devicetokScopepathOf(userid: Userid): DevicetokScopepath { return [userid, 'devicetok'] }
 // --
 

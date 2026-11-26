@@ -93,7 +93,7 @@ export function bornAtNotNow(ask: WriteAsk): Errors.VaultError { return new Erro
 export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
 // --
 
-// == [Storing Throwers]: RefusalkindForRefusaltag, taggedRefusal, storeQuotaTooSmall, storageCallRefused, rowOfOtherAddress, bankRootsMissing, banktokMissing, listParentNotLive, answerNotMade, writtenOfOtherAct, proposedNotWritten, tagsOfOtherRow, tagsOfOtherAsk, answerOfOtherManifest
+// == [Storage Throwers]: RefusalkindForRefusaltag, taggedRefusal, storeQuotaTooSmall, storageCallRefused, rowOfOtherAddress, bankRootsMissing, banktokMissing, listParentNotLive, answerNotMade, writtenOfOtherAct, proposedNotWritten, tagsOfOtherRow, tagsOfOtherAsk, answerOfOtherManifest
 
 /** The kind of refusal of a `policied` write, by the {@link Refusaltag} of its phrase. */
 export const RefusalkindForRefusaltag = {

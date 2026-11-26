@@ -1,6 +1,6 @@
 /** Tests for IdbDeviceDB: the battery every deviceDB must pass, then what is its own (options, its database, its bell). */
 
-// Import fake-indexeddb first: it installs IndexedDB's globals before the store loads, with real transactions and structured clone but no browser.
+// Import fake-indexeddb first: it installs IndexedDB's globals before IdbDeviceDB loads, with real transactions and structured clone but no browser.
 import 'fake-indexeddb/auto'
 import { createStore } from 'idb-keyval'
 import { describe, expect, it } from 'vitest'

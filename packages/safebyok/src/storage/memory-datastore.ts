@@ -163,6 +163,6 @@ export function isWritable(ask: WriteAsk, ante: unknown): boolean {
   return isCited && isOfFormat && isLifeseqOwn && isFlagged && isBornAtSame && isLifetokSame && isPolicyMet
 }
 
-/** True when the datastore writes a birth's three roots over the raw `ante` roots, by its own predicate, a copy of `VaultFunctionsSql`'s `birth_roots`: where none of the three is stored. */
+/** True when the datastore writes a birth's three roots over the raw `ante` roots, by its own predicate, a copy of `VaultFunctionsSql`'s `birth_roots`: where the ante roots are all null. */
 export function isBirthWritable(ante: RootRows): boolean { return (ante.bank === null) && (ante.gate === null) && (ante.root === null) }
 // --

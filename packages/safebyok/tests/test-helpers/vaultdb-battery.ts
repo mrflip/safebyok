@@ -20,7 +20,7 @@ import { describeVaultDBStats } from './vaultdb-battery-stats'
 
 /** A vaultDB's stored Things, past its verbs: the cheat the battery plants an incompatible Thing with, or removes one with. */
 export type VaultDBRowCheats = {
-  /** Stores `raw` as the Thing at `scope`, unchecked. A concrete adapter that cannot write `raw` throws. */
+  /** Plants `raw` as the Thing at `scope`, unchecked. A concrete adapter that cannot write `raw` throws. */
   plant:  (scope: ThingScope, raw: unknown) => Helpers.Awaitable<void>
   /** Takes away the Thing at `scope`, if any, unchecked. */
   remove: (scope: ThingScope) => Helpers.Awaitable<void>
@@ -29,7 +29,7 @@ export type VaultDBRowCheats = {
 /** What the battery runs over: a vaultDB, or a `VaultMinder`, which answers the same verbs and has no watch. */
 export type BatteryVaultDB = Omit<VaultDB, 'watch'>
 
-/** The options of {@link describeVaultDBBattery}: how to make a vaultDB, and the cheat into what it stores. */
+/** The options of {@link describeVaultDBBattery}: how to make a vaultDB, and the cheat into what it has. */
 export type VaultDBBatteryOpts<DBT extends BatteryVaultDB = VaultDB> = {
   /** A fresh, empty vaultDB. A concrete adapter may empty one database for each it makes: a case uses only the vaultDB it made last. */
   makeVaultDB:   () => Helpers.Awaitable<DBT>
@@ -61,9 +61,9 @@ export type VaultDBBatteryWorld = {
   bornUnder: (vaultDB: VaultDB, thing: ThingRecord, parentLifepath: Lifepath) => Promise<void>
   /** Write each of `boxes` into `vaultDB`, born under the root box's life 0, and return them. */
   boxesBorn: (vaultDB: VaultDB, ...boxes: BoxRecord[]) => Promise<BoxRecord[]>
-  /** The live Thing `vaultDB` stores at `labelpath`, or null for a tombstone or none; throws on a refusal. */
+  /** The live Thing `vaultDB` has at `labelpath`, or null for a tombstone or none; throws on a refusal. */
   gotAt:     (vaultDB: VaultDB, labelpath: Labelpath) => Promise<ThingRecord | null>
-  /** The cheat into what `vaultDB` stores. */
+  /** The cheat into what `vaultDB` has. */
   rowsOf:    (vaultDB: VaultDB) => VaultDBRowCheats
   watches:   boolean
 }
@@ -74,7 +74,7 @@ async function bornUnder(vaultDB: VaultDB, thing: ThingRecord, parentLifepath: L
   await expectGood(vaultDB.tryWriteThing(ask))
 }
 
-/** The live Thing `vaultDB` stores at `labelpath`, or null for a tombstone or none; throws on a refusal. */
+/** The live Thing `vaultDB` has at `labelpath`, or null for a tombstone or none; throws on a refusal. */
 async function gotAt(vaultDB: VaultDB, labelpath: Labelpath): Promise<ThingRecord | null> {
   const answer = await vaultDB.tryGetThing(getAskAt(labelpath))
   return await expectGood<ThingRecord | null>(answer)

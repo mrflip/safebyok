@@ -357,7 +357,7 @@ function precisesOf(row: ChainCase): Precis[] {
   return [...row.chain, ...[row.initial, row.wanted].flatMap(({ item, soon, dead }) => [item, soon, dead].filter((precis) => (precis !== undefined) && (precis !== null)))]
 }
 
-/** Each précis, or pair of them, in `precises` that no one history of the box could store, as text. */
+/** Each précis, or pair of them, in `precises` that no one history of the box could write, as text. */
 function historyClashesOf(precises: readonly Precis[]): string[] {
   const clashes: string[] = []
   for (const precis of precises) {
@@ -392,7 +392,7 @@ describe("the chain table", () => {
     expect(() => recordOf(["soon", 5, 15])).to.throw('no soon has the lifenum 5')
   })
 
-  it("names only records one history of the box could store", () => {
+  it("names only records one history of the box could write", () => {
     expect(ChainCases.flatMap((row) => historyClashesOf(precisesOf(row)).map((clash) => `${titleOf(row)}: ${clash}`))).to.deep.equal([])
   })
 

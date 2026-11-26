@@ -196,7 +196,7 @@ export const DelFlagsFixed = "A del's flags are fixed, ifAbsent 'fail' and ifPre
 export const PolicyNotOwn = "Only a gate's writes name storage policies: a bank and a box have none."
 
 /** A bank stored without one of its roots, or with one incompatible. */
-export const BankRootsMissing = "A bank is stored without its main gate or its root box, or with its bank or main gate incompatible: the store needs mending by hand."
+export const BankRootsMissing = "A bank is stored without its main gate or its root box, or with its bank or main gate incompatible: the datastore needs mending by hand."
 
 /** A list whose parent holds a tombstone or nothing. */
 export const ListParentNotLive = "The Thing listed is not stored live: it was never stored, or was deleted, and has no children."
@@ -251,9 +251,9 @@ export function probeStepRefused(stepkind: string): string {
 export const ProbePutNotGot = "Storage answered the probe's get without the revision its put had just written: storage lost the write, or answered from a replica or cache that lags behind it."
 // --
 
-// == [Storing]: StoreQuotaTooSmall, storageCallRefused, WrittenOfOtherAct, ProposedNotWritten, TagsOfOtherRow, TagsOfOtherAsk, BanktokMissing, AnswerOfOtherManifest
+// == [Storage]: StoreQuotaTooSmall, storageCallRefused, WrittenOfOtherAct, ProposedNotWritten, TagsOfOtherRow, TagsOfOtherAsk, BanktokMissing, AnswerOfOtherManifest
 
-/** An IndexedDB store opened where the browser offers the page `quota` bytes, fewer than the `least` a vault needs. */
+/** An IndexedDB database opened where the browser offers the page `quota` bytes, fewer than the `least` a vault needs. */
 export function StoreQuotaTooSmall(quota: number, least: number): string {
   return `This browser offers the page ${String(quota)} bytes of storage, and a vault needs at least ${String(least)}.`
 }

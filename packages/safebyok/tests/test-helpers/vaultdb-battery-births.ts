@@ -41,7 +41,7 @@ export function describeVaultDBBirths({ fresh, bornBank, withGate, gotAt, rowsOf
       expect(await vaultDB.tryBirthBank(birthBankAskOf())).to.deep.include({ ok: false, act: 'retcon', dbhas: roots.bank })
     })
 
-    it("refuses a live bank stored without its main gate as a broken store", async () => {
+    it("refuses a live bank stored without its main gate as a broken datastore", async () => {
       const vaultDB = await bornBank()
       await rowsOf(vaultDB).remove(GateScope)
       const other = birthBankAskOf({ bank: bankThingOf({ revtok: OtherRevtok }) })

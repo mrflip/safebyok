@@ -25,6 +25,6 @@ export const SafebyokVaultApiAdvice = 'Hand it { getUserId }, a function answeri
 
 // == [Answers]: SidecarKeyRefused
 
-/** Message for a box whose sidecar holds a key Convex refuses to store. */
-export const SidecarKeyRefused = "A key in this box's sidecar is one Convex will not store: it starts with `$`, holds a character outside printable ASCII, or runs past 1024 characters. Rename the key, or keep such keys inside a string of your own. This refusal's cause names the key."
+/** Message for a box whose sidecar holds a key Convex refuses. */
+export const SidecarKeyRefused = "A key in this box's sidecar is one Convex refuses: it starts with `$`, holds a character outside printable ASCII, or runs past 1024 characters. Rename the key, or keep such keys inside a string of your own. This refusal's cause names the key."
 // --

@@ -276,7 +276,7 @@ export class Device {
   }
 
   // Call it as a QueryClient's `mount` is called, from an effect whose cleanup calls `disconnect`.
-  /** Keep the device in step with the vaultDB and the deviceDB: watch the signed-in user's bank in the vaultDB, from now or from `signin`, and follow the lease the deviceDB stores ({@link World.connect}). Never throws; a second call, or a call once the device is disabled, does nothing.
+  /** Keep the device in step with the vaultDB and the deviceDB: watch the signed-in user's bank in the vaultDB, from now or from `signin`, and follow the lease the deviceDB has ({@link World.connect}). Never throws; a second call, or a call once the device is disabled, does nothing.
    * @example
    *   useEffect(() => { device.connect(); return () => { device.disconnect() } }, [device])
    */
@@ -286,7 +286,7 @@ export class Device {
   }
 
   /** Lock the signed-in user's bank in this tab alone, and stop watching the vaultDB and following the deviceDB, until the next {@link connect} ({@link World.disconnect}). Never throws; calling it twice in a row is the same as once.
-   * The device stays enabled: its verbs still work, and a call waiting for an `unlock` gating still waits. The next connect takes up the lease the deviceDB stores.
+   * The device stays enabled: its verbs still work, and a call waiting for an `unlock` gating still waits. The next connect takes up the lease the deviceDB has.
    */
   disconnect(): this {
     this.#world.disconnect()

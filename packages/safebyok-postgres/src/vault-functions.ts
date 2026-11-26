@@ -56,7 +56,7 @@ DECLARE
   cited    ${table} := jsonb_populate_record(NULL::${table}, cited_record);
 BEGIN
   IF (cited.revseq = -1) THEN
-    -- Over the shell: a birth, where no row is stored.
+    -- Over the shell: a birth, where there is no ante row.
     INSERT INTO ${table} AS written
     SELECT (proposed).*
     WHERE  (cited.revtok = ${VoidRevtok})

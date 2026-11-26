@@ -1,4 +1,4 @@
-/** The lease records a deviceDB's tests store, and where: a live lease and a tombstone of {@link WorldScope}'s main gate, at the life and revision a test asks for. */
+/** The lease records a deviceDB's tests stow, and where: a live lease and a tombstone of {@link WorldScope}'s main gate, at the life and revision a test asks for. */
 import { Crypto } from 'safebyok-big/internals'
 import { fakeCiphered } from 'safebyok-big/testing'
 import { type Lifenum, Lifeseq } from '../../src/shapes/primitives'

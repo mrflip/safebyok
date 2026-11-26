@@ -91,7 +91,7 @@ export const GetWorldSql = `
 `
 
 // A row's size is Postgres's own measure of it as a value, pg_column_size: its columns as stored, compressed where Postgres compressed them.
-/** The SQL of a subquery for the stats of a bank's ($1 userid, $2 banklabel) Things in `table`: how many it stores, how many are live, and their size in bytes. */
+/** The SQL of a subquery for the stats of a bank's ($1 userid, $2 banklabel) Things in `table`: how many it has, how many are live, and their size in bytes. */
 function thingkindStatsSqlOf(table: string): string {
   return `(
     SELECT jsonb_build_object('count', count(*), 'live_count', count(*) FILTER (WHERE thing.am = 'a'), 'size', COALESCE(sum(pg_column_size(thing)), 0))

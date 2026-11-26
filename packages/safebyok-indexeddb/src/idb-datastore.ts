@@ -17,7 +17,7 @@ function isHeardBy(watched: ThingWatchScope, scope: ThingWatchScope): boolean {
   return (watched.userid === scope.userid) && (watched.banklabel === scope.banklabel)
 }
 
-/** The bytes this browser lets the page's origin store, all its databases together, or undefined where it gives no estimate. */
+/** The bytes this browser lets the page's origin fill, all its databases together, or undefined where it gives no estimate. */
 async function quotaNow(): Promise<number | undefined> {
   const { storage } = globalThis.navigator as Partial<Navigator> | undefined ?? {}
   if (storage === undefined) { return undefined }

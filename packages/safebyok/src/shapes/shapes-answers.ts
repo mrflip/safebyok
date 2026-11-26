@@ -86,7 +86,7 @@ export type ListThingsAnswer<RecordT extends ThingRecord = ThingRecord> =
   | (GoodAnswer<Kids, 'gotlive'> & ListedBeside<RecordT>)
   | (BadAnswer & ListedBeside<RecordT>)
 
-/** The answer to `tryBirthBank`: the three roots written (`born`), or found already stored (`passed`). Refused, its `dbhas` is the actual root that refused it. */
+/** The answer to `tryBirthBank`: the three roots written (`born`), or the actual roots of a bank already live (`passed`). Refused, its `dbhas` is the actual root that refused it. */
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
 
 /** The answer to `tryGetWorld`: the bank's three roots ({@link WorldRoots}), under the act `got`. Only a verb that threw refuses it. */

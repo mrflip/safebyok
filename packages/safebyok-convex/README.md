@@ -102,7 +102,7 @@ UTF-8 length of its JSON, a little under what Convex counts for its document.
 **What a sidecar may hold.** Convex refuses an object key, anywhere in a stored Thing, that starts with `$`, holds a
 character outside printable ASCII, or runs past 1024 characters. A put of a box whose sidecar has such a key, at any
 depth, refuses `bad_record` before it is sent; the refusal's cause names the key, and nothing of the sidecar's values.
-To keep such keys, store them inside a string of your own, a JSON text, say.
+To use such keys, put them inside a string of your own, a JSON text, say.
 
 **Upgrading.** Until 1.0 there is no migration. A release that changes the tables says so in its changelog. Coming from
 an earlier `safebyok-convex`, whose one table was `things`: that table is not read, so its vaults read as absent. Export

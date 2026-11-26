@@ -19,7 +19,7 @@ export type Adoptable<RecordT extends ThingRecord> = RecordT | Tombstone<RecordT
  * Its Thing fields are its own read-only enumerable props, so a spread, `{ ...thing }`, or `JSON.stringify` shows nothing secret and nothing opaque.
  * A subclass reads its kind's body off the record with getters, and has no other member under a record field's name: over the shell each reads as
  * undefined, after a tombstone as the tombstone's. Its scope fields never change. Narrow {@link pickle} for the rest of a kind's fields.
- * It holds records as the vaultDB stores them, never a cleartext, a key or a lease. A listener can {@link subscribe} to hear of each record it adopts.
+ * It holds records as the vaultDB has them, never a cleartext, a key or a lease. A listener can {@link subscribe} to hear of each record it adopts.
  */
 export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT extends Adoptable<RecordT> = Adoptable<RecordT>> extends BaseThing {
   // == [Props]: #record, #bulletproofCallback, #subscribers, #subscribe

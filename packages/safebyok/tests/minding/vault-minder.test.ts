@@ -13,7 +13,7 @@ import { VoidTrack } from '../../src/shapes/shapes-asks'
 import type { VaultDB } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
-/** The store in memory each VaultMinder the battery makes stands over. */
+/** The datastore in memory each VaultMinder the battery makes stands over. */
 const InnerOf = new WeakMap<VaultMinder, MemoryVaultDB>()
 
 TH.describeVaultDBBattery('VaultMinder over a MemoryVaultDB', {

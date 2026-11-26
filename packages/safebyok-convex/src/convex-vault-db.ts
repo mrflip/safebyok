@@ -197,7 +197,7 @@ function refusalOfCrossed(crossed: SafebyokRefusal): VaultError {
 // Convex refuses an object key that starts with `$`, holds a character outside printable ASCII, or runs past 1024
 // characters, and `convexToJson` applies its rules (`validateObjectField`, not exported). Of the keys in an ask, only those
 // of a box's sidecar are not safebyok's own. Convex's error names the key and its fault, never a value, and is the cause.
-/** Throw `bad_record` if `ask` holds an object key Convex would refuse to store, before it is sent. */
+/** Throw `bad_record` if `ask` holds an object key Convex would refuse, before it is sent. */
 function demandStorableKeys(ask: WriteAsk | BirthBankAsk): void {
   try {
     convexToJson(ask)

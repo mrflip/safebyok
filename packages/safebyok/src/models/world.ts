@@ -33,7 +33,7 @@ export type SomeThing = Bank | Gate | Box
 
 /** The signed-in user's bank as this device locks, unlocks and connects it: its lease, the wait for an unlock, and its snapshot, which a host renders.
  * Made with its device, it lives as long. Its gates build leases and hand them to it, and boxes are sealed and unsealed under the lease it holds, which no member hands out.
- * While connected, its lease is the one its device's deviceDB stores, which every tab given that deviceDB shares: an unlock, a renewal or a lock in one tab reaches the rest.
+ * While connected, its lease is the one its device's deviceDB has, which every tab given that deviceDB shares: an unlock, a renewal or a lock in one tab reaches the rest.
  * Its snapshot's stage is read from the bank, the main gate and the root box its VaultMinder keeps, each of which it subscribes to, and from the lease.
  */
 export class World {
@@ -316,7 +316,7 @@ export class World {
     this.align()
   }
 
-  /** Drop this world's lease, and the keys in it, in this tab alone: the deviceDB keeps what it stores. */
+  /** Drop this world's lease, and the keys in it, in this tab alone: the deviceDB's lease record is left as it is. */
   #dropLease(): void {
     this.#lease?.evict()
     this.#lease = null
@@ -337,7 +337,7 @@ export class World {
   }
 
   // The watch starts before the vaults hear it, so that what a vault refetches as it connects is fetched under the watch.
-  /** Start what this world keeps running: its VaultMinder's watch of the vaultDB, once someone signs in, the deviceDB's listener, and each vault it hosts hearing the VaultMinder; and take up the lease the deviceDB stores. Never throws; a call once the device is disabled does nothing.
+  /** Start what this world keeps running: its VaultMinder's watch of the vaultDB, once someone signs in, the deviceDB's listener, and each vault it hosts hearing the VaultMinder; and take up the lease the deviceDB has. Never throws; a call once the device is disabled does nothing.
    * What the host's vaultDB or deviceDB throws goes to the device's `onBadNews`; a later call, or the janitor's next tick, starts the watch again. A call while the watch runs leaves it running.
    */
   connect(): this {
@@ -353,7 +353,7 @@ export class World {
   // A disconnect drops this tab's lease alone, and stows no tombstone: one tab unmounting its provider locks no other.
   // Only a lock, the janitor's autolock among them, ends the lease in every tab.
   /** Drop this world's lease in this tab alone, and stop what it keeps running: the deviceDB's listener, each vault it hosts hearing the VaultMinder, and the VaultMinder's watch of the vaultDB. Never throws; calling it twice in a row is the same as once.
-   * The world stays enabled: its verbs still work, a call waiting in {@link ensureUnlocked} still waits, and {@link connect} resumes it, taking up the lease the deviceDB stores.
+   * The world stays enabled: its verbs still work, a call waiting in {@link ensureUnlocked} still waits, and {@link connect} resumes it, taking up the lease the deviceDB has.
    * What the host's vaultDB or deviceDB throws as they stop goes to the device's `onBadNews`.
    */
   disconnect(): this {
@@ -389,7 +389,7 @@ export class World {
     try { this.#vaultMinder.connect(() => { this.#device.announce({ kind: 'watch_ended' }) }) } catch (err) { this.#device.tellBadNews([err]) }
   }
 
-  /** Follow the lease the deviceDB stores each time any tab stows one, where the listener is not running already, telling the device's `onBadNews` what the deviceDB throws */
+  /** Follow the lease the deviceDB has each time any tab stows one, where the listener is not running already, telling the device's `onBadNews` what the deviceDB throws */
   #startListening(): void {
     try { this.#unlisten ??= this.#device.deviceDB.listen(() => { void this.#followStored() }) } catch (err) { this.#device.tellBadNews([err]) }
   }
@@ -402,10 +402,10 @@ export class World {
   // --
 
   // == [Following the stored lease]: followStored, isNewerThanLease, takeUp, canUnlock, softlockPastGate, peekStored, stowLease, stowTombstoneOf
-  // Each tab's lease is the one the deviceDB stores, compared by life, then revision. The newest stow wins there, so a
+  // Each tab's lease is the one the deviceDB has, compared by life, then revision. The newest stow wins there, so a
   // late stow never brings a locked lease back. A stow or a peek refused is bad news, and the tab keeps its lease.
 
-  /** Make this world's lease the one the deviceDB stores for the main gate, where that one is newer, then softlock it where the gate has moved past it. Does nothing until the roots are live. Never throws: a refusal goes to the device's `onBadNews`. */
+  /** Make this world's lease the one the deviceDB has for the main gate, where that one is newer, then softlock it where the gate has moved past it. Does nothing until the roots are live. Never throws: a refusal goes to the device's `onBadNews`. */
   async #followStored(): Promise<void> {
     if (! this.areRootsLive) { return }
     const stored = await this.#peekStored({ ...this.#device.scope, labelpath: LeaseLabelpath.of(Labelpath.MainGate) })
@@ -451,7 +451,7 @@ export class World {
     this.#device.announce({ kind: 'softlocked' })
   }
 
-  /** The lease record the deviceDB stores at `leaseScope`, or null for none, or where the deviceDB refuses, which goes to the device's `onBadNews` */
+  /** The lease record the deviceDB has at `leaseScope`, or null for none, or where the deviceDB refuses, which goes to the device's `onBadNews` */
   async #peekStored(leaseScope: LeaseScope): Promise<LeaseRecord | null> {
     try {
       return await this.#device.deviceDB.peekLease(leaseScope)
@@ -534,7 +534,7 @@ export class World {
 
   // == [Stats]: stats, tryStats
 
-  /** The bank's storage stats, read from the vaultDB once: how many boxes and gates it stores, live and in all, their size in bytes, and the store's limits.
+  /** The bank's storage stats, read from the vaultDB once: how many boxes and gates it has, live and in all, their size in bytes, and the datastore's limits.
    * Needs no unlock. Nothing refuses a write for being over a limit.
    * @example
    *   const { box, gate, max } = await world.stats()
@@ -645,7 +645,7 @@ export class World {
   // own. The last of them to land live brings `'locked'`, so a birth shows no stage between `'unborn'` and `'locked'`.
   // The softlock is at once, so a grant under way in this tab follows it; the lease stored is taken up once the roots
   // are live, as when they first arrive.
-  /** Softlock the lease where the gate has moved past it; while connected, follow the lease the deviceDB stores; and realign, once all three roots are live or the bank holds no live record. */
+  /** Softlock the lease where the gate has moved past it; while connected, follow the lease the deviceDB has; and realign, once all three roots are live or the bank holds no live record. */
   #hearRoot(): void {
     this.#softlockPastGate()
     if (this.#isConnected) { void this.#followStored() }

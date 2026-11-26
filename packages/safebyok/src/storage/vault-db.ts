@@ -25,12 +25,12 @@ export interface VaultDB {
   tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer>
   /** The children of the Thing at `ask`'s scope, read in one step. */
   tryListThings(ask: ListAsk): Promise<ListThingsAnswer>
-  /** Write a new bank's three roots (bank, main gate, root box), or answer the roots already stored. */
+  /** Write a new bank's three roots (bank, main gate, root box), or answer the actual roots of a bank already live. */
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
   /** A bank's three roots (bank, main gate, root box), read in one step: each live, a tombstone, or the shell where none is stored. */
   tryGetWorld(ask: GetWorldAsk): Promise<GetWorldAnswer>
-  /** A bank's storage stats, read in one step: how many boxes and gates it stores, live and in all, their size in bytes, and the store's limits.
-   * Nothing refuses a write for being over a limit. A store's limit is never `Infinity`: one with none reports `StoreLimitCap`.
+  /** A bank's storage stats, read in one step: how many boxes and gates it has, live and in all, their size in bytes, and the datastore's limits.
+   * Nothing refuses a write for being over a limit. A datastore's limit is never `Infinity`: one with none reports `StoreLimitCap`.
    */
   tryStats(ask: StatsAsk): Promise<StatsAnswer>
   /** Watch a bank's Things, returning a function that stops the watch.

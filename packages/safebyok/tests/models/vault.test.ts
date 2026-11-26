@@ -1163,7 +1163,7 @@ function refuseGets(bank: Bank, refusal = Throwers.storageUnavailable(new Error(
 }
 
 describe("vault.stats() and vault.tryStats()", () => {
-  it("answer the bank's storage stats, read from its vaultDB: its boxes, its main gate, and the cap for each limit of a store in memory", async () => {
+  it("answer the bank's storage stats, read from its vaultDB: its boxes, its main gate, and the cap for each limit of a datastore in memory", async () => {
     // stats @example
     const { vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
