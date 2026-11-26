@@ -265,7 +265,12 @@ export function scribeGetAct(ask: GetAsk, manifest: CheckedGetManifest): asserts
 export function scribeWriteAct(ask: WriteAsk, manifest: CheckedWriteManifest): asserts manifest is ScribedWriteManifest {
   const act        = writeTableActOf(ask, manifest.tags)
   const refusaltag = isWriteAct(act) ? refusaltagOf(ask, manifest.tags) : null
-  if (refusaltag === null) { Object.assign(manifest, { ok: isGoodAct(act), act }) } else { Object.assign(manifest, { ok: false, act: 'policied', refusaltag }) }
+  if (refusaltag !== null) {
+    Object.assign(manifest, { ok: false, act: 'policied', refusaltag })
+    return
+  }
+
+  Object.assign(manifest, { ok: isGoodAct(act), act })
 }
 
 /** Write onto a listing's manifest the act its parent's presence finds, and whether it answers good. */
