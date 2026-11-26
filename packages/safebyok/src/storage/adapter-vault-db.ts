@@ -169,7 +169,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // == [Protected, for a subclass to write]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats, doWatch
   // Each is one atomic step that observes, and hands back a manifest: the datastore's tags and each row exactly as it stands
   // at the step's last read, beside the bank's banktok, its `tracked` and its `read_tc`. `notes/vault-adapter-contract.md`
-  // says what each manifest holds, and when a write and a birth write. A datastore that runs TypeScript makes its tags with
+  // says what each manifest has, and when a write and a birth write. A datastore that runs TypeScript makes its tags with
   // `ManifestTags`; one that cannot makes the same comparisons in its own language. It reads no check and no act table:
   // this class checks each row once, finds the act from the tags, and requires the datastore's write to agree with it.
 
