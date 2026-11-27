@@ -622,3 +622,25 @@ user is not heard by the second.
 Reasoning for wontfix: a watch starts and stops when a device connects or disconnects, a few times a day, and a LISTEN is
 in flight for milliseconds (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). Nothing is written to the
 bankDB, and nothing secret is held. Written by adapter_port thread G (postgres_listen), 2026-11-26.
+
+### A write over a row that fails its kind's checks lands when the write predicate's clauses match
+
+* current outcome: a datastore checks no ante row against its kind. A write whose cited revision and the predicate's
+  equality clauses (`fmt`, `lifeseq`, the revision pins, `born_at`, `lifetok`) match the ante row overwrites it, and
+  answers `replaced`. A gate policy reads the raw ante wayins, so a `passkey0` that is a string of garbage reads as a
+  passkey stored, and a write under `revoke_passkey` that cites the gate lands. Without a policy, safebyok-big
+  overwrote such a row as well; under a policy, it refused `damaged_row`.
+* alternatives:
+  - check the ante row in each datastore before the write: puts a check outside its owner, in every datastore, on the
+    critical path of every write. A datastore reads no check.
+  - have AdapterVaultDB check the manifest's ante row and refuse: the write has already landed in the atomic step, so
+    the refusal would misreport what the bankDB stores.
+* workaround: none needed. The row was already broken, and every get of it refused `incompatible_row` before the write.
+
+Steps to reproduce: store a gate whose `passkey0` is the string `'garbage'`; then put the gate under the
+`revoke_passkey` policy, citing that revision exactly.
+
+Reasoning for wontfix: an incompatible row is a broken state, which is reported on the read path, never accommodated
+on the write path. Refusing the write would add a check outside its owner to every datastore's write. "A write over an
+incompatible row refuses" is not a guarantee of the new core. Ruled by the Coach, 2026-11-27, vault_manifest Closer
+Look E1.
