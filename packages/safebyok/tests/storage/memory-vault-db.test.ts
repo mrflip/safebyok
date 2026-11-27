@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { readTcNow } from '../../src/storage/agerank'
-import * as Classifier from '../../src/storage/thing-classifier'
 import { Shell } from '../../src/shapes/shapes-thing'
 import { StoreLimitCap, type VaultStats } from '../../src/shapes/shapes-vault-stats'
 import { rowWeightOf } from '../../src/storage/vault-stats'
@@ -15,8 +13,8 @@ TH.describeVaultDBBattery('MemoryVaultDB', {
   }),
 })
 
-describe("MemoryVaultDB, what only a store in memory can show", () => {
-  it("answers with a copy of what it stores, deeply frozen, and stores a copy of what it is handed", async () => {
+describe("MemoryVaultDB, what only a datastore in memory can show", () => {
+  it("answers with a copy of what it has, deeply frozen, and writes a copy of what it is handed", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate = TH.gateThingOf()
     await TH.expectGood(vaultDB.tryWriteThing(TH.birthAskOf(gate)))
@@ -28,13 +26,13 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
     expect(again).to.deep.include({ val: TH.gateThingOf() })
   })
 
-  const StoredCases = [
-    ["damaged_row",   { ...TH.gateThingOf(), note: 'hi' },         'refuses a gate with a field this version does not know'],
-    ["storage_issue", { ...TH.gateThingOf(), banklabel: 'other' }, 'refuses a gate filed at another scope as a broken store'],
-    ["storage_issue", 'not a Thing',                               'refuses a Thing that is not an object as a broken store'],
+  const PlantedCases = [
+    ["incompatible_row", { ...TH.gateThingOf(), note: 'hi' },         'refuses a gate with a field this version does not know'],
+    ["storage_issue",    { ...TH.gateThingOf(), banklabel: 'other' }, 'refuses a gate filed at another scope as a broken datastore'],
+    ["storage_issue",    'not a Thing',                               'refuses a Thing that is not an object as a broken datastore'],
   ] as const
 
-  for (const [refusalkind, raw, blurb] of StoredCases) {
+  for (const [refusalkind, raw, blurb] of PlantedCases) {
     it(blurb, async () => {
       const vaultDB = new MemoryVaultDB()
       vaultDB._cheat_things(TH.ThingBank).set('gate', raw)
@@ -43,7 +41,31 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
     })
   }
 
-  it("refuses a listed child filed at another scope as a broken store", async () => {
+  const UnwrittenCases = [
+    [{ ...TH.gateThingOf(), fmt: 'other' },            'writes nothing over a gate of another format, cited exactly, and refuses it as an incompatible row'],
+    [{ ...TH.gateThingOf(), lifeseq: '0000000002' },  'writes nothing over a gate whose lifeseq is not the last of its lifepath, cited exactly, and refuses it as an incompatible row'],
+  ] as const
+
+  for (const [raw, blurb] of UnwrittenCases) {
+    it(blurb, async () => {
+      const vaultDB = new MemoryVaultDB()
+      const gate    = TH.gateThingOf()
+      const ask     = TH.replaceAskOf(gate, TH.nextOf(gate))
+      vaultDB._cheat_things(TH.ThingBank).set('gate', raw)
+      await TH.expectBad(vaultDB.tryWriteThing(ask), 'incompatible_row')
+      expect(vaultDB._cheat_things(TH.ThingBank).get('gate')).to.deep.equal(raw)
+    })
+  }
+
+  it("adds a passkey wayin under an ask that names its storage policy twice", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const gate    = TH.gateThingOf()
+    const added   = TH.nextGateOf(gate, { wayins: TH.WithPasskey })
+    vaultDB._cheat_things(TH.ThingBank).set('gate', gate)
+    expect(await vaultDB.tryWriteThing(TH.replaceAskOf(gate, added, { policies: ["add_passkey", "add_passkey"] }))).to.deep.include({ ok: true, act: 'replaced' })
+  })
+
+  it("refuses a listed child filed at another scope as a broken datastore", async () => {
     const vaultDB = new MemoryVaultDB()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     vaultDB._cheat_things(TH.ThingBank).set('box/aa', TH.boxThingOf('zz'))
@@ -58,31 +80,25 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
   })
 })
 
-describe("Classifier.classifyListThings(ask, fetched, roots)", () => {
-  it("refuses, as a broken store, a child a store fetched from outside the parent", () => {
-    const child = { labelpath: 'box/aa/deep', raw: TH.boxThingOf('deep') }
-    const fetched = { parent: TH.rootBoxOf(), children: [child] }
-    TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), fetched, { bank: null, tracked: { bank: null, gate: null, box: null }, read_tc: readTcNow() }), 'storage_issue')
-  })
-})
-
-describe("Classifier.classifyGetThing(ask, raw, above) and Classifier.classifyWriteThing(ask, raw, above), over nothing stored", () => {
-  const OverNothing = [
-    ['storage_issue', TH.boxThingOf('open'),              'refuses, as a broken store, an ancestor a store fetched that is not above the scope'],
-    ['storage_issue', 'not a Thing',                      'refuses, as a broken store, an ancestor that is not an object'],
-    ['damaged_row',   { ...TH.rootBoxOf(), revseq: -2 },  'refuses, as a damaged row, an ancestor whose revision fails its checks'],
+describe("MemoryVaultDB, a row planted above a scope where nothing is stored", () => {
+  const AboveCases = [
+    ["storage_issue",    TH.boxThingOf('open'),               'refuses, as a broken datastore, a row above the scope that names a labelpath not above it'],
+    ["storage_issue",    "not a Thing",                       'refuses, as a broken datastore, a row above the scope that is not an object'],
+    ["incompatible_row", { ...TH.rootBoxOf(), revseq: -2 },   'refuses, as an incompatible row, a row above the scope whose revision fails its checks'],
   ] as const
+  const voidPut = { ...TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)), ifAbsent: 'fail' } as const
 
-  for (const [refusalkind, ancestor, blurb] of OverNothing) {
-    it(blurb, () => {
-      const above = { bank: null, tracked: { bank: null, gate: null, box: null }, read_tc: readTcNow(), ancestor }
-      TH.expectSyncRefusal(() => Classifier.classifyGetThing(TH.getAskAt('box/openai'), null, above), refusalkind)
-      TH.expectSyncRefusal(() => Classifier.classifyWriteThing({ ...TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)), ifAbsent: 'fail' }, null, above), refusalkind)
+  for (const [refusalkind, ancestor, blurb] of AboveCases) {
+    it(blurb, async () => {
+      const vaultDB = new MemoryVaultDB()
+      vaultDB._cheat_things(TH.ThingBank).set('box', ancestor)
+      await TH.expectBad(vaultDB.tryGetThing(TH.getAskAt('box/openai')), refusalkind)
+      await TH.expectBad(vaultDB.tryWriteThing(voidPut), refusalkind)
     })
   }
 })
 
-describe("MemoryVaultDB.tryStats(ask), a store in memory", () => {
+describe("MemoryVaultDB.tryStats(ask), a datastore in memory", () => {
   it("weighs each box and gate stored at the UTF-8 length of its JSON, and reports the cap for each limit", async () => {
     const vaultDB = new MemoryVaultDB()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))

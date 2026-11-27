@@ -119,7 +119,7 @@ VOCABULARY.md *Shapes*: `VaultRecord`, `VaultSparse`, `VaultStamp`; never a bare
 
 **A plain string type's helpers ride on a companion object of the same name**, beside the type:
 `Lifeseq.ofLifenum(lifenum)`, `Labelpath.modelkindOf(labelpath)`. **A module of related functions
-is imported whole**: `import * as Classifier from './thing-classifier'`, `import * as Throwers from '../refusals/throwers'`.
+is imported whole**: `import * as ManifestActs from './manifest-acts'`, `import * as Throwers from '../refusals/throwers'`.
 
 **A name is the doc block's first line, compressed.** Write that line (*Comments and doc
 blocks*), then read the name against it: the verb promises what the line says, in the vocabulary
@@ -376,8 +376,8 @@ has.
   cascade of validators each accepting a part and refusing with its own kind.
 * **Deep code leaves the kind to whoever knows.** A method deep in a call asserts with a schema
   and leaves its kind be; the public call that knows what the caller was doing re-throws with the
-  better kind (a name that fails may be the host's typo, `bad_scope`, or a damaged row read back,
-  `damaged_*`). No `ZodError` escapes a public call.
+  better kind (a name that fails may be the host's typo, `bad_scope`, or a row read back that fails its checks,
+  `incompatible_row`). No `ZodError` escapes a public call.
 
 **What a refusal says.**
 
@@ -607,7 +607,7 @@ A member that will not describe in a line is a smell: report it.
 
   When that noun needs a clause to describe it, open with the verb instead: `Classify a vault request's outcome, based on the stored row`. Read the
   member's name against that sentence (*Naming*). It carries one qualifier at most; anything more is a sentence of its own.
-* **Replace multiple fragments with a sentence** `#use-sentences`. The usual signs: a semicolon joining two facts, a list with its verb gapped out (`a row, 'damaged_row'; a cutoff,
+* **Replace multiple fragments with a sentence** `#use-sentences`. The usual signs: a semicolon joining two facts, a list with its verb gapped out (`a row, 'incompatible_row'; a cutoff,
   'bad_record'`), a clause hung on "as", "so", "once", "since" or "which", and "one" standing in for a noun you cut. Each
   is a cue to rewrite as a sentence, not a ban.
 * **A member's block names no refusal catalog** `#no-refusal-catalog`. The thrower's doc and the `Outcome` type carry the

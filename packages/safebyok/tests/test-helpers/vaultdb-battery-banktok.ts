@@ -66,7 +66,7 @@ export function describeVaultDBBanktok({ fresh, bornBank, withGate, boxesBorn, r
       await rowsOf(vaultDB).plant(GateScope, { ...gateThingOf(), wayins: { main: {}, passkey0: null } })
       expect(await vaultDB.tryGetThing({ ...getAskAt('box'), track: trackOf() })).to.deep.include({ ok: true, act: 'gotlive', val: rootBoxOf(), banktok: BornBanktok })
       expect(await vaultDB.tryListThings({ ...listAskAt('box'), track: trackOf() })).to.deep.include({ ok: true, deltas: [], banktok: BornBanktok })
-      await expectBad(vaultDB.tryGetThing(getAskAt('box')), 'damaged_row')
+      await expectBad(vaultDB.tryGetThing(getAskAt('box')), 'incompatible_row')
     })
 
     it("is the void lifetok where the bank fails its checks, and the answer stands to an ask that tracks the bank at its revision", async () => {
@@ -74,7 +74,7 @@ export function describeVaultDBBanktok({ fresh, bornBank, withGate, boxesBorn, r
       await rowsOf(vaultDB).plant(BankScope, { ...bankThingOf(), lifetok: 'not-a-lifetok' })
       expect(await vaultDB.tryGetThing({ ...getAskAt('box'), track: trackOf() })).to.deep.include({ ok: true, act: 'gotlive', val: rootBoxOf(), banktok: SX.VoidLifeTok })
       expect(await vaultDB.tryListThings({ ...listAskAt('box'), track: trackOf() })).to.deep.include({ ok: true, deltas: [], banktok: SX.VoidLifeTok })
-      await expectBad(vaultDB.tryGetThing(getAskAt('box')), 'damaged_row')
+      await expectBad(vaultDB.tryGetThing(getAskAt('box')), 'incompatible_row')
     })
   })
 }

@@ -5,12 +5,12 @@
  * - The server could not serve the request, as when its `getUserId` throws: the VaultError `getUserId` threw, or else `unexpected_error`. A watch ends with it.
  * - The request broke this package's rules, as a watch scope that fails its check (only another client sends one): the rule's refusal, `bad_record`.
  * - GraphQL itself failed, as when the server serves another schema: `unexpected_error`, without the server's error text. A request that fails in the network gets `storage_unavailable`.
+ * - The server answered what no vaultDB answers, or a Thing where the ask reaches none: `storage_issue`.
  */
 
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import * as DB from 'safebyok/storage'
-import { Classifier } from 'safebyok/storage'
-import { CrossedErrExtension, WireChecks } from './shapes/shapes-wire'
+import { type AnyAnswer, type CheckedAnswer, type CheckedNotice, CrossedErrExtension, WireChecks, checkGotAt, checkListedAt, checkRootsAt, checkStatsAt, checkWatchedAt } from './shapes/shapes-wire'
 import { networkTroubleOf, schemaNotServed, serverErred, watchEnded } from './refusals/throwers'
 import { VaultOperations } from './vault-operations'
 import * as Phrases from './phrases'
@@ -44,9 +44,9 @@ true satisfies DB.AssertEqual<GraphQLVaultDBOpts, DB.CheckerInput<typeof graphQL
 // == [The vaultDB]: GraphQLVaultDB
 
 /** A vaultDB that sends each verb to your GraphQL server: `new GraphQLVaultDB({ client })`.
- * The server answers from its own vaultDB, and this one checks every Thing the answer carries against the ask, as it would a datastore's.
+ * Each verb checks its ask before sending it, and answers what the server's vaultDB answered, once it is checked by its form and by where its Things sit.
  */
-export class GraphQLVaultDB extends DB.AdapterVaultDB {
+export class GraphQLVaultDB implements DB.VaultDB {
   // == [Props]: #client
 
   readonly #client: GraphQLVaultClient
@@ -55,84 +55,88 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
   // == [Construction]: constructor
 
   constructor(opts: GraphQLVaultDBOpts) {
-    super()
     const { client } = graphQLVaultDBOpts.parse(opts)
     this.#client = client
   }
   // --
 
-  // == [Verbs]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats
-  // Each sends its ask and reads the server's answer back into the report a datastore would make. A refusal the server's
-  // verb threw is thrown again here, so it answers as it did there.
+  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetWorld, tryStats
+  // Each checks its ask, sends it, checks the answer that crosses back by its form and then by its scopes, and answers it:
+  // as its own verb's answer, the only one its form check lets through. Every throw in it lands in `answerForThrown`.
 
-  /** Get the Thing at the ask's scope from the server. */
-  protected async doGetThing(ask: DB.GetAsk): Promise<DB.GotActual> {
-    const answer = WireChecks.gotAnswer.parse(thingAnswerDrop(await this.#runQuery(VaultOperations.getThing, 'safebyokGetThing', { ask })))
-    if (! answer.ok) { throwIfThrown(ask, answer) }
-    return { ...besideOf(ask, answer), ...Classifier.crossedGotOf(ask, answer.act, (answer.act === 'gotlive') ? answer.val : answer.dbhas) }
+  /** The Thing at `ask`'s scope ({@link DB.VaultDB.tryGetThing}). */
+  async tryGetThing(ask: DB.GetAsk): Promise<DB.GetThingAnswer> {
+    try {
+      const thingGetAsk = DB.AskChecks.getAsk.parse(ask)
+      const crossed     = WireChecks.getAnswer.parse(thingAnswerDrop(await this.#runQuery(VaultOperations.getThing, 'safebyokGetThing', { ask: thingGetAsk })))
+      checkGotAt(thingGetAsk, crossed)
+      return answerOf(thingGetAsk, crossed) as DB.GetThingAnswer
+    } catch (err) { return answerForThrown(err, 'getThing', ask) }
   }
 
-  /** Write the ask's record on the server. */
-  protected async doWriteThing(ask: DB.WriteAsk): Promise<DB.WroteActual> {
-    const answer = WireChecks.wroteAnswer.parse(thingAnswerDrop(await this.#runMutation(VaultOperations.writeThing, 'safebyokWriteThing', { ask })))
-    if (! answer.ok) {
-      throwIfThrown(ask, answer)
-      return { ...besideOf(ask, answer), ok: false, ...Classifier.crossedRefusedWriteOf(ask, answer.act, answer.dbhas) }
-    }
-    return { ...besideOf(ask, answer), ok: true, act: answer.act, record: Classifier.crossedWrittenOf(ask, answer.val) }
+  /** Write `ask.record` over the Thing `ask.cited` ({@link DB.VaultDB.tryWriteThing}). */
+  async tryWriteThing(ask: DB.WriteAsk): Promise<DB.WriteThingAnswer> {
+    try {
+      const writeAsk = DB.checkedWriteAsk(ask)
+      const crossed  = WireChecks.writeAnswer.parse(thingAnswerDrop(await this.#runMutation(VaultOperations.writeThing, 'safebyokWriteThing', { ask: writeAsk })))
+      checkGotAt(writeAsk, crossed)
+      return answerOf(writeAsk, crossed) as DB.WriteThingAnswer
+    } catch (err) { return answerForThrown(err, 'writeThing', ask) }
   }
 
-  /** List the children of the live Thing at the ask's scope from the server. */
-  protected async doListThings(ask: DB.ListAsk): Promise<DB.ListThingsActual> {
-    const answer = WireChecks.listAnswer.parse(listAnswerDrop(await this.#runQuery(VaultOperations.listThings, 'safebyokListThings', { ask })))
-    if (! answer.ok) {
-      throwIfThrown(ask, answer)
-      if ((answer.act !== 'void') && (answer.act !== 'gone')) { throw DB.storageIssue() }
-      const record = (answer.dbhas === null) ? null : Classifier.crossedThingOf(ask, answer.dbhas)
-      return { ...besideOf(ask, answer), ok: false, act: answer.act, record, parentage: [], deltas: [], damaged_rows: [] }
-    }
-    return { ...besideOf(ask, answer), ok: true, act: answer.act, ...Classifier.crossedListingOf(ask, answer) }
+  /** The children of the Thing at `ask`'s scope ({@link DB.VaultDB.tryListThings}). */
+  async tryListThings(ask: DB.ListAsk): Promise<DB.ListThingsAnswer> {
+    try {
+      const listAsk = DB.AskChecks.listAsk.parse(ask)
+      const crossed = WireChecks.listAnswer.parse(listAnswerDrop(await this.#runQuery(VaultOperations.listThings, 'safebyokListThings', { ask: listAsk })))
+      checkListedAt(listAsk, crossed)
+      return answerOf(listAsk, crossed) as DB.ListThingsAnswer
+    } catch (err) { return { ...answerForThrown(err, 'listThings', ask), parentage: [], deltas: [], incompatible_rows: [] } }
   }
 
-  /** Write a new bank's three roots on the server. */
-  protected async doBirthBank(ask: DB.BirthBankAsk, puts: DB.BirthPuts): Promise<DB.BirthBankActual> {
-    const answer = WireChecks.rootsAnswer.parse(rootsAnswerDrop(await this.#runMutation(VaultOperations.birthBank, 'safebyokBirthBank', { ask })))
-    if (! answer.ok) {
-      throwIfThrown(ask, answer)
-      return { ...besideOf(ask, answer), ok: false, ...Classifier.crossedRefusedBirthOf(puts, answer.act, answer.dbhas) }
-    }
-    return { ...besideOf(ask, answer), ok: true, act: answer.act, things: Classifier.crossedRootsOf(puts, answer.val) }
+  /** Write a new bank's three roots, or answer the actual roots of a bank already live ({@link DB.VaultDB.tryBirthBank}). */
+  async tryBirthBank(ask: DB.BirthBankAsk): Promise<DB.BirthBankAnswer> {
+    try {
+      const birthBankAsk = DB.checkedBirthBankAsk(ask)
+      const crossed      = WireChecks.birthAnswer.parse(rootsAnswerDrop(await this.#runMutation(VaultOperations.birthBank, 'safebyokBirthBank', { ask: birthBankAsk })))
+      checkRootsAt(birthBankAsk, crossed)
+      return answerOf(birthBankAsk, crossed) as DB.BirthBankAnswer
+    } catch (err) { return answerForThrown(err, 'birthBank', ask) }
   }
 
-  /** Get the bank's three roots from the server. */
-  protected async doGetWorld(ask: DB.GetWorldAsk): Promise<DB.GetWorldActual> {
-    const answer = WireChecks.worldAnswer.parse(rootsAnswerDrop(await this.#runQuery(VaultOperations.getWorld, 'safebyokGetWorld', { ask })))
-    if (! answer.ok) {
-      throwIfThrown(ask, answer)
-      throw DB.storageIssue()
-    }
-    return { ...besideOf(ask, answer), ok: true, act: answer.act, things: Classifier.crossedWorldOf(ask, answer.val) }
+  /** The bank's three roots, read in one step ({@link DB.VaultDB.tryGetWorld}). */
+  async tryGetWorld(ask: DB.GetWorldAsk): Promise<DB.GetWorldAnswer> {
+    try {
+      const worldAsk = DB.AskChecks.getWorldAsk.parse(ask)
+      const crossed  = WireChecks.worldAnswer.parse(rootsAnswerDrop(await this.#runQuery(VaultOperations.getWorld, 'safebyokGetWorld', { ask: worldAsk })))
+      checkRootsAt(worldAsk, crossed)
+      return answerOf(worldAsk, crossed) as DB.GetWorldAnswer
+    } catch (err) { return answerForThrown(err, 'getWorld', ask) }
   }
 
-  /** Get the bank's storage stats from the server. `AdapterVaultDB` checks them. */
-  protected async doStats(ask: DB.StatsAsk): Promise<DB.StatsActual> {
-    const answer = WireChecks.statsAnswer.parse(statsAnswerDrop(await this.#runQuery(VaultOperations.stats, 'safebyokStats', { ask })))
-    if (! answer.ok) {
-      throwIfThrown(ask, answer)
-      throw DB.storageIssue()
-    }
-    return { ...besideOf(ask, answer), ok: true, act: answer.act, stats: answer.val as DB.VaultStats }
+  /** The bank's storage stats, read in one step ({@link DB.VaultDB.tryStats}). */
+  async tryStats(ask: DB.StatsAsk): Promise<DB.StatsAnswer> {
+    try {
+      const statsAsk = DB.AskChecks.statsAsk.parse(ask)
+      const crossed  = WireChecks.statsAnswer.parse(statsAnswerDrop(await this.#runQuery(VaultOperations.stats, 'safebyokStats', { ask: statsAsk })))
+      checkStatsAt(statsAsk, crossed)
+      return answerOf(statsAsk, crossed) as DB.StatsAnswer
+    } catch (err) { return answerForThrown(err, 'stats', ask) }
   }
   // --
 
-  // == [Watch]: doWatch
+  // == [Watch]: watch
 
-  /** Subscribe to the bank's changes on the server, passing each changed Thing to `receive`.
+  /** Hear the changes to a bank's Things on the server ({@link DB.VaultDB.watch}).
+   * Each notice reaches `onNotice` as a Thing the server's vaultDB notified. One that fails its check, or is of a Thing in another bank, goes to `onBadNews` instead, as does an error `onNotice` throws.
    * The watch ends, once, at the notice the server marks as its last, or when the server ends the stream or the request fails; it never resubscribes.
    */
-  protected override doWatch(scope: DB.ThingWatchScope, receive: (received: DB.Received) => void, onBadNews: (news: DB.VaultError) => void, onEnded: () => void): () => void {
+  watch(scope: DB.ThingWatchScope, onNotice: (event: DB.VaultEvent) => void, onBadNews: (news: DB.VaultError) => void, onEnded: () => void = noEnding): () => void {
+    const { scope: bankScope } = DB.AskChecks.watchArgs.parse({ scope, onNotice, onBadNews, onEnded })
     const watching: { isOn: boolean, subscription?: { unsubscribe: () => void } } = { isOn: true }
     let heardData: unknown
+    // A notice handler that throws is a bug in the host's code, not trouble in storage.
+    const notify = DB.bulletproofHandlerOf(onNotice, { ifError: 'tell', transformer: DB.refusalOfThrown, onBadNews })
     // End once: stop the subscription, and where the watch ended itself, say so, then why. A stream can end inside
     // subscribe(), before `watch` returns, so the ending is told in a microtask, always after it.
     function end(news: DB.VaultError | null): void {
@@ -144,7 +148,7 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
         onBadNews(news)
       })
     }
-    watching.subscription = this.#client.subscription(VaultOperations.watchThings, { scope }).subscribe((result) => {
+    watching.subscription = this.#client.subscription(VaultOperations.watchThings, { scope: bankScope }).subscribe((result) => {
       if (! watching.isOn) { return }
       if (result.error !== undefined) {
         end(troubleOf(result.error))
@@ -153,7 +157,7 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
       // When a stream over fetch closes, its final result repeats the previous notice. Do not hear it twice.
       const isHeard = (result.data === heardData)
       heardData = result.data
-      const ending = isHeard ? null : hearNotice(result, receive, onBadNews)
+      const ending = isHeard ? null : hearNotice(bankScope, result, notify, onBadNews)
       if (ending !== null) {
         end(ending)
         return
@@ -181,24 +185,38 @@ export class GraphQLVaultDB extends DB.AdapterVaultDB {
 }
 // --
 
-// == [Answers]: CheckedAnswer, RefusedAnswer, besideOf, throwIfThrown, fieldOf, troubleOf, carriedErrOf, hearNotice
+// == [Answers]: answerOf, answerForThrown, noEnding, fieldOf, troubleOf, carriedErrOf, hearNotice
 
-/** What every answer carries, as its check read it. */
-type CheckedAnswer = Readonly<{ banktok: DB.Lifetok, tracked: unknown, read_tc: DB.ReadTc }>
-
-/** A refused answer, as its check read it. */
-type RefusedAnswer = CheckedAnswer & Readonly<{ ok: false, act: DB.BadAct, dbhas: unknown, err: DB.CrossedErr }>
-
-/** What a report carries beside its act, read from `answer`: its banktok and read_tc, and its `tracked` checked against `ask`. */
-function besideOf(ask: DB.AnyAsk, { banktok, tracked, read_tc }: CheckedAnswer): DB.ActualBeside {
-  return { banktok, tracked: Classifier.crossedTrackedOf(ask, tracked), read_tc }
+// A record crosses checked for its scope and citation alone, and is typed here as the answer has it: whoever reads it
+// checks the rest where a Thing takes it, as for an answer from any vaultDB.
+/** The answer to `ask` that `crossed` carries, deeply frozen, with a refusal made a VaultError again.
+ * Its `ask` is the loggable part of `ask`.
+ */
+function answerOf(ask: DB.AnyAsk, crossed: CheckedAnswer): AnyAnswer {
+  const loggableAsk = DB.loggableAskOf(ask)
+  if (crossed.ok) {
+    const { val, dbhas, err: _err, ...beside } = crossed
+    return DB.frozenAnswerOf((dbhas === null) ? { ...beside, ask: loggableAsk, val } : { ...beside, ask: loggableAsk, val, dbhas }) as unknown as AnyAnswer
+  }
+  const { val: _val, err, ...beside } = crossed
+  const refusal = DB.refusedOverWire(err, { act: crossed.act, dbhas: crossed.dbhas as DB.ThingRecord | DB.VoidSentinel | null })
+  Object.assign(refusal, { meta: { ...refusal.meta, ask: loggableAsk } })
+  return DB.frozenAnswerOf({ ...beside, ask: loggableAsk, err: refusal }) as unknown as AnyAnswer
 }
 
-// The server answers `tracked: 'unread'` for a verb that threw, and for no other answer.
-/** Rethrow the refusal of a server verb that threw, with its act and the Thing it names. */
-function throwIfThrown(ask: DB.AnyAsk, { act, tracked, dbhas, err }: RefusedAnswer): void {
-  if (tracked === 'unread') { throw DB.refusedOverWire(err, { act, dbhas: (dbhas === null) ? null : Classifier.crossedNamedOf(ask, dbhas) }) }
+// Every throw in a verb lands here: an ask that fails its check, a server out of reach, or an answer that fails its own.
+/** The refused answer for a verb that threw: the refusal it threw, or `storage_unavailable` for any other error.
+ * The refusal's meta names `oplabel` and the loggable ask. The answer's act is the refusal's own, else `unclassified_storing`, and it names no Thing.
+ */
+function answerForThrown(thrown: unknown, oplabel: string, ask: unknown): DB.BadAnswer<null> {
+  const err         = DB.storageRefusalOf(thrown)
+  const loggableAsk = DB.loggableAskOf(ask)
+  Object.assign(err, { meta: { ...err.meta, oplabel, ask: loggableAsk } })
+  return { ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', banktok: DB.VoidLifeTok, tracked: 'unread', read_tc: DB.readTcNow(), dbhas: null, err }
 }
+
+/** The `onEnded` of a watch given none. */
+const noEnding = (): void => undefined
 
 /** Return the `fieldname` field of an operation's result, or throw the refusal for a failed operation. */
 function fieldOf({ error: err, data }: OperationResult<unknown>, fieldname: string): unknown {
@@ -224,17 +242,20 @@ function carriedErrOf(gqlErr: unknown): unknown {
   return ((typeof extensions === 'object') && (extensions !== null)) ? (extensions as Record<string, unknown>)[CrossedErrExtension] : undefined
 }
 
-/** Pass a notice's Thing to `receive` and its trouble to `onBadNews`, or return the trouble that ends the watch. */
-function hearNotice({ data }: OperationResult<unknown>, receive: (received: DB.Received) => void, onBadNews: (news: DB.VaultError) => void): DB.VaultError | null {
+/** Pass a notice's Thing to `onNotice` and its trouble to `onBadNews`, or return the trouble that ends the watch. */
+function hearNotice(scope: DB.ThingWatchScope, { data }: OperationResult<unknown>, notify: (event: DB.VaultEvent) => void, onBadNews: (news: DB.VaultError) => void): DB.VaultError | null {
   const fields = ((typeof data === 'object') && (data !== null)) ? data as Record<string, unknown> : {}
-  const report = WireChecks.notice.safeParse(noticeDrop(fields['safebyokWatchThings']))
-  if (! report.success) {
-    onBadNews(DB.storageIssue())
+  let notice: CheckedNotice
+  try {
+    notice = WireChecks.notice.parse(noticeDrop(fields['safebyokWatchThings']))
+    checkWatchedAt(scope, notice)
+  } catch (err) {
+    onBadNews(DB.refusalOfThrown(err))
     return null
   }
-  const notice = report.data
   if (notice.err === null) {
-    receive({ record: notice.record, banktok: notice.banktok, read_tc: notice.read_tc })
+    // Checked for its scope and citation alone, as an answer's records are (`answerOf`).
+    notify(DB.noticeOf(notice.record as DB.ThingRecord, notice.banktok, notice.read_tc))
     return null
   }
   const news = DB.refusedOverWire(notice.err)
@@ -265,7 +286,7 @@ const dropTypename = (bag: unknown, nested: Record<string, Drop> = {}): unknown 
 const errDrop: Drop = (err) => dropTypename(err, { meta: dropTypename })
 const thingAnswerDrop: Drop = (answer) => dropTypename(answer, { err: errDrop })
 const listAnswerDrop: Drop = (answer) => dropTypename(answer, {
-  err: errDrop, val: dropTypename, damaged_rows: (rows) => (Array.isArray(rows) ? rows.map((row) => dropTypename(row)) : rows),
+  err: errDrop, val: dropTypename, incompatible_rows: (rows) => (Array.isArray(rows) ? rows.map((row) => dropTypename(row)) : rows),
 })
 const rootsAnswerDrop: Drop = (answer) => dropTypename(answer, { err: errDrop, val: dropTypename })
 const statsAnswerDrop: Drop = (answer) => dropTypename(answer, { err: errDrop, val: (stats) => dropTypename(stats, { box: dropTypename, gate: dropTypename, max: dropTypename }) })

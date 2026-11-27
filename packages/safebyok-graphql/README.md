@@ -10,8 +10,8 @@ A `VaultDB` for safebyok over [GraphQL](https://graphql.org), in two halves:
   app's [urql](https://commerce.nearform.com/open-source/urql/) Client.
 
 **Deploy the two halves together.** The browser half sends the documents the server half's schema
-serves, and checks each answer against its own copy of safebyok. An answer that fails those checks,
-such as one from a server on another version, is refused as `storage_issue`.
+serves, and checks each answer's form against its own copy of safebyok. An answer that fails those
+checks, such as one from a server on another version, is refused as `storage_issue`.
 
 Your server and your database have ciphertext and the few unencrypted fields a Thing is found by.
 Neither ever sees a whisper, a passphrase, or a key that could decipher one.
@@ -98,13 +98,14 @@ adds begins `safebyok` or `Safebyok`, to sit beside your own. `VaultOperations` 
 
 Each operation takes the verb's ask, typed, and returns an object with the fields of the verb's
 `try*` answer, less its ask. A Thing, a `tracked` and a track cross as `SafebyokJson`, carried whole;
-everything else is typed. The browser half checks each Thing at the ask's scope, as the core
-checks what a datastore reads.
+everything else is typed. The browser half answers what the server's vaultDB answered, once it has
+checked the answer's form and that each Thing it carries sits where the ask reaches: at the ask's
+scope, one label under a listing's parent, or at a root's labelpath, always in the ask's bank. It
+leaves the act, and the body of each Thing, to the server's vaultDB, which made them.
 
 **A refusal of the vaultDB's is the answer's `err` field, never a GraphQL error.** It carries its `refusalkind`, its
 message, and in `meta` the `oplabel` it refused, its `act`, the `capacity` of a `vault_full`, and the
-`fieldnames` and `labelpaths` it names. The browser answers it as the server's vaultDB did, throwing
-it again where that verb threw. **Nothing else of a refusal is sent**, not its cause, its ask or the
+`fieldnames` and `labelpaths` it names. The browser answers it as the server's vaultDB did. **Nothing else of a refusal is sent**, not its cause, its ask or the
 rows it names, so a driver's message stays on your server.
 
 A request the resolvers cannot serve, where `getUserId` throws, or one that breaks the package's
@@ -118,7 +119,7 @@ In the browser:
   code such as `ECONNREFUSED`, never a message or a response's body;
 * a GraphQL error carrying a refusal under `extensions.safebyokErr` is that refusal;
 * any other GraphQL error, or a result that lacks the operation's field, is `unexpected_error`, with no cause;
-* an answer the core's checks refuse is `storage_issue`.
+* an answer of another form, or carrying a Thing where its ask reaches none, is `storage_issue`.
 
 ### A watch
 

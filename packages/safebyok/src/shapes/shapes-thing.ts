@@ -28,7 +28,7 @@ export const ThingFormat = 'a010501'
 function isLabelpath(labelpath: Labelpath): boolean { return thingkindVals.some((modelkind) => Labelpath.isOfModelkind(labelpath, modelkind)) }
 // --
 
-// == [Thing]: isLifepathDeep, isParityRight, GenericChecks, vaultDBShape, PerKindChecks, policiesByModelkind, ThingChecks, ThingScope, ScopeAt, ThingCited, StoredCited, Sealed, Wayins, Sparse, BoxSparse, AnyThingRecord
+// == [Thing]: isLifepathDeep, isParityRight, GenericChecks, vaultDBShape, PerKindChecks, policiesByModelkind, ThingChecks, ThingScope, ScopeAt, ThingCited, Sealed, Wayins, Sparse, BoxSparse, AnyThingRecord
 
 // A stored lifeseq is 10 base-32 digits; the void lifeseq, -000000001, is never stored. A lifepath joins lifeseqs with '/',
 // and every one after a void one is void: a void lifepath is the void lifeseq under its parent's lifepath (void itself
@@ -100,8 +100,6 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
   // A checked record shows its fields in this order, for a reader's eye alone: nothing stored, compared or bound into a
   // ctx takes its order from an object's keys (STYLE.md, *Order comes from an explicit list*).
   const sparse       = obj({ ...thingScope.shape, label, ...revisioned, fmt: lit(ThingFormat) })
-  // What a write reads of the Thing stored before it carries its record forward: the rest of the row goes unread.
-  const storedCited  = obj({ ...thingScope.shape, revtok: revisioned.revtok, revseq: uint, am, lifepath, born_at: epochMillis })
   // AdapterVaultDB checks only the shape of a sealed part: what is inside is the sealer's.
   const sealed       = obj({
     /** The part's own key, fresh for each seal, wrapped under the bankKey. */
@@ -115,7 +113,7 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
   }).strict()
   return {
     modelkind, labelpath, anyLifeseq, voidLifeseq, anyLifepath, voidLifepath, ...revisioned, bankScope, label,
-    thingScope, thingCited, scopedCited, scopedLive, scopedTombstone, sparse, storedCited, sealed,
+    thingScope, thingCited, scopedCited, scopedLive, scopedTombstone, sparse, sealed,
   }
 })
 
@@ -126,8 +124,6 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
   const { labelpath, anyLifeseq, voidLifeseq, voidLifepath, sparse, thingCited, sealed } = GenericChecks
   const emptyBag     = obj({}).strict()
   const { wayins }   = WayinChecks
-  // What a write under a storage policy reads of the gate stored, beside its storedCited.
-  const storedWayins = obj({ wayins })
 
   const bankLabelpath = lit('bank')
   const gateLabelpath = labelpath.refine((given) => Labelpath.isOfModelkind(given, 'gate'), Phrases.LabelpathOfOtherKind)
@@ -142,8 +138,8 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
     /** Minted at the bank's birth, and kept by each write over the live bank (`Lifetok`). */
     lifetok:        uuid(Phrases.LifetokShape),
   }).strict()
-  // What a write over a live bank reads of the bank stored to compare its lifetok, beside its storedCited.
-  const storedLifetok = obj({ lifetok: bankBase.shape.lifetok })
+  // A bank's lifetok alone: the check of a banktok.
+  const banktok      = bankBase.shape.lifetok
   const gateBase     = obj({
     ...sparse.shape,
     labelpath:      gateLabelpath,
@@ -250,7 +246,7 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
   const boxShell     = shellAt(boxLabelpath)
   const boxRecordOrShell = union([boxRecord, boxShell])
   return {
-    bankLabelpath, gateLabelpath, boxLabelpath, wayins, storedWayins, storedLifetok, bankShell, gateShell, boxShell,
+    bankLabelpath, gateLabelpath, boxLabelpath, wayins, banktok, bankShell, gateShell, boxShell,
     bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse, boxSealable, boxLiveSealable, boxRecord, boxRecordOrShell,
   }
 }))
@@ -261,7 +257,7 @@ export const policiesByModelkind = Object.freeze({ bank: [], gate: EX.storagePol
 /** The check of a host's {@link VaultDB}, by {@link isVaultDB}. */
 const vaultDBShape = Validator.Checker(({ custom }) => custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected), 'bad_record')
 
-/** The checks of a Thing's fields, of its citation, of what a write reads of the Thing stored, and of a host's vaultDB.
+/** The checks of a Thing's fields, of its citation, of what a write reads of the ante Thing, and of a host's vaultDB.
  * Also `ThingFormat`, the `fmt` of every Thing, and `thingkindVals`, the kinds.
  */
 export const ThingChecks = Object.freeze({ ...GenericChecks, vaultDBShape, ThingFormat, thingkindVals })
@@ -272,8 +268,6 @@ export type ThingScope   = Readonly<Z.infer<typeof ThingChecks.thingScope>>
 export type ScopeAt<LabelpathT extends Labelpath> = ThingScope & Readonly<{ labelpath: LabelpathT }>
 /** A write's citation of the Thing it expects to find: its revision, life and liveness, the only fields AdapterVaultDB compares. The shell may be cited. */
 export type ThingCited   = Readonly<Z.infer<typeof ThingChecks.thingCited>>
-/** The fields a write reads of the Thing stored at its scope: its scope, the fields the act tables compare, and the born_at a replace leaves unchanged. */
-export type StoredCited  = Readonly<Z.infer<typeof ThingChecks.storedCited>>
 /** The name of a Thing field: one of the fields every kind of Thing has, which AdapterVaultDB reads. The rest of a record is its body. */
 export type ThingFieldname = keyof Z.infer<typeof ThingChecks.sparse>
 /** The bank, as a Thing. */
@@ -360,7 +354,7 @@ export const Shell = Object.freeze({
   VoidLifeseq,
   /** A root's shell lifepath: the shell's lifeseq alone. */
   RootVoidLifepath: VoidLifeseq,
-  /** The citation for a root's birth: the shell, the void sentinel for no Thing stored. */
+  /** The citation for a root's birth: the shell, the void sentinel, which cites no row. */
   Cited: Object.freeze<ThingCited>({ revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifepath: VoidLifeseq }),
   /** The citation for the birth of a child of the Thing at `parentLifepath`: the shell, at the parent's lifepath then the shell's lifeseq. */
   childCited(parentLifepath: Lifepath): ThingCited {
@@ -388,7 +382,7 @@ export const Shell = Object.freeze({
    * Its lifepath is the ancestor's, then the shell's lifeseq for each level below it down to its own; with no ancestor, the shell's lifeseq at every level.
    * Refuses an `ancestor` that is not above `scope`.
    */
-  under({ userid, banklabel, labelpath }: ThingScope, ancestor: Readonly<Pick<StoredCited, 'labelpath' | 'lifepath'>> | null): VoidSentinel {
+  under({ userid, banklabel, labelpath }: ThingScope, ancestor: Readonly<Pick<ThingRecord, 'labelpath' | 'lifepath'>> | null): VoidSentinel {
     const labels      = ThingChecks.labelpath.parse(labelpath).split('/')
     const above       = (ancestor === null) ? null : shellAncestorChecker.parse(ancestor)
     const aboveLabels = above?.labelpath.split('/') ?? []

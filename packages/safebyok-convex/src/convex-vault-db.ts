@@ -5,8 +5,7 @@ import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex
 import { ConvexError, convexToJson } from 'convex/values'
 import * as DB from 'safebyok/storage'
 import type {
-  BirthBankActual, BirthBankAsk, BirthPuts, GetAsk, GetWorldActual, GetWorldAsk, GotActual, ListAsk, ListThingsActual, Received, StatsActual, StatsAsk, ThingWatchScope, VaultError, WriteAsk,
-  WroteActual,
+  BirthBankAsk, BirthManifest, GetAsk, GetManifest, GetWorldAsk, ListAsk, ListManifest, Received, StatsAsk, StatsManifest, ThingWatchScope, VaultError, WorldManifest, WriteAsk, WriteManifest,
 } from 'safebyok/storage'
 import * as Phrases from './phrases'
 import { safebyokRefusal } from './refusals'
@@ -50,7 +49,7 @@ export type ConvexVaultClient = ConvexWatchingClient | ConvexReactWatchingClient
  */
 export type ConvexVaultDBOpts = Readonly<{ client: ConvexVaultClient, api: SafebyokVaultApi }>
 
-/** The result of `watchThings`: the Things committed after the cursor, the bank, and the next cursor. */
+/** The result of `watchThings`: the Things committed after the cursor, the banktok of their bank, and the next cursor. */
 type Watched = FunctionReturnType<SafebyokVaultApi['watchThings']>
 // --
 
@@ -75,68 +74,46 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
   // --
 
   // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats, doWatch
-  // A get is one query, and what it fetched is classified here. A write is one mutation, so one transaction: the component
-  // fetches the Things, classifies the ask with the same classifier, and writes the record if the act is a write. It returns
-  // the Things as it fetched them, which are classified here to the same outcome, and what it wrote, read back, or null if
-  // it wrote nothing. Whether it wrote is checked against the act, and a write answers what was stored. Each call's
-  // `read_tc` is made before it is sent, so no later than the snapshot it reads, and a watch's notice is dated as it
-  // arrives. Convex's own clock is no better: a query's Date.now() is frozen as it starts, and Convex serves a query's
-  // result again from its cache, so a later call could answer an earlier read_tc.
+  // Each call is one query or mutation of the component, which hands back the manifest of what it observed but its
+  // `read_tc`. That is made here, before the call is sent, so no later than the snapshot it reads, and a watch's notice is
+  // dated as it arrives. Convex's own clock is no better: a query's Date.now() is frozen as it starts, and Convex serves a
+  // query's result again from its cache, so a later call could answer an earlier read_tc.
 
-  protected async doGetThing(ask: GetAsk): Promise<GotActual> {
+  protected async doGetThing(ask: GetAsk): Promise<GetManifest> {
     const read_tc = DB.readTcNow()
-    const { thing, ...above } = await runOrRefuse('getThing', () => this.#client.query(this.#api.getThing, { ask }))
-    return this.classifyGetThing(ask, thing, { ...above, read_tc })
+    return { ...(await runOrRefuse('getThing', () => this.#client.query(this.#api.getThing, { ask }))), read_tc }
   }
 
-  protected async doWriteThing(ask: WriteAsk): Promise<WroteActual> {
+  protected async doWriteThing(ask: WriteAsk): Promise<WriteManifest> {
     demandStorableKeys(ask)
     const read_tc = DB.readTcNow()
-    const { thing, written, ...above } = await runOrRefuse('writeThing', () => this.#client.mutation(this.#api.writeThing, { ask }))
-    const actual = this.classifyWriteThing(ask, thing, { ...above, read_tc })
-    if (! (actual.ok && DB.Classifier.isWriteAct(actual.act))) {
-      demandUnwritten(written)
-      return actual
-    }
-
-    const after = checkedWritten(written)
-    return { ...actual, banktok: DB.Classifier.banktokOf(ask, after.bank), tracked: DB.Classifier.trackedOf(ask, after.tracked), record: DB.Classifier.writtenThingOf(ask, after.thing) }
+    return { ...(await runOrRefuse('writeThing', () => this.#client.mutation(this.#api.writeThing, { ask }))), read_tc }
   }
 
-  protected async doListThings(ask: ListAsk): Promise<ListThingsActual> {
+  protected async doListThings(ask: ListAsk): Promise<ListManifest> {
     const read_tc = DB.readTcNow()
-    const { parent, children, ...bankFetched } = await runOrRefuse('listThings', () => this.#client.query(this.#api.listThings, { ask }))
-    return this.classifyListThings(ask, { parent, children }, { ...bankFetched, read_tc })
+    return { ...(await runOrRefuse('listThings', () => this.#client.query(this.#api.listThings, { ask }))), read_tc }
   }
 
-  protected async doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthBankActual> {
+  // The component makes the same puts of the ask.
+  protected async doBirthBank(ask: BirthBankAsk): Promise<BirthManifest> {
     demandStorableKeys(ask)
     const read_tc = DB.readTcNow()
-    const { written, ...fetched } = await runOrRefuse('birthBank', () => this.#client.mutation(this.#api.birthBank, { ask }))
-    const actual = this.classifyBirthBank(puts, { ...fetched, read_tc })
-    if (! (actual.ok && (actual.act === 'born'))) {
-      demandUnwritten(written)
-      return actual
-    }
-
-    const after = checkedWritten(written)
-    return { ...actual, banktok: DB.Classifier.banktokOf(ask, after.bank), tracked: DB.Classifier.trackedOf(ask, after.tracked), things: DB.Classifier.writtenRootsOf(puts, after) }
+    return { ...(await runOrRefuse('birthBank', () => this.#client.mutation(this.#api.birthBank, { ask }))), read_tc }
   }
 
-  protected async doGetWorld(ask: GetWorldAsk): Promise<GetWorldActual> {
+  protected async doGetWorld(ask: GetWorldAsk): Promise<WorldManifest> {
     const read_tc = DB.readTcNow()
-    const fetched = await runOrRefuse('getWorld', () => this.#client.query(this.#api.getWorld, { ask }))
-    return this.classifyGetWorld(ask, { ...fetched, read_tc })
+    return { ...(await runOrRefuse('getWorld', () => this.#client.query(this.#api.getWorld, { ask }))), read_tc }
   }
 
-  protected async doStats(ask: StatsAsk): Promise<StatsActual> {
+  protected async doStats(ask: StatsAsk): Promise<StatsManifest> {
     const read_tc = DB.readTcNow()
-    const { box, gate, ...bankFetched } = await runOrRefuse('stats', () => this.#client.query(this.#api.stats, { ask }))
-    return this.classifyStats(ask, { ...bankFetched, read_tc }, { box, gate, max: ConvexBankLimits })
+    return { ...(await runOrRefuse('stats', () => this.#client.query(this.#api.stats, { ask }))), read_tc }
   }
 
   // Each result of `watchThings` holds the Things committed after the cursor it was asked with, so `receive` gets each, with
-  // the banktok of the bank in the same result. Where the cursor moved, the watch subscribes again from the new one, and drops
+  // the banktok of their bank in the same result. Where the cursor moved, the watch subscribes again from the new one, and drops
   // the old subscription; every Thing committed later is after the new cursor. The first subscription, from null, fetches no
   // Thing: the watch reports what changes after it starts.
   protected override doWatch(scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: VaultError) => void): () => void {
@@ -152,8 +129,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
     }
     // A listener told of a Thing may stop the watch then and there, and a stopped watch subscribes no more.
     const hearThings = (watched: Watched): void => {
-      const banktok = DB.Classifier.banktokOf(scope, watched.bank)
-      for (const { raw } of watched.things) { receive({ record: raw, banktok }) }
+      for (const { raw } of watched.things) { receive({ record: raw, banktok: watched.banktok }) }
       if ((! isWatching) || (watched.cursor === cursor)) { return }
       unsubscribe()
       watchFrom(watched.cursor)
@@ -190,15 +166,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 }
 // --
 
-// == [Limits]: ConvexBankLimits
-
-// docs.convex.dev/production/state/limits: one query may scan 32,000 documents and read 16 MiB. The stats read every Thing
-// of a bank in one query, as may a watch that comes back after long enough away, so a bank holds no more than that.
-/** The most a bank holds in Convex: the documents and bytes one query may read. */
-const ConvexBankLimits = DB.storeLimitsOf({ count: 32_000, size: 16_777_216 })
-// --
-
-// == [Helpers]: runOrRefuse, refusalOf, refusalOfCrossed, storedOutOfStep, demandStorableKeys, demandUnwritten, checkedWritten, latestOf, noop
+// == [Helpers]: runOrRefuse, refusalOf, refusalOfCrossed, demandStorableKeys, latestOf, noop
 
 // Accepts a thunk because ConvexReactClient.query can throw synchronously, before it returns a promise.
 /** Run `thunk`, rethrowing any failure as a VaultError. */
@@ -226,31 +194,16 @@ function refusalOfCrossed(crossed: SafebyokRefusal): VaultError {
   return new DB.VaultError(crossed.kind, crossed.message)
 }
 
-// A disagreement is a component out of step with this copy of safebyok, never a damaged Thing: the classifier checked what was fetched.
-/** The `unexpected_error` for a component that wrote where the classifier found no write, or wrote nothing where it found one. */
-function storedOutOfStep(): VaultError { return DB.unexpectedError(new Error(Phrases.StoredOutOfStep)) }
-
 // Convex refuses an object key that starts with `$`, holds a character outside printable ASCII, or runs past 1024
 // characters, and `convexToJson` applies its rules (`validateObjectField`, not exported). Of the keys in an ask, only those
 // of a box's sidecar are not safebyok's own. Convex's error names the key and its fault, never a value, and is the cause.
-/** Throw `bad_record` if `ask` holds an object key Convex would refuse to store, before it is sent. */
+/** Throw `bad_record` if `ask` holds an object key Convex would refuse, before it is sent. */
 function demandStorableKeys(ask: WriteAsk | BirthBankAsk): void {
   try {
     convexToJson(ask)
   } catch (err) {
     throw new DB.VaultError('bad_record', Phrases.SidecarKeyRefused, { cause: err })
   }
-}
-
-/** Throw unless the component wrote nothing. */
-function demandUnwritten(written: unknown): void {
-  if (written !== null) { throw storedOutOfStep() }
-}
-
-/** What the component wrote, refused if it wrote nothing. */
-function checkedWritten<WrittenT>(written: WrittenT | null): WrittenT {
-  if (written === null) { throw storedOutOfStep() }
-  return written
 }
 
 /** A React watch's latest result, or undefined while it has none. A failing watch passes its error to `fail`, and gives undefined. */

@@ -1,0 +1,4 @@
+---
+---
+
+None: safebyok is private at 0.0.0. A concrete adapter's doListThings, doBirthBank, doGetWorld and doStats now hand back a manifest too (ListManifest, BirthManifest, WorldManifest, StatsManifest), as `notes/vault-adapter-contract.md` describes, and the classifier, the Actual types and ActualChecks are gone. The manifests are interfaces; `AnteWayins` and `TrackedRows` are exported from `safebyok/storage` beside them. A working vaultDB answers as before. A broken one answers otherwise in these cases: a manifest with no `banktok` refuses `storage_issue`; a listing's, birth's, world's or stats' banktok that is no lifetok answers the void lifetok, as a get's and a write's already did; a listed child at another address refuses `storage_issue`, checked after its kind's checks; and an answer that does not copy its manifest refuses `unexpected_error`, not `storage_issue`.

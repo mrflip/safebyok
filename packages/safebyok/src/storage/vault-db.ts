@@ -14,23 +14,23 @@ import type { VaultEvent } from '../shapes/shapes-vault-event'
 export interface VaultDB {
   /** The Thing at `ask`'s scope. */
   tryGetThing(ask: GetAsk): Promise<GetThingAnswer>
-  /** Write `ask.record` over the Thing stored, if it matches `ask.cited`.
-   * - The write is stored when its preconditions hold: the exact revision cited and, for a put that replaces a live Thing, the
-   *   born_at left unchanged and the storage policies it names. Nothing else of the Thing stored is checked.
+  /** Write `ask.record` over the ante Thing, if it matches `ask.cited`.
+   * - The record is written when its preconditions hold: the exact revision cited and, for a put that replaces a live Thing, the
+   *   born_at left unchanged and the storage policies it names. Nothing else of the ante Thing is checked.
    * - Where several refusals apply at once, the answer is one of them, but which is unspecified, and may differ between concrete adapters
-   *   and between versions. A Thing stored too damaged to check the preconditions against may refuse `damaged_row`,
+   *   and between versions. An ante Thing that fails its checks, so that no precondition can be checked against it, may refuse `incompatible_row`,
    *   `storage_issue`, or the failed precondition's own refusal.
-   * - The record carries every field, so a concrete adapter may write it by replacing the Thing stored whole.
+   * - The record carries every field, so a concrete adapter may write it by replacing the ante Thing whole.
    */
   tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer>
   /** The children of the Thing at `ask`'s scope, read in one step. */
   tryListThings(ask: ListAsk): Promise<ListThingsAnswer>
-  /** Write a new bank's three roots (bank, main gate, root box), or answer the roots already stored. */
+  /** Write a new bank's three roots (bank, main gate, root box), or answer the actual roots of a bank already live. */
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
   /** A bank's three roots (bank, main gate, root box), read in one step: each live, a tombstone, or the shell where none is stored. */
   tryGetWorld(ask: GetWorldAsk): Promise<GetWorldAnswer>
-  /** A bank's storage stats, read in one step: how many boxes and gates it stores, live and in all, their size in bytes, and the store's limits.
-   * Nothing refuses a write for being over a limit. A store's limit is never `Infinity`: one with none reports `StoreLimitCap`.
+  /** A bank's storage stats, read in one step: how many boxes and gates it has, live and in all, their size in bytes, and the datastore's limits.
+   * Nothing refuses a write for being over a limit. A datastore's limit is never `Infinity`: one with none reports `StoreLimitCap`.
    */
   tryStats(ask: StatsAsk): Promise<StatsAnswer>
   /** Watch a bank's Things, returning a function that stops the watch.

@@ -1,5 +1,7 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
+import { Phrases as BigPhrases } from 'safebyok-big/internals'
+
 // == [Models]: VaultDBExpected, DeviceDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, RootShelfExpected, ThingSoonestBare, WorldExpected, ThingExpected, BegunOfOtherKind, WayinExpected, WayinKeyExpected, WayinOfOtherHeader
 
 /** A vaultDB that lacks one of its verbs or builders. */
@@ -170,10 +172,10 @@ export const LifeseqNotNext = "A write's record has the cited lifeseq when am st
 export const BornAtNotNow = "A write over a tombstone or none is a birth: its born_at is its written_at."
 
 /** A write over a live Thing that changes its born_at. */
-export const BornAtNotStored = "A write over a live Thing leaves the stored Thing's born_at unchanged."
+export const BornAtMoved = "A write over a live Thing leaves its born_at unchanged."
 
 /** A write of the bank over a live bank that changes its lifetok. */
-export const LifetokNotStored = "A write of the bank over a live bank keeps the stored bank's lifetok."
+export const LifetokMoved = "A write of the bank over a live bank leaves its lifetok unchanged."
 
 /** A deleted main gate. */
 export const MainGateDeleted = "The main gate is never deleted: its record is always live (am: 'a')."
@@ -193,8 +195,8 @@ export const DelFlagsFixed = "A del's flags are fixed, ifAbsent 'fail' and ifPre
 /** A write naming a storage policy its kind lacks. */
 export const PolicyNotOwn = "Only a gate's writes name storage policies: a bank and a box have none."
 
-/** A bank stored without one of its roots, or with one damaged. */
-export const BankRootsMissing = "A bank is stored without its main gate or its root box, or with its bank or main gate damaged: the store needs mending by hand."
+/** A bank stored without one of its roots, or with one incompatible. */
+export const BankRootsMissing = "A bank is stored without its main gate or its root box, or with its bank or main gate incompatible: the datastore needs mending by hand."
 
 /** A list whose parent holds a tombstone or nothing. */
 export const ListParentNotLive = "The Thing listed is not stored live: it was never stored, or was deleted, and has no children."
@@ -202,7 +204,7 @@ export const ListParentNotLive = "The Thing listed is not stored live: it was ne
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: QueryClientExpected, VaultTSQExpected, ListOfBoxes, NotMinded, WorldNotHeard, StaleTimeShape, ChildrenStoredDamaged
+// == [Minding]: QueryClientExpected, VaultTSQExpected, ListOfBoxes, NotMinded, WorldNotHeard, StaleTimeShape, ChildrenIncompatible
 
 /** A VaultTSQ made without a TanStack Query client. */
 export const QueryClientExpected = 'Expected a TanStack Query QueryClient: an object with setQueryDefaults, setMutationDefaults, getQueryData, setQueryData, query, invalidateQueries and resetQueries.'
@@ -222,8 +224,8 @@ export const WorldNotHeard = "This bank's root box is not known live on this dev
 /** A staleTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
 export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
 
-/** Children a list found stored damaged, and left out of its answer. */
-export const ChildrenStoredDamaged = "Some of the Things this list found are stored damaged, so it left them out: the refusal's meta.labelpaths names each one. They were left as they are in storage."
+/** Children a list found incompatible, and left out of its answer. */
+export const ChildrenIncompatible = "Some of the Things this list found are incompatible, so it left them out: the refusal's meta.labelpaths names each one. They were left as they are in storage."
 // --
 
 // == [Telling the host]: LeaseAnnounced, StageCrossed, WatchEnded
@@ -249,9 +251,9 @@ export function probeStepRefused(stepkind: string): string {
 export const ProbePutNotGot = "Storage answered the probe's get without the revision its put had just written: storage lost the write, or answered from a replica or cache that lags behind it."
 // --
 
-// == [Storing]: StoreQuotaTooSmall, storageCallRefused
+// == [Storage]: StoreQuotaTooSmall, storageCallRefused, WrittenOfOtherAct, ProposedNotWritten, TagsOfOtherRow, TagsOfOtherAsk, BanktokMissing, AnswerOfOtherManifest
 
-/** An IndexedDB store opened where the browser offers the page `quota` bytes, fewer than the `least` a vault needs. */
+/** An IndexedDB database opened where the browser offers the page `quota` bytes, fewer than the `least` a vault needs. */
 export function StoreQuotaTooSmall(quota: number, least: number): string {
   return `This browser offers the page ${String(quota)} bytes of storage, and a vault needs at least ${String(least)}.`
 }
@@ -260,4 +262,47 @@ export function StoreQuotaTooSmall(quota: number, least: number): string {
 export function storageCallRefused(oplabel: string): string {
   return `The vault's storage refused ${oplabel}: trying again is unlikely to help. Its logs have the request, and this refusal's cause has what it answered.`
 }
+
+/** The datastore's write disagrees with the act its tags find. */
+export const WrittenOfOtherAct = "The vault's storage wrote where its own comparisons find no write, or wrote nothing where they find one: the storage adapter needs mending."
+
+/** The row the datastore wrote is not the record proposed. */
+export const ProposedNotWritten = "The vault's storage reported writing a row without the revision, life or liveness of the record it was asked to write: the storage adapter needs mending."
+
+/** The datastore's tags are not those of its row. */
+export const TagsOfOtherRow = "The vault's storage reported comparisons that are not those of the row it handed back: the storage adapter needs mending."
+
+/** The datastore's tags disagree with the ask. */
+export const TagsOfOtherAsk = "The vault's storage reported comparisons that disagree with the write asked of it: the storage adapter needs mending."
+
+/** The datastore's manifest has no banktok. */
+export const BanktokMissing = "The vault's storage handed back no banktok, the lifetok of the bank it read: the storage adapter needs mending."
+
+/** The vaultDB's answer is not its manifest's. */
+export const AnswerOfOtherManifest = "The vaultDB made an answer that is not a copy of what its storage handed back: a bug in safebyok."
+// --
+
+// == [Storage policies]: PolicyPhrases, PhraseForRefusaltag
+
+/** The message of each refusal a storage policy makes, by the tag a datastore's verdict names it with. */
+export const PolicyPhrases = {
+  ProvedWayinMoved:  BigPhrases.ProvedWayinMoved,
+  OtherWayinMoved:   BigPhrases.OtherWayinMoved,
+  PasskeyStored:     BigPhrases.PasskeyStored,
+  PasskeyNotAdded:   BigPhrases.PasskeyNotAdded,
+  NoPasskeyStored:   BigPhrases.NoPasskeyStored,
+  PasskeyNotRevoked: BigPhrases.PasskeyNotRevoked,
+} as const
+
+/** The message a `policied` write is refused with, by the name of its phrase: a changed born_at's, a changed lifetok's, or a storage policy's in {@link PolicyPhrases}. */
+export const PhraseForRefusaltag = {
+  BornAtMoved,
+  LifetokMoved,
+  ProvedWayinMoved:  BigPhrases.gateIssue(PolicyPhrases.ProvedWayinMoved),
+  OtherWayinMoved:   BigPhrases.gateIssue(PolicyPhrases.OtherWayinMoved),
+  PasskeyStored:     BigPhrases.gateIssue(PolicyPhrases.PasskeyStored),
+  PasskeyNotAdded:   BigPhrases.gateIssue(PolicyPhrases.PasskeyNotAdded),
+  NoPasskeyStored:   BigPhrases.gateIssue(PolicyPhrases.NoPasskeyStored),
+  PasskeyNotRevoked: BigPhrases.gateIssue(PolicyPhrases.PasskeyNotRevoked),
+} as const
 // --

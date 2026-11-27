@@ -71,7 +71,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       }
     })
 
-    it("answers gotlive with the Thing stored", async () => {
+    it("answers gotlive with the actual Thing", async () => {
       const vaultDB = await withGate()
       expect(await vaultDB.tryGetThing(getGateAskOf())).to.deep.include({ ok: true, act: 'gotlive', val: gateThingOf() })
     })
@@ -97,27 +97,27 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     })
 
     it("replaces the live gate it expects", async () => {
-      const stored = gateThingOf()
-      const next = nextGateOf(stored)
-      const vaultDB = await withGate(stored)
-      expect(await vaultDB.tryWriteThing(replaceAskOf(stored, next))).to.deep.include({ ok: true, act: 'replaced', val: next })
+      const ante = gateThingOf()
+      const next = nextGateOf(ante)
+      const vaultDB = await withGate(ante)
+      expect(await vaultDB.tryWriteThing(replaceAskOf(ante, next))).to.deep.include({ ok: true, act: 'replaced', val: next })
       expect(await gotAt(vaultDB, 'gate')).to.deep.equal(next)
     })
 
     it("accepts a citation of no more than ThingCited names", async () => {
-      const stored = gateThingOf()
-      const vaultDB = await withGate(stored)
-      const { revtok, revseq, am, lifepath } = stored
-      const answer = await vaultDB.tryWriteThing(replaceAskOf({ revtok, revseq, am, lifepath }, nextGateOf(stored)))
+      const ante = gateThingOf()
+      const vaultDB = await withGate(ante)
+      const { revtok, revseq, am, lifepath } = ante
+      const answer = await vaultDB.tryWriteThing(replaceAskOf({ revtok, revseq, am, lifepath }, nextGateOf(ante)))
       expect(answer).to.deep.include({ ok: true, act: 'replaced' })
     })
 
     it("passes the live gate back, writing nothing, under ifPresent 'get' when it expected another", async () => {
-      const stored = gateThingOf()
-      const vaultDB = await withGate(stored)
+      const ante = gateThingOf()
+      const vaultDB = await withGate(ante)
       const answer = await vaultDB.tryWriteThing({ ...birthAskOf(gateThingOf({ revtok: OtherRevtok })), ifPresent: 'get' })
-      expect(answer).to.deep.include({ ok: true, act: 'passed', val: stored })
-      expect(await gotAt(vaultDB, 'gate')).to.deep.equal(stored)
+      expect(answer).to.deep.include({ ok: true, act: 'passed', val: ante })
+      expect(await gotAt(vaultDB, 'gate')).to.deep.equal(ante)
     })
 
     it("logs what the ask cites, never its wayins", async () => {
@@ -129,44 +129,44 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
   })
 
   describe("tryWriteThing(ask), refused by the act tables", () => {
-    const stored = gateThingOf()
-    const next   = nextGateOf(stored)
+    const ante   = gateThingOf()
+    const next   = nextGateOf(ante)
     const later  = nextGateOf(next)
     const lifeseq2 = Lifeseq.ofLifenum(2)
     const otherLife = { lifeseq: lifeseq2, lifepath: lifeseq2 }
     const ActCases = [
       // the datastore moved on:
-      ["stale",  replaceAskOf(stored, nextGateOf(stored, { revtok: revtokOf('1b') })), 'expects a revision the store has moved past'],
-      ["retcon", replaceAskOf(stored, next),                                      'resends a write that already landed'],
-      ["forked", replaceAskOf({ ...next, revtok: revtokOf('fork') }, nextGateOf(next)), 'expects the revseq stored under another revtok'],
+      ["stale",  replaceAskOf(ante, nextGateOf(ante, { revtok: revtokOf('1b') })), 'expects a revision the datastore has moved past'],
+      ["retcon", replaceAskOf(ante, next),                                        'resends a write that already landed'],
+      ["forked", replaceAskOf({ ...next, revtok: revtokOf('fork') }, nextGateOf(next)), 'expects the ante revseq under another revtok'],
       // the caller is ahead of the datastore, or confused:
-      ["ahead",  replaceAskOf(later, nextGateOf(later)),                          'expects a revision the store has not reached'],
-      ["clash",  replaceAskOf({ ...next, ...otherLife }, { ...nextGateOf(next), ...otherLife }), 'expects the revtok stored in another life'],
+      ["ahead",  replaceAskOf(later, nextGateOf(later)),                          'expects a revision the datastore has not reached'],
+      ["clash",  replaceAskOf({ ...next, ...otherLife }, { ...nextGateOf(next), ...otherLife }), 'expects the ante revtok in another life'],
       ["camped", { ...replaceAskOf(next, nextGateOf(next)), ifPresent: 'fail' as const }, 'finds the live gate it expects under ifPresent fail'],
       ["stale",  birthAskOf(gateThingOf({ revtok: OtherRevtok })),               'births a gate over a live one'],
     ] as const
 
     for (const [act, ask, blurb] of ActCases) {
       it(blurb, async () => {
-        const vaultDB = await withGate(stored)
-        await expectGood(vaultDB.tryWriteThing(replaceAskOf(stored, next)))
+        const vaultDB = await withGate(ante)
+        await expectGood(vaultDB.tryWriteThing(replaceAskOf(ante, next)))
         expect(await vaultDB.tryWriteThing(ask)).to.deep.include({ ok: false, act, dbhas: next })
         expect(await gotAt(vaultDB, 'gate')).to.deep.equal(next)
       })
     }
 
-    it("refuses a replacement that moves the stored born_at", async () => {
-      const vaultDB = await withGate(stored)
-      const answer = await vaultDB.tryWriteThing(replaceAskOf(stored, nextGateOf(stored, { born_at: T0 + 1 })))
+    it("refuses a replacement that moves the ante born_at", async () => {
+      const vaultDB = await withGate(ante)
+      const answer = await vaultDB.tryWriteThing(replaceAskOf(ante, nextGateOf(ante, { born_at: T0 + 1 })))
       const err = await expectBad(Promise.resolve(answer), 'bad_record')
-      expect(err.message).to.include(Phrases.BornAtNotStored)
-      expect(answer).to.deep.include({ act: 'policied', dbhas: stored })
+      expect(err.message).to.include(Phrases.BornAtMoved)
+      expect(answer).to.deep.include({ act: 'policied', dbhas: ante })
     })
 
     it("refuses a write over nothing under ifAbsent 'fail', and one citing a revision where none is stored, with the root's shell as its dbhas", async () => {
       const vaultDB = await fresh()
       expect(await vaultDB.tryWriteThing({ ...birthAskOf(), ifAbsent: 'fail' })).to.deep.include({ ok: false, act: 'void', dbhas: Shell.of(GateScope) })
-      const ahead = replaceAskOf(stored, nextGateOf(stored))
+      const ahead = replaceAskOf(ante, nextGateOf(ante))
       expect(await vaultDB.tryWriteThing(ahead)).to.deep.include({ ok: false, act: 'ahead', dbhas: Shell.of(GateScope) })
     })
 
@@ -202,15 +202,15 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     })
 
     it("refuses the main gate's deletion, writing nothing", async () => {
-      const vaultDB = await withGate(stored)
+      const vaultDB = await withGate(ante)
       const life1 = Lifeseq.ofLifenum(1)
-      const gone = nextOf(stored, { am: 'x', lifeseq: life1, lifepath: life1 })
-      await expectBad(vaultDB.tryWriteThing(delAskFor(stored, gone)), 'bad_record')
-      expect(await gotAt(vaultDB, 'gate')).to.deep.equal(stored)
+      const gone = nextOf(ante, { am: 'x', lifeseq: life1, lifepath: life1 })
+      await expectBad(vaultDB.tryWriteThing(delAskFor(ante, gone)), 'bad_record')
+      expect(await gotAt(vaultDB, 'gate')).to.deep.equal(ante)
     })
 
     it("carries what it refused, loggable, on its refusal", async () => {
-      const vaultDB = await withGate(stored)
+      const vaultDB = await withGate(ante)
       const answer = await vaultDB.tryWriteThing(birthAskOf(gateThingOf({ revtok: OtherRevtok })))
       const err = await expectBad(Promise.resolve(answer), 'stale_write')
       expect(err.meta).to.deep.include({ oplabel: 'writeThing', act: 'stale' })
@@ -219,34 +219,34 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
   })
 
   describe("tryWriteThing(ask), under a storage policy", () => {
-    const stored = gateThingOf()
+    const ante = gateThingOf()
     const otherMain = { main: OtherMainWayin, passkey0: null }
 
     it("replaces the passphrase wayin the gating proved against", async () => {
-      const vaultDB = await withGate(stored)
-      const ask = replaceAskOf(stored, nextGateOf(stored, { wayins: otherMain }), { policies: ['replace_passphrase'] })
+      const vaultDB = await withGate(ante)
+      const ask = replaceAskOf(ante, nextGateOf(ante, { wayins: otherMain }), { policies: ['replace_passphrase'] })
       expect(await vaultDB.tryWriteThing(ask)).to.deep.include({ ok: true, act: 'replaced' })
     })
 
     it("refuses to replace a passphrase wayin other than the one proved against", async () => {
-      const vaultDB = await withGate(stored)
-      const ask = replaceAskOf({ ...stored, wayins: otherMain }, nextGateOf(stored, { wayins: otherMain }), { policies: ['replace_passphrase'] })
+      const vaultDB = await withGate(ante)
+      const ask = replaceAskOf({ ...ante, wayins: otherMain }, nextGateOf(ante, { wayins: otherMain }), { policies: ['replace_passphrase'] })
       const answer = await vaultDB.tryWriteThing(ask)
       await expectBad(Promise.resolve(answer), 'gate_issue')
-      expect(answer).to.deep.include({ act: 'policied', dbhas: stored })
+      expect(answer).to.deep.include({ act: 'policied', dbhas: ante })
     })
 
     it("refuses a passphrase replacement that changes the passkey wayin too", async () => {
-      const vaultDB = await withGate(stored)
-      const ask = replaceAskOf(stored, nextGateOf(stored, { wayins: { ...WithPasskey, main: OtherMainWayin } }), { policies: ['replace_passphrase'] })
+      const vaultDB = await withGate(ante)
+      const ask = replaceAskOf(ante, nextGateOf(ante, { wayins: { ...WithPasskey, main: OtherMainWayin } }), { policies: ['replace_passphrase'] })
       await expectBad(vaultDB.tryWriteThing(ask), 'gate_issue')
     })
 
     it("adds a passkey wayin to a gate that has none, and revokes it", async () => {
-      const vaultDB = await withGate(stored)
-      const added = nextGateOf(stored, { wayins: WithPasskey })
-      expect(await vaultDB.tryWriteThing(replaceAskOf(stored, added, { policies: ['add_passkey'] }))).to.deep.include({ ok: true, act: 'replaced' })
-      const revoked = nextGateOf(added, { wayins: stored.wayins })
+      const vaultDB = await withGate(ante)
+      const added = nextGateOf(ante, { wayins: WithPasskey })
+      expect(await vaultDB.tryWriteThing(replaceAskOf(ante, added, { policies: ['add_passkey'] }))).to.deep.include({ ok: true, act: 'replaced' })
+      const revoked = nextGateOf(added, { wayins: ante.wayins })
       expect(await vaultDB.tryWriteThing(replaceAskOf(added, revoked, { policies: ['revoke_passkey'] }))).to.deep.include({ ok: true, act: 'replaced' })
     })
 
@@ -258,8 +258,8 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     })
 
     it("refuses to revoke a passkey wayin from a gate that has none", async () => {
-      const vaultDB = await withGate(stored)
-      const ask = replaceAskOf(stored, nextGateOf(stored), { policies: ['revoke_passkey'] })
+      const vaultDB = await withGate(ante)
+      const ask = replaceAskOf(ante, nextGateOf(ante), { policies: ['revoke_passkey'] })
       await expectBad(vaultDB.tryWriteThing(ask), 'gate_issue')
     })
 
@@ -271,22 +271,22 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
   })
 
   describe("tryWriteThing(ask), the bank", () => {
-    const stored = bankThingOf()
+    const ante   = bankThingOf()
     const life1  = Lifeseq.ofLifenum(1)
     const life2  = Lifeseq.ofLifenum(2)
-    const gone   = nextOf(stored, { am: 'x', lifeseq: life1, lifepath: life1 })
+    const gone   = nextOf(ante, { am: 'x', lifeseq: life1, lifepath: life1 })
 
     it("replaces and deletes a live bank, keeping its lifetok", async () => {
       const vaultDB = await bornBank()
-      const next = nextOf(stored)
-      expect(await vaultDB.tryWriteThing(replaceAskOf(stored, next))).to.deep.include({ ok: true, act: 'replaced', val: next })
+      const next = nextOf(ante)
+      expect(await vaultDB.tryWriteThing(replaceAskOf(ante, next))).to.deep.include({ ok: true, act: 'replaced', val: next })
       const tomb = nextOf(next, { am: 'x', lifeseq: life1, lifepath: life1 })
       expect(await vaultDB.tryWriteThing(delAskFor(next, tomb))).to.deep.include({ ok: true, act: 'deleted', val: tomb })
     })
 
     const LifetokCases = [
-      ['a replacement',  replaceAskOf(stored, nextOf(stored, { lifetok: OtherLifetok }))],
-      ['a deletion',     delAskFor(stored, { ...gone, lifetok: OtherLifetok })],
+      ['a replacement',  replaceAskOf(ante, nextOf(ante, { lifetok: OtherLifetok }))],
+      ['a deletion',     delAskFor(ante, { ...gone, lifetok: OtherLifetok })],
     ] as const
 
     for (const [blurb, ask] of LifetokCases) {
@@ -294,18 +294,20 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
         const vaultDB = await bornBank()
         const answer = await vaultDB.tryWriteThing(ask)
         const err = await expectBad(Promise.resolve(answer), 'bad_record')
-        expect(err.message).to.include(Phrases.LifetokNotStored)
-        expect(answer).to.deep.include({ act: 'policied', dbhas: stored })
-        expect(await gotAt(vaultDB, 'bank')).to.deep.equal(stored)
+        expect(err.message).to.include(Phrases.LifetokMoved)
+        expect(answer).to.deep.include({ act: 'policied', dbhas: ante })
+        expect(await gotAt(vaultDB, 'bank')).to.deep.equal(ante)
       })
     }
 
-    // Each of these asks tracks the damaged row at its revision, so the answer's tracked is 'same' there, and never the damaged row.
-    it("carries a bank damaged outside its lifetok forward, under a put that keeps the lifetok", async () => {
+    // Each of these asks tracks the incompatible row at its revision, so the answer's tracked is 'same' there, and never the incompatible row.
+    // A written_at past the far future is a row every datastore's table can hold, and that fails the bank's checks.
+    it("carries a bank incompatible outside its lifetok forward, under a put that keeps the lifetok", async () => {
       const vaultDB = await fresh()
-      await rowsOf(vaultDB).plant(BankScope, { ...stored, auth: { stray: true } })
-      const next = nextOf(stored)
-      expect(await vaultDB.tryWriteThing({ ...replaceAskOf(stored, next), track: trackOf(stored, Shell.Cited, Shell.Cited) })).to.deep.include({ ok: true, act: 'replaced', val: next })
+      await rowsOf(vaultDB).plant(BankScope, { ...ante, written_at: Number.MAX_SAFE_INTEGER })
+      await expectBad(vaultDB.tryGetThing(getAskAt('bank')), 'incompatible_row')
+      const next = nextOf(ante)
+      expect(await vaultDB.tryWriteThing({ ...replaceAskOf(ante, next), track: trackOf(ante, Shell.Cited, Shell.Cited) })).to.deep.include({ ok: true, act: 'replaced', val: next })
       expect(await gotAt(vaultDB, 'bank')).to.deep.equal(next)
     })
 
@@ -327,21 +329,21 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
   })
 
   describe("a Thing stored that fails its checks", () => {
-    // Which refusal a write over a damaged Thing meets is unspecified: see tryWriteThing.
-    it("refuses a damaged gate as damaged to a get, and refuses a write over it", async () => {
+    // Which refusal a write over an incompatible Thing meets is unspecified: see tryWriteThing.
+    it("refuses an incompatible gate as incompatible to a get, and refuses a write over it", async () => {
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant(GateScope, { ...gateThingOf(), wayins: { main: {}, passkey0: null } })
-      await expectBad(vaultDB.tryGetThing(getGateAskOf()), 'damaged_row')
+      await expectBad(vaultDB.tryGetThing(getGateAskOf()), 'incompatible_row')
       expect(await vaultDB.tryWriteThing(birthAskOf())).to.deep.include({ ok: false })
     })
 
-    it("carries a gate damaged outside its wayins forward, under the storage policy it meets", async () => {
+    it("carries a gate incompatible outside its wayins forward, under the storage policy it meets", async () => {
       const vaultDB = await fresh()
-      const stored = gateThingOf()
-      await rowsOf(vaultDB).plant(GateScope, { ...stored, auth: { stray: true } })
-      const next = nextGateOf(stored, { wayins: { main: OtherMainWayin, passkey0: null } })
-      // The ask tracks the damaged gate at its revision, so the answer's tracked is 'same' there, and never the damaged row.
-      const ask  = { ...replaceAskOf(stored, next, { policies: ['replace_passphrase'] }), track: trackOf(Shell.Cited, stored, Shell.Cited) }
+      const ante = gateThingOf()
+      await rowsOf(vaultDB).plant(GateScope, { ...ante, auth: { stray: true } })
+      const next = nextGateOf(ante, { wayins: { main: OtherMainWayin, passkey0: null } })
+      // The ask tracks the incompatible gate at its revision, so the answer's tracked is 'same' there, and never the incompatible row.
+      const ask  = { ...replaceAskOf(ante, next, { policies: ['replace_passphrase'] }), track: trackOf(Shell.Cited, ante, Shell.Cited) }
       expect(await vaultDB.tryWriteThing(ask)).to.deep.include({ ok: true, act: 'replaced', val: next })
       expect(await gotAt(vaultDB, 'gate')).to.deep.equal(next)
     })
@@ -412,13 +414,13 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       await expectBad(vaultDB.tryWriteThing(ask as never), 'bad_record')
     })
 
-    it("refuses a damaged box as damaged, to a get", async () => {
+    it("refuses an incompatible box as incompatible, to a get", async () => {
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant({ ...ThingBank, labelpath: box.labelpath }, { ...box, whisper_sealed: {} })
-      await expectBad(vaultDB.tryGetThing(getAskAt(box.labelpath)), 'damaged_row')
+      await expectBad(vaultDB.tryGetThing(getAskAt(box.labelpath)), 'incompatible_row')
     })
 
-    it("carries a box damaged in its body forward, under a write that cites it exactly", async () => {
+    it("carries a box incompatible in its body forward, under a write that cites it exactly", async () => {
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant({ ...ThingBank, labelpath: box.labelpath }, { ...box, whisper_sealed: {} })
       const next = nextOf(box)

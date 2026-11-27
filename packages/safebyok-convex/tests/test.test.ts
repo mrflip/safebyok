@@ -12,7 +12,7 @@ describe("register", () => {
     const backend = defineTestApp({ schema: defineSchema({}) }).defineModules({}).createTest()
     const vaultdb = register(backend, 'vaultdb')
     await backend.mutation(vaultdb.things.birthBank, birthArgs)
-    expect(await backend.query(vaultdb.things.getWorld, worldArgs)).to.deep.include({ bank: TH.bankThingOf() })
+    expect(await backend.query(vaultdb.things.getWorld, worldArgs)).to.deep.nested.include({ 'actual.bank': TH.bankThingOf() })
   })
 
   it("serves a host app's re-exported functions, as defineTestApp's component helper", async () => {
@@ -20,6 +20,6 @@ describe("register", () => {
     const { api, createTest } = TH.vaultHostWith(() => 'u1')
     const backend = createTest()
     await backend.mutation(api.safebyokVault.birthBank, birthArgs)
-    expect(await backend.query(api.safebyokVault.getWorld, worldArgs)).to.deep.include({ bank: TH.bankThingOf() })
+    expect(await backend.query(api.safebyokVault.getWorld, worldArgs)).to.deep.nested.include({ 'actual.bank': TH.bankThingOf() })
   })
 })

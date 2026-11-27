@@ -139,7 +139,7 @@ describe("BaseBox.nextRevisionOf(donor, publicProps)", () => {
   })
 
   const DonorCases = [
-    [() => ({ ...TH.boxShellOf(), am: 'd' }),                'a donor of a damaged row'],
+    [() => ({ ...TH.boxShellOf(), am: 'd' }),                'a donor of an incompatible row'],
     [() => ({ ...TH.boxShellOf(), revseq: 1.5 }),            'a revseq that is not an integer'],
     [() => ({ ...TH.boxShellOf(), revtok: TH.revtokOf('1') }),        'half the shell: its revtok moved, its revseq and lifeseq not'],
     [() => ({ ...TH.boxShellOf(), fmt: 5000 }),              'a donor of another fmt'],

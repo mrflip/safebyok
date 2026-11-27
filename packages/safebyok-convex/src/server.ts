@@ -72,7 +72,7 @@ export class SafebyokVaultComponent {
     return {
       getThing: publicQuery({
         args:    CVX.askArgs,
-        returns: CVX.thingFetched,
+        returns: CVX.getManifest,
         handler: async (ctx, args) => {
           await checkCaller(ctx, args.ask)
           return await ctx.runQuery(things.getThing, args)
@@ -80,7 +80,7 @@ export class SafebyokVaultComponent {
       }),
       writeThing: publicMutation({
         args:    CVX.askArgs,
-        returns: CVX.thingWritten,
+        returns: CVX.writeManifest,
         handler: async (ctx, args) => {
           await checkCaller(ctx, args.ask)
           return await ctx.runMutation(things.writeThing, args)
@@ -88,7 +88,7 @@ export class SafebyokVaultComponent {
       }),
       listThings: publicQuery({
         args:    CVX.askArgs,
-        returns: CVX.thingsFetched,
+        returns: CVX.listManifest,
         handler: async (ctx, args) => {
           await checkCaller(ctx, args.ask)
           return await ctx.runQuery(things.listThings, args)
@@ -96,7 +96,7 @@ export class SafebyokVaultComponent {
       }),
       birthBank: publicMutation({
         args:    CVX.askArgs,
-        returns: CVX.rootsWritten,
+        returns: CVX.birthManifest,
         handler: async (ctx, args) => {
           await checkCaller(ctx, args.ask)
           return await ctx.runMutation(things.birthBank, args)
@@ -104,7 +104,7 @@ export class SafebyokVaultComponent {
       }),
       getWorld: publicQuery({
         args:    CVX.askArgs,
-        returns: CVX.rootsFetched,
+        returns: CVX.worldManifest,
         handler: async (ctx, args) => {
           await checkCaller(ctx, args.ask)
           return await ctx.runQuery(things.getWorld, args)
@@ -112,7 +112,7 @@ export class SafebyokVaultComponent {
       }),
       stats: publicQuery({
         args:    CVX.askArgs,
-        returns: CVX.statsFetched,
+        returns: CVX.statsManifest,
         handler: async (ctx, args) => {
           await checkCaller(ctx, args.ask)
           return await ctx.runQuery(things.stats, args)

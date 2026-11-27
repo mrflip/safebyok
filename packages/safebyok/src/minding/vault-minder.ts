@@ -91,7 +91,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return { answer, refusal: this.#tellAnswer(answer, rootsOf(answer), gotRecordsOf(answer)) }
   }
 
-  /** {@link VaultDB.tryWriteThing}: a write refused over nothing stored tells the shell its answer carries. */
+  /** {@link VaultDB.tryWriteThing}: a write refused where there is no actual row tells the shell its answer carries. */
   async tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer> {
     const { answer } = await this.#doTryWriteThing(ask)
     return answer
@@ -106,7 +106,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
 
   /** {@link VaultDB.tryListThings}: the parent and each Thing listed are told in labelpath order, or a refusal's tombstone or shell. */
   async tryListThings(ask: ListAsk): Promise<ListThingsAnswer> {
-    try { this.#checkOwnAsk(ask) } catch (err) { return { ...refusedAnswerOf(ask, err), parentage: [], deltas: [], damaged_rows: [] } }
+    try { this.#checkOwnAsk(ask) } catch (err) { return { ...refusedAnswerOf(ask, err), parentage: [], deltas: [], incompatible_rows: [] } }
     const answer = await this.#vaultDB.tryListThings(ask)
     this.#tellAnswer(answer, rootsOf(answer), listedRecordsOf(answer))
     return answer
@@ -179,11 +179,11 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return car.thing.pickle() as ReturnType<ThingT['pickle']>
   }
 
-  /** List the children of the live Thing at `labelpath` once. A parent deleted or never stored refuses `absent_thing`. A child stored damaged is told to each listener's `onBadNews`. */
+  /** List the children of the live Thing at `labelpath` once. A parent deleted or never stored refuses `absent_thing`. An incompatible child is told to each listener's `onBadNews`. */
   async tryListOnce(labelpath: Labelpath): Promise<ListThingsAnswer> {
     const ask    = this.makeListAsk({ labelpath })
     const answer = await this.tryListThings(ask)
-    if (answer.damaged_rows.length > 0) { this.#tellBadNews(Throwers.childrenStoredDamaged(ask, answer.damaged_rows), null) }
+    if (answer.incompatible_rows.length > 0) { this.#tellBadNews(Throwers.childrenIncompatible(ask, answer.incompatible_rows), null) }
     return answer
   }
 
@@ -202,7 +202,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return (refusal === null) ? answer : ownRefusedAnswerOf(answer, refusal)
   }
 
-  /** Write `args.record` over `args.cited` once, resolving the record the vaultDB reports stored. */
+  /** Write `args.record` over `args.cited` once, resolving the actual record the vaultDB reports. */
   async putOnce<RecordT extends ThingRecord>(args: PutOnceArgs<RecordT>): Promise<RecordT> {
     const answer = await this.tryPutOnce(args)
     if (! answer.ok) { throw answer.err }
@@ -218,7 +218,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return (refusal === null) ? answer : ownRefusedAnswerOf(answer, refusal)
   }
 
-  /** Write the tombstone `args.record` over `args.cited` once, resolving the tombstone the vaultDB reports stored. */
+  /** Write the tombstone `args.record` over `args.cited` once, resolving the actual tombstone the vaultDB reports. */
   async delOnce<RecordT extends ThingRecord>(args: DelOnceArgs<RecordT>): Promise<RecordT> {
     const answer = await this.tryDelOnce(args)
     if (! answer.ok) { throw answer.err }
@@ -455,7 +455,7 @@ function ownRefusedAnswerOf(answer: GetThingAnswer | WriteThingAnswer, err: Erro
 
 // == [Records of an answer]: rootsOf, gotRecordsOf, writtenRecordsOf, listedRecordsOf, bornRecordsOf, worldRootsOf
 
-// Unspecified for a missing or damaged row: notes/wontfix.md.
+// Unspecified for a missing or incompatible row: notes/wontfix.md.
 /** The roots `answer` carries: each root its `tracked` reports other than `'same'`, the bank first and the root box last. */
 function rootsOf({ tracked }: { tracked: Tracked | 'unread' }): ThingRecord[] {
   if (tracked === 'unread') { return [] }

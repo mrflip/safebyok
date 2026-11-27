@@ -178,13 +178,13 @@ export interface BornBankGiven {
   device?:       Device | undefined
 }
 
-/** A bank born under {@link TestPassphrase}, unlocked, beside its device, the records its birth stored, and the passphrase's proving. */
+/** A bank born under {@link TestPassphrase}, unlocked, beside its device, the records its birth wrote, and the passphrase's proving. */
 export interface BornBank {
   device:     Device
   bank:       LiveBank
-  /** The bank's Thing, as the birth stored it. */
+  /** The bank's Thing, as the birth wrote it. */
   record:     BankRecord
-  /** The main gate's Thing, as the birth stored it. */
+  /** The main gate's Thing, as the birth wrote it. */
   gateRecord: GateRecord
   proving:    PassphraseProving
 }

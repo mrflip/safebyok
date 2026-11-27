@@ -1,8 +1,7 @@
-/** The refusals PostgresVaultDB makes: of what Postgres and its driver throw, and of a write function out of step with this package. */
+/** The refusals PostgresVaultDB makes of what Postgres and its driver throw. */
 
 import * as DB from 'safebyok/storage'
 import type { VaultError } from 'safebyok/storage'
-import * as Phrases from './phrases'
 
 // == [What the driver throws]: refusalOf, isTransient, causeOf, codeOf, TransientSqlstate, TransientSystemCodes, PgConnectionLost
 
@@ -55,10 +54,4 @@ export const PgConnectionLost: ReadonlySet<string> = new Set([
   'timeout exceeded when trying to connect',
   'Connection terminated due to connection timeout',
 ])
-// --
-
-// == [What the database returns]: storedNothing
-
-/** The `unexpected_error` for a write function that stored nothing where the classifier finds a write. */
-export function storedNothing(): VaultError { return DB.unexpectedError(new Error(Phrases.StoredNothing)) }
 // --

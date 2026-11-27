@@ -150,9 +150,10 @@ report `bailed`.
    Then pick them in order. A candidate whose author time and subject match a commit in `landed`
    is already in the tree, landed by another route, and is skipped as `landed`: picking it puts
    its hunks through `-X ours`, and the clean ones can be second copies of what the tree holds.
-   A candidate whose subject ends `squashed by base-sync` is an earlier
-   run's plan squash, which the new one replaces: picking it would bring back a plan line the sprint
-   has since changed, so it is skipped as `superseded`. A candidate reachable from the sprint
+   A candidate whose subject is `plan: <sprint dir> at …, squashed by base-sync` is an earlier
+   run's squash of this same sprint's plan, which the new one replaces: picking it would bring back a plan line the
+   sprint has since changed, so it is skipped as `superseded`. Another sprint's squash is one of the base branch's own
+   commits, and is picked. A candidate reachable from the sprint
    branch whose every path is in `plan-paths` is skipped: the squash is the sprint's version of
    those paths. Every other one, a base-only plan commit included, is picked, dated as written so
    a second run makes the same SHA:
@@ -162,7 +163,7 @@ report `bailed`.
    empty() { [ -z "$(git diff --name-only --diff-filter=U)" ] && git diff --cached --quiet; }
    while read -r c; do
      if command grep -qFx "$(git log -1 --format='%at %s' "$c")" "$snap/landed"; then echo "$c landed"; continue; fi
-     if git log -1 --format=%s "$c" | command grep -q ', squashed by base-sync$'; then echo "$c superseded"; continue; fi
+     if git log -1 --format=%s "$c" | command grep -q '^plan: <sprint dir> at .*, squashed by base-sync$'; then echo "$c superseded"; continue; fi
      if git merge-base --is-ancestor "$c" <sprint> \
        && git diff-tree --no-commit-id --name-only -r "$c" | command grep -vqFxf "$snap/plan-paths"; then :
      elif git merge-base --is-ancestor "$c" <sprint>; then echo "$c squashed"; continue; fi

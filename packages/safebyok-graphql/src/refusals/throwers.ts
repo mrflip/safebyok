@@ -4,7 +4,7 @@ import type { CombinedError } from '@urql/core'
 import * as DB from 'safebyok/storage'
 import * as Phrases from '../phrases'
 
-// == [Server trouble]: serverErred, schemaNotServed, watchEnded, networkTroubleOf
+// == [Server trouble]: serverErred, schemaNotServed, thingOutOfReach, kidsOfOtherParent, watchEnded, networkTroubleOf
 
 // A GraphQL error means the client and server disagree about the schema, or the server's resolver failed. A retry will not
 // fix either, so it is never reported as a storage condition. The refusal carries no cause, so the server's error text never
@@ -14,6 +14,12 @@ export function serverErred(): DB.VaultError { return new DB.VaultError('unexpec
 
 /** The `unexpected_error` for a server answer that lacks the field asked for. */
 export function schemaNotServed(): DB.VaultError { return new DB.VaultError('unexpected_error', Phrases.SchemaNotServed) }
+
+/** The `storage_issue` for an answer carrying a Thing at `labelpath`, where its ask reaches no Thing. */
+export function thingOutOfReach(labelpath: string): DB.VaultError { return new DB.VaultError('storage_issue', Phrases.ThingOutOfReach, { meta: { labelpaths: [labelpath] } }) }
+
+/** The `storage_issue` for a good listing whose kids name a parent other than the ask's, or other than the parent the listing carries. */
+export function kidsOfOtherParent(parentpath: string): DB.VaultError { return new DB.VaultError('storage_issue', Phrases.KidsOfOtherParent, { meta: { labelpaths: [parentpath] } }) }
 
 /** The `storage_unavailable` for a watch whose stream the server ended. */
 export function watchEnded(): DB.VaultError { return new DB.VaultError('storage_unavailable', Phrases.WatchEnded, { meta: { oplabel: 'watch' } }) }

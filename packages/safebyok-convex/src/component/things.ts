@@ -1,129 +1,128 @@
 import * as DB from 'safebyok/storage'
-import type { AnyAsk, BirthBankActual, ThingScope, ThingWatchScope, WroteActual } from 'safebyok/storage'
+import type {
+  AnyAsk, BankObserved, BirthManifest, GetAsk, GetManifest, ListManifest, RootRows, StatsManifest, ThingScope, ThingWatchScope, WorldManifest, WriteAsk, WriteManifest,
+} from 'safebyok/storage'
 import { ConvexError } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc } from './_generated/dataModel'
+import { ThingTables, tableOf } from './schema'
 import type { SafebyokRefusal } from '../refusals'
 import * as CVX from './validators'
 
-// One function for each call of AdapterVaultDB, and the query a watch subscribes to. They are called through the host's
-// wrapper, which has already checked that the caller is the user the call names. Convex runs a mutation as one serializable
-// transaction, so each write is atomic. A write function, in one mutation:
-// * checks its ask with the core's checker,
-// * fetches the Thing at the ask's scope, the nearest Thing above it, and the bank, main gate and root box,
-// * classifies the ask with the core's classifier, then
-// * writes the ask's record over the Thing it cites if the act is a write, and reads back what was stored.
-// It returns what it fetched, as it stood before any write, and as `written` what it read back, or null if it wrote nothing.
-// The client classifies what was fetched with the same classifier, so it reaches the same act, outcome or refusal, checks
-// that the act agrees with whether anything was written, and answers what was read back. A get, a listing, a get of the
-// world and the stats only read, from one snapshot.
+// The datastore of `ConvexVaultDB` (`notes/vault-adapter-contract.md`): one function for each call of AdapterVaultDB, and the
+// query a watch subscribes to. They are called through the host's wrapper, which has already checked that the caller is
+// the user the call names. Each is one Convex query or mutation, and a mutation is one serializable transaction. Each hands
+// back a manifest of what it observed, its tags made with `ManifestTags` and its write decided by the core's own predicate,
+// as `MemoryDatastore` does; it reads no check and no act table. The client adds the manifest's `read_tc`.
+
+/** A manifest as the component hands it back: the client adds its `read_tc`. */
+type Observed<ManifestT extends BankObserved> = Omit<ManifestT, 'read_tc'>
 
 // == [Gets]: getThing, listThings, getWorld
 
-/** Fetch the stored Things a get is classified against, in one snapshot. */
+/** The Thing at the ask's scope, observed in one query. */
 export const getThing = query({
   args:    CVX.askArgs,
-  returns: CVX.thingFetched,
-  handler: async (ctx, { ask: sent }) => {
-    const ask = askFor(() => DB.AskChecks.getAsk.parse(sent))
-    const [thing, above] = await Promise.all([rawAt(ctx.db, ask), aboveIn(ctx.db, ask)])
-    return { thing, ...above }
+  returns: CVX.getManifest,
+  handler: async (ctx, { ask: sent }): Promise<Observed<GetManifest>> => {
+    const ask    = askFor(() => DB.AskChecks.getAsk.parse(sent))
+    const actual = await rowAt(ctx.db, ask)
+    return { tags: DB.ManifestTags.getTagsOf(actual), actual, ancestor: await ancestorOf(ctx.db, ask, actual), ...(await bankObservedOf(ctx.db, ask)) }
   },
 })
 
-/** Fetch the stored Things a listing is classified against, in one snapshot. */
+// Like Postgres's, the listing reads the children whatever the parent: the vaultDB reads them only under a live one.
+/** The Thing at the ask's scope, and each Thing one label under it, observed in one query. */
 export const listThings = query({
   args:    CVX.askArgs,
-  returns: CVX.thingsFetched,
-  handler: async (ctx, { ask: sent }) => {
-    const ask = askFor(() => DB.AskChecks.listAsk.parse(sent))
-    const [parent, children, { bank, tracked }] = await Promise.all([rawAt(ctx.db, ask), childrenIn(ctx.db, ask), rootsIn(ctx.db, ask)])
-    return { parent, children, bank, tracked }
+  returns: CVX.listManifest,
+  handler: async (ctx, { ask: sent }): Promise<Observed<ListManifest>> => {
+    const ask    = askFor(() => DB.AskChecks.listAsk.parse(sent))
+    const actual = await rowAt(ctx.db, ask)
+    return { tags: DB.ManifestTags.getTagsOf(actual), actual, children: await childrenIn(ctx.db, ask), ...(await bankObservedOf(ctx.db, ask)) }
   },
 })
 
-/** Fetch the bank, main gate and root box, and how they compare with the ask's track, in one snapshot. */
+/** The three roots of the ask's bank, observed in one query. */
 export const getWorld = query({
   args:    CVX.askArgs,
-  returns: CVX.rootsFetched,
-  handler: async (ctx, { ask: sent }) => await rootsIn(ctx.db, askFor(() => DB.AskChecks.getWorldAsk.parse(sent))),
+  returns: CVX.worldManifest,
+  handler: async (ctx, { ask: sent }): Promise<Observed<WorldManifest>> => {
+    const ask = askFor(() => DB.AskChecks.getWorldAsk.parse(sent))
+    return { actual: await rootsOf(ctx.db, ask), ...(await bankObservedOf(ctx.db, ask)) }
+  },
 })
 // --
 
 // == [Writes]: writeThing, birthBank
 
-/** Classify a write, and store its record if the act is a write, in one transaction.
- * Returns the Things as fetched before any write, and `written`: what was stored, or null if nothing was.
- */
+/** Write the ask's record where `isWritable` allows, and observe the result, in one mutation. */
 export const writeThing = mutation({
   args:    CVX.askArgs,
-  returns: CVX.thingWritten,
-  handler: async (ctx, { ask: sent }) => {
-    const ask = askFor(() => DB.checkedWriteAsk(sent))
-    const [thing, above] = await Promise.all([rawAt(ctx.db, ask), aboveIn(ctx.db, ask)])
-    const isWrite = wouldWrite(() => DB.Classifier.classifyWriteThing(ask, thing, { ...above, read_tc: DB.readTcNow() }))
-    if (! isWrite) { return { thing, ...above, written: null } }
-
-    const thingWritten = await writeAt(ctx.db, ask, ask.record)
-    const { bank, tracked } = await rootsIn(ctx.db, ask)
-    return { thing, ...above, written: { thing: thingWritten, bank, tracked } }
+  returns: CVX.writeManifest,
+  handler: async (ctx, { ask: sent }): Promise<Observed<WriteManifest>> => {
+    const ask       = askFor(() => DB.checkedWriteAsk(sent))
+    const ante      = await rowAt(ctx.db, ask)
+    const isWritten = DB.isWritable(ask, ante)
+    if (isWritten) { await writeAt(ctx.db, ask) }
+    const actual = await rowAt(ctx.db, ask)
+    return { tags: DB.ManifestTags.writeTagsOf(ask, ante, isWritten), actual, ancestor: await ancestorOf(ctx.db, ask, actual), ...(await bankObservedOf(ctx.db, ask)) }
   },
 })
 
-/** Classify a bank's birth, and store its three roots if the act is a write, in one transaction.
- * Returns the roots as fetched before any write, and `written`: what was stored, or null if nothing was.
- */
+/** Write a new bank's three roots, each put's record, where `isBirthWritable` allows, and observe the result, in one mutation. */
 export const birthBank = mutation({
   args:    CVX.askArgs,
-  returns: CVX.rootsWritten,
-  handler: async (ctx, { ask: sent }) => {
-    const ask = askFor(() => DB.checkedBirthBankAsk(sent))
-    const puts = DB.birthPutsOf(ask)
-    const fetched = await rootsIn(ctx.db, ask)
-    const isBorn = wouldWrite(() => DB.Classifier.classifyBirthBank(puts, { ...fetched, read_tc: DB.readTcNow() }))
-    if (! isBorn) { return { ...fetched, written: null } }
-
-    for (const put of puts) { await writeAt(ctx.db, put, put.record) }
-    return { ...fetched, written: await rootsIn(ctx.db, ask) }
+  returns: CVX.birthManifest,
+  handler: async (ctx, { ask: sent }): Promise<Observed<BirthManifest>> => {
+    const ask       = askFor(() => DB.checkedBirthBankAsk(sent))
+    const puts      = DB.birthPutsOf(ask)
+    const ante      = await rootsOf(ctx.db, ask)
+    const isWritten = DB.isBirthWritable(ante)
+    if (isWritten) { for (const put of puts) { await writeAt(ctx.db, put) } }
+    return { tags: DB.ManifestTags.birthTagsOf(puts, ante, isWritten), actual: await rootsOf(ctx.db, ask), ...(await bankObservedOf(ctx.db, ask)) }
   },
 })
 // --
 
-// == [Stats]: stats
+// == [Stats]: ConvexBankLimits, stats
 
-/** Count and weigh the boxes and gates of a bank, and fetch the bank and how its roots compare with the ask's track, in one snapshot. */
+// docs.convex.dev/production/state/limits: one query may scan 32,000 documents and read 16 MiB. The stats read every Thing
+// of a bank in one query, as may a watch that comes back after long enough away, so a bank holds no more than that.
+/** The most a bank holds in Convex: the documents and bytes one query may read. */
+const ConvexBankLimits = { count: 32_000, size: 16_777_216 }
+
+/** The storage stats of the ask's bank, observed in one query. */
 export const stats = query({
   args:    CVX.askArgs,
-  returns: CVX.statsFetched,
-  handler: async (ctx, { ask: sent }) => {
+  returns: CVX.statsManifest,
+  handler: async (ctx, { ask: sent }): Promise<Observed<StatsManifest>> => {
     const ask = askFor(() => DB.AskChecks.statsAsk.parse(sent))
-    const [filed, { bank, tracked }] = await Promise.all([bankThingsIn(ctx.db, ask), rootsIn(ctx.db, ask)])
-    const { box, gate } = DB.vaultStatsOf(filed)
-    return { box, gate, bank, tracked }
+    return { stats: DB.vaultStatsOf(await bankThingsIn(ctx.db, ask), ConvexBankLimits), ...(await bankObservedOf(ctx.db, ask)) }
   },
 })
 // --
 
 // == [Watching]: watchThings
 
-// Convex re-runs this query whenever a Thing in its range is committed, and sends the client its whole result each time,
+// Convex re-runs this query whenever a Thing in its ranges is committed, and sends the client its whole result each time,
 // so the client watches again from the cursor each result returns. Every later commit has a higher commit timestamp than
 // any this query read, and than the snapshot it read, so watching from that cursor misses nothing.
-/** Fetch the Things of a bank committed after `cursor`, with the bank and the cursor to watch from next.
- * A null cursor fetches no Thing, and returns the cursor of now.
+/** The Things of a bank committed after `cursor`, with the banktok of their bank and the cursor to watch from next.
+ * A null cursor reads nothing, and returns the cursor of now.
  */
 export const watchThings = query({
   args:    CVX.watchArgs,
   returns: CVX.thingsWatched,
   handler: async (ctx, { scope: sent, cursor }) => {
     const scope = askFor(() => DB.AskChecks.thingWatchScope.parse(sent))
-    return (cursor === null) ? { things: [], bank: null, cursor: ctx.meta.getSnapshotTs() } : await committedAfterIn(ctx.db, scope, cursor)
+    return (cursor === null) ? { things: [], banktok: null, cursor: ctx.meta.getSnapshotTs() } : await committedAfterIn(ctx.db, scope, cursor)
   },
 })
 // --
 
-// == [Asks and refusals]: askFor, wouldWrite
+// == [Asks]: askFor
 
 // Anyone signed in may call these functions with an ask of their own making, so each parses its ask again here, with the core's
 // own checker, before a Thing is read, and continues with what the parse returns. The ask's checks refuse `bad_record` only.
@@ -136,97 +135,94 @@ function askFor<AskT>(parse: () => AskT): AskT {
     throw new ConvexError<SafebyokRefusal>({ kind: 'bad_record', message: err.message })
   }
 }
-
-// A refusal writes nothing, and the client's own classification reaches the same refusal.
-/** True when `classify` reaches a write act. */
-function wouldWrite(classify: () => WroteActual | BirthBankActual): boolean {
-  try {
-    const actual = classify()
-    return actual.ok && DB.Classifier.isWriteAct(actual.act)
-  } catch (err) {
-    if (DB.isVaultError(err)) { return false }
-    throw err
-  }
-}
 // --
 
-// == [Things stored]: ThingDoc, docAt, rawAt, rootsIn, aboveIn, childrenIn, bankThingsIn, committedAfterIn, writeAt
+// == [Rows]: ThingDoc, docAt, rowOf, rowAt, ancestorOf, rootsOf, bankObservedOf, childrenIn, bankThingsIn, committedAfterIn, writeAt
 
-/** A Thing's document. Its `thing` is `unknown` until the core has checked it. */
-type ThingDoc = Omit<Doc<'things'>, 'thing'> & { thing: unknown }
+/** A Thing's document, in the table of any kind. */
+type ThingDoc = Doc<'bank_things'> | Doc<'gate_things'> | Doc<'box_things'>
 
 // `.unique()` throws if it finds two documents. A document is inserted only when none was found in the same transaction, so
 // two would mean damage, and that should fail loudly.
 /** The document of the Thing at `scope`, or null for none. */
 async function docAt(db: DatabaseReader, { userid, banklabel, labelpath }: ThingScope): Promise<ThingDoc | null> {
-  return await db.query('things').withIndex('by_scope', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel).eq('labelpath', labelpath)).unique()
+  return await db.query(tableOf(labelpath)).withIndex('by_scope', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel).eq('labelpath', labelpath)).unique()
 }
 
-/** The raw Thing at `scope`, or null for none. */
-async function rawAt(db: DatabaseReader, scope: ThingScope): Promise<unknown> {
+/** The raw row a document holds: the Thing's fields, without Convex's own or the commit timestamp. */
+function rowOf(doc: ThingDoc): unknown {
+  const { _id, _creationTime, commit_ts: _commitTs, ...row } = doc
+  return row
+}
+
+/** The raw row at `scope`, or null for none. */
+async function rowAt(db: DatabaseReader, scope: ThingScope): Promise<unknown> {
   const doc = await docAt(db, scope)
-  return doc?.thing ?? null
+  return (doc === null) ? null : rowOf(doc)
 }
 
-/** The raw roots of `ask`'s bank, and how each compares with what `ask` tracks. */
-async function rootsIn(db: DatabaseReader, ask: AnyAsk) {
+/** Where `actual` is null, the nearest row above `ask`'s scope, or null for none; otherwise null, as it is read nowhere else. */
+async function ancestorOf(db: DatabaseReader, ask: GetAsk | WriteAsk, actual: unknown): Promise<unknown> {
+  if (actual !== null) { return null }
   const { userid, banklabel } = ask
+  const aboves = await Promise.all(DB.Labelpath.ancestorsOf(ask.labelpath).map(async (labelpath) => await rowAt(db, { userid, banklabel, labelpath })))
+  return aboves.find((raw) => raw !== null) ?? null
+}
+
+/** The raw roots of `scope`'s bank, each null for none. */
+async function rootsOf(db: DatabaseReader, { userid, banklabel }: ThingWatchScope): Promise<RootRows> {
   const [bank, gate, root] = await Promise.all([
-    rawAt(db, { userid, banklabel, labelpath: 'bank' }),
-    rawAt(db, { userid, banklabel, labelpath: DB.Labelpath.MainGate }),
-    rawAt(db, { userid, banklabel, labelpath: DB.Labelpath.RootBox }),
+    rowAt(db, { userid, banklabel, labelpath: DB.RootLabelpaths.bank }),
+    rowAt(db, { userid, banklabel, labelpath: DB.RootLabelpaths.gate }),
+    rowAt(db, { userid, banklabel, labelpath: DB.RootLabelpaths.root }),
   ])
-  return { bank, gate, root, tracked: DB.Classifier.trackedFetchedOf(ask, { bank, [DB.Labelpath.MainGate]: gate, [DB.Labelpath.RootBox]: root }) }
+  return { bank, gate, root }
 }
 
-/** The raw nearest Thing stored above `ask`'s scope, with its bank and `tracked`. */
-async function aboveIn(db: DatabaseReader, ask: AnyAsk & ThingScope) {
-  const { userid, banklabel } = ask
-  const [{ bank, tracked }, ...ancestors] = await Promise.all([
-    rootsIn(db, ask),
-    ...DB.Labelpath.ancestorsOf(ask.labelpath).map(async (labelpath) => await rawAt(db, { userid, banklabel, labelpath })),
-  ])
-  return { bank, tracked, ancestor: ancestors.find((raw) => raw !== null) ?? null }
+/** The banktok of `ask`'s bank as it now stands, and its `tracked` for what `ask` tracks. */
+async function bankObservedOf(db: DatabaseReader, ask: AnyAsk): Promise<Observed<BankObserved>> {
+  const { bank, gate, root } = await rootsOf(db, ask)
+  return { banktok: DB.ManifestTags.banktokOf(bank), tracked: DB.ManifestTags.trackedOf(ask, { bank, [DB.Labelpath.MainGate]: gate, [DB.Labelpath.RootBox]: root }) }
 }
 
 // The index sorts a bank's labelpaths, so the Things below `scope` are the one range from `<labelpath>/` up to `<labelpath>0`,
 // '0' being the character after '/'. A child is one label under it: no '/' past the prefix.
-/** The raw children of `scope`, with their labelpaths. */
+/** Each raw row one label under `scope`, beside its labelpath. */
 async function childrenIn(db: DatabaseReader, { userid, banklabel, labelpath }: ThingScope) {
   const under = `${labelpath}/`
-  const docs: ThingDoc[] = await db.query('things')
+  const docs: ThingDoc[] = await db.query(tableOf(labelpath))
     .withIndex('by_scope', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel).gte('labelpath', under).lt('labelpath', `${labelpath}0`))
     .collect()
-  return docs.filter((doc) => ! doc.labelpath.includes('/', under.length)).map((doc) => ({ labelpath: doc.labelpath, raw: doc.thing }))
+  return docs.filter((doc) => ! doc.labelpath.includes('/', under.length)).map((doc) => ({ labelpath: doc.labelpath, raw: rowOf(doc) }))
 }
 
-/** Every raw Thing of a bank, each beside its labelpath. */
+/** Every raw row of a bank, of each kind, beside its labelpath. */
 async function bankThingsIn(db: DatabaseReader, { userid, banklabel }: ThingWatchScope) {
-  const docs: ThingDoc[] = await db.query('things').withIndex('by_scope', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel)).collect()
-  return docs.map(({ labelpath, thing }) => ({ labelpath, raw: thing }))
+  const docsByTable: ThingDoc[][] = await Promise.all(Object.values(ThingTables).map(async (table) =>
+    await db.query(table).withIndex('by_scope', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel)).collect()))
+  return docsByTable.flat().map((doc) => ({ labelpath: doc.labelpath, raw: rowOf(doc) }))
 }
 
-/** The raw Things of a bank committed after `cursor`, with the raw bank and the next cursor. */
+/** The raw rows of a bank, of each kind, committed after `cursor` and in commit order, with the banktok of the bank and the next cursor. */
 async function committedAfterIn(db: DatabaseReader, { userid, banklabel }: ThingWatchScope, cursor: bigint) {
   // Only the mutation that writes a document reads its `commit_ts` back as Convex's placeholder; a query reads the timestamp.
   type CommittedThingDoc = ThingDoc & { commit_ts: bigint }
-  const [docs, bank] = await Promise.all([
-    db.query('things').withIndex('by_commit', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel).gt('commit_ts', cursor)).collect() as Promise<CommittedThingDoc[]>,
-    rawAt(db, { userid, banklabel, labelpath: 'bank' }),
+  const [docsByTable, bank] = await Promise.all([
+    Promise.all(Object.values(ThingTables).map(async (table) =>
+      await db.query(table).withIndex('by_commit', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel).gt('commit_ts', cursor)).collect() as CommittedThingDoc[])),
+    rowAt(db, { userid, banklabel, labelpath: DB.RootLabelpaths.bank }),
   ])
-  const things = docs.map(({ labelpath, thing }) => ({ labelpath, raw: thing }))
-  return { things, bank, cursor: docs.at(-1)?.commit_ts ?? cursor }
+  // Commit timestamps rise in commit order, so the last of the sorted documents carries the next cursor.
+  const docs   = docsByTable.flat().toSorted((one, other) => Number(one.commit_ts - other.commit_ts))
+  const things = docs.map((doc) => ({ labelpath: doc.labelpath, raw: rowOf(doc) }))
+  return { things, banktok: DB.ManifestTags.banktokOf(bank), cursor: docs.at(-1)?.commit_ts ?? cursor }
 }
 
-// Every write stamps `commit_ts`, the commit's timestamp, which `watchThings` reads from.
-/** Store `thing` at `scope`, and return it as read back. */
-async function writeAt(db: DatabaseWriter, scope: ThingScope, thing: unknown): Promise<unknown> {
-  const { userid, banklabel, labelpath } = scope
-  const doc = { userid, banklabel, labelpath, thing, commit_ts: db.vars.commitTs }
-  const anteDoc = await docAt(db, scope)
-  let id = anteDoc?._id
-  if (id === undefined) { id = await db.insert('things', doc) } else { await db.replace('things', id, doc) }
-  const stored = await db.get('things', id)
-  return stored?.thing ?? null
+/** Write `ask.record` at its scope, over the document there or as a new one, stamped with the commit's timestamp. */
+async function writeAt(db: DatabaseWriter, ask: WriteAsk): Promise<void> {
+  const doc     = { ...ask.record, commit_ts: db.vars.commitTs }
+  const table   = tableOf(ask.labelpath)
+  const anteDoc = await docAt(db, ask)
+  if (anteDoc === null) { await db.insert(table, doc) } else { await db.replace(table, anteDoc._id, doc) }
 }
 // --

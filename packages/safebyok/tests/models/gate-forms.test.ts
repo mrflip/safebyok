@@ -18,8 +18,8 @@ const NextPassphrase = 'a different passphrase, just as long'
 /** A strength checker that finds `'weak'` weak and every other passphrase strong. */
 function strengthChecker(passphrase: string) { return (passphrase === 'weak' ? { strong: false as const, reason: 'too short' } : { strong: true as const }) }
 
-/** The main gate stored for `bank`, as its vaultDB answers it. */
-async function storedGateOf(bank: Bank): Promise<GateRecord> {
+/** The actual main gate of `bank`, as its vaultDB answers it. */
+async function actualGateOf(bank: Bank): Promise<GateRecord> {
   const answer = await bank.device.vaultDB.tryGetThing(bank.device.world.demandVaultMinder().makeGetAsk({ labelpath: 'gate' }))
   if (! answer.ok) { throw answer.err }
   return answer.val as GateRecord
@@ -156,7 +156,7 @@ describe("bank.gate.replacePassphrase(cleartexts)", () => {
     expect(bank.gate).to.include({ revseq: ante.revseq + 1, lifeseq: ante.lifeseq })
     expect(bank.gate.main.pickle()).to.not.deep.equal(ante.wayins.main)
     expect(bank.gate.passkey0!.pickle()).to.deep.equal(ante.wayins.passkey0)
-    expect(await storedGateOf(bank)).to.deep.equal(bank.gate.pickle())
+    expect(await actualGateOf(bank)).to.deep.equal(bank.gate.pickle())
     expect(bank.gate).to.equal(gate)
     expect(bank.isUnlocked).to.be.true
     expect(make.mock.calls[0]![0]).to.include({ gate_revtok: bank.gate.revtok, wayinkind: 'passphrase' })
@@ -238,7 +238,7 @@ describe("bank.gate.replacePassphrase(cleartexts)", () => {
     expect(born.bank.isUnlocked).to.be.true
   })
 
-  it("refuses 'stale_write' over a gate changed elsewhere and not yet heard of, leaving the bank locked, its gate then the one stored", async () => {
+  it("refuses 'stale_write' over a gate changed elsewhere and not yet heard of, leaving the bank locked, its gate then the actual one", async () => {
     const { bank, elsewhere } = await bankAndElsewhere()
     await elsewhere.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
     const make = vi.spyOn(Lease, 'make')
@@ -281,7 +281,7 @@ describe("bank.gate.addPasskey(cleartexts)", () => {
     expect(bank.gate).to.include({ revseq: ante.revseq + 1 })
     expect(bank.gate.main.pickle()).to.deep.equal(ante.wayins.main)
     expect(bank.gate.passkey0).to.deep.include({ wayinkind: 'passkey', credential_id: answer.credential_id })
-    expect(await storedGateOf(bank)).to.deep.equal(bank.gate.pickle())
+    expect(await actualGateOf(bank)).to.deep.equal(bank.gate.pickle())
     expect(make.mock.calls[0]![0]).to.include({ gate_revtok: bank.gate.revtok, wayinkind: 'passphrase' })
     expect(TH.isZeroed(answer.prfBytes)).to.be.true
     bank.lock()
@@ -311,7 +311,7 @@ describe("bank.gate.addPasskey(cleartexts)", () => {
     expect(bank.isLocked).to.be.true
   })
 
-  it("refuses 'stale_write' over a gate changed elsewhere and not yet heard of, leaving the bank locked, its gate then the one stored", async () => {
+  it("refuses 'stale_write' over a gate changed elsewhere and not yet heard of, leaving the bank locked, its gate then the actual one", async () => {
     const { bank, elsewhere } = await bankAndElsewhere()
     await elsewhere.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
     const answer = TH.passkeyAnswerOf()
@@ -331,7 +331,7 @@ describe("bank.gate.revokePasskey(cleartexts)", () => {
     expect(await bank.gate.revokePasskey({ passphraseCleartext: TH.TestPassphrase })).to.equal(bank.gate)
     expect(bank.gate).to.include({ revseq: ante.revseq + 1 })
     expect(bank.gate.passkey0).to.be.null
-    expect(await storedGateOf(bank)).to.deep.equal(bank.gate.pickle())
+    expect(await actualGateOf(bank)).to.deep.equal(bank.gate.pickle())
     expect(make.mock.calls[0]![0]).to.include({ gate_revtok: bank.gate.revtok, wayinkind: 'passphrase' })
     bank.lock()
     await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
@@ -371,7 +371,7 @@ describe("bank.gate.revokePasskey(cleartexts)", () => {
     expect(bank.isLocked).to.be.true
   })
 
-  it("refuses 'stale_write' over a gate changed elsewhere and not yet heard of, leaving the bank locked, its gate then the one stored", async () => {
+  it("refuses 'stale_write' over a gate changed elsewhere and not yet heard of, leaving the bank locked, its gate then the actual one", async () => {
     const { bank, elsewhere } = await bankAndElsewhere({ passkeyCleartext: TH.passkeyAnswerOf() })
     await elsewhere.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
     await TH.expectRefusal(bank.gate.revokePasskey({ passphraseCleartext: TH.TestPassphrase }), 'stale_write')

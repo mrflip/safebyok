@@ -25,7 +25,8 @@ const ThingChecks = `
   CHECK (array_length(string_to_array(lifepath, '/'), 1) = array_length(string_to_array(labelpath, '/'), 1)),`
 
 /** The SQL that creates PostgresVaultDB's three tables, one per kind of Thing: `await pool.query(VaultTablesSql)`. */
-export const VaultTablesSql = `-- safebyok-postgres: the three tables PostgresVaultDB stores its Things in, one per kind. For Postgres 14 or later.
+export const VaultTablesSql = `-- safebyok-postgres: the three tables PostgresVaultDB writes its Things to, one per kind. For Postgres 14 or later;
+-- VaultFunctionsSql and PostgresVaultDB need Postgres 18.
 -- Safe to run again: it creates only what is missing.
 --
 -- Each row is the Thing safebyok wrote, with a column for each of its fields. A field that is an object is a jsonb column.
@@ -37,7 +38,7 @@ export const VaultTablesSql = `-- safebyok-postgres: the three tables PostgresVa
 -- Every text column is COLLATE "C", compared and sorted byte for byte, as safebyok compares names. A locale's collation
 -- can reorder strings when the operating system or ICU is upgraded, leaving an index silently out of order.
 --
--- No table has a foreign key: a bank's roots are written together by safebyok_birth_roots, and a lone or damaged row
+-- No table has a foreign key: a bank's roots are written together by safebyok_birth_roots, and a lone or incompatible row
 -- reads as one.
 
 -- A bank: its Thing alone. lifetok is minted at the bank's birth, kept by each write over the live bank, and tells it from

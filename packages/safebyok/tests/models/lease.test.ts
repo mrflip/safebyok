@@ -630,13 +630,13 @@ describe("lease.stow(deviceDB)", () => {
     const deviceDB = new MemoryDeviceDB()
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     await lease.stow(deviceDB)
-    const stored = await deviceDB.peekLease(TH.WorldLeaseScope)
-    expect(stored).to.deep.include(pick(lease, ShownFieldnames))
-    const reloaded = Lease.make(stored as LiveLeaseRecord, { gate })
+    const actual = await deviceDB.peekLease(TH.WorldLeaseScope)
+    expect(actual).to.deep.include(pick(lease, ShownFieldnames))
+    const reloaded = Lease.make(actual as LiveLeaseRecord, { gate })
     expect(await reloaded.unseal(BaseBox, sealed)).to.deep.include(Cleartexts)
   })
 
-  it("leaves a newer record stored in place", async () => {
+  it("leaves a newer ante record in place", async () => {
     const { lease } = await leaseWorld()
     const deviceDB = new MemoryDeviceDB()
     const tombstone = Lease.tombstoneOf(lease)

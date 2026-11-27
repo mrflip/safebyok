@@ -21,7 +21,7 @@ import type { VaultMinder } from '../minding/vault-minder'
 import type { ThingCar } from '../minding/thing-car'
 
 /** One bank's boxes in this tab: the verbs to seal and write them, to use their whispers, and to probe storage and keys with one.
- * Each seal is made under the bank's lease, so it needs the bank unlocked. A write answers the record stored.
+ * Each seal is made under the bank's lease, so it needs the bank unlocked. A write answers the actual record.
  */
 export class Vault {
   // == [Props]: #world, #vaultTSQ
@@ -76,7 +76,7 @@ export class Vault {
 
   // == [Writing boxes]: tryPutBoxOnce, putBoxOnce, tryDelBoxOnce, delBoxOnce
 
-  /** Seal and write the next revision of the box `cited`, applying `patch` and encrypting `secrets`. Resolves an `Outcome` of the record stored.
+  /** Seal and write the next revision of the box `cited`, applying `patch` and encrypting `secrets`. Resolves an `Outcome` of the actual record.
    * Given a labelpath, it writes over the newest revision this device has seen of the box, getting the box first where it has seen none.
    * It tries once. Where another revision is stored, it refuses `stale_write`, and the box then holds that revision.
    * Over a sparse box, a tombstone or no box, `patch` must give the sidecar. Misuse is a bad outcome too.
@@ -92,7 +92,7 @@ export class Vault {
     return Outcome.good(answer.val)
   }
 
-  /** {@link tryPutBoxOnce}, throwing its refusal instead of answering it: the record stored, on success.
+  /** {@link tryPutBoxOnce}, throwing its refusal instead of answering it: the actual record, on success.
    * @example
    *   const box = await vault.putBoxOnce('box/openai', { sidecar: { account: 'work' } }, { whisper })
    */
@@ -100,7 +100,7 @@ export class Vault {
     return Outcome.valOf(await this.tryPutBoxOnce(cited, patch, secrets))
   }
 
-  /** Delete the box at `labelpath`, resolving an `Outcome` of the tombstone stored.
+  /** Delete the box at `labelpath`, resolving an `Outcome` of the actual tombstone.
    * It writes over the newest revision this device has seen of the box, getting the box first where it has seen none. Misuse is a bad outcome too.
    */
   async tryDelBoxOnce(labelpath: BoxLabelpath): Promise<Outcome.Outcome<TombstoneOf<BoxRecord>>> {
@@ -112,7 +112,7 @@ export class Vault {
     return Outcome.good(answer.val)
   }
 
-  /** {@link tryDelBoxOnce}, throwing its refusal instead of answering it: the tombstone stored, on success. */
+  /** {@link tryDelBoxOnce}, throwing its refusal instead of answering it: the actual tombstone, on success. */
   async delBoxOnce(labelpath: BoxLabelpath): Promise<TombstoneOf<BoxRecord>> {
     return Outcome.valOf(await this.tryDelBoxOnce(labelpath))
   }
@@ -120,7 +120,7 @@ export class Vault {
 
   // == [Stats]: stats, tryStats
 
-  /** The bank's storage stats, read from the vaultDB once: how many boxes and gates it stores, live and in all, their size in bytes, and the store's limits.
+  /** The bank's storage stats, read from the vaultDB once: how many boxes and gates it has, live and in all, their size in bytes, and the datastore's limits.
    * Needs no unlock. Nothing refuses a write for being over a limit.
    * @example
    *   const { box, gate, max } = await vault.stats()

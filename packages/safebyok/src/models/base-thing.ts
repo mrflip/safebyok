@@ -100,7 +100,7 @@ export abstract class BaseThing implements Sparse<ThingRecord> {
     return isVoidSentinelOfKind(this.modelkind, val)
   }
 
-  // The void sentinel is a whole tombstone, though no record check accepts it: a store must never treat a shell as a record.
+  // The void sentinel is a whole tombstone, though no record check accepts it: a datastore must never treat a shell as a record.
   /** True when `record` is whole, with its body, and of this class's kind. The void sentinel is whole. */
   static isWhole<KindT extends Thingkind | null, ValT extends Sparse<ThingRecord>>(this: Kinded<KindT>, record: ValT): record is WholeOfKind<KindT, ValT> {
     return isWholeOfKind(this.modelkind, record)

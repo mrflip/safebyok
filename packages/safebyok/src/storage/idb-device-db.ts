@@ -22,14 +22,14 @@ function leaseShelfOf(dbName: string | undefined): UseStore {
 /** The name of the IndexedDB database an IdbDeviceDB of `dbName` opens. */
 export function leaseDatabasenameOf(dbName?: string): string { return `${dbprefixOf(dbName)}:lease-v${LeaseDBVersion}` }
 
-/** The name of the BroadcastChannel that tells every tab of the lease records stored in the database of `dbName`. */
+/** The name of the BroadcastChannel that tells every tab of the lease records stowed in the database of `dbName`. */
 export function leaseBellnameOf(dbName?: string): string { return `${dbprefixOf(dbName)}:lease` }
 
 /** Where the lease record at `scope` is filed: one for each gate. */
 export function scopepathOf({ userid, banklabel, labelpath }: LeaseScope): LeaseScopepath { return [userid, banklabel, labelpath] }
 
 // It never meets a lease record's scopepath, which has three parts.
-/** Where the devicetok of the user `userid` is filed, in the same store as the lease records: one for each user. */
+/** Where the devicetok of the user `userid` is filed, in the same object store as the lease records: one for each user. */
 export function devicetokScopepathOf(userid: Userid): DevicetokScopepath { return [userid, 'devicetok'] }
 // --
 

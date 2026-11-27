@@ -474,6 +474,9 @@ delete's own atomic unit is still correct.
 
 ## Adapter contract
 
+This is safebyok-big's adapter contract. The new core's (`packages/safebyok`), its datastore's manifests and the three
+roles, is `notes/vault-adapter-contract.md`.
+
 Each rule is one testable statement about what an adapter does. An atomic unit is one statement or one transaction; the adapter may use either.
 
 ### Fetching

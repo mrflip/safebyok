@@ -49,7 +49,7 @@ export function stowRoots(shelf: RootShelf, scope: BankScope, world: World): voi
 
 // == [The value]: ShelvedRoot, ShelvedRoots, ShelvedVersion, shelvedRootOf, shelvedOf, rootsOfShelved, shelfCkeyOf
 
-/** One root, as the vaultDB stores it, beside when it was read. */
+/** One root, as the vaultDB has it, beside when it was read. */
 type ShelvedRoot = Readonly<{ record: Adoptable<ThingRecord>, read_tc: ReadTc }>
 
 /** The bank's three roots: the bank, its main gate and its root box. */

@@ -108,7 +108,7 @@ describe("vault.probe(args)", () => {
     expect(rowsOf(bank).get(ProbeLabelpath)).to.include({ am: 'x' })
   })
 
-  it("refuses at the get where storage answers the put ok but stores nothing", async () => {
+  it("refuses at the get where storage answers the put ok but writes nothing", async () => {
     const { bank, vault } = await TH.buildBornVault()
     loseProbePut(bank)
     const err = await TH.expectRefusal(vault.probe(), 'stale_read')

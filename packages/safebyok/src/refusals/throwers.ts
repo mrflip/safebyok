@@ -8,7 +8,8 @@ import * as Phrases from '../phrases'
 import { type ThingRecord } from '../shapes/shapes-thing'
 import { StoreLimitFloor } from '../shapes/shapes-vault-stats'
 import { type ListAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
-import type { DamagedThing } from '../shapes/shapes-answers'
+import type { IncompatibleThing } from '../shapes/shapes-answers'
+import type { Refusaltag } from '../shapes/shapes-manifest'
 import type { ProbeStepkind } from '../shapes/shapes-vault-probe'
 
 // == [Big's Throwers]: every thrower of safebyok-big, re-exported
@@ -92,15 +93,25 @@ export function bornAtNotNow(ask: WriteAsk): Errors.VaultError { return new Erro
 export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
 // --
 
-// == [Storing Throwers]: PoliciedMeta, gateIssue, storeQuotaTooSmall, storageCallRefused, bornAtNotStored, lifetokNotStored, rowOfOtherAddress, bankRootsMissing, listParentNotLive, answerNotMade
+// == [Storage Throwers]: RefusalkindForRefusaltag, taggedRefusal, storeQuotaTooSmall, storageCallRefused, rowOfOtherAddress, bankRootsMissing, banktokMissing, listParentNotLive, answerNotMade, writtenOfOtherAct, proposedNotWritten, tagsOfOtherRow, tagsOfOtherAsk, answerOfOtherManifest
+
+/** The kind of refusal of a `policied` write, by the {@link Refusaltag} of its phrase. */
+export const RefusalkindForRefusaltag = {
+  BornAtMoved:       'bad_record',
+  LifetokMoved:      'bad_record',
+  ProvedWayinMoved:  'gate_issue',
+  OtherWayinMoved:   'gate_issue',
+  PasskeyStored:     'gate_issue',
+  PasskeyNotAdded:   'gate_issue',
+  NoPasskeyStored:   'gate_issue',
+  PasskeyNotRevoked: 'gate_issue',
+} as const satisfies Record<Refusaltag, Errors.Refusalkind>
 
 // Big types a refusal's meta.act as its own BadAct, which has no `policied`.
-/** Refusal meta with act `policied`, for a write the act tables allow but a storage policy, the born_at check or the lifetok check refuses. */
-export const PoliciedMeta = { act: 'policied' } as unknown as Errors.RefusalMeta
-
-/** A `gate_issue` refusal of a write over `stored`, saying `why`. */
-export function gateIssue(stored: ThingRecord | null, why: string): Errors.VaultError {
-  return new Errors.VaultError('gate_issue', BigPhrases.gateIssue(why), { rows: { dbhas: stored }, meta: PoliciedMeta })
+/** The refusal of a `policied` write, of the kind and phrase its `refusaltag` names, with its `actual` row, null for none, as `dbhas`. */
+export function taggedRefusal(ask: WriteAsk, { act, actual, refusaltag }: Readonly<{ act: 'policied', actual: ThingRecord | null, refusaltag: Refusaltag }>): Errors.VaultError {
+  const meta = { oplabel: 'writeThing', ask: loggableAskOf(ask), act } as unknown as Errors.RefusalMeta
+  return new Errors.VaultError(RefusalkindForRefusaltag[refusaltag], Phrases.PhraseForRefusaltag[refusaltag], { rows: { dbhas: actual }, meta })
 }
 
 /** A `storage_blocked` refusal: the browser's `quota` of bytes for the page is under {@link StoreLimitFloor}, too little for a vault. */
@@ -113,30 +124,39 @@ export function storageCallRefused(oplabel: string, thrown: unknown): Errors.Vau
   return new Errors.VaultError('storage_issue', Phrases.storageCallRefused(oplabel), { cause: sanitizeForeignError(thrown) })
 }
 
-/** A `bad_record` refusal of a write over `stored`, the live Thing whose born_at it changes. */
-export function bornAtNotStored(stored: ThingRecord | null): Errors.VaultError {
-  return new Errors.VaultError('bad_record', Phrases.BornAtNotStored, { rows: { dbhas: stored }, meta: PoliciedMeta })
-}
-
-/** A `bad_record` refusal of a write of the bank over `stored`, the live bank whose lifetok it changes. */
-export function lifetokNotStored(stored: ThingRecord | null): Errors.VaultError {
-  return new Errors.VaultError('bad_record', Phrases.LifetokNotStored, { rows: { dbhas: stored }, meta: PoliciedMeta })
-}
-
 /** A `storage_issue` refusal: storage answered a row at another address than asked, by the `fieldnames` that disagree. */
 export function rowOfOtherAddress(fieldnames: readonly string[]): Errors.VaultError { return new Errors.VaultError('storage_issue', BigPhrases.rowOfOtherAddress(fieldnames)) }
 
 /** A `storage_issue` refusal: a live bank is stored without its main gate or its root box. */
 export function bankRootsMissing(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.BankRootsMissing) }
 
+/** A `storage_issue` refusal: the datastore handed back a manifest with no banktok. */
+export function banktokMissing(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.BanktokMissing) }
+
 /** An `absent_thing` refusal of a list whose parent holds a tombstone or nothing, which has no children. `meta` names its act, its oplabel and its ask. */
 export function listParentNotLive(meta: Errors.RefusalMeta): Errors.VaultError { return new Errors.VaultError('absent_thing', Phrases.ListParentNotLive, { meta }) }
 
 /** An `unexpected_error` refusal: a vaultDB could not make the answer for a failure. */
 export function answerNotMade(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerNotMade) }
+
+/** A `storage_issue` refusal: the datastore wrote where the act its tags find is no write, or wrote nothing where it is one. */
+export function writtenOfOtherAct(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.WrittenOfOtherAct) }
+
+/** A `storage_issue` refusal: the row the datastore wrote lacks the revision, life or liveness of the record the write proposed. */
+export function proposedNotWritten(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.ProposedNotWritten) }
+
+/** A `storage_issue` refusal: the datastore's tags are not those of the row it handed back. */
+export function tagsOfOtherRow(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.TagsOfOtherRow) }
+
+/** A `storage_issue` refusal: the datastore's tags disagree with the write it was asked. */
+export function tagsOfOtherAsk(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.TagsOfOtherAsk) }
+
+// Only our own code can make an answer that does not copy its manifest: it is a bug, not trouble in storage.
+/** An `unexpected_error` refusal: the vaultDB's answer is not a copy of the datastore's manifest it was made from. */
+export function answerOfOtherManifest(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerOfOtherManifest) }
 // --
 
-// == [Minding Throwers]: notMinded, worldNotHeard, childrenStoredDamaged
+// == [Minding Throwers]: notMinded, worldNotHeard, childrenIncompatible
 
 /** The refusal of a box's item asked of a vault TSQ for a Thing other than a box under the root box. */
 export function notMinded(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.NotMinded) }
@@ -144,9 +164,9 @@ export function notMinded(): Errors.VaultError { return new Errors.VaultError('b
 /** The refusal of a bank's root box read while its world holds none live. */
 export function worldNotHeard(): Errors.VaultError { return new Errors.VaultError('record_conflict', Phrases.WorldNotHeard) }
 
-/** The bad news of `damaged_rows`, the children a list for `ask` found stored damaged and left out, each named by its labelpath. */
-export function childrenStoredDamaged(ask: ListAsk, damaged_rows: readonly DamagedThing[]): Errors.VaultError {
-  return new Errors.VaultError('damaged_row', Phrases.ChildrenStoredDamaged, { meta: { ask: loggableAskOf(ask), labelpaths: damaged_rows.map(({ labelpath }) => labelpath) } })
+/** The bad news of `incompatible_rows`, the children a list for `ask` found incompatible and left out, each named by its labelpath. */
+export function childrenIncompatible(ask: ListAsk, incompatible_rows: readonly IncompatibleThing[]): Errors.VaultError {
+  return new Errors.VaultError('incompatible_row', Phrases.ChildrenIncompatible, { meta: { ask: loggableAskOf(ask), labelpaths: incompatible_rows.map(({ labelpath }) => labelpath) } })
 }
 // --
 

@@ -351,7 +351,7 @@ describe("a device's root shelf", () => {
     expect([...rootShelf.items.keys()]).to.deep.equal([WorldShelfCkey])
   })
 
-  it("tells onBadNews of a damaged root, and the others still reach their Things", async () => {
+  it("tells onBadNews of an incompatible root, and the others still reach their Things", async () => {
     const onBadNews = vi.fn()
     const { born, device, rootShelf } = await bornAndReloaded({ onBadNews })
     const [version, bank, , rootBox] = shelvedOf(rootShelf) as [string, { record: unknown }, unknown, { record: unknown }]
@@ -473,7 +473,7 @@ describe("device.signin(userid)", () => {
     expect(vaultMinder.makeGetAsk({ labelpath: 'bank' })).to.deep.include({ banktok: bank.lifetok })
   })
 
-  it("shows the vaultDB's refusal as failed where its bank is stored damaged, and never rejects", async () => {
+  it("shows the vaultDB's refusal as failed where its bank is incompatible, and never rejects", async () => {
     const born    = await TH.buildBornBank()
     const vaultDB = born.device.vaultDB as MemoryVaultDB
     vaultDB._cheat_things(born.bank.scope).set('bank', { mangled: true })
@@ -481,7 +481,7 @@ describe("device.signin(userid)", () => {
     await device.signin(TH.WorldScope.userid)
     const shown = device.world.getSnapshot()
     expect(shown).to.include({ stage: 'failed', isLocked: true })
-    expect(shown.lastErr).to.include({ refusalkind: 'damaged_row' })
+    expect(shown.lastErr).to.include({ refusalkind: 'incompatible_row' })
     expect(Object.isFrozen(shown.lastErr)).to.be.true
     expect(device.bank).to.be.null
   })
@@ -887,7 +887,7 @@ describe("a device's onBadNews, told of trouble in storage", () => {
     await vault.bank.device.vaultTSQ.listOnce('box')
     await TH.eventually(() => onBadNews.mock.calls.length > 0)
     await TH.aWhile()
-    expect(onBadNews.mock.calls.map(([heard]) => (heard as BadNews).news.refusalkind)).to.deep.equal(['damaged_row'])
+    expect(onBadNews.mock.calls.map(([heard]) => (heard as BadNews).news.refusalkind)).to.deep.equal(['incompatible_row'])
   })
 })
 

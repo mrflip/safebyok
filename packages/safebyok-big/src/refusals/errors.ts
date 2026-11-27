@@ -26,11 +26,12 @@ import type { Capacity } from '../shapes/shapes-storage'
  *   `same_passphrase`, `camped`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_whisper`, `damaged_lease`, `newer_format`,
- *   `identity_revoked`, `damaged_row`, `damaged_vault`, `storage_issue`.
+ *   `identity_revoked`, `damaged_row`, `incompatible_row`, `damaged_vault`, `storage_issue`.
  *
  * A record that fails its checks is named for its direction: `damaged_row` for one read from
  * storage, and `bad_record` for one handed in or where one check serves both ways. A
  * damaged row is thrown by the bankDB that reads the datastore, and never stands for a newer format.
+ * The new core's vaultDB throws `incompatible_row` in its place: a row our code would not write.
  * A whisper that will not decipher under the lease in hand, or deciphers to no whisper, is
  * `damaged_whisper`. A storage adapter's answer that cannot be, such as one revision under two toks,
  * is `record_conflict`.
@@ -74,6 +75,7 @@ export const refusalkindVals = [
   'same_passphrase',     // a new passphrase that is the one the vault already has
   'camped',              // a bankDB put told not to replace a live row found one there
   'damaged_row',         // a row read from storage failed its checks, on the way out, and is set aside
+  'incompatible_row',    // the new core's `damaged_row`: a row read from storage failed its kind's checks, a record our code would not write, and is set aside
   'damaged_vault',       // the vault row stored above a box asked for failed its checks, as the classifier of notes/answer-contract.md found it
   'gate_issue',          // a bankDB gate put that its storage policy refuses: it changes more of the stored gate row than its gating does, or the row is not one its gating changes
   'disabled',            // a call on a bank, a listing or a thing of theirs no longer enabled, since a sweep, a vacate or a delete: it answers nothing more
@@ -124,6 +126,7 @@ export const RefusalFamilyForKind = {
   same_passphrase:     'condition',
   camped:              'condition',
   damaged_row:         'bad_news',
+  incompatible_row:    'bad_news',
   damaged_vault:       'bad_news',
   gate_issue:          'misuse',
   disabled:            'misuse',

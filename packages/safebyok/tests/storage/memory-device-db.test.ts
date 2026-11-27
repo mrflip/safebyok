@@ -22,8 +22,8 @@ class FailingDeviceDB extends MemoryDeviceDB {
   protected override doStowDevicetok(): never { throw new TypeError('lease_key quoted here') }
 }
 
-describe("MemoryDeviceDB, what only a store in memory can show", () => {
-  it("stores a copy of the lease record it is handed, and answers a copy of what it stores", async () => {
+describe("MemoryDeviceDB, what only a deviceDB in memory can show", () => {
+  it("stows a copy of the lease record it is handed, and answers a copy of what it has", async () => {
     const deviceDB = new MemoryDeviceDB()
     const lease    = await TH.liveLeaseRecordOf()
     await deviceDB.stowLease(lease)
@@ -44,7 +44,7 @@ describe("MemoryDeviceDB, what only a store in memory can show", () => {
   })
 })
 
-describe("DeviceDB, what a store throws", () => {
+describe("DeviceDB, what a subclass throws", () => {
   const VerbCases = [
     [(deviceDB: MemoryDeviceDB) => deviceDB.peekLease(TH.WorldLeaseScope), 'peekLease', 'refuses a peek that throws as storage_unavailable, naming only what it threw'],
     [async (deviceDB: MemoryDeviceDB) => deviceDB.stowLease(await TH.liveLeaseRecordOf()), 'stowLease', 'refuses a stow that throws as storage_unavailable, naming only what it threw'],

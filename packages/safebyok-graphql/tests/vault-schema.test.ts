@@ -1,10 +1,10 @@
 /** VaultSchemaSdl compared with the core's checks: every typed input and answer has the fields its check reads, and each enum the values. */
 
 import { describe, expect, it } from 'vitest'
-import { buildSchema, getNamedType, isEnumType, isInputObjectType, isLeafType, isObjectType, parse, validate } from 'graphql'
+import { buildSchema, getNamedType, isEnumType, isInputObjectType, isLeafType, parse, validate } from 'graphql'
 import type { GraphQLField, GraphQLInputType, GraphQLNamedType, GraphQLOutputType, GraphQLSchema } from 'graphql'
 import type * as Z from 'zod'
-import { AskChecks, CrossedChecks, VaultStatsChecks } from 'safebyok/storage'
+import { AskChecks } from 'safebyok/storage'
 import { VaultOperations } from '../src/index'
 import { VaultSchemaSdl } from '../src/server'
 import { WireChecks } from '../src/shapes/shapes-wire'
@@ -100,7 +100,7 @@ function rootFieldOf(schema: GraphQLSchema, fieldname: string): GraphQLField<unk
   return field
 }
 
-/** List the mismatches between the core's checks and `schema`: every root field's answer and argument, and each type an answer's check reads raw. */
+/** List the mismatches between the core's checks and `schema`: every root field's answer and argument. */
 function schemaDriftOf(schema: GraphQLSchema): string[] {
   return [
     ...AnswerChecks.flatMap(([fieldname, check]) => driftOf(check, rootFieldOf(schema, fieldname).type, fieldname)),
@@ -109,25 +109,20 @@ function schemaDriftOf(schema: GraphQLSchema): string[] {
       if (! arg) { throw new Error(`the schema's ${fieldname} has no ${argname}`) }
       return driftOf(check, arg.type, `${fieldname}(${argname})`)
     }),
-    ...TypeChecks.flatMap(([typename, check]) => {
-      const type = schema.getType(typename)
-      if (! isObjectType(type)) { throw new Error(`the schema has no type ${typename}`) }
-      return driftOf(check, type, typename)
-    }),
   ]
 }
 // --
 
-// == [The checks]: AnswerChecks, InputChecks, TypeChecks
+// == [The checks]: AnswerChecks, InputChecks
 
 // The check GraphQLVaultDB reads each root field's answer with.
 const AnswerChecks = [
-  ['safebyokGetThing',    WireChecks.gotAnswer],
+  ['safebyokGetThing',    WireChecks.getAnswer],
   ['safebyokListThings',  WireChecks.listAnswer],
   ['safebyokGetWorld',    WireChecks.worldAnswer],
   ['safebyokStats',       WireChecks.statsAnswer],
-  ['safebyokWriteThing',  WireChecks.wroteAnswer],
-  ['safebyokBirthBank',   WireChecks.rootsAnswer],
+  ['safebyokWriteThing',  WireChecks.writeAnswer],
+  ['safebyokBirthBank',   WireChecks.birthAnswer],
   ['safebyokWatchThings', WireChecks.notice],
 ] as const
 
@@ -140,14 +135,6 @@ const InputChecks = [
   ['safebyokWriteThing',  'ask',   AskChecks.writeAsk],
   ['safebyokBirthBank',   'ask',   AskChecks.birthBankAsk],
   ['safebyokWatchThings', 'scope', AskChecks.thingWatchScope],
-] as const
-
-// The check the core reads each typed part of an answer with, where the answer's own check reads it raw.
-const TypeChecks = [
-  ['SafebyokKids',         CrossedChecks.listing.shape.val],
-  ['SafebyokDamagedThing', CrossedChecks.damagedThing],
-  ['SafebyokRoots',        CrossedChecks.roots],
-  ['SafebyokStats',        VaultStatsChecks.vaultStats],
 ] as const
 // --
 
@@ -197,6 +184,6 @@ describe("the schema walk", () => {
 
   it("finds a typed part of an answer that lacks a field the core reads", () => {
     const shorted = buildSchema(VaultSchemaSdl.replace(/(type SafebyokKids \{[^}]*?)\n {2}parentlife: +String!/u, '$1'))
-    expect(schemaDriftOf(shorted).join('\n')).to.include('SafebyokKids: SafebyokKids lacks parentlife')
+    expect(schemaDriftOf(shorted).join('\n')).to.include('safebyokListThings.val: SafebyokKids lacks parentlife')
   })
 })

@@ -18,7 +18,7 @@ export function describeVaultDBTracked({ fresh, bornBank }: VaultDBBatteryWorld)
       expect(await vaultDB.tryGetThing({ ...getAskAt('box'), track: trackOf() })).to.deep.include({ ok: true, tracked: { bank: 'same', gate: 'same', box: 'same' } })
     })
 
-    it("is the stored Thing where its revseq or lifepath is not the one tracked, the bank without its main gate", async () => {
+    it("is the actual Thing where its revseq or lifepath is not the one tracked, the bank without its main gate", async () => {
       const vaultDB = await bornBank()
       expect(await vaultDB.tryGetThing({ ...getAskAt('box'), track: GateStaleTrack })).to.deep.include({ tracked: { bank: 'same', gate: gateThingOf(), box: 'same' } })
       expect(await vaultDB.tryListThings({ ...listAskAt('box'), track: BankStaleTrack })).to.deep.include({ ok: true, tracked: { bank: bankThingOf(), gate: 'same', box: 'same' } })
@@ -48,7 +48,7 @@ export function describeVaultDBTracked({ fresh, bornBank }: VaultDBBatteryWorld)
       expect(await vaultDB.tryBirthBank(other)).to.deep.include({ ok: true, act: 'passed', tracked: { bank: 'same', gate: 'same', box: 'same' } })
     })
 
-    it("is, for each root, 'same' where the ask tracks the void revision and none is stored, or tracks the revision stored, and the stored root whole where it tracks any other", async () => {
+    it("is, for each root, 'same' where the ask tracks the void revision and none is stored, or tracks the actual revision, and the actual root whole where it tracks any other", async () => {
       const same  = { bank: 'same', gate: 'same', box: 'same' }
       const whole = { bank: bankThingOf(), gate: gateThingOf(), box: rootBoxOf() }
       const empty = await fresh()

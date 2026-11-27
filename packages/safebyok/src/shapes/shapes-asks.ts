@@ -10,7 +10,7 @@ import {
 } from './shapes-thing'
 import * as Throwers from '../refusals/throwers'
 
-// == [Asks]: RawChecks, loggableAsk, AskChecks, Track, VoidTrack, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, GetWorldAsk, WorldRoots, StatsAsk, ThingWatchScope, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
+// == [Asks]: RawChecks, loggableAsk, AskChecks, Track, VoidTrack, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, RootLabelpaths, GetWorldAsk, WorldRoots, StatsAsk, ThingWatchScope, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
 type Kinded   = { modelkind: Thingkind, labelpath: Labelpath }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
@@ -32,15 +32,15 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof,
   const modelkind       = oneof(ThingChecks.thingkindVals)
   const thingWatchScope = ThingChecks.thingScope.pick({ userid: true, banklabel: true })
   const thingOptions    = obj({
-    /** The storage policies the write must meet, each over the Thing stored. */
+    /** The storage policies the write must meet, each over the ante Thing. */
     policies: arr(oneof(EX.storagePolicyVals)),
   }).strict()
   // A root the sender knows none stored of is tracked at the void revision.
   const trackPair       = obj({ revseq: ThingChecks.thingCited.shape.revseq, lifepath: ThingChecks.thingCited.shape.lifepath }).strict()
   const track           = obj({ bank: trackPair, [Labelpath.MainGate]: trackPair, [Labelpath.RootBox]: trackPair }).strict()
-  // The sender's, not the datastore's: a vaultDB neither compares it with the bank stored nor refuses on it. A get may
+  // The sender's, not the datastore's: a vaultDB neither compares it with the actual bank nor refuses on it. A get may
   // be sent before its sender knows the bank, at sign-in or before a birth, and carries the void lifetok then.
-  const anyBanktok      = PerKindChecks.storedLifetok.shape.lifetok
+  const anyBanktok      = PerKindChecks.banktok
   const banktok         = anyBanktok.refine((given) => given !== SX.VoidLifeTok, Phrases.BanktokVoid)
   return {
     thingOptions,
@@ -86,18 +86,18 @@ const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => 
     gate:      citedFields.optional(),
     root:      citedFields.optional(),
     track:     obj({ bank: trackFields, [Labelpath.MainGate]: trackFields, [Labelpath.RootBox]: trackFields }).partial().optional(),
-    banktok:   PerKindChecks.storedLifetok.shape.lifetok.optional(),
+    banktok:   PerKindChecks.banktok.optional(),
   }
 }, 'bad_record')
 
 /** The checks of a vaultDB ask, its records aside, of a watch's scope and handlers, and of the part of an ask that is safe to log.
  * A write or birth ask's records are checked by {@link checkedWriteAsk} and {@link checkedBirthBankAsk}.
- * Every ask carries `banktok`, the lifetok its sender has of the bank's life: a vaultDB checks it, and nothing more. Only a get, of a Thing or of the world, and an ask for stats may carry the void lifetok.
+ * Every ask carries `banktok`, the lifetok its sender has of the bank's life: a vaultDB checks its form, and compares it with nothing stored. Only a get, of a Thing or of the world, and an ask for stats may carry the void lifetok.
  */
 export const AskChecks = Object.freeze({ ...RawChecks, loggableAsk })
 
 /** The revseq and lifepath the ask's sender has of its bank, its main gate and its root box, each at the void revision where it knows none stored.
- * The answer's `tracked` says, for each, whether it is still the one stored; a root tracked at the void revision is `'same'` where none is stored.
+ * The answer's `tracked` says, for each, whether it is still the actual one; a root tracked at the void revision is `'same'` where none is stored.
  */
 export type Track           = Readonly<Z.infer<typeof AskChecks.track>>
 /** The revseq and lifepath a track gives a root its sender knows none stored of. */
@@ -120,17 +120,19 @@ export type GateWriteAsk = WriteAskFlags & Readonly<{ modelkind: 'gate', cited: 
 /** A write ask of a box: see {@link WriteAsk}. */
 export type BoxWriteAsk  = WriteAskFlags & Readonly<{ modelkind: 'box',  cited: CitedOf<BoxRecord>,  record: BoxRecord }>
 /** An ask to write `record` over the Thing it `cited`: a `put` of a live record, or a `del` with a tombstone. With no `RecordT`, a write of any kind.
- * The store compares the {@link ThingCited} fields of `cited` with the Thing stored. Any other field of `cited` is read only by a storage policy, as testimony.
+ * The datastore compares the {@link ThingCited} fields of `cited` with the ante Thing. Any other field of `cited` is read only by a storage policy, as testimony.
  * `modelkind` says which kind of Thing both are.
  */
 export type WriteAsk<RecordT extends ThingRecord = ThingRecord> = Extract<BankWriteAsk | GateWriteAsk | BoxWriteAsk, { record: RecordT }>
 /** A bank's three roots: the bank, its main gate and its root box. */
 export type BankRoots       = Readonly<{ bank: BankRecord, gate: GateRecord, root: BoxRecord }>
+/** Where each of a bank's three roots is stored, by its key in {@link BankRoots}. */
+export const RootLabelpaths = Object.freeze({ bank: 'bank', gate: Labelpath.MainGate, root: Labelpath.RootBox } as const satisfies Record<keyof BankRoots, Labelpath>)
 /** An ask to write a new bank's first Things in one step: the bank, its main gate and its root box. */
 export type BirthBankAsk    = Readonly<Omit<Z.infer<typeof AskChecks.birthBankAsk>, keyof BankRoots> & BankRoots>
 /** An ask for a bank's three roots, read in one step. */
 export type GetWorldAsk     = Readonly<Z.infer<typeof AskChecks.getWorldAsk>>
-/** A bank's three roots as one step read them: each the whole record stored, live or a tombstone, or the shell where none is stored. */
+/** A bank's three roots as one step read them: each the whole actual record, live or a tombstone, or the shell where none is stored. */
 export type WorldRoots      = Readonly<{ bank: BankRecord | VoidSentinel, gate: GateRecord | VoidSentinel, root: BoxRecord | VoidSentinel }>
 /** An ask for a bank's storage stats, read in one step. */
 export type StatsAsk        = Readonly<Z.infer<typeof AskChecks.statsAsk>>
@@ -140,8 +142,8 @@ export type AnyAsk          = GetAsk | ListAsk | WriteAsk | BirthBankAsk | GetWo
 export type BirthPuts       = readonly [BankWriteAsk, GateWriteAsk, BoxWriteAsk]
 /** The scope of a watch: a bank. */
 export type ThingWatchScope = Readonly<Z.infer<typeof AskChecks.thingWatchScope>>
-// Unspecified for a missing or damaged row: notes/wontfix.md.
-/** For each Thing an ask tracks, `'same'` if it is stored at the revseq and lifepath tracked, else the Thing stored. */
+// Unspecified for a missing or incompatible row: notes/wontfix.md.
+/** For each Thing an ask tracks, `'same'` if the actual Thing is at the revseq and lifepath tracked, else the actual Thing. */
 export type Tracked         = Readonly<{ bank: BankRecord | 'same', [Labelpath.MainGate]: GateRecord | 'same', [Labelpath.RootBox]: BoxRecord | 'same' }>
 
 /** Check a write `ask`, and its records by their kind and against each other, throwing `bad_record`. Returns it typed. */
@@ -189,7 +191,7 @@ function checkWriteInvariants(ask: WriteAsk): void {
   if (Lifeseq.leadingOf(record.lifepath) !== Lifeseq.leadingOf(cited.lifepath))                     { throw Throwers.lifepathNotKept(ask) }
   const isLifeFlipped = (record.am !== cited.am)
   if (Lifeseq.lifenumOf(record.lifeseq) !== Lifeseq.lifenumOf(Lifeseq.ofLifepath(cited.lifepath)) + (isLifeFlipped ? 1 : 0)) { throw Throwers.lifeseqNotNext(ask) }
-  // A live record over a live one leaves the stored born_at unchanged: AdapterVaultDB checks that, against the Thing it has.
+  // A live record over a live one leaves the ante Thing's born_at unchanged: AdapterVaultDB checks that, against the Thing it has.
   if (isLifeFlipped && (record.am === 'a') && (record.born_at !== record.written_at))               { throw Throwers.bornAtNotNow(ask) }
   if ((ask.modelkind === 'gate') && ask.options?.policies.includes('replace_passphrase') && (ask.cited.wayins?.main === undefined)) { throw Throwers.testimonyMissing(ask) }
 }

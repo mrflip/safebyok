@@ -1,7 +1,7 @@
 /** The dojo's vaultDB: the IndexedDB one, which can be told to refuse the next write, as a backend that is down would. */
 
 import { IdbVaultDB } from 'safebyok-indexeddb'
-import { type Actual, type BirthBankActual, type BirthBankAsk, type BirthPuts, type DelAct, type PutAct, VaultError, type WriteAsk } from 'safebyok/storage'
+import { type BirthBankAsk, type BirthManifest, type BirthPuts, VaultError, type WriteAsk, type WriteManifest } from 'safebyok/storage'
 
 /** The message of the refusal a {@link RefusingVaultDB} answers when told to. */
 export const RefusedWriteMessage = 'The dojo told its vaultDB to refuse this write.'
@@ -30,7 +30,7 @@ export class RefusingVaultDB extends IdbVaultDB {
   /** Forget a refusal asked for and not yet made. */
   stopRefusing(): void { this.#isRefusing = false }
 
-  protected override async doWriteThing(ask: WriteAsk): Promise<Actual<PutAct | DelAct>> {
+  protected override async doWriteThing(ask: WriteAsk): Promise<WriteManifest> {
     // The refusal is taken before the hold, so a button pressed meanwhile, which disarms, cannot change this write's outcome.
     const refusal = this.#refusalIfAsked()
     await this.#holdIfAsked()
@@ -38,7 +38,7 @@ export class RefusingVaultDB extends IdbVaultDB {
     return await super.doWriteThing(ask)
   }
 
-  protected override async doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthBankActual> {
+  protected override async doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthManifest> {
     const refusal = this.#refusalIfAsked()
     if (refusal !== null) { throw refusal }
     return await super.doBirthBank(ask, puts)

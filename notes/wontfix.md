@@ -61,27 +61,27 @@ the Coach, 2026-11-20, soon_item rework.
   - refuse `record_conflict` as a record is received: a comparison of revtoks, and a refusal state, in the common path
     of every record.
 * workaround: none needed. A write citing what the cache holds is refused by storage where storage holds otherwise,
-  and the refusal carries the stored record.
+  and the refusal carries the actual record.
 
-Steps to create: storage restored from a backup, or two stores answering for one bank.
+Steps to create: storage restored from a backup, or two datastores answering for one bank.
 
-Reasoning for wontfix: storage is the ground truth, and the cache a copy. The store knows the record it holds, and
+Reasoning for wontfix: storage is the ground truth, and the cache a copy. The datastore knows the record it holds, and
 refuses a write that cites another, so a conflict is found where it can be settled, not in the cache. Ruled by the Coach,
 2026-11-15, vault_minder.
 
-### The value in `tracked`, and the `banktok`, of a missing or damaged record
+### The value in `tracked`, and the `banktok`, of a missing or incompatible record
 
-The answer to an ask that tracks a root stored missing or damaged is unspecified behavior.
+The answer to an ask that tracks a root that is missing or incompatible is unspecified behavior.
 
-* current outcome: unspecified. As the code stands, an ask that tracks a root at another revision than the row stored is
-  refused: `damaged_row` where the row fails its checks, `storage_issue` where none is stored. An ask that tracks the
-  damaged row's own revision is told `'same'` for it, and the step's answer stands; where that row is the bank, the
+* current outcome: unspecified. As the code stands, an ask that tracks a root at another revision than the actual row is
+  refused: `incompatible_row` where the row fails its checks, `storage_issue` where there is none. An ask that tracks the
+  incompatible row's own revision is told `'same'` for it, and the step's answer stands; where that row is the bank, the
   answer's `banktok` is the void lifetok. No caller checks for either case, and none may: no guard, no null, no refusal
   of its own, and no test of the value in `tracked`.
 * alternatives:
   - a sentinel for either case (null, a refusal kind, a left-out key): it extends the contract, so every caller must
-    then handle it, and the handling cascades into code that second-guesses the store.
-  - refuse every ask over a damaged root, whatever it tracks: every step would check rows it does not otherwise read,
+    then handle it, and the handling cascades into code that second-guesses the datastore.
+  - refuse every ask over an incompatible root, whatever it tracks: every step would check rows it does not otherwise read,
     for a case storage should never produce.
 * workaround: reload the page, or restart the system.
 
@@ -91,7 +91,7 @@ the datastore has lost or damaged either row.
 Reasoning for wontfix: the device was sent revisions of both rows, so either case means storage has gone wrong
 underneath it: work stops until the page reloads, or until a developer catches the error and restarts the system.
 Pinned by a type-level test that each `tracked` entry is exactly its record or `'same'`, and by a `//` comment at the
-`tracked` type, at `VaultMinder`'s `rootsOf` and at the classifier's `banktokOf` pointing here. Ruled by the Coach,
+`tracked` type, at `VaultMinder`'s `rootsOf` and at `banktokOrVoidOf` in the new core's `src/storage/manifest-acts.ts` pointing here. Ruled by the Coach,
 2026-11-15, lean_buttonup T1; kept 2026-11-25 ("damaged_rows are mostly impossible hallucinations so stay with my
 ruling").
 
@@ -159,7 +159,7 @@ Steps to reproduce: start a get of a box; while the vaultDB answers it, list its
 box anew; let the get answer.
 
 Reasoning for wontfix: it is a crossing of a get and a list or notice, which the host does not sequence and which no
-retry, lock or abort may settle in a primitive's critical path; what each answer says is a revision the vaultDB did store,
+retry, lock or abort may settle in a primitive's critical path; what each answer says is a revision the vaultDB did write,
 and the cache marks itself behind before any later call reads it. Ruled by the orchestrator, 2026-11-20, soon_item.
 
 ### A box new to a listing that lands while a list read before it is under way
@@ -349,8 +349,8 @@ thread 1b, 2026-11-25; its announcement to `onLifecycle` added by thread 6, 2026
 
 ### Two tabs that stow a lease record at once keep only what stow-keeps-newest keeps
 
-* current outcome: each `stowLease` reads the stored record and writes its own in one transaction, and writes only a record
-  newer by life, then revision; each answers the record stored afterward. Two tabs that stow at once (a renewal in each,
+* current outcome: each `stowLease` reads the ante record and writes its own in one transaction, and writes only a record
+  newer by life, then revision; each answers the actual record. Two tabs that stow at once (a renewal in each,
   or a renewal in one and a lock's tombstone in the other) keep the newer record, and every tab takes it up as the bell
   rings. Two records of the same life and revision keep whichever landed first, though their other fields
   (`proved_at`, `ends_at`, the keys) may differ, and the tab whose record lost keeps its own lease, since a record of the
@@ -371,7 +371,7 @@ Reasoning for wontfix: a lease record changes at a gating, a renewal or a lock, 
 stowing in the same few milliseconds is a crossing (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). The one
 case where they stow together on purpose is a gate change, which every tab softlocks on: a softlock only ever brings
 `ends_at` nearer, so the revisions the tabs write differ by milliseconds of `ends_at` alone, and whichever lands first is
-as good as the rest. The stow-keeps-newest rule decides, and that is all. Nothing the bankDB stores changes, and no key leaves the device's
+as good as the rest. The stow-keeps-newest rule decides, and that is all. Nothing stored in the bankDB changes, and no key leaves the device's
 database other than by a stow over it. Directed by the lease_shelf handoff (thread 1a), 2026-11-25; written by the
 device_db worker; the softlock and the tab whose record lost added by thread 1b, 2026-11-25.
 
@@ -397,7 +397,7 @@ write a box from another device.
 Reasoning for wontfix: a hand-over happens at a tab's mount, unmount or sign-out, minutes or hours apart, and a change
 landing in the milliseconds it takes is a crossing (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`): "Remember
 how slowly everything changes vs. time from mount to unmount" (the Coach). Fixing it costs a read at every hand-over or a
-hand-shake between tabs. Nothing the bankDB stores changes, and no notice carries secret material beyond the sealed
+hand-shake between tabs. Nothing stored in the bankDB changes, and no notice carries secret material beyond the sealed
 records any reader of the vaultDB sees. Directed by the lease_shelf handoff (thread 7), 2026-11-25; written by the
 one_watch worker.
 
@@ -419,7 +419,7 @@ Steps to reproduce: over a OneWatchVaultDB whose lock manager rejects a request 
 
 Reasoning for wontfix: a Web Lock request without a signal rejects only where the platform refuses it, as when its page
 is torn down, and a disconnect then a connect in the moment before it rejects is a crossing (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). Guarding it puts a
-state or a token on the watch's lifecycle path. Nothing the bankDB stores changes, and a notice carries only the sealed
+state or a token on the watch's lifecycle path. Nothing stored in the bankDB changes, and a notice carries only the sealed
 records any reader of the vaultDB sees. Written by the lease_shelf thread 13 reviewer, 2026-11-25, awaiting a ruling.
 
 ## React
@@ -588,7 +588,7 @@ verb for a line in the host's log. Ruled by the Coach, 2026-11-25, written by le
 * alternatives:
   - a flag each handler checks before it delivers: a state checked on every notice, for a crossing.
   - wait for UNLISTEN, or the unsubscribe, before the stop function returns: a stop that waits on the network.
-* workaround: none needed: what lands is what the datastore stored, sealed, and the VaultMinder's next connect fetches
+* workaround: none needed: what lands is what the datastore wrote, sealed, and the VaultMinder's next connect fetches
   again.
 
 Steps to reproduce: watch a bank over `PostgresVaultDB`; have a write's notice arrive, and stop the watch while its
@@ -622,3 +622,25 @@ user is not heard by the second.
 Reasoning for wontfix: a watch starts and stops when a device connects or disconnects, a few times a day, and a LISTEN is
 in flight for milliseconds (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). Nothing is written to the
 bankDB, and nothing secret is held. Written by adapter_port thread G (postgres_listen), 2026-11-26.
+
+### A write over a row that fails its kind's checks lands when the write predicate's clauses match
+
+* current outcome: a datastore checks no ante row against its kind. A write whose cited revision and the predicate's
+  equality clauses (`fmt`, `lifeseq`, the revision pins, `born_at`, `lifetok`) match the ante row overwrites it, and
+  answers `replaced`. A gate policy reads the raw ante wayins, so a `passkey0` that is a string of garbage reads as a
+  passkey stored, and a write under `revoke_passkey` that cites the gate lands. Without a policy, safebyok-big
+  overwrote such a row as well; under a policy, it refused `damaged_row`.
+* alternatives:
+  - check the ante row in each datastore before the write: puts a check outside its owner, in every datastore, on the
+    critical path of every write. A datastore reads no check.
+  - have AdapterVaultDB check the manifest's ante row and refuse: the write has already landed in the atomic step, so
+    the refusal would misreport what the bankDB stores.
+* workaround: none needed. The row was already broken, and every get of it refused `incompatible_row` before the write.
+
+Steps to reproduce: store a gate whose `passkey0` is the string `'garbage'`; then put the gate under the
+`revoke_passkey` policy, citing that revision exactly.
+
+Reasoning for wontfix: an incompatible row is a broken state, which is reported on the read path, never accommodated
+on the write path. Refusing the write would add a check outside its owner to every datastore's write. "A write over an
+incompatible row refuses" is not a guarantee of the new core. Ruled by the Coach, 2026-11-27, vault_manifest Closer
+Look E1.

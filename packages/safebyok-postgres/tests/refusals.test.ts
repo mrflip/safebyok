@@ -4,8 +4,7 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { describe, expect, it } from 'vitest'
 import { isVaultError, unexpectedError } from 'safebyok/storage'
-import * as Phrases from '../src/phrases'
-import { PgConnectionLost, refusalOf, storedNothing } from '../src/refusals'
+import { PgConnectionLost, refusalOf } from '../src/refusals'
 
 /** An Error with a driver's `code`. */
 function coded(message: string, code: string): Error { return Object.assign(new Error(message), { code }) }
@@ -77,13 +76,5 @@ describe("refusalOf(oplabel, thrown)", () => {
     const pgPool   = createRequire(pgClient).resolve('pg-pool')
     const sources  = [pgClient, pgPool].map((path) => readFileSync(path, 'utf8')).join('\n')
     for (const message of PgConnectionLost) { expect(sources).to.include(message) }
-  })
-})
-
-describe("storedNothing()", () => {
-  it("refuses unexpected_error, saying the SQL functions and this package disagree", () => {
-    const refusal = storedNothing()
-    expect(refusal.refusalkind).to.eq('unexpected_error')
-    expect(refusal.cause).to.have.property('message', Phrases.StoredNothing)
   })
 })

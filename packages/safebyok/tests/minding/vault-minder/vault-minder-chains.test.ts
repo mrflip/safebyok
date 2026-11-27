@@ -7,7 +7,7 @@ import type { BoxRecord, BoxSparse, Sparse, ThingRecord } from '../../../src/sha
 import { Thing } from '../../../src/models/thing'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
-import { type TSQWorld, cheatStored, isObservedStale, itemQueryAt, listQueryAt, noticeOf, tsqWorldOf } from './tsq-world'
+import { type TSQWorld, cheatPlant, isObservedStale, itemQueryAt, listQueryAt, noticeOf, tsqWorldOf } from './tsq-world'
 
 // == [Précis]: Liveness, Precis, CachePrecis, EndPrecis, ChainCase, Route
 
@@ -259,7 +259,7 @@ async function arrive(world: TSQWorld<MemoryVaultDB>, precis: Precis, route: Rou
     world.notify(noticeOf(recordOf(precis)))
     return false
   }
-  cheatStored(world.vaultDB, recordOf(wholeOf(precis)))
+  cheatPlant(world.vaultDB, recordOf(wholeOf(precis)))
   if (liveness === 'soon') {
     await world.vaultTSQ.listOnce('box')
     return false
@@ -277,7 +277,7 @@ async function seed(world: TSQWorld<MemoryVaultDB>, initial: CachePrecis): Promi
   const chain = seedRowOf(initial)?.chain ?? []
   for (const precis of chain) { await arrive(world, precis, 'f') }
   const newest = newestOf(initial)
-  if (newest) { cheatStored(world.vaultDB, recordOf(wholeOf(newest))) }
+  if (newest) { cheatPlant(world.vaultDB, recordOf(wholeOf(newest))) }
   await world.vaultTSQ.listOnce('box')
 }
 
@@ -357,7 +357,7 @@ function precisesOf(row: ChainCase): Precis[] {
   return [...row.chain, ...[row.initial, row.wanted].flatMap(({ item, soon, dead }) => [item, soon, dead].filter((precis) => (precis !== undefined) && (precis !== null)))]
 }
 
-/** Each précis, or pair of them, in `precises` that no one history of the box could store, as text. */
+/** Each précis, or pair of them, in `precises` that no one history of the box could write, as text. */
 function historyClashesOf(precises: readonly Precis[]): string[] {
   const clashes: string[] = []
   for (const precis of precises) {
@@ -392,7 +392,7 @@ describe("the chain table", () => {
     expect(() => recordOf(["soon", 5, 15])).to.throw('no soon has the lifenum 5')
   })
 
-  it("names only records one history of the box could store", () => {
+  it("names only records one history of the box could write", () => {
     expect(ChainCases.flatMap((row) => historyClashesOf(precisesOf(row)).map((clash) => `${titleOf(row)}: ${clash}`))).to.deep.equal([])
   })
 

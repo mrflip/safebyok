@@ -5,12 +5,14 @@ import { anyApi } from 'convex/server'
 import type { FunctionReference } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import type { ConvexClient } from 'convex/browser'
-import { type BoxRecord, type ThingScope, type VaultEvent, Shell } from 'safebyok/storage'
+import { type BoxRecord, type ThingScope, type VaultEvent, Shell, VoidLifeTok } from 'safebyok/storage'
 import * as TH from './test-helpers'
 import { ConvexVaultDB } from '../src/index'
 import { fakeDeployment } from '../src/testing'
 import type { FakeDeployment, FakeHost } from '../src/testing'
 import type { SafebyokVaultApi } from '../src/server'
+import schema, { tableOf } from '../src/component/schema'
+import type { TableNames } from '../src/component/_generated/dataModel'
 
 type ComponentDeployment = FakeDeployment<ReturnType<typeof TH.componentHost>>
 type ComponentBackend = ReturnType<ComponentDeployment['_cheat_backendAs']>
@@ -49,26 +51,31 @@ function madeOf(convexVaultDB: ConvexVaultDB) {
 
 /** The document of the Thing at `scope`, or null for none. */
 async function thingDocAt(db: ComponentDb, { userid, banklabel, labelpath }: ThingScope) {
-  return await db.query('things').withIndex('by_scope', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel).eq('labelpath', labelpath)).unique()
+  return await db.query(tableOf(labelpath)).withIndex('by_scope', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel).eq('labelpath', labelpath)).unique()
 }
 
-/** The cheat into what `convexVaultDB` stores. Each plants through `_cheat_arrange`, so the clients hear of it as of a write from elsewhere. */
+// As Postgres's plant (`jsonb_populate_record`), a field of `raw` its table has no field for is dropped; one of the wrong type is refused.
+/** Insert `raw` as the document at `scope`, in place of any there. */
+async function plantIn(db: ComponentDb, scope: ThingScope, raw: unknown): Promise<void> {
+  const doc = await thingDocAt(db, scope)
+  if (doc) { await db.delete(doc._id) }
+  const table = tableOf(scope.labelpath)
+  const fields = Object.entries(raw as object).filter(([fieldname]) => Object.hasOwn(schema.tables[table].validator.fields, fieldname))
+  await db.insert(table, { ...Object.fromEntries(fields), commit_ts: db.vars.commitTs } as never)
+}
+
+/** The cheat into what `convexVaultDB` has. Each plants through `_cheat_arrange`, so the clients hear of it as of a write from elsewhere. */
 function _cheat_convexThingsOf(convexVaultDB: ConvexVaultDB): TH.VaultDBRowCheats {
   const { deployment } = madeOf(convexVaultDB)
   const run: ComponentBackend['run'] = async (fn) => await deployment._cheat_arrange(async (backend) => await backend.run(fn))
   return {
     plant: async (scope, raw) => {
-      await run(async ({ db }) => {
-        const { userid, banklabel, labelpath } = scope
-        const doc = await thingDocAt(db, scope)
-        const planted = { userid, banklabel, labelpath, thing: raw, commit_ts: db.vars.commitTs }
-        if (doc) { await db.replace('things', doc._id, planted) } else { await db.insert('things', planted) }
-      })
+      await run(async ({ db }) => { await plantIn(db, scope, raw) })
     },
     remove: async (scope) => {
       await run(async ({ db }) => {
         const doc = await thingDocAt(db, scope)
-        if (doc) { await db.delete('things', doc._id) }
+        if (doc) { await db.delete(doc._id) }
       })
     },
   }
@@ -95,21 +102,26 @@ function failNextCallWith(convexVaultDB: ConvexVaultDB, thrown: Error): void {
   for (const spy of spies) { spy.mockImplementationOnce(fail) }
 }
 
-/** Until the test ends, hand the client each mutation's result with `written` as `alter` makes it, as a component out of step with the client would. */
-function alterWritten(convexVaultDB: ConvexVaultDB, alter: (written: unknown) => unknown): void {
+/** Until the test ends, hand the client each mutation's manifest with its `written` tag flipped, as a component out of step with the client would. */
+function flipWritten(convexVaultDB: ConvexVaultDB): void {
   const { client } = madeOf(convexVaultDB)
   const mutation = client.mutation.bind(client)
   const spy = vi.spyOn(client, 'mutation').mockImplementation(async (fnRef, args) => {
-    const result = await mutation(fnRef, args) as { written: unknown }
-    return { ...result, written: alter(result.written) }
+    const manifest = await mutation(fnRef, args) as { tags: { written: boolean } }
+    return { ...manifest, tags: { ...manifest.tags, written: ! manifest.tags.written } }
   })
   onTestFinished(() => { spy.mockRestore() })
 }
 
-/** The labelpath of each Thing the deployment stores, in order. */
-async function thingLabelpathsOf(convexVaultDB: ConvexVaultDB): Promise<string[]> {
-  const docs = await madeOf(convexVaultDB).deployment._cheat_backendAs(null).run(async ({ db }) => await db.query('things').withIndex('by_scope').collect())
-  return docs.map(({ labelpath }) => labelpath)
+/** The labelpath of each Thing the deployment has, table by table, in order. */
+async function thingLabelpathsOf(convexVaultDB: ConvexVaultDB): Promise<Record<string, string[]>> {
+  return await madeOf(convexVaultDB).deployment._cheat_backendAs(null).run(async ({ db }) => {
+    const labelpathsIn = async (table: TableNames): Promise<string[]> => {
+      const docs = await db.query(table).withIndex('by_scope').collect()
+      return docs.map(({ labelpath }) => labelpath)
+    }
+    return { bank_things: await labelpathsIn('bank_things'), gate_things: await labelpathsIn('gate_things'), box_things: await labelpathsIn('box_things') }
+  })
 }
 
 describe("ConvexVaultDB's refusals", () => {
@@ -164,27 +176,36 @@ describe("ConvexVaultDB's refusals", () => {
 })
 
 describe("ConvexVaultDB against a component out of step with it", () => {
-  it("refuses unexpected_error where the component wrote nothing and the client finds a write", async () => {
+  it("refuses storage_issue where the component says it wrote nothing and the act tables find a write", async () => {
     const [writing, birthing] = [makeConvexVaultDB(), makeConvexVaultDB()]
-    alterWritten(writing, () => null)
-    alterWritten(birthing, () => null)
-    await TH.expectBad(writing.tryWriteThing(TH.birthAskOf()), 'unexpected_error')
-    await TH.expectBad(birthing.tryBirthBank(TH.birthBankAskOf()), 'unexpected_error')
+    flipWritten(writing)
+    flipWritten(birthing)
+    await TH.expectBad(writing.tryWriteThing(TH.birthAskOf()), 'storage_issue')
+    await TH.expectBad(birthing.tryBirthBank(TH.birthBankAskOf()), 'storage_issue')
   })
 
-  it("refuses unexpected_error where the component wrote and the client finds no write", async () => {
+  it("refuses storage_issue where the component says it wrote and the act tables find no write", async () => {
     const convexVaultDB = makeConvexVaultDB()
     await TH.expectGood(convexVaultDB.tryWriteThing(TH.birthAskOf()))
-    alterWritten(convexVaultDB, () => ({ thing: TH.gateThingOf(), bank: null, tracked: { bank: null, gate: 'same', box: null } }))
-    await TH.expectBad(convexVaultDB.tryWriteThing(TH.birthAskOf()), 'unexpected_error')
+    flipWritten(convexVaultDB)
+    await TH.expectBad(convexVaultDB.tryWriteThing(TH.birthAskOf()), 'storage_issue')
   })
 })
 
 describe("ConvexVaultDB's component", () => {
-  it("stores one document for each Thing a bank is born with", async () => {
+  it("writes one document for each Thing a bank is born with, each in the table of its kind", async () => {
     const convexVaultDB = makeConvexVaultDB()
     await TH.expectGood(convexVaultDB.tryBirthBank(TH.birthBankAskOf()))
-    expect(await thingLabelpathsOf(convexVaultDB)).to.deep.equal(['bank', 'box', 'gate'])
+    expect(await thingLabelpathsOf(convexVaultDB)).to.deep.equal({ bank_things: ['bank'], gate_things: ['gate'], box_things: ['box'] })
+  })
+
+  it("writes each of a Thing's fields as a field of its document, beside the commit timestamp", async () => {
+    const convexVaultDB = makeConvexVaultDB()
+    await TH.expectGood(convexVaultDB.tryBirthBank(TH.birthBankAskOf()))
+    const backend = madeOf(convexVaultDB).deployment._cheat_backendAs(null)
+    const doc = await backend.run(async ({ db }) => await thingDocAt(db, TH.GateScope))
+    expect(doc).to.deep.include(TH.gateThingOf())
+    expect(doc).to.have.all.keys(...Object.keys(TH.gateThingOf()), '_creationTime', '_id', 'commit_ts')
   })
 
   it("writes no document but the cited Thing's", async () => {
@@ -192,14 +213,14 @@ describe("ConvexVaultDB's component", () => {
     const deployment = deploy(TH.componentHostWritingAtMost(1))
     const backend = deployment._cheat_backendAs(null)
     for (const thing of [TH.bankThingOf(), TH.gateThingOf(), TH.rootBoxOf()]) {
-      await backend.run(async ({ db }) => { await db.insert('things', { ...TH.ThingBank, labelpath: thing.labelpath, thing, commit_ts: db.vars.commitTs }) })
+      await backend.run(async ({ db }) => { await plantIn(db, { ...TH.ThingBank, labelpath: thing.labelpath }, thing) })
     }
     const convexVaultDB = new ConvexVaultDB({ client: deployment.client(null), api: TH.rootVaultApi })
     const box = TH.boxThingOf()
     const boxBirthAsk = TH.birthAskOf(box, Shell.childCited(TH.Life0))
     await TH.expectGood(convexVaultDB.tryWriteThing(boxBirthAsk))
-    const stored = await backend.run(async ({ db }) => await thingDocAt(db, TH.BoxScope))
-    expect(stored?.thing).to.deep.equal(box)
+    const actual = await backend.run(async ({ db }) => await thingDocAt(db, TH.BoxScope))
+    expect(actual).to.deep.include(box)
   })
 
   it("refuses an ask that fails the core's checks, with the core's sentence", async () => {
@@ -261,7 +282,7 @@ const SidecarKeyCases: readonly (readonly [BoxRecord['sidecar'], string])[] = [
   [{ teams: [{ $lead: "ada" }] },     'refuses such a key in an object within an array'],
 ]
 
-describe("ConvexVaultDB's put of a box whose sidecar Convex would not store", () => {
+describe("ConvexVaultDB's put of a box whose sidecar Convex would refuse", () => {
   for (const [sidecar, blurb] of SidecarKeyCases) {
     it(blurb, async () => {
       const convexVaultDB = makeConvexVaultDB()
@@ -323,7 +344,7 @@ describe("ConvexVaultDB's component watch", () => {
     const box = TH.boxThingOf()
     await backend.mutation(TH.rootVaultApi.writeThing, { ask: boxBirthAskOf(box) })
     const since = await backend.query(TH.rootVaultApi.watchThings, { scope: TH.ThingBank, cursor: start.cursor })
-    expect(since).to.deep.include({ things: [{ labelpath: box.labelpath, raw: box }], bank: TH.bankThingOf() })
+    expect(since).to.deep.include({ things: [{ labelpath: box.labelpath, raw: box }], banktok: TH.bankThingOf().lifetok })
     expect(Number(since.cursor - start.cursor)).to.be.above(0)
     expect(await backend.query(TH.rootVaultApi.watchThings, { scope: TH.ThingBank, cursor: since.cursor })).to.deep.include({ things: [], cursor: since.cursor })
   })
@@ -332,7 +353,7 @@ describe("ConvexVaultDB's component watch", () => {
     const backend = TH.componentTest()
     await backend.mutation(TH.rootVaultApi.birthBank, { ask: TH.birthBankAskOf() })
     const other = await backend.query(TH.rootVaultApi.watchThings, { scope: { ...TH.ThingBank, banklabel: 'other' }, cursor: 0n })
-    expect(other).to.deep.include({ things: [], bank: null, cursor: 0n })
+    expect(other).to.deep.include({ things: [], banktok: VoidLifeTok, cursor: 0n })
   })
 })
 

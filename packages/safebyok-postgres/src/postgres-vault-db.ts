@@ -1,12 +1,13 @@
 /** A vaultDB that keeps its Things in Postgres. */
 
 import {
-  type AnyAsk, type Awaitable, type BadAnswer, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldActual, type GetWorldAsk, type GotActual, type ListThingsActual, type ListAsk, type StatsActual, type StatsAsk,
-  type ThingkindStats, type ReadTc, type Received, type ThingWatchScope, type VaultError, type WriteAct, type WriteAsk, type WroteActual, AdapterVaultDB, Classifier, Shell, VoidLifeTok, VoidTrack, getAskOf, isVaultError, objCheck, storeLimitsOf,
+  type AnyAsk, type Awaitable, type BadAnswer, type BankObserved, type BirthBankAsk, type BirthManifest, type BirthPuts, type GetAsk, type GetManifest, type GetWorldAsk, type ListAsk, type ListManifest, type Received,
+  type StatsAsk, type StatsManifest, type ThingWatchScope, type VaultError, type WorldManifest, type WriteAsk, type WriteManifest, AdapterVaultDB, ManifestTags, VoidLifeTok, VoidTrack, getAskOf, isVaultError, objCheck,
+  storeLimitsOf,
 } from 'safebyok/storage'
 import { type ThingNotification, thingNotificationOf, thingsChannelOf } from './notifications'
 import * as Phrases from './phrases'
-import { refusalOf, storedNothing } from './refusals'
+import { refusalOf } from './refusals'
 import { BirthRootsSql, GetThingSql, GetWorldSql, ListThingsSql, StatsSql, WriteThingSql } from './vault-queries'
 
 // == [Options]: PostgresQueryable, PostgresListen, PostgresVaultDBOpts, isPostgresQueryable, postgresVaultDBOpts
@@ -35,32 +36,22 @@ const postgresVaultDBOpts = objCheck(({ custom, fn }) => ({
 }), 'bad_record')
 // --
 
-// == [Rows]: FetchedThing, trackParam, mayWrite, writtenActOf
-
-/** A get's row, unchecked: the Thing, null for none, the raw bank, the nearest Thing stored above it, how the roots compare with the ask's track, and when Postgres read them. */
-type FetchedThing = { thing: unknown, bank: unknown, ancestor: unknown, tracked: Classifier.TrackedFetched, read_tc: ReadTc }
+// == [Parameters]: trackParam, writeParamsOf
 
 /** The parameter that carries what `ask` tracks: its JSON. */
 function trackParam({ track }: AnyAsk): string { return JSON.stringify(track) }
 
-// The classifier finds a write only where the Thing stored is the one cited, so only the flag for the cited Thing can let the ask write.
-/** True when the ask's flags let it write over the Thing it cites: a del over a live Thing, or a put by `ifPresent` over a live one and by `ifAbsent` over a tombstone or the shell. */
-function mayWrite({ op, cited, ifAbsent, ifPresent }: WriteAsk): boolean {
-  if (op === 'del') { return cited.am === 'a' }
-  return (cited.am === 'a') ? (ifPresent === 'repl') : (ifAbsent === 'add')
-}
-
-/** The act of a write Postgres made, over the Thing the ask cites. */
-function writtenActOf({ op, cited }: WriteAsk): WriteAct {
-  if (op === 'del')                        { return 'deleted' }
-  if (cited.revseq === Shell.Cited.revseq)  { return 'born' }
-  return (cited.am === 'a') ? 'replaced' : 'reborn'
+/** The parameters of `ask`'s statement in `WriteThingSql`: its record, what it cites, its flags and its track, and for a gate the storage policies it names. */
+export function writeParamsOf(ask: WriteAsk): unknown[] {
+  const { modelkind, record, cited, ifAbsent, ifPresent } = ask
+  const policies = (modelkind === 'gate') ? [ask.options?.policies ?? []] : []
+  return [JSON.stringify(record), JSON.stringify(cited), ifAbsent, ifPresent, trackParam(ask), ...policies]
 }
 // --
 
 /** A vaultDB that keeps its Things in Postgres, a table for each kind: run `VaultTablesSql`, then `VaultFunctionsSql`, before its first call.
- * Each write is one call of its kind's write function, which makes every check again in the statement that writes, and notifies the
- * user's channel ({@link thingsChannelOf}) for `watch`.
+ * Each verb is one statement, which hands back its manifest whole. A write calls its kind's write function, which decides in the
+ * statement that writes whether to write, and notifies the user's channel ({@link thingsChannelOf}) for `watch`.
  */
 export class PostgresVaultDB extends AdapterVaultDB {
   // == [Props]: #client, #listen
@@ -79,7 +70,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
   }
   // --
 
-  // == [Statements]: #queryRow, #fetchThing
+  // == [Statements]: #queryRow
 
   // Every statement it runs returns one row, whatever is stored.
   /** The one row of the statement `text`, run with `params`. */
@@ -87,78 +78,38 @@ export class PostgresVaultDB extends AdapterVaultDB {
     const { rows } = await this.#client.query(text, params)
     return rows[0] as RowT
   }
-
-  /** The row of the Thing at `ask`'s scope. */
-  async #fetchThing(ask: GetAsk | WriteAsk): Promise<FetchedThing> {
-    const { userid, banklabel, labelpath, modelkind } = ask
-    return await this.#queryRow<FetchedThing>(GetThingSql[modelkind], [userid, banklabel, labelpath, trackParam(ask)])
-  }
   // --
 
   // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats, doWatch
 
-  protected async doGetThing(ask: GetAsk): Promise<GotActual> {
-    const { thing, ...above } = await this.#fetchThing(ask)
-    return this.classifyGetThing(ask, thing, above)
-  }
-
-  protected async doWriteThing(ask: WriteAsk): Promise<WroteActual> {
-    if (! mayWrite(ask)) {
-      const { thing, ...above } = await this.#fetchThing(ask)
-      return this.classifyWriteThing(ask, thing, above)
-    }
-    // Each verdict is of a check of the Thing stored that the act tables cannot name, and is true where its check does not apply:
-    // the stored born_at kept, the stored lifetok kept (the bank's alone), and the storage policies met (the gate's alone).
-    /** A write's row, unchecked: whether it stored the record, a get's row as the Thing now stands, and the verdicts. */
-    type WrittenThing = FetchedThing & { ok: boolean, born_at_ok: boolean, lifetok_ok: boolean, policies_ok: boolean }
-    const policies = (ask.modelkind === 'gate') ? [ask.options?.policies ?? []] : []
-    const params   = [JSON.stringify(ask.record), JSON.stringify(ask.cited), trackParam(ask), ...policies]
-    const written  = await this.#queryRow<WrittenThing>(WriteThingSql[ask.modelkind], params)
-    if (written.ok) {
-      return { ok: true, act: writtenActOf(ask), banktok: Classifier.banktokOf(ask, written.bank), tracked: Classifier.trackedOf(ask, written.tracked), read_tc: written.read_tc, record: Classifier.writtenThingOf(ask, written.thing) }
-    }
-    // Postgres wrote nothing. The act tables say why, of the revision cited; where they find a write, a verdict names the check it failed.
-    const { thing, bank, ancestor, tracked, read_tc } = written
-    const act = Classifier.writeActOf(ask, Classifier.storedCitedOf(ask, thing))
-    if (! Classifier.isWriteAct(act))  { return Classifier.unwrittenWriteOf(thing, { ask, act, above: { bank, ancestor, tracked, read_tc } }) }
-    if (! written.born_at_ok)          { Classifier.demandBornAtKept(ask, thing) }
-    if (! written.lifetok_ok)          { Classifier.demandLifetokKept(ask, thing) }
-    if (! written.policies_ok)         { Classifier.demandPolicies(ask, thing) }
-    // No verdict explains the refusal: a check a validated ask cannot fail, or a verdict the classifier does not share.
-    throw storedNothing()
-  }
-
-  protected async doListThings(ask: ListAsk): Promise<ListThingsActual> {
+  protected async doGetThing(ask: GetAsk): Promise<GetManifest> {
     const { userid, banklabel, labelpath, modelkind } = ask
-    const { parent, children, ...bankFetched } = await this.#queryRow<Classifier.ThingsFetched & Classifier.BankFetched>(ListThingsSql[modelkind], [userid, banklabel, labelpath, trackParam(ask)])
-    return this.classifyListThings(ask, { parent, children }, bankFetched)
+    return await this.#queryRow<GetManifest>(GetThingSql[modelkind], [userid, banklabel, labelpath, trackParam(ask)])
   }
 
-  protected async doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthBankActual> {
-    // Whether it stored the three roots, each as it now stands, and how they compare with the track.
-    const params  = [...puts.map(({ record }) => JSON.stringify(record)), trackParam(ask)]
-    const written = await this.#queryRow<Classifier.BankRootsFetched & { ok: boolean }>(BirthRootsSql, params)
-    if (written.ok) {
-      const things = Classifier.writtenRootsOf(puts, written)
-      return { ok: true, act: 'born', banktok: things.bank.lifetok, tracked: Classifier.trackedOf(ask, written.tracked), read_tc: written.read_tc, things }
-    }
-    // Postgres wrote nothing. The act tables say why: a live bank, or a root the birth would write over. Every other check is one a validated ask cannot fail.
-    const unwritten = Classifier.unwrittenBirthOf(puts, written)
-    if (unwritten === null) { throw storedNothing() }
-    return unwritten
+  protected async doWriteThing(ask: WriteAsk): Promise<WriteManifest> {
+    return await this.#queryRow<WriteManifest>(WriteThingSql[ask.modelkind], writeParamsOf(ask))
   }
 
-  protected async doGetWorld(ask: GetWorldAsk): Promise<GetWorldActual> {
+  protected async doListThings(ask: ListAsk): Promise<ListManifest> {
+    const { userid, banklabel, labelpath, modelkind } = ask
+    return await this.#queryRow<ListManifest>(ListThingsSql[modelkind], [userid, banklabel, labelpath, trackParam(ask)])
+  }
+
+  protected async doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthManifest> {
+    return await this.#queryRow<BirthManifest>(BirthRootsSql, [...puts.map(({ record }) => JSON.stringify(record)), trackParam(ask)])
+  }
+
+  protected async doGetWorld(ask: GetWorldAsk): Promise<WorldManifest> {
     const { userid, banklabel } = ask
-    const fetched = await this.#queryRow<Classifier.BankRootsFetched>(GetWorldSql, [userid, banklabel, trackParam(ask)])
-    return this.classifyGetWorld(ask, fetched)
+    return await this.#queryRow<WorldManifest>(GetWorldSql, [userid, banklabel, trackParam(ask)])
   }
 
   // Postgres sets no limit of its own that a client can read, so each is the cap.
-  protected async doStats(ask: StatsAsk): Promise<StatsActual> {
+  protected async doStats(ask: StatsAsk): Promise<StatsManifest> {
     const { userid, banklabel } = ask
-    const { box, gate, ...bankFetched } = await this.#queryRow<Classifier.BankFetched & Record<'box' | 'gate', ThingkindStats>>(StatsSql, [userid, banklabel, trackParam(ask)])
-    return this.classifyStats(ask, bankFetched, { box, gate, max: storeLimitsOf() })
+    const { box, gate, ...observed } = await this.#queryRow<BankObserved & Record<'box' | 'gate', unknown>>(StatsSql, [userid, banklabel, trackParam(ask)])
+    return { stats: { box, gate, max: storeLimitsOf() }, ...observed }
   }
 
   // A notification may come before or after a read or a write made beside it, and before or after another notification.
@@ -204,18 +155,18 @@ export class PostgresVaultDB extends AdapterVaultDB {
    */
   async #receiveNotified(scope: ThingWatchScope, { labelpath, read_tc, thing, bank }: ThingNotification, receive: (received: Received) => void, end: (why: VaultError) => void): Promise<void> {
     if ((thing !== undefined) && (bank !== undefined)) {
-      receive({ record: thing, banktok: Classifier.banktokOf(scope, bank), read_tc })
+      receive({ record: thing, banktok: ManifestTags.banktokOf(bank), read_tc })
       return
     }
-    let fetched: FetchedThing
+    let got: GetManifest
     try {
-      fetched = await this.#fetchThing(getAskOf({ ...scope, labelpath, track: VoidTrack, banktok: VoidLifeTok }))
+      got = await this.doGetThing(getAskOf({ ...scope, labelpath, track: VoidTrack, banktok: VoidLifeTok }))
     } catch (err) {
       const refusal = refusalOf('getThing', err)
       if (! isVaultError(refusal, 'storage_unavailable')) { end(refusal) }
       return
     }
-    if (fetched.thing !== null) { receive({ record: fetched.thing, banktok: Classifier.banktokOf(scope, fetched.bank), read_tc: fetched.read_tc }) }
+    if (got.actual !== null) { receive({ record: got.actual, banktok: got.banktok, read_tc: got.read_tc }) }
   }
   // --
 }

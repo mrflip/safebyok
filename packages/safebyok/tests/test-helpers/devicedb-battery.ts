@@ -13,13 +13,13 @@ import { type LeaseGiven, leaseTombstoneOf, liveLeaseRecordOf } from './devicedb
 
 // == [The hooks a deviceDB hands the battery]: DeviceDBLeaseBatteryOpts
 
-/** The options of {@link describeDeviceDBLeaseBattery}: how to make a deviceDB, another tab's view of it, and the cheat into what it stores. */
+/** The options of {@link describeDeviceDBLeaseBattery}: how to make a deviceDB, another tab's view of it, and the cheat into what it has. */
 export type DeviceDBLeaseBatteryOpts<DBT extends DeviceDB> = {
   /** A fresh, empty deviceDB. */
   makeDeviceDB: () => DBT
-  /** A deviceDB over the same database as `deviceDB`, as another tab would make: for a store in memory, `deviceDB` itself. */
+  /** A deviceDB over the same database as `deviceDB`, as another tab would make: for a deviceDB in memory, `deviceDB` itself. */
   makeTwin:     (deviceDB: DBT) => DeviceDB
-  /** Stores `raw` as the lease record at `scope`, unchecked. */
+  /** Plants `raw` as the lease record at `scope`, unchecked. */
   plant:        (deviceDB: DBT, scope: LeaseScope, raw: unknown) => Helpers.Awaitable<void>
 }
 // --
@@ -44,7 +44,7 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
       expect(await makeDeviceDB().peekLease(WorldLeaseScope)).to.be.null
     })
 
-    it("stores a live lease, and answers it and peeks it back with its leaseKey", async () => {
+    it("stows a live lease, and answers it and peeks it back with its leaseKey", async () => {
       const deviceDB = makeDeviceDB()
       const lease    = await liveLeaseRecordOf()
       expect(sansKey(await deviceDB.stowLease(lease))).to.deep.equal(sansKey(lease))
@@ -73,16 +73,16 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
 
     const NewerCases = [
       // what a lease's life goes through:
-      [{ lifenum: 0, revseq: 0 }, { lifenum: 0, revseq: 1 }, 'stores a later revision of the same life, as a renewal does'],
-      [{ lifenum: 0, revseq: 3 }, { lifenum: 1, revseq: 0 }, 'stores a tombstone over the live lease, as a lock does'],
-      [{ lifenum: 1, revseq: 0 }, { lifenum: 2, revseq: 0 }, 'stores the next live life over a tombstone, as a grant after a lock does'],
+      [{ lifenum: 0, revseq: 0 }, { lifenum: 0, revseq: 1 }, 'stows a later revision of the same life, as a renewal does'],
+      [{ lifenum: 0, revseq: 3 }, { lifenum: 1, revseq: 0 }, 'stows a tombstone over the live lease, as a lock does'],
+      [{ lifenum: 1, revseq: 0 }, { lifenum: 2, revseq: 0 }, 'stows the next live life over a tombstone, as a grant after a lock does'],
       // a life skipped:
-      [{ lifenum: 0, revseq: 5 }, { lifenum: 2, revseq: 0 }, 'stores a later life whatever the revision stored'],
+      [{ lifenum: 0, revseq: 5 }, { lifenum: 2, revseq: 0 }, 'stows a later life whatever the ante revision'],
     ] as const
-    for (const [stored, stowed, blurb] of NewerCases) {
+    for (const [ante, stowed, blurb] of NewerCases) {
       it(blurb, async () => {
         const deviceDB = makeDeviceDB()
-        await deviceDB.stowLease(await leaseOf(stored))
+        await deviceDB.stowLease(await leaseOf(ante))
         const lease = await leaseOf(stowed)
         expect(sansKey(await deviceDB.stowLease(lease))).to.deep.equal(sansKey(lease))
         expect(sansKey(await deviceDB.peekLease(WorldLeaseScope))).to.deep.equal(sansKey(lease))
@@ -91,14 +91,14 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
 
     const NotNewerCases = [
       [{ lifenum: 0, revseq: 2 }, { lifenum: 0, revseq: 1 },                     'leaves a later revision in place over an earlier one'],
-      [{ lifenum: 0, revseq: 1 }, { lifenum: 0, revseq: 1, ends_at: 2e12 },      'leaves the lease stored in place over one of the same life and revision'],
+      [{ lifenum: 0, revseq: 1 }, { lifenum: 0, revseq: 1, ends_at: 2e12 },      'leaves the ante lease in place over one of the same life and revision'],
       [{ lifenum: 2, revseq: 0 }, { lifenum: 0, revseq: 7 },                     'leaves a later life in place over an earlier one at any revision'],
       [{ lifenum: 1, revseq: 0 }, { lifenum: 0, revseq: 4 },                     'leaves a tombstone in place over a late live lease of the life it ended'],
     ] as const
-    for (const [stored, stowed, blurb] of NotNewerCases) {
+    for (const [ante, stowed, blurb] of NotNewerCases) {
       it(blurb, async () => {
         const deviceDB = makeDeviceDB()
-        const prior    = await leaseOf(stored)
+        const prior    = await leaseOf(ante)
         await deviceDB.stowLease(prior)
         const lease    = await leaseOf(stowed)
         expect(sansKey(await deviceDB.stowLease(lease))).to.deep.equal(sansKey(prior))
@@ -106,7 +106,7 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
       })
     }
 
-    it("stores a tombstone with no keys", async () => {
+    it("stows a tombstone with no keys", async () => {
       const deviceDB = makeDeviceDB()
       await deviceDB.stowLease(await liveLeaseRecordOf())
       await deviceDB.stowLease(leaseTombstoneOf())
@@ -176,7 +176,7 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
   })
 
   describe(`${dbname}: listen`, () => {
-    it("calls each listener, another tab's among them, with the scope of a lease stored", async () => {
+    it("calls each listener, another tab's among them, with the scope of a lease stowed", async () => {
       const deviceDB = makeDeviceDB()
       const twin     = makeTwin(deviceDB)
       const heard: LeaseScope[] = []
@@ -189,7 +189,7 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
       expect(twinHeard).to.deep.equal([WorldLeaseScope])
     })
 
-    it("calls no listener for a lease it does not store", async () => {
+    it("calls no listener for a lease it does not stow", async () => {
       const deviceDB = makeDeviceDB()
       const heard: string[] = []
       makeTwin(deviceDB).listen(({ banklabel }) => { heard.push(banklabel) })
@@ -217,9 +217,9 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
 
 // == [The devicetok battery]: DeviceDBDevicetokBatteryOpts, describeDeviceDBDevicetokBattery
 
-/** The options of {@link describeDeviceDBDevicetokBattery}: how to make a deviceDB, another tab's view of it, and the cheat into the devicetoks it stores. */
+/** The options of {@link describeDeviceDBDevicetokBattery}: how to make a deviceDB, another tab's view of it, and the cheat into the devicetoks it has. */
 export type DeviceDBDevicetokBatteryOpts<DBT extends DeviceDB> = Pick<DeviceDBLeaseBatteryOpts<DBT>, 'makeDeviceDB' | 'makeTwin'> & {
-  /** Stores `raw` as the devicetok of the user `userid`, unchecked. */
+  /** Plants `raw` as the devicetok of the user `userid`, unchecked. */
   plantDevicetok: (deviceDB: DBT, userid: Userid, raw: unknown) => Helpers.Awaitable<void>
 }
 
@@ -278,7 +278,7 @@ export function describeDeviceDBDevicetokBattery<DBT extends DeviceDB>(dbname: s
       [{ devicetok: '00000000-0000-4000-8000-0000000000d2' }, 'a devicetok wrapped in an object'],
     ] as const
     for (const [raw, blurb] of DamagedCases) {
-      it(`replaces a devicetok stored that is ${blurb} with a fresh one, stored from then on`, async () => {
+      it(`replaces an ante devicetok that is ${blurb} with a fresh one, stowed from then on`, async () => {
         const deviceDB = makeDeviceDB()
         await plantDevicetok(deviceDB, WorldScope.userid, raw)
         const devicetok = await deviceDB.ensureDevicetok(WorldScope.userid)

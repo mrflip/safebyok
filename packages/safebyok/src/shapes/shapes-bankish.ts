@@ -117,8 +117,8 @@ export type Lifecyclekind = typeof lifecyclekindVals[number]
 
 // #lock-is-intent: each is news of what happened, never an alarm.
 /** What changed a device's lease, other than its own lock, unlock or disable, by its `kind`:
- * - `'lease_taken_up'` -- this tab took up the lease the deviceDB stores, newer than its own: an unlock, a renewal or a softlock in another tab, or, as it signs in or connects, one stowed before
- * - `'lock_taken_up'`  -- this tab dropped its lease, as the deviceDB stores one that no longer unlocks the bank: a lock in another tab, its autolock among them
+ * - `'lease_taken_up'` -- this tab took up the lease the deviceDB has, newer than its own: an unlock, a renewal or a softlock in another tab, or, as it signs in or connects, one stowed before
+ * - `'lock_taken_up'`  -- this tab dropped its lease, as the deviceDB has one that no longer unlocks the bank: a lock in another tab, its autolock among them
  * - `'autolocked'`     -- this tab's janitor locked the lease past its end, in every tab
  * - `'softlocked'`     -- the bank's gate changed, so this tab brought its lease's end to `softlockMinutes` from now
  */

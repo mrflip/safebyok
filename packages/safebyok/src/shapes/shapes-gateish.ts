@@ -140,7 +140,7 @@ export interface GateGatingFriend {
 export interface WorldGateFriend {
   /** The world as a lease granted under `bankStamp` reads it back. */
   leaseGateOf:   (bankStamp: BankStamp) => LeaseGate
-  /** The Thing fields a lease granted under the gate at `gateScope` follows: the lease record the deviceDB stores, the world's lease, or the gate's lease shell. */
+  /** The Thing fields a lease granted under the gate at `gateScope` follows: the lease record the deviceDB has, the world's lease, or the gate's lease shell. */
   leaseFollowed: (gateScope: LeaseShellScope) => Promise<Sparse<LeaseRecord>>
   /** Attach `lease` in place of the world's lease, resuming every call waiting for an `unlock` gating, and stow it in the deviceDB. Refuses on a disabled world. */
   attachLease:   (lease: Lease) => void

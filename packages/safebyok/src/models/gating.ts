@@ -48,7 +48,7 @@ export class Gating<ResolvedT = unknown> {
     Object.freeze(this)
   }
 
-  /** Prove the cleartexts and make the verb's change, resolving the gate, or the bank a birth stores.
+  /** Prove the cleartexts and make the verb's change, resolving the gate, or the bank a birth writes.
    * A gating is attempted once, and vacated whatever the outcome: make another for the next try.
    */
   async attempt(): Promise<ResolvedT> {
@@ -136,7 +136,7 @@ export class RevokePasskeyGating extends Gating<Gate> {
 // * A gating's contract is in its name: a gating whose intent is met may succeed even where its inputs would otherwise have
 //   been refused. (`revokePasskey` on a gate with no passkey proves, unlocks and writes nothing.)
 
-/** Store a new bank of `device`'s scope, with the user's new passphrase and optional passkey, and resolve it unlocked.
+/** Write a new bank of `device`'s scope, with the user's new passphrase and optional passkey, and resolve it unlocked.
  * Refuses `gate_made_elsewhere` where a live bank is already stored.
  */
 async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatingFriend): Promise<Bank> {
@@ -158,11 +158,11 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
   const lease = await friend.leaseByProving(passphraseProving, bankStamp, gateRecord)
   try {
     const root   = await lease.seal(BaseBox, rootShell, { sidecar: {} }, { whisper: {} })
-    // The roots it answers, written or found stored, are then the Things of the device's world, which shows them locked.
+    // The roots it answers, written or read, are then the Things of the device's world, which shows them locked.
     const vaultMinder = device.world.demandVaultMinder()
     const answer = await vaultMinder.tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gateRecord, root, track: vaultMinder.knownRoots, banktok: bankRecord.lifetok })
     if (! answer.ok) { throw answer.err }
-    // The user must hear that their passphrase was not set: the bank stored is another's.
+    // The user must hear that their passphrase was not set: the actual bank is another's.
     if (answer.val.bank.revtok !== bankRecord.revtok) { throw Throwers.gateMadeElsewhere() }
     const bank = device.world.demandRootsLive()
     friend.attachLease(lease)

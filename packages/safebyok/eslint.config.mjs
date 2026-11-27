@@ -20,7 +20,7 @@ const SourceFiles = ['**/*.{js,mjs,cjs,ts,mts,cts}']
 const QuotedKind = "'[a-z]+_[a-z_]+'"
 
 /** The refusal kinds a customer checks for and reacts to: part of our API, so a test title may quote them. */
-const CustomerKinds = ['absent_box', 'bank_locked', 'damaged_whisper', 'damaged_row', 'identity_revoked', 'newer_format', 'stale_read', 'stale_write', 'weak_passphrase', 'wrong_passphrase']
+const CustomerKinds = ['absent_box', 'bank_locked', 'damaged_whisper', 'incompatible_row', 'identity_revoked', 'newer_format', 'stale_read', 'stale_write', 'weak_passphrase', 'wrong_passphrase']
 
 /** A quoted refusal kind other than {@link CustomerKinds}, which a test title leaves to its assertions. */
 const UntitledKind = `'(?!(?:${CustomerKinds.join('|')})')[a-z]+_[a-z_]+'`
@@ -294,7 +294,7 @@ export default defineConfig([
       'unicorn/prefer-ternary': 'off',
       // A decision table reads best flat: a row a line, each with its tests and its answer. The
       // rule counts every `&&` and early return against such a function, and the way to satisfy
-      // it is helpers that hide the rows (`storage/classifier.ts`).
+      // it is helpers that hide the rows.
       'sonarjs/cognitive-complexity': 'off',
       // Written for JavaScript, where a return type is only what the code happens to return. Here
       // it is declared, and a declared union (`WhisperJson`) is the contract, not an accident.
