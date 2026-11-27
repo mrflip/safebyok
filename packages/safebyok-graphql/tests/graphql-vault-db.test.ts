@@ -89,6 +89,7 @@ function refusedOf(served: Served, dbhas: unknown): Served {
 
 const ForeignGate = TH.gateThingOf({ userid: 'u2' })
 const ChildOfGate = { ...TH.ThingBank, labelpath: 'gate/zz', am: 'd' }
+const ParentOfOpenai = TH.boxThingOf('openai')
 const MisplacedRoots = { bank: TH.bankThingOf(), gate: TH.rootBoxOf(), root: TH.rootBoxOf() }
 
 // Each case: the root field, an ask over the born test bank, how the server's answer to it is altered, and the blurb.
@@ -111,6 +112,10 @@ const MisanswerCases = [
   ["safebyokListThings", TH.listAskAt('box'),        (served: Served) => ({ ...served, deltas: [TH.gateThingOf()] }),                        "a listing's child under another parent"],
   ["safebyokListThings", TH.listAskAt('box'),        (served: Served) => ({ ...served, deltas: [TH.boxThingOf('zz', { userid: 'u2' })] }),   "a listing's child in another user's bank"],
   ["safebyokListThings", TH.listAskAt('box'),        (served: Served) => ({ ...served, incompatible_rows: [ChildOfGate] }),                  "a listing's incompatible child under another parent"],
+  ["safebyokListThings", TH.listAskAt('box'),        (served: Served) => ({ ...served, val: { ...(served['val'] as object), parentpath: 'gate' } }),            "a good listing's kids of another parentpath"],
+  ["safebyokListThings", TH.listAskAt('box'),        (served: Served) => ({ ...served, val: { ...(served['val'] as object), parentlife: '9' } }),                "a good listing's kids of another parentlife than its parent's"],
+  ["safebyokListThings", TH.listAskAt('box/openai'), (served: Served) => ({ ...served, ok: true, act: 'gotlive', err: null, dbhas: null, parentage: [ParentOfOpenai], deltas: [{ ...ParentOfOpenai, labelpath: 'box/openai/zz', label: 'zz' }], val: { modelkind: 'kids', parentpath: 'box/openai', parentlife: ParentOfOpenai.lifepath, items: {}, gones: {}, read_tc: served['read_tc'] } }), "a listing's child too deep to be of the ask's modelkind"],
+  ["safebyokListThings", TH.listAskAt('box/openai'), (served: Served) => ({ ...served, parentage: [TH.gateThingOf()] }),                                                                                                       "a refused listing's parentage at another labelpath"],
   ["safebyokBirthBank",  TH.birthBankAskOf(),        (served: Served) => ({ ...served, ok: true, act: 'born', dbhas: null, err: null, val: MisplacedRoots }), "a birth's root at another root's labelpath"],
   ["safebyokBirthBank",  TH.birthBankAskOf(),        (served: Served) => ({ ...refusedOf(served, TH.boxThingOf()), act: 'stale' }),          "a birth's refusal naming a Thing that is no root"],
   ["safebyokGetWorld",   TH.getWorldAskOf(),         (served: Served) => ({ ...served, val: { ...(served['val'] as object), gate: ForeignGate } }),     "a world's root in another user's bank"],

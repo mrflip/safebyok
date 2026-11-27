@@ -97,7 +97,7 @@ export type CheckedAnswer = GetChecked | WriteChecked | ListChecked | RootsCheck
 export type CheckedNotice = Z.output<typeof WireChecks.notice>
 // --
 
-// == [Scopes]: checkGotAt, checkListedAt, checkRootsAt, checkStatsAt, checkWatchedAt, checkThingAt, checkRootAt, checkTrackedAt
+// == [Scopes]: checkGotAt, checkListedAt, checkRootsAt, checkStatsAt, checkWatchedAt, checkParentageAt, checkKidsPathAt, checkKidsLifeOf, checkChildUnder, checkChildOfKind, checkThingAt, checkRootAt, checkTrackedAt
 // The light checks of an answer against its ask: each record it carries sits where the ask reaches. They read nothing of the
 // act, whose sense is the server's vaultDB's, which made it.
 
@@ -119,13 +119,18 @@ export function checkGotAt(ask: DB.GetAsk | DB.WriteAsk, answer: GetChecked | Wr
   checkThingAt(ask, ask.labelpath, answer.val ?? answer.dbhas)
 }
 
-/** Refuse a listing's answer whose parent does not sit at the ask's scope, or whose child, listed or incompatible, does not sit one label under it. */
+/** Refuse a listing's answer where a Thing does not sit where the ask reaches, or the kids it names are not the ask's parent's. */
 export function checkListedAt(ask: DB.ListAsk, answer: ListChecked): void {
   checkTrackedAt(ask, answer)
-  checkThingAt(ask, ask.labelpath, answer.ok ? (answer.parentage[0] ?? null) : answer.dbhas)
+  if (! answer.ok) { checkThingAt(ask, ask.labelpath, answer.dbhas) }
+  checkParentageAt(ask, answer)
+  if (answer.ok) {
+    checkKidsPathAt(ask, answer)
+    checkKidsLifeOf(answer)
+  }
   for (const child of [...answer.deltas, ...answer.incompatible_rows]) {
-    ScopeChecks.bankScope.parseConsistent(child, ask)
-    if (DB.Labelpath.parentOf(child.labelpath) !== ask.labelpath) { throw Throwers.thingOutOfReach(child.labelpath) }
+    checkChildUnder(ask, child)
+    checkChildOfKind(ask, child)
   }
 }
 
@@ -150,6 +155,32 @@ export function checkStatsAt(ask: DB.StatsAsk, answer: StatsChecked): void {
 /** Refuse a watch's notice of a Thing in another bank than the watch's `scope`. */
 export function checkWatchedAt(scope: DB.ThingWatchScope, { record }: CheckedNotice): void {
   if (record !== null) { ScopeChecks.bankScope.parseConsistent(record, scope) }
+}
+
+/** Refuse a listing whose parentage, good or refused, holds a Thing that does not sit at the ask's scope. */
+function checkParentageAt(ask: DB.ListAsk, answer: ListChecked): void {
+  for (const parent of answer.parentage) { checkThingAt(ask, ask.labelpath, parent) }
+}
+
+/** Refuse a good listing whose kids name a parentpath other than the ask's. */
+function checkKidsPathAt(ask: DB.ListAsk, answer: Extract<ListChecked, { ok: true }>): void {
+  if (answer.val.parentpath !== ask.labelpath) { throw Throwers.kidsOfOtherParent(answer.val.parentpath) }
+}
+
+/** Refuse a good listing whose kids name a parentlife other than the lifepath of the parent in its `parentage`. */
+function checkKidsLifeOf(answer: Extract<ListChecked, { ok: true }>): void {
+  if (answer.parentage[0]?.lifepath !== answer.val.parentlife) { throw Throwers.kidsOfOtherParent(answer.val.parentpath) }
+}
+
+/** Refuse a listed child, delta or incompatible row, that is not in the ask's bank or not one label under its parent. */
+function checkChildUnder(ask: DB.ListAsk, child: Scoped): void {
+  ScopeChecks.bankScope.parseConsistent(child, ask)
+  if (DB.Labelpath.parentOf(child.labelpath) !== ask.labelpath) { throw Throwers.thingOutOfReach(child.labelpath) }
+}
+
+/** Refuse a listed child, delta or incompatible row, that is not of the ask's modelkind. */
+function checkChildOfKind(ask: DB.ListAsk, child: Scoped): void {
+  if (! DB.Labelpath.isOfModelkind(child.labelpath, ask.modelkind)) { throw Throwers.thingOutOfReach(child.labelpath) }
 }
 
 /** Refuse a record that is not null and does not sit at `labelpath` in `ask`'s bank. */
