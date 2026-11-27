@@ -127,8 +127,8 @@ export class GraphQLVaultDB implements DB.VaultDB {
 
   // == [Watch]: watch
 
-  /** Watch a bank's Things on the server ({@link DB.VaultDB.watch}): each notice is of a Thing the server's vaultDB notified, read when it says.
-   * A notice that fails its check, or is of a Thing in another bank, goes to `onBadNews` instead of `onNotice`, as does an error `onNotice` throws.
+  /** Hear the changes to a bank's Things on the server ({@link DB.VaultDB.watch}).
+   * Each notice reaches `onNotice` as a Thing the server's vaultDB notified. One that fails its check, or is of a Thing in another bank, goes to `onBadNews` instead, as does an error `onNotice` throws.
    * The watch ends, once, at the notice the server marks as its last, or when the server ends the stream or the request fails; it never resubscribes.
    */
   watch(scope: DB.ThingWatchScope, onNotice: (event: DB.VaultEvent) => void, onBadNews: (news: DB.VaultError) => void, onEnded: () => void = noEnding): () => void {
@@ -189,8 +189,8 @@ export class GraphQLVaultDB implements DB.VaultDB {
 
 // A record crosses checked for its scope and citation alone, and is typed here as the answer has it: whoever reads it
 // checks the rest where a Thing takes it, as for an answer from any vaultDB.
-/** The answer to `ask` that `crossed` carries: its refusal made a VaultError again, naming the Thing its `dbhas` gives, and without each field the answer lacks.
- * Its ask is the loggable part of `ask`, and every record it carries is deeply frozen.
+/** The answer to `ask` that `crossed` carries, deeply frozen, with a refusal made a VaultError again.
+ * Its `ask` is the loggable part of `ask`.
  */
 function answerOf(ask: DB.AnyAsk, crossed: CheckedAnswer): AnyAnswer {
   const loggableAsk = DB.loggableAskOf(ask)
@@ -205,8 +205,8 @@ function answerOf(ask: DB.AnyAsk, crossed: CheckedAnswer): AnyAnswer {
 }
 
 // Every throw in a verb lands here: an ask that fails its check, a server out of reach, or an answer that fails its own.
-/** The refused answer for a verb that threw, as an `AdapterVaultDB`'s is: its refusal, or `storage_unavailable` for anything else, its meta naming `oplabel` and the loggable ask.
- * Its act is the one in the refusal's meta, else `unclassified_storing`. It names no Thing.
+/** The refused answer for a verb that threw: the refusal it threw, or `storage_unavailable` for any other error.
+ * The refusal's meta names `oplabel` and the loggable ask. The answer's act is the refusal's own, else `unclassified_storing`, and it names no Thing.
  */
 function answerForThrown(thrown: unknown, oplabel: string, ask: unknown): DB.BadAnswer<null> {
   const err         = DB.storageRefusalOf(thrown)

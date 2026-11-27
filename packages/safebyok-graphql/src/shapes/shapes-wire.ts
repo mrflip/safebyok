@@ -42,8 +42,8 @@ export type WireNotice = Readonly<{
 
 // Each record an answer carries is checked for its scope and citation alone, as a Thing or a shell of any kind: whoever
 // reads it checks the rest where a Thing takes it, as for an answer from any vaultDB.
-/** The checks of what crosses, each refusing `storage_issue`, by the verb whose answer it reads.
- * Each answer is a good one of its verb's acts, with its `val` and `dbhas` as that act has them and null where it has none, or any refused one:
+/** The checks of what crosses the wire, each refusing `storage_issue`.
+ * An answer's check passes a good answer of its verb's acts, or any refusal:
  * - `getAnswer`, `writeAnswer`, `listAnswer`, `birthAnswer`, `worldAnswer`, `statsAnswer`
  * - `notice` -- a watch's notice: a Thing with its banktok and read_tc, or a refusal
  */
