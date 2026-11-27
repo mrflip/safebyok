@@ -4,7 +4,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` on its own model and effort; reviewer `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin
 * **At once:** 3 threads
 * **Sprint doc:** https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (State enum `284c80a7-3a91`; Open Matters body `6515179e-17ac`, Cleanup `d7cdbdea-e78f`, Progress `98e00e1b-46fc`, Resolved `fa82f351-58d7`)
-* **Status:** threads 1–5 filed and out of draft; the line `#934 → #937 → #939 → #941 → #940` passes `pnpm justify` at f0ef7e1b9. Threads 8 and 9 filed (#942, #943); thread 6 filed (#944); thread 7 filed (#945); restacked onto #913 (merged); thread 10 filed (#946); threads 1–12 filed, the line `#934 → … → #948` green; wrap-up next
+* **Status:** closed 2026-11-27. Threads 1–12 filed; the line `#934 → #937 → #939 → #941 → #940 → #942 → #943 → #944 → #945 → #946 → #947 → #948 → #933` on `main`, green from #947; merge #933. Done note: `human/20261127-sprint_vault_manifest_done.md`.
 
 ## Read first
 
