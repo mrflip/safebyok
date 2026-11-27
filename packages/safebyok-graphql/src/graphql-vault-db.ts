@@ -135,6 +135,8 @@ export class GraphQLVaultDB implements DB.VaultDB {
     const { scope: bankScope } = DB.AskChecks.watchArgs.parse({ scope, onNotice, onBadNews, onEnded })
     const watching: { isOn: boolean, subscription?: { unsubscribe: () => void } } = { isOn: true }
     let heardData: unknown
+    // A notice handler that throws is a bug in the host's code, not trouble in storage.
+    const notify = DB.bulletproofHandlerOf(onNotice, { ifError: 'tell', transformer: DB.refusalOfThrown, onBadNews })
     // End once: stop the subscription, and where the watch ended itself, say so, then why. A stream can end inside
     // subscribe(), before `watch` returns, so the ending is told in a microtask, always after it.
     function end(news: DB.VaultError | null): void {
@@ -155,7 +157,7 @@ export class GraphQLVaultDB implements DB.VaultDB {
       // When a stream over fetch closes, its final result repeats the previous notice. Do not hear it twice.
       const isHeard = (result.data === heardData)
       heardData = result.data
-      const ending = isHeard ? null : hearNotice(bankScope, result, onNotice, onBadNews)
+      const ending = isHeard ? null : hearNotice(bankScope, result, notify, onBadNews)
       if (ending !== null) {
         end(ending)
         return
@@ -183,7 +185,7 @@ export class GraphQLVaultDB implements DB.VaultDB {
 }
 // --
 
-// == [Answers]: answerOf, answerForThrown, noEnding, fieldOf, troubleOf, carriedErrOf, hearNotice, notify
+// == [Answers]: answerOf, answerForThrown, noEnding, fieldOf, troubleOf, carriedErrOf, hearNotice
 
 // A record crosses checked for its scope and citation alone, and is typed here as the answer has it: whoever reads it
 // checks the rest where a Thing takes it, as for an answer from any vaultDB.
@@ -241,7 +243,7 @@ function carriedErrOf(gqlErr: unknown): unknown {
 }
 
 /** Pass a notice's Thing to `onNotice` and its trouble to `onBadNews`, or return the trouble that ends the watch. */
-function hearNotice(scope: DB.ThingWatchScope, { data }: OperationResult<unknown>, onNotice: (event: DB.VaultEvent) => void, onBadNews: (news: DB.VaultError) => void): DB.VaultError | null {
+function hearNotice(scope: DB.ThingWatchScope, { data }: OperationResult<unknown>, notify: (event: DB.VaultEvent) => void, onBadNews: (news: DB.VaultError) => void): DB.VaultError | null {
   const fields = ((typeof data === 'object') && (data !== null)) ? data as Record<string, unknown> : {}
   let notice: CheckedNotice
   try {
@@ -253,21 +255,13 @@ function hearNotice(scope: DB.ThingWatchScope, { data }: OperationResult<unknown
   }
   if (notice.err === null) {
     // Checked for its scope and citation alone, as an answer's records are (`answerOf`).
-    notify(DB.noticeOf(notice.record as DB.ThingRecord, notice.banktok, notice.read_tc), onNotice, onBadNews)
+    notify(DB.noticeOf(notice.record as DB.ThingRecord, notice.banktok, notice.read_tc))
     return null
   }
   const news = DB.refusedOverWire(notice.err)
   if (notice.isEnded) { return news }
   onBadNews(news)
   return null
-}
-
-// A notice handler that throws is a bug in the host's code, not trouble in storage.
-/** Pass `event` to `onNotice`, and what it throws to `onBadNews`. */
-function notify(event: DB.VaultItemEvent, onNotice: (event: DB.VaultEvent) => void, onBadNews: (news: DB.VaultError) => void): void {
-  try {
-    onNotice(event)
-  } catch (err) { onBadNews(DB.refusalOfThrown(err)) }
 }
 // --
 
