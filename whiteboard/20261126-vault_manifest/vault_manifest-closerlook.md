@@ -15,6 +15,7 @@ A cold read of the filed line, threads 1–3, at `517463cf4` (main was `0a860f28
 - **Cost.** A security reviewer reasons about guardrails over unchecked input, and trusts two clauses three-way cannot see.
 - **Flavour.** Guidance gap: the draft never says whether a write may land over an incompatible ante row.
 - **Settles it.** A ruling: is "a write over an incompatible row refuses" a guarantee of the new core? If yes, the write manifest needs something about the ante row; if no, a wontfix row.
+- → *Coach (2026-11-27, in chat):* "It is not a guarantee". A row in `notes/wontfix.md`, on #948.
 
 ### E2. The answer is built from tags not yet checked against the row; a listing whose tags lie answers `storage_unavailable`
 

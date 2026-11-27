@@ -4,7 +4,11 @@ Every matter the Coach ruled during the sprint, swept out of the doc's *Resolved
 
 Doc: https://claude.ai/artifact/NJ79cHNaiWKs2MNcRPegmD (*Resolved* tab).
 
-## Batch 7 (newest)
+## Batch 8 (newest, 2026-11-27, in chat)
+
+* **Closer Look E1: a write under a storage policy lands over a gate whose wayins fail their checks.** Asked: is "a write over an incompatible row refuses" a guarantee of the new core? If no, a wontfix row. Coach, in chat: "It is not a guarantee". 2026-11-27, Closer Look E1; a row in `notes/wontfix.md`, on #948.
+
+## Batch 7
 
 * **TOP: The graphql port loosened the core's datastore contract.** #947 rebuilt manifests from the server's answers and loosened the core to accept them; the explorer then proposed the manifest on the wire. Coach, in chat: "GraphQL is a VaultDB exactly inasmuch as it presents exactly the VaultDB interface. ... GraphQLVaultDB does not do any of the things an AdapterVaultDB does: it doesn't have to." Then: "yes, let's stick with the non-transforming pipe. I encourage such light consistency checks as you judge; it doesn't have to be blind, only transparent." And: "Do logical commits over the stack as reasonable: you can have the prs red as we have now; but let's not put this big a change through a write-rewrite within itself." 2026-11-26, #947; thread 11 redone in place (#947 force-pushed): GraphQLVaultDB implements VaultDB and forwards answers, checked by shape and scope; the core's contract untouched; the first attempt kept at tag 20261126-graphql_manifest-pipe-prerewrite.
 
