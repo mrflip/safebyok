@@ -449,6 +449,8 @@ export default defineConfig([
     rules: {
       // A test's stand-in for a model keeps its literals as own keys, as the real records a checker is given do.
       '@typescript-eslint/class-literal-property-style': 'off',
+      // A test's stand-in for a model, a device or an error is a literal or a cast by design: the stand-in is the point.
+      '@typescript-eslint/no-unsafe-class-instance-assignment': 'off',
       'vitest/no-disabled-tests': 'warn',
       'vitest/no-focused-tests': 'warn',
       // A type-level test asserts with `expectTypeOf` and has no runtime to check. Without
