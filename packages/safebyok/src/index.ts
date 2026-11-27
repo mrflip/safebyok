@@ -23,7 +23,7 @@ export { VaultChecks } from './shapes/shapes-vault'
 export { type ProbeArgs, type ProbeReport, type ProbeStep, type ProbeStepkind, ProbeChecks, ProbeLabelpath, probeStepkindVals } from './shapes/shapes-vault-probe'
 export { DefaultStrengthChecker, guardStrengthChecker } from './helpers/passphrase-strength'
 export { maskUuid } from './helpers/mask-uuid'
-export { type BulletproofFailOpts, type BulletproofOpts, type BulletproofTellOpts, bulletproofAsyncHandlerOf, bulletproofHandlerOf } from './helpers/bulletproof'
+export { type BulletproofFailOpts, type BulletproofOpts, type BulletproofTellOpts, bulletproofAsyncHandlerOf } from './helpers/bulletproof'
 
 // From safebyok-big, beside what core.ts and storage.ts re-export: the kinds, sizes and patterns a host checks its own input
 // against, and the small helpers of `safebyok-big/utils`.
