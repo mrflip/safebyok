@@ -323,9 +323,12 @@ Use these only where the precise word does not apply:
 * **open, as a verb on a key, a whisper or a box.** Name the operation instead. A key is
   unwrapped (`unwrap`). A whisper is deciphered (`decipher`). A box is unsealed (`unseal`). A
   whisper is taken out of its box by `extract`. A sentence the user sees may still say "open".
-* **unlock, as a noun.** A way in is a wayin. A gating grants a lease. `ensureUnlocked()` is the
+* **unlock, as the name of an object.** In code, unlock is an action: `ensureUnlocked()` is the
   verb, `gate.unlockGating()` makes the gating, and `gate.unlock()` is the form-verb imperative. (Code-wise, a
-  gating is considered a verb.)
+  gating is considered a verb.) It also describes: an unlock event, an unlock form, the `unlock` gating. Prose
+  may say "an unlock in another tab". Never name a variable, a field or a type `unlock`: the verb is
+  usually in scope beside it. Name the object for what it is: a way in is a wayin, and what a gating grants
+  is a lease.
 * **proof or ask, for the request for cleartext.** The user hands in cleartext through the
   host's form, and a proof is that cleartext (`ProvedCleartexts`), never the request. Made into a
   key, it is a proving. An ask is what a storage verb is asked.
