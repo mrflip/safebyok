@@ -143,7 +143,7 @@ export function rootScopesOf({ userid, banklabel }: ThingWatchScope): Readonly<{
     root: { modelkind: RootModelkinds.root, userid, banklabel, labelpath: labelpaths.root },
   }
 }
-/** What a birth's two puts cite, by root: each root as its sender found it, the shell where none is stored, or its tombstone. */
+/** The records a birth's two puts cite, by root: each root as its sender found it, the shell where none is stored, or its tombstone. */
 export type BirthCited      = Readonly<{ gate: CitedOf<GateRecord>, root: CitedOf<BoxRecord> }>
 /** An ask to write a bank's roots in one step, its gate and its root box, each over the root it `cited`: the bank's first life, or its next after its end. */
 export type BirthBankAsk    = Readonly<Omit<Z.infer<typeof AskChecks.birthBankAsk>, keyof BankRoots | 'cited'> & BankRoots & { cited: BirthCited }>

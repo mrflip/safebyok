@@ -85,7 +85,7 @@ export class Device {
   #vaultTSQ: VaultTSQ | null = null
   /** The vault of the bank's boxes, made as `signin` starts the bank. */
   #vault: Vault | null = null
-  /** What `signin` resolves, once it has been called. */
+  /** The promise `signin` returns, once it has been called. */
   #signinAnswer: Promise<void> | null = null
   /** Why the device ended, or null while it is enabled. */
   #endCause:   Errors.VaultError | null = null

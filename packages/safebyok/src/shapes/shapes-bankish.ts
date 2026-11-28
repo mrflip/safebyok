@@ -115,7 +115,7 @@ export const lifecyclekindVals = [...leasekindVals, 'stage_crossed', 'watch_ende
 export type Lifecyclekind = typeof lifecyclekindVals[number]
 
 // #lock-is-intent: each is news of what happened, never an alarm.
-/** What changed a device's lease, other than its own lock, unlock or disable, by its `kind`:
+/** A change to a device's lease, other than its own lock, unlock or disable, by its `kind`:
  * - `'lease_taken_up'` -- this tab took up the lease the deviceDB has, newer than its own: an unlock, a renewal or a softlock in another tab, or, as it signs in or connects, one stowed before
  * - `'lock_taken_up'`  -- this tab dropped its lease, as the deviceDB has one that no longer unlocks the bank: a lock in another tab, its autolock among them
  * - `'autolocked'`     -- this tab's janitor locked the lease past its end, in every tab
@@ -129,10 +129,10 @@ export type StageCrossing = Readonly<{ kind: 'stage_crossed', from: BankStage, t
 /** The device's watch of its bank ended of itself, before anything stopped it. */
 export type WatchEnding = Readonly<{ kind: 'watch_ended' }>
 
-/** What a device announces to `onLifecycle`, by its `kind`: a {@link LeaseAnnouncement}, a {@link StageCrossing} or a {@link WatchEnding}. */
+/** An announcement a device makes to `onLifecycle`, by its `kind`: a {@link LeaseAnnouncement}, a {@link StageCrossing} or a {@link WatchEnding}. */
 export type DeviceAnnouncement = LeaseAnnouncement | StageCrossing | WatchEnding
 
-/** What `onLifecycle` hears: a {@link DeviceAnnouncement}, and the device it happened to. */
+/** The event `onLifecycle` is called with: a {@link DeviceAnnouncement}, and the device it happened to. */
 export type DeviceEvent = DeviceAnnouncement & Readonly<{ device: Device }>
 
 /** `Device.make`'s `onLifecycle`: hears each {@link DeviceAnnouncement}. */

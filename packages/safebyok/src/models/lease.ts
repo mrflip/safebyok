@@ -88,7 +88,7 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
   /** This lease's {@link loggable}, for `JSON.stringify`. */
   toJSON(): LeaseLoggable { return this.loggable }
 
-  /** What a log wants of this lease, with nothing secret and nothing opaque. Its two tokens are cut short by `maskUuid`. */
+  /** The fields of this lease a log may show, with nothing secret and nothing opaque. Its two tokens are cut short by `maskUuid`. */
   get loggable(): LeaseLoggable {
     const { fmt, userid, banklabel, labelpath, wayinkind, born_at, proved_at, gate_labelpath, gate_lifepath, gate_born_at, isEvicted } = this
     return Object.freeze({

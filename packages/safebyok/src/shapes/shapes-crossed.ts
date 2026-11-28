@@ -48,7 +48,7 @@ export type CrossedErr = Z.output<typeof CrossedChecks.err>
 /** A refusal's act as it crosses a wire: a vaultDB's act, or `policied` for a write a storage policy refused. */
 export type CrossedAct = NonNullable<NonNullable<CrossedErr['meta']>['act']>
 
-/** What an answer that crossed a wire says beside its refusal: its act, and the Thing stored that it names, or the shell, checked at the ask's scope. */
+/** The fields beside the refusal in an answer that crossed a wire: its act, and the Thing stored that it names, or the shell, checked at the ask's scope. */
 export type CrossedAnswered = Readonly<{ act?: CrossedAct, dbhas?: ThingRecord | VoidSentinel | null }>
 
 /** The check of a refusal handed to {@link crossedErrOf}, which a server sends: a bad one is a bug on its side of the wire, not trouble in storage. */

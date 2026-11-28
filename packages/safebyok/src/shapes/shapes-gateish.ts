@@ -193,7 +193,7 @@ export interface ProvingOpts {
 
 // == [What a lease is handed]: LeaseBank, SecretFieldname, LeaseOpts
 
-/** What a lease, and the proving that builds it, need of the bank it is attached to: its device's `leaseMillis`, whether it is enabled, and its `lock` (called when the bankKey will not unwrap) and `demandEnabled`. A {@link Bank} is one. */
+/** The members a lease, and the proving that builds it, need of the bank it is attached to: its device's `leaseMillis`, whether it is enabled, and its `lock` (called when the bankKey will not unwrap) and `demandEnabled`. A {@link Bank} is one. */
 export interface LeaseBank {
   /** The bank's device: how long a lease granted in the bank lasts, in milliseconds. */
   readonly device: { readonly leaseMillis: number }

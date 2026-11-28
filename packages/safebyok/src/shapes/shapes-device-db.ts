@@ -32,7 +32,7 @@ export const DeviceDBChecks = Object.freeze(Validator.Checkers('bad_record', ({ 
 
 // == [IndexedDB]: IdbDeviceDBOpts, idbDeviceDBOpts, LeaseScopepath, DevicetokScopepath
 
-/** What an IdbDeviceDB is made with. */
+/** Options for an IdbDeviceDB. */
 export interface IdbDeviceDBOpts {
   /** Scopes the database's name and its bell's: `safebyok-<dbName>:…`, or `safebyok:…` if left out. */
   dbName?: string | undefined

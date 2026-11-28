@@ -159,7 +159,7 @@ export type LeaseRecord    = Z.infer<typeof StampChecks.leaseRecord>
 /** A lease record's tombstone, which a lock stows in place of the live record: its Thing fields, and no keys. */
 export type LeaseTombstone = TombstoneOf<LeaseRecord>
 // Picked field by field, so that a field added to the stamp joins the loggable only when chosen.
-/** What a log wants of a lease: its scope, the bank and gate it was granted under, when, by which wayin, and whether it is evicted.
+/** The fields of a lease a log may show: its scope, the bank and gate it was granted under, when, by which wayin, and whether it is evicted.
  * It has nothing secret and nothing opaque, and is no stamp: a ctx binds the {@link LeaseStamp}.
  */
 export type LeaseLoggable = Readonly<Pick<LeaseStamp, 'fmt' | 'userid' | 'banklabel' | 'wayinkind' | 'born_at' | 'proved_at' | 'gate_labelpath' | 'gate_lifepath' | 'gate_born_at'> & {

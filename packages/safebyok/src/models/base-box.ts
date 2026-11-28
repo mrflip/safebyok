@@ -18,7 +18,7 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
   // == [Body]: sidecar, whisper_sealed
   // Read off the record adopted: a field it lacks reads as undefined.
 
-  /** What a UI may show beside the whisper while the bank is locked: `{}` for a tombstone, and undefined over the shell. */
+  /** The box's sidecar: `{}` for a tombstone, and undefined over the shell. */
   get sidecar(): BoxRecord['sidecar'] | undefined { return wholeOf(this.pickle())?.sidecar }
 
   /** The whisper, sealed, or undefined over the shell. */

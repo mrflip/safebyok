@@ -20,7 +20,7 @@ export const ProbeChecks = Validator.Checkers('bad_record', ({ obj }) => ({
   }).strict(),
 }))
 
-/** What `Vault.probe` is asked: where its box goes and what it holds, each with a default. */
+/** The arguments of `Vault.probe`: where its box goes and what it contains, each with a default. */
 export type ProbeArgs = Z.input<typeof ProbeChecks.probeArgs>
 // --
 
