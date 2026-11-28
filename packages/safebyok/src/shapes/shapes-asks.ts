@@ -128,13 +128,13 @@ export type BankRoots       = Readonly<{ gate: GateRecord, root: BoxRecord }>
 /** The modelkind of each of a bank's roots, by its ckey in {@link BankRoots}. */
 export const RootModelkinds = Object.freeze({ gate: 'gate', root: 'box' } as const satisfies Record<keyof BankRoots, Thingkind>)
 /** Where each of a bank's roots is stored, by its ckey in {@link BankRoots}: its gate at its banklabel, its root box at `box`.
- * Refuses a banklabel that is no bank's, as `bad_record`.
+ * Refuses a banklabel that is no bank's.
  */
 export function rootLabelpathsOf({ banklabel }: Pick<ThingScope, 'banklabel'>): Readonly<Record<keyof BankRoots, Labelpath>> {
   return { gate: Labelpath.gateOf(ThingChecks.banklabel.parse(banklabel)), root: Labelpath.RootBox }
 }
 /** The scope of each of a bank's roots, by its ckey in {@link BankRoots}: its gate at its banklabel, its root box at `box`.
- * Refuses a banklabel that is no bank's, as `bad_record`.
+ * Refuses a banklabel that is no bank's.
  */
 export function rootScopesOf({ userid, banklabel }: ThingWatchScope): Readonly<{ [RootT in keyof BankRoots]: ThingScope & Readonly<{ modelkind: typeof RootModelkinds[RootT] }> }> {
   const labelpaths = rootLabelpathsOf({ banklabel })
@@ -163,7 +163,7 @@ export type ThingWatchScope = Readonly<Z.infer<typeof AskChecks.thingWatchScope>
 /** For each Thing an ask tracks, `'same'` if the actual Thing is at the revseq and lifepath tracked, else the actual Thing. */
 export type Tracked         = Readonly<{ gate: GateRecord | 'same', root: BoxRecord | 'same' }>
 
-/** Check a write `ask`, and its records by their kind and against each other, throwing `bad_record`. Returns it typed. */
+/** Check a write `ask`, and its records by their kind and against each other. Returns it typed. */
 export function checkedWriteAsk(ask: unknown): WriteAsk {
   const writeAsk = withRecordsChecked(AskChecks.writeAsk.parse(ask))
   if ((writeAsk.op === 'put') !== (writeAsk.record.am === 'a')) { throw Throwers.opNotOfRecord(writeAsk) }
@@ -177,7 +177,7 @@ function withRecordsChecked({ cited, record, ...flags }: Z.infer<typeof AskCheck
   return { ...flags, modelkind: 'box', cited: PerKindChecks.boxCited.parse(cited), record: PerKindChecks.boxThing.parse(record) }
 }
 
-/** Check a birth `ask`: each of its two records and what each cites, as the put {@link birthPutsOf} makes of them. Throws `bad_record`, and returns it typed. */
+/** Check a birth `ask`: each of its two records and what each cites, as the put {@link birthPutsOf} makes of them. Returns it typed. */
 export function checkedBirthBankAsk(ask: unknown): BirthBankAsk {
   const { cited, gate, root, ...flags } = AskChecks.birthBankAsk.parse(ask)
   const birthCited   = { gate: PerKindChecks.gateCited.parse(cited.gate), root: PerKindChecks.boxCited.parse(cited.root) }
