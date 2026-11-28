@@ -36,13 +36,13 @@ export function describeVaultDBStats({ fresh, bornBank, boxesBorn, rowsOf }: Vau
 
     it("counts a tombstone among the boxes stored, but not among the live ones, and weighs each box it has", async () => {
       const vaultDB = await bornBank()
-      const before  = await statsOf(vaultDB)
+      const ante    = await statsOf(vaultDB)
       const [openai] = await boxesBorn(vaultDB, boxThingOf('openai'), boxThingOf('mistral'))
       await rowsOf(vaultDB).plant(openai!, boxTombOf(openai!))
-      const after = await statsOf(vaultDB)
-      expect(after.box).to.deep.include({ count: 3, live_count: 2 })
-      expect(after.box.size).to.be.greaterThan(before.box.size)
-      expect(after.gate).to.deep.equal(before.gate)
+      const post  = await statsOf(vaultDB)
+      expect(post.box).to.deep.include({ count: 3, live_count: 2 })
+      expect(post.box.size).to.be.greaterThan(ante.box.size)
+      expect(post.gate).to.deep.equal(ante.gate)
     })
 
     it("counts nothing of another bank", async () => {

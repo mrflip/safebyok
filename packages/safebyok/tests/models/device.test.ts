@@ -835,8 +835,8 @@ describe("device.inspectable()", () => {
     const named = [gateRecord.wayins.main.bank_key_wayin_wrapped, whisper_sealed.key_wrapped, whisper_sealed.ciphered].map(({ ciphertext_b64 }) => ciphertext_b64)
     // Every ciphertext the vault TSQ and the roots' Things hold, the root box's among them, not only those named above.
     const roots     = [TH.GateScope, TH.RootScope].map((root) => device.bank.demandVaultMinder().thingAt({ ...TH.WorldScope, ...root })?.pickle())
-    const keptJsons = [...device.vaultTsqClient.getQueryCache().getAll().map(({ state }) => state.data), ...roots].map((val) => JSON.stringify(val ?? null))
-    const ciphertexts = new Set(keptJsons.flatMap((json) => [...json.matchAll(/"ciphertext_b64":"([^"]+)"/g)].map(([, ciphertext]) => ciphertext!)))
+    const cachedJsons = [...device.vaultTsqClient.getQueryCache().getAll().map(({ state }) => state.data), ...roots].map((val) => JSON.stringify(val ?? null))
+    const ciphertexts = new Set(cachedJsons.flatMap((json) => [...json.matchAll(/"ciphertext_b64":"([^"]+)"/g)].map(([, ciphertext]) => ciphertext!)))
     expect([...ciphertexts]).to.include.members(named)
     expect(ciphertexts.size).to.be.at.least(5)
     const shown = JSON.stringify(device.inspectable())

@@ -231,8 +231,8 @@ describe("bank.gate.replacePassphrase(cleartexts)", () => {
     born.bank.lock()
     const device = TH.makeDevice({}, { vaultDB: born.device.vaultDB })
     await device.signin(TH.WorldScope.userid)
-    const after = await device.bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
-    await TH.eventually(() => born.bank.gate.revtok === after.revtok)
+    const post = await device.bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
+    await TH.eventually(() => born.bank.gate.revtok === post.revtok)
     await TH.expectRefusal(born.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase }), 'wrong_passphrase')
     await born.bank.gate.unlock({ passphraseCleartext: NextPassphrase })
     expect(born.bank.isUnlocked).to.be.true
@@ -456,9 +456,9 @@ describe("bank.ensureUnlocked()", () => {
   it("dismissUnlock changes nothing with no call waiting", async () => {
     const { bank } = await TH.buildBornBank()
     bank.lock()
-    const before = bank.device.bank.getSnapshot()
+    const ante = bank.device.bank.getSnapshot()
     bank.dismissUnlock()
-    expect(bank.device.bank.getSnapshot()).to.equal(before)
+    expect(bank.device.bank.getSnapshot()).to.equal(ante)
   })
 
   it("keeps every waiter waiting through a disconnect, still wanting an `unlock` gating, and resolves them once one lands, disconnected or not", async () => {

@@ -714,10 +714,10 @@ describe("car.read_tc", () => {
   })
 
   it("is when a read_tc minted now was read", () => {
-    const before  = Date.now()
+    const ante    = Date.now()
     const read_tc = readTcNow()
     const car     = carReceived(undefined, TH.boxThingOf(), read_tc)
-    expect(readAtOf(car.read_tc)).to.be.within(before, Date.now())
+    expect(readAtOf(car.read_tc)).to.be.within(ante, Date.now())
   })
 
   it("follows the newest revision: a newer one brings its own time, the same one the later, an older one none", () => {
@@ -847,8 +847,8 @@ describe("a car made from a Thing that holds a record", () => {
   const whole2 = TH.boxThingOf('openai', { revseq: 2 })
 
   it("starts from that record, seen whole at the VacantReadTc, and from the vacant agerank over the shell", () => {
-    const held  = TH.PlainThing.make(eventOf(whole2, readTcOf(5)))
-    const car   = ThingCar.make(held, { bank: TH.PlainCarBank })
+    const thing = TH.PlainThing.make(eventOf(whole2, readTcOf(5)))
+    const car   = ThingCar.make(thing, { bank: TH.PlainCarBank })
     expect([car.agerank, car.agekind, car.read_tc]).to.deep.equal([agerankOf(0, 2, 2), 'here', VacantReadTc])
     const shell = TH.PlainThing.make(Thing.shellOf(whole2))
     expect(ThingCar.make(shell, { bank: TH.PlainCarBank }).agerank).to.eq(VacantAgerank)
@@ -893,13 +893,13 @@ describe("car.receive", () => {
 
   it("returns no events, in a frozen list, and changes nothing, for a record that is not news", () => {
     const [car] = received(undefined, TH.boxThingOf('openai', { revseq: 2 }))
-    const before = [car.agerank, car.thing.pickle()]
+    const ante = [car.agerank, car.thing.pickle()]
     for (const record of [TH.boxThingOf('openai', { revseq: 2 }), TH.boxThingOf('openai', { revseq: 1 }), TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 1 }))]) {
       const events = car.receive(eventOf(record, readTcOf(0)))
       expect(events).to.deep.equal([])
       expect(Object.isFrozen(events)).to.eq(true)
     }
-    expect([car.agerank, car.thing.pickle()]).to.deep.equal(before)
+    expect([car.agerank, car.thing.pickle()]).to.deep.equal(ante)
   })
 
   it("returns no events for a life or aged event, and changes nothing", () => {

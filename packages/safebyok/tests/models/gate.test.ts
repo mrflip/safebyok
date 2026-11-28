@@ -340,10 +340,10 @@ describe("gate.subscribe(listener)", () => {
     await ensuring
     await gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(counter.calls).to.eq(0)
-    const before = gate.pickle()
+    const ante = gate.pickle()
     await gate.addPasskey({ passphraseCleartext: TH.TestPassphrase, nextPasskeyCleartext: TH.passkeyAnswerOf() })
     expect(counter.calls).to.eq(1)
-    expect(gate.pickle()).to.not.equal(before)
+    expect(gate.pickle()).to.not.equal(ante)
     const elsewhere = { ...gate.pickle(), revtok: Crypto.randomId(), revseq: gate.revseq + 1, written_at: TH.T0 + 1 }
     device.bank.demandVaultMinder().receive({ ...TH.itemEventOf(elsewhere), sourcelabel: 'other_device', read_tc: readTcNow() })
     expect(counter.calls).to.eq(2)

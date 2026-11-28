@@ -413,28 +413,28 @@ describe("a bank's janitor", () => {
 
   it("runs from sign-in, and through a disconnect", async () => {
     const device = TH.makeDevice({ userid: null })
-    const before = vi.getTimerCount()
+    const ante = vi.getTimerCount()
     await device.signin(TH.WorldScope.userid)
-    expect(vi.getTimerCount() - before).to.eq(1)
+    expect(vi.getTimerCount() - ante).to.eq(1)
     device.disconnect()
-    expect(vi.getTimerCount() - before).to.eq(1)
+    expect(vi.getTimerCount() - ante).to.eq(1)
   })
 
   it("stops for good once the device is disabled", async () => {
     const device = TH.makeDevice({ userid: null })
-    const before = vi.getTimerCount()
+    const ante = vi.getTimerCount()
     await device.signin(TH.WorldScope.userid)
     device.disable()
     device.connect()
-    expect(vi.getTimerCount() - before).to.eq(0)
+    expect(vi.getTimerCount() - ante).to.eq(0)
   })
 
   it("does not start on a device disabled before it signs in", async () => {
     const device = TH.makeDevice({ userid: null })
-    const before = vi.getTimerCount()
+    const ante = vi.getTimerCount()
     device.disable()
     await device.signin(TH.WorldScope.userid)
-    expect(vi.getTimerCount() - before).to.eq(0)
+    expect(vi.getTimerCount() - ante).to.eq(0)
   })
 })
 
@@ -955,9 +955,9 @@ describe("a bank whose device is disabled", () => {
 describe("the bank's Things, beside a gate verb", () => {
   it("have the gate a gate verb wrote once the verb resolves", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const after = await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'another horse battery staple' })
-    expect(device.bank.demandVaultMinder().thingAt(TH.GateScope)?.pickle()).to.deep.equal(after.pickle())
-    expect(after.pickle()).to.include({ banktok: bank.banktok, labelpath: TH.ThingBank.banklabel })
+    const post = await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'another horse battery staple' })
+    expect(device.bank.demandVaultMinder().thingAt(TH.GateScope)?.pickle()).to.deep.equal(post.pickle())
+    expect(post.pickle()).to.include({ banktok: bank.banktok, labelpath: TH.ThingBank.banklabel })
   })
 })
 

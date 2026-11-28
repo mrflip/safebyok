@@ -666,8 +666,8 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const using = vault.withWhisper(Openai, () => 'done')
     await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await using).to.equal('done')
-    const kept   = device.vaultTsqClient.getQueryCache().getAll().map(({ state }) => state.data)
-    const traces = JSON.stringify([boxAt(vault)!.pickle(), kept, device.bank.getSnapshot()])
+    const cached = device.vaultTsqClient.getQueryCache().getAll().map(({ state }) => state.data)
+    const traces = JSON.stringify([boxAt(vault)!.pickle(), cached, device.bank.getSnapshot()])
     expect(traces).to.include(Openai).and.not.include('sk-test-0000')
   })
 

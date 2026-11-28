@@ -43,9 +43,9 @@ function loseProbePut(bank: Bank): void {
   vi.spyOn(vaultDB, 'tryWriteThing').mockImplementation(async (ask) => {
     if ((ask.labelpath !== ProbeLabelpath) || (ask.op !== 'put')) { return await write(ask) }
 
-    const before = rowsOf(bank).get(ProbeLabelpath)
+    const prior = rowsOf(bank).get(ProbeLabelpath)
     const answer = await write(ask)
-    if (before === undefined) { rowsOf(bank).delete(ProbeLabelpath) } else { rowsOf(bank).set(ProbeLabelpath, before) }
+    if (prior === undefined) { rowsOf(bank).delete(ProbeLabelpath) } else { rowsOf(bank).set(ProbeLabelpath, prior) }
     return answer
   })
 }

@@ -225,12 +225,12 @@ function lifeOf(cache: CachePrecis): number | 'vacant' {
 function cachePrecisOf(world: TSQWorld<MemoryVaultDB>): CachePrecis {
   const car     = world.sorted.carAt(TH.BoxScope)
   const item    = itemQueryAt(world)?.state.data as ThingRecord | null | undefined
-  const held    = car?.thing.pickle()
+  const record  = car?.thing.pickle()
   const listing = listQueryAt(world)?.state
   return {
     ...((item !== undefined) && { item: (item === null) ? null : precisOf(item) }),
     ...((car !== undefined) && (car.agekind !== 'here') && { soon: precisOf(car.citable) }),
-    ...((item === null) && (car?.agekind === 'here') && (held !== undefined) && Thing.isGone(held) && { dead: precisOf(held) }),
+    ...((item === null) && (car?.agekind === 'here') && (record !== undefined) && Thing.isGone(record) && { dead: precisOf(record) }),
     ...((listing !== undefined) && (listing.isInvalidated || (listing.data === undefined)) && { isListingStale: true }),
   }
 }

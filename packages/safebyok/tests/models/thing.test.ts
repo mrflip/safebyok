@@ -276,10 +276,10 @@ describe("Thing's props and record", () => {
   it("is left as it was by a receive whose adopt throws", () => {
     const live2 = TH.boxThingOf('openai', { revseq: 2 })
     const thing = TH.RefusingThing.make(eventOf(live2))
-    const before = [thing.pickle(), thing.revseq]
+    const ante = [thing.pickle(), thing.revseq]
     const refused = TH.boxThingOf('openai', { revseq: TH.RefusingThing.RefusedRevseq, revtok: TH.revtokOf('three') })
     expect(() => thing.receive(eventOf(refused, readTcOf(1)))).to.throw(TH.RefusingThing.Refusal)
-    expect([thing.pickle(), thing.revseq]).to.deep.equal(before)
+    expect([thing.pickle(), thing.revseq]).to.deep.equal(ante)
   })
 })
 
@@ -306,9 +306,9 @@ describe("Thing refusals", () => {
   for (const [val, blurb] of RefusedVals) {
     it(`refuses an event whose val is ${blurb}, holding the record it held`, () => {
       const [thing] = received(undefined, TH.boxThingOf('openai', { revseq: 1 }))
-      const held = thing.pickle()
+      const ante = thing.pickle()
       TH.expectSyncRefusal(() => thing.receive({ ...eventOf(live), val } as never), 'bad_record')
-      expect(thing.pickle()).to.eq(held)
+      expect(thing.pickle()).to.eq(ante)
     })
   }
 
@@ -325,9 +325,9 @@ describe("Thing refusals", () => {
   for (const [fields, blurb] of RefusedEvents) {
     it(`refuses an event ${blurb}, holding the record it held`, () => {
       const [thing] = received(undefined, TH.boxThingOf('openai', { revseq: 1 }))
-      const held = thing.pickle()
+      const ante = thing.pickle()
       TH.expectSyncRefusal(() => thing.receive({ ...eventOf(live), ...fields } as never), 'bad_record')
-      expect(thing.pickle()).to.eq(held)
+      expect(thing.pickle()).to.eq(ante)
     })
   }
 
