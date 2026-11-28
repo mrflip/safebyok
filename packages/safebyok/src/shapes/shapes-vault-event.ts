@@ -78,9 +78,9 @@ export type VaultEventOf<EventkindT extends VaultEventkind> = Readonly<{
   labelpath:  Labelpath
   /** The kind of Thing at `labelpath`. */
   modelkind:  Thingkind
-  /** The Thing's agerank with this event's record seen, or the vacant agerank where no ageranks are kept, as in a vaultDB's watch. */
+  /** The Thing's agerank with this event's record seen, or the vacant agerank where no ageranks are recorded, such as in a vaultDB's watch. */
   agerank:    Agerank
-  /** The Thing's agerank before this event's record: the vacant agerank where it had received none, or where no ageranks are kept. */
+  /** The Thing's agerank before this event's record: the vacant agerank where it had received none, or where no ageranks are recorded. */
   agerankWas: Agerank
   /** The banktok of the bank's life, where the event's source knew it: from a `VaultMinder`, the answer's `banktok`, or the one the notice or the event rung carried, else the bank's as last read. The void banktok where none was known, as in a vaultDB's raw watch where the datastore did not hand over the bank. */
   banktok:    Banktok
@@ -90,7 +90,7 @@ export type VaultEventOf<EventkindT extends VaultEventkind> = Readonly<{
   read_tc:    ReadTc
 }>
 
-/** A record of the Thing. Where ageranks are kept, the record left the Thing's agerank greater than it was. Narrow it on `liveness` to know what `val` has.
+/** A record of the Thing. Where ageranks are recorded, the record left the Thing's agerank greater than it was. Narrow it on `liveness` to know what `val` has.
  * The newest revision seen again in a later tcchunk moves only the agerank's tcchunk: the event's `agerankWas` and `agerank` then differ only in their last field.
  */
 export type VaultItemEvent<RecordT extends ThingRecord = ThingRecord> = VaultEventOf<'item'> & ItemSeen<RecordT>

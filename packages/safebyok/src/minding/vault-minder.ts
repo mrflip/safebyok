@@ -246,7 +246,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
 
   // == [Asks]: makeGetAsk, makeListAsk, makePutAsk, makeDelAsk, knownRoots, cachedRoots, #cachedAt, #bankFields
   // Each adds this bank's scope, banktok and track to the draft, `getAskOf` and its siblings add the op and default
-  // flags, and the verb checks the ask. A bank whose gate is not yet known to be stored, as at sign-in or before its
+  // flags, and the verb checks the ask. A bank whose gate is not yet known to be stored, such as at sign-in or before its
   // first birth, has asks with the void banktok, which only a get may carry, and a root not yet known to be stored is
   // tracked at the void revision.
 
