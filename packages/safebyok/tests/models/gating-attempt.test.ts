@@ -182,7 +182,7 @@ describe("a refused form entrypoint", () => {
 })
 
 describe("the makers, handed a dna", () => {
-  it("make a gating that a second attempt refuses, as every gating does", async () => {
+  it("make a gating that a second attempt refuses", async () => {
     const { bank } = await lockedBank()
     const gating = bank.gate.unlockGating({ passphrase: TH.TestPassphrase })
     await gating.attempt()

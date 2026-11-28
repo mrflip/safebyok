@@ -622,7 +622,7 @@ describe("ThingCar.make(begun, { bank })", () => {
     expect(car.thing).to.be.instanceOf(Box)
   })
 
-  it("throws where its bank refuses to make the Thing, as a device's does a record of another bank", () => {
+  it("throws where its bank refuses to make the Thing", () => {
     TH.expectSyncRefusal(() => ThingCar.make(TH.thingEventOf({ ...TH.boxThingOf(), userid: 'u2' }), { bank: TH.makeDevice().bank }), 'record_conflict')
   })
 

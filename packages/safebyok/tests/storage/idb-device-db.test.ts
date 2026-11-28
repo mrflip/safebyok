@@ -60,7 +60,7 @@ describe("IdbDeviceDB's options", () => {
 })
 
 describe("IdbDeviceDB's database and bell", () => {
-  it("peeks a lease stowed on another connection, as after a reload", async () => {
+  it("peeks a lease stowed on another connection", async () => {
     const deviceDB = makeIdbDeviceDB()
     const lease    = await TH.liveLeaseRecordOf()
     await deviceDB.stowLease(lease)

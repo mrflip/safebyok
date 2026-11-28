@@ -226,7 +226,7 @@ describe("bank.gate.replacePassphrase(cleartexts)", () => {
     await TH.expectRefusal(bank.gate.replacePassphrase({ nextPassphraseCleartext: NextPassphrase }), 'bad_record')
   })
 
-  it("follows a gate change made on another device, as its vaultDB's watch notifies it", async () => {
+  it("follows a gate change made on another device", async () => {
     const born = await TH.buildBornBank()
     born.bank.lock()
     const device = TH.makeDevice({}, { vaultDB: born.device.vaultDB })

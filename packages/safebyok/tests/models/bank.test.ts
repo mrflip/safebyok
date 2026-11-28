@@ -472,7 +472,7 @@ async function changeGateElsewhere(vaultDB: MemoryVaultDB): Promise<void> {
 }
 
 describe("a lease shared by the tabs of one deviceDB", () => {
-  it("unlocks a tab as it signs in under the lease another tab stowed, as a page reload does", async () => {
+  it("unlocks a tab as it signs in under the lease another tab stowed", async () => {
     const { first, second } = await twoTabs()
     expect(second.bank.getSnapshot().stage).to.eq('unlocked')
     expect(second.bank.leaseLoggable).to.deep.equal(first.device.bank.leaseLoggable)
@@ -535,7 +535,7 @@ describe("a lease shared by the tabs of one deviceDB", () => {
     expect(later.bank.getSnapshot().stage).to.eq('locked')
   })
 
-  it("starts the next life at an unlock after the lease stored has passed its end, as when every tab closed while it was live", async () => {
+  it("starts the next life at an unlock after the lease stored has passed its end", async () => {
     const [vaultDB, deviceDB] = [new MemoryVaultDB(), new MemoryDeviceDB()]
     const { device } = await TH.buildBornBank({ device: TH.makeDevice({}, { vaultDB, deviceDB }) })
     device.disconnect()
@@ -612,7 +612,7 @@ describe("a lease shared by the tabs of one deviceDB", () => {
     expect(second.bank.isUnlocked).to.be.true
   })
 
-  it("leaves the other tabs unlocked when one is disabled, as a disconnect does", async () => {
+  it("leaves the other tabs unlocked when one is disabled", async () => {
     const { first, second } = await twoTabs()
     second.disable()
     await settle()

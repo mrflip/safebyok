@@ -84,7 +84,7 @@ export function describeVaultDBBirths({ fresh, bornBank, withGate, gotAt, rowsOf
       })
     }
 
-    it("writes a rebirth over the gate's tombstone that keeps its banktok, as over a tombstone a gate may carry any", async () => {
+    it("writes a rebirth over the gate's tombstone that keeps its banktok", async () => {
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant(GateScope, gateGone)
       const ask = { ...rebirthBankAskOf(gateGone, null), gate: gateRebornOf(gateGone), banktok: gateGone.banktok }
