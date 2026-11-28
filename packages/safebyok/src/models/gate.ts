@@ -2,7 +2,6 @@ import { Clock, type Errors, Validator } from 'safebyok-big/internals'
 import { type Adoptable, Thing } from './thing'
 import type { Device } from './device'
 import { AddPasskeyGating, ReplacePassphraseGating, RevokePasskeyGating, UnlockGating } from './gating'
-import { Lease } from './lease'
 import type { Proving } from './proving'
 import { Wayin } from './wayin'
 import type { Bank } from './bank'
@@ -12,8 +11,8 @@ import type {
 } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import type { LiveOf } from '../shapes/shapes-sealers'
-import { type GateLife, type GateStamp, type LeaseLoggable, type LeaseRecord, StampChecks } from '../shapes/shapes-stamps'
-import { type GateRecord, type Modelkind, type Sparse, type ThingCited, type ThingScope, type ThingShaped, type Wayins, Shell, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
+import { type GateLife, type GateStamp, type LeaseLoggable, StampChecks } from '../shapes/shapes-stamps'
+import { type GateRecord, type Modelkind, type ThingCited, type ThingScope, type ThingShaped, type Wayins, Shell, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
 import { type ThingMakeOpts, ThingMakeChecks } from '../shapes/shapes-bankish'
 import { type VaultItemEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import { GateChecks } from '../shapes/shapes-thingkinds'
@@ -28,13 +27,12 @@ import * as Throwers from '../refusals/throwers'
  * Over the shell or a tombstone, its stamp, its life, `main` and `passkey0` refuse `absent_thing`, and so does a gating's attempt. A gating can still be made, and it still takes in the cleartexts.
  */
 export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<GateRecord>> implements GateStamp {
-  // == [Props]: #device, #bank, #friend
+  // == [Props]: #bank, #friend
 
-  readonly #device:    Device
   /** The bank that the leases this gate builds are attached to. */
-  readonly #bank:     Bank
+  readonly #bank:   Bank
   /** The bank's lease verbs. */
-  readonly #friend:    BankGateFriend
+  readonly #friend: BankGateFriend
   // --
 
   // == [Body]: wayins, auth, sigs, meta
@@ -53,7 +51,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   // == [Getters]: device, main, passkey0, scope, stamp, life, leaseEndsAt, leaseLoggable
 
   /** The device this gate's bank is on. */
-  get device(): Device { return this.#device }
+  get device(): Device { return this.#bank.device }
 
   /** The passphrase wayin, a new Wayin on each read. */
   get main(): Wayin { return Wayin.make(this.demandLive().wayins.main) }
@@ -100,9 +98,8 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
   private constructor(shell: Sealers.ShellOf<GateRecord>, bank: Bank, friend: BankGateFriend) {
     super(shell, bank.bulletproofCallback)
-    this.#device    = bank.device
-    this.#bank     = bank
-    this.#friend    = friend
+    this.#bank   = bank
+    this.#friend = friend
   }
 
   // Thing's constructor calls this before this gate's own fields exist, so it reads and sets none of them.
@@ -232,14 +229,10 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
    * The lease follows the one stored, or the bank's where that is newer: after a live lease it is that lease's next revision, a renewal keeping its `born_at`; after a lock's tombstone it starts the next life.
    */
   async #unlockByProving(proved: Proving): Promise<this> {
-    const lease = await this.#buildLease(proved, await this.#friend.leaseFollowed(this))
+    const followed = await this.#friend.leaseFollowed(this)
+    const lease    = await proved.buildLease(this.#bank, this, followed)
     this.#friend.attachLease(lease)
     return this
-  }
-
-  /** A lease `proved` builds, granted in this gate's bank under its life, citing the revision this gate models, and following `followed`. */
-  async #buildLease(proved: Proving, followed: Sparse<LeaseRecord>): Promise<Lease> {
-    return await proved.buildLease(this.#bank, this, followed)
   }
 
   /** Put `ask.record`, this gate's next revision, over `ask.cited`. Resolves this gate, which then models the revision put. */
