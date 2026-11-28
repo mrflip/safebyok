@@ -66,10 +66,10 @@ async function unsealByHand(bankKey: CryptoKey, box: LiveOf<BoxRecord>, boxStamp
   return textOf(await Crypto.decipherBytes(partKey, ciphered, Crypto.cipherCtx(boxStamp, BaseBox.purposes.cipher, tags)))
 }
 
-/** A lease's record and its stamp, built by a born bank's passphrase proving on a fake gate of {@link TH.WorldGateLife}. */
+/** A lease's record and its stamp, built by a born bank's passphrase proving on a fake bank of {@link TH.WorldGateLife}. */
 async function leaseRecordOf(): Promise<{ record: LiveOf<LeaseRecord>, stamp: LeaseStamp }> {
   const { proving } = await TH.buildBornBank()
-  const { lease, record } = await TH._cheat_grantedLease(proving, TH.fakeLeaseGateOf())
+  const { lease, record } = await TH._cheat_grantedLease(proving, TH.fakeLeaseBankOf())
   return { record, stamp: lease.stamp }
 }
 
@@ -243,7 +243,7 @@ describe("each ctx binds every field of its stamp", () => {
 async function twoLives() {
   const { device, bank, gateRecord, proving } = await TH.buildBornBank()
   const box = await device.vault!.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-  const { lease, record: leaseRecord } = await TH._cheat_grantedLease(proving, TH.fakeLeaseGateOf(), bank.gate.stamp)
+  const { lease, record: leaseRecord } = await TH._cheat_grantedLease(proving, TH.fakeLeaseBankOf(), bank.gate.stamp)
   const [life, main, bankKey, root] = [bank.gate.life, bank.gate.main, await TH._cheat_bankKeyOf(bank), bank.rootBox]
   const [gateGone, rootGone] = [TH.gateTombOf(gateRecord), TH.boxTombOf(root)]
   await TH.expectGood(device.vaultDB.tryWriteThing(TH.delAskFor(gateRecord, gateGone)))

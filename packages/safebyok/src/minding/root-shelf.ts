@@ -24,7 +24,7 @@ export function guardRootShelf(shelf: RootShelf, onBadNews: (news: Errors.VaultE
   })
 }
 
-/** The roots `shelf` keeps of the bank at `scope`, each beside when it was read, unchecked, or none. A value that does not read as today's is removed. */
+/** The roots `shelf` has for the bank at `scope`, each beside when it was read, unchecked, or none. A value that is not of version {@link ShelvedVersion} is removed. */
 export function peekRoots(shelf: RootShelf, scope: BankScope): readonly unknown[] {
   const shelved = shelf.getItem(shelfCkeyOf(scope))
   if (shelved === null) { return [] }
@@ -53,7 +53,7 @@ type ShelvedRoot = Readonly<{ record: Adoptable<ThingRecord>, read_tc: ReadTc }>
 /** The bank's two roots: its gate and its root box. */
 type ShelvedRoots = readonly [gate: ShelvedRoot, rootBox: ShelvedRoot]
 
-/** The version a shelved value begins with: a value of any other reads as nothing kept. */
+/** The version a shelved value begins with: a value of any other version reads as nothing shelved. */
 const ShelvedVersion = `roots-tc-${ThingFormat}`
 
 /** The root `record`, beside when `vaultMinder` last read news of it */

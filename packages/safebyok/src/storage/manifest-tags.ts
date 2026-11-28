@@ -46,8 +46,9 @@ function rootTagsOf(ask: WriteAsk, prior: unknown): RootTags {
   }
 }
 
-// The write predicate pins the prior row's revtok, revseq, lifepath and liveness to the cited ones, or citing the shell finds no
-// row; holds its born_at and banktok to the record's; and meets each storage policy. So the ask alone makes the tags.
+// The write predicate requires the prior row's revtok, revseq, lifepath and liveness to equal the cited ones (or, citing the
+// shell, that there is no row), its born_at and banktok to equal the record's, and each storage policy to pass. So the ask
+// alone makes the tags.
 /** The tags of a written write, made of its `ask` alone: those {@link writeTagsOf} makes of any prior row the write predicate lets through. */
 export function writtenTagsOf(ask: WriteAsk): WriteTags {
   const isLive = (ask.cited.am === 'a')

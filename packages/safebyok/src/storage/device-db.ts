@@ -28,7 +28,7 @@ export abstract class DeviceDB {
   /** Stow `record` at its scope, its gate's, if it is newer than the prior lease record there, and answer the actual one.
    * - Newer means a later life, or a later revision of the same life: a record of the same life and revision is not newer, and is not stowed.
    * - A prior record that fails its checks is replaced by any record.
-   * - Every listener of this database, in this tab or another, hears of each record stowed.
+   * - Every listener of this database, in this tab or another, is called with the scope of each record stowed.
    */
   async stowLease(record: LeaseRecord): Promise<LeaseRecord> {
     try {

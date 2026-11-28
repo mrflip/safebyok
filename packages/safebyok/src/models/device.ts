@@ -35,16 +35,15 @@ export const DefaultSoftlockMillis = 10 * 60_000
 /** How often the janitor runs when the host gives no `janitorMinutes`: every ten minutes. */
 export const DefaultJanitorMillis = 10 * 60_000
 
-/** How long after the gate was last read it is read again when the host gives no `gateStaleMinutes`: twelve hours. */
+/** How long after the gate was last read the bank gets it again, when the host gives no `gateStaleMinutes`: twelve hours. */
 export const DefaultGateStaleMillis = 12 * 60 * 60_000
 // --
 /** This browser, before and after anyone signs in: the host's functions, guarded, and the signed-in user's bank and vault.
  * Make it with `Device.make(record, opts)`, which does no I/O, touches no browser global and subscribes to nothing; call
  * `hello()` to start it, `connect()` to keep it in step with the vaultDB until `disconnect()`, and `signin(userid)` once
- * the host knows who is signed in, which brings up that user's bank
- * from the roots kept on the host's root shelf. Its bank's snapshot shows the stage `'signed_out'` until then, `'starting'` while it
- * starts the user's bank, then `'locked'` for a bank stored, or `'unborn'` for none, which a
- * {@link birthGating} on this device fills.
+ * the host knows who is signed in, which brings up that user's bank from the roots on the host's root shelf. Its bank's
+ * snapshot shows the stage `'signed_out'` until then, `'starting'` while it starts the user's bank, then `'locked'` for a
+ * bank stored, or `'unborn'` for none, which a {@link birthGating} on this device fills.
  * It serves the first user it is told of for its life: another user signing in is a sign-out, which the host answers by
  * reloading the page.
  */
@@ -54,9 +53,9 @@ export class Device {
   /** The label of the bank this device serves each user. */
   readonly banklabel:          Banklabel
   // Hidden, so that a spread or a log line of the device passes by the host's objects and their guards.
-  /** Where this device's banks are stored. */
+  /** Where the signed-in user's bank is stored. */
   declare readonly vaultDB:            VaultDB
-  /** Where the signed-in bank's lease is kept, shared by every tab given the same one: the host's, or one in this device's memory. */
+  /** Where the signed-in bank's lease is stowed, shared by every tab given the same one: the host's, or one in this device's memory. */
   declare readonly deviceDB:           DeviceDB
   declare readonly keyDeriver:         GuardedKeyDeriver
   declare readonly strengthChecker:    GuardedStrengthChecker
@@ -67,7 +66,7 @@ export class Device {
   readonly softlockMillis:     number
   /** How often, in milliseconds, the bank's janitor locks a lease past its end, and, while connected, starts the watch where it is not running and checks whether the gate is stale. */
   readonly janitorMillis:      number
-  /** How long after this device last read the gate, in milliseconds, the bank reads it again. */
+  /** How long after this device last read the gate, in milliseconds, the bank gets it again. */
   readonly gateStaleMillis:    number
 
   /** The host's `onBadNews`, or the default. */
@@ -76,7 +75,7 @@ export class Device {
   readonly #onLifecycle: GuardedLifecycleHandler
   /** The host's root shelf, guarded, which the signed-in bank's roots are read from and put to, or null for none. */
   readonly #rootShelf: RootShelf | null
-  /** The QueryClient the vault TSQ keeps the boxes in: the host's, or one made with the device. */
+  /** The QueryClient the vault TSQ caches the boxes in: the host's, or one made with the device. */
   readonly #vaultTsqClient: QueryClient
   /** The signed-in user's bank, made with the device. */
   readonly #bank: Bank
@@ -114,7 +113,7 @@ export class Device {
   /** The autolock duration in minutes, past which a lease no longer unlocks the bank. */
   get autolockMinutes(): number { return this.leaseMillis / Consts.MinuteMillis }
 
-  /** The QueryClient the vault TSQ keeps the signed-in user's boxes in: `opts.queryClient`, the host's own, or one the device made. The same one from `Device.make` on. */
+  /** The QueryClient the vault TSQ caches the signed-in user's boxes in: `opts.queryClient`, the host's own, or one the device made. The same one from `Device.make` on. */
   get vaultTsqClient(): QueryClient { return this.#vaultTsqClient }
 
   /** The vault TSQ of the signed-in user's boxes, in {@link vaultTsqClient}. Refuses `absent_vault` until `signin`, and `disabled` until the sign-in has started the bank. */
@@ -124,7 +123,7 @@ export class Device {
     return this.#vaultTSQ
   }
 
-  /** The signed-in user's bank: what locks, unlocks and ends it, holds its lease, and has the snapshot a host renders. The same one from `Device.make` on.
+  /** The signed-in user's bank: what locks, unlocks and ends it, has its lease attached, and has the snapshot a host renders. The same one from `Device.make` on.
    * It is the bank of {@link banklabel} from the start, and unsealable until its gate and root box are live, found stored or born on this device: its snapshot's stage says which.
    */
   get bank(): Bank { return this.#bank }
@@ -138,7 +137,7 @@ export class Device {
   // == [Construction]: make, constructor
 
   /** Make a device of the banklabel in `record`, guarding the host's functions in `opts`, with nobody signed in.
-   * The signed-in user's boxes are kept in `opts.queryClient`, the host's own, under the bank's key, or in a QueryClient the
+   * The signed-in user's boxes are cached in `opts.queryClient`, the host's own, under the bank's query key, or in a QueryClient the
    * device makes: {@link vaultTsqClient}. The signed-in bank's roots are read from `opts.rootShelf` at {@link signin}.
    * Nothing is fetched from the vaultDB until then, and nothing is watched until the device is both signed in and {@link connect}ed.
    */
@@ -191,7 +190,7 @@ export class Device {
   // == [Starting]: hello, signin, birthGating, gatingBirthAttempt, #doSignin
 
   /** Start the device. It resolves at once, and never rejects.
-   * Refuses `insecure_context` outside a secure context, where WebCrypto is missing.
+   * Throws `insecure_context`, before returning a promise, outside a secure context, where WebCrypto is missing.
    */
   hello(): Promise<void> {
     checkSecureContext()
@@ -227,21 +226,22 @@ export class Device {
     return gating
   }
 
-  /** Birth this device's bank under the new `passphrase`, and a new passkey's answer if given, in a form or a dna, as {@link Bank.birth} does: the bank is then this device's, unlocked.
+  /** Birth this device's bank under the new `passphrase`, and a new passkey's answer if given, in a form or a dna: the bank is then this device's, unlocked. See {@link Bank.birth}.
    * A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields before anything is awaited; its other fields stay. A dna's fields are never changed, but a passkey answer's PRF bytes are zeroed.
    * @example
    *   await device.gatingBirthAttempt(new FormData(formEl))
    */
   async gatingBirthAttempt(params: FormData | BirthDna): Promise<Bank> { return await this.birthGating(params).attempt() }
 
-  // The roots fetched land in the bank's Things, which the stage is read from. A root its Thing refuses reaches the host
+  // The roots fetched are received by the bank's Things, which the stage is read from. A root its Thing refuses reaches the host
   // once, as bad news told by the VaultMinder; sign-in then reports only what the roots amount to: both live, the
   // bank unborn, or broken. A failure to fetch them, once a bank is up from what was restored, is no caller's to hear.
-  // The VaultMinder, the vault TSQ, the bank's hold on them and the vault are made with nothing awaited between: the
-  // VaultMinder's cars remember what they take, so a record it took with no one listening would reach them later only
-  // as a repeat, which it drops. The vault TSQ listens from the vault's making where the device is connected, and else
-  // from its next connect, which refetches what the vault TSQ caches. The bank takes the roots shelved before the
-  // vaultDB is asked. The vault is made last, on everything made before it.
+  // The VaultMinder and the vault TSQ are made, the bank is given the VaultMinder, and the vault is made, with nothing
+  // awaited between: the VaultMinder's cars remember each record they receive, so a record received with no one
+  // listening would reach a later listener only as a repeat, which the VaultMinder drops. The vault TSQ listens from the
+  // vault's making where the device is connected, and else from its next connect, which refetches what the vault TSQ
+  // caches. The bank is seeded from the shelved roots before the vaultDB is asked. The vault is made last, on everything
+  // made before it.
   /** Start the signed-in user's bank over a VaultMinder of it: from the roots shelved, where there are any, and from the two roots the vaultDB answers. */
   async #doSignin(): Promise<void> {
     try {
@@ -311,7 +311,7 @@ export class Device {
    */
   tellBadNews(badnews: readonly unknown[]): void {
     const refusals = badnews.map((news) => Throwers.refusalOfThrown(news))
-    // A thing disabled since is no news: its bank went away.
+    // A `disabled` refusal is no news: the device has ended, and its bank with it.
     tellBadNewsTo(this.isEnabled ? this.#onBadNews : DefaultOnBadNews, this, refusals.filter((refusal) => refusal.refusalkind !== 'disabled'))
   }
 
@@ -343,7 +343,7 @@ export class Device {
 
   // == [A devtool's view]: inspectable
 
-  /** Safe view of the device, for logging and debugging.
+  /** A masked view of the device, for logging and debugging.
    * It has the bank's roots (`bankTSQ`) and the vault TSQ, each ciphertext masked, and the lease's loggable and when it ends, never its key material. Before `signin`, it answers {@link EmptyMaskedView}.
    * For experimenting, never for an app's own logic: what it answers may change without notice.
    */

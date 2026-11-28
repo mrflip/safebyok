@@ -1,4 +1,4 @@
-/** The `OneWatchVaultDB` wrapper: one tab of the origin runs a vaultDB's watch of a bank, and tells the others. */
+/** The `OneWatchVaultDB` wrapper: one tab of the origin runs a vaultDB's watch of a bank, and notifies the others. */
 
 import { deepFreeze, noop } from 'es-toolkit'
 import { type Errors, Outcome } from 'safebyok-big/internals'
@@ -24,7 +24,7 @@ function lockManagerOf(): LockManager | undefined {
 // --
 
 // The platform hands the lock to the next tab waiting when the holder lets it go, or when its page closes, reloads or is
-// discarded. A hidden holder keeps hearing: Chrome's freezing spares a page holding a Web Lock that another page waits for.
+// discarded. A hidden holder keeps its watch running: Chrome's freezing spares a page holding a Web Lock that another page waits for.
 /** A vaultDB that runs the watch of `vaultDB` in one tab of the origin for each bank, and hands what it notifies to the watch of every other tab.
  * Each watch asks for a Web Lock named for the bank; the tab holding it runs the wrapped vaultDB's watch, and posts each notice on a BroadcastChannel of the same name.
  * Every other verb is the wrapped vaultDB's own. Where the platform has no Web Locks, each tab runs the wrapped vaultDB's watch.

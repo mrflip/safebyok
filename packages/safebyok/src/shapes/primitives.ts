@@ -1,4 +1,4 @@
-/** The plain values the lean core's signatures name: aliases of `string` and `number`, so that a signature says which.
+/** The plain values this package's signatures name: aliases of `string` and `number`, so that a signature says which.
  * `Lifeseq` and `Labelpath` also name the plain string helpers of their values.
  */
 
@@ -16,7 +16,7 @@ export type BoxLabelpath = 'box' | `box/${string}`
 
 /** The helpers for a {@link Labelpath}, and where the root box is stored. */
 export const Labelpath = Object.freeze({
-  /** Where the root box is stored in its bank, and its key in a `track`. */
+  /** Where the root box is stored in its bank. */
   RootBox:  'box',
   /** Where the gate of the bank labelled `banklabel` is stored: at the banklabel. */
   gateOf(banklabel: Banklabel): Labelpath { return banklabel },
@@ -88,7 +88,7 @@ function paddedSeqOf(seqnum: number): string {
 // --
 
 // == [Device]: Devicetok, EpochMillis
-/** This device's token for a bank, a UUID recorded in each wayin it builds: the host's `devicetok`, or the one its deviceDB keeps for the bank. */
+/** This device's token for the signed-in user, a UUID recorded in each wayin it builds: the host's `devicetok`, or the one its deviceDB stores for the user. */
 export type Devicetok = string
 /** An instant: whole UTC epoch milliseconds, as `Date.now()` gives. */
 export type EpochMillis = CX.EpochMillis

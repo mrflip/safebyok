@@ -42,7 +42,7 @@ export class MemoryDeviceDB extends DeviceDB {
     return prior
   }
 
-  // Each hearer is called on a later microtask, so nothing it does runs inside the stow that rang.
+  // Each listener is called on a later microtask, so nothing it does runs inside the stow that rang.
   protected doRing({ modelkind, userid, banklabel, labelpath }: LeaseScope): void {
     for (const listener of this.#listeners) { queueMicrotask(() => { listener({ modelkind, userid, banklabel, labelpath }) }) }
   }

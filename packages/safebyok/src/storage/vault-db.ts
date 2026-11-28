@@ -8,7 +8,7 @@ import type { VaultEvent } from '../shapes/shapes-vault-event'
 // == [The interface]: VaultDB, VaultDBMembernames, isVaultDB
 
 /** Storage for the Things of a user's banks. Each `try` verb is one atomic step, and resolves an answer instead of throwing.
- * Each `*Ask` builder fills in an ask's defaults and checks nothing: the verb it is passed to refuses a bad ask.
+ * Each `*AskOf` builder fills in an ask's defaults and checks nothing: the verb it is passed to refuses a bad ask.
  * The records an answer or a notice carries become the caller's to keep, deeply frozen: a vaultDB never changes one after handing it over.
  */
 export interface VaultDB {

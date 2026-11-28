@@ -18,8 +18,9 @@ export const BankChecks = Object.freeze({
   birthAsk:      AskChecks.birthBankAsk,
 })
 
-/** The checks of a gate's Thing: its record, its citation and what is stored of it, the storage policies it may name, and its labelpath, a label alone, which its record, shell and asks also hold equal to the banklabel.
- * Also its `live` record, its `shell`, a live gate's wayins, its `banktok`, which is its bank's, its `life`, its `stamp`, and its `provable` form, its life and wayins.
+/** The checks of a gate's Thing: its record, its citation, what is stored of it, the storage policies it may name, and its labelpath.
+ * Also its `live` record, its `shell`, a live gate's `wayins`, its bank's `banktok`, its `life`, its `stamp`, and its `provable` form (its life and wayins).
+ * The `labelpath` check takes one label alone; the record, shell and ask checks also require it to equal the banklabel.
  */
 export const GateChecks = Object.freeze({
   record:        PerKindChecks.gateThing,
@@ -37,7 +38,7 @@ export const GateChecks = Object.freeze({
 })
 
 /** The checks of a box's Thing: its record, its citation and what is stored of it, the storage policies it may name (none), and its labelpath.
- * Also its `shell`, its `live` record, its `liveOrShell` record, which a bank has of its root box, its `sparse` form, a live box without its body, and its `stamp`.
+ * Also its `shell`, its `live` record, the `liveOrShell` record a bank has of its root box, its `sparse` form (a live box without its body), and its `stamp`.
  * And what its seal is given: its sealable, a live one for a tombstone (`liveSealable`), the public props of a revision and of a tombstone, and the cleartexts.
  */
 export const BoxChecks = Object.freeze({

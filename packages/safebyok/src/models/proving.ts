@@ -2,7 +2,7 @@ import { isEqual } from 'es-toolkit'
 import type { Deriver } from 'safebyok-big/internals'
 import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { Lease } from './lease'
-import { type GuardedKeyDeriver, type LeaseGate, type ProvingDevice, type ProvingOpts, type ProvingParts, GateishChecks } from '../shapes/shapes-gateish'
+import { type GuardedKeyDeriver, type LeaseBank, type ProvingDevice, type ProvingOpts, type ProvingParts, GateishChecks } from '../shapes/shapes-gateish'
 import type { BankScope, GateLife, GateStamp, LeaseRecord, ProvableGate } from '../shapes/shapes-stamps'
 import * as Stamps from '../shapes/shapes-stamps'
 import type { Modelkind, Sparse } from '../shapes/shapes-thing'
@@ -43,7 +43,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   readonly #gateLife: GateLife
 
-  /** The life of this proving's gate, which its wayin's stamp takes, with the wayin's own label. */
+  /** The life of this proving's gate, which its wayin's stamp binds, with the wayin's own label. */
   get gateLife(): GateLife { return this.#gateLife }
 
   /** The key this proving wraps and unwraps the bankKey under. No method returns it (G2) */
@@ -90,13 +90,12 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   // The bankKey is unwrapped, wrapped again under the leaseKey and dropped here, crossing no method boundary (G3).
   // The wrap binds the lease's stamp alone, never its own life or revision, so a later revision of the record keeps it.
-  /** Build a lease granted to `gate`, citing its revision `cited`, that follows `followed`: the lease stored or held for the gate, or its shell where there is none.
+  /** Build a lease attached to `bank`, citing its gate's revision `cited`, that follows `followed`: the lease stored for the gate, or the bank's attached lease, or its shell where there is none.
    * After a live lease it is that lease's life at the next revision, keeping its `born_at`; after a tombstone or the shell, it is born in the next life.
-   * It ends `gate.leaseMillis` after it is proved. The bankKey this proving unwraps is wrapped under a fresh, non-extractable leaseKey.
+   * It is stamped with the life of `cited`'s gate, and ends `bank.device.leaseMillis` after it is proved. The bankKey this proving unwraps is wrapped under a fresh, non-extractable leaseKey.
    */
-  async buildLease(gate: LeaseGate, cited: GateStamp, followed: Sparse<LeaseRecord>): Promise<Lease> {
-    const { gate: { gateLife, leaseMillis }, cited: gateRevision } = Checks.provingLeaseArgs.parse({ gate, cited })
-    Validator.checkedConsistent(gateLife,     this.gateLife, { kind: 'unexpected_error', message: BigPhrases.LeaseOfOtherGate })
+  async buildLease(bank: LeaseBank, cited: GateStamp, followed: Sparse<LeaseRecord>): Promise<Lease> {
+    const { bank: { device }, cited: gateRevision } = Checks.provingLeaseArgs.parse({ bank, cited })
     Validator.checkedConsistent(gateRevision, this.gateLife, { kind: 'unexpected_error', message: BigPhrases.LeaseOfOtherGate })
     const proved_at = Clock.nowMillis()
     const revision  = Lease.nextRevisionOf(followed, proved_at)
@@ -106,7 +105,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
       modelkind:      'lease',
       userid,
       banklabel,
-      banktok:        gateLife.banktok,
+      banktok:        gateRevision.banktok,
       gate_labelpath: gateRevision.labelpath,
       gate_lifepath:  gateRevision.lifepath,
       gate_born_at:   gateRevision.born_at,
@@ -119,8 +118,8 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     const bankKey = await this.#unwrapBankKey()
     const leaseKey = await Crypto.makeLeaseKey()
     const bank_key_lease_wrapped = await Crypto.wrapKeyUnder(leaseKey, bankKey, Crypto.cipherCtx(granted, 'bank_key_lease_wrapped'))
-    const ends_at = Math.min(proved_at + leaseMillis, ConstsX.FarFuture)
-    return Lease.make({ ...revision, ...granted, lease_key: leaseKey, bank_key_lease_wrapped, ends_at, gate_revseq: gateRevision.revseq }, { gate })
+    const ends_at = Math.min(proved_at + device.leaseMillis, ConstsX.FarFuture)
+    return Lease.make({ ...revision, ...granted, lease_key: leaseKey, bank_key_lease_wrapped, ends_at, gate_revseq: gateRevision.revseq }, { bank, gateLife: gateRevision })
   }
 
   /** The wayin of this proving's header, with `bankKey` wrapped under its wayinKey */
@@ -336,7 +335,7 @@ function isStoredOfHeader({ header, stored }: { header: WayinHeader, stored: Way
 }
 
 // Defined here, not with the shapes: they name a model class.
-// The builders' checks are big's, over the lean core's stamps and the lean core's strength checker.
+// The builders' checks are big's, over the new core's stamps and the new core's strength checker.
 /** The checks of {@link Proving.buildLease}'s arguments, and the static makers', builders' and `judgeStrength`'s arguments. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => {
   // A wayin's header has a check of its own kind, so each kind's parts are checked apart.
@@ -344,7 +343,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => {
   return {
     passphraseMakeArgs:   obj({ parts: provingParts.extend({ header: WayinChecks.passphraseWayinHeader.strict() }).strict().refine(isStoredOfHeader, Phrases.WayinOfOtherHeader), opts: GateishChecks.provingOpts }),
     passkeyMakeArgs:      obj({ parts: provingParts.extend({ header: WayinChecks.passkeyWayinHeader.strict() }).strict().refine(isStoredOfHeader, Phrases.WayinOfOtherHeader), opts: GateishChecks.provingOpts }),
-    provingLeaseArgs:     obj({ gate: GateishChecks.leaseGate, cited: GateChecks.stamp }),
+    provingLeaseArgs:     obj({ bank: GateishChecks.leaseBank, cited: GateChecks.stamp }),
     passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ gateLife: GateChecks.life, device: GateishChecks.provingDevice }),
     passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ gateLife: GateChecks.life, device: GateishChecks.provingDevice }),
     passphraseStoredArgs: GX.passphraseStoredArgs.extend({ gate: GateChecks.provable, device: GateishChecks.provingDevice }),

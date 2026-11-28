@@ -120,7 +120,7 @@ export abstract class BaseThing implements Sparse<ThingRecord> {
   // == [Reading records]: shellOf, haveSameScope, cmp, sparseOf, nextLifeOf, revisionAfter
 
   // The shell is built of `seen`'s modelkind, which TypeScript cannot follow through `Shell`.
-  /** The shell a Thing of `seen` is made at: `seen` itself where it is the void sentinel, else the shell under the lives it names above it. */
+  /** The shell a Thing of `seen` is made at: `seen` itself where it is the void sentinel, else the shell in the parent lives that `seen`'s lifepath names. */
   static shellOf<RecordT extends ThingRecord>(seen: SeenThing<RecordT>): ShellOf<RecordT> {
     return (isVoidSentinelOfKind(null, seen) ? seen : Shell.inParentLivesOf<Thingkind>(seen)) as ShellOf<RecordT>
   }

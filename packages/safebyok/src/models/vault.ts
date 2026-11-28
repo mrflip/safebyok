@@ -22,13 +22,13 @@ import type { ThingCar } from '../minding/thing-car'
 /** The scope of a box of this vault's bank. */
 type BoxAt = ScopeAt<BoxLabelpath> & Readonly<{ modelkind: 'box' }>
 
-/** One bank's boxes in this tab: the verbs to seal and write them, to use their whispers, and to probe storage and keys with one.
- * Each seal is made under the bank's lease, so it needs the bank unlocked. A write answers the actual record.
+/** One bank's boxes in this tab: the verbs to seal, put and delete them, to use their whispers, and to probe storage and keys with one.
+ * Each seal is made under the bank's lease, so it needs the bank unlocked. A put or a delete answers the actual record.
  */
 export class Vault {
   // == [Props]: #bank, #vaultTSQ
 
-  /** The bank, which holds its Things and its lease. */
+  /** The bank: its VaultMinder has the Things, and its lease is attached to it. */
   readonly #bank:    Bank
   readonly #vaultTSQ: VaultTSQ
   // --
@@ -76,10 +76,10 @@ export class Vault {
   }
   // --
 
-  // == [Writing boxes]: tryPutBoxOnce, putBoxOnce, tryDelBoxOnce, delBoxOnce
+  // == [Putting and deleting boxes]: tryPutBoxOnce, putBoxOnce, tryDelBoxOnce, delBoxOnce
 
-  /** Seal and write the next revision of the box `cited`, applying `patch` and encrypting `secrets`. Resolves an `Outcome` of the actual record.
-   * Given a labelpath, it writes over the newest revision this device has seen of the box, getting the box first where it has seen none.
+  /** Seal and put the next revision of the box `cited`, applying `patch` and encrypting `secrets`. Resolves an `Outcome` of the actual record.
+   * Given a labelpath, it cites the newest revision this device has seen of the box, getting the box first where it has seen none.
    * It tries once. Where another revision is stored, it refuses `stale_write`, and the box then holds that revision.
    * Over a sparse box, a tombstone or no box, `patch` must give the sidecar. Misuse is a bad outcome too.
    * @example
@@ -103,7 +103,7 @@ export class Vault {
   }
 
   /** Delete the box at `labelpath`, resolving an `Outcome` of the actual tombstone.
-   * It writes over the newest revision this device has seen of the box, getting the box first where it has seen none. Misuse is a bad outcome too.
+   * It cites the newest revision this device has seen of the box, getting the box first where it has seen none. Misuse is a bad outcome too.
    */
   async tryDelBoxOnce(labelpath: BoxLabelpath): Promise<Outcome.Outcome<TombstoneOf<BoxRecord>>> {
     const sealed = await Outcome.outcomeOf(async () => await this.#sealedWriteOf(labelpath, { am: 'x' }))
@@ -123,7 +123,7 @@ export class Vault {
   // == [Stats]: stats, tryStats
 
   /** The bank's storage stats, read from the vaultDB once: how many boxes and gates it has, live and in all, their size in bytes, and the datastore's limits.
-   * Needs no unlock. Nothing refuses a write for being over a limit.
+   * Works on a locked bank. Nothing refuses a write for being over a limit.
    * @example
    *   const { box, gate, max } = await vault.stats()
    *   const isNearlyFull = (box.size + gate.size) > 0.9 * max.size
@@ -136,10 +136,10 @@ export class Vault {
 
   // == [Sealing boxes]: sealBox, trySealBox, unsealBox, tryUnsealBox
   // The bank's seal and unseal, for this vault's own boxes: the root box's lifeseq begins each box's lifepath. They
-  // refuse a locked bank; only withWhisper waits for the unlock.
+  // refuse a locked bank; only withWhisper waits for an `unlock` gating.
 
   /** Seal and return the next revision of the box `donorProps`. Needs the bank unlocked.
-   * The revision applies `publicProps`, and encrypts the whisper of `secretProps`. An unknown key in either refuses.
+   * The revision applies `publicProps`, and encrypts the whisper of `secretProps`. An unknown field in either refuses.
    * Pass `donorProps` as you have it: whole or sparse, sealed or unsealed, a tombstone or the shell. It must be a box of this vault's bank.
    * A whole live box's revision keeps its sidecar unless `publicProps` gives one. Over a sparse box, a tombstone or the shell,
    * `publicProps` must give the sidecar. After a tombstone or the shell, the revision begins the box's next life.
@@ -182,9 +182,9 @@ export class Vault {
   // == [Using whispers]: forceTimelyUnlocked, withWhisper, withUnlockedWhisper, #demandReadableBox
 
   /** Get the box at `labelpath` and wait for the bank to be unlocked, both at once; resolve once the box can be unsealed.
-   * The get runs under `opts.staleTime` where given, else only where this device has seen a newer revision than it holds whole, or is not connected.
+   * The get runs under `opts.staleTime` where given, else only where this device has seen a newer revision than it has whole, or is not connected.
    * It rejects with the `unlock` gating's refusal where that wait is dismissed or the bank ends ({@link Bank.ensureUnlocked}),
-   * else with the get's refusal unchanged, else as {@link withWhisper} would refuse the box: `stale_read` or `absent_box`.
+   * else with the get's refusal unchanged, else with `stale_read` where the box is unknown or known only sparse in its newest life, or `absent_box` where it is deleted or never stored.
    */
   async forceTimelyUnlocked(labelpath: BoxLabelpath, opts: GetOnceOpts = {}): Promise<void> {
     const scope = this.#scopeAt(labelpath)
@@ -198,7 +198,7 @@ export class Vault {
 
   /** Call `fn` with the box at `labelpath` unsealed, and resolve what `fn` resolves.
    * On a locked bank, or one whose lease is near its end, it first waits for an `unlock` gating, and rejects if that wait is dismissed or the bank ends.
-   * Then it gets and unseals the box as {@link withUnlockedWhisper} does, refusing as it refuses.
+   * Then it calls {@link withUnlockedWhisper}.
    * @example
    *   const reply = await vault.withWhisper('box/openai', ({ whisper }) => askModel(whisper['apiKey'], question))
    */
@@ -212,8 +212,8 @@ export class Vault {
 
   /** Call `fn` with the box at `labelpath` unsealed, on an unlocked bank, and resolve what `fn` resolves.
    * It never waits for an `unlock` gating: on a locked bank it refuses `bank_locked`. Call it where the bank shows unlocked, or call {@link withWhisper}.
-   * The box is got only where this device holds none, has seen a newer revision than it holds whole, or is not connected. A refused get rejects
-   * with its refusal, unless it is `storage_unavailable` over a box this device holds, which runs on that box.
+   * It gets the box only where this device has none, has seen a newer revision than it has whole, or is not connected. A refused get rejects
+   * with its refusal, unless it is `storage_unavailable` over a box this device has, which runs on that box.
    * `fn` gets the whole box, in a revision stored at a moment during the call: its whisper, its sidecar and its record's fields.
    * That box may be behind a revision of the same life heard of since.
    * It refuses `stale_read` where the newest revision heard of is a sparse record of a newer life, and `absent_box` for a box deleted or never stored.
@@ -236,9 +236,7 @@ export class Vault {
     return await fn(await this.unsealBox(this.#demandReadableBox(scope)))
   }
 
-  /** The live record the box at `scope` holds, of the newest life heard of, behind within that life or not.
-   * Refuses `stale_read` where the box is unknown or known only sparse in its newest life, then `absent_box` where it holds a tombstone or the shell.
-   */
+  /** Demand that the box at `scope` is live and seen whole in the newest life heard of, and return its record, which may be behind a revision of that life heard of since. */
   #demandReadableBox(scope: BoxAt): LiveOf<BoxRecord> {
     const car = this.#boxCarAt(scope)
     if ((car === undefined) || (car.agekind === 'bare')) { throw Throwers.thingSoonestBare(scope.labelpath) }
@@ -295,14 +293,14 @@ export class Vault {
   /** The bank's VaultMinder, which holds its Things and sends its writes */
   get #vaultMinder(): VaultMinder { return this.#bank.demandVaultMinder() }
 
-  /** The write of the next revision after `cited`, or after the newest revision seen at a labelpath, applying `publicProps` and sealing `secretProps` */
+  /** The put or delete ask for the next revision after `cited`, or after the newest revision seen at a labelpath, applying `publicProps` and sealing `secretProps` */
   async #sealedWriteOf(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<PutOnceArgs<BoxRecord>> {
     const donor = (typeof cited === 'string') ? await this.#donorAt(cited) : cited
     return { cited: Thing.sparseOf(donor), record: await this.sealBox(donor, publicProps, secretProps) }
   }
 
   // A box whose newest revision is known only sparse is written over that revision, and the patch then gives the sidecar.
-  /** The newest revision seen of the box at `labelpath`: the record it holds where that was seen whole, else its citable, the box got first where none is seen */
+  /** The newest revision seen of the box at `labelpath`: its record where that was seen whole, else its citable. Where none is seen, it gets the box first */
   async #donorAt(labelpath: BoxLabelpath): Promise<Sealable<LiveOf<BoxRecord>>> {
     const scope = this.#scopeAt(labelpath)
     if (this.#boxCarAt(scope) === undefined) { await this.#vaultTSQ.getOnce(scope) }

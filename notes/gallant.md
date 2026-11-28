@@ -1037,12 +1037,12 @@ Lease.make(record, { bank })
 ## Pass what you hold, whole `#pass-it-whole`
 
 A signature takes whole members of the cast, each named for its role: an ask, an answer, a record, a scope, props, opts.
-Each already has a type and a validator, so a caller has no signature to remember: it passes what it holds, and the
+Each already has a type and a validator, so a caller has no signature to remember: it passes the variable already in scope, and the
 callee picks. A callee that reads less than it is handed still takes the whole: its parameter is named for what is passed
 and typed by what is read (`ask: Scope`). Two of one kind in two roles are named for the roles (`ante` and `post`), and a
 `make` takes a record-ish half and a live half, both ducking (`#record-then-opts`).
 
-**Gallant:** each argument is something the caller already holds, whole.
+**Gallant:** each argument is something the caller already has, whole.
 
 ```ts
 foo(ask: Ask, answer: Answer)
@@ -1110,9 +1110,9 @@ wayinsOf(wayins)
 
 ## One band per argument `#one-band-per-argument`
 
-`#pass-it-whole` has a limit: two things in different bands stay two arguments, even where one would hold them both. A
+`#pass-it-whole` has a limit: two things in different bands stay two arguments, even where one could carry them both. A
 band is what a value is for and who may see it: the record in hand and the changes to it, what carries no cleartext and
-what does, what holds for every call and what this call adds.
+what does, what is true for every call and what this call adds.
 
 **Gallant:**
 
@@ -1210,7 +1210,7 @@ Goofuses show a decision given as its reason, the project rule the code follows 
 |---|---|
 | A verdict that admits, frozen so that a checker may share it. | A passing verdict. *(above it: `// Frozen: a checker may share it.`)* |
 | `Checkers`, `Checker` and `objCheck`, where every validator is made, and the {@link Kit} its builders are handed; and `consistent`, `demandConsistent` and `verifyConsistent`, which hold one bag to another, as a validator's `parseConsistent` does. | The validator builders, `Checkers`, `Checker` and `objCheck`, and the `consistent` family, which checks one bag against another. |
-| Which generation of the whisper's own shape this box holds: 1, the only one so far. | Which generation of the whisper's own shape this box holds. |
+| Which generation of the whisper's own shape this box holds: 1, the only one so far. | Which generation of the whisper's shape this box stores. |
 
 ## A doc block does not read the body aloud `#purpose-not-machinery`
 

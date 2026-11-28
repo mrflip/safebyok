@@ -1,4 +1,4 @@
-// safebyok, the front door: everything `safebyok/core` and `safebyok/storage` export, the VaultTSQ and Vault the layers above the
+// safebyok, the main entry: everything `safebyok/core` and `safebyok/storage` export, the VaultTSQ and Vault the layers above the
 // core build on, the strength checkers, the bulletproof wrappers of a host's functions, and what a host or an adapter reaches
 // for that safebyok-big defines, re-exported so that each stays one binding across both packages. The browser's deriver and checker are on `safebyok/browser`.
 // The proving classes are on no entry as values: see core.ts.

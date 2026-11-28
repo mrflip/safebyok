@@ -23,7 +23,7 @@ export class MemoryDatastore {
   // == [Props]: #tables, #watchers
 
   // A table per kind of Thing, as Postgres's `safebyok_gate_things` and `safebyok_box_things` and Convex's `gate_things` and `box_things`.
-  // Each holds every bank's Things of its kind, by bank, then by labelpath, so that a listing reads one bank's. A verb picks
+  // Each holds every bank's Things of its kind, by bank, then by labelpath, so that a list reads one bank's. A verb picks
   // its table by the kind its ask names.
   readonly #tables: Readonly<Record<Thingkind, Map<string, BankRows>>> = { gate: new Map(), box: new Map() }
   readonly #watchers = new Set<Watcher>()
@@ -104,7 +104,7 @@ export class MemoryDatastore {
     return manifest
   }
 
-  // Like Postgres's, the listing reads the children whatever the parent: the vaultDB reads them only under a live one.
+  // Like Postgres's, a list reads the children whatever the parent: the vaultDB reads them only under a live one.
   /** The Thing at `ask`'s scope, and each Thing one label under it, observed in one step. */
   listThings(ask: ListAsk): ListManifest {
     const actual   = this.#rowAt(ask)

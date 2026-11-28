@@ -21,7 +21,6 @@ const GateFields = [...ThingFields, 'wayins', 'auth', 'sigs', 'meta']
 
 /** The lease verbs of a bank, for a gate made alone, on which no test here builds a lease. */
 const AloneFriend: BankGateFriend = {
-  leaseGateOf:   () => { throw new Error("No lease is built on a gate made alone.") },
   leaseFollowed: () => { throw new Error("No lease is built on a gate made alone.") },
   attachLease:   noop,
 }

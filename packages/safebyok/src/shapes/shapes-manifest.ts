@@ -14,7 +14,7 @@ import { PolicyPhrases } from '../phrases'
 // == [Tags]: ManifestChecks, PolicyVerdict, PolicyVerdicts, PolicyTag, Refusaltag, GetTags, WriteTags, RootTags, BirthTags, Presence, RevtokCmp, RevseqCmp, SameCmp, PriorWayins
 // Each tag spells the field it compares. A datastore makes them of the row it judged a write against, the prior row.
 
-/** The checks of what a datastore hands back: its tags, a listing's children, a birth's or a bank's roots, a watch's {@link Received}, its `tracked` and its `read_tc`. Each refuses `storage_issue`. */
+/** The checks of what a datastore hands back: its tags, a list's children, a birth's or a bank's roots, a watch's {@link Received}, its `tracked` and its `read_tc`. Each refuses `storage_issue`. */
 export const ManifestChecks = Validator.Checkers('storage_issue', ({ obj, arr, lit, str, bool, unk, oneof, discrim, custom }) => {
   const presence       = oneof(['void', 'gone', 'live'])
   const revtokCmp      = oneof(['birth', '=next', 'eq', 'neq'])
@@ -100,7 +100,7 @@ export type RevtokCmp = WriteTags['revtok_cmp']
 /** The ask's cited revseq against the prior row's.
  * - `'birth'` -- cited the shell
  * - `'eq'`    -- cited exactly the prior row's revseq
- * - `'stale'` -- cited an older revision: a write has intervened
+ * - `'stale'` -- cited a revseq lower than the prior row's
  * - `'ahead'` -- cited a newer revision, or a revision where there is no prior row: an impossible situation
  */
 export type RevseqCmp = WriteTags['revseq_cmp']
@@ -150,7 +150,7 @@ export interface WriteManifest extends BankObserved {
   ancestor: unknown
 }
 
-/** A datastore's observations of one atomic step of a listing. */
+/** A datastore's observations of one atomic step of a list. */
 export interface ListManifest extends BankObserved {
   /** The parent's tags, made of `actual`. */
   tags: GetTags
@@ -206,7 +206,7 @@ export type CheckedGetManifest = CheckedManifestRows & { tags: GetTags }
 /** A write's manifest, its tags and each row checked. */
 export type CheckedWriteManifest = CheckedManifestRows & { tags: WriteTags }
 
-/** A listing's manifest, its tags and each row checked: its children, where the parent is live, those that pass their kind's checks and, as `incompatible_rows`, those that fail. */
+/** A list's manifest, its tags and each row checked: its children, where the parent is live, those that pass their kind's checks and, as `incompatible_rows`, those that fail. */
 export type CheckedListManifest = CheckedBankObserved & { tags: GetTags, actual: ThingRecord | null, children: readonly ListedChild[], incompatible_rows: readonly IncompatibleThing[] }
 
 /** A birth's manifest, its tags and each root checked. */
@@ -236,7 +236,7 @@ export type ScribedWriteManifest = CheckedWriteManifest & (
   | { ok: false, act: 'policied',            actual: ThingRecord | null, refusaltag: Refusaltag }
 )
 
-/** A listing's checked manifest with the act its parent's tags find, and whether it answers good. */
+/** A list's checked manifest with the act its parent's tags find, and whether it answers good. */
 export type ScribedListManifest = CheckedListManifest & (
   | { ok: true,  act: 'gotlive', actual: ThingRecord }
   | { ok: false, act: 'gone',    actual: TombstoneOf<ThingRecord> }

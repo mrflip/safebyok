@@ -33,7 +33,7 @@ export function checkWriteObservations(ask: WriteAsk, manifest: WriteManifest): 
   Object.assign(manifest, { ...checkedRowsOf(ask, manifest), tags: ManifestChecks.writeTags.parse(manifest.tags) })
 }
 
-/** Check a listing's manifest in place: its tags, its parent, and where the parent is live, each child once, setting aside those that fail their kind's checks as `incompatible_rows`. */
+/** Check a list's manifest in place: its tags, its parent, and where the parent is live, each child once, setting aside those that fail their kind's checks as `incompatible_rows`. */
 export function checkListObservations(ask: ListAsk, manifest: ListManifest): asserts manifest is ListManifest & CheckedListManifest {
   const actual = checkedActualOf(ask, manifest.actual)
   const listed = (actual?.am === 'a') ? checkedChildrenOf(ask, manifest.children) : { children: [], incompatible_rows: [] }
@@ -68,8 +68,8 @@ function checkedActualOf({ modelkind }: Pick<ThingScope, 'modelkind'>, actual: u
   return ThingkindChecks.byModelkind[modelkind].stored.parse(actual)
 }
 
-// A child is checked by the listing's modelkind, not by the labelpath it is listed at: `demandListConsistency` checks that.
-/** A listing's raw children, each checked by its kind but not its address: those that pass, and those that fail as `incompatible_rows`. */
+// A child is checked by the list's modelkind, not by the labelpath it is listed at: `demandListConsistency` checks that.
+/** A list's raw children, each checked by its kind but not its address: those that pass, and those that fail as `incompatible_rows`. */
 function checkedChildrenOf({ modelkind, userid, banklabel }: ListAsk, children: unknown): Pick<CheckedListManifest, 'children' | 'incompatible_rows'> {
   const check = ThingkindChecks.byModelkind[modelkind].stored
   const listed: ListedChild[] = []
@@ -191,7 +191,7 @@ const GetActs = {
   live: { nil: 'gotlive', fail: 'gotlive' },
 } as const satisfies Record<Presence, Record<GetAsk['ifAbsent'], EX.GotAct | EX.RefusedAct>>
 
-/** The act of a listing, by its parent's presence: only a live parent lists. */
+/** The act of a list, by its parent's presence: only a live parent lists. */
 const ListActs = { void: 'void', gone: 'gone', live: 'gotlive' } as const satisfies Record<Presence, 'gotlive' | EX.RefusedAct>
 
 // Each cell is keyed by the flags that reach it: a put's `ifAbsent` is add or fail (`AskChecks.writeAsk`), and a del's flags
@@ -234,7 +234,7 @@ function isGoodAct(act: string): act is EX.GoodAct { return (EX.goodActVals as r
 /** True when `act` refuses the ask. */
 export function isRefusedAct(act: string): act is EX.RefusedAct { return (EX.refusedActVals as readonly string[]).includes(act) }
 
-/** True when `act` is one a datastore writes the ask's record under. */
+/** True when `act` means the datastore writes the ask's record. */
 export function isWriteAct(act: string): act is EX.WriteAct { return (EX.writeActVals as readonly string[]).includes(act) }
 // --
 
@@ -262,7 +262,7 @@ export function scribeWriteAct(ask: WriteAsk, manifest: CheckedWriteManifest): a
   Object.assign(manifest, { ok: isGoodAct(act), act })
 }
 
-/** Write onto a listing's manifest the act its parent's presence finds, and whether it answers good. */
+/** Write onto a list's manifest the act its parent's presence finds, and whether it answers good. */
 export function scribeListAct(_ask: ListAsk, manifest: CheckedListManifest): asserts manifest is ScribedListManifest {
   const act = ListActs[manifest.tags.presence]
   Object.assign(manifest, { ok: (act === 'gotlive'), act })
@@ -310,7 +310,7 @@ export function writeAnswerOf(ask: WriteAsk, manifest: ScribedWriteManifest): Wr
   return { ok: false, ...beside, act: manifest.act, dbhas, err: Throwers.actRefused('vault', manifest.act, { oplabel: 'writeThing', ask: beside.ask }) }
 }
 
-/** The answer to a listing, stripped from its scribed manifest: the children of the parent's live life as a {@link Kids} value, the parent as its `parentage`,
+/** The answer to a list, stripped from its scribed manifest: the children of the parent's live life as a {@link Kids} value, the parent as its `parentage`,
  * and each child of that life as its `deltas`, in labelpath order. Refused, its `dbhas` is the actual parent, or where none is, {@link voidParentOf}.
  */
 export function listAnswerOf(ask: ListAsk, manifest: ScribedListManifest): ListThingsAnswer {
@@ -328,17 +328,17 @@ export function listAnswerOf(ask: ListAsk, manifest: ScribedListManifest): ListT
   return { ok: true, ...beside, act: manifest.act, val: kidsOf(ask, parent, deltas, read_tc), parentage: [listedOf(parent)], deltas, incompatible_rows }
 }
 
-// The listing reads nothing above its parent, so the shell's lives are known only at a root, which has nothing above it.
-/** The `dbhas` of a listing whose parent is not stored: the shell at a root, null below one. */
+// A list reads nothing above its parent, so the shell's lives are known only at a root, which has nothing above it.
+/** The `dbhas` of a list whose parent is not stored: the shell at a root, null below one. */
 export function voidParentOf(ask: ListAsk): VoidSentinel | null { return (Labelpath.parentOf(ask.labelpath) === '') ? Shell.under(ask, null) : null }
 
-/** `thing` as a listing carries it: a live box's sparse form, or any other Thing whole, a tombstone among them. */
+/** `thing` as a list answers it: a live box's sparse form, or any other Thing whole, a tombstone among them. */
 function listedOf(thing: ThingRecord): ThingRecord | BoxSparse {
   return ((thing.am === 'a') && (thing.modelkind === 'box')) ? BaseThing.sparseOf(thing) as BoxSparse : thing
 }
 
 // Object.fromEntries makes each label an own key, `__proto__` among them.
-/** The {@link Kids} value of `deltas`, the children of the live `parent` at the listing's scope, read at `read_tc`. */
+/** The {@link Kids} value of `deltas`, the children of the live `parent` at the list's scope, read at `read_tc`. */
 function kidsOf(ask: ListAsk, parent: ThingRecord, deltas: readonly (ThingRecord | BoxSparse)[], read_tc: Kids['read_tc']): Kids {
   const kidLifeOf = ({ label, lifeseq }: ThingRecord | BoxSparse): [string, KidLife] => [label, { lifeseq }]
   return {

@@ -37,7 +37,7 @@ export {
 } from './shapes/shapes-bankish'
 export {
   type AddPasskeyCleartexts, type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateFound, type GateGatingFriend, type GatingCleartexts, type GuardedKeyDeriver,
-  type GuardedStrengthChecker, type HandedCleartexts, type LeaseGate, type LeaseOpts, type LeaseShellScope, type ProvedCleartexts, type ProvingDevice,
+  type GuardedStrengthChecker, type HandedCleartexts, type LeaseBank, type LeaseOpts, type LeaseShellScope, type ProvedCleartexts, type ProvingDevice,
   type ProvingOpts, type ProvingParts, type ReplacePassphraseCleartexts, type ReplacePassphraseDna, type RevokePasskeyCleartexts, type RevokePasskeyDna, type SecretFieldname, type StrengthChecker, type UnlockCleartexts, type UnlockDna, type BankGateFriend, CleartextChecks,
   FormSecretFieldnames, GateishChecks, GatingChecks,
 } from './shapes/shapes-gateish'
@@ -50,7 +50,7 @@ export {
   type BulletproofCallback, type VoidSentinel, type Wayins, Shell, ThingChecks, thingkindVals,
 } from './shapes/shapes-thing'
 export { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from './shapes/shapes-thingkinds'
-// A device shows a devtool a masked view of the roots it keeps, its vault TSQ and its lease; the VaultTSQ itself is on the front door.
+// A device shows a devtool a masked view of the roots it keeps, its vault TSQ and its lease; the VaultTSQ itself is on the main entry (`safebyok`).
 export { type MaskedRow, type MaskedView, type MaskedViewLease, EmptyMaskedView } from './shapes/shapes-masked-view'
 
 // From safebyok-big, re-exported so that each stays one binding across both packages: its refusals and logger, what a

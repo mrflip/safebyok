@@ -33,8 +33,8 @@ export function demandWriteConsistency(ask: WriteAsk, manifest: ScribedWriteMani
   demandSharedConsistency(ask, manifest, answer, recordCopyOf(ask, manifest, answer), [[manifest.actual, ask.labelpath]])
 }
 
-/** Refuse a listing whose ask, manifest and answer disagree.
- * Of what the answer carries beside the bank, only the parent's lifepath, or a refused listing's `dbhas`, is compared with the manifest.
+/** Refuse a list whose ask, manifest and answer disagree.
+ * Of what the answer carries beside the bank, only the parent's lifepath, or a refused list's `dbhas`, is compared with the manifest.
  */
 export function demandListConsistency(ask: ListAsk, manifest: ScribedListManifest, answer: ListThingsAnswer): void {
   if (! isEqual(ManifestTags.getTagsOf(manifest.actual), manifest.tags)) { throw Throwers.tagsOfOtherRow() }
@@ -134,8 +134,8 @@ function demandTagsOfWritten(ask: WriteAsk, tags: WriteTags): void {
   if (! isEqual(ManifestTags.writtenTagsOf(ask), tags)) { throw Throwers.tagsOfOtherAsk() }
 }
 
-// An incompatible child's record is checked by nothing, so its labelpath is held to the listing's kind's rule here.
-/** True when `labelpath` is one label under the listing's parent, and a labelpath of the listing's modelkind. */
+// An incompatible child's record is checked by nothing, so its labelpath is checked against the rule of the list's kind here.
+/** True when `labelpath` is one label under the list's parent, and a labelpath of the list's modelkind. */
 function isChildLabelpath(ask: ListAsk, labelpath: Labelpath): boolean {
   const label = labelpath.slice(ask.labelpath.length + 1)
   return labelpath.startsWith(`${ask.labelpath}/`) && (! label.includes('/')) && isLabelpathOfKind({ ...ask, labelpath })

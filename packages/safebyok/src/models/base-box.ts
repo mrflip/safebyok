@@ -101,7 +101,7 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
   /** The {@link BoxStamp} of `record`. Refuses the shell, which has no revision to seal. */
   static stampOf(record: RevisionOf<BoxRecord, BoxCleartexts>): BoxStamp { return BoxChecks.stamp.parse(record) }
 
-  /** The whisper of `cleartexts` as stable JSON, with its keys sorted. */
+  /** The whisper of `cleartexts` as stable JSON, with its ckeys sorted. */
   static encode(cleartexts: BoxCleartexts): string { return StableJsonify.stableJsonify(BoxChecks.cleartexts.parse(cleartexts).whisper) }
 
   /** The whisper in the JSON `text`. A refusal never quotes the text. */

@@ -1,5 +1,5 @@
 /** The test world of the lean core's models: fixed stamps, a fake clock, a device over a fast key deriver, passkey answers,
- * a bank born unlocked, a spy on births, a gating with no gate behind it, a box's shell, a fake of the gate a lease is granted to, and the loudly named
+ * a bank born unlocked, a spy on births, a gating with no gate behind it, a box's shell, a fake of the bank a lease is attached to, and the loudly named
  * cheats that unwrap a wayin or read a lease's record from outside.
  *
  * Time. Call {@link useFakeClock} at the top of a test file that reads a time a proving, a lease or a record carries: it
@@ -24,7 +24,7 @@ import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import type { DeviceOpts, DeviceRecord, RootShelf } from '../../src/shapes/shapes-bankish'
 import type { LiveOf, ShellOf } from '../../src/shapes/shapes-sealers'
 import type { BoxRecord, GateRecord, Sparse, Wayins } from '../../src/shapes/shapes-thing'
-import { type GatingCleartexts, type LeaseGate, type ProvingDevice, type StrengthChecker, GatingChecks } from '../../src/shapes/shapes-gateish'
+import { type GatingCleartexts, type LeaseBank, type ProvingDevice, type StrengthChecker, GatingChecks } from '../../src/shapes/shapes-gateish'
 import type { BankLife, BankScope, GateLife, GateStamp, LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
@@ -272,29 +272,29 @@ const VoidRootRevision = {
 } as const
 // --
 
-// == [Leases]: FakeLeaseGate, FakeLeaseMillis, fakeLeaseGateOf, leaseShellOf, _cheat_grantedLease
+// == [Leases]: FakeLeaseBank, FakeLeaseMillis, fakeLeaseBankOf, leaseShellOf, _cheat_grantedLease
 
-/** A fake of the gate a lease is granted to: its gate's life, a lease's length, a spy for `lock`, and an enabled check that always passes. */
-export type FakeLeaseGate = LeaseGate & { lock: Mock<() => void> }
+/** A fake of the bank a lease is attached to: its device's lease length, a spy for `lock`, and an enabled check that always passes. */
+export type FakeLeaseBank = LeaseBank & { lock: Mock<() => void> }
 
-/** How long a lease granted to a {@link FakeLeaseGate} lasts: an hour. */
+/** How long a lease granted to a {@link FakeLeaseBank} lasts: an hour. */
 export const FakeLeaseMillis = 3_600_000
 
-/** A {@link FakeLeaseGate} whose gate's life is {@link WorldGateLife}, as `overrides` moves it. */
-export function fakeLeaseGateOf(overrides: Partial<GateLife> = {}): FakeLeaseGate {
-  const gate = { gateLife: { ...WorldGateLife, ...overrides }, leaseMillis: FakeLeaseMillis, lock: vi.fn<() => void>(), isEnabled: true, demandEnabled: () => gate }
-  return gate
+/** A new {@link FakeLeaseBank}. */
+export function fakeLeaseBankOf(): FakeLeaseBank {
+  const bank = { device: { leaseMillis: FakeLeaseMillis }, lock: vi.fn<() => void>(), isEnabled: true, demandEnabled: () => bank }
+  return bank
 }
 
 /** The shell of the lease of `cited`'s gate, {@link WorldGate}'s unless given: what a first lease follows. */
 export function leaseShellOf(cited: GateStamp = WorldGate): ShellOf<LeaseRecord> { return Lease.shellOf(cited) }
 
-/** A test cheat: a lease `proving` builds, granted to `gate`, citing `cited` and following `followed` (the shell unless given), beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */
+/** A test cheat: a lease `proving` builds, attached to `bank`, citing `cited` and following `followed` (the shell unless given), beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */
 export async function _cheat_grantedLease(
-  proving: Proving, gate: LeaseGate, cited: GateStamp = WorldGate, followed: Sparse<LeaseRecord> = leaseShellOf(cited),
+  proving: Proving, bank: LeaseBank, cited: GateStamp = WorldGate, followed: Sparse<LeaseRecord> = leaseShellOf(cited),
 ): Promise<{ lease: Lease, record: LiveOf<LeaseRecord> }> {
   const make = vi.spyOn(Lease, 'make')
-  const lease = await proving.buildLease(gate, cited, followed)
+  const lease = await proving.buildLease(bank, cited, followed)
   const [record] = make.mock.calls.at(-1)!
   make.mockRestore()
   return { lease, record: record as LiveOf<LeaseRecord> }

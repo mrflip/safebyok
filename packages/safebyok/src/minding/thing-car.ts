@@ -16,7 +16,7 @@ import * as Throwers from '../refusals/throwers'
 // == [ThingCar]: ThingCar
 
 /** A Thing, and how far it has been seen: what a write over it cites, its agerank, and when its newest revision was read.
- * It decides which records of the Thing are news, and hands the Thing those it holds whole. It keeps the refusal the Thing last raised, for a devtool.
+ * It decides which records of the Thing are news, and hands the Thing those that are whole. It keeps the refusal the Thing last raised, for a devtool.
  */
 export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
   // == [Props]: thing, #lastErr, #erredAt, #citable, #agerank, #readTc
@@ -65,7 +65,7 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
   /** When the Thing last refused a record, or null where it has refused none. */
   get erred_at(): EpochMillis | null { return this.#erredAt }
 
-  /** What a write over the Thing cites: the Thing fields of the newest revision seen, whole or a live box's sparse form, frozen. */
+  /** The citation for a write over the Thing: the Thing fields of the newest revision seen, whole or a live box's sparse form, frozen. */
   get citable(): Sparse<ThingRecord> { return this.#citable }
 
   /** How far the Thing has been seen, as {@link Agerank} spells it: the vacant agerank until a record is taken. */
@@ -84,12 +84,12 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
 
   // == [Receiving]: receive, #take, #readTcAfter
 
-  /** Take `event`, an event of the Thing, and return the events that are news: none, and nothing changed, unless its record is news.
+  /** Receive `event`, an event of the Thing, and return the events that are news. An event whose record is not news returns none and changes nothing.
    * News is a record that leaves the agerank greater than it was: from a later life, newer than any revision seen, a whole record newer than any
    * whole one seen, or the newest revision seen again in a later tcchunk, a span of 65.536 seconds, than it was last seen in.
    * The events are `event` with its ageranks, then any `life`, then any `aged`, each frozen. A record that is news is handed to the Thing,
    * unless it is a live box's sparse form. A `life` or `aged` event returns none.
-   * Refuses an event of another Thing, and a record in any other form. What it or the Thing refuses is kept as {@link lastErr} and thrown; an event taken clears it.
+   * Refuses an event of another Thing, and a record in any other form. What it or the Thing refuses is kept as {@link lastErr} and thrown; an event received clears it.
    */
   receive(event: VaultEvent): readonly VaultEvent[] {
     let events: readonly VaultEvent[]
@@ -107,7 +107,7 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
 
   // The Thing takes the record first, so that one it refuses leaves the car as it was, and publishes last, so that a
   // subscriber finds the car past the record.
-  /** The events of `proposed` that are news, this car moved past it */
+  /** Move this car past `proposed`, and return the events of it that are news */
   #take(proposed: VaultEvent): readonly VaultEvent[] {
     SeenChecks.event.parseConsistent(proposed, pick(this.thing, ['modelkind', 'userid', 'banklabel', 'labelpath']))
     if (proposed.eventkind !== 'item') { return NoEvents }
@@ -124,8 +124,8 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
     return eventsOf(proposed, agerankWas, agerank)
   }
 
-  // The time belongs to the newest revision, as the agerank's tcchunk does: a newer one brings its own, the same one the later, an older one leaves it.
-  /** The `read_tc` after `seen` is read at `read_tc`: moved where `seen` is the newest revision seen, or newer */
+  // The time belongs to the newest revision seen, as the agerank's tcchunk does.
+  /** This car's `read_tc` once `seen` is read at `read_tc`: `read_tc` where nothing was seen or `seen` is newer than the newest revision seen, the later of the two where it is that revision, else unchanged */
   #readTcAfter(seen: Pick<ThingCited, 'lifepath' | 'revseq'>, read_tc: ReadTc): ReadTc {
     const order = BaseThing.cmp(this.#citable, seen)
     if ((this.agekind === 'vacant') || (order > 0)) { return read_tc }
@@ -137,7 +137,8 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
 
   // The record is no devtool's to read whole: a gate's has each wayin's wrapped bankKey, which an offline guess at a
   // passphrase is checked against.
-  /** The Thing's record, each ciphertext masked, for a devtool, as a vault TSQ item settled on it would show, dated by {@link read_tc} and with the refusal kept.
+  /** The Thing's record, each ciphertext masked, for a devtool, in the form of a settled vault TSQ item.
+   * It is dated by {@link read_tc}, and gives the kind of {@link lastErr}.
    * For experimenting, never for an app's own logic: what it answers may change without notice.
    */
   inspectable(): MaskedRow {
@@ -157,17 +158,17 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
 
 // == [Helpers]: NoEvents, thingOf, isItemEvent, isShell, citedOf
 
-/** What `receive` returns for an event that is not news. */
+/** The empty list `receive` returns for an event that is not news. */
 const NoEvents: readonly never[] = Object.freeze([])
 
-/** The Thing `begun` is, or the one `bank` makes at the shell `begun` is or names */
+/** `begun` where it is a Thing, else a new Thing from `bank`, at the shell `begun` is or at the shell of its record */
 function thingOf<ThingT extends ReceivingThing>(begun: ThingT | VoidSentinel | VaultItemEvent, bank: CarBank<ThingT>): ThingT {
   if (isItemEvent(begun)) { return bank.makeThing(BaseThing.shellOf(begun.val)) }
   if (isShell(begun)) { return bank.makeThing(begun) }
   return begun
 }
 
-/** True of an item event, among the forms a car is made from, which make's check has told apart */
+/** True when `begun`, already checked by `make` as one of the forms a car is made from, is an item event */
 function isItemEvent(begun: unknown): begun is VaultItemEvent {
   return (typeof begun === 'object') && (begun !== null) && ('eventkind' in begun) && (begun.eventkind === 'item')
 }

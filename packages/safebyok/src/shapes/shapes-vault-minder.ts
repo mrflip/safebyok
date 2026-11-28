@@ -13,13 +13,13 @@ import type { VaultDB } from '../storage/vault-db'
 
 // == [Shapes]: ReceivingThing, ThingMaker, CarBank, ThingCarOpts, VaultMinderOpts, VaultMinderListener, PutOnceArgs, DelOnceArgs
 
-/** What a {@link ThingCar} asks of the Thing it carries. */
+/** The members of a Thing that its {@link ThingCar} calls. */
 export type ReceivingThing = Pick<Thing<ThingRecord, unknown, unknown, Adoptable<ThingRecord>>, 'receive' | 'take' | 'publish' | 'pickle' | 'modelkind' | 'userid' | 'banklabel' | 'labelpath'>
 
 /** Make the Thing at `shell`'s labelpath, holding `shell`, which has received nothing. */
 export type ThingMaker<ThingT extends ReceivingThing = ReceivingThing> = (shell: VoidSentinel) => ThingT
 
-/** What a {@link ThingCar} reaches of its bank: the maker of the Thing it carries. A device's `Bank` is one. */
+/** The part of a bank that a {@link ThingCar} calls: the maker of the Thing it carries. A device's `Bank` is one. */
 export type CarBank<ThingT extends ReceivingThing = ReceivingThing> = Readonly<{ makeThing: ThingMaker<ThingT> }>
 
 /** The options of `ThingCar.make`, beside the Thing, shell or item event it is made from. */
@@ -36,7 +36,7 @@ export interface VaultMinderOpts<ThingT extends ReceivingThing = ReceivingThing>
   bank:   CarBank<ThingT>
 }
 
-/** What listens to a {@link VaultMinder}: it hears each event that is news, and is told of trouble. */
+/** A listener of a {@link VaultMinder}: it hears each event that is news, and is told of trouble. */
 export type VaultMinderListener = Readonly<{
   /** Hear `event`, of a record that is news. */
   hear: (event: VaultEvent) => void
@@ -44,10 +44,10 @@ export type VaultMinderListener = Readonly<{
   onBadNews: (news: Errors.VaultError, scope: ThingScope | null) => void
 }>
 
-/** What `VaultMinder.putOnce` writes: a put ask's draft, whose `cited` defaults to the citable of the Thing at the record's labelpath. */
+/** The arguments of `VaultMinder.putOnce`: a put ask's draft, whose `cited` defaults to the citable of the Thing at the record's labelpath. */
 export type PutOnceArgs<RecordT extends ThingRecord = ThingRecord> = Readonly<Omit<PutAskDraft<RecordT>, 'cited' | 'track' | 'banktok'> & { cited?: CitedOf<RecordT> }>
 
-/** What `VaultMinder.delOnce` writes: the tombstone, and the revision it cites, by default the citable of the Thing at its labelpath. */
+/** The arguments of `VaultMinder.delOnce`: the tombstone, and the revision it cites, by default the citable of the Thing at its labelpath. */
 export type DelOnceArgs<RecordT extends ThingRecord = ThingRecord> = Readonly<Omit<DelAskDraft<RecordT>, 'cited' | 'track' | 'banktok'> & { cited?: CitedOf<RecordT> }>
 // --
 

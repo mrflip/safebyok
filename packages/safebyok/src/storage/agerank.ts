@@ -72,7 +72,7 @@ function lifeAgerankOf(lifepath: Lifepath, revseq: string, isWhole: boolean, tcc
 function laterOrNone(agerankWas: Agerank, agerank: Agerank): Agerank | undefined { return (agerank > agerankWas) ? agerank : undefined }
 
 // The tcchunk belongs to the newest revision: it is when the newest revision was last read.
-/** The tcchunk an agerank of `fieldsWas` gives once `revseq` is read in `tcchunk`: its own above the newest revision, the later of the two at it, and the one before below it */
+/** The tcchunk an agerank of `fieldsWas` gives once `revseq` is read in `tcchunk`: `tcchunk` where `revseq` is newer than the newest revision, the later of the two where it is that revision, else the earlier one */
 function tcchunkAfter([, highWas, , tcchunkWas]: AgerankFields, revseq: string, tcchunk: string): string {
   if (revseq > highWas) { return tcchunk }
   if (revseq < highWas) { return tcchunkWas }

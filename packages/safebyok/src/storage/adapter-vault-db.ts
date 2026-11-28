@@ -125,7 +125,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { return this.answerForThrown(err, 'stats', ask) }
   }
 
-  /** Watch a bank's Things ({@link VaultDB.watch}): each notice is of a Thing the datastore reports changing, read when the datastore says, else when it arrives.
+  /** Watch a bank's Things ({@link VaultDB.watch}): each notice is of a Thing the datastore reports changing, dated by the datastore's `read_tc`, or else by when it arrives.
    * Records a datastore pushes together are notified one at a time.
    * A Thing that fails its checks or belongs to another bank goes to `onBadNews` instead of `onNotice`, as does an error `onNotice` throws.
    */

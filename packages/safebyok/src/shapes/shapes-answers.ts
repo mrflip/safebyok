@@ -9,8 +9,8 @@ import type { ReadTc } from './shapes-vault-event'
 import type { VaultStats } from './shapes-vault-stats'
 
 // == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, IncompatibleThing, KidLife, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer, GetBankAnswer, StatsAnswer
-// No check reads an answer whole: `AdapterVaultDB` makes each of parts it has checked, and a reader checks each record it
-// keeps where a Thing takes it.
+// No check reads an answer whole: `AdapterVaultDB` builds each answer from parts it has checked, and a reader checks each
+// record when a Thing receives it.
 
 /** A vaultDB verb's good answer: its `val`, the `act` that says what the datastore did, the loggable part of its `ask`, and when its step read the datastore (`read_tc`).
  * `banktok` is that of the bank's gate as the step left it, or the void banktok where none is stored or it fails its checks.
@@ -67,7 +67,7 @@ export type Kids = Readonly<{
   read_tc:    ReadTc
 }>
 
-/** What a listing answer carries beside its `val` or `dbhas`, each empty when refused. A live box is carried sparse, and any other Thing whole:
+/** The records a list's answer carries beside its `val` or `dbhas`, each empty when refused. A live box is carried sparse, and any other Thing whole:
  * - `parentage`    -- the parent
  * - `deltas`       -- each child the `val` names, in labelpath order
  * - `incompatible_rows` -- each child that fails its kind's checks

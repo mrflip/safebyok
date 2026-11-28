@@ -7,7 +7,7 @@ import * as Phrases from '../phrases'
 import { maskUuid } from '../helpers/mask-uuid'
 import { type Banklabel, type Banktok, type EpochMillis, type Lifepath, type Lifeseq, type Revtok, type Userid, Labelpath, VoidLifeseq } from '../shapes/primitives'
 import type { Modelkind, Sparse, ThingShaped } from '../shapes/shapes-thing'
-import { type LeaseGate, type LeaseOpts, type LeaseShellScope, type SecretFieldname, GateishChecks } from '../shapes/shapes-gateish'
+import { type LeaseBank, type LeaseOpts, type LeaseShellScope, type SecretFieldname, GateishChecks } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import type { LiveOf, ShellOf } from '../shapes/shapes-sealers'
 import {
@@ -24,15 +24,15 @@ type AnySealer = Sealers.Sealer<never, never>
 /** The fieldnames that contain a cleartext. */
 const CleartextFieldnames: ReadonlySet<string> = new Set(['whisper'])
 
-/** A grant to a gate that lets this device seal and unseal under its bank's key without asking the user, for one revision of the gate.
+/** A grant to a gate that lets this device seal and unseal under its bank's bankKey without asking the user, for one revision of the gate.
  * It is the model of one live {@link LeaseRecord}, whose fields it shows, all but its keys.
  * The bankKey stays wrapped under a non-extractable leaseKey: each seal or unseal unwraps it for that call alone, and nothing hands it out.
  * The sealer passed to each call, such as `BaseBox`, decides what is sealed and how. The lease itself knows only which fieldnames contain secrets.
- * A bankKey that will not unwrap locks the gate, and refuses `damaged_lease`.
+ * A bankKey that will not unwrap locks its bank, and refuses `damaged_lease`.
  * Once evicted, or once its device ends, it refuses every seal not yet under way, and every unseal, even one in flight.
  */
 export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
-  // == [Props]: fmt, userid, banklabel, labelpath, label, banktok, am, lifeseq, lifepath, revseq, revtok, born_at, written_at, gate_labelpath, gate_lifepath, gate_born_at, gate_revtok, gate_revseq, proved_at, ends_at, wayinkind, scope, #gate, #record, stamp, toJSON, loggable
+  // == [Props]: fmt, userid, banklabel, labelpath, label, banktok, am, lifeseq, lifepath, revseq, revtok, born_at, written_at, gate_labelpath, gate_lifepath, gate_born_at, gate_revtok, gate_revseq, proved_at, ends_at, wayinkind, scope, #bank, #record, stamp, toJSON, loggable
 
   declare readonly fmt:            LeaseStamp['fmt']
   declare readonly userid:         Userid
@@ -77,7 +77,7 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
    */
   get scope(): LeaseScope { return { modelkind: this.modelkind, userid: this.userid, banklabel: this.banklabel, labelpath: this.labelpath } }
 
-  readonly #gate: LeaseGate
+  readonly #bank: LeaseBank
 
   /** The record with the leaseKey and the wrapped bankKey; null after eviction. */
   #record: LiveOf<LeaseRecord> | null
@@ -99,21 +99,21 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
 
   // == [Construction]: make, constructor
 
-  /** Make the lease of the live `record`, granted to `opts.gate`, whose gate's life must be the one `record` is stamped with. */
+  /** Make the lease of the live `record`, attached to `opts.bank`. It refuses `damaged_lease` unless `record` is stamped with `opts.gateLife`, the life of the gate it is used under. */
   static make(record: Z.input<typeof StampChecks.liveLeaseRecord>, opts: LeaseOpts): Lease { return new Lease(record, opts) }
 
   private constructor(record: Z.input<typeof StampChecks.liveLeaseRecord>, opts: LeaseOpts) {
-    const { record: recordChecked, opts: { gate } } = Checks.leaseMakeArgs.parse({ record, opts })
-    Validator.checkedConsistent(gateLifeOf(recordChecked), gate.gateLife, { kind: 'damaged_lease' })
+    const { record: recordChecked, opts: { gateLife } } = Checks.leaseMakeArgs.parse({ record, opts })
+    Validator.demandConsistent(gateLifeOf(recordChecked), gateLife, { kind: 'damaged_lease' })
     this.#record = recordChecked
     Helpers.tattoo(this, omit(recordChecked, ['lease_key', 'bank_key_lease_wrapped']), { configurable: false })
-    this.#gate = opts.gate
+    this.#bank = opts.bank
     Object.freeze(this)
   }
   // --
 
   // == [Records]: shellOf, nextRevisionOf, makeNextRecord, tombstoneOf
-  // A lease's life ticks and tocks as a Thing's: even while live, odd for the tombstone a lock leaves. Its revision moves
+  // A lease's lifeseq, like a Thing's, is even while live and odd for the tombstone a lock leaves. Its revision moves
   // within a life. None of these is bound into the wrap of its bankKey, which binds the stamp alone.
 
   /** The shell of the lease of the gate at `gateScope`: what the first lease follows where none is stored. */
@@ -158,14 +158,14 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
 
   // == [Revising and stowing]: nextEndingAt, stow
 
-  /** This lease's next revision, ending at `ends_at`, such as a softlock's: a new Lease, granted to the same gate, whose bankKey unwraps as this one's does. Refuses once this lease is evicted. */
+  /** This lease's next revision, ending at `ends_at`, such as a softlock's: a new Lease, attached to the same bank under the same gate's life, whose bankKey unwraps as this one's does. Refuses once this lease is evicted. */
   nextEndingAt(ends_at: EpochMillis): Lease {
     this.demandEnabled()
     // demandEnabled refuses an evicted lease, whose record is null.
-    return Lease.make(Lease.makeNextRecord(this.#record!, { ends_at }), { gate: this.#gate })
+    return Lease.make(Lease.makeNextRecord(this.#record!, { ends_at }), { bank: this.#bank, gateLife: gateLifeOf(this.#record!) })
   }
 
-  /** Stow this lease's record, its keys with it, in `deviceDB`, where it is newer than the prior record there. Refuses as `deviceDB.stowLease` does, and once this lease is evicted. */
+  /** Stow this lease's record, its keys with it, in `deviceDB`, where it is newer than the prior record there. Refuses where `deviceDB.stowLease` refuses, and once this lease is evicted. */
   async stow(deviceDB: DeviceDB): Promise<void> {
     Checks.stowArgs.parse({ deviceDB })
     this.demandEnabled()
@@ -183,7 +183,7 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
   // == [Sealing under the bankKey]: seal, unseal, sealText, unsealText, ctxOf, bankKey
 
   /** Seal and return the next revision after `donorProps`, with `publicProps` applied and `secretProps` encrypted.
-   * The seal checks its arguments (`BaseBox` refuses an unknown key in `publicProps` or `secretProps`) and the record it returns, so pass `donorProps` as you have it: whole, sparse, sealed or unsealed. None of its secrets reaches the revision.
+   * The seal checks its arguments (`BaseBox` refuses an unknown field in `publicProps` or `secretProps`) and the record it returns, so pass `donorProps` as you have it: whole, sparse, sealed or unsealed. None of its secrets reaches the revision.
    * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live `donorProps` instead, and refuses any `secretProps`. The sealer may refuse body fields there too: `BaseBox` refuses any sidecar but `{}`.
    * The revision carries this lease's `banktok`, its bank's, and the seal is bound to the revision's stamp and the sealer's tags. The cleartext's bytes are zeroed afterwards.
    * @example
@@ -281,8 +281,8 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
     try {
       return await Crypto.unwrapKeyUnder(lease_key, bank_key_lease_wrapped, ctx, { extractable: false, usage: [usage] })
     } catch {
-      // The gate drops its lease as it locks; this one is evicted too, should the gate have another.
-      this.#gate.lock()
+      // Locking drops the bank's attached lease; this one is evicted too, should the bank have another attached.
+      this.#bank.lock()
       this.evict()
       throw Throwers.damagedLease()
     }
@@ -294,12 +294,12 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
   /** True once this lease's keys are dropped. */
   get isEvicted(): boolean { return this.#record === null }
 
-  /** True while this lease is not evicted and its gate is enabled. */
-  get isEnabled(): boolean { return (this.#record !== null) && this.#gate.isEnabled }
+  /** True while this lease is not evicted and its bank is enabled. */
+  get isEnabled(): boolean { return (this.#record !== null) && this.#bank.isEnabled }
 
   /** Throw unless {@link isEnabled}. */
   demandEnabled(): this {
-    this.#gate.demandEnabled()
+    this.#bank.demandEnabled()
     if (this.#record === null) { throw Throwers.leaseNotInForce() }
     return this
   }
@@ -357,7 +357,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, str, fn, custom, epochMi
     recordOf:         fn(),
   })
   return {
-    leaseMakeArgs:     obj({ record: StampChecks.liveLeaseRecord, opts: obj({ gate: GateishChecks.leaseGate }) }),
+    leaseMakeArgs:     obj({ record: StampChecks.liveLeaseRecord, opts: obj({ bank: GateishChecks.leaseBank, gateLife: GateChecks.life }) }),
     gateScope:         GateChecks.life.pick({ userid: true, banklabel: true, labelpath: true }),
     nextRevisionArgs:  obj({ followed: StampChecks.leaseSparseOrShell, written_at: epochMillis }),
     nextRecordArgs:    obj({ live: StampChecks.liveLeaseRecord, revised: obj({ ends_at: epochMillis }) }),

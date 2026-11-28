@@ -160,9 +160,9 @@ const RootShelfMethodnames = ['getItem', 'setItem', 'removeItem'] as const
 
 /** The options of {@link Device.make}, beside the device's record. */
 export interface DeviceOpts {
-  /** Where this device's banks are stored: each bank made on it is given this vaultDB. */
+  /** Where the signed-in user's bank is stored: the device's bank is given this vaultDB. */
   vaultDB:           VaultDB
-  /** Makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok-big/browser`, or your own. */
+  /** Makes the passphraseKey from a passphrase: `argon2idWebV1Deriver` from `safebyok-big/browser`, or your own. */
   keyDeriver:        Deriver.KeyDeriver
   /** Judges each new passphrase before the bank accepts it. Without one, every new passphrase is too weak. */
   strengthChecker?:  StrengthChecker | undefined
@@ -180,7 +180,7 @@ export interface DeviceOpts {
   onBadNews?:        BadNewsHandler | undefined
   /** Hears what changed the device's lease, other than your own lock, unlock or disable: a lease taken up as the device signs in or connects, a lock or an unlock in another tab, the autolock, a softlock. Your own gate verb (replacing the passphrase, adding or revoking a passkey) announces `softlocked` in its own tab. Also hears each crossing from one stage to another as a `stage_crossed`, including those your own lock, unlock or disable cause, and a `watch_ended` where the device's watch of its bank ends of itself. What it throws or rejects with is reported to the platform. Default: {@link DefaultOnLifecycle}, which logs each announcement. */
   onLifecycle?:      LifecycleHandler | undefined
-  /** The QueryClient the signed-in user's boxes are kept in, under their bank's key: your own, so one client serves your queries and the vault's. Default: one the device makes. */
+  /** The QueryClient the signed-in user's boxes are kept in, under their bank's query key: your own, so one client serves your queries and the vault's. Default: one the device makes. */
   queryClient?:      QueryClient | undefined
   /** Where the device keeps the signed-in bank's two roots between page loads: hand it `localStorage`. Without one, nothing is kept, and each page load waits on the vaultDB for the bank. */
   rootShelf?:        RootShelf | undefined
@@ -196,11 +196,11 @@ export interface DeviceOpts {
 /** The stages of a bank, each described at {@link BankStage}. */
 export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'disabled', 'failed'] as const
 /** Where the user stands with their bank, for a host's screen to switch on:
- * - `'signed_out'` -- nobody is signed in, or the bank was vacated or signed out of
+ * - `'signed_out'` -- nobody has signed in on this device
  * - `'starting'`   -- signed in, and the device's sign-in has not answered
  * - `'unborn'`     -- no bank is stored for this user, or it was deleted
- * - `'locked'`     -- the bank is stored, and needs the passphrase or passkey before a whisper can be read
- * - `'unlocked'`   -- the bank has a lease, and whispers can be read and written
+ * - `'locked'`     -- the bank is stored, and needs the passphrase or passkey before a whisper can be sealed or unsealed
+ * - `'unlocked'`   -- the bank has a lease, and whispers can be sealed and unsealed
  * - `'disabled'`   -- the device was disabled for good: everything was unloaded, and nothing follows
  * - `'failed'`     -- bringing the bank up failed, as `lastErr` says
  */

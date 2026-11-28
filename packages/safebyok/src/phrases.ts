@@ -2,15 +2,15 @@
 
 import { Phrases as BigPhrases } from 'safebyok-big/internals'
 
-// == [Models]: VaultDBExpected, DeviceDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, RootShelfExpected, ThingSoonestBare, BankExpected, ThingExpected, BegunOfOtherKind, WayinExpected, WayinKeyExpected, WayinOfOtherHeader
+// == [Models]: VaultDBExpected, DeviceDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, GatingSpent, HostedVaultExpected, RootShelfExpected, ThingSoonestBare, BankExpected, ThingExpected, BegunOfOtherKind, WayinExpected, WayinKeyExpected, WayinOfOtherHeader
 
-/** A vaultDB that lacks one of its verbs or builders. */
-export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
+/** A vaultDB that lacks one of its verbs or watch. */
+export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs and watch.'
 
 /** A deviceDB that lacks one of its verbs. */
-export const DeviceDBExpected = 'Expected a DeviceDB: an object with a function for each of peekLease, stowLease and listen.'
+export const DeviceDBExpected = 'Expected a DeviceDB: an object with a function for each of peekLease, stowLease, listen and ensureDevicetok.'
 
-/** What a vault TSQ is made with that lacks one of a VaultMinder's members. */
+/** A VaultMinder, given to make a vault TSQ, that lacks one of its members. */
 export const VaultMinderExpected = 'Expected a VaultMinder: an object with a function for each of its verbs, listen, receive, thingAt, connect and disconnect.'
 
 /** A sealer that lacks one of its methods, its tags or its purposes. */
@@ -43,7 +43,7 @@ export const GatingSpent = 'This gating was attempted already, and a gating is a
 /** Something a bank is asked to host that lacks connect or disconnect. */
 export const HostedVaultExpected = 'Expected a vault: an object with connect and disconnect functions.'
 
-/** A root shelf handed to `Device.make` that has not the three methods of Web Storage it is called through. */
+/** A root shelf handed to `Device.make` that lacks the three methods of Web Storage it is called through. */
 export const RootShelfExpected = 'Expected a root shelf, such as localStorage: an object with getItem, setItem and removeItem functions.'
 
 /** A box the device has heard a newer revision of, with no whole record of its newest life to unseal. */
@@ -52,19 +52,19 @@ export const ThingSoonestBare = 'This device has heard of a newer revision of th
 /** A Thing or a car given something that is not a device's bank. */
 export const BankExpected = "Expected a device's bank: an object with a function for each of its verbs."
 
-/** What a car is made from that is neither a Thing, the shell, nor an item event. */
+/** A car made from something that is neither a Thing, the shell, nor an item event. */
 export const ThingExpected = 'Expected a Thing, the shell at its labelpath, or an item event of its record.'
 
-/** What a kind of Thing is made from that is another kind's. */
+/** A Thing made from the shell or an item event of another modelkind. */
 export const BegunOfOtherKind = "A Thing is made from the shell or an item event of its own modelkind."
 
-/** What a proving is made with, as the wayin it proves, that is not a Wayin. */
+/** A proving given, as the wayin it proves, something that is not a Wayin. */
 export const WayinExpected = 'Expected a Wayin, or null for a new wayin.'
 
-/** What a proving is made with, as its wayinKey, that is not one. */
+/** A proving given, as its wayinKey, something that is not one. */
 export const WayinKeyExpected = 'Expected a wayinKey: a non-extractable 256-bit AES-GCM CryptoKey for wrapKey and unwrapKey.'
 
-/** What a proving is made with, as the wayin it proves, whose header is not the proving's own. */
+/** A proving given a stored wayin whose header is not the proving's own. */
 export const WayinOfOtherHeader = "A proving's stored wayin has the proving's header."
 // --
 
@@ -106,7 +106,7 @@ export const LifepathDepth = "A Thing's lifepath has one lifeseq for each segmen
 /** A Thing whose am and lifeseq disagree. */
 export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tombstone (am: 'x')."
 
-/** A lease record whose lifepath is more than its lifeseq. */
+/** A lease record whose lifepath is not `0000000000/` and its own lifeseq. */
 export const LeaseLifepathOwn = "A lease record's lifepath is `0000000000/` and its own lifeseq: no life is above a lease's own."
 
 /** A lease record whose labelpath is not `lease/` and one label. */
@@ -206,7 +206,7 @@ export const AnswerNotMade = "The vaultDB could not make an answer for a failure
 /** A VaultTSQ made without a TanStack Query client. */
 export const QueryClientExpected = 'Expected a TanStack Query QueryClient: an object with setQueryDefaults, getQueryData, setQueryData, query, invalidateQueries and resetQueries.'
 
-/** What a vault is made with that lacks one of a VaultTSQ's members. */
+/** A VaultTSQ, given to make a vault, that lacks one of its members. */
 export const VaultTSQExpected = 'Expected a VaultTSQ: an object with a function for each of its verbs, itemQueryOptions, getOnce, listOnce, connect and disconnect.'
 
 /** A listing asked of a VaultTSQ for a Thing other than a box. */
@@ -215,7 +215,7 @@ export const ListOfBoxes = "A VaultTSQ lists only a box's children: the root box
 /** A box's item asked of a vault TSQ for a Thing other than a box under the root box. */
 export const NotMinded = "A vault TSQ keeps an item only for a box under the root box: not for the bank's gate or its root box."
 
-/** A bank's root box read while none is known live. */
+/** `bank.rootBox` read while no live root box is known. */
 export const RootBoxNotHeard = "This bank's root box is not known live on this device: bring the device up, or birth the bank, first."
 
 /** A staleTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
@@ -255,7 +255,7 @@ export function DatastoreQuotaTooSmall(quota: number, least: number): string {
   return `This browser offers the page ${String(quota)} bytes of storage, and a vault needs at least ${String(least)}.`
 }
 
-/** The vault's storage refused the call `oplabel`, as it would again. */
+/** The vault's storage refused the call `oplabel`, and would refuse it again. */
 export function storageCallRefused(oplabel: string): string {
   return `The vault's storage refused ${oplabel}: trying again is unlikely to help. Its logs have the request, and this refusal's cause has what it answered.`
 }

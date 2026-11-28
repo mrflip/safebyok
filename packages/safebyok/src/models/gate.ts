@@ -23,15 +23,15 @@ import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
 /** A bank's gate: its passphrase wayin and its passkey wayin if it has one.
- * Its form verbs prove the user's cleartexts against its wayins, and an `unlock` gating builds a lease, which it hands to its device's bank.
- * A gate change writes the gate, and this object then models the revision written.
- * Over the shell or a tombstone, its stamp, its life, `main` and `passkey0` refuse `absent_thing`, and so does a gating's attempt, though its maker still takes in the cleartexts.
+ * Its form verbs prove the user's cleartexts against its wayins, and an `unlock` gating builds a lease, which it attaches to its device's bank.
+ * A gate change puts the gate's next revision, and this object then models the revision put.
+ * Over the shell or a tombstone, its stamp, its life, `main` and `passkey0` refuse `absent_thing`, and so does a gating's attempt. A gating can still be made, and it still takes in the cleartexts.
  */
 export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<GateRecord>> implements GateStamp {
   // == [Props]: #device, #bank, #friend
 
   readonly #device:    Device
-  /** The bank that holds the leases this gate builds. */
+  /** The bank that the leases this gate builds are attached to. */
   readonly #bank:     Bank
   /** The bank's lease verbs. */
   readonly #friend:    BankGateFriend
@@ -82,7 +82,8 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
   // == [Construction]: make, constructor, adopt, makeRecord, makeNextRecord
 
-  /** Make the gate at `begun`, its shell, or an item event of its record, which it then receives, handing its leases to `opts.bank` through `friend`. Locked, and nothing is fetched or stored.
+  /** Make the gate at `begun`, its shell or an item event of its record, which it then receives. Locked, and nothing is fetched or stored.
+   * The leases it builds are attached to `opts.bank` through `friend`.
    * Throws where it refuses `begun`'s record.
    * Internal: the device's bank makes the gate its VaultMinder keeps.
    */
@@ -136,7 +137,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   /** The gating of {@link unlock} over `params`, for a form mutation to attempt. A `FormData` loses its `passphrase` field, and `nextPassphrase` and `confirmation`, at once. */
   unlockGating(params: FormData | UnlockDna | UnlockCleartexts): UnlockGating { return new UnlockGating(this, params, this.#gatingFriend()) }
 
-  /** Unlock this gate by the passphrase, or the passkey's answer, in a form or a dna, as {@link unlock} does.
+  /** Unlock this gate by the passphrase, or the passkey's answer, in a form or a dna. See {@link unlock}.
    * A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields before anything is awaited; its other fields stay. A dna's fields are never changed, but a passkey answer's PRF bytes are zeroed.
    * @example
    *   await gate.gatingUnlockAttempt(new FormData(formEl))
@@ -156,7 +157,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   /** The gating of {@link replacePassphrase} over `params`, for a form mutation to attempt. A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once. */
   replacePassphraseGating(params: FormData | ReplacePassphraseDna | ReplacePassphraseCleartexts): ReplacePassphraseGating { return new ReplacePassphraseGating(this, params, this.#gatingFriend()) }
 
-  /** Replace the passphrase by `nextPassphrase`, proved by the `passphrase` or the passkey's answer, in a form or a dna, as {@link replacePassphrase} does.
+  /** Replace the passphrase by `nextPassphrase`, proved by the `passphrase` or the passkey's answer, in a form or a dna. See {@link replacePassphrase}.
    * A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields before anything is awaited; its other fields stay. A dna's fields are never changed, but a passkey answer's PRF bytes are zeroed.
    */
   async gatingReplacePassphraseAttempt(params: FormData | ReplacePassphraseDna): Promise<Gate> { return await this.replacePassphraseGating(params).attempt() }
@@ -174,7 +175,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   addPasskeyGating(params: FormData | AddPasskeyDna | AddPasskeyCleartexts): AddPasskeyGating { return new AddPasskeyGating(this, params, this.#gatingFriend()) }
 
   // A FormData cannot carry a passkey's answer, so only a dna can add one.
-  /** Add the passkey whose answer is `nextPasskeyAnswer`, proved by the `passphrase`, as {@link addPasskey} does. The dna is never changed, but the answer's PRF bytes are zeroed. */
+  /** Add the passkey whose answer is `nextPasskeyAnswer`, proved by the `passphrase` (see {@link addPasskey}). The dna is never changed, but the answer's PRF bytes are zeroed. */
   async gatingAddPasskeyAttempt(params: AddPasskeyDna): Promise<Gate> { return await this.addPasskeyGating(params).attempt() }
 
   /** Add a passkey, proved by the passphrase, and leave the gate unlocked.
@@ -188,7 +189,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   /** The gating of {@link revokePasskey} over `params`, for a form mutation to attempt. A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once. */
   revokePasskeyGating(params: FormData | RevokePasskeyDna | RevokePasskeyCleartexts): RevokePasskeyGating { return new RevokePasskeyGating(this, params, this.#gatingFriend()) }
 
-  /** Revoke the passkey, proved by the `passphrase` or the passkey's answer, in a form or a dna, as {@link revokePasskey} does.
+  /** Revoke the passkey, proved by the `passphrase` or the passkey's answer, in a form or a dna. See {@link revokePasskey}.
    * A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields before anything is awaited; its other fields stay. A dna's fields are never changed, but a passkey answer's PRF bytes are zeroed.
    */
   async gatingRevokePasskeyAttempt(params: FormData | RevokePasskeyDna): Promise<Gate> { return await this.revokePasskeyGating(params).attempt() }
@@ -238,10 +239,10 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 
   /** A lease `proved` builds, granted in this gate's bank under its life, citing the revision this gate models, and following `followed`. */
   async #buildLease(proved: Proving, followed: Sparse<LeaseRecord>): Promise<Lease> {
-    return await proved.buildLease(this.#friend.leaseGateOf(this.life), this, followed)
+    return await proved.buildLease(this.#bank, this, followed)
   }
 
-  /** Write `ask.record`, this gate's next revision, over `ask.cited`. Resolves this gate, which then models the revision written. */
+  /** Put `ask.record`, this gate's next revision, over `ask.cited`. Resolves this gate, which then models the revision put. */
   async #putGate(ask: Omit<PutAskDraft<GateRecord>, 'track' | 'banktok'>): Promise<this> {
     this.demandEnabled()
     await this.#bank.demandVaultMinder().putOnce(ask)
@@ -291,13 +292,13 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   /** The refusal every call on this gate meets once its device ends, or null while it is enabled. */
   get endCause(): Errors.VaultError | null { return this.#bank.endCause }
 
-  /** True while this gate's bank holds no lease. */
+  /** True while this gate's bank has no lease attached. */
   get isLocked(): boolean { return this.#bank.isLocked }
 
   /** True while this gate's bank is locked, or its lease is near its end ({@link Bank.isSoftlocked}): {@link ensureUnlocked} then waits for an `unlock` gating. */
   get isSoftlocked(): boolean { return this.#bank.isSoftlocked }
 
-  /** True while this gate's bank holds a lease. */
+  /** True while this gate's bank has a lease attached. */
   get isUnlocked(): boolean { return this.#bank.isUnlocked }
 
   /** True while a call waits in {@link ensureUnlocked}: render the unlock form while it is. */
@@ -328,7 +329,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
 function wholeOf(record: Adoptable<GateRecord>): GateRecord | undefined { return ('wayins' in record) ? record : undefined }
 
 // A Wayin's pickle is typed as either kind; the gate record's parse checks each is the kind its label wants.
-/** The frozen records of `wayins`, its passkey0 null for none. */
+/** The frozen records of `wayins`, with `passkey0` null where there is none. */
 function wayinsOf({ main, passkey0 }: GateDna['wayins']): Wayins {
   return Object.freeze({ main: main.pickle(), passkey0: passkey0?.pickle() ?? null }) as Wayins
 }
@@ -346,7 +347,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn, union }) => 
     gateMakeArgs:   obj({
       begun:  union([GateChecks.shell, SeenChecks.itemEvent]).refine(({ modelkind }) => modelkind === 'gate', Phrases.BegunOfOtherKind),
       opts:   ThingMakeChecks.thingMakeOpts,
-      friend: obj({ leaseGateOf: fn<BankGateFriend['leaseGateOf']>(), leaseFollowed: fn<BankGateFriend['leaseFollowed']>(), attachLease: fn<BankGateFriend['attachLease']>() }),
+      friend: obj({ leaseFollowed: fn<BankGateFriend['leaseFollowed']>(), attachLease: fn<BankGateFriend['attachLease']>() }),
     }),
     makeRecordArgs: obj({ dna: GateChecks.life.extend({ wayins }), found: ThingChecks.thingCited.pick({ revseq: true }) }),
     nextRecordArgs: obj({ cited: GateChecks.live, wayins }),

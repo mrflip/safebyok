@@ -12,7 +12,6 @@ import type { Lease } from '../models/lease'
 import type { Proving, guardKeyDeriver } from '../models/proving'
 import type { Wayin } from '../models/wayin'
 import type { BankScope, GateLife, GateStamp, LeaseRecord } from './shapes-stamps'
-import { GateChecks } from './shapes-thingkinds'
 import type { GateRecord, Sparse, Tombstone } from './shapes-thing'
 import type { ShellOf } from './shapes-sealers'
 import type { PutAskDraft } from './shapes-asks'
@@ -38,7 +37,7 @@ export const CleartextChecks = Validator.Checkers('bad_record', ({ obj, unk }) =
   }
 })
 
-/** The one proof among `given`: its passphrase where it has one, else its passkey answer. Neither is an issue on `ctx`. */
+/** The proof in `given`: its passphrase where it has one, else its passkey answer. Given neither, add an issue to `ctx`. */
 function oneProofOf({ passphraseCleartext, passkeyCleartext }: { passphraseCleartext?: GX.PassphraseCleartext | undefined, passkeyCleartext?: GX.PasskeyAnswer | null | undefined }, ctx: Z.RefinementCtx): ProvedCleartexts {
   if (passphraseCleartext !== undefined) { return { passphraseCleartext } }
   if (passkeyCleartext) { return { passkeyCleartext } }
@@ -100,19 +99,19 @@ export type HandedCleartexts = Partial<Record<keyof GatingCleartexts, unknown>>
 /** The fields a form verb takes out of a `FormData`, whichever verb it is: the passphrase, the new passphrase, and the confirmation of either. */
 export const FormSecretFieldnames = Object.freeze(['passphrase', 'nextPassphrase', 'confirmation'] as const)
 
-/** What a birth is handed: the new passphrase, a new passkey's answer or none, and the confirmation, which is ignored. */
+/** The form fields that birth a bank: the new passphrase, a new passkey's answer or none, and the confirmation, which is ignored. */
 export type BirthDna = { passphrase: string, passkeyAnswer?: GX.PasskeyAnswer | null | undefined, confirmation?: string | undefined }
 
-/** What an unlock is handed: the passphrase, or the passkey's answer. Given both, the passphrase is tried. */
+/** The form fields that unlock a gate: the passphrase, or the passkey's answer. Given both, the passphrase is tried. */
 export type UnlockDna = { passphrase?: string | undefined, passkeyAnswer?: GX.PasskeyAnswer | null | undefined }
 
-/** What a passphrase replacement is handed: the proof, by the passphrase or the passkey's answer, the new passphrase, and its confirmation, which is ignored. */
+/** The form fields that replace a gate's passphrase: the proof, by the passphrase or the passkey's answer, the new passphrase, and its confirmation, which is ignored. */
 export type ReplacePassphraseDna = { passphrase?: string | undefined, passkeyAnswer?: GX.PasskeyAnswer | null | undefined, nextPassphrase: string, confirmation?: string | undefined }
 
-/** What adding a passkey is handed: the passphrase, and the new passkey's answer. */
+/** The form fields that add a passkey: the passphrase, and the new passkey's answer. */
 export type AddPasskeyDna = { passphrase: string, nextPasskeyAnswer: GX.PasskeyAnswer }
 
-/** What revoking the passkey is handed: the proof, by the passphrase or the passkey's answer. */
+/** The form fields that revoke the passkey: the proof, by the passphrase or the passkey's answer. */
 export type RevokePasskeyDna = { passphrase?: string | undefined, passkeyAnswer?: GX.PasskeyAnswer | null | undefined }
 // --
 
@@ -126,21 +125,19 @@ export interface BirthGatingFriend {
   attachLease:    (lease: Lease) => void
 }
 
-/** What names a gate's lease shell: the gate's bank scope and labelpath. */
+/** The scope of a gate's lease shell: the gate's bank scope and labelpath. */
 export type LeaseShellScope = Pick<GateLife, 'userid' | 'banklabel' | 'labelpath'>
 
 /** A gate's private verbs, for its form verbs' gatings to call. Internal. */
 export interface GateGatingFriend {
   /** Unlock the gate under a lease `proved` builds, citing the revision it models. */
   unlockByProving: (proved: Proving) => Promise<Gate>
-  /** Write the gate's next revision, and model the revision written. */
+  /** Put the gate's next revision, and model the revision put. */
   putGate:         (ask: Omit<PutAskDraft<GateRecord>, 'track' | 'banktok'>) => Promise<Gate>
 }
 
 /** A bank's lease verbs, for each gate it makes to call. Internal. */
 export interface BankGateFriend {
-  /** A view of the bank for a lease granted under the gate's life `gateLife`. */
-  leaseGateOf:   (gateLife: GateLife) => LeaseGate
   /** The Thing fields a lease granted under the gate at `gateScope` follows: the lease record the deviceDB has, the bank's lease, or the gate's lease shell. */
   leaseFollowed: (gateScope: LeaseShellScope) => Promise<Sparse<LeaseRecord>>
   /** Attach `lease` in place of the bank's lease, resuming every call waiting for an `unlock` gating, and stow it in the deviceDB. Refuses on a disabled bank. */
@@ -157,11 +154,11 @@ export type GateDna = GateLife & { wayins: { main: Wayin, passkey0: Wayin | null
 export type GateFound = Tombstone<GateRecord> | ShellOf<GateRecord>
 // --
 
-// == [What a proving is handed]: RawChecks, leaseGate, isWayinKey, ProvingDevice, GuardedKeyDeriver, ProvingParts, ProvingOpts
+// == [What a proving is handed]: RawChecks, leaseBank, isWayinKey, ProvingDevice, GuardedKeyDeriver, ProvingParts, ProvingOpts
 
 /** The checks of what a lease and a proving are handed. */
 const RawChecks = Validator.Checkers('bad_record', ({ obj, fn, bool, uint, custom }) => ({
-  leaseGate:           obj({ gateLife: GateChecks.life, leaseMillis: uint, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }),
+  leaseBank:           obj({ device: obj({ leaseMillis: uint }), lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }),
   provingDevice:       GX.provingDevice.omit({ device_tok: true }).extend({ strengthChecker: custom<GuardedStrengthChecker>(Consts.isGuarded, BigPhrases.GuardedExpected), ensureDevicetok: fn<(userid: Userid) => Promise<Devicetok>>() }),
   provingOpts:         obj({ wayinKey: custom<CryptoKey>(isWayinKey, Phrases.WayinKeyExpected) }).strict(),
 }))
@@ -173,13 +170,13 @@ function isWayinKey(val: unknown): val is CryptoKey {
     && (val.usages.length === 2) && val.usages.includes('wrapKey') && val.usages.includes('unwrapKey')
 }
 
-/** The parts of its device a proving is given: the wrapped key deriver and strength checker, and what answers the device's token. */
+/** The parts of its device a proving is given: the guarded key deriver and strength checker, and `ensureDevicetok`. */
 export type ProvingDevice = Z.infer<typeof GateishChecks.provingDevice>
 
 /** The host's key deriver, wrapped by {@link guardKeyDeriver}. */
 export type GuardedKeyDeriver = ProvingDevice['keyDeriver']
 
-/** The parts of a proving: the life of the gate its wayin's stamp takes, the wayin's header, and the stored wayin it proves, if any. */
+/** The parts of a proving: the gate life its wayin's stamp binds, the wayin's header, and the stored wayin it proves, if any. */
 export interface ProvingParts<HeaderT extends WayinHeader> {
   gateLife:  GateLife
   header:    HeaderT
@@ -194,14 +191,12 @@ export interface ProvingOpts {
 }
 // --
 
-// == [What a lease is handed]: LeaseGate, SecretFieldname, LeaseOpts
+// == [What a lease is handed]: LeaseBank, SecretFieldname, LeaseOpts
 
-/** A view of the bank a lease is granted in: its gate's life, how long a lease lasts, whether it is enabled, and its `lock` (called when the bankKey will not unwrap) and `demandEnabled`. */
-export interface LeaseGate {
-  /** The life of the gate the lease was granted under, fixed for the lease's life. */
-  readonly gateLife: GateLife
-  /** How long a lease granted in the bank lasts, in milliseconds. */
-  readonly leaseMillis: number
+/** What a lease, and the proving that builds it, need of the bank it is attached to: its device's `leaseMillis`, whether it is enabled, and its `lock` (called when the bankKey will not unwrap) and `demandEnabled`. A {@link Bank} is one. */
+export interface LeaseBank {
+  /** The bank's device: how long a lease granted in the bank lasts, in milliseconds. */
+  readonly device: { readonly leaseMillis: number }
   /** True until the bank's device ends. */
   readonly isEnabled: boolean
   /** Lock the bank, dropping its lease. */
@@ -215,8 +210,10 @@ export type SecretFieldname = 'whisper' | `${string}_sealed`
 
 /** The options of {@link Lease.make}, beside its record. */
 export interface LeaseOpts {
-  /** The bank the lease is granted in, as the lease reads it back. */
-  gate: LeaseGate
+  /** The bank the lease is attached to. */
+  bank:     LeaseBank
+  /** The life of the gate the lease is used under: a record whose gate fields differ from it refuses `damaged_lease`. */
+  gateLife: GateLife
 }
 // --
 
@@ -261,6 +258,6 @@ const StrengthChecks = Validator.Checkers('bad_record', ({ custom }) => ({
   strengthChecker: custom<StrengthChecker>(GX.isStrengthChecker, BigPhrases.StrengthCheckerShape),
 }))
 
-/** The checks of a {@link ProvingDevice}, a proving's {@link ProvingOpts}, a {@link LeaseGate} and a host's {@link StrengthChecker}. */
+/** The checks of a {@link ProvingDevice}, a proving's {@link ProvingOpts}, a {@link LeaseBank} and a host's {@link StrengthChecker}. */
 export const GateishChecks = Object.freeze({ ...RawChecks, ...StrengthChecks })
 // --

@@ -19,8 +19,8 @@ import { labelsOf, tableKeyHeadOf } from './query-keys'
 
 // == [VaultTSQ]: VaultTSQ
 
-// The writer, `#hear` and `#hearRefused`, is the only code that changes an item or a listing: the queryFns answer what
-// the Thing holds, and nothing here acts on a query's success.
+// The writer, `#hear`, `#hearLife` and `#hearRefused`, is the only code that changes an item or a listing: the queryFns
+// answer with the Thing's record, and nothing here acts on a query's success.
 /** One bank's vault TSQ: its boxes under the root box, as items, and their listings, in a client it is handed.
  * An item is the box's live record, deep-equal to the one its Thing holds, or null where none is stored live. Across
  * revisions, a part of the record left unchanged stays the same object. Once the box is known only sparse in a newer life
@@ -36,7 +36,7 @@ export class VaultTSQ {
 
   readonly #vaultMinder: VaultMinder
   readonly #queryClient: TSQ.QueryClient
-  /** The bank. */
+  /** The bank's scope. */
   readonly #scope:       BankScope
   /** The host's `onBadNews`, told of each record refused. */
   readonly #onBadNews:   (news: Errors.VaultError) => void
@@ -49,8 +49,8 @@ export class VaultTSQ {
   // TanStack Query merges every query default whose key is a prefix of a query's key, and a query's own options over
   // them, so a host's options win and nothing outside the key of the bank's boxes is touched. It sets no mutation
   // defaults: a host's box write takes its options from {@link mutationOptionsOf}, and a form verb's from the giver.
-  /** Keep the bank's boxes in `opts.queryClient` from what `opts.vaultMinder` tells once {@link connect}ed, telling `opts.onBadNews` of trouble.
-   * Its query defaults go under the key of the bank's boxes, where a host's own options override them.
+  /** Make the bank's vault TSQ in `opts.queryClient`, which caches the bank's boxes from what `opts.vaultMinder` tells once {@link connect}ed.
+   * Trouble goes to `opts.onBadNews`. Its query defaults go under the key of the bank's boxes, where a host's own options override them.
    */
   static make(opts: VaultTSQOpts): VaultTSQ { return new VaultTSQ(VaultTSQChecks.makeArgs.parse(opts)) }
 
@@ -109,7 +109,7 @@ export class VaultTSQ {
   }
 
   /** Get the box at `scope` once, unless its item is fresh by `opts.staleTime`: its live record, or null where none is stored live.
-   * Refuses `stale_read` where storage answers an earlier life than the box's newest known only sparse. Rejects with the
+   * Refuses `stale_read` where the box's newest life is known only sparse and storage answers an earlier one. Rejects with the
    * library's `CancelledError` where the item, holding no data, is reset while the get runs.
    */
   async getOnce(scope: ThingScope, opts: GetOnceOpts = {}): Promise<ThingRecord | null> {
@@ -205,7 +205,7 @@ export class VaultTSQ {
     void this.#queryClient.resetQueries({ queryKey: VaultTSQ.listQueryKeyOf(this.#boxScopeOf(labelpath)), exact: true })
   }
 
-  // A refusal met by the item's own fetch lands while that fetch runs, so the refetch it asks for is that same fetch, and
+  // A refusal met by the item's own fetch is told while that fetch runs, so the refetch it asks for is that same fetch, and
   // nothing loops.
   /** Refetch the item of the box at `scope`, a record of which its Thing refused, so that its query shows the refusal beside its data. */
   #hearRefused(scope: ThingScope | null): void {

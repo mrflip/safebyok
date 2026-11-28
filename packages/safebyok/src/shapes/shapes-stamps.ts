@@ -27,13 +27,13 @@ const PlainChecks = Validator.Checkers('bad_record', ({ obj, lit, oneof }) => {
   }
 })
 
-/** A bank's scope: its user and its `banklabel`. */
+/** A bank's scope: its `userid` and `banklabel`. */
 export type BankScope    = Z.infer<typeof StampChecks.bankScope>
 /** A bank's life, as its gate's record has it: its scope, and the lifeseq, `born_at` and `banktok` of the life. It is bound into nothing as it is. */
 export type BankLife     = Z.infer<typeof StampChecks.bankLife>
-/** One life of a gate: its scope, its lifepath and `born_at`, and its `banktok`. A wayin's stamp and a lease's take it, each in its own names. */
+/** One life of a gate: its scope, its lifepath and `born_at`, and its `banktok`. A wayin's stamp and a lease's stamp each include it, under their own field names. */
 export type GateLife     = Z.infer<typeof StampChecks.gateLife>
-/** A gate's stamp: every Thing field of one revision but its `label` and `lifeseq`, which its labelpath and lifepath carry. Nothing is sealed under it yet. */
+/** A gate's stamp: every Thing field of one revision but its `label` and `lifeseq`, which its labelpath and lifepath carry. Nothing is sealed under it. */
 export type GateStamp    = Z.infer<typeof StampChecks.gateStamp>
 /** A box's stamp: every Thing field of one revision but its `label` and `lifeseq`, which its labelpath and lifepath carry; not its sidecar or its sealed whisper.
  * Its whisper's seal is bound to it: the whisper unseals only within the revision it was sealed in.

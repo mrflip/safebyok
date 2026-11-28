@@ -10,7 +10,7 @@ import type { Proving } from './proving'
 import { bulletproofHandlerOf } from '../helpers/bulletproof'
 import type { BankStage, HostedVault, RefusalSnapshot, RootShelf, ThingMakeOpts, BankOpts, BankSnapshot } from '../shapes/shapes-bankish'
 import { PendingBank, SignedOutBank, HostedVaultChecks, isRootShelf } from '../shapes/shapes-bankish'
-import type { BirthCleartexts, BirthDna, BirthGatingFriend, GateFound, LeaseGate, LeaseShellScope, BankGateFriend } from '../shapes/shapes-gateish'
+import type { BirthCleartexts, BirthDna, BirthGatingFriend, GateFound, LeaseShellScope, BankGateFriend } from '../shapes/shapes-gateish'
 import { type MaskedViewLease, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type BankLife, type BankScope, type GateLife, type GateStamp, type LeaseLoggable, type LeaseRecord, type LeaseScope, LeaseLabelpath, StampChecks } from '../shapes/shapes-stamps'
@@ -31,11 +31,11 @@ import * as Throwers from '../refusals/throwers'
 /** A Thing of the signed-in user's bank, as the bank makes one: its gate or a box. */
 export type SomeThing = Gate | Box
 
-/** The signed-in user's bank on this device: its gate and its root box, its lease, the wait for an unlock, and its snapshot, which a host renders.
+/** The signed-in user's bank on this device: its gate and its root box, its lease, the awaited `unlock` gating, and its snapshot, which a host renders.
  * It exists once its device is made, labelled and unstored: it seals, unseals and unlocks only once its gate's record is stored and heard of.
- * Made with its device, it lives as long. Its gate builds leases and hands them to it, and boxes are sealed and unsealed under the lease it holds, which no member hands out.
+ * Made with its device, it lives as long. Its gate builds leases and attaches them to it, and boxes are sealed and unsealed under the attached lease, which no member hands out.
  * While connected, its lease is the one its device's deviceDB has, which every tab given that deviceDB shares: an unlock, a renewal or a lock in one tab reaches the rest.
- * Its snapshot's stage is read from the gate and the root box its VaultMinder keeps, each of which it subscribes to, and from the lease.
+ * Its snapshot's stage is read from the gate and the root box in its VaultMinder, each of which it subscribes to, and from the lease.
  */
 export class Bank {
   // == [Props]: #device, #vaultMinder, #lease, #unlockWait, #isConnected, #unlisten, #janitor, #lastErr, #vaults, #snapshot, #subscribers, #getSnapshot, #subscribe, #bulletproofCallback
@@ -134,7 +134,7 @@ export class Bank {
    */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
 
-  /** Wrap `callback`, one the core keeps for someone else, so that what it throws goes to the device's `onBadNews`, never to whoever calls it. Already bound. */
+  /** Wrap `callback` so that what it throws goes to the device's `onBadNews`, never to whoever calls it. Already bound. */
   get bulletproofCallback(): BulletproofCallback { return this.#bulletproofCallback }
 
   /** The device this bank is on. */
@@ -156,7 +156,7 @@ export class Bank {
     Object.freeze(this)
   }
 
-  /** A fresh life of a bank's gate, born now: the life after `found`, the gate's tombstone or its shell, with a new banktok. Mint one per gating that births a bank. */
+  /** Mint a fresh life of a bank's gate, born now: the life after `found`, the gate's tombstone or its shell, with a new banktok. Mint one per gating that births a bank. */
   static mintLife(found: GateFound): GateLife {
     const { userid, banklabel, ...lives } = Checks.mintLifeArgs.parse(found)
     const { lifepath } = BaseThing.nextLifeOf(lives)
@@ -185,7 +185,7 @@ export class Bank {
 
   // == [Signing in]: signin, seedFromShelf, startShelving, showSigninRefusal, birthGating, birth, birthFriend
 
-  // Its Things are seeded before it listens to keep them on the shelf, which would only put back what it read.
+  // The roots are seeded from the shelf before the bank listens for them, so that seeding does not put each root it peeked straight back on the shelf.
   /** Give this bank `vaultMinder`, the VaultMinder of the signed-in user's bank; where `shelf` is given, seed it from the roots on `shelf` and put the roots there as they change. A second call does nothing.
    * With no shelf, the roots are kept nowhere between page loads. The janitor starts, and where this bank is connected, the VaultMinder starts watching the vaultDB.
    */
@@ -212,13 +212,13 @@ export class Bank {
     }
   }
 
-  // The Things hear each root first, so the roots put are the ones this bank shows.
+  // Each root's Thing receives it before this listener hears of it, so the roots stowed are the ones this bank shows.
   /** Put this bank's roots on `shelf` at each root `vaultMinder` tells of, or remove them while they are not all live. */
   #startShelving(vaultMinder: VaultMinder, shelf: RootShelf): void {
     const hear = this.#bulletproofCallback((event: VaultEvent) => {
       if ((event.eventkind === 'item') && this.#isRootScope(event)) { stowRoots(shelf, this.#device.scope, this) }
     })
-    // The onBadNews of the vault TSQ, listening beside it, tells the device of the same record refused.
+    // A refused record goes to every listener's onBadNews, and the vault TSQ's tells the device: this one tells nothing.
     vaultMinder.listen({ hear, onBadNews: noop })
   }
 
@@ -244,7 +244,7 @@ export class Bank {
   /** This bank's lease verbs, for a birth's gating to call. */
   #birthFriend(): BirthGatingFriend {
     return {
-      leaseByProving: async (proving: Proving, cited: GateStamp) => await proving.buildLease(this.#leaseGateOf(GateChecks.life.parse(cited)), cited, await this.#leaseFollowed(cited)),
+      leaseByProving: async (proving: Proving, cited: GateStamp) => await proving.buildLease(this, cited, await this.#leaseFollowed(cited)),
       attachLease:    (lease: Lease) => { this.#attachAndStow(lease) },
     }
   }
@@ -291,19 +291,15 @@ export class Bank {
   }
   // --
 
-  // == [The gate's friend]: gateFriend, leaseGateOf, leaseFollowed, attachAndStow, attachLease, dropLease
+  // == [The gate's friend]: gateFriend, leaseFollowed, attachAndStow, attachLease, dropLease
 
   /** This bank's lease verbs, for a gate it makes to call. */
   #gateFriend(): BankGateFriend {
     return {
-      leaseGateOf:   (gateLife: GateLife) => this.#leaseGateOf(gateLife),
       leaseFollowed: async (gateScope: LeaseShellScope) => await this.#leaseFollowed(gateScope),
       attachLease:   (lease: Lease) => { this.#attachAndStow(lease) },
     }
   }
-
-  /** A view of this bank for a lease granted under the gate life `gateLife`. */
-  #leaseGateOf(gateLife: GateLife): LeaseGate { return new BankLeaseGate(this, gateLife) }
 
   // A grant follows the deviceDB, so one after a lock in any tab starts the life after that lock's tombstone. It follows
   // this bank's lease where that is newer, as a softlock not yet stowed is.
@@ -311,17 +307,17 @@ export class Bank {
   async #leaseFollowed(gateScope: LeaseShellScope): Promise<Sparse<LeaseRecord>> {
     const shell  = Lease.shellOf(gateScope)
     const { modelkind, userid, banklabel, labelpath } = shell
-    const stored = await this.#peekStored({ modelkind, userid, banklabel, labelpath })
-    if (this.#isNewerThanLease(stored)) { return this.#endedIfStale(stored) }
+    const stowedLease = await this.#peekStored({ modelkind, userid, banklabel, labelpath })
+    if (this.#isNewerThanLease(stowedLease)) { return this.#endedIfStale(stowedLease) }
     return this.#lease ?? shell
   }
 
   // A renewal happens only while a lease is granted: a grant after the stored lease has ended, as when every tab closed
   // past its end, starts the next life.
-  /** The record a grant follows over `stored`: its tombstone, written now, where `stored` is live but can no longer unlock the bank, or else `stored` itself */
-  #endedIfStale(stored: LeaseRecord): Sparse<LeaseRecord> {
-    const isStale = (stored.am === 'a') && ! this.#canUnlock(stored)
-    return isStale ? Lease.tombstoneOf(stored) : stored
+  /** The record a grant follows over `stowedLease`: its tombstone, written now, where `stowedLease` is live but can no longer unlock the bank, or else `stowedLease` itself */
+  #endedIfStale(stowedLease: LeaseRecord): Sparse<LeaseRecord> {
+    const isStale = (stowedLease.am === 'a') && ! this.#canUnlock(stowedLease)
+    return isStale ? Lease.tombstoneOf(stowedLease) : stowedLease
   }
 
   /** Attach `lease`, and stow it in the deviceDB for every tab to take up. */
@@ -365,7 +361,8 @@ export class Bank {
   }
 
   // The watch starts before the vaults hear it, so that what a vault refetches as it connects is fetched under the watch.
-  /** Start what this bank keeps running: its VaultMinder's watch of the vaultDB, once someone signs in, the deviceDB's listener, and each vault it hosts hearing the VaultMinder; and take up the lease the deviceDB has. Never throws; a call once the device is disabled does nothing.
+  /** Start this bank's watch and listeners, and take up the lease the deviceDB has. Never throws.
+   * It starts its VaultMinder's watch of the vaultDB, once someone signs in, the deviceDB's listener, and each vault it hosts hearing the VaultMinder. A call once the device is disabled does nothing.
    * What the host's vaultDB or deviceDB throws goes to the device's `onBadNews`; a later call, or the janitor's next tick, starts the watch again. A call while the watch runs leaves it running.
    */
   connect(): this {
@@ -380,7 +377,8 @@ export class Bank {
 
   // A disconnect drops this tab's lease alone, and stows no tombstone: one tab unmounting its provider locks no other.
   // Only a lock, the janitor's autolock among them, ends the lease in every tab.
-  /** Drop this bank's lease in this tab alone, and stop what it keeps running: the deviceDB's listener, each vault it hosts hearing the VaultMinder, and the VaultMinder's watch of the vaultDB. Never throws; calling it twice in a row is the same as once.
+  /** Drop this bank's lease in this tab alone, and stop its watch and listeners. Never throws, and calling it twice in a row is the same as once.
+   * It stops the deviceDB's listener, each vault it hosts hearing the VaultMinder, and the VaultMinder's watch of the vaultDB.
    * The bank stays enabled: its verbs still work, a call waiting in {@link ensureUnlocked} still waits, and {@link connect} resumes it, taking up the lease the deviceDB has.
    * What the host's vaultDB or deviceDB throws as they stop goes to the device's `onBadNews`.
    */
@@ -436,9 +434,9 @@ export class Bank {
   /** Make this bank's lease the one the deviceDB has for its gate, where that one is newer, then softlock it where the gate has moved past it. Does nothing until the roots are live. Never throws: a refusal goes to the device's `onBadNews`. */
   async #followStored(): Promise<void> {
     if (! this.areRootsLive) { return }
-    const stored = await this.#peekStored({ modelkind: 'lease', ...this.#device.scope, labelpath: LeaseLabelpath.of(Labelpath.gateOf(this.#device.banklabel)) })
+    const stowedLease = await this.#peekStored({ modelkind: 'lease', ...this.#device.scope, labelpath: LeaseLabelpath.of(Labelpath.gateOf(this.#device.banklabel)) })
     try {
-      if (this.#isNewerThanLease(stored)) { this.#attachOrDropLease(stored) }
+      if (this.#isNewerThanLease(stowedLease)) { this.#attachOrDropLease(stowedLease) }
       this.#softlockPastGate()
     } catch (err) {
       this.#device.tellBadNews([err])
@@ -446,15 +444,14 @@ export class Bank {
   }
 
   /** True of a lease record newer than this bank's lease, by life then revision; any record is newer than none */
-  #isNewerThanLease(stored: LeaseRecord | null): stored is LeaseRecord {
-    return (stored !== null) && ((this.#lease === null) || (BaseThing.cmp(this.#lease, stored) > 0))
+  #isNewerThanLease(stowedLease: LeaseRecord | null): stowedLease is LeaseRecord {
+    return (stowedLease !== null) && ((this.#lease === null) || (BaseThing.cmp(this.#lease, stowedLease) > 0))
   }
 
-  /** Attach the Lease of `stored` where it can unlock the bank, or else drop this bank's lease where it has one, announcing either */
-  #attachOrDropLease(stored: LeaseRecord): void {
-    if ((stored.am === 'a') && this.#canUnlock(stored)) {
-      const gate = this.#leaseGateOf(this.#demandGateLive().life)
-      this.#attachLease(Lease.make(stored, { gate }))
+  /** Attach the Lease of `stowedLease` where it can unlock the bank, or else drop this bank's lease where it has one, announcing either */
+  #attachOrDropLease(stowedLease: LeaseRecord): void {
+    if ((stowedLease.am === 'a') && this.#canUnlock(stowedLease)) {
+      this.#attachLease(Lease.make(stowedLease, { bank: this, gateLife: this.#demandGateLive().life }))
       this.#device.announce({ kind: 'lease_taken_up' })
     } else if (this.isUnlocked) {
       this.#dropLease()
@@ -463,9 +460,9 @@ export class Bank {
   }
 
   /** True of a live lease record not past its end, granted under the gate's life */
-  #canUnlock(stored: Sealers.LiveOf<LeaseRecord>): boolean {
+  #canUnlock(stowedLease: Sealers.LiveOf<LeaseRecord>): boolean {
     const gate = this.#gateThing()
-    return (Clock.nowMillis() < stored.ends_at) && (stored.gate_labelpath === gate?.labelpath) && (stored.gate_lifepath === gate.lifepath)
+    return (Clock.nowMillis() < stowedLease.ends_at) && (stowedLease.gate_labelpath === gate?.labelpath) && (stowedLease.gate_lifepath === gate.lifepath)
   }
 
   // A softlock only ever brings the end nearer, so every tab that hears the same gate change writes the same revision,
@@ -490,7 +487,7 @@ export class Bank {
     }
   }
 
-  /** Stow `lease` in the deviceDB, telling the device's `onBadNews` where it refuses: this bank keeps the lease either way */
+  /** Stow `lease` in the deviceDB, telling the device's `onBadNews` where it refuses: the lease stays attached either way */
   async #stowLease(lease: Lease): Promise<void> {
     try { await lease.stow(this.#device.deviceDB) } catch (err) { this.#device.tellBadNews([err]) }
   }
@@ -516,7 +513,7 @@ export class Bank {
     this.#janitor = null
   }
 
-  /** Lock this bank once its lease has passed its end, and, while connected, start a watch that is not running and read the roots again once the gate is stale. Never throws: a refusal goes to the device's `onBadNews`. */
+  /** Lock this bank once its lease has passed its end, and, while connected, start a watch that is not running and get the roots again once the gate is stale. Never throws: a refusal goes to the device's `onBadNews`. */
   #tidy(): void {
     try {
       this.#lockPastLeaseEnd()
@@ -537,7 +534,7 @@ export class Bank {
     this.#device.announce({ kind: 'autolocked' })
   }
 
-  /** Start the VaultMinder's watch where it is not running, and read the roots again where the gate is stale */
+  /** Start the VaultMinder's watch where it is not running, and get the roots again where the gate is stale */
   #tidyConnected(): void {
     if (! this.demandVaultMinder().isWatching) { this.#startWatch() }
     if (this.#isGateStale()) { void this.#refreshRoots() }
@@ -564,7 +561,7 @@ export class Bank {
   // == [Stats]: stats, tryStats
 
   /** The bank's storage stats, read from the vaultDB once: how many boxes and gates it has, live and in all, their size in bytes, and the datastore's limits.
-   * Needs no unlock. Nothing refuses a write for being over a limit.
+   * Works on a locked bank. Nothing refuses a write for being over a limit.
    * @example
    *   const { box, gate, max } = await bank.stats()
    *   const isNearlyFull = (box.size + gate.size) > 0.9 * max.size
@@ -691,7 +688,7 @@ export class Bank {
   // == [Snapshot]: hearRoot, align, stageOf, setStage, makeSnapshot
 
   // The two roots may arrive in either order, one at a time: one live alone is never shown as a stage of its own. The
-  // last of them to land live brings `'locked'`, so a birth shows no stage between `'unborn'` and `'locked'`.
+  // last of them to arrive live brings `'locked'`, so a birth shows no stage between `'unborn'` and `'locked'`.
   // The softlock is at once, so a grant under way in this tab follows it; the lease stored is taken up once the roots
   // are live, as when they first arrive.
   /** Softlock the lease where the gate has moved past it; while connected, follow the lease the deviceDB has; and realign, once both roots are live or the gate holds no live record. */
@@ -762,7 +759,7 @@ export class Bank {
   // --
 }
 
-// == [Helpers]: ShelvedSourcelabel, banktokOf, shelvedEventOf, ThingClass, receiveFirst, thingClassOf, isLive, refusalSnapshotOf, BankLeaseGate, Wait, makeWait
+// == [Helpers]: ShelvedSourcelabel, banktokOf, shelvedEventOf, ThingClass, receiveFirst, thingClassOf, isLive, refusalSnapshotOf, Wait, makeWait
 
 /** The `sourcelabel` of the events of the roots a bank read from its root shelf. */
 const ShelvedSourcelabel = 'root_shelf'
@@ -800,31 +797,6 @@ function isLive<ThingT extends SomeThing>(thing: ThingT | null): thing is ThingT
 function refusalSnapshotOf(err: unknown): RefusalSnapshot {
   const { refusalkind, family, message } = Throwers.refusalOfThrown(err)
   return Object.freeze({ refusalkind, family, message })
-}
-
-// The gate's life is pinned once per lease: a lease is made only of a record granted under it.
-/** A view of a bank for one lease: the life of the gate the lease was granted under, how long a lease lasts, whether the bank is enabled, and its `lock` and `demandEnabled`. */
-class BankLeaseGate implements LeaseGate {
-  readonly gateLife: GateLife
-  readonly #bank:    Bank
-
-  constructor(bank: Bank, gateLife: GateLife) {
-    this.gateLife = Object.freeze(gateLife)
-    this.#bank    = bank
-    Object.freeze(this)
-  }
-
-  /** How long a lease granted in the bank lasts: its device's `leaseMillis`. */
-  get leaseMillis(): number { return this.#bank.device.leaseMillis }
-
-  /** True until the bank's device ends. */
-  get isEnabled(): boolean { return this.#bank.isEnabled }
-
-  /** Drop the bank's lease, and the keys in it. */
-  lock(): void { this.#bank.lock() }
-
-  /** Throw unless the bank is enabled. */
-  demandEnabled(): void { this.#bank.demandEnabled() }
 }
 
 /** A promise, beside the functions that settle it. */

@@ -128,7 +128,7 @@ export class RevokePasskeyGating extends Gating<Gate> {
 // Each body checks its gating's cleartexts, proves them, and makes its change through the gate's private verbs its friend
 // carries. A cleartext goes only to its check, a strength check and a Proving builder, and a proving never leaves the body
 // that built it but for those verbs (G9). Its gating vacates the cleartexts whatever the outcome (G2), and a body changes
-// nothing where it refuses: a gate change writes the gate before it unlocks, so a refused write never unlocks.
+// nothing where it refuses: a gate change puts the gate before it unlocks, so a refused put never unlocks.
 //
 // Two invariants hold of every gating:
 // * Gatings are pragmatically idempotent: a gating whose intent is demonstrably satisfied may resolve with success. It is not
@@ -138,7 +138,7 @@ export class RevokePasskeyGating extends Gating<Gate> {
 
 // A birth writes each root over the record the device holds of it, its tombstone or the shell: the bank's first life, or
 // its next after its end, by the same puts.
-/** Write a new life of the bank of `device`'s scope, with the user's new passphrase and optional passkey, and resolve it unlocked.
+/** Birth a new life of the bank of `device`'s scope, with the user's new passphrase and optional passkey, and resolve it unlocked.
  * Refuses `gate_made_elsewhere` where a live gate is already stored.
  */
 async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatingFriend): Promise<Bank> {
@@ -155,9 +155,9 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
 
   const main     = await passphraseProving.buildWayin(NOVEL)
   const passkey0 = await passkeyProving?.buildWayin(passphraseProving) ?? null
-  // The root box is sealed under the lease the birth builds, against the life it minted. The lease reaches the
-  // device's bank, unlocking it, only once the gate its VaultMinder keeps is this one. Where the birth refuses, or the
-  // vaultDB's answer is broken, the lease is evicted, and the bank holds no lease of it.
+  // The root box is sealed under the lease the birth builds, against the life it minted. The lease is attached to the
+  // device's bank, unlocking it, only once the gate in its VaultMinder is this one. Where the birth refuses, or the
+  // vaultDB's answer is broken, the lease is evicted, and never attached.
   const gateRecord = Gate.makeRecord({ ...gateLife, wayins: { main, passkey0 } }, prior.gate)
   const lease = await friend.leaseByProving(passphraseProving, gateRecord)
   try {
@@ -185,8 +185,8 @@ async function unlockGate(gate: Gate, cleartexts: unknown, friend: Pick<GateGati
   return await friend.unlockByProving(proved)
 }
 
-// Each gate change reads the revision it proves against before its first await, writes the gate's next revision over
-// that one, then unlocks the gate under a lease citing the revision written. The bankKey does not change.
+// Each gate change reads the revision it proves against before its first await, puts the gate's next revision over
+// that one, then unlocks the gate under a lease citing the revision put. The bankKey does not change.
 
 /** Replace the passphrase of `gate`, proved by the current passphrase or the passkey. */
 async function replacePassphrase(gate: Gate, cleartexts: unknown, friend: GateGatingFriend): Promise<Gate> {
@@ -306,7 +306,8 @@ function adoptedCleartextsOf(params: unknown, dnaCheck: DnaCheck): GatingClearte
   }
 }
 
-// Today's `…Cleartext` names are read as given, so the form verbs' own `unlock(cleartexts)` and the like keep their bag.
+// A bag that names any field `…Cleartext` is used as given, so the cleartexts handed to `unlock(cleartexts)` and the
+// other form verbs need no renaming.
 /** The cleartexts `params` hands its gating, in the names its body takes: a form's secret fields, taken out of it, or a dna's fields, renamed by `dnaCheck`. */
 function handedCleartextsOf(params: unknown, dnaCheck: DnaCheck): HandedCleartexts {
   if (params instanceof FormData) { return dnaCheck.parse(extractSecretFields(params)) }
@@ -333,7 +334,7 @@ function isInCleartextNames(params: unknown): boolean {
 }
 
 // Every object kept is the gating's own, its fields read once here, so nothing a vacate reaches can be a host's getter.
-/** A copy of `answer` with PRF bytes of its own, the PRF bytes of `answer` itself zeroed (G2), or anything but an object as given. */
+/** Copy `answer` with PRF bytes of its own, and zero the PRF bytes of `answer` itself (G2). Anything but an object is returned as given. */
 function adoptedAnswerOf(answer: unknown): unknown {
   if ((typeof answer !== 'object') || (answer === null)) { return answer }
   const adopted: { prfBytes?: unknown } = { ...answer }

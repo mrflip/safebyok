@@ -15,8 +15,8 @@ import type { Kids } from './shapes-answers'
 /** The checks of the parts of a vaultDB answer that cross a wire, each refusing `storage_issue`:
  * - `err`               -- a refusal, as {@link crossedErrOf} lets it cross: its kind, its message and an allowlisted meta, never its cause
  * - `answered`          -- what an answer says beside its refusal: its act, and the Thing it names
- * - `kids`              -- a listing's `val`, its children by label left unchecked
- * - `incompatibleThing` -- a child a listing found incompatible
+ * - `kids`              -- a list's `val`, its children by label left unchecked
+ * - `incompatibleThing` -- a child a list found incompatible
  */
 export const CrossedChecks = Validator.Checkers('storage_issue', ({ obj, arr, str, lit, oneof, custom }) => {
   const act = oneof([...EX.badActVals, 'policied'])

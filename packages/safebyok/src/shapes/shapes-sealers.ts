@@ -28,7 +28,7 @@ export type LiveOf<RecordT> = RecordT & Readonly<{ am: 'a' }>
 /** The tombstones of `RecordT`. */
 export type TombstoneOf<RecordT> = RecordT & Readonly<{ am: 'x' }>
 
-/** The sparse form of `RecordT`: a live box without its body ({@link BoxSparse}), and none for a bank or a gate. */
+/** The sparse form of `RecordT`: a live box without its body ({@link BoxSparse}), and none for any other record. */
 export type SparseOf<RecordT> = RecordT extends BoxRecord ? BoxSparse : never
 
 /** The shell of `RecordT`: the void record, without a body, that its first revision is sealed over and cites.
@@ -117,7 +117,7 @@ export interface Sealer<RecordT extends ThingShaped, CleartextsT> {
 
 // == [A box's records]: SealerChecks, BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps
 
-// Strict, since a misspelt key in any of these bags would otherwise be dropped without a word.
+// Strict, since a misspelt field in any of these bags would otherwise be dropped without a word.
 /** The checks of what a box's seal is given beside its sealable: the public props of a revision and of a tombstone, and the cleartexts. */
 export const SealerChecks = Validator.Checkers('bad_record', ({ obj, lit, oneof, epochMillis }) => ({
   boxPublicProps:          obj({ sidecar: exactOptional(CX.sidecar), am: exactOptional(oneof(['a', 'x'])), written_at: exactOptional(epochMillis) }).strict(),

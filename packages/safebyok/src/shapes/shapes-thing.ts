@@ -301,7 +301,7 @@ export type ThingShaped  = Readonly<Omit<Z.infer<typeof ThingChecks.sparse>, 'mo
 export type Sparse<RecordT extends ThingShaped> = Pick<RecordT, ThingFieldname & keyof RecordT>
 // Stored, a sparse box has neither body field. Typed, each may be left out or undefined, so that a Box over it, whose
 // getters answer undefined, ducks as one: no other record field, of any kind or form, is optional.
-/** A live box without its body, `sidecar` and `whisper_sealed`, as a listing carries it: the only sparse form of any record. */
+/** A live box without its body, `sidecar` and `whisper_sealed`, as a list answers it: the only sparse form of any record. */
 export type BoxSparse    = Readonly<Z.infer<typeof PerKindChecks.boxSparse> & { sidecar?: BoxRecord['sidecar'] | undefined, whisper_sealed?: Sealed | undefined }>
 // --
 
@@ -334,7 +334,7 @@ const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, label }) => {
       fmt:       exactOptional(lit(ThingFormat)),
       ...fixed,
     }),
-    // What a shell proposed must meet, of a record's rules.
+    // The rules of a record that a proposed shell must meet.
     // An ask's banktok is its sender's, never the shell's: what is proposed has none, and the shell's is the void banktok.
     shell: obj({ ...ThingChecks.sparse.shape, lifepath: shellLifepath, ...fixed, banktok: lit(SX.VoidLifeTok).default(SX.VoidLifeTok) })
       .refine(isLabelLast,    Phrases.LabelNotLast)
