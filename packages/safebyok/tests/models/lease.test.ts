@@ -89,7 +89,7 @@ describe("Lease.make(record, { bank, gateLife })", () => {
     expect(record.lease_key.extractable).to.be.false
   })
 
-  it("opens what another lease of the same record sealed", async () => {
+  it("unseals what another lease of the same record sealed", async () => {
     const { bank, lease, record } = await leaseWorld()
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     expect(await Lease.make(record, { bank, gateLife: TH.WorldGateLife }).unseal(BaseBox, sealed)).to.deep.include(Cleartexts)
@@ -301,7 +301,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     expect(await lease.unseal(BaseBox, tombstone)).to.deep.include({ whisper: {} })
   })
 
-  it("zeroes the whisper's bytes once each has sealed or opened them", async () => {
+  it("zeroes the whisper's bytes once each has sealed or unsealed them", async () => {
     const { lease } = await leaseWorld()
     const text = BaseBox.encode(Cleartexts)
     const encode = vi.spyOn(TextEncoder.prototype, 'encode')
