@@ -1,4 +1,4 @@
-/** `ThingCar`, which a VaultMinder keeps for each Thing: the Thing, how far it has been seen, and the refusal it last threw at a record. */
+/** `ThingCar`, which a VaultMinder has for each Thing: the Thing, how far it has been seen, and the refusal it last threw at a record. */
 
 import { pick } from 'es-toolkit'
 import { Clock, type Errors } from 'safebyok-big/internals'
@@ -16,7 +16,7 @@ import * as Throwers from '../refusals/throwers'
 // == [ThingCar]: ThingCar
 
 /** A Thing, and how far it has been seen: what a write over it cites, its agerank, and when its newest revision was read.
- * It decides which records of the Thing are news, and hands the Thing those that are whole. It keeps the refusal the Thing last threw, for a devtool.
+ * It decides which records of the Thing are news, and hands the Thing those that are whole. It has the refusal the Thing last threw, for a devtool.
  */
 export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
   // == [Props]: thing, #lastErr, #erredAt, #citable, #agerank, #readTc
@@ -33,7 +33,7 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
 
   // == [Construction]: make, constructor
 
-  // A refused first record leaves the car all the same, its Thing at the shell: the car keeps the refusal.
+  // A refused first record leaves the car all the same, its Thing at the shell: the car has the refusal.
   /** Make the car of `begun`: a Thing, or the Thing `opts.bank` makes at the shell or at an item event's record, which the car then receives.
    * Hand it the shell and call {@link receive} for the events of the first record: here they are dropped.
    */
@@ -46,7 +46,7 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
     return car
   }
 
-  // A Thing handed in may hold a record already: the car starts from it, seen whole at the VacantReadTc, so that it never
+  // A Thing handed in may have a record already: the car starts from it, seen whole at the VacantReadTc, so that it never
   // calls news an older record the Thing would decline.
   private constructor(thing: ThingT) {
     this.thing = thing
@@ -71,7 +71,7 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
   /** How far the Thing has been seen, as {@link Agerank} spells it: the vacant agerank until a record is taken. */
   get agerank(): Agerank { return this.#agerank }
 
-  // A Thing bare in a later life still holds an earlier life's record.
+  // A Thing bare in a later life still has an earlier life's record.
   /** Whether the newest revision seen has been seen whole ({@link Agekind}): `vacant` until a record is taken. Check it before reading the Thing's record. */
   get agekind(): Agekind { return agekindOf(this.#agerank) }
 
@@ -173,7 +173,7 @@ function isItemEvent(begun: unknown): begun is VaultItemEvent {
   return (typeof begun === 'object') && (begun !== null) && ('eventkind' in begun) && (begun.eventkind === 'item')
 }
 
-// A Thing holding the shell reads as the shell, so a shell is one that is no Thing.
+// A Thing at the shell reads as the shell, so a shell is one that is no Thing.
 /** True of the shell, among the forms a car is made from */
 function isShell(begun: unknown): begun is VoidSentinel { return (! (begun instanceof BaseThing)) && BaseThing.isVoidSentinel(begun) }
 

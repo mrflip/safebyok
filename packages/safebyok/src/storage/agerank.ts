@@ -57,7 +57,7 @@ export function nextAgerankOf(agerankWas: Agerank, seen: Pick<ThingCited, 'lifep
   return laterOrNone(agerankWas, agerank)
 }
 
-/** The agerank of a Thing holding `cached`, seen whole at the {@link VacantReadTc}: the {@link VacantAgerank} for the shell. */
+/** The agerank of a Thing that has `cached`, seen whole at the {@link VacantReadTc}: the {@link VacantAgerank} for the shell. */
 export function cachedAgerankOf(cached: Sparse<ThingRecord>): Agerank {
   if (BaseThing.isVoidSentinel(cached)) { return VacantAgerank }
   return lifeAgerankOf(cached.lifepath, Revseq.padded(cached.revseq), true, tcchunkOf(VacantReadTc))

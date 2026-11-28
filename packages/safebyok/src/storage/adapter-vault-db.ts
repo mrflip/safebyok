@@ -19,7 +19,7 @@ import * as Throwers from '../refusals/throwers'
 
 // == [Answers]: frozenAnswerOf, noticeOf
 
-// Frozen once, here, so that a Thing or a cache may hold the very records an answer carries.
+// Frozen once, here, so that a Thing or a cache may have the very records an answer carries.
 /** `answer`, with every record it carries deeply frozen, and neither its ask nor its refusal. */
 export function frozenAnswerOf<AnswerT extends { ask: unknown, err?: unknown }>(answer: AnswerT): AnswerT {
   const { ask: _ask, err: _err, ...carried } = answer

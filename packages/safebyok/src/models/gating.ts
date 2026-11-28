@@ -136,7 +136,7 @@ export class RevokePasskeyGating extends Gating<Gate> {
 // * A gating's contract is in its name: a gating whose intent is met may succeed even where its inputs would otherwise have
 //   been refused. (`revokePasskey` on a gate with no passkey proves, unlocks and writes nothing.)
 
-// A birth writes each root over the record the device holds of it, its tombstone or the shell: the bank's first life, or
+// A birth writes each root over the record the device has of it, its tombstone or the shell: the bank's first life, or
 // its next after its end, by the same puts.
 /** Birth a new life of the bank of `device`'s scope, with the user's new passphrase and optional passkey, and resolve it unlocked.
  * Refuses `gate_made_elsewhere` where a live gate is already stored.

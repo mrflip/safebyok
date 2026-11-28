@@ -13,7 +13,7 @@ import { vaultStatsOf } from './vault-stats'
 /** A watch: the bank it follows, the function called with each change, and the one called with any trouble. */
 export type Watcher = { scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: Errors.VaultError) => void }
 
-/** A bank's Things of one kind, by labelpath: what a table holds of one bank. */
+/** A bank's Things of one kind, by labelpath: what a table has of one bank. */
 export type BankRows = Map<Labelpath, unknown>
 
 // Its rows are only what our code wrote, or what a test planted through `_cheat_things`, and it never throws. A row that fails
@@ -23,7 +23,7 @@ export class MemoryDatastore {
   // == [Props]: #tables, #watchers
 
   // A table per kind of Thing, as Postgres's `safebyok_gate_things` and `safebyok_box_things` and Convex's `gate_things` and `box_things`.
-  // Each holds every bank's Things of its kind, by bank, then by labelpath, so that a list reads one bank's. A verb picks
+  // Each has every bank's Things of its kind, by bank, then by labelpath, so that a list reads one bank's. A verb picks
   // its table by the kind its ask names.
   readonly #tables: Readonly<Record<Thingkind, Map<string, BankRows>>> = { gate: new Map(), box: new Map() }
   readonly #watchers = new Set<Watcher>()

@@ -23,7 +23,7 @@ export { OneWatchVaultDB, oneWatchVaultDB, watchnameOf } from './storage/one-wat
 export interface BrowserOpts {
   /** `argon2idWebV1Deriver`. */
   readonly keyDeriver:      KeyDeriver
-  /** An {@link IdbDeviceDB} over the database of the `dbName` asked, where the device keeps the lease every tab of the origin shares. */
+  /** An {@link IdbDeviceDB} over the database of the `dbName` asked, where the device stows the lease every tab of the origin shares. */
   readonly deviceDB:        IdbDeviceDB
   /** `zxcvbnStrengthChecker`. */
   readonly strengthChecker: StrengthChecker

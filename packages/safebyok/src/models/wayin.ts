@@ -29,7 +29,7 @@ export class Wayin {
   // == [Props]: wayinkind, label, devicetok, born_at, bank_key_wayin_wrapped, key_deriver_label, salt_b64, credential_id, prf_salt_b64, labelpath, am, written_at, #pickle
 
   declare readonly wayinkind:              EX.Wayinkind
-  /** The ckey its gate's `wayins` keep it under. */
+  /** The ckey of this wayin in its gate's `wayins`. */
   declare readonly label:                  'main' | 'passkey0'
   declare readonly devicetok:              Devicetok
   declare readonly born_at:                EpochMillis

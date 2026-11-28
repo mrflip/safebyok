@@ -134,7 +134,7 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
   const { labelpath, anyLifeseq, voidLifeseq, voidLifepath, sparse, thingCited, sealed, banktok } = GenericChecks
   const emptyBag     = obj({}).strict()
   const { wayins }   = WayinChecks
-  // A gate's tombstone keeps no wayin: each place is null, so no wrapped bankKey, salt or credential id outlives the bank.
+  // A gate's tombstone has no wayin: each place is null, so no wrapped bankKey, salt or credential id outlives the bank.
   const goneWayins   = obj({ main: lit(null), passkey0: lit(null) }).strict()
 
   // A gate's labelpath alone can be checked only as a label: that it is its bank's banklabel takes the banklabel beside it.

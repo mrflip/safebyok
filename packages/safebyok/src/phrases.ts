@@ -198,7 +198,7 @@ export const PolicyNotOwn = "Only a gate's writes name storage policies: a box h
 /** A bank's roots stored broken: a live gate without a live root box, a live root box without a live gate, or an incompatible gate. */
 export const BankRootsMissing = "A bank's roots are stored broken: a live gate without a live root box, a live root box without a live gate, or an incompatible gate. The datastore needs mending by hand."
 
-/** A list whose parent holds a tombstone or nothing. */
+/** A list whose parent is a tombstone or nothing. */
 export const ListParentNotLive = "The Thing listed is not stored live: it was never stored, or was deleted, and has no children."
 /** The last resort of a vaultDB's error handler. */
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
@@ -242,7 +242,7 @@ export const WatchEnded = "The device's watch of its bank ended; it starts again
 
 // == [Probing]: probeStepRefused, ProbePutNotGot
 
-/** A step of `Vault.probe` refused, its own refusal kept as the cause. */
+/** A step of `Vault.probe` refused, its own refusal as the cause. */
 export function probeStepRefused(stepkind: string): string {
   return `The probe of storage and keys was refused at its ${stepkind} step: the refusal's meta.stepkind names the step, and its cause says why.`
 }

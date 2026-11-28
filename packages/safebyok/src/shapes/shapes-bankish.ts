@@ -138,10 +138,10 @@ export type DeviceEvent = DeviceAnnouncement & Readonly<{ device: Device }>
 /** `Device.make`'s `onLifecycle`: hears each {@link DeviceAnnouncement}. */
 export type LifecycleHandler = (event: DeviceEvent) => unknown
 
-/** `onLifecycle` as a device keeps it, wrapped by `guardOnLifecycle`. It never throws. */
+/** `onLifecycle` as a device has it, wrapped by `guardOnLifecycle`. It never throws. */
 export type GuardedLifecycleHandler = (event: DeviceEvent) => Promise<void>
 
-/** Where a device keeps the signed-in bank's two roots between page loads: `localStorage`, or anything with its three methods. */
+/** Where a device stows the signed-in bank's two roots between page loads: `localStorage`, or anything with its three methods. */
 export type RootShelf = Readonly<{
   getItem:    (ckey: string) => string | null
   setItem:    (ckey: string, val: string) => void
@@ -180,13 +180,13 @@ export interface DeviceOpts {
   onBadNews?:        BadNewsHandler | undefined
   /** Hears what changed the device's lease, other than your own lock, unlock or disable: a lease taken up as the device signs in or connects, a lock or an unlock in another tab, the autolock, a softlock. Your own gate verb (replacing the passphrase, adding or revoking a passkey) announces `softlocked` in its own tab. Also hears each crossing from one stage to another as a `stage_crossed`, including those your own lock, unlock or disable cause, and a `watch_ended` where the device's watch of its bank ends of itself. What it throws or rejects with is reported to the platform. Default: {@link DefaultOnLifecycle}, which logs each announcement. */
   onLifecycle?:      LifecycleHandler | undefined
-  /** The QueryClient the signed-in user's boxes are kept in, under their bank's query key: your own, so one client serves your queries and the vault's. Default: one the device makes. */
+  /** The QueryClient the signed-in user's boxes are cached in, under their bank's query key: your own, so one client serves your queries and the vault's. Default: one the device makes. */
   queryClient?:      QueryClient | undefined
-  /** Where the device keeps the signed-in bank's two roots between page loads: hand it `localStorage`. Without one, nothing is kept, and each page load waits on the vaultDB for the bank. */
+  /** Where the device stows the signed-in bank's two roots between page loads: hand it `localStorage`. Without one, nothing is stowed, and each page load waits on the vaultDB for the bank. */
   rootShelf?:        RootShelf | undefined
-  /** Where the device keeps the signed-in bank's lease, which every tab given the same one shares, and which outlasts a page load: `browserOpts()` from `safebyok/browser` hands an `IdbDeviceDB`. Default: one in the device's memory, so this tab's lease is its own and ends with the page. It keeps this device's devicetok for each user too. */
+  /** Where the device stows the signed-in bank's lease, which every tab given the same one shares, and which outlasts a page load: `browserOpts()` from `safebyok/browser` hands an `IdbDeviceDB`. Default: one in the device's memory, so this tab's lease is its own and ends with the page. It keeps this device's devicetok for each user too. */
   deviceDB?:         DeviceDB | undefined
-  /** The token each wayin this device builds records, a UUID, visible in storage. Default: the one the deviceDB keeps for the signed-in user, made at its first use. Make it at random, and another for each user: one shared by users, or derived from anything about the device, would link records the vault does not link. */
+  /** The token each wayin this device builds records, a UUID, visible in storage. Default: the one the deviceDB has for the signed-in user, made at its first use. Make it at random, and another for each user: one shared by users, or derived from anything about the device, would link records the vault does not link. */
   devicetok?:        Devicetok | undefined
 }
 // --

@@ -69,7 +69,7 @@ export type ProvedCleartexts = { passphraseCleartext: GX.PassphraseCleartext, pa
 
 // == [The form verbs' dnas]: GatingChecks, DnaCheck, HandedCleartexts, FormSecretFieldnames, BirthDna, UnlockDna, ReplacePassphraseDna, AddPasskeyDna, RevokePasskeyDna
 
-// A dna keeps a form's fieldnames, and its check renames each into the cleartext its gating's body takes. It judges no
+// A dna has a form's fieldnames, and its check renames each into the cleartext its gating's body takes. It judges no
 // value, as a gating's own check does not: any field it does not know, a username or a host's own, is ignored.
 /** The checks of a form verb's dna, each named for its gating: each answers the cleartexts the gating takes. */
 export const GatingChecks = Validator.Checkers('bad_record', ({ obj, unk }) => ({

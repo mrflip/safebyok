@@ -80,7 +80,7 @@ export class Vault {
 
   /** Seal and put the next revision of the box `cited`, applying `patch` and encrypting `secrets`. Resolves an `Outcome` of the actual record.
    * Given a labelpath, it cites the newest revision this device has seen of the box, getting the box first where it has seen none.
-   * It tries once. Where another revision is stored, it refuses `stale_write`, and the box then holds that revision.
+   * It tries once. Where another revision is stored, it refuses `stale_write`, and the box then has that revision.
    * Over a sparse box, a tombstone or no box, `patch` must give the sidecar. Misuse is a bad outcome too.
    * @example
    *   const { ok, val: box, err } = await vault.tryPutBoxOnce('box/openai', { sidecar: { account: 'work' } }, { whisper })
@@ -226,7 +226,7 @@ export class Vault {
     VaultChecks.fn.parse(fn)
     this.#liveBank.demandEnabled()
     if (this.#liveBank.isLocked) { throw Throwers.needUnlocked() }
-    // Storage out of reach is no news of the box: the page already shows the box this device holds, and so may its whisper.
+    // Storage out of reach is no news of the box: the page already shows the box this device has, and so may its whisper.
     // The vault TSQ's get is TanStack's, which rejects: there is no outcome to branch on.
     try {
       await this.#vaultTSQ.getOnce(scope)
@@ -264,7 +264,7 @@ export class Vault {
     if (this.#liveBank.isLocked) { throw Throwers.needUnlocked() }
     const put    = await timeStep('put', () => this.putBoxOnce(scope.labelpath, { sidecar }, { whisper }))
     // The vault TSQ's get may answer from its item even under a staleTime of 0, since storage's clock dates the item: the minder's get always asks storage.
-    // Its answer's own record is checked, never the box this device holds, which right after the put is the put's record whatever storage kept.
+    // Its answer's own record is checked, never the box this device has, which right after the put is the put's record whatever storage kept.
     const got    = await timeStep('get', async () => {
       const answer = await this.#vaultMinder.tryGetOnce(scope)
       if (! answer.ok) { throw answer.err }
@@ -290,7 +290,7 @@ export class Vault {
 
   // == [Helpers]: #vaultMinder, #sealedWriteOf, #donorAt, #boxCarAt, #scopeAt, #demandOwnBox
 
-  /** The bank's VaultMinder, which holds its Things and sends its writes */
+  /** The bank's VaultMinder, which caches its Things and sends its writes */
   get #vaultMinder(): VaultMinder { return this.#bank.demandVaultMinder() }
 
   /** The put or delete ask for the next revision after `cited`, or after the newest revision seen at a labelpath, applying `publicProps` and sealing `secretProps` */

@@ -24,7 +24,7 @@ import type { VaultDB } from '../storage/vault-db'
 /** Who dispatched a record, when it was read, and its bank's banktok, the void one where none is known: every event of it carries all three. */
 type Dispatch = Readonly<{ sourcelabel: string, read_tc: ReadTc, banktok: Banktok }>
 
-/** One call of `listen`, holding its listener: a listener that listens twice is told twice, and each end stops one. */
+/** One call of `listen`, with its listener: a listener that listens twice is told twice, and each end stops one. */
 type Listening = Readonly<{ listener: VaultMinderListener }>
 
 /** A vaultDB's answer, once its records are told, with the refusal thrown at the record it carries at the ask's labelpath, or null. */
@@ -48,9 +48,9 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   readonly #vaultDB: VaultDB
   /** The scope of the bank this vaultDB serves. */
   readonly #scope: BankScope
-  /** The bank that makes each Thing kept. */
+  /** The bank that makes each cached Thing. */
   readonly #bank: CarBank<ThingT>
-  // Kept per kind, as the datastore keeps a table per kind: a bank labelled `box` has its gate and its root box at one labelpath.
+  // Cached per kind, as the datastore has a table per kind: a bank labelled `box` has its gate and its root box at one labelpath.
   /** The car of each Thing a record was learned of, by its modelkind, then its labelpath. */
   readonly #cars: Readonly<Record<Thingkind, Map<Labelpath, ThingCar<ThingT>>>> = { gate: new Map(), box: new Map() }
   readonly #listenings = new Set<Listening>()
@@ -176,7 +176,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   async getOnce(scoped: ThingScope): Promise<ReturnType<ThingT['pickle']>> {
     const answer = await this.tryGetOnce(scoped)
     if (! answer.ok) { throw answer.err }
-    // A good answer's own record was told and taken, so a car is kept at its scope.
+    // A good answer's own record was told and taken, so a car is cached at its scope.
     const car = this.carAt(scoped)!
     if (car.agekind === 'bare') { throw Throwers.thingSoonestBare(this.#kindAndLabelpathOf(scoped).labelpath) }
     return car.thing.pickle() as ReturnType<ThingT['pickle']>
@@ -232,7 +232,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
 
   // The act tables read a revseq of -1 and the void revtok as citing nothing stored. The cited lives above it are the
   // record's, as the ask's checks demand, so a record of a life after the first refuses there.
-  /** The citable of the car kept for `record`'s Thing, as a write of `record` cites it, or the void revision where none is kept */
+  /** The citable of the car cached for `record`'s Thing, as a write of `record` cites it, or the void revision where none is cached */
   #citableAt<RecordT extends ThingRecord>(record: RecordT): CitedOf<RecordT> {
     return (this.carAt(record)?.citable ?? Shell.citedInParentLivesOf(record)) as CitedOf<RecordT>
   }
@@ -319,14 +319,14 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
 
   /** Receive an event a device database rang, and tell every listener, before returning, the events of its `val` that are news, at its `sourcelabel`, `read_tc` and `banktok`.
    * An `item` event's `val` is received as an answer's record is, a void sentinel included, at the lifepath it carries.
-   * A `life` or `aged` event tells nothing, and its agerank is never read: the Thing at its labelpath keeps its own.
+   * A `life` or `aged` event tells nothing, and its agerank is never read: the Thing at its labelpath has its own.
    * Refuses an event of another bank.
    */
   receive(event: VaultEvent): void {
     const rung = VaultMinderChecks.rungEvent.parseConsistent(event, this.#scope)
     if (event.eventkind !== 'item') { return }
     const { liveness } = VaultMinderChecks.rungItem.parse(event)
-    // Only its scope is held to the event's: a record's own banktok is no event's.
+    // Only its scope is checked against the event's: a record's own banktok is no event's.
     const scope = ThingChecks.thingScope.parse(rung)
     if (liveness === 'void') { VaultMinderChecks.rungVoid.parseConsistent(event.val, scope) } else { VaultMinderChecks.rungThing.parseConsistent(event.val, scope) }
     this.#tell([event.val], { sourcelabel: rung.sourcelabel, read_tc: rung.read_tc, banktok: this.#banktokOr(rung.banktok) })
@@ -437,14 +437,14 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
     return firstRefusal
   }
 
-  /** The events `seen`'s Thing returns for `seen` at `dispatch`, its car kept first where there is none */
+  /** The events `seen`'s Thing returns for `seen` at `dispatch`, its car cached first where there is none */
   #receiveAtThing(seen: SeenThing, dispatch: Dispatch): readonly VaultEvent[] {
     return this.#ensureCar(seen).receive(itemEventOf(seen, dispatch))
   }
 
-  // The car is kept before its Thing receives a record, so that a subscriber the Thing tells finds it here, and stays
-  // where that record is refused, its Thing holding the shell.
-  /** The car of `seen`'s Thing, made and kept where there is none, its Thing holding the shell in the lives `seen` names above it */
+  // The car is cached before its Thing receives a record, so that a subscriber the Thing tells finds it here, and stays
+  // where that record is refused, its Thing at the shell.
+  /** The car of `seen`'s Thing, made and cached where there is none, its Thing at the shell in the lives `seen` names above it */
   #ensureCar(seen: SeenThing): ThingCar<ThingT> {
     const cars = this.#cars[seen.modelkind]
     const existing = cars.get(seen.labelpath)

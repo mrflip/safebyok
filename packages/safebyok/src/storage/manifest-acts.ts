@@ -270,7 +270,7 @@ export function scribeListAct(_ask: ListAsk, manifest: CheckedListManifest): ass
 
 // The gate's put passes over a live gate, whose root box is stored with it: a live gate without it is a broken state.
 // Otherwise a birth writes both roots or neither, so it is born only where neither root's put refuses. A root's put writes
-// only over a tombstone or none, where no born_at or banktok is held to the prior row's, and names no storage policy, so the
+// only over a tombstone or none, where no born_at or banktok is checked against the prior row's, and names no storage policy, so the
 // put table alone judges it.
 /** Write onto a birth's manifest the act the put table finds for its two roots, each judged as a write is, and whether it answers good: `passed` over a live gate, else the first root's refusal, else `born`. */
 export function scribeBirthAct(ask: BirthBankAsk, manifest: CheckedBirthManifest): asserts manifest is ScribedBirthManifest {

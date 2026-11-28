@@ -16,7 +16,7 @@ export const DatastoreLimitLeastBoxes = 2
 
 // notes/reference-sizes.md: a medium box 1,087 bytes, a gate with a passphrase and a passkey wayin 1,029, an empty root box 566:
 // 2,682 bytes, plus half again is 4,023, rounded up to the next 1000.
-/** The fewest bytes a datastore may allow: below this it cannot hold even a bank's first few Things. */
+/** The fewest bytes a datastore may allow: below this it cannot store even a bank's first few Things. */
 export const DatastoreLimitFloor = 5000
 
 /** The limits a datastore reports: each of `limits` given, capped at {@link DatastoreLimitCap}, and the cap for each left out. */
@@ -49,7 +49,7 @@ export const VaultStatsChecks = Validator.Checkers('storage_issue', ({ obj, uint
  */
 export type ThingkindStats = Readonly<Z.infer<typeof VaultStatsChecks.thingkindStats>>
 
-/** The most a datastore holds, as it reports it: `count`, of Things, and `size`, in bytes. `count` is at least {@link DatastoreLimitLeastBoxes} and `size` at least {@link DatastoreLimitFloor}; each is at most {@link DatastoreLimitCap}, which a datastore with no limit reports. */
+/** The most a datastore stores, as it reports it: `count`, of Things, and `size`, in bytes. `count` is at least {@link DatastoreLimitLeastBoxes} and `size` at least {@link DatastoreLimitFloor}; each is at most {@link DatastoreLimitCap}, which a datastore with no limit reports. */
 export type DatastoreLimits = Readonly<Z.infer<typeof VaultStatsChecks.datastoreLimits>>
 
 /** A bank's storage stats: its boxes and its gates as stored, and the datastore's limits under `max`. Nothing refuses a write for being over a limit. */

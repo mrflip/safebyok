@@ -13,7 +13,7 @@ import type { VaultDB } from './vault-db'
 
 // == [Names]: watchnameOf, lockManagerOf
 
-// A userid and a banklabel never hold a `/`, so the name reads back into its parts.
+// A userid and a banklabel never contain a `/`, so the name reads back into its parts.
 /** The name of the Web Lock and of the BroadcastChannel for the watch of the bank at `scope`: `safebyok/<userid>/<banklabel>/bank`. */
 export function watchnameOf({ userid, banklabel }: ThingWatchScope): string { return `safebyok/${userid}/${banklabel}/bank` }
 

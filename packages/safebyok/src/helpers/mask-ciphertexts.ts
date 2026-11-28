@@ -7,7 +7,7 @@ import { cloneDeepWith } from 'es-toolkit'
 // A masked ciphertext shows its end, which lies in its GCM tag. The tag depends on the whole ciphertext, and so on
 // the key it wraps: while the bankKey is unknown, two characters of a wayin's tag check no guess at the passphrase,
 // nor do those of up to 21 wraps of the one bankKey taken together: 12 bits each, against a key of 256. From the 22nd
-// such wrap a guess at all their passphrases at once can be checked, and whoever holds the bankKey already can check a
+// such wrap a guess at all their passphrases at once can be checked, and whoever has the bankKey already can check a
 // guess against one.
 // The start would not do: a passphrase replace rewraps the same bankKey, and two masks of its start, one from either
 // side, XOR to keystream alone, which checks a guess at both passphrases. See notes/security.md.

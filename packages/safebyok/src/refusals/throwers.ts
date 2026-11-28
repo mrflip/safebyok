@@ -35,7 +35,7 @@ export function nobodySignedIn(): Errors.VaultError { return new Errors.VaultErr
 /** An `unexpected_error` refusal: the Thing a VaultMinder has at one of its bank's roots is not of that root's kind. */
 export function rootOfOtherKind(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.RootOfOtherKind) }
 
-/** An `absent_thing` refusal: the bank or gate at `labelpath` holds the shell or a tombstone, not a live record. */
+/** An `absent_thing` refusal: the bank or gate at `labelpath` has the shell or a tombstone, not a live record. */
 export function thingNotLive(labelpath: string): Errors.VaultError {
   return new Errors.VaultError('absent_thing', Phrases.ThingNotLive, { meta: { labelpaths: [labelpath] } })
 }

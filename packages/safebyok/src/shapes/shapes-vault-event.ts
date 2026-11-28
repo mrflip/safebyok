@@ -90,7 +90,7 @@ export type VaultEventOf<EventkindT extends VaultEventkind> = Readonly<{
   read_tc:    ReadTc
 }>
 
-/** A record of the Thing. Where ageranks are kept, the record left the Thing's agerank greater than it was. Narrow it on `liveness` to know what `val` holds.
+/** A record of the Thing. Where ageranks are kept, the record left the Thing's agerank greater than it was. Narrow it on `liveness` to know what `val` has.
  * The newest revision seen again in a later tcchunk moves only the agerank's tcchunk: the event's `agerankWas` and `agerank` then differ only in their last field.
  */
 export type VaultItemEvent<RecordT extends ThingRecord = ThingRecord> = VaultEventOf<'item'> & ItemSeen<RecordT>

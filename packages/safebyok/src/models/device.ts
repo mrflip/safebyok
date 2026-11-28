@@ -173,7 +173,7 @@ export class Device {
   // == [The devicetok]: ensureDevicetok
 
   // As a refused lease stow is (Bank.#stowLease), a refused devicetok is bad news: the wayin is still built.
-  /** The token each wayin this device builds records: the host's `devicetok`, or the one the deviceDB keeps for the user `userid`, made at its first use.
+  /** The token each wayin this device builds records: the host's `devicetok`, or the one the deviceDB has for the user `userid`, made at its first use.
    * Where the deviceDB refuses, it tells `onBadNews`, and answers a fresh token for this call alone.
    */
   async ensureDevicetok(userid: Userid): Promise<Devicetok> {
@@ -198,7 +198,7 @@ export class Device {
   }
 
   /** Tell the device who is signed in, and start that user's bank: resolves once the snapshot shows `'locked'`, `'unborn'` or `'failed'` (with `lastErr`). Never rejects.
-   * Where the host's root shelf keeps the bank's roots, the bank comes up `'locked'` from them at once, and unlocks on
+   * Where the host's root shelf has the bank's roots, the bank comes up `'locked'` from them at once, and unlocks on
    * that gate, before the vaultDB answers.
    * Each later call resolves as the first, whatever userid it is handed: the device serves its first user for its life.
    */
@@ -250,7 +250,7 @@ export class Device {
       this.#vault = Vault.make(this.#bank, this.#vaultTSQ)
       const answer = await vaultMinder.tryGetBankOnce()
       if (! answer.ok) { throw answer.err }
-      // A root void at signin is no newer than the shell its Thing holds, so no subscriber hears it: the bank is told here.
+      // A root void at signin is no newer than the shell its Thing has, so no subscriber hears it: the bank is told here.
       this.#bank.align()
       if (! (this.#bank.areRootsLive || isUnbornIn(answer.val))) { throw Throwers.bankRootsMissing() }
     } catch (err) {
@@ -424,10 +424,10 @@ function checkSecureContext(): void {
 }
 
 // A root's tombstone is unborn as its shell is, since a birth writes over either: a live root box beside a gate not live is broken.
-/** True where `roots` keep no live gate, and no live root box: the bank is unborn. */
+/** True where `roots` have no live gate, and no live root box: the bank is unborn. */
 function isUnbornIn({ gate, root }: ActualRoots): boolean { return (gate.am !== 'a') && (root.am !== 'a') }
 
-/** The car `vaultMinder` keeps of each of `scope`'s bank's roots, undefined for none or for no VaultMinder */
+/** The car `vaultMinder` has of each of `scope`'s bank's roots, undefined for none or for no VaultMinder */
 function rootCarsOf(scope: BankScope, vaultMinder: VaultMinder | null): (ThingCar | undefined)[] {
   const scopes = rootScopesOf(scope)
   return [vaultMinder?.carAt(scopes.gate), vaultMinder?.carAt(scopes.root)]
