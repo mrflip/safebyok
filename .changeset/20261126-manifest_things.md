@@ -1,4 +1,0 @@
----
----
-
-None: safebyok is private at 0.0.0. A concrete adapter's doGetThing and doWriteThing now hand back a manifest (GetManifest, WriteManifest: the datastore's tags and each row as it stands at the step's last read) instead of a classified report, and AdapterVaultDB answers from it. A working vaultDB answers as before, but for these: a write refused `policied` now carries the step's banktok, tracked and read_tc, not the void lifetok and 'unread'; a write whose row lacks the proposed revision, or whose tags disagree with its row, refuses `storage_issue`; a get whose bank row carries a sound lifetok answers it even where the rest of the bank row is incompatible; and a void Thing under an incompatible ancestor refuses `damaged_row`, where it answered the shell when only the ancestor's revision fields were read.

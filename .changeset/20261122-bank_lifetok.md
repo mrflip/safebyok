@@ -1,4 +1,0 @@
----
----
-
-safebyok, private, gains `lifetok`, a UUID the bank's Thing is born with and every later revision of its life, and the tombstone that ends it, keeps, so one birth of a bank under its banklabel can be told from another when storage has been emptied and the bank is born again at life 0. It is a required field of the bank's record and of `BankStamp`, so every ctx under the bank binds it: each wayin's wrapped bankKey, each box's seal, and the lease. A vaultDB refuses a put or a del of the bank over a live bank that changes it, as `bad_record` with act `policied`, as it does a changed born_at. `Bank.mintStamps` mints it, `Bank.makeRecord` takes it from the stamp, `Bank` has a `lifetok` getter, and `safebyok/storage` exports the `Lifetok` type. A stored bank without one fails its checks as `damaged_row`; there is no migration. The published safebyok-postgres change is in its own changeset.

@@ -1,4 +1,0 @@
----
----
-
-Empty: the new `safebyok` is private and the giver is not yet exported. What a caller of `ThingMinder` will see: `invalidate(labelpath, { list: 'all' })` marks stale every listing under the Thing at `labelpath`, its own included, or every listing in the bank where `labelpath` is `undefined`. The second argument is required. It asks the vaultDB nothing and leaves every car and each listing's labelpaths as they were; a later `list` sets the listing again. `listen` tells an `invalidation` event for each listing marked (`{ carkind: 'invalidation', modelkind, labelpath, card: 'list', tag: 'kids' }`, `labelpath` the listing's parent), once, until the listing is next set. `InvalidationEvent` carries `tag`, typed as `ListingEvent`'s, in place of `tags: 'all'`, and `MinderInvalidateOpts` is exported.

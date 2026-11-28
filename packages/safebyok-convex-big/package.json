@@ -1,7 +1,7 @@
 {
   "name": "safebyok-convex-big",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Convex storage for safebyok: a Convex component keeping bank, vault and box rows as ciphertext, and the BankDB adapter that speaks to it.",
   "keywords": [
     "safebyok",
