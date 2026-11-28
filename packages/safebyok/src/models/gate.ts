@@ -74,7 +74,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   /** When the bank's lease stops unlocking the bank, or null while locked ({@link Bank.leaseEndsAt}). */
   get leaseEndsAt(): EpochMillis | null { return this.#bank.leaseEndsAt }
 
-  /** What a log wants of the bank's lease, or null while locked ({@link Bank.leaseLoggable}). */
+  /** The bank's lease's loggable, or null while locked ({@link Bank.leaseLoggable}). */
   get leaseLoggable(): LeaseLoggable | null { return this.#bank.leaseLoggable }
   // --
 

@@ -118,7 +118,7 @@ export class Bank {
   /** When the attached lease stops unlocking the bank, or null while locked. */
   get leaseEndsAt(): EpochMillis | null { return this.#lease?.ends_at ?? null }
 
-  /** What a log wants of the attached lease, or null while locked. */
+  /** The attached lease's loggable, or null while locked. */
   get leaseLoggable(): LeaseLoggable | null { return this.#lease?.loggable ?? null }
 
   /** This bank's snapshot getter, already bound, as `useSyncExternalStore` wants it: the same frozen object until the snapshot changes.
@@ -777,7 +777,7 @@ function thingClassOf(modelkind: Thingkind): ThingClass {
 /** True of a Thing modelling a live record; false of one modelling the shell or a tombstone */
 function isLive(thing: SomeThing): boolean { return thing.pickle().am === 'a' }
 
-/** What a snapshot shows of `err`: its refusal's kind, family and message, anything but a refusal as an unexpected error */
+/** The {@link RefusalSnapshot} of `err`: its refusal's kind, family and message. Anything but a refusal reads as an unexpected error. */
 function refusalSnapshotOf(err: unknown): RefusalSnapshot {
   const { refusalkind, family, message } = Throwers.refusalOfThrown(err)
   return Object.freeze({ refusalkind, family, message })
