@@ -88,12 +88,12 @@ describe("bank.gate, bank.rootBox, bank.life, bank.banktok and bank.scope", () =
     expect(bank.gate.labelpath).to.equal(bank.scope.banklabel)
   })
 
-  it("refuses its gate before signin, and its root box and life until it hears of a live gate", async () => {
-    TH.expectSyncRefusal(() => TH.makeDevice({ userid: null }).bank.gate, 'absent_thing')
+  it("refuses its gate before signin, and its life and root box while each models the shell", async () => {
+    TH.expectSyncRefusal(() => TH.makeDevice({ userid: null }).bank.gate, 'absent_vault')
     const { bank } = await signedInDevice()
     expect(bank.gate.pickle()).to.deep.equal(TH.gateShellOf())
     expect(bank.banktok).to.equal(SX.VoidLifeTok)
-    TH.expectSyncRefusal(() => bank.life, 'absent_thing')
+    TH.expectSyncRefusal(() => bank.life)
     TH.expectSyncRefusal(() => bank.rootBox)
   })
 })
@@ -818,8 +818,8 @@ describe("bank.stats() and bank.tryStats()", () => {
     expect(await device.bank.tryStats()).to.deep.equal({ ok: true, val: stats })
   })
 
-  it("refuse before signin (the roots are not live), and a disabled device, reading nothing", async () => {
-    await TH.expectRefusal(TH.makeDevice({ userid: null }).bank.stats(), 'absent_thing')
+  it("refuse before signin, and a disabled device, reading nothing", async () => {
+    await TH.expectRefusal(TH.makeDevice({ userid: null }).bank.stats(), 'absent_vault')
     const { bank, device } = await TH.buildBornVault()
     const read = vi.spyOn(bank.device.vaultDB, 'tryStats')
     device.disable()

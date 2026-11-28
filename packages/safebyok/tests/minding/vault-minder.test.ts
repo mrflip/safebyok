@@ -683,6 +683,27 @@ describe("VaultMinder, a bank labelled box", () => {
   })
 })
 
+describe("VaultMinder.ensureRootCars()", () => {
+  it("makes each root a vacant car whose Thing models the shell, where no record of it was received", () => {
+    const { vaultDB } = sortedOverQuietMemory()
+    expect(vaultDB.carAt(TH.GateScope)).to.equal(undefined)
+    const { gate, root } = vaultDB.ensureRootCars()
+    expect([gate.agekind, root.agekind]).to.deep.equal(['vacant', 'vacant'])
+    expect(gate.thing.pickle()).to.deep.equal(TH.gateShellOf())
+    expect(root.thing.pickle()).to.deep.include({ modelkind: 'box', labelpath: 'box', revseq: -1 })
+  })
+
+  it("answers the same cars again, and those a record was received at", async () => {
+    const { vaultDB } = sortedOverQuietMemory()
+    const made = vaultDB.ensureRootCars()
+    await vaultDB.tryBirthBank(TH.birthBankAskOf())
+    const { gate, root } = vaultDB.ensureRootCars()
+    expect([gate, root]).to.deep.equal([made.gate, made.root])
+    expect(gate).to.equal(vaultDB.carAt(TH.GateScope))
+    expect(root.thing.pickle()).to.deep.include({ am: 'a', revseq: 0 })
+  })
+})
+
 describe("VaultMinder.carAt(scoped)", () => {
   it("holds the refusal its Thing last raised at a record, and when, and clears it at a record taken, keeping when", async () => {
     const { vaultDB, inner } = refusingOverQuietMemory()

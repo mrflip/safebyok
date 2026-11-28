@@ -368,7 +368,7 @@ describe("a device's root shelf", () => {
     await TH.eventually(() => onBadNews.mock.calls.length === 1)
     expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'bad_record' })
     expect(device.bank.vaultMinder!.thingAt(TH.RootScope)?.pickle()).to.deep.equal(rootBox.record)
-    expect(device.bank.vaultMinder!.thingAt(TH.GateScope)).to.equal(undefined)
+    expect(device.bank.vaultMinder!.thingAt(TH.GateScope)?.pickle()).to.deep.equal(TH.gateShellOf())
     expect(device.bank.getSnapshot().stage).to.eq('starting')
   })
 

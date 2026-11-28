@@ -16,7 +16,7 @@ import type * as Sealers from '../shapes/shapes-sealers'
 import { type BankLife, type BankScope, type GateLife, type GateStamp, type LeaseLoggable, type LeaseRecord, type LeaseScope, LeaseLabelpath, StampChecks } from '../shapes/shapes-stamps'
 import { type BoxRecord, type BulletproofCallback, type GateRecord, type Sparse, type ThingScope, type ThingShaped, type Thingkind, type VoidSentinel, ThingChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
-import { type BankRoots, rootScopesOf } from '../shapes/shapes-asks'
+import { rootScopesOf } from '../shapes/shapes-asks'
 import { type ReadTc, type SeenThing, type VaultEvent, type VaultItemEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import type { VaultStats } from '../shapes/shapes-vault-stats'
 import { MaxTimerMillis } from '../shapes/shapes-vault-tsq'
@@ -32,7 +32,7 @@ import * as Throwers from '../refusals/throwers'
 export type SomeThing = Gate | Box
 
 /** The signed-in user's bank on this device: its gate and its root box, its lease, the awaited `unlock` gating, and its snapshot, which a host renders.
- * It exists once its device is made, labelled and unstored: it seals, unseals and unlocks only once its gate's record is stored and heard of.
+ * It exists once its device is made, labelled and unstored. From sign-in on it has a gate and a root box, each modelling the shell until its record is received: it seals, unseals and unlocks only once both are live.
  * Made with its device, it lives as long. Its gate builds leases and attaches them to it, and boxes are sealed and unsealed under the attached lease, which no member hands out.
  * While connected, its lease is the one its device's deviceDB has, which every tab given that deviceDB shares: an unlock, a renewal or a lock in one tab reaches the rest.
  * Its snapshot's stage is read from the gate and the root box in its VaultMinder, each of which it subscribes to, and from the lease.
@@ -90,32 +90,30 @@ export class Bank {
   /** This bank's scope: its `userid` and `banklabel`. Refuses `absent_vault` until someone signs in. */
   get scope(): BankScope { return this.#device.scope }
 
-  /** The bank's gate: the wayins a user unlocks with, and the form verbs that change them. The same object across a gate change, of whatever life.
-   * Refuses `absent_thing` until a record of it has been heard of.
+  /** The bank's gate: the wayins a user unlocks with, and the form verbs that change them.
+   * The same object from sign-in on, whatever its record: it models the shell until a gate is stored.
+   * Refuses `absent_vault` until someone signs in.
    */
   get gate(): Gate {
-    const gate = this.#gateThing()
-    if (gate === null) { throw Throwers.thingNotLive(Labelpath.gateOf(this.#device.banklabel)) }
-    return gate
+    const { thing } = this.#rootCars().gate
+    if (! (thing instanceof Gate)) { throw Throwers.rootOfOtherKind() }
+    return thing
   }
 
   // A bank of a life replaced since reads the root box of the life that replaced it: its boxes refuse as of another root box.
-  /** The root box's record, as last heard of. Every box of this bank is under it.
-   * Refuses `absent_thing` until a live gate is heard of, and `record_conflict` until a live root box is.
-   */
+  /** The root box's record, as last received. Every box of this bank is under it. Refuses `record_conflict` until a live root box is received. */
   get rootBox(): BoxRecord {
-    this.#demandGateLive()
-    const root = this.#rootBoxThing()?.pickle()
-    if (root?.am !== 'a') { throw Throwers.rootBoxNotHeard() }
+    const root = this.#rootBoxThing().pickle()
+    if (root.am !== 'a') { throw Throwers.rootBoxNotHeard() }
     return root
   }
 
   // The bank's life is its gate's: its lifeseq, born_at and banktok are the gate's record's.
-  /** This bank's {@link BankLife}: its scope, and the lifeseq, `born_at` and `banktok` of its gate's life. Refuses `absent_thing` until a live gate is heard of. */
-  get life(): BankLife { return BankChecks.life.parse(this.#demandGateLive().pickle()) }
+  /** This bank's {@link BankLife}: its scope, and the lifeseq, `born_at` and `banktok` of its gate's life. Refuses while its gate models the shell. */
+  get life(): BankLife { return BankChecks.life.parse(this.gate.pickle()) }
 
-  /** The token minted when this bank was born, which tells this life of the bank from any other under its banklabel. The void banktok while its gate holds the shell, and undefined before sign-in, when it has no gate. */
-  get banktok(): Banktok | undefined { return this.#gateThing()?.banktok }
+  /** The token minted when this bank was born, which tells this life of the bank from any other under its banklabel: the void banktok while its gate models the shell. */
+  get banktok(): Banktok { return this.gate.banktok }
 
   // Every read of the lease's end goes through here: the janitor's, and isSoftlocked's.
   /** When the attached lease stops unlocking the bank, or null while locked. */
@@ -193,6 +191,8 @@ export class Bank {
     Checks.signinArgs.parse({ vaultMinder, shelf })
     if (this.#vaultMinder !== null) { return }
     this.#vaultMinder = vaultMinder
+    // The stage is `'starting'` before any root is received, the shelved ones included.
+    this.align()
     if (shelf !== null) {
       this.#seedFromShelf(vaultMinder, shelf)
       this.#startShelving(vaultMinder, shelf)
@@ -451,7 +451,7 @@ export class Bank {
   /** Attach the Lease of `stowedLease` where it can unlock the bank, or else drop this bank's lease where it has one, announcing either */
   #attachOrDropLease(stowedLease: LeaseRecord): void {
     if ((stowedLease.am === 'a') && this.#canUnlock(stowedLease)) {
-      this.#attachLease(Lease.make(stowedLease, { bank: this, gateLife: this.#demandGateLive().life }))
+      this.#attachLease(Lease.make(stowedLease, { bank: this, gateLife: this.gate.life }))
       this.#device.announce({ kind: 'lease_taken_up' })
     } else if (this.isUnlocked) {
       this.#dropLease()
@@ -461,8 +461,8 @@ export class Bank {
 
   /** True of a live lease record not past its end, granted under the gate's life */
   #canUnlock(stowedLease: Sealers.LiveOf<LeaseRecord>): boolean {
-    const gate = this.#gateThing()
-    return (Clock.nowMillis() < stowedLease.ends_at) && (stowedLease.gate_labelpath === gate?.labelpath) && (stowedLease.gate_lifepath === gate.lifepath)
+    const { gate } = this
+    return (Clock.nowMillis() < stowedLease.ends_at) && (stowedLease.gate_labelpath === gate.labelpath) && (stowedLease.gate_lifepath === gate.lifepath)
   }
 
   // A softlock only ever brings the end nearer, so every tab that hears the same gate change writes the same revision,
@@ -470,9 +470,8 @@ export class Bank {
   /** Attach, stow and announce the next revision of this bank's lease, ending the device's `softlockMillis` from now, where the gate has moved past the revision the lease cites and that end is the nearer */
   #softlockPastGate(): void {
     const lease = this.#lease
-    const gateRevseq = this.#gateThing()?.revseq ?? SX.VoidRevisionSeq
     const ends_at = Clock.nowMillis() + this.#device.softlockMillis
-    if ((lease === null) || (gateRevseq <= lease.gate_revseq) || (ends_at >= lease.ends_at)) { return }
+    if ((lease === null) || (this.gate.revseq <= lease.gate_revseq) || (ends_at >= lease.ends_at)) { return }
     this.#attachAndStow(lease.nextEndingAt(ends_at))
     this.#device.announce({ kind: 'softlocked' })
   }
@@ -542,10 +541,7 @@ export class Bank {
 
   // Each tab judges for itself, by when it last read the gate: a gate never read is not stale.
   /** True where the gate was last read more than the device's `gateStaleMillis` ago */
-  #isGateStale(): boolean {
-    const car = this.#vaultMinder?.carAt(rootScopesOf(this.#device.scope).gate)
-    return (car !== undefined) && (Clock.nowMillis() - car.read_at > this.#device.gateStaleMillis)
-  }
+  #isGateStale(): boolean { return this.#isGateRead() && (Clock.nowMillis() - this.#rootCars().gate.read_at > this.#device.gateStaleMillis) }
 
   /** Get the gate and the root box from the vaultDB, past anything kept here, telling the device's `onBadNews` of a refusal */
   async #refreshRoots(): Promise<void> {
@@ -604,7 +600,7 @@ export class Bank {
   }
   // --
 
-  // == [Guards]: isEnabled, endCause, isLocked, isSoftlocked, isUnlocked, isUnlockWanted, areRootsLive, demandEnabled, demandRootsLive, demandGateLive, demandVaultMinder, demandLease, rootThingAt, gateThing, rootBoxThing, isRootScope
+  // == [Guards]: isEnabled, endCause, isLocked, isSoftlocked, isUnlocked, isUnlockWanted, areRootsLive, demandEnabled, demandRootsLive, demandVaultMinder, demandLease, rootCars, rootBoxThing, isGateRead, isRootScope
 
   /** True until its device ends. */
   get isEnabled(): boolean { return this.endCause === null }
@@ -629,8 +625,8 @@ export class Bank {
   /** True while a call waits in {@link ensureUnlocked}: render the unlock form while it is. */
   get isUnlockWanted(): boolean { return this.#unlockWait !== null }
 
-  /** True while the gate's and the root box's Things each hold a live record. */
-  get areRootsLive(): boolean { return isLive(this.#gateThing()) && isLive(this.#rootBoxThing()) }
+  /** True while the gate and the root box each model a live record. False until someone signs in. */
+  get areRootsLive(): boolean { return (this.#vaultMinder !== null) && isLive(this.gate) && isLive(this.#rootBoxThing()) }
 
   /** Throw unless {@link isEnabled}. */
   demandEnabled(): this {
@@ -639,18 +635,12 @@ export class Bank {
     return this
   }
 
-  /** Demand that the gate's and the root box's Things each hold a live record, and return this bank. */
+  /** Demand that the gate and the root box each model a live record, and return this bank. */
   demandRootsLive(): this {
-    this.#demandGateLive()
-    if (! isLive(this.#rootBoxThing())) { throw Throwers.thingNotLive(Labelpath.RootBox) }
+    for (const root of [this.gate, this.#rootBoxThing()]) {
+      if (! isLive(root)) { throw Throwers.thingNotLive(root.labelpath) }
+    }
     return this
-  }
-
-  /** Demand that the gate's Thing holds a live record, and return it. */
-  #demandGateLive(): Gate {
-    const gate = this.#gateThing()
-    if (! isLive(gate)) { throw Throwers.thingNotLive(Labelpath.gateOf(this.#device.banklabel)) }
-    return gate
   }
 
   /** Demand that someone has signed in, and return the {@link vaultMinder}. */
@@ -666,20 +656,18 @@ export class Bank {
     return this.#lease
   }
 
-  /** The Thing of the root at `rootckey` in the signed-in user's bank's VaultMinder, or undefined for none */
-  #rootThingAt(rootckey: keyof BankRoots): unknown { return this.#vaultMinder?.thingAt(rootScopesOf(this.#device.scope)[rootckey]) }
+  /** The cars of the gate and the root box in the {@link vaultMinder}. Demands that someone has signed in. */
+  #rootCars(): ReturnType<VaultMinder['ensureRootCars']> { return this.demandVaultMinder().ensureRootCars() }
 
-  /** The gate's Thing in the {@link vaultMinder}, of whatever life, or null where no record of it has been heard of */
-  #gateThing(): Gate | null {
-    const thing = this.#rootThingAt('gate')
-    return (thing instanceof Gate) ? thing : null
+  /** The root box's Thing: the same object from sign-in on, modelling the shell until a root box is stored. Demands that someone has signed in. */
+  #rootBoxThing(): Box {
+    const { thing } = this.#rootCars().root
+    if (! (thing instanceof Box)) { throw Throwers.rootOfOtherKind() }
+    return thing
   }
 
-  /** The root box's Thing in the {@link vaultMinder}, of whatever life, or null where no record of it has been heard of */
-  #rootBoxThing(): Box | null {
-    const thing = this.#rootThingAt('root')
-    return (thing instanceof Box) ? thing : null
-  }
+  /** True once the vaultDB's answer for the gate has been received, whatever it found */
+  #isGateRead(): boolean { return this.#rootCars().gate.agekind !== 'vacant' }
 
   /** True of the scope of one of this bank's roots, which the stage is read from */
   #isRootScope(scope: ThingScope): boolean { return Object.values(rootScopesOf(this.#device.scope)).some((root) => BaseThing.haveSameScope(root, scope)) }
@@ -691,11 +679,11 @@ export class Bank {
   // last of them to arrive live brings `'locked'`, so a birth shows no stage between `'unborn'` and `'locked'`.
   // The softlock is at once, so a grant under way in this tab follows it; the lease stored is taken up once the roots
   // are live, as when they first arrive.
-  /** Softlock the lease where the gate has moved past it; while connected, follow the lease the deviceDB has; and realign, once both roots are live or the gate holds no live record. */
+  /** Softlock the lease where the gate has moved past it; while connected, follow the lease the deviceDB has; and realign, once both roots are live or the gate is not. */
   #hearRoot(): void {
     this.#softlockPastGate()
     if (this.#isConnected) { void this.#followStored() }
-    if (this.areRootsLive || ! isLive(this.#gateThing())) { this.align() }
+    if (this.areRootsLive || ! isLive(this.gate)) { this.align() }
   }
 
   /** Remake the snapshot, and tell each subscriber if it changed. Internal: the device calls it once someone signs in. */
@@ -713,8 +701,7 @@ export class Bank {
     if (this.#device.userid === null) { return 'signed_out' }
     if (this.areRootsLive)            { return this.isLocked ? 'locked' : 'unlocked' }
     if (this.#lastErr !== null)       { return 'failed' }
-    const gate = this.#gateThing()
-    return ((gate === null) || isLive(gate)) ? 'starting' : 'unborn'
+    return (this.#isGateRead() && ! isLive(this.gate)) ? 'unborn' : 'starting'
   }
 
   /** Record `stage` as the bank's stage, announcing the crossing from the one before it. */
@@ -790,8 +777,8 @@ function thingClassOf(modelkind: Thingkind): ThingClass {
   return ({ gate: Gate, box: Box } as const satisfies Record<Thingkind, ThingClass>)[modelkind]
 }
 
-/** True of a Thing holding a live record; false of one holding the shell or a tombstone, and of none */
-function isLive<ThingT extends SomeThing>(thing: ThingT | null): thing is ThingT { return thing?.pickle().am === 'a' }
+/** True of a Thing modelling a live record; false of one modelling the shell or a tombstone */
+function isLive(thing: SomeThing): boolean { return thing.pickle().am === 'a' }
 
 /** What a snapshot shows of `err`: its refusal's kind, family and message, anything but a refusal as an unexpected error */
 function refusalSnapshotOf(err: unknown): RefusalSnapshot {

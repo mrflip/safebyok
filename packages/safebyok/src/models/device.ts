@@ -207,7 +207,6 @@ export class Device {
     checkSecureContext()
     if (this.#signinAnswer !== null) { return this.#signinAnswer }
     this.#userid = signedIn
-    this.#bank.align()
     this.#signinAnswer = this.#doSignin()
     return this.#signinAnswer
   }

@@ -333,7 +333,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   }
   // --
 
-  // == [Reading]: thingAt, carAt
+  // == [Reading]: thingAt, carAt, ensureRootCars
 
   /** The Thing at `scoped`, in this vaultDB's bank, or undefined where no record of it has been learned of. The same object across records and lives. */
   thingAt(scoped: ThingScope): ThingT | undefined { return this.carAt(scoped)?.thing }
@@ -344,6 +344,12 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   carAt(scoped: ThingScope): ThingCar<ThingT> | undefined {
     const { modelkind, labelpath } = this.#kindAndLabelpathOf(scoped)
     return this.#cars[modelkind].get(labelpath)
+  }
+
+  /** The cars of this bank's gate and root box. A root no record has been received of gets its car here, its Thing modelling the shell. */
+  ensureRootCars(): Readonly<{ gate: ThingCar<ThingT>, root: ThingCar<ThingT> }> {
+    const scopes = rootScopesOf(this.#scope)
+    return { gate: this.#ensureCar(Shell.under(scopes.gate, null)), root: this.#ensureCar(Shell.under(scopes.root, null)) }
   }
   // --
 
