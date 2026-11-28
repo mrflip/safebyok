@@ -131,7 +131,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   // whatever its outcome, and changes nothing where it refuses.
   // A maker takes a `FormData`, a dna in a form's fieldnames, or the cleartexts in the names a gating's body takes.
 
-  /** The gating of {@link unlock} over `params`, for a form mutation to attempt. A `FormData` loses its `passphrase` field, and `nextPassphrase` and `confirmation`, at once. */
+  /** The gating of {@link unlock} over `params`, for a form mutation to attempt. A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once. */
   unlockGating(params: FormData | UnlockDna | UnlockCleartexts): UnlockGating { return new UnlockGating(this, params, this.#gatingFriend()) }
 
   /** Unlock this gate by the passphrase, or the passkey's answer, in a form or a dna. See {@link unlock}.

@@ -32,8 +32,8 @@ import * as Throwers from '../refusals/throwers'
 export type SomeThing = Gate | Box
 
 /** The signed-in user's bank on this device: its gate and its root box, its lease, the awaited `unlock` gating, and its snapshot, which a host renders.
- * It exists once its device is made, labelled and unstored. From sign-in on it has a gate and a root box, each modelling the shell until its record is received: it seals, unseals and unlocks only once both are live.
- * Made with its device, it lives as long. Its gate builds leases and attaches them to it, and boxes are sealed and unsealed under the attached lease, which no member hands out.
+ * A device makes its bank, which lives as long as the device. From sign-in on, the bank has a gate and a root box, each modelling the shell until its record is received. It seals, unseals and unlocks only once both are live.
+ * Its gate builds leases and attaches them to it, and boxes are sealed and unsealed under the attached lease, which no member hands out.
  * While connected, its lease is the one its device's deviceDB has, which every tab given that deviceDB shares: an unlock, a renewal or a lock in one tab reaches the rest.
  */
 export class Bank {
@@ -69,7 +69,7 @@ export class Bank {
   #snapshot: BankSnapshot
   /** The stage the bank was last at, or null before its first. */
   #stage: BankStage | null = null
-  /** Each subscriber, beside its bulletproofed form, which is what is called. */
+  /** Each subscriber, mapped to its bulletproofed form, which is the one called. */
   readonly #subscribers = new Map<() => void, () => void>()
   readonly #getSnapshot = (): BankSnapshot => this.#snapshot
   readonly #subscribe = (listener: () => void): (() => void) => {
@@ -161,7 +161,7 @@ export class Bank {
 
   // A root's Thing is subscribed to before it receives its first record, so that this bank hears of that record too.
   /** Make the Thing at `begun`, of this bank: a {@link Gate} or a {@link Box}, by its modelkind. Nothing is fetched or stored.
-   * Made from the shell, it models the shell; made from an item event, it receives the event after, and throws where it refuses its record.
+   * Made from the shell, the Thing models the shell. Made from an item event, it receives the event, and throws if it refuses the record.
    * What its subscribers throw goes to the device's `onBadNews`.
    */
   makeThing(begun: VaultItemEvent<GateRecord>): Gate
