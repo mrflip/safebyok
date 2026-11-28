@@ -70,14 +70,13 @@ describe("bank.makeThing(begun)", () => {
   }
 })
 
-describe("bank.gate, bank.rootBox, bank.life, bank.banktok and bank.scope", () => {
-  it("are the gate and root box its VaultMinder caches, and the life and banktok of its gate", async () => {
+describe("bank.gate, bank.rootBox, bank.banktok and bank.scope", () => {
+  it("are the gate and root box its VaultMinder caches, and the banktok of its gate", async () => {
     const { device, bank, gateRecord } = await TH.buildBornBank()
     expect(device.bank).to.equal(bank)
     expect(bank.gate).to.equal(bank.vaultMinder!.thingAt(TH.GateScope))
     expect(bank.rootBox).to.deep.equal(bank.vaultMinder!.thingAt(TH.RootScope)!.pickle())
-    expect(bank.life).to.deep.equal(TH.WorldBankLife)
-    expect(bank.banktok).to.equal(gateRecord.banktok).and.equal(TH.WorldBankLife.banktok)
+    expect(bank.banktok).to.equal(gateRecord.banktok).and.equal(TH.FirstBanktok)
     expect(bank.gate.life).to.deep.equal(TH.WorldGateLife)
     expect(bank.scope).to.deep.equal(device.scope)
   })
@@ -88,12 +87,11 @@ describe("bank.gate, bank.rootBox, bank.life, bank.banktok and bank.scope", () =
     expect(bank.gate.labelpath).to.equal(bank.scope.banklabel)
   })
 
-  it("refuses its gate before signin, and its life and root box while each models the shell", async () => {
+  it("refuses its gate before signin, and its root box while it models the shell", async () => {
     TH.expectSyncRefusal(() => TH.makeDevice({ userid: null }).bank.gate, 'need_user')
     const { bank } = await signedInDevice()
     expect(bank.gate.pickle()).to.deep.equal(TH.gateShellOf())
     expect(bank.banktok).to.equal(SX.VoidLifeTok)
-    TH.expectSyncRefusal(() => bank.life)
     TH.expectSyncRefusal(() => bank.rootBox)
   })
 })

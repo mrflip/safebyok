@@ -14,6 +14,9 @@ import * as TH from '../test-helpers'
 
 TH.useFakeClock()
 
+/** A bank's scope with the `lifeseq`, `born_at` and `banktok` of its gate's first life: no gate's life, which has a labelpath and lifepath in place of the lifeseq. */
+const LifeseqLife = Object.freeze({ ...TH.WorldScope, lifeseq: Lifeseq.ofLifenum(0), born_at: TH.T0, banktok: TH.FirstBanktok })
+
 /** A key deriver scripted to hand back anything at all, to try what a proving makes of it. */
 function deriverHanding(handBack: () => unknown): Deriver.KeyDeriver {
   return {
@@ -139,7 +142,7 @@ describe("PassphraseProving.buildNovel(device, gateLife, passphraseCleartext)", 
     [() => ({ gateLife: TH.omitting(TH.WorldGateLife, 'labelpath') }),                          'a gate life with no labelpath'],
     [() => ({ gateLife: TH.omitting(TH.WorldGateLife, 'userid') }),                             'a gate life with no userid'],
     [() => ({ gateLife: TH.omitting(TH.WorldGateLife, 'banklabel') }),                          'a gate life with no banklabel'],
-    [() => ({ gateLife: TH.WorldBankLife }),                                                    "a bank's life as the gate's"],
+    [() => ({ gateLife: LifeseqLife }),                                                         'a life with a lifeseq in place of its labelpath and lifepath'],
     [() => ({ gateLife: null }),                                                                'no gate life at all'],
     [() => ({ passphraseCleartext: 42 }),                                                       'a passphrase that is not a string'],
   ] as const
@@ -391,7 +394,7 @@ const MakeRefusalCases: readonly (readonly [(handed: MakeHanded, spares: MakeSpa
   [({ parts, opts }) => ({ parts: TH.omitting(parts, 'header'), opts }),                        'parts with no header'],
   [({ parts, opts }) => ({ parts: TH.omitting(parts, 'stored'), opts }),                        'parts with no stored wayin, not even null'],
   [({ parts }) => ({ parts, opts: {} }),                                                        'opts with no wayinKey'],
-  [({ parts, opts }) => ({ parts: { ...parts, gateLife: TH.WorldBankLife }, opts }),            "the bank's life as the gate's"],
+  [({ parts, opts }) => ({ parts: { ...parts, gateLife: LifeseqLife }, opts }),                 'a life with a lifeseq in place of its labelpath and lifepath'],
   [({ parts, opts }, { otherHeader }) => ({ parts: { ...parts, header: otherHeader }, opts }),  "the other kind of wayin's header"],
   [({ parts, opts }, { record }) => ({ parts: { ...parts, header: record }, opts }),            "a whole wayin record, wrapped bankKey and all, as the header"],
   [({ parts, opts }, { record }) => ({ parts: { ...parts, stored: record }, opts }),            "a wayin's record in place of a Wayin"],

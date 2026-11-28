@@ -268,7 +268,7 @@ describe("a gate over the shell or a tombstone", () => {
     const tomb = TH.gateTombOf(await gateRecordOf())
     const gate = makeGate(tomb)
     expect(gate.pickle()).to.equal(tomb)
-    expect([gate.am, gate.banktok]).to.deep.equal(['x', TH.WorldBankLife.banktok])
+    expect([gate.am, gate.banktok]).to.deep.equal(['x', TH.FirstBanktok])
     TH.expectSyncRefusal(() => gate.main, 'absent_thing')
   })
 

@@ -34,7 +34,7 @@ export { PolicyPhrases } from './phrases'
 export { GatePolicies } from './storage/policies'
 export { VacantAgerank, readAtOf, readTcNow } from './storage/agerank'
 export {
-  type BankLife, type BankScope, type BoxStamp, type GateLife, type GateStamp, type LeaseRecord, type LeaseScope, type LeaseStamp, type LeaseTombstone, LeaseFormat, LeaseLabelpath, LeaseLifeRoot, StampChecks, leaseLifepathOf,
+  type BankScope, type BoxStamp, type GateLife, type GateStamp, type LeaseRecord, type LeaseScope, type LeaseStamp, type LeaseTombstone, LeaseFormat, LeaseLabelpath, LeaseLifeRoot, StampChecks, leaseLifepathOf,
 } from './shapes/shapes-stamps'
 // The deviceDB, which has each gate's lease record on this device, and its memory deviceDB. The IndexedDB deviceDB is on `safebyok/browser`.
 export { DeviceDB } from './storage/device-db'

@@ -16,7 +16,7 @@ export type {
   SealedOf, SealedPartsOf, Sealer, ShellOf, SparseOf, TombstoneOf, TombstonePublicProps, UnsealedOf,
 } from './shapes/shapes-sealers'
 export {
-  type BankLife, type BankScope, type BoxStamp, type GateLife, type GateStamp, type LeaseLoggable, type LeaseRecord, type LeaseScope, type LeaseSparse, type LeaseStamp, type LeaseTombstone, type ProvableGate, type WayinStamp,
+  type BankScope, type BoxStamp, type GateLife, type GateStamp, type LeaseLoggable, type LeaseRecord, type LeaseScope, type LeaseSparse, type LeaseStamp, type LeaseTombstone, type ProvableGate, type WayinStamp,
   LeaseFormat, LeaseLabelpath, LeaseLifeRoot, StampChecks, leaseLifepathOf,
 } from './shapes/shapes-stamps'
 export { Wayin } from './models/wayin'

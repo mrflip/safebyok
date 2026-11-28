@@ -132,9 +132,7 @@ wayin wraps still unwraps under a new format of the gate's record. A lease's sta
 `modelkind` `lease`, the scope, `banktok`, its gate's life and revision under `gate_` names
 (`gate_labelpath`, `gate_lifepath`, `gate_born_at`, `gate_revtok`), and its own `fmt`, `born_at`,
 `proved_at` and `wayinkind`: fixed for the lease, since a softlock writes its next revision keeping
-the wrapped bankKey. A bank's life (`BankLife`: its scope and its gate's `lifeseq`, `born_at` and
-`banktok`) is a view, bound into nothing by itself. Say "stamp" for the bound fields, never "the
-binding" or "the authentics".
+the wrapped bankKey. Say "stamp" for the bound fields, never "the binding" or "the authentics".
 
 ## Names, records and times
 

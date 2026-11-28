@@ -32,7 +32,6 @@ const ThingStampFields = ['modelkind', 'userid', 'banklabel', 'labelpath', 'bank
 const WayinStampFields = ['modelkind', 'userid', 'banklabel', 'labelpath', 'lifepath', 'born_at', 'label', 'banktok'] as const
 const PassphraseHeaderFields = ['wayinkind', 'key_deriver_label', 'salt_b64', 'devicetok', 'born_at'] as const
 const LeaseStampFields = ['modelkind', 'userid', 'banklabel', 'banktok', 'gate_labelpath', 'gate_lifepath', 'gate_born_at', 'gate_revtok', 'fmt', 'born_at', 'proved_at', 'wayinkind'] as const
-const BankLifeFields = ['userid', 'banklabel', 'lifeseq', 'born_at', 'banktok'] as const
 const SealTagFields = ['codectag', 'schematag'] as const
 
 /** The JSON text of a box's tags, as each ctx of its seal ends with them. */
@@ -162,11 +161,6 @@ describe("each stamp's fields", () => {
   it("names every field of a lease's stamp", async () => {
     const { stamp } = await leaseRecordOf()
     expect(Object.keys(stamp)).to.have.members([...LeaseStampFields])
-  })
-
-  it("names every field of a bank's life, which no ctx binds by itself", async () => {
-    const { bank } = await TH.buildBornBank()
-    expect(Object.keys(bank.life)).to.have.members([...BankLifeFields])
   })
 })
 

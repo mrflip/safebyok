@@ -13,9 +13,9 @@ import { PendingBank, SignedOutBank, HostedVaultChecks, isRootShelf } from '../s
 import type { BirthCleartexts, BirthDna, BirthGatingFriend, GateFound, LeaseShellScope, BankGateFriend } from '../shapes/shapes-gateish'
 import { type MaskedViewLease, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import type * as Sealers from '../shapes/shapes-sealers'
-import { type BankLife, type BankScope, type GateLife, type GateStamp, type LeaseLoggable, type LeaseRecord, type LeaseScope, StampChecks } from '../shapes/shapes-stamps'
+import { type BankScope, type GateLife, type GateStamp, type LeaseLoggable, type LeaseRecord, type LeaseScope, StampChecks } from '../shapes/shapes-stamps'
 import { type BoxRecord, type BulletproofCallback, type GateRecord, type Sparse, type ThingScope, type ThingShaped, type Thingkind, type VoidSentinel, ThingChecks } from '../shapes/shapes-thing'
-import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
+import { BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { rootScopesOf } from '../shapes/shapes-asks'
 import { type ReadTc, type SeenThing, type VaultEvent, type VaultItemEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import type { VaultStats } from '../shapes/shapes-vault-stats'
@@ -81,7 +81,7 @@ export class Bank {
   })
   // --
 
-  // == [Getters]: vaultMinder, scope, gate, rootBox, life, banktok, leaseEndsAt, leaseLoggable, getSnapshot, subscribe, bulletproofCallback, device
+  // == [Getters]: vaultMinder, scope, gate, rootBox, banktok, leaseEndsAt, leaseLoggable, getSnapshot, subscribe, bulletproofCallback, device
 
   /** The VaultMinder of the signed-in user's bank, as handed to {@link signin}, or null until then. */
   get vaultMinder(): VaultMinder | null { return this.#vaultMinder }
@@ -106,10 +106,6 @@ export class Bank {
     if (root.am !== 'a') { throw Throwers.rootBoxNotHeard() }
     return root
   }
-
-  // The bank's life is its gate's: its lifeseq, born_at and banktok are the gate's record's.
-  /** This bank's {@link BankLife}: its scope, and the lifeseq, `born_at` and `banktok` of its gate's life. Refuses while its gate models the shell. */
-  get life(): BankLife { return BankChecks.life.parse(this.gate.pickle()) }
 
   /** The token minted when this bank was born, which tells this life of the bank from any other under its banklabel: the void banktok while its gate models the shell. */
   get banktok(): Banktok { return this.gate.banktok }

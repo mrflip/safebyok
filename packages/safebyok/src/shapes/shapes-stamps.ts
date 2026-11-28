@@ -1,4 +1,4 @@
-/** The stamps a ctx binds (a Thing's, a wayin's and a lease's), the lives of a bank and its gate, and the lease record. */
+/** The stamps a ctx binds (a Thing's, a wayin's and a lease's), the life of a gate, and the lease record. */
 
 import type * as Z from 'zod'
 import { CX, GX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/internals'
@@ -7,18 +7,17 @@ import { type Lifepath, Labelpath, Lifeseq, VoidLifeseq } from './primitives'
 import type { TombstoneOf } from './shapes-sealers'
 import { PerKindChecks, ThingChecks, ThingFormat, isLabelLast, isParityRight } from './shapes-thing'
 
-// == [The stamps]: PlainChecks, BankScope, BankLife, GateLife, GateStamp, BoxStamp, WayinStamp, ProvableGate
+// == [The stamps]: PlainChecks, BankScope, GateLife, GateStamp, BoxStamp, WayinStamp, ProvableGate
 
 // A ctx binds one stamp, and no field twice: a field another holds forced equal (a label, the last segment of a labelpath) is left off.
-/** The checks of a bank's and a gate's lives, and of a gate's, a box's and a wayin's stamps. */
+/** The checks of a gate's life, and of a gate's, a box's and a wayin's stamps. */
 const PlainChecks = Validator.Checkers('bad_record', ({ obj, lit, oneof }) => {
-  const { userid, banklabel, lifeseq, lifepath, born_at, banktok } = ThingChecks.sparse.shape
+  const { userid, banklabel, lifepath, born_at, banktok } = ThingChecks.sparse.shape
   // Every Thing field but `label` and `lifeseq`, the last segments of its labelpath and lifepath.
   const thingStamp = ThingChecks.sparse.omit({ label: true, lifeseq: true })
   const gateLife   = obj({ userid, banklabel, labelpath: PerKindChecks.gateLabelpath, lifepath, born_at, banktok })
   return {
     bankScope:    ThingChecks.bankScope,
-    bankLife:     obj({ userid, banklabel, lifeseq, born_at, banktok }),
     gateLife,
     gateStamp:    thingStamp.extend({ modelkind: lit('gate'), labelpath: PerKindChecks.gateLabelpath }),
     boxStamp:     thingStamp.extend({ modelkind: lit('box'), labelpath: PerKindChecks.boxLabelpath }),
@@ -29,8 +28,6 @@ const PlainChecks = Validator.Checkers('bad_record', ({ obj, lit, oneof }) => {
 
 /** A bank's scope: its `userid` and `banklabel`. */
 export type BankScope    = Z.infer<typeof StampChecks.bankScope>
-/** A bank's life, as its gate's record has it: its scope, and the lifeseq, `born_at` and `banktok` of the life. It is bound into nothing as it is. */
-export type BankLife     = Z.infer<typeof StampChecks.bankLife>
 /** One life of a gate: its scope, its lifepath and `born_at`, and its `banktok`. A wayin's stamp and a lease's stamp each include it, under their own field names. */
 export type GateLife     = Z.infer<typeof StampChecks.gateLife>
 /** A gate's stamp: every Thing field of one revision but its `label` and `lifeseq`, which its labelpath and lifepath carry. Nothing is sealed under it. */

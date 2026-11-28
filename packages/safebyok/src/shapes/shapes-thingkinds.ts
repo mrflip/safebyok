@@ -10,11 +10,10 @@ import { type Thingkind, PerKindChecks, policiesByModelkind } from './shapes-thi
 // A bundle makes no check of its own: each is made in shapes-thing, shapes-stamps, shapes-sealers or shapes-asks, which
 // sit below this module and read their checks where they are made.
 
-/** The checks of what a bank has that is no Thing's own: its `life`, its gate's, and `birthAsk`, the ask that writes a new bank's first Things.
+/** The checks of what a bank has that is no Thing's own: `birthAsk`, the ask that writes a new bank's first Things.
  * The birth ask leaves its two records unchecked, for `GateChecks.record` and `BoxChecks.record`.
  */
 export const BankChecks = Object.freeze({
-  life:          StampChecks.bankLife,
   birthAsk:      AskChecks.birthBankAsk,
 })
 

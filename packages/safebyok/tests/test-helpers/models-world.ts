@@ -25,7 +25,7 @@ import type { DeviceOpts, DeviceRecord, RootShelf } from '../../src/shapes/shape
 import type { LiveOf, ShellOf } from '../../src/shapes/shapes-sealers'
 import type { BoxRecord, GateRecord, Sparse, Wayins } from '../../src/shapes/shapes-thing'
 import { type GatingCleartexts, type LeaseBank, type ProvingDevice, type StrengthChecker, GatingChecks } from '../../src/shapes/shapes-gateish'
-import type { BankLife, BankScope, GateLife, GateStamp, LeaseRecord } from '../../src/shapes/shapes-stamps'
+import type { BankScope, GateLife, GateStamp, LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -65,15 +65,12 @@ export function useFakeClock(): void {
 }
 // --
 
-// == [The lives]: WorldScope, WorldBankLife, WorldGateLife, WorldGate
+// == [The lives]: WorldScope, WorldGateLife, WorldGate
 
 /** The bank scope every builder here works in: `u1`'s bank `acme`. */
 export const WorldScope: BankScope = Object.freeze({ userid: 'u1', banklabel: 'acme' })
 
-/** The life of the bank every builder here makes things in: its first, born at {@link T0} with {@link FirstBanktok}. */
-export const WorldBankLife: BankLife = Object.freeze({ userid: WorldScope.userid, banklabel: WorldScope.banklabel, lifeseq: Lifeseq.ofLifenum(0), born_at: T0, banktok: FirstBanktok })
-
-/** The life of {@link WorldBankLife}'s gate, at its banklabel: its first, born at {@link T0} with {@link FirstBanktok}. */
+/** The life of the gate of the bank every builder here makes things in, at its banklabel: its first, born at {@link T0} with {@link FirstBanktok}. */
 export const WorldGateLife: GateLife = Object.freeze({ ...WorldScope, labelpath: WorldScope.banklabel, lifepath: Lifeseq.ofLifenum(0), born_at: T0, banktok: FirstBanktok })
 
 /** The gate a lease cites when a test says nothing else: the stamp of {@link WorldGateLife}'s gate, at a revision of its own. */
@@ -186,7 +183,7 @@ export interface BornBank {
   proving:    PassphraseProving
 }
 
-/** A bank of {@link WorldBankLife}, its gate of {@link WorldGateLife}, born in its device's vaultDB by `Bank.birth` once the device has signed in, and so unlocked.
+/** A bank of {@link WorldScope}, its gate of {@link WorldGateLife}, born in its device's vaultDB by `Bank.birth` once the device has signed in, and so unlocked.
  * Its proving is a stored proving of the gate, by {@link TestPassphrase}.
  */
 export async function buildBornBank({ passkeyCleartext, device = makeDevice() }: BornBankGiven = {}): Promise<BornBank> {

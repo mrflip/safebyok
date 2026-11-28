@@ -73,7 +73,7 @@ describe("Bank.birth(device, cleartexts)", () => {
   it("mints a new gate revision and banktok for each birth, in its first life", async () => {
     const one = await birth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase })
     const two = await birth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase })
-    expect([one.life.lifeseq, two.life.lifeseq, one.gate.lifeseq, two.gate.lifeseq]).to.deep.equal([TH.Life0, TH.Life0, TH.Life0, TH.Life0])
+    expect([one.gate.lifeseq, two.gate.lifeseq]).to.deep.equal([TH.Life0, TH.Life0])
     expect(one.banktok).to.not.eq(two.banktok)
     expect(one.gate.revtok).to.not.eq(two.gate.revtok)
   })

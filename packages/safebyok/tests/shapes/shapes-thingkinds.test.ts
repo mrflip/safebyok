@@ -6,7 +6,6 @@ import * as TH from '../test-helpers'
 
 describe("BankChecks, GateChecks and BoxChecks", () => {
   it("carry each kind's life, stamp and ask checks, the same checks StampChecks and AskChecks have", () => {
-    expect(BankChecks.life).to.eq(StampChecks.bankLife)
     expect(BankChecks.birthAsk).to.eq(AskChecks.birthBankAsk)
     expect(GateChecks.life).to.eq(StampChecks.gateLife)
     expect(GateChecks.stamp).to.eq(StampChecks.gateStamp)
