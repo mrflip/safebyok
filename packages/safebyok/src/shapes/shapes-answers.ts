@@ -8,7 +8,7 @@ import type { BankRoots, LoggableAsk, Tracked, ActualRoots } from './shapes-asks
 import type { ReadTc } from './shapes-vault-event'
 import type { VaultStats } from './shapes-vault-stats'
 
-// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, IncompatibleThing, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer, GetBankAnswer, StatsAnswer
+// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, IncompatibleThing, KidLife, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer, GetBankAnswer, StatsAnswer
 // No check reads an answer whole: `AdapterVaultDB` makes each of parts it has checked, and a reader checks each record it
 // keeps where a Thing takes it.
 
@@ -51,7 +51,7 @@ export type WriteThingAnswer = Answer<ThingRecord, EX.PutAct | EX.DelAct>
 export type IncompatibleThing = Readonly<ThingScope & { am: 'd' }>
 
 /** One child in a {@link Kids} value: the lifeseq of its life as the list read it. */
-export type KidEntry = Readonly<{ lifeseq: Lifeseq }>
+export type KidLife = Readonly<{ lifeseq: Lifeseq }>
 
 // Keyed by label, not labelpath. JavaScript orders an object's keys that look like whole numbers first, so a reader that
 // needs labelpath order sorts the labels.
@@ -62,8 +62,8 @@ export type Kids = Readonly<{
   modelkind:  'kids'
   parentpath: Labelpath
   parentlife: Lifepath
-  items:      Readonly<Record<string, KidEntry>>
-  gones:      Readonly<Record<string, KidEntry>>
+  items:      Readonly<Record<string, KidLife>>
+  gones:      Readonly<Record<string, KidLife>>
   read_tc:    ReadTc
 }>
 

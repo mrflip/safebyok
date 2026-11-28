@@ -32,7 +32,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof,
   const scopeFields     = ThingChecks.thingScope.shape
   const thingWatchScope = ThingChecks.bankScope
   const thingOptions    = obj({
-    /** The storage policies the write must meet, each over the ante Thing. */
+    /** The storage policies the write must meet, each over the prior Thing. */
     policies: arr(oneof(EX.storagePolicyVals)),
   }).strict()
   // A root the sender knows none stored of is tracked at the void revision.
@@ -119,7 +119,7 @@ export type GateWriteAsk = WriteAskFlags & Readonly<{ modelkind: 'gate', cited: 
 /** A write ask of a box: see {@link WriteAsk}. */
 export type BoxWriteAsk  = WriteAskFlags & Readonly<{ modelkind: 'box',  cited: CitedOf<BoxRecord>,  record: BoxRecord }>
 /** An ask to write `record` over the Thing it `cited`: a `put` of a live record, or a `del` with a tombstone. With no `RecordT`, a write of any kind.
- * The datastore compares the {@link ThingCited} fields of `cited` with the ante Thing. Any other field of `cited` is read only by a storage policy, as testimony.
+ * The datastore compares the {@link ThingCited} fields of `cited` with the prior Thing. Any other field of `cited` is read only by a storage policy, as testimony.
  * `modelkind` says which kind of Thing both are.
  */
 export type WriteAsk<RecordT extends ThingRecord = ThingRecord> = Extract<GateWriteAsk | BoxWriteAsk, { record: RecordT }>
@@ -205,10 +205,10 @@ function checkWriteInvariants(ask: WriteAsk): void {
   if ((record.revtok === cited.revtok) || (record.revtok === SX.VoidRevisionTok))                   { throw Throwers.revtokNotNew(ask) }
   if (! Validator.isConsistent(record, { userid, banklabel, labelpath }))                           { throw Throwers.recordOfOtherScope(ask) }
   if ((record.am === 'x') && (cited.am === 'x'))                                                    { throw Throwers.tombstoneOverTombstone(ask) }
-  if (Lifeseq.leadingOf(record.lifepath) !== Lifeseq.leadingOf(cited.lifepath))                     { throw Throwers.lifepathNotKept(ask) }
+  if (Lifeseq.leadingOf(record.lifepath) !== Lifeseq.leadingOf(cited.lifepath))                     { throw Throwers.leadingLifeseqsMoved(ask) }
   const isLifeFlipped = (record.am !== cited.am)
   if (Lifeseq.lifenumOf(record.lifeseq) !== Lifeseq.lifenumOf(Lifeseq.ofLifepath(cited.lifepath)) + (isLifeFlipped ? 1 : 0)) { throw Throwers.lifeseqNotNext(ask) }
-  // A live record over a live one leaves the ante Thing's born_at unchanged: AdapterVaultDB checks that, against the Thing it has.
+  // A live record over a live one leaves the prior Thing's born_at unchanged: AdapterVaultDB checks that, against the Thing it has.
   if (isLifeFlipped && (record.am === 'a') && (record.born_at !== record.written_at))               { throw Throwers.bornAtNotNow(ask) }
   if ((ask.modelkind === 'gate') && ask.options?.policies.includes('replace_passphrase') && ((ask.cited.wayins?.main ?? null) === null)) { throw Throwers.testimonyMissing(ask) }
 }

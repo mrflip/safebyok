@@ -25,8 +25,8 @@ export {
 // A datastore's contract (notes/vault-adapter-contract.md): the manifest each verb's step hands back, the tags in it, and the functions that make them in TypeScript.
 export * as ManifestTags from './storage/manifest-tags'
 export {
-  type AnteWayins, type BankObserved, type BirthManifest, type BirthTags, type CheckedBankObserved, type CheckedBirthManifest, type CheckedGetManifest, type CheckedListManifest, type CheckedManifestRows, type CheckedRoots,
-  type CheckedStatsManifest, type CheckedGetBankManifest, type CheckedWriteManifest, type GetManifest, type GetTags, type ListManifest, type ListedChild, type PolicyTag, type PolicyVerdict, type PolicyVerdicts, type Presence,
+  type BankObserved, type BirthManifest, type BirthTags, type CheckedBankObserved, type CheckedBirthManifest, type CheckedGetManifest, type CheckedListManifest, type CheckedManifestRows, type CheckedRoots,
+  type CheckedStatsManifest, type CheckedGetBankManifest, type CheckedWriteManifest, type GetManifest, type GetTags, type ListManifest, type ListedChild, type PolicyTag, type PolicyVerdict, type PolicyVerdicts, type Presence, type PriorWayins,
   type Received, type Refusaltag, type RevseqCmp, type RevtokCmp, type RootRows, type RootTags, type SameCmp, type ScribedBirthManifest, type ScribedGetManifest, type ScribedListManifest, type ScribedWriteManifest, type StatsManifest,
   type GetBankManifest, type WriteManifest, type WriteTags, ManifestChecks,
 } from './shapes/shapes-manifest'
@@ -41,12 +41,12 @@ export { DeviceDB } from './storage/device-db'
 export { MemoryDeviceDB } from './storage/memory-device-db'
 export { type DevicetokScopepath, type LeaseListener, type LeaseScopepath, DeviceDBChecks } from './shapes/shapes-device-db'
 export {
-  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type IncompatibleThing, type GetThingAnswer, type GetBankAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside,
+  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type IncompatibleThing, type GetThingAnswer, type GetBankAnswer, type GoodAnswer, type KidLife, type Kids, type ListThingsAnswer, type ListedBeside,
   type StatsAnswer, type WriteThingAnswer,
 } from './shapes/shapes-answers'
 export { type VaultDB, isVaultDB } from './storage/vault-db'
 // A bank's storage stats, as `tryStats` answers them, and how a concrete adapter measures them.
-export { type FiledRaw, type StoreLimits, type ThingkindStats, type VaultStats, StoreLimitCap, StoreLimitFloor, StoreLimitLeastBoxes, VaultStatsChecks, storeLimitsOf } from './shapes/shapes-vault-stats'
+export { type DatastoreLimits, type FiledRaw, type ThingkindStats, type VaultStats, DatastoreLimitCap, DatastoreLimitFloor, DatastoreLimitLeastBoxes, VaultStatsChecks, datastoreLimitsOf } from './shapes/shapes-vault-stats'
 export { rowWeightOf, vaultStatsOf } from './storage/vault-stats'
 // The events a vaultDB's watcher is notified with.
 export {
@@ -65,7 +65,7 @@ export const { delActVals, gotActVals, ifPresentVals, putActVals, putIfAbsentVal
 export { VaultError, isVaultError, type Capacity, type RefusalFamily, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'
 export { fetchFailed, identityRevoked, sanitizeForeignError, storageFailed, storageRefusalOf, storageUnavailable, unexpectedError } from 'safebyok-big/storage'
 export { storageIssue } from 'safebyok-big/refusals/throwers'
-export { refusalOfThrown, storageCallRefused, storeQuotaTooSmall } from './refusals/throwers'
+export { datastoreQuotaTooSmall, refusalOfThrown, storageCallRefused } from './refusals/throwers'
 // What crosses a wire, for an adapter whose server runs a whole vaultDB: a refusal, and the parts of an answer that have no check of their own.
 export { type CrossedAct, type CrossedAnswered, type CrossedErr, CrossedChecks, crossedErrOf, refusedOverWire } from './shapes/shapes-crossed'
 // An IndexedDB adapter's own: each call's one transaction, the row at a key within it, and the versioned database.

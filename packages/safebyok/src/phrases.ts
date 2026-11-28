@@ -166,7 +166,7 @@ export const RecordOfOtherScope = "A write's record is at the scope its ask name
 export const TombstoneOverTombstone = "A tombstone is never written over a tombstone."
 
 /** A write that changes the leading lifeseqs of the cited lifepath. */
-export const LifepathNotKept = "A write's record leaves the leading lifeseqs of the lifepath it cites unchanged: only the last, its own, may change."
+export const LeadingLifeseqsMoved = "A write's record leaves the leading lifeseqs of the lifepath it cites unchanged: only the last, its own, may change."
 
 /** A write whose lifeseq does not follow. */
 export const LifeseqNotNext = "A write's record has the cited lifeseq when am stays, and the next one when am flips."
@@ -248,10 +248,10 @@ export function probeStepRefused(stepkind: string): string {
 export const ProbePutNotGot = "Storage answered the probe's get without the revision its put had just written: storage lost the write, or answered from a replica or cache that lags behind it."
 // --
 
-// == [Storage]: StoreQuotaTooSmall, storageCallRefused, WrittenOfOtherAct, ProposedNotWritten, TagsOfOtherRow, TagsOfOtherAsk, BanktokMissing, AnswerOfOtherManifest
+// == [Storage]: DatastoreQuotaTooSmall, storageCallRefused, WrittenOfOtherAct, ProposedNotWritten, TagsOfOtherRow, TagsOfOtherAsk, BanktokMissing, AnswerOfOtherManifest
 
 /** An IndexedDB database opened where the browser offers the page `quota` bytes, fewer than the `least` a vault needs. */
-export function StoreQuotaTooSmall(quota: number, least: number): string {
+export function DatastoreQuotaTooSmall(quota: number, least: number): string {
   return `This browser offers the page ${String(quota)} bytes of storage, and a vault needs at least ${String(least)}.`
 }
 

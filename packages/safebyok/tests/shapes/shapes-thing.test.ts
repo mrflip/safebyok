@@ -365,10 +365,10 @@ describe("AskChecks.getAsk and AskChecks.listAsk", () => {
 })
 
 describe("checkedWriteAsk(ask), of the gate", () => {
-  const ante   = TH.gateThingOf()
-  const next   = TH.nextGateOf(ante)
+  const prior  = TH.gateThingOf()
+  const next   = TH.nextGateOf(prior)
   // The helper builds an ask of any kind: this one is the gate's.
-  const good   = TH.replaceAskOf(ante, next)
+  const good   = TH.replaceAskOf(prior, next)
 
   it("accepts a birth and a replacement", () => {
     expect(checkedWriteAsk(TH.birthAskOf())).to.deep.equal(TH.birthAskOf())
@@ -377,11 +377,11 @@ describe("checkedWriteAsk(ask), of the gate", () => {
 
   const lifeseq1 = Lifeseq.ofLifenum(1)
   const lifeseq2 = Lifeseq.ofLifenum(2)
-  const noTestimony = { revtok: ante.revtok, revseq: 0, am: 'a' as const, lifepath: ante.lifepath }
+  const noTestimony = { revtok: prior.revtok, revseq: 0, am: 'a' as const, lifepath: prior.lifepath }
   const BadRecordCases: readonly (readonly [WriteAsk, string, string])[] = [
     // the record does not follow the one cited:
     [{ ...good, record: { ...next, revseq: 2 } },                                    Phrases.RevseqNotNext,      'a revseq that skips one'],
-    [{ ...good, record: { ...next, revtok: ante.revtok } },                          Phrases.RevtokNotNew,       'a revtok that is not new'],
+    [{ ...good, record: { ...next, revtok: prior.revtok } },                         Phrases.RevtokNotNew,       'a revtok that is not new'],
     [TH.birthAskOf(TH.gateThingOf({ revtok: Shell.Cited.revtok })),                  Phrases.RevtokNotNew,       'the void revtok'],
     [{ ...good, record: { ...next, lifeseq: lifeseq2, lifepath: lifeseq2 } },        Phrases.LifeseqNotNext,     'a new life where am stays'],
     [TH.birthAskOf(TH.gateThingOf({ born_at: TH.T0 - 1 })),                          Phrases.BornAtNotNow,       'a birth born before it is written'],
@@ -397,13 +397,13 @@ describe("checkedWriteAsk(ask), of the gate", () => {
     [{ ...good, record: { ...next, lifeseq: '000000000w' } },                        Phrases.LifeseqShape,       'a lifeseq digit past v'],
     [{ ...good, record: { ...next, label: 'main' } },                                Phrases.LabelNotLast,       'a label not the last of its labelpath'],
     [{ ...good, record: { ...next, wayins: {} } } as never,                         'wayins.main',              'a gate with no passphrase wayin'],
-    [TH.delAskFor(ante, { ...TH.gateTombOf(ante), wayins: ante.wayins } as never), 'wayins.main',           'a del whose tombstone keeps its wayins'],
+    [TH.delAskFor(prior, { ...TH.gateTombOf(prior), wayins: prior.wayins } as never), 'wayins.main',        'a del whose tombstone keeps its wayins'],
     // the citation is not a sound one:
     [{ ...good, cited: { ...Shell.Cited, revtok: TH.revtokOf('0') } },               Phrases.CitedHalfShell,     'a citation half the shell'],
     [{ ...good, cited: { revtok: TH.revtokOf('0'), revseq: 0 } } as never,                   'am',                       'a citation of too little'],
     [{ ...good, cited: { ...noTestimony, am: 'x' } },                                Phrases.LifeseqParity,      'a citation whose am its lifepath belies'],
-    [{ ...good, cited: { ...noTestimony, lifepath: `${Life0}/${Life0}` } },          Phrases.LifepathNotKept,    'a citation of another lifepath'],
-    [{ ...good, cited: { ...ante, wayins: {} } } as never,                          'wayins.main',              'a cited gate whose wayins fail'],
+    [{ ...good, cited: { ...noTestimony, lifepath: `${Life0}/${Life0}` } },          Phrases.LeadingLifeseqsMoved,    'a citation of another lifepath'],
+    [{ ...good, cited: { ...prior, wayins: {} } } as never,                         'wayins.main',              'a cited gate whose wayins fail'],
   ]
 
   for (const [ask, said, blurb] of BadRecordCases) {
@@ -456,8 +456,8 @@ describe("checkedWriteAsk(ask), of each kind", () => {
     [{ ...TH.delAskFor(box, tomb), ifPresent: 'fail' },                              Phrases.DelFlagsFixed,   'a del under ifPresent fail'],
     [{ ...TH.delAskFor(box, tomb), options: { policies: [] } },                      Phrases.DelFlagsFixed,   'a del naming storage policies'],
     [TH.replaceAskOf(box, TH.nextOf(box), { policies: ['add_passkey'] }),            Phrases.PolicyNotOwn,    'a box put naming a storage policy'],
-    [TH.birthAskOf(box),                                                             Phrases.LifepathNotKept,    'a box\'s birth citing a root\'s shell'],
-    [TH.birthAskOf(box, Shell.childCited(Lifeseq.ofLifenum(2))),                              Phrases.LifepathNotKept,    'a box\'s birth under another life of its parent'],
+    [TH.birthAskOf(box),                                                             Phrases.LeadingLifeseqsMoved,    'a box\'s birth citing a root\'s shell'],
+    [TH.birthAskOf(box, Shell.childCited(Lifeseq.ofLifenum(2))),                              Phrases.LeadingLifeseqsMoved,    'a box\'s birth under another life of its parent'],
     [TH.birthAskOf(TH.boxThingOf('openai', { lifepath: Life0 }), under),             Phrases.LifepathDepth,      'a box whose lifepath is shallower than its labelpath'],
     [TH.birthAskOf(TH.boxThingOf('openai', { label: 'other' }), under),              Phrases.LabelNotLast,       'a box whose label is not its last'],
     [TH.birthAskOf({ ...box, sidecar: undefined } as never, under),                  'sidecar',                  'a live box with no sidecar'],

@@ -6,7 +6,7 @@ import { Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
 import { sanitizeForeignError, unexpectedError } from 'safebyok-big/refusals/throwers'
 import * as Phrases from '../phrases'
 import { type ThingRecord } from '../shapes/shapes-thing'
-import { StoreLimitFloor } from '../shapes/shapes-vault-stats'
+import { DatastoreLimitFloor } from '../shapes/shapes-vault-stats'
 import { type ListAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
 import type { IncompatibleThing } from '../shapes/shapes-answers'
 import type { Refusaltag } from '../shapes/shapes-manifest'
@@ -58,7 +58,7 @@ export function thingSoonestBare(labelpath: string): Errors.VaultError {
 }
 // --
 
-// == [Write Throwers]: opNotOfRecord, revseqNotNext, revtokNotNew, recordOfOtherScope, tombstoneOverTombstone, lifepathNotKept, lifeseqNotNext, bornAtNotNow, testimonyMissing
+// == [Write Throwers]: opNotOfRecord, revseqNotNext, revtokNotNew, recordOfOtherScope, tombstoneOverTombstone, leadingLifeseqsMoved, lifeseqNotNext, bornAtNotNow, testimonyMissing
 // Each refuses a write ask, and its meta carries the loggable part of the ask.
 
 /** A `bad_record` refusal: a put's record is a tombstone, or a del's is live. */
@@ -81,7 +81,7 @@ export function tombstoneOverTombstone(ask: WriteAsk): Errors.VaultError {
 }
 
 /** A `bad_record` refusal: the record changes a leading lifeseq of the lifepath it cites. */
-export function lifepathNotKept(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.LifepathNotKept, { meta: { ask: loggableAskOf(ask) } }) }
+export function leadingLifeseqsMoved(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.LeadingLifeseqsMoved, { meta: { ask: loggableAskOf(ask) } }) }
 
 /** A `bad_record` refusal: the record's lifeseq is not the cited one, or the next one when am flips. */
 export function lifeseqNotNext(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.LifeseqNotNext, { meta: { ask: loggableAskOf(ask) } }) }
@@ -93,7 +93,7 @@ export function bornAtNotNow(ask: WriteAsk): Errors.VaultError { return new Erro
 export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
 // --
 
-// == [Storage Throwers]: RefusalkindForRefusaltag, taggedRefusal, storeQuotaTooSmall, storageCallRefused, rowOfOtherAddress, bankRootsMissing, banktokMissing, listParentNotLive, answerNotMade, writtenOfOtherAct, proposedNotWritten, tagsOfOtherRow, tagsOfOtherAsk, answerOfOtherManifest
+// == [Storage Throwers]: RefusalkindForRefusaltag, taggedRefusal, datastoreQuotaTooSmall, storageCallRefused, rowOfOtherAddress, bankRootsMissing, banktokMissing, listParentNotLive, answerNotMade, writtenOfOtherAct, proposedNotWritten, tagsOfOtherRow, tagsOfOtherAsk, answerOfOtherManifest
 
 /** The kind of refusal of a `policied` write, by the {@link Refusaltag} of its phrase. */
 export const RefusalkindForRefusaltag = {
@@ -114,9 +114,9 @@ export function taggedRefusal(ask: WriteAsk, { act, actual, refusaltag }: Readon
   return new Errors.VaultError(RefusalkindForRefusaltag[refusaltag], Phrases.PhraseForRefusaltag[refusaltag], { rows: { dbhas: actual }, meta })
 }
 
-/** A `storage_blocked` refusal: the browser's `quota` of bytes for the page is under {@link StoreLimitFloor}, too little for a vault. */
-export function storeQuotaTooSmall(quota: number): Errors.VaultError {
-  return new Errors.VaultError('storage_blocked', Phrases.StoreQuotaTooSmall(quota, StoreLimitFloor))
+/** A `storage_blocked` refusal: the browser's `quota` of bytes for the page is under {@link DatastoreLimitFloor}, too little for a vault. */
+export function datastoreQuotaTooSmall(quota: number): Errors.VaultError {
+  return new Errors.VaultError('storage_blocked', Phrases.DatastoreQuotaTooSmall(quota, DatastoreLimitFloor))
 }
 
 /** A `storage_issue` refusal: the vault's storage refused the call `oplabel`, and would refuse it again. What it threw is the cause. */

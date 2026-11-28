@@ -19,7 +19,7 @@ import type { PutAskDraft } from './shapes-asks'
 import type { WayinHeader } from './shapes-wayin'
 import type { Devicetok, Userid } from './primitives'
 
-// == [The form verbs' cleartexts]: CleartextChecks, BirthCleartexts, UnlockCleartexts, PassphraseReplaceCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, ProvedCleartexts, GatingCleartexts
+// == [The form verbs' cleartexts]: CleartextChecks, BirthCleartexts, UnlockCleartexts, ReplacePassphraseCleartexts, AddPasskeyCleartexts, RevokePasskeyCleartexts, ProvedCleartexts, GatingCleartexts
 
 // A gate change's proof is named as an `unlock` gating's, `passphraseCleartext` or `passkeyCleartext`, and what it puts in place is named `next…`.
 /** The checks of what {@link Bank.birth}, {@link Gate.unlock}, {@link Gate.replacePassphrase}, {@link Gate.addPasskey}, {@link Gate.revokePasskey} and a {@link Gating} are handed.
@@ -32,9 +32,9 @@ export const CleartextChecks = Validator.Checkers('bad_record', ({ obj, unk }) =
     gatingArgs:        obj({ passphraseCleartext: unk.optional(), passkeyCleartext: unk.optional(), nextPassphraseCleartext: unk.optional(), nextPasskeyCleartext: unk.optional() }).strict(),
     birth:             obj({ passphraseCleartext: GX.passphraseCleartext, passkeyCleartext: GX.freshPasskeyAnswer.nullable().optional() }).strict(),
     unlock:            obj(proof).strict().transform(oneProofOf),
-    passphraseReplace: obj({ ...proof, nextPassphraseCleartext: GX.passphraseCleartext }).strict().transform(({ nextPassphraseCleartext, ...given }, ctx) => ({ proof: oneProofOf(given, ctx), nextPassphraseCleartext })),
-    passkeyAdd:        obj({ passphraseCleartext: GX.passphraseCleartext, nextPasskeyCleartext: GX.freshPasskeyAnswer }).strict(),
-    passkeyRevoke:     obj(proof).strict().transform(oneProofOf),
+    replacePassphrase: obj({ ...proof, nextPassphraseCleartext: GX.passphraseCleartext }).strict().transform(({ nextPassphraseCleartext, ...given }, ctx) => ({ proof: oneProofOf(given, ctx), nextPassphraseCleartext })),
+    addPasskey:        obj({ passphraseCleartext: GX.passphraseCleartext, nextPasskeyCleartext: GX.freshPasskeyAnswer }).strict(),
+    revokePasskey:     obj(proof).strict().transform(oneProofOf),
   }
 })
 
@@ -53,16 +53,16 @@ export type BirthCleartexts = Z.input<typeof CleartextChecks.birth>
 export type UnlockCleartexts = Z.input<typeof CleartextChecks.unlock>
 
 /** The cleartexts {@link Gate.replacePassphrase} is handed: the proof, by the passphrase or the passkey's answer, and the new passphrase. */
-export type PassphraseReplaceCleartexts = Z.input<typeof CleartextChecks.passphraseReplace>
+export type ReplacePassphraseCleartexts = Z.input<typeof CleartextChecks.replacePassphrase>
 
 /** The cleartexts {@link Gate.addPasskey} is handed: the passphrase, and the new passkey's answer. */
-export type PasskeyAddCleartexts = Z.input<typeof CleartextChecks.passkeyAdd>
+export type AddPasskeyCleartexts = Z.input<typeof CleartextChecks.addPasskey>
 
 /** The cleartexts {@link Gate.revokePasskey} is handed: the proof, by the passphrase or the passkey's answer. */
-export type PasskeyRevokeCleartexts = Z.input<typeof CleartextChecks.passkeyRevoke>
+export type RevokePasskeyCleartexts = Z.input<typeof CleartextChecks.revokePasskey>
 
 /** The cleartexts a {@link Gating} adopts: any of the form verbs' fields. */
-export type GatingCleartexts = Partial<BirthCleartexts & UnlockCleartexts & PassphraseReplaceCleartexts & PasskeyAddCleartexts>
+export type GatingCleartexts = Partial<BirthCleartexts & UnlockCleartexts & ReplacePassphraseCleartexts & AddPasskeyCleartexts>
 
 /** One proof of a gate's way in, once checked: the passphrase, or the passkey's answer. */
 export type ProvedCleartexts = { passphraseCleartext: GX.PassphraseCleartext, passkeyCleartext?: never } | { passkeyCleartext: GX.PasskeyAnswer, passphraseCleartext?: never }

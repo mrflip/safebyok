@@ -267,7 +267,7 @@ export const policiesByModelkind = Object.freeze({ gate: EX.storagePolicyVals, b
 /** The check of a host's {@link VaultDB}, by {@link isVaultDB}. */
 const vaultDBShape = Validator.Checker(({ custom }) => custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected), 'bad_record')
 
-/** The checks of a Thing's fields, of its citation, of what a write reads of the ante Thing, and of a host's vaultDB.
+/** The checks of a Thing's fields, of its citation, of what a write reads of the prior Thing, and of a host's vaultDB.
  * Also `ThingFormat`, the `fmt` of every Thing, and `thingkindVals`, the kinds.
  */
 export const ThingChecks = Object.freeze({ ...GenericChecks, vaultDBShape, ThingFormat, thingkindVals })

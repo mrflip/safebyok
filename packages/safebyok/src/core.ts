@@ -25,7 +25,7 @@ export type { AddPasskeyGating, BirthGating, Gating, ReplacePassphraseGating, Re
 export { vacateHanded } from './models/gating'
 export { type Banklabel, type BoxLabelpath, type Devicetok, type EpochMillis, type Lifenum, type Lifepath, type Banktok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
-  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type IncompatibleThing, type GetThingAnswer, type GetBankAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside,
+  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type IncompatibleThing, type GetThingAnswer, type GetBankAnswer, type GoodAnswer, type KidLife, type Kids, type ListThingsAnswer, type ListedBeside,
   type WriteThingAnswer,
 } from './shapes/shapes-answers'
 export { type VaultDB, isVaultDB } from './storage/vault-db'
@@ -36,9 +36,9 @@ export {
   BankishChecks, DefaultBanklabel, PendingBank, SignedOutBank, ThingMakeChecks, bankStageVals, isRootShelf, isBank, leasekindVals, lifecyclekindVals,
 } from './shapes/shapes-bankish'
 export {
-  type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateFound, type GateGatingFriend, type GatingCleartexts, type GuardedKeyDeriver,
-  type GuardedStrengthChecker, type HandedCleartexts, type LeaseGate, type LeaseOpts, type LeaseShellScope, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type ProvedCleartexts, type ProvingDevice,
-  type ProvingOpts, type ProvingParts, type ReplacePassphraseDna, type RevokePasskeyDna, type SecretFieldname, type StrengthChecker, type UnlockCleartexts, type UnlockDna, type BankGateFriend, CleartextChecks,
+  type AddPasskeyCleartexts, type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateFound, type GateGatingFriend, type GatingCleartexts, type GuardedKeyDeriver,
+  type GuardedStrengthChecker, type HandedCleartexts, type LeaseGate, type LeaseOpts, type LeaseShellScope, type ProvedCleartexts, type ProvingDevice,
+  type ProvingOpts, type ProvingParts, type ReplacePassphraseCleartexts, type ReplacePassphraseDna, type RevokePasskeyCleartexts, type RevokePasskeyDna, type SecretFieldname, type StrengthChecker, type UnlockCleartexts, type UnlockDna, type BankGateFriend, CleartextChecks,
   FormSecretFieldnames, GateishChecks, GatingChecks,
 } from './shapes/shapes-gateish'
 export {

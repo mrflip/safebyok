@@ -11,8 +11,8 @@ import { type ReadTc, SeenChecks } from './shapes-vault-event'
 import type { VaultStats } from './shapes-vault-stats'
 import { PolicyPhrases } from '../phrases'
 
-// == [Tags]: ManifestChecks, PolicyVerdict, PolicyVerdicts, PolicyTag, Refusaltag, GetTags, WriteTags, RootTags, BirthTags, Presence, RevtokCmp, RevseqCmp, SameCmp, AnteWayins
-// Each tag spells the field it compares. A datastore makes them of the row it judged a write against, the ante row.
+// == [Tags]: ManifestChecks, PolicyVerdict, PolicyVerdicts, PolicyTag, Refusaltag, GetTags, WriteTags, RootTags, BirthTags, Presence, RevtokCmp, RevseqCmp, SameCmp, PriorWayins
+// Each tag spells the field it compares. A datastore makes them of the row it judged a write against, the prior row.
 
 /** The checks of what a datastore hands back: its tags, a listing's children, a birth's or a bank's roots, a watch's {@link Received}, its `tracked` and its `read_tc`. Each refuses `storage_issue`. */
 export const ManifestChecks = Validator.Checkers('storage_issue', ({ obj, arr, lit, str, bool, unk, oneof, discrim, custom }) => {
@@ -23,19 +23,19 @@ export const ManifestChecks = Validator.Checkers('storage_issue', ({ obj, arr, l
   const policyVerdict  = discrim('ok', [obj({ ok: lit(true) }).strict(), obj({ ok: lit(false), refusaltag: policyTag }).strict()])
   const policyVerdicts = obj({ replace_passphrase: policyVerdict.optional(), add_passkey: policyVerdict.optional(), revoke_passkey: policyVerdict.optional() }).strict()
   const writeTags      = obj({
-    /** The ante row's liveness: none (`void`), a tombstone (`gone`), or live. */
+    /** The prior row's liveness: none (`void`), a tombstone (`gone`), or live. */
     presence,
-    /** The ante row's revtok against the ask's: see {@link RevtokCmp}. */
+    /** The prior row's revtok against the ask's: see {@link RevtokCmp}. */
     revtok_cmp:  revtokCmp,
-    /** The ask's cited revseq against the ante row's: see {@link RevseqCmp}. */
+    /** The ask's cited revseq against the prior row's: see {@link RevseqCmp}. */
     revseq_cmp:  oneof(['birth', 'eq', 'stale', 'ahead']),
-    /** True when the ante row's lifepath is the cited one, or where there is no ante row. */
+    /** True when the prior row's lifepath is the cited one, or where there is no prior row. */
     lifepath_eq: bool,
-    /** A live record over a live ante row: whether it leaves the born_at the same. `'moot'` for any other write. */
+    /** A live record over a live prior row: whether it leaves the born_at the same. `'moot'` for any other write. */
     born_at_cmp: sameCmp,
     /** A write of a gate over a live gate: whether it leaves the banktok the same. `'moot'` for any other write. */
     banktok_cmp: sameCmp,
-    /** One verdict for each storage policy the ask names, and no other: met wherever the ante row is no live gate. */
+    /** One verdict for each storage policy the ask names, and no other: met wherever the prior row is no live gate. */
     policies:    policyVerdicts,
     /** True when the datastore's own predicate wrote the proposed record. */
     written:     bool,
@@ -77,10 +77,10 @@ export type Refusaltag = 'BornAtMoved' | 'BanktokMoved' | PolicyTag
 /** The tag the get table reads: the actual row's `presence`. */
 export type GetTags = Readonly<Z.infer<typeof ManifestChecks.getTags>>
 
-/** The comparisons the put and del tables read, as the datastore made them of the ante row against the ask, and whether it wrote. */
+/** The comparisons the put and del tables read, as the datastore made them of the prior row against the ask, and whether it wrote. */
 export type WriteTags = Readonly<Z.infer<typeof ManifestChecks.writeTags>>
 
-/** The comparisons the put table reads of one root's put in a birth, as the datastore made them of the ante root against the put: a write's tags, but for `written`, which is the birth's. */
+/** The comparisons the put table reads of one root's put in a birth, as the datastore made them of the prior root against the put: a write's tags, but for `written`, which is the birth's. */
 export type RootTags = Readonly<Z.infer<typeof ManifestChecks.rootTags>>
 
 /** The {@link RootTags} of each of a birth's two roots, by its ckey in {@link BankRoots}, and whether the datastore wrote. */
@@ -89,27 +89,27 @@ export type BirthTags = Readonly<Z.infer<typeof ManifestChecks.birthTags>>
 /** A row's liveness: none (`void`), a tombstone (`gone`), or live. */
 export type Presence = WriteTags['presence']
 
-/** The ante row's revtok against the ask's.
- * - `'birth'` -- cited the shell, and there is no ante row
- * - `'=next'` -- the ante row has the revtok this ask would write
- * - `'eq'`    -- cited exactly the ante row's revtok
+/** The prior row's revtok against the ask's.
+ * - `'birth'` -- cited the shell, and there is no prior row
+ * - `'=next'` -- the prior row has the revtok this ask would write
+ * - `'eq'`    -- cited exactly the prior row's revtok
  * - `'neq'`   -- anything else
  */
 export type RevtokCmp = WriteTags['revtok_cmp']
 
-/** The ask's cited revseq against the ante row's.
+/** The ask's cited revseq against the prior row's.
  * - `'birth'` -- cited the shell
- * - `'eq'`    -- cited exactly the ante row's revseq
+ * - `'eq'`    -- cited exactly the prior row's revseq
  * - `'stale'` -- cited an older revision: a write has intervened
- * - `'ahead'` -- cited a newer revision, or a revision where there is no ante row: an impossible situation
+ * - `'ahead'` -- cited a newer revision, or a revision where there is no prior row: an impossible situation
  */
 export type RevseqCmp = WriteTags['revseq_cmp']
 
 /** Whether a write leaves a field the same, changes it, or is a write the field's rule does not judge (`'moot'`). */
 export type SameCmp = WriteTags['born_at_cmp']
 
-/** The wayins of the ante gate as a datastore read them, each field unchecked: what a storage policy judges. */
-export type AnteWayins = Readonly<Record<string, unknown>>
+/** The wayins of the prior gate as a datastore read them, each field unchecked: what a storage policy judges. */
+export type PriorWayins = Readonly<Record<string, unknown>>
 // --
 
 // == [Manifests]: BankObserved, GetManifest, WriteManifest, ListManifest, RootRows, BirthManifest, GetBankManifest, StatsManifest, CheckedBankObserved, CheckedManifestRows, CheckedRoots, ListedChild, CheckedGetManifest, CheckedWriteManifest, CheckedListManifest, CheckedBirthManifest, CheckedGetBankManifest, CheckedStatsManifest, ScribedGetManifest, ScribedWriteManifest, ScribedListManifest, ScribedBirthManifest, Received
@@ -142,9 +142,9 @@ export interface GetManifest extends BankObserved {
  * The vaultDB writes onto the manifest it is handed, so hand it a new one each step.
  */
 export interface WriteManifest extends BankObserved {
-  /** The write's tags, made of the ante row, the row the write was judged against, and whether the datastore wrote. */
+  /** The write's tags, made of the prior row, the row the write was judged against, and whether the datastore wrote. */
   tags: WriteTags
-  /** The row written where the datastore wrote, else the ante row; null for none. */
+  /** The row written where the datastore wrote, else the prior row; null for none. */
   actual: unknown
   /** Where `actual` is null, the nearest row above the scope, live or a tombstone, null for none: it gives the shell's lifepath. Read nowhere else. */
   ancestor: unknown
