@@ -22,7 +22,8 @@ export type Thingkind = typeof thingkindVals[number]
 /** A model's `modelkind`: a kind of Thing, or one of the models that are never stored. */
 export type Modelkind = Thingkind | 'device' | 'wayin' | 'lease' | 'proving'
 
-/** The `fmt` of every Thing, of every kind: the kind is in its `modelkind`. Distinct from big's rows' fmts (3001, 4001, 5003), which are numbers. */
+// Distinct from big's rows' fmts (3001, 4001, 5003), which are numbers.
+/** The `fmt` of every Thing, of every kind: the kind is in its `modelkind`. */
 export const ThingFormat = 'a010502'
 
 /** True when `labelpath` is one some kind of Thing may have: one label alone, as a gate's is, or a box's. */

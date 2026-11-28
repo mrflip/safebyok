@@ -159,7 +159,7 @@ export const SeenChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom
     .refine(({ val, ...scope }) => BaseThing.haveSameScope(val, scope), Phrases.EventOfOtherThing)
     .refine(({ val }) => isSeenForm(val as SeenThing), Phrases.SeenFormUnknown)
     .refine(({ val, liveness }) => itemSeenOf(val as SeenThing).liveness === liveness, Phrases.EventLiveness)
-  /** Check an `item` event whole: as `item` does, and its kind, who dispatched it, its bank's banktok and its ageranks. */
+  /** Check an `item` event whole: its scope, record, liveness and `read_tc`, and its kind, who dispatched it, its bank's banktok and its ageranks. */
   const itemEvent = item.and(obj({
     eventkind:   lit('item'),
     sourcelabel: ThingChecks.label,
