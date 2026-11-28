@@ -114,7 +114,6 @@ export class Bank {
   /** The token minted when this bank was born, which tells this life of the bank from any other under its banklabel: the void banktok while its gate models the shell. */
   get banktok(): Banktok { return this.gate.banktok }
 
-  // Every read of the lease's end goes through here: the janitor's, and isSoftlocked's.
   /** When the attached lease stops unlocking the bank, or null while locked. */
   get leaseEndsAt(): EpochMillis | null { return this.#lease?.ends_at ?? null }
 
