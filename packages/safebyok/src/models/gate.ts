@@ -223,11 +223,9 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   }
   // --
 
-  // == [The gatings' private verbs]: unlockByProving, buildLease, putGate
+  // == [The gatings' private verbs]: unlockByProving, putGate
 
-  /** Unlock this gate's bank under a lease `proved` builds, citing the revision this gate models, and stow the lease in the deviceDB for every tab.
-   * The lease follows the one stored, or the bank's where that is newer: after a live lease it is that lease's next revision, a renewal keeping its `born_at`; after a lock's tombstone it starts the next life.
-   */
+  /** Unlock this gate's bank under a lease `proved` builds, citing the revision this gate models, and stow the lease in the deviceDB for every tab. */
   async #unlockByProving(proved: Proving): Promise<this> {
     const followed = await this.#friend.leaseFollowed(this)
     const lease    = await proved.buildLease(this.#bank, this, followed)

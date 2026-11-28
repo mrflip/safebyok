@@ -35,7 +35,6 @@ export type SomeThing = Gate | Box
  * It exists once its device is made, labelled and unstored. From sign-in on it has a gate and a root box, each modelling the shell until its record is received: it seals, unseals and unlocks only once both are live.
  * Made with its device, it lives as long. Its gate builds leases and attaches them to it, and boxes are sealed and unsealed under the attached lease, which no member hands out.
  * While connected, its lease is the one its device's deviceDB has, which every tab given that deviceDB shares: an unlock, a renewal or a lock in one tab reaches the rest.
- * Its snapshot's stage is read from the gate and the root box in its VaultMinder, each of which it subscribes to, and from the lease.
  */
 export class Bank {
   // == [Props]: #device, #vaultMinder, #lease, #unlockWait, #isConnected, #unlisten, #janitor, #lastErr, #vaults, #snapshot, #subscribers, #getSnapshot, #subscribe, #bulletproofCallback
@@ -213,7 +212,7 @@ export class Bank {
   }
 
   // Each root's Thing receives it before this listener hears of it, so the roots stowed are the ones this bank shows.
-  /** Put this bank's roots on `shelf` at each root `vaultMinder` tells of, or remove them while they are not all live. */
+  /** Stow this bank's roots on `shelf` each time `vaultMinder` delivers an item event of a root. */
   #startShelving(vaultMinder: VaultMinder, shelf: RootShelf): void {
     const hear = this.#bulletproofCallback((event: VaultEvent) => {
       if ((event.eventkind === 'item') && this.#isRootScope(event)) { stowRoots(shelf, this.#device.scope, this) }
@@ -361,7 +360,7 @@ export class Bank {
 
   // The watch starts before the vaults hear it, so that what a vault refetches as it connects is fetched under the watch.
   /** Start this bank's watch and listeners, and take up the lease the deviceDB has. Never throws.
-   * It starts its VaultMinder's watch of the vaultDB, once someone signs in, the deviceDB's listener, and each vault it hosts hearing the VaultMinder. A call once the device is disabled does nothing.
+   * A call once the device is disabled does nothing.
    * What the host's vaultDB or deviceDB throws goes to the device's `onBadNews`; a later call, or the janitor's next tick, starts the watch again. A call while the watch runs leaves it running.
    */
   connect(): this {
@@ -377,7 +376,6 @@ export class Bank {
   // A disconnect drops this tab's lease alone, and stows no tombstone: one tab unmounting its provider locks no other.
   // Only a lock, the janitor's autolock among them, ends the lease in every tab.
   /** Drop this bank's lease in this tab alone, and stop its watch and listeners. Never throws, and calling it twice in a row is the same as once.
-   * It stops the deviceDB's listener, each vault it hosts hearing the VaultMinder, and the VaultMinder's watch of the vaultDB.
    * The bank stays enabled: its verbs still work, a call waiting in {@link ensureUnlocked} still waits, and {@link connect} resumes it, taking up the lease the deviceDB has.
    * What the host's vaultDB or deviceDB throws as they stop goes to the device's `onBadNews`.
    */
@@ -668,7 +666,7 @@ export class Bank {
   /** True once the vaultDB's answer for the gate has been received, whatever it found */
   #isGateRead(): boolean { return this.#rootCars().gate.agekind !== 'vacant' }
 
-  /** True of the scope of one of this bank's roots, which the stage is read from */
+  /** True of the scope of this bank's gate or root box */
   #isRootScope(scope: ThingScope): boolean { return Object.values(rootScopesOf(this.#device.scope)).some((root) => BaseThing.haveSameScope(root, scope)) }
   // --
 
@@ -678,7 +676,7 @@ export class Bank {
   // last of them to arrive live brings `'locked'`, so a birth shows no stage between `'unborn'` and `'locked'`.
   // The softlock is at once, so a grant under way in this tab follows it; the lease stored is taken up once the roots
   // are live, as when they first arrive.
-  /** Softlock the lease where the gate has moved past it; while connected, follow the lease the deviceDB has; and realign, once both roots are live or the gate is not. */
+  /** Bring the lease and the snapshot up to date with a change to a root. */
   #hearRoot(): void {
     this.#softlockPastGate()
     if (this.#isConnected) { void this.#followStored() }
