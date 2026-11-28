@@ -4,42 +4,42 @@
 // such as urql's cacheExchange, has it dropped again one selection at a time.
 
 const err = 'err { refusalkind message meta { oplabel act capacity fieldnames labelpaths } }'
-const answerFields = `ok act banktok tracked read_tc dbhas ${err}`
+const answerFields = `ok act banktok tracked read_tc ${err}`
 
 /** Each GraphQL document `GraphQLVaultDB` sends, keyed by its verb: for a server that allows only the operations it knows. */
 export const VaultOperations = Object.freeze({
   getThing: `query SafebyokGetThing($ask: SafebyokGetAsk!) {
-  safebyokGetThing(ask: $ask) { ${answerFields} val }
+  safebyokGetThing(ask: $ask) { ${answerFields} val dbhas }
 }`,
 
   listThings: `query SafebyokListThings($ask: SafebyokListAsk!) {
   safebyokListThings(ask: $ask) {
-    ${answerFields}
+    ${answerFields} dbhas
     val { modelkind parentpath parentlife items gones read_tc }
-    parentage deltas incompatible_rows { userid banklabel labelpath am }
+    parentage deltas incompatible_rows { modelkind userid banklabel labelpath am }
   }
 }`,
 
-  getWorld: `query SafebyokGetWorld($ask: SafebyokBankAsk!) {
-  safebyokGetWorld(ask: $ask) { ${answerFields} val { bank gate root } }
+  getBank: `query SafebyokGetBank($ask: SafebyokBankAsk!) {
+  safebyokGetBank(ask: $ask) { ${answerFields} val { gate root } dbhas { gate root } }
 }`,
 
   stats: `query SafebyokStats($ask: SafebyokBankAsk!) {
   safebyokStats(ask: $ask) {
-    ${answerFields}
+    ${answerFields} dbhas
     val { box { count live_count size } gate { count live_count size } max { count size } }
   }
 }`,
 
   writeThing: `mutation SafebyokWriteThing($ask: SafebyokWriteAsk!) {
-  safebyokWriteThing(ask: $ask) { ${answerFields} val }
+  safebyokWriteThing(ask: $ask) { ${answerFields} val dbhas }
 }`,
 
   birthBank: `mutation SafebyokBirthBank($ask: SafebyokBirthBankAsk!) {
-  safebyokBirthBank(ask: $ask) { ${answerFields} val { bank gate root } }
+  safebyokBirthBank(ask: $ask) { ${answerFields} val { gate root } dbhas { gate root } }
 }`,
 
   watchThings: `subscription SafebyokWatchThings($scope: SafebyokWatchScope!) {
-  safebyokWatchThings(scope: $scope) { record banktok read_tc ${err} isEnded }
+  safebyokWatchThings(scope: $scope) { record modelkind banktok read_tc ${err} isEnded }
 }`,
 })

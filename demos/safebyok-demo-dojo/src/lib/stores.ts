@@ -8,7 +8,7 @@ import { Fixture, type ShelvedRow, type StoredRow } from './fixture'
 // `things`; the root shelf's key, `safebyok:roots:<banklabel>:<userid>`, is read from the core's source
 // (src/minding/root-shelf.ts).
 /** The vault database: what the backend would store. */
-const VaultShelf: UseStore = createStore(`safebyok-${DojoDBName}:vault-v001-001-001`, 'things')
+const VaultShelf: UseStore = createStore(`safebyok-${DojoDBName}:vault-v002-001-001`, 'things')
 
 /** The start of each key the device keeps a bank's roots under in localStorage. */
 const RootShelfCkeyPrefix = 'safebyok:roots:'

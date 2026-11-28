@@ -19,7 +19,7 @@ const saveKeyAction = Knock.putBoxAction(KeyLabelpath, {
 
 /** The saved key: its mask, Show, and, while unlocked, the editor and Delete. */
 export function KeyPanel() {
-  const isLocked = Knock.useWorld((snap) => snap.isLocked)
+  const isLocked = Knock.useBank((snap) => snap.isLocked)
   const { data: box } = Knock.useBox(KeyLabelpath)
   return (
     <section aria-labelledby="key-title" className="card">

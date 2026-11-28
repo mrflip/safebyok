@@ -246,7 +246,7 @@ Don't hypothesize a caller ("What a birth asks after each wait."): what does thi
 **Gallant:**
 
 ```ts
-/** Demand that the bank still holds `entry` at `vaultScopepath`. */
+/** Demand that the minder still has a live thing at `vaultScopepath`. */
 ```
 
 ## A private helper gets a phrase, second specimen `#a-helper-gets-a-phrase`
@@ -467,7 +467,7 @@ States the 'vault_full' a caller meets in normal use, and gives no recipe for it
 
 ```ts
 // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-/** A soft cap on the boxes a vault holds. Default: the smaller of {@link MaxBoxes}, 100, and the `maxBoxes` the bankDB adapter advises.
+/** A soft cap on a bank's box count. Default: the smaller of {@link MaxBoxes}, 100, and the `maxBoxes` the bankDB adapter advises.
  * A box past it refuses `'vault_full'`: delete one first, or relaunch with a larger value. Replacing or reading a box is
  * always allowed, even over the limit. Lowering it against a live datastore is unspecified behavior.
  */

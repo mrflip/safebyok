@@ -6,10 +6,10 @@ import { EnvList } from './EnvList'
 
 /** The page below the header, by the bank's stage. The unlock dialog is mounted at every stage, and opens while a value waits for the passphrase. */
 export function EnvmanPage({ username }: Readonly<{ username: string | undefined }>) {
-  const world = Envman.useWorld()
+  const bank = Envman.useBank()
   return (
     <>
-      {screenOf(world.stage, username, world.lastErr?.message)}
+      {screenOf(bank.stage, username, bank.lastErr?.message)}
       <UnlockDialog username={username} />
     </>
   )

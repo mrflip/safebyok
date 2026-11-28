@@ -27,7 +27,7 @@ function readTcOf(chunk: number): ReadTc { return `${tcchunkOf(chunk)}-0000-7000
 /** The tcchunk a read_tc in `chunk` begins with */
 function tcchunkOf(chunk: number): string { return chunk.toString(16).padStart(8, '0') }
 
-/** The item event of `record` read at `read_tc`, as a VaultMinder builds it, with no source or bank lifetok */
+/** The item event of `record` read at `read_tc`, as a VaultMinder builds it, with no source or bank banktok */
 function eventOf(record: SeenThing, read_tc: ReadTc = readTcOf(0)): VaultItemEvent {
   return { ...TH.itemEventOf(record), read_tc }
 }
@@ -81,7 +81,7 @@ describe("Thing.receive", () => {
 
   it("answers false for a life or aged event, and changes nothing", () => {
     const soon = TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 3 }))
-    const car  = ThingCar.make(Thing.shellOf(soon), { world: TH.PlainWorld })
+    const car  = ThingCar.make(Thing.shellOf(soon), { bank: TH.PlainCarBank })
     const [, life, aged] = car.receive(eventOf(soon))
     const [thing] = received(undefined, whole2)
     for (const event of [life, aged]) { expect(thing.receive(event as never)).to.eq(false) }
@@ -247,10 +247,10 @@ describe("Thing's props and record", () => {
     expect(Object.getOwnPropertyNames(thing)).to.have.members(Object.keys(Thing.sparseOf(record)))
   })
 
-  it("sets every Thing field non-writable, its scope fields non-configurable and the rest configurable", () => {
+  it("sets every Thing field non-writable, its scope fields and modelkind non-configurable and the rest configurable", () => {
     const record = TH.boxThingOf()
     const thing = TH.PlainThing.make(eventOf(record))
-    const scopeFieldnames = new Set(['userid', 'banklabel', 'labelpath'])
+    const scopeFieldnames = new Set(['userid', 'banklabel', 'labelpath', 'modelkind'])
     const thingFieldnames = Object.keys(Thing.sparseOf(record))
     for (const fieldname of thingFieldnames) {
       const configurable = ! scopeFieldnames.has(fieldname)

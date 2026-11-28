@@ -1,32 +1,32 @@
 /** The answers a vaultDB's verbs resolve. */
 
 import type { EX, Errors } from 'safebyok-big/internals'
-import type { Labelpath, Lifepath, Lifeseq, Lifetok } from './primitives'
+import type { Labelpath, Lifepath, Lifeseq, Banktok } from './primitives'
 import type { ThingRecord, ThingScope, VoidSentinel } from './shapes-thing'
 import type { SparseOf, TombstoneOf } from './shapes-sealers'
-import type { BankRoots, LoggableAsk, Tracked, WorldRoots } from './shapes-asks'
+import type { BankRoots, LoggableAsk, Tracked, ActualRoots } from './shapes-asks'
 import type { ReadTc } from './shapes-vault-event'
 import type { VaultStats } from './shapes-vault-stats'
 
-// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, IncompatibleThing, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer, GetWorldAnswer, StatsAnswer
-// No check reads an answer whole: `AdapterVaultDB` makes each of parts it has checked, and a reader checks each record it
-// keeps where a Thing takes it.
+// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, IncompatibleThing, KidLife, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer, GetBankAnswer, StatsAnswer
+// No check reads an answer whole: `AdapterVaultDB` builds each answer from parts it has checked, and a reader checks each
+// record when a Thing receives it.
 
 /** A vaultDB verb's good answer: its `val`, the `act` that says what the datastore did, the loggable part of its `ask`, and when its step read the datastore (`read_tc`).
- * `banktok` is the lifetok of the bank as the step left it, or the void lifetok where none is stored or it fails its checks.
- * `tracked` says for each of the bank, its main gate and its root box whether it is still at the revision the ask tracks ({@link Tracked}).
+ * `banktok` is that of the bank's gate as the step left it, or the void banktok where none is stored or it fails its checks.
+ * `tracked` says for each of the bank's gate and its root box whether it is still at the revision the ask tracks ({@link Tracked}).
  */
-export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, banktok: Lifetok, tracked: Tracked, read_tc: ReadTc, val: ValT }
+export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, banktok: Banktok, tracked: Tracked, read_tc: ReadTc, val: ValT }
 
-/** A refused answer's act: big's, or `policied` for a write that a storage policy, a changed born_at or a changed lifetok refuses. */
+/** A refused answer's act: big's, or `policied` for a write that a storage policy, a changed born_at or a changed banktok refuses. */
 export type BadAct = EX.BadAct | 'policied'
 
 /** A vaultDB verb's refused answer: its `err` and `act`, the actual Thing (`dbhas`), the loggable part of its `ask`, and when its step read the datastore (`read_tc`).
  * Where nothing is stored at the ask's scope, `dbhas` is the shell there, under the nearest Thing stored above it (see {@link GetThingAnswer}).
  * `banktok` is as for a {@link GoodAnswer}.
- * If the verb threw, `banktok` is the void lifetok, `tracked` is `'unread'`, `read_tc` is when it was refused, and `dbhas` is the Thing the refusal names, or null where it names none.
+ * If the verb threw, `banktok` is the void banktok, `tracked` is `'unread'`, `read_tc` is when it was refused, and `dbhas` is the Thing the refusal names, or null where it names none.
  */
-export type BadAnswer<DbhasT = ThingRecord | VoidSentinel | null> = { ok: false, ask: LoggableAsk, act: BadAct, banktok: Lifetok, tracked: Tracked | 'unread', read_tc: ReadTc, dbhas: DbhasT, err: Errors.VaultError }
+export type BadAnswer<DbhasT = ThingRecord | VoidSentinel | null> = { ok: false, ask: LoggableAsk, act: BadAct, banktok: Banktok, tracked: Tracked | 'unread', read_tc: ReadTc, dbhas: DbhasT, err: Errors.VaultError }
 
 /** A vaultDB verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. Never thrown. */
 export type Answer<ValT, ActT extends EX.GoodAct> = GoodAnswer<ValT, ActT> | BadAnswer
@@ -51,7 +51,7 @@ export type WriteThingAnswer = Answer<ThingRecord, EX.PutAct | EX.DelAct>
 export type IncompatibleThing = Readonly<ThingScope & { am: 'd' }>
 
 /** One child in a {@link Kids} value: the lifeseq of its life as the list read it. */
-export type KidEntry = Readonly<{ lifeseq: Lifeseq }>
+export type KidLife = Readonly<{ lifeseq: Lifeseq }>
 
 // Keyed by label, not labelpath. JavaScript orders an object's keys that look like whole numbers first, so a reader that
 // needs labelpath order sorts the labels.
@@ -62,12 +62,12 @@ export type Kids = Readonly<{
   modelkind:  'kids'
   parentpath: Labelpath
   parentlife: Lifepath
-  items:      Readonly<Record<string, KidEntry>>
-  gones:      Readonly<Record<string, KidEntry>>
+  items:      Readonly<Record<string, KidLife>>
+  gones:      Readonly<Record<string, KidLife>>
   read_tc:    ReadTc
 }>
 
-/** What a listing answer carries beside its `val` or `dbhas`, each empty when refused. A live box is carried sparse, and any other Thing whole:
+/** The records a list's answer carries beside its `val` or `dbhas`, each empty when refused. A live box is carried sparse, and any other Thing whole:
  * - `parentage`    -- the parent
  * - `deltas`       -- each child the `val` names, in labelpath order
  * - `incompatible_rows` -- each child that fails its kind's checks
@@ -86,11 +86,14 @@ export type ListThingsAnswer<RecordT extends ThingRecord = ThingRecord> =
   | (GoodAnswer<Kids, 'gotlive'> & ListedBeside<RecordT>)
   | (BadAnswer & ListedBeside<RecordT>)
 
-/** The answer to `tryBirthBank`: the three roots written (`born`), or the actual roots of a bank already live (`passed`). Refused, its `dbhas` is the actual root that refused it. */
-export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
+/** The answer to `tryBirthBank`: the two roots written (`born`), or the actual roots of a bank already live (`passed`).
+ * Refused, its `dbhas` is the bank's two roots as the step read them ({@link ActualRoots}), and its act is the gate's put's refusal, else the root box's.
+ * If the verb threw, `dbhas` is null.
+ */
+export type BirthBankAnswer = GoodAnswer<BankRoots, 'born' | 'passed'> | BadAnswer<ActualRoots | null>
 
-/** The answer to `tryGetWorld`: the bank's three roots ({@link WorldRoots}), under the act `got`. Only a verb that threw refuses it. */
-export type GetWorldAnswer = Answer<WorldRoots, 'got'>
+/** The answer to `tryGetBank`: the bank's two roots ({@link ActualRoots}), under the act `got`. Only a verb that threw refuses it. */
+export type GetBankAnswer = Answer<ActualRoots, 'got'>
 
 /** The answer to `tryStats`: the bank's storage stats ({@link VaultStats}), under the act `got`. Only a verb that threw refuses it. */
 export type StatsAnswer = Answer<VaultStats, 'got'>

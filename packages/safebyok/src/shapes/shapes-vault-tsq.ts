@@ -30,7 +30,7 @@ export type VaultTSQOpts = Readonly<{
   vaultMinder: VaultMinder
   /** The client the items and listings are kept in: a host's own, or one made for the bank. */
   queryClient: TSQ.QueryClient
-  /** The bank. */
+  /** The bank's scope. */
   scope:       BankScope
   /** Hears each refusal no caller waits on: a record the VaultMinder refuses, or what the vault TSQ fails to keep. Default: none hears it. */
   onBadNews?:  ((news: Errors.VaultError) => void) | undefined
@@ -81,7 +81,7 @@ export const VaultTSQChecks = Validator.Checkers('bad_record', ({ obj, custom, f
 })
 
 /** The members of a QueryClient a VaultTSQ calls. */
-const QueryClientMembernames = ['setQueryDefaults', 'setMutationDefaults', 'getQueryData', 'setQueryData', 'query', 'invalidateQueries', 'resetQueries'] as const
+const QueryClientMembernames = ['setQueryDefaults', 'getQueryData', 'setQueryData', 'query', 'invalidateQueries', 'resetQueries'] as const
 
 /** True for an object with a function for each member of a QueryClient a VaultTSQ calls. */
 export function isQueryClient(val: unknown): val is TSQ.QueryClient {

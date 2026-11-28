@@ -12,7 +12,7 @@ export const SOK = reactGiver({
   strengthChecker: zxcvbnStrengthChecker,
 })
 
-// PascalCase, so the rules-of-hooks lint checks Envman.useWorld() as a hook.
+// PascalCase, so the rules-of-hooks lint checks Envman.useBank() as a hook.
 /** The hooks and calls of the app's one bank. */
 export const Envman = SOK.bank('envman')
 

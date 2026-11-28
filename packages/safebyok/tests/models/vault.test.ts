@@ -6,11 +6,11 @@ import type { Device } from '../../src/models/device'
 import { Vault } from '../../src/models/vault'
 import { VaultTSQ } from '../../src/minding/vault-tsq'
 import { type BadNews, type BoxUnsealed } from '../../src/shapes/shapes-bankish'
-import type { LiveOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
+import type { LiveOf, ShellOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
 import { type BoxLabelpath, Lifeseq } from '../../src/shapes/primitives'
 import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
-import { StoreLimitCap } from '../../src/shapes/shapes-vault-stats'
+import { DatastoreLimitCap } from '../../src/shapes/shapes-vault-stats'
 import { Thing } from '../../src/models/thing'
 import type { ThingCar } from '../../src/minding/thing-car'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -32,19 +32,22 @@ const Life2 = Lifeseq.ofLifenum(2)
 const Life3 = Lifeseq.ofLifenum(3)
 
 /** The scope of the box at {@link Openai} in `bank`. */
-function openaiScopeOf(bank: Bank) { return { ...bank.scope, labelpath: Openai } }
+function openaiScopeOf(bank: Bank) { return { ...bank.scope, modelkind: 'box', labelpath: Openai } as const }
+
+/** The shell of the box at {@link Openai}, under `bank`'s root box. */
+function openaiShellOf(bank: Bank): ShellOf<BoxRecord> { return Shell.of(openaiScopeOf(bank), bank.rootBox) }
 
 /** The rows of `bank`'s MemoryVaultDB, by labelpath, to plant a record as another device would, notifying no watch. */
-function rowsOf(bank: Bank): Map<string, unknown> { return (bank.device.vaultDB as MemoryVaultDB)._cheat_things(bank.scope) }
+function rowsOf(bank: Bank): Map<string, unknown> { return (bank.device.vaultDB as MemoryVaultDB)._cheat_things(bank.scope).box }
 
-/** The Thing `vault`'s device's world holds at {@link Openai}, or undefined for none. */
+/** The Thing `vault`'s device's bank holds at {@link Openai}, or undefined for none. */
 function boxAt(vault: Vault): Box | undefined {
-  const thing = vault.bank.device.world.demandVaultMinder().thingAt(openaiScopeOf(vault.bank))
+  const thing = vault.bank.device.bank.demandVaultMinder().thingAt(openaiScopeOf(vault.bank))
   return (thing instanceof Box) ? thing : undefined
 }
 
-/** The car `vault`'s device's world keeps at {@link Openai}, or undefined for none. */
-function carAt(vault: Vault): ThingCar | undefined { return vault.bank.device.world.demandVaultMinder().carAt(openaiScopeOf(vault.bank)) }
+/** The car `vault`'s device's bank keeps at {@link Openai}, or undefined for none. */
+function carAt(vault: Vault): ThingCar | undefined { return vault.bank.device.bank.demandVaultMinder().carAt(openaiScopeOf(vault.bank)) }
 
 /** What `vault`'s device's QueryClient keeps in the item of {@link Openai}. */
 function itemAt(vault: Vault): unknown {
@@ -79,36 +82,36 @@ function answerWritesUntimed(bank: Bank): void {
 async function buildVaultBeside(bank: Bank): Promise<Vault> {
   const device = TH.makeDevice({}, { vaultDB: bank.device.vaultDB })
   await device.signin(TH.WorldScope.userid)
-  await device.bank!.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+  await device.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
   return device.vault!
 }
 
-describe("Vault.make(world, vaultTSQ)", () => {
-  it("makes the vault of the boxes of the world's bank, over the vault TSQ given", async () => {
+describe("Vault.make(bank, vaultTSQ)", () => {
+  it("makes the vault of the boxes of the bank, over the vault TSQ given", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const vault = Vault.make(device.world, device.vaultTSQ)
+    const vault = Vault.make(device.bank, device.vaultTSQ)
     expect(vault.bank).to.equal(bank)
     expect(Object.isFrozen(vault)).to.be.true
   })
 
-  const NotWorldCases = [
+  const NotBankCases = [
     [() => null,                                 'null'],
     [(device: Device) => device,                 'the device'],
     [(device: Device) => device.vaultTSQ,        'a vault TSQ'],
     [() => ({ hostVault: noop }),                'an object with hostVault alone'],
   ] as const
 
-  for (const [worldOf, blurb] of NotWorldCases) {
-    it(`refuses ${blurb} as its world, as 'bad_record'`, async () => {
+  for (const [notBankOf, blurb] of NotBankCases) {
+    it(`refuses ${blurb} as its bank, as 'bad_record'`, async () => {
       const { device } = await TH.buildBornBank()
-      const err = TH.expectSyncRefusal(() => Vault.make(worldOf(device) as never, device.vaultTSQ), 'bad_record')
-      expect(err.message).to.include(Phrases.WorldExpected)
+      const err = TH.expectSyncRefusal(() => Vault.make(notBankOf(device) as never, device.vaultTSQ), 'bad_record')
+      expect(err.message).to.include(Phrases.BankExpected)
     })
   }
 
   const NotVaultTSQCases = [
     [() => undefined,                            'undefined'],
-    [(device: Device) => device.world,           'the world'],
+    [(device: Device) => device.bank,           'the bank'],
     [(device: Device) => device.vaultTsqClient,  'a QueryClient'],
     [() => ({ connect: noop, getOnce: noop }),   'an object with connect and getOnce alone'],
   ] as const
@@ -116,15 +119,15 @@ describe("Vault.make(world, vaultTSQ)", () => {
   for (const [vaultTSQOf, blurb] of NotVaultTSQCases) {
     it(`refuses ${blurb} as its vault TSQ, as 'bad_record'`, async () => {
       const { device } = await TH.buildBornBank()
-      const err = TH.expectSyncRefusal(() => Vault.make(device.world, vaultTSQOf(device) as never), 'bad_record')
+      const err = TH.expectSyncRefusal(() => Vault.make(device.bank, vaultTSQOf(device) as never), 'bad_record')
       expect(err.message).to.include(Phrases.VaultTSQExpected)
     })
   }
 
-  it("refuses a world whose device is disabled", async () => {
+  it("refuses a bank whose device is disabled", async () => {
     const { device } = await TH.buildBornBank()
     device.disable()
-    TH.expectSyncRefusal(() => Vault.make(device.world, device.vaultTSQ), 'disabled')
+    TH.expectSyncRefusal(() => Vault.make(device.bank, device.vaultTSQ), 'disabled')
   })
 })
 
@@ -148,7 +151,7 @@ describe("device.disconnect() and device.connect(), over the vaults made on the 
     const planted = await vault.sealBox(first, {}, { whisper: TH.Whisper })
     device.disconnect()
     rowsOf(bank).set(Openai, planted)
-    await bank.device.world.demandVaultMinder().tryGetOnce(openaiScopeOf(bank))
+    await bank.device.bank.demandVaultMinder().tryGetOnce(openaiScopeOf(bank))
     expect(boxAt(vault)).to.include({ revtok: planted.revtok })
     expect(itemAt(vault)).to.deep.equal(first)
     expect(unwatched.calls).to.have.lengthOf(1)
@@ -161,7 +164,7 @@ describe("device.disconnect() and device.connect(), over the vaults made on the 
     device.disconnect()
     device.connect()
     rowsOf(bank).set(Openai, planted)
-    await bank.device.world.demandVaultMinder().tryGetOnce(openaiScopeOf(bank))
+    await bank.device.bank.demandVaultMinder().tryGetOnce(openaiScopeOf(bank))
     expect(itemAt(vault)).to.deep.equal(planted)
   })
 
@@ -175,7 +178,7 @@ describe("device.disconnect() and device.connect(), over the vaults made on the 
     const onBadNews = vi.fn()
     const { device } = await TH.buildBornVault({ device: TH.makeDevice({}, { vaultDB, onBadNews }) })
     expect(() => device.disconnect()).not.to.throw()
-    expect(device.world.getSnapshot()).to.include({ stage: 'locked' })
+    expect(device.bank.getSnapshot()).to.include({ stage: 'locked' })
     await TH.eventually(() => onBadNews.mock.calls.length === 1)
     expect(onBadNews.mock.calls.map(([badNews]) => (badNews as BadNews).news.refusalkind)).to.deep.equal(['unexpected_error'])
   })
@@ -189,15 +192,15 @@ describe("a vault whose device is disabled", () => {
     device.disable()
     device.connect()
     rowsOf(bank).set(Openai, planted)
-    await bank.device.world.demandVaultMinder().tryGetOnce(openaiScopeOf(bank))
+    await bank.device.bank.demandVaultMinder().tryGetOnce(openaiScopeOf(bank))
     expect(itemAt(vault)).to.deep.equal(first)
     expect(unwatched.calls).to.have.lengthOf(1)
   })
 
-  it("tells the world's subscribers once, and nothing after", async () => {
+  it("tells the bank's subscribers once, and nothing after", async () => {
     const { bank, device } = await TH.buildBornVault()
     const listener = vi.fn()
-    device.world.subscribe(listener)
+    device.bank.subscribe(listener)
     device.disable()
     bank.lock()
     bank.dismissUnlock()
@@ -289,11 +292,11 @@ describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
 
   it("writes a put ask over the box it was given, cited sparse, in its bank's scope, tracking its roots", async () => {
     const { bank, vault } = await TH.buildBornVault()
-    const shell   = Shell.of(openaiScopeOf(bank), bank.rootBox)
+    const shell   = openaiShellOf(bank)
     const written = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
     const box     = await TH.expectGood(vault.tryPutBoxOnce(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }))
     expect(written).toHaveBeenCalledTimes(1)
-    expect(written.mock.calls[0]![0]).to.deep.include({ ...bank.scope, op: 'put', labelpath: Openai, modelkind: 'box', cited: Thing.sparseOf(shell), record: box, track: TH.trackOf(bank.pickle(), bank.gate.pickle(), bank.rootBox) })
+    expect(written.mock.calls[0]![0]).to.deep.include({ ...bank.scope, op: 'put', labelpath: Openai, modelkind: 'box', cited: Thing.sparseOf(shell), record: box, track: TH.trackOf(TH.livePickleOf(bank.gate), bank.rootBox) })
   })
 
   it("answers stale_write over an older revision, with the actual revision", async () => {
@@ -441,7 +444,7 @@ describe("vault.tryDelBoxOnce(labelpath)", () => {
     const written   = vi.spyOn(bank.device.vaultDB, 'tryWriteThing')
     const tombstone = await TH.expectGood(vault.tryDelBoxOnce(Openai))
     expect(written).toHaveBeenCalledTimes(1)
-    expect(written.mock.calls[0]![0]).to.deep.include({ ...bank.scope, op: 'del', labelpath: Openai, modelkind: 'box', cited: Thing.sparseOf(box), record: tombstone, track: TH.trackOf(bank.pickle(), bank.gate.pickle(), bank.rootBox) })
+    expect(written.mock.calls[0]![0]).to.deep.include({ ...bank.scope, op: 'del', labelpath: Openai, modelkind: 'box', cited: Thing.sparseOf(box), record: tombstone, track: TH.trackOf(TH.livePickleOf(bank.gate), bank.rootBox) })
   })
 
   it("answers the refusal its box raises at the tombstone its answer carries, though written", async () => {
@@ -548,7 +551,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
 
   it("refuses 'stale_read' where its get is refused and this device has seen the box only sparse, never calling fn", async () => {
     const { bank, vault, vaultTSQ } = await TH.buildBornVault()
-    const planted = await vault.sealBox(Shell.of(openaiScopeOf(bank), bank.rootBox), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const planted = await vault.sealBox(openaiShellOf(bank), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     rowsOf(bank).set(Openai, planted)
     await vaultTSQ.listOnce('box')
     refuseGets(bank)
@@ -581,7 +584,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     bank.lock()
     const fn = vi.fn(({ whisper }: BoxUnsealed) => String(whisper['apiKey']))
     const using = vault.withWhisper(Openai, fn)
-    expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.true
+    expect(bank.device.bank.getSnapshot().isUnlockWanted).to.be.true
     expect(fn).not.toHaveBeenCalled()
     await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await using).to.equal('sk-test-0000')
@@ -598,7 +601,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const using = other.withWhisper(Openai, ({ revseq }) => revseq)
     await vi.advanceTimersByTimeAsync(0)
     expect(boxGetsOf(asked)).to.equal(0)
-    expect(other.bank.device.world.getSnapshot().isUnlockWanted).to.be.true
+    expect(other.bank.device.bank.getSnapshot().isUnlockWanted).to.be.true
     await other.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await using).to.equal(0)
     expect(boxGetsOf(asked)).to.equal(1)
@@ -610,7 +613,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     bank.lock()
     const fn = vi.fn()
     const refused = TH.expectRefusal(vault.withWhisper(Openai, fn), 'absent_box')
-    expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.true
+    expect(bank.device.bank.getSnapshot().isUnlockWanted).to.be.true
     await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     await refused
     expect(fn).not.toHaveBeenCalled()
@@ -664,7 +667,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await using).to.equal('done')
     const kept   = device.vaultTsqClient.getQueryCache().getAll().map(({ state }) => state.data)
-    const traces = JSON.stringify([boxAt(vault)!.pickle(), kept, device.world.getSnapshot()])
+    const traces = JSON.stringify([boxAt(vault)!.pickle(), kept, device.bank.getSnapshot()])
     expect(traces).to.include(Openai).and.not.include('sk-test-0000')
   })
 
@@ -674,7 +677,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     await TH.expectRefusal(vault.withWhisper(Openai, undefined as never), 'bad_record')
     await TH.expectRefusal(vault.withWhisper(Openai, 'apiKey' as never), 'bad_record')
     await TH.expectRefusal(vault.withWhisper('gate' as never, () => undefined), 'bad_record')
-    expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.false
+    expect(bank.device.bank.getSnapshot().isUnlockWanted).to.be.false
   })
 
   it("refuses the root box's labelpath, wanting no unlock and fetching nothing", async () => {
@@ -684,7 +687,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const err = await TH.expectRefusal(vault.withWhisper('box', () => undefined), 'bad_record')
     expect(err.message).to.include(Phrases.VaultBoxIsRoot)
     expect(fetched).not.toHaveBeenCalled()
-    expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.false
+    expect(bank.device.bank.getSnapshot().isUnlockWanted).to.be.false
   })
 })
 
@@ -713,7 +716,7 @@ describe("vault.withUnlockedWhisper(labelpath, fn)", () => {
     const asked = vi.spyOn(bank.device.vaultDB, 'tryGetThing')
     const fn = vi.fn()
     await TH.expectRefusal(vault.withUnlockedWhisper(Openai, fn), 'bank_locked')
-    expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.false
+    expect(bank.device.bank.getSnapshot().isUnlockWanted).to.be.false
     expect(boxGetsOf(asked)).to.equal(0)
     expect(fn).not.toHaveBeenCalled()
   })
@@ -808,7 +811,7 @@ describe("vault.forceTimelyUnlocked(labelpath, opts)", () => {
     bank.lock()
     await TH.expectRefusal(vault.forceTimelyUnlocked(Openai, { staleTime: -1 }), 'bad_record')
     await TH.expectRefusal(vault.forceTimelyUnlocked('gate' as never), 'bad_record')
-    expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.false
+    expect(bank.device.bank.getSnapshot().isUnlockWanted).to.be.false
   })
 })
 
@@ -817,24 +820,25 @@ describe("a vault of a bank not stored", () => {
     const device = TH.makeDevice({})
     await device.signin(TH.WorldScope.userid)
     const vault = device.vault!
-    expect(device.world.getSnapshot().stage).to.eq('unborn')
+    expect(device.bank.getSnapshot().stage).to.eq('unborn')
     await TH.expectRefusal(vault.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'absent_thing')
     await TH.expectRefusal(vault.unsealBox(TH.boxThingOf()), 'absent_thing')
     expect(await vault.trySealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })).to.deep.include({ ok: false })
     expect(await vault.tryUnsealBox(TH.boxThingOf())).to.deep.include({ ok: false })
   })
 
-  it("refuses absent_thing to each verb that reads a box, before any wait for an unlock, and answers its bank absent", async () => {
+  it("refuses absent_thing to each verb that reads a box, before any wait for an unlock, and answers its bank, unborn", async () => {
     const device = TH.makeDevice({})
     await device.signin(TH.WorldScope.userid)
     const vault = device.vault!
-    TH.expectSyncRefusal(() => vault.bank, 'absent_thing')
+    expect(vault.bank).to.equal(device.bank)
+    expect(vault.bank.getSnapshot().stage).to.eq('unborn')
     await TH.expectRefusal(vault.withWhisper('box/openai', noop), 'absent_thing')
     await TH.expectRefusal(vault.withUnlockedWhisper('box/openai', noop), 'absent_thing')
     await TH.expectRefusal(vault.forceTimelyUnlocked('box/openai'), 'absent_thing')
     expect(await vault.tryPutBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })).to.deep.include({ ok: false })
     await TH.expectRefusal(vault.delBoxOnce('box/openai'), 'absent_thing')
-    expect(device.world.getSnapshot().isUnlockWanted).to.be.false
+    expect(device.bank.getSnapshot().isUnlockWanted).to.be.false
   })
 })
 
@@ -920,7 +924,7 @@ describe("vault.sealBox(donor, publicProps, secretProps) and vault.unsealBox(box
   }
 
   const UncheckedCases = [
-    [(box: LiveOf<BoxRecord>) => ({ ...box, fmt: 'a010502' }),                                                 'its fmt not its one value'],
+    [(box: LiveOf<BoxRecord>) => ({ ...box, fmt: 'a010501' }),                                                 'its fmt not its one value'],
     [(box: LiveOf<BoxRecord>) => ({ ...box, am: 'd' }),                                                        'am d'],
     [(box: LiveOf<BoxRecord>) => ({ ...box, label: 'openai_api_key' }),                                        'a label not the last of its labelpath'],
     [(box: LiveOf<BoxRecord>) => ({ ...box, whisper_sealed: { ...box.whisper_sealed, codectag: 'JSON v1' } }), 'a codectag that is not a label'],
@@ -1170,7 +1174,7 @@ describe("vault.stats() and vault.tryStats()", () => {
     const stats = await vault.stats()
     expect(stats.box).to.deep.include({ count: 2, live_count: 2 })
     expect(stats.gate).to.deep.include({ count: 1, live_count: 1 })
-    expect(stats.max).to.deep.equal({ count: StoreLimitCap, size: StoreLimitCap })
+    expect(stats.max).to.deep.equal({ count: DatastoreLimitCap, size: DatastoreLimitCap })
     expect(stats.box.size + stats.gate.size).to.be.below(0.9 * stats.max.size)
     expect(await vault.tryStats()).to.deep.equal({ ok: true, val: stats })
   })

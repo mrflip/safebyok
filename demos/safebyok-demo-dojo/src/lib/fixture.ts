@@ -14,7 +14,7 @@ export type ShelvedRow = [ckey: string, shelved: string]
 /** The fixture, as the script wrote it. */
 type Fixture = Readonly<{
   users:   readonly DojoUser[]
-  /** The vault database's rows: each Thing at `[userid, banklabel, labelpath]`. */
+  /** The vault database's rows: each Thing at `[modelkind, userid, banklabel, labelpath]`. */
   vault:   readonly StoredRow[]
   /** The root shelf's items, in localStorage: each bank's roots at its key. */
   cache:   readonly ShelvedRow[]

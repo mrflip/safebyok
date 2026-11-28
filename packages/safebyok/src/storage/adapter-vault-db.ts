@@ -3,14 +3,14 @@
 import { deepFreeze, noop } from 'es-toolkit'
 import { Errors, Outcome, SX, type Helpers } from 'safebyok-big/internals'
 import { bulletproofHandlerOf } from '../helpers/bulletproof'
-import type { Lifetok } from '../shapes/primitives'
+import type { Banktok } from '../shapes/primitives'
 import type { ThingRecord } from '../shapes/shapes-thing'
 import { type ReadTc, type VaultEvent, type VaultItemEvent, VaultDBSourcelabel } from '../shapes/shapes-vault-event'
 import {
-  type BirthBankAsk, type BirthPuts, type GetAsk, type GetWorldAsk, type ListAsk, type StatsAsk, type ThingWatchScope, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
+  type BirthBankAsk, type BirthPuts, type GetAsk, type GetBankAsk, type ListAsk, type StatsAsk, type ThingWatchScope, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
 } from '../shapes/shapes-asks'
-import type { BadAnswer, BirthBankAnswer, GetThingAnswer, GetWorldAnswer, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
-import { type BirthManifest, type GetManifest, type ListManifest, type Received, type StatsManifest, type WorldManifest, type WriteManifest, ManifestChecks } from '../shapes/shapes-manifest'
+import type { BadAnswer, BirthBankAnswer, GetThingAnswer, GetBankAnswer, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
+import { type BirthManifest, type GetManifest, type ListManifest, type Received, type StatsManifest, type GetBankManifest, type WriteManifest, ManifestChecks } from '../shapes/shapes-manifest'
 import { itemEventOf, readTcNow } from './agerank'
 import * as ManifestActs from './manifest-acts'
 import * as ThreeWay from './three-way'
@@ -27,9 +27,12 @@ export function frozenAnswerOf<AnswerT extends { ask: unknown, err?: unknown }>(
   return answer
 }
 
-/** The `item` notice for `record`, deeply frozen, read at `read_tc`, from a vaultDB, with the vacant agerank, and the lifetok of `record` where it is the bank, else `received`. */
-export function noticeOf(record: ThingRecord, received: Lifetok, read_tc: ReadTc): VaultItemEvent {
-  const banktok = ('lifetok' in record) ? record.lifetok : received
+/** The `item` notice of `record` from a vaultDB, deeply frozen and read at `read_tc`, with the vacant agerank.
+ * Its banktok is that of `record` where it is the bank's gate, else `received`.
+ */
+export function noticeOf(record: ThingRecord, received: Banktok, read_tc: ReadTc): VaultItemEvent {
+  // A box's own banktok is its gate's when it was sealed, which may not be the bank's now.
+  const banktok = (record.modelkind === 'gate') ? record.banktok : received
   return itemEventOf(deepFreeze(record), { sourcelabel: VaultDBSourcelabel, read_tc, banktok })
 }
 // --
@@ -43,7 +46,7 @@ export function noticeOf(record: ThingRecord, received: Lifetok, read_tc: ReadTc
  */
 export abstract class AdapterVaultDB implements VaultDB {
 
-  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetWorld, tryStats, watch
+  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetBank, tryStats, watch
   // Each verb's body is the plain path. Every throw in it lands in `answerForThrown`.
 
   /** The Thing at `ask`'s scope ({@link VaultDB.tryGetThing}). */
@@ -85,7 +88,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { return { ...this.answerForThrown(err, 'listThings', ask), dbhas: null, parentage: [], deltas: [], incompatible_rows: [] } }
   }
 
-  /** Write a new bank's three roots (bank, main gate, root box), or answer the actual roots of a bank already live ({@link VaultDB.tryBirthBank}). */
+  /** Write a new bank's two roots (its gate, at its banklabel, and its root box), or answer the actual roots of a bank already live ({@link VaultDB.tryBirthBank}). */
   async tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer> {
     try {
       const birthBankAsk = checkedBirthBankAsk(ask)
@@ -95,19 +98,19 @@ export abstract class AdapterVaultDB implements VaultDB {
       const answer       = ManifestActs.birthAnswerOf(birthBankAsk, manifest)
       ThreeWay.demandBirthConsistency(birthBankAsk, manifest, answer)
       return frozenAnswerOf(answer)
-    } catch (err) { return this.answerForThrown(err, 'birthBank', ask) }
+    } catch (err) { return { ...this.answerForThrown(err, 'birthBank', ask), dbhas: null } }
   }
 
-  /** The bank's three roots, read in one step ({@link VaultDB.tryGetWorld}). */
-  async tryGetWorld(ask: GetWorldAsk): Promise<GetWorldAnswer> {
+  /** The bank's two roots, read in one step ({@link VaultDB.tryGetBank}). */
+  async tryGetBank(ask: GetBankAsk): Promise<GetBankAnswer> {
     try {
-      const worldAsk = AskChecks.getWorldAsk.parse(ask)
-      const manifest = await this.doGetWorld(worldAsk)
-      ManifestActs.checkWorldObservations(worldAsk, manifest)
-      const answer   = ManifestActs.worldAnswerOf(worldAsk, manifest)
-      ThreeWay.demandWorldConsistency(worldAsk, manifest, answer)
+      const bankAsk = AskChecks.getBankAsk.parse(ask)
+      const manifest = await this.doGetBank(bankAsk)
+      ManifestActs.checkGetBankObservations(bankAsk, manifest)
+      const answer   = ManifestActs.getBankAnswerOf(bankAsk, manifest)
+      ThreeWay.demandGetBankConsistency(bankAsk, manifest, answer)
       return frozenAnswerOf(answer)
-    } catch (err) { return this.answerForThrown(err, 'getWorld', ask) }
+    } catch (err) { return this.answerForThrown(err, 'getBank', ask) }
   }
 
   /** A bank's storage stats, read in one step ({@link VaultDB.tryStats}). */
@@ -122,7 +125,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { return this.answerForThrown(err, 'stats', ask) }
   }
 
-  /** Watch a bank's Things ({@link VaultDB.watch}): each notice is of a Thing the datastore reports changing, read when the datastore says, else when it arrives.
+  /** Watch a bank's Things ({@link VaultDB.watch}): each notice is of a Thing the datastore reports changing, dated by the datastore's `read_tc`, or else by when it arrives.
    * Records a datastore pushes together are notified one at a time.
    * A Thing that fails its checks or belongs to another bank goes to `onBadNews` instead of `onNotice`, as does an error `onNotice` throws.
    */
@@ -134,8 +137,8 @@ export abstract class AdapterVaultDB implements VaultDB {
       const { record, banktok } = received
       let event: VaultItemEvent
       try {
-        const { read_tc = readTcNow() } = ManifestChecks.received.parse(received)
-        event = noticeOf(ManifestActs.checkedWatchedOf(bankScope, record), ManifestActs.banktokOrVoidOf(banktok), read_tc)
+        const { modelkind, read_tc = readTcNow() } = ManifestChecks.received.parse(received)
+        event = noticeOf(ManifestActs.checkedWatchedOf({ ...bankScope, modelkind }, record), ManifestActs.banktokOrVoidOf(banktok), read_tc)
       } catch (err) {
         onBadNews(Outcome.storageRefusalOf(err))
         return
@@ -166,7 +169,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
   // --
 
-  // == [Protected, for a subclass to write]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats, doWatch
+  // == [Protected, for a subclass to write]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetBank, doStats, doWatch
   // Each is one atomic step that observes, and hands back a manifest: the datastore's tags and each row exactly as it stands
   // at the step's last read, beside the bank's banktok, its `tracked` and its `read_tc`. `notes/vault-adapter-contract.md`
   // says what each manifest has, and when a write and a birth write. A datastore that runs TypeScript makes its tags with
@@ -179,12 +182,12 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doWriteThing(ask: WriteAsk): Helpers.Awaitable<WriteManifest>
   /** In one step, read the Thing at `ask`'s scope and each Thing one label under it, and hand back what was observed ({@link ListManifest}). */
   protected abstract doListThings(ask: ListAsk): Helpers.Awaitable<ListManifest>
-  /** In one step, write the three `puts`' records where the ante roots are all null, and hand back what was observed ({@link BirthManifest}). */
+  /** In one step, write the two `puts`' records where the prior roots are both null, and hand back what was observed ({@link BirthManifest}). */
   protected abstract doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Helpers.Awaitable<BirthManifest>
-  /** In one step, read the bank's three roots, and hand back what was observed ({@link WorldManifest}). */
-  protected abstract doGetWorld(ask: GetWorldAsk): Helpers.Awaitable<WorldManifest>
+  /** In one step, read the bank's two roots, and hand back what was observed ({@link GetBankManifest}). */
+  protected abstract doGetBank(ask: GetBankAsk): Helpers.Awaitable<GetBankManifest>
   /** In one step, measure the bank's boxes and gates, and hand back what was observed ({@link StatsManifest}).
-   * Report the datastore's limits where it has them; `storeLimitsOf` caps each, and gives the cap for one it lacks.
+   * Report the datastore's limits where it has them; `datastoreLimitsOf` caps each, and gives the cap for one it lacks.
    */
   protected abstract doStats(ask: StatsAsk): Helpers.Awaitable<StatsManifest>
   /** Start watching the datastore: call `receive` with each changed Thing, one at a time ({@link Received}), and `onBadNews` with any trouble,

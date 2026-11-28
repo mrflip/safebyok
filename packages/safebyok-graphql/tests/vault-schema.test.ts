@@ -119,7 +119,7 @@ function schemaDriftOf(schema: GraphQLSchema): string[] {
 const AnswerChecks = [
   ['safebyokGetThing',    WireChecks.getAnswer],
   ['safebyokListThings',  WireChecks.listAnswer],
-  ['safebyokGetWorld',    WireChecks.worldAnswer],
+  ['safebyokGetBank',    WireChecks.getBankAnswer],
   ['safebyokStats',       WireChecks.statsAnswer],
   ['safebyokWriteThing',  WireChecks.writeAnswer],
   ['safebyokBirthBank',   WireChecks.birthAnswer],
@@ -130,7 +130,7 @@ const AnswerChecks = [
 const InputChecks = [
   ['safebyokGetThing',    'ask',   AskChecks.getAsk],
   ['safebyokListThings',  'ask',   AskChecks.listAsk],
-  ['safebyokGetWorld',    'ask',   AskChecks.getWorldAsk],
+  ['safebyokGetBank',    'ask',   AskChecks.getBankAsk],
   ['safebyokStats',       'ask',   AskChecks.statsAsk],
   ['safebyokWriteThing',  'ask',   AskChecks.writeAsk],
   ['safebyokBirthBank',   'ask',   AskChecks.birthBankAsk],

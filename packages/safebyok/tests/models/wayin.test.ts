@@ -153,7 +153,7 @@ describe("a wayin's Thing-like getters", () => {
   }
 })
 
-describe("wayinCtxOf(bankStamp, gateStamp, header)", () => {
+describe("wayinCtxOf(gateLife, header)", () => {
   const BadHeaderCases = [
     [{ wayinkind: 'telepathy' }, 'of an unknown kind'],
     [{ label: 'passkey0' },      "under the other kind's label"],
@@ -163,14 +163,14 @@ describe("wayinCtxOf(bankStamp, gateStamp, header)", () => {
   for (const [altered, blurb] of BadHeaderCases) {
     it(`refuses a wayin header ${blurb}`, () => {
       const { bank_key_wayin_wrapped: _wrapped, ...header } = passphraseRecord()
-      TH.expectSyncRefusal(() => wayinCtxOf(TH.WorldBankStamp, TH.WorldGateStamp, { ...header, ...altered } as never), 'bad_record')
+      TH.expectSyncRefusal(() => wayinCtxOf(TH.WorldGateLife, { ...header, ...altered } as never), 'bad_record')
     })
   }
 
   it("gives each kind of wayin its own purpose", () => {
     const { bank_key_wayin_wrapped: _pp, ...passphraseHeader } = passphraseRecord()
     const { bank_key_wayin_wrapped: _pk, ...passkeyHeader } = passkeyRecord()
-    expect(new TextDecoder().decode(wayinCtxOf(TH.WorldBankStamp, TH.WorldGateStamp, passphraseHeader as never))).to.include('"bank_key_passphrase_wrapped"')
-    expect(new TextDecoder().decode(wayinCtxOf(TH.WorldBankStamp, TH.WorldGateStamp, passkeyHeader as never))).to.include('"bank_key_passkey_wrapped"')
+    expect(new TextDecoder().decode(wayinCtxOf(TH.WorldGateLife, passphraseHeader as never))).to.include('"bank_key_passphrase_wrapped"')
+    expect(new TextDecoder().decode(wayinCtxOf(TH.WorldGateLife, passkeyHeader as never))).to.include('"bank_key_passkey_wrapped"')
   })
 })

@@ -5,14 +5,14 @@ import { register } from '../src/test'
 import * as TH from './test-helpers'
 
 const birthArgs = { ask: TH.birthBankAskOf() }
-const worldArgs = { ask: TH.getWorldAskOf() }
+const bankArgs = { ask: TH.getBankAskOf() }
 
 describe("register", () => {
   it("installs the component under the name a host gave it, and hands back its functions", async () => {
     const backend = defineTestApp({ schema: defineSchema({}) }).defineModules({}).createTest()
     const vaultdb = register(backend, 'vaultdb')
     await backend.mutation(vaultdb.things.birthBank, birthArgs)
-    expect(await backend.query(vaultdb.things.getWorld, worldArgs)).to.deep.nested.include({ 'actual.bank': TH.bankThingOf() })
+    expect(await backend.query(vaultdb.things.getBank, bankArgs)).to.deep.nested.include({ 'actual.gate': TH.gateThingOf() })
   })
 
   it("serves a host app's re-exported functions, as defineTestApp's component helper", async () => {
@@ -20,6 +20,6 @@ describe("register", () => {
     const { api, createTest } = TH.vaultHostWith(() => 'u1')
     const backend = createTest()
     await backend.mutation(api.safebyokVault.birthBank, birthArgs)
-    expect(await backend.query(api.safebyokVault.getWorld, worldArgs)).to.deep.nested.include({ 'actual.bank': TH.bankThingOf() })
+    expect(await backend.query(api.safebyokVault.getBank, bankArgs)).to.deep.nested.include({ 'actual.gate': TH.gateThingOf() })
   })
 })

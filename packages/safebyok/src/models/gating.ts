@@ -9,15 +9,15 @@ import { Gate } from './gate'
 import type { Wayin } from './wayin'
 import { NOVEL, PasskeyProving, PassphraseProving, type Proving } from './proving'
 import {
-  type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateGatingFriend, type GatingCleartexts, type HandedCleartexts, type PasskeyAddCleartexts,
-  type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type ProvedCleartexts, type ReplacePassphraseDna, type RevokePasskeyDna, type UnlockCleartexts, type UnlockDna,
+  type AddPasskeyCleartexts, type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateGatingFriend, type GatingCleartexts, type HandedCleartexts,
+  type ProvedCleartexts, type ReplacePassphraseCleartexts, type ReplacePassphraseDna, type RevokePasskeyCleartexts, type RevokePasskeyDna, type UnlockCleartexts, type UnlockDna,
   CleartextChecks, FormSecretFieldnames, GatingChecks,
 } from '../shapes/shapes-gateish'
 import type { PutAskDraft } from '../shapes/shapes-asks'
-import type { StampedGate } from '../shapes/shapes-stamps'
-import { Labelpath } from '../shapes/primitives'
-import { type GateRecord, Shell } from '../shapes/shapes-thing'
-import { BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
+import type { LiveOf } from '../shapes/shapes-sealers'
+import type { ProvableGate } from '../shapes/shapes-stamps'
+import { type GateRecord, ThingChecks } from '../shapes/shapes-thing'
+import { GateChecks } from '../shapes/shapes-thingkinds'
 import * as Throwers from '../refusals/throwers'
 
 // == [The gating]: Gating, GatingMarker
@@ -103,21 +103,21 @@ export class UnlockGating extends Gating<Gate> {
 
 /** A {@link Gate.replacePassphrase} to attempt: make one with {@link Gate.replacePassphraseGating}. */
 export class ReplacePassphraseGating extends Gating<Gate> {
-  constructor(gate: Gate, params: FormData | ReplacePassphraseDna | PassphraseReplaceCleartexts, friend: GateGatingFriend) {
+  constructor(gate: Gate, params: FormData | ReplacePassphraseDna | ReplacePassphraseCleartexts, friend: GateGatingFriend) {
     super(params, GatingChecks.replacePassphraseGating, (given) => replacePassphrase(gate, given, friend))
   }
 }
 
 /** A {@link Gate.addPasskey} to attempt: make one with {@link Gate.addPasskeyGating}. */
 export class AddPasskeyGating extends Gating<Gate> {
-  constructor(gate: Gate, params: FormData | AddPasskeyDna | PasskeyAddCleartexts, friend: GateGatingFriend) {
+  constructor(gate: Gate, params: FormData | AddPasskeyDna | AddPasskeyCleartexts, friend: GateGatingFriend) {
     super(params, GatingChecks.addPasskeyGating, (given) => addPasskey(gate, given, friend))
   }
 }
 
 /** A {@link Gate.revokePasskey} to attempt: make one with {@link Gate.revokePasskeyGating}. */
 export class RevokePasskeyGating extends Gating<Gate> {
-  constructor(gate: Gate, params: FormData | RevokePasskeyDna | PasskeyRevokeCleartexts, friend: GateGatingFriend) {
+  constructor(gate: Gate, params: FormData | RevokePasskeyDna | RevokePasskeyCleartexts, friend: GateGatingFriend) {
     super(params, GatingChecks.revokePasskeyGating, (given) => revokePasskey(gate, given, friend))
   }
 }
@@ -128,7 +128,7 @@ export class RevokePasskeyGating extends Gating<Gate> {
 // Each body checks its gating's cleartexts, proves them, and makes its change through the gate's private verbs its friend
 // carries. A cleartext goes only to its check, a strength check and a Proving builder, and a proving never leaves the body
 // that built it but for those verbs (G9). Its gating vacates the cleartexts whatever the outcome (G2), and a body changes
-// nothing where it refuses: a gate change writes the gate before it unlocks, so a refused write never unlocks.
+// nothing where it refuses: a gate change puts the gate before it unlocks, so a refused put never unlocks.
 //
 // Two invariants hold of every gating:
 // * Gatings are pragmatically idempotent: a gating whose intent is demonstrably satisfied may resolve with success. It is not
@@ -136,35 +136,39 @@ export class RevokePasskeyGating extends Gating<Gate> {
 // * A gating's contract is in its name: a gating whose intent is met may succeed even where its inputs would otherwise have
 //   been refused. (`revokePasskey` on a gate with no passkey proves, unlocks and writes nothing.)
 
-/** Write a new bank of `device`'s scope, with the user's new passphrase and optional passkey, and resolve it unlocked.
- * Refuses `gate_made_elsewhere` where a live bank is already stored.
+// A birth writes each root over the record the device holds of it, its tombstone or the shell: the bank's first life, or
+// its next after its end, by the same puts.
+/** Birth a new life of the bank of `device`'s scope, with the user's new passphrase and optional passkey, and resolve it unlocked.
+ * Refuses `gate_made_elsewhere` where a live gate is already stored.
  */
 async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatingFriend): Promise<Bank> {
   device.demandEnabled()
   const { passphraseCleartext, passkeyCleartext } = CleartextChecks.birth.parse(cleartexts)
-  // A birth's stamps are minted here, one pair per gating.
-  const { bankStamp, gateStamp } = Bank.mintStamps(device.scope)
-  const passphraseProving = await PassphraseProving.buildNovel(device, bankStamp, gateStamp, passphraseCleartext)
-  const passkeyProving    = passkeyCleartext ? await PasskeyProving.buildNovel(device, bankStamp, gateStamp, passkeyCleartext) : null
+  const vaultMinder = device.bank.demandVaultMinder()
+  const prior = vaultMinder.cachedRoots
+  // The user must hear that their passphrase was not set: the live gate is another's.
+  if (prior.gate.am === 'a') { throw Throwers.gateMadeElsewhere() }
+  // A birth's life, its banktok among it, is minted here, one per gating.
+  const gateLife = Bank.mintLife(prior.gate)
+  const passphraseProving = await PassphraseProving.buildNovel(device, gateLife, passphraseCleartext)
+  const passkeyProving    = passkeyCleartext ? await PasskeyProving.buildNovel(device, gateLife, passkeyCleartext) : null
 
   const main     = await passphraseProving.buildWayin(NOVEL)
   const passkey0 = await passkeyProving?.buildWayin(passphraseProving) ?? null
-  const bankRecord = Bank.makeRecord(bankStamp)
-  const rootShell  = BoxChecks.liveOrShell.parse(Shell.of({ ...device.scope, labelpath: Labelpath.RootBox }))
-  // The root box is sealed under the lease the birth builds, against the stamps it minted. The lease reaches the
-  // device's world, unlocking it, only once the bank the world's VaultMinder keeps is this one. Where the birth refuses,
-  // or the vaultDB's answer is broken, the lease is evicted, and the world holds no lease of it.
-  const gateRecord = Gate.makeRecord({ ...gateStamp, wayins: { main, passkey0 } })
-  const lease = await friend.leaseByProving(passphraseProving, bankStamp, gateRecord)
+  // The root box is sealed under the lease the birth builds, against the life it minted. The lease is attached to the
+  // device's bank, unlocking it, only once the gate in its VaultMinder is this one. Where the birth refuses, or the
+  // vaultDB's answer is broken, the lease is evicted, and never attached.
+  const gateRecord = Gate.makeRecord({ ...gateLife, wayins: { main, passkey0 } }, prior.gate)
+  const lease = await friend.leaseByProving(passphraseProving, gateRecord)
   try {
-    const root   = await lease.seal(BaseBox, rootShell, { sidecar: {} }, { whisper: {} })
-    // The roots it answers, written or read, are then the Things of the device's world, which shows them locked.
-    const vaultMinder = device.world.demandVaultMinder()
-    const answer = await vaultMinder.tryBirthBank({ ...device.scope, op: 'birth', bank: bankRecord, gate: gateRecord, root, track: vaultMinder.knownRoots, banktok: bankRecord.lifetok })
+    const root   = await lease.seal(BaseBox, prior.root, { sidecar: {} }, { whisper: {} })
+    // The roots it answers, written or read, are then the Things of the device's bank, which shows them locked.
+    const cited  = { gate: ThingChecks.thingCited.parse(prior.gate), root: ThingChecks.thingCited.parse(prior.root) }
+    const answer = await vaultMinder.tryBirthBank({ ...device.scope, op: 'birth', cited, gate: gateRecord, root, track: vaultMinder.knownRoots, banktok: gateRecord.banktok })
     if (! answer.ok) { throw answer.err }
-    // The user must hear that their passphrase was not set: the actual bank is another's.
-    if (answer.val.bank.revtok !== bankRecord.revtok) { throw Throwers.gateMadeElsewhere() }
-    const bank = device.world.demandRootsLive()
+    // The user must hear that their passphrase was not set: the actual gate is another's.
+    if (answer.val.gate.revtok !== gateRecord.revtok) { throw Throwers.gateMadeElsewhere() }
+    const bank = device.bank.demandRootsLive()
     friend.attachLease(lease)
     return bank
   } catch (err) {
@@ -177,25 +181,25 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
 async function unlockGate(gate: Gate, cleartexts: unknown, friend: Pick<GateGatingFriend, 'unlockByProving'>): Promise<Gate> {
   gate.demandEnabled()
   const proof  = CleartextChecks.unlock.parse(cleartexts)
-  const proved = await provingOf(gate.device, anteOf(gate), proof)
+  const proved = await provingOf(gate.device, priorOf(gate), proof)
   return await friend.unlockByProving(proved)
 }
 
-// Each gate change reads the revision it proves against before its first await, writes the gate's next revision over
-// that one, then unlocks the gate under a lease citing the revision written. The bankKey does not change.
+// Each gate change reads the revision it proves against before its first await, puts the gate's next revision over
+// that one, then unlocks the gate under a lease citing the revision put. The bankKey does not change.
 
 /** Replace the passphrase of `gate`, proved by the current passphrase or the passkey. */
 async function replacePassphrase(gate: Gate, cleartexts: unknown, friend: GateGatingFriend): Promise<Gate> {
   gate.demandEnabled()
-  const { proof, nextPassphraseCleartext } = CleartextChecks.passphraseReplace.parse(cleartexts)
+  const { proof, nextPassphraseCleartext } = CleartextChecks.replacePassphrase.parse(cleartexts)
   if (proof.passphraseCleartext === nextPassphraseCleartext) { throw Throwers.samePassphrase() }
-  const ante = anteOf(gate)
+  const prior = priorOf(gate)
   await checkStrength(gate.device, nextPassphraseCleartext)
-  const proved      = await provingOf(gate.device, ante, proof)
-  const nextProving = await PassphraseProving.buildNovel(gate.device, ante.bankStamp, ante.stamp, nextPassphraseCleartext)
+  const proved      = await provingOf(gate.device, prior, proof)
+  const nextProving = await PassphraseProving.buildNovel(gate.device, prior.life, nextPassphraseCleartext)
 
   const main = await nextProving.buildWayin(proved)
-  await friend.putGate(nextGateAsk(ante, { main, passkey0: ante.passkey0 }, 'replace_passphrase'))
+  await friend.putGate(nextGateAsk(prior, { main, passkey0: prior.passkey0 }, 'replace_passphrase'))
   return await friend.unlockByProving(proved)
 }
 
@@ -204,14 +208,14 @@ async function replacePassphrase(gate: Gate, cleartexts: unknown, friend: GateGa
  */
 async function addPasskey(gate: Gate, cleartexts: unknown, friend: GateGatingFriend): Promise<Gate> {
   gate.demandEnabled()
-  const { passphraseCleartext, nextPasskeyCleartext } = CleartextChecks.passkeyAdd.parse(cleartexts)
+  const { passphraseCleartext, nextPasskeyCleartext } = CleartextChecks.addPasskey.parse(cleartexts)
   gate.demandPasskeyAddable()
-  const ante = anteOf(gate)
-  const proved         = await PassphraseProving.buildStored(gate.device, ante, passphraseCleartext)
-  const passkeyProving = await PasskeyProving.buildNovel(gate.device, ante.bankStamp, ante.stamp, nextPasskeyCleartext)
+  const prior = priorOf(gate)
+  const proved         = await PassphraseProving.buildStored(gate.device, prior, passphraseCleartext)
+  const passkeyProving = await PasskeyProving.buildNovel(gate.device, prior.life, nextPasskeyCleartext)
 
   const passkey0 = await passkeyProving.buildWayin(proved)
-  await friend.putGate(nextGateAsk(ante, { main: ante.main, passkey0 }, 'add_passkey'))
+  await friend.putGate(nextGateAsk(prior, { main: prior.main, passkey0 }, 'add_passkey'))
   return await friend.unlockByProving(proved)
 }
 
@@ -220,29 +224,29 @@ async function addPasskey(gate: Gate, cleartexts: unknown, friend: GateGatingFri
  */
 async function revokePasskey(gate: Gate, cleartexts: unknown, friend: GateGatingFriend): Promise<Gate> {
   gate.demandEnabled()
-  const proof  = CleartextChecks.passkeyRevoke.parse(cleartexts)
-  const ante   = anteOf(gate)
-  const proved = await provingOf(gate.device, ante, proof)
+  const proof  = CleartextChecks.revokePasskey.parse(cleartexts)
+  const prior  = priorOf(gate)
+  const proved = await provingOf(gate.device, prior, proof)
 
-  if (ante.passkey0 !== null) { await friend.putGate(nextGateAsk(ante, { main: ante.main, passkey0: null }, 'revoke_passkey')) }
+  if (prior.passkey0 !== null) { await friend.putGate(nextGateAsk(prior, { main: prior.main, passkey0: null }, 'revoke_passkey')) }
   return await friend.unlockByProving(proved)
 }
 // --
 
-// == [A body's helpers]: Ante, anteOf, checkStrength, provingOf, nextGateAsk
+// == [A body's helpers]: Prior, priorOf, checkStrength, provingOf, nextGateAsk
 
-/** The revision of a gate a gate change proves against: its stamps, its record, which the write cites, and its wayins. */
-interface Ante extends StampedGate {
-  record:   GateRecord
+/** The revision of a gate a gate change proves against: its life, its record, which the write cites, and its wayins. */
+interface Prior extends ProvableGate {
+  record:   LiveOf<GateRecord>
   main:     Wayin
   passkey0: Wayin | null
 }
 
 /** The revision `gate` models now, as a gating proves against it and a gate change carries it forward. Refuses a gate that is not live. */
-function anteOf(gate: Gate): Ante {
-  const { stamp, main, passkey0, bankStamp } = gate
-  const record = GateChecks.record.parse(gate)
-  return { record, bankStamp, stamp, wayins: record.wayins, main, passkey0 }
+function priorOf(gate: Gate): Prior {
+  const { life, main, passkey0 } = gate
+  const record = GateChecks.live.parse(gate)
+  return { record, life, wayins: record.wayins, main, passkey0 }
 }
 
 /** Refuse `weak_passphrase` unless `device`'s strength checker judges `passphraseCleartext` strong. */
@@ -252,20 +256,20 @@ async function checkStrength(device: Device, passphraseCleartext: string): Promi
 }
 
 /** The proving of `proof`, built against `gate`'s passphrase wayin or its passkey wayin, whichever `proof` is for. */
-function provingOf(device: Device, gate: StampedGate, proof: ProvedCleartexts): Promise<Proving> {
+function provingOf(device: Device, gate: ProvableGate, proof: ProvedCleartexts): Promise<Proving> {
   if (proof.passphraseCleartext === undefined) { return PasskeyProving.buildStored(gate, proof.passkeyCleartext) }
   return PassphraseProving.buildStored(device, gate, proof.passphraseCleartext)
 }
 
 // The ask cites the revision the gating proved against, never the gate as it stands at the write: a gate change landed
 // meanwhile is refused as stale, and the proof unlocks nothing.
-/** The draft put ask that writes the revision after `ante`, with `wayins`, over `ante`, under the storage `policy`. */
-function nextGateAsk(ante: Ante, wayins: GateDna['wayins'], policy: EX.StoragePolicy): Omit<PutAskDraft<GateRecord>, 'track' | 'banktok'> {
-  return { cited: ante.record, record: Gate.makeNextRecord(ante.record, wayins), options: { policies: [policy] } }
+/** The draft put ask that writes the revision after `prior`, with `wayins`, over `prior`, under the storage `policy`. */
+function nextGateAsk(prior: Prior, wayins: GateDna['wayins'], policy: EX.StoragePolicy): Omit<PutAskDraft<GateRecord>, 'track' | 'banktok'> {
+  return { cited: prior.record, record: Gate.makeNextRecord(prior.record, wayins), options: { policies: [policy] } }
 }
 // --
 
-// == [Adopting and vacating]: vacateHanded, adoptedCleartextsOf, handedCleartextsOf, takeSecretFields, isInCleartextNames, adoptedAnswerOf, isAnswerish, zeroAnswer, zeroBytes
+// == [Adopting and vacating]: vacateHanded, adoptedCleartextsOf, handedCleartextsOf, extractSecretFields, isInCleartextNames, adoptedAnswerOf, isAnswerish, zeroAnswer, zeroBytes
 
 /** Clear the cleartexts in `handed`, whichever form verb it was given to, as a gating made and vacated at once would: a `FormData` loses its secret fields, and each passkey answer's PRF bytes are zeroed.
  * Anything it cannot read as a form or a dna is left as it is, and it never throws.
@@ -302,10 +306,11 @@ function adoptedCleartextsOf(params: unknown, dnaCheck: DnaCheck): GatingClearte
   }
 }
 
-// Today's `…Cleartext` names are read as given, so the form verbs' own `unlock(cleartexts)` and the like keep their bag.
+// A bag that names any field `…Cleartext` is used as given, so the cleartexts handed to `unlock(cleartexts)` and the
+// other form verbs need no renaming.
 /** The cleartexts `params` hands its gating, in the names its body takes: a form's secret fields, taken out of it, or a dna's fields, renamed by `dnaCheck`. */
 function handedCleartextsOf(params: unknown, dnaCheck: DnaCheck): HandedCleartexts {
-  if (params instanceof FormData) { return dnaCheck.parse(takeSecretFields(params)) }
+  if (params instanceof FormData) { return dnaCheck.parse(extractSecretFields(params)) }
   if (isInCleartextNames(params)) { return params as HandedCleartexts }
   return dnaCheck.parse(params)
 }
@@ -313,14 +318,14 @@ function handedCleartextsOf(params: unknown, dnaCheck: DnaCheck): HandedCleartex
 // React keeps an action's FormData as the form's status (`useFormStatus().data`) and in the action's queued update; a
 // field deleted before the action's first await is in neither.
 /** The text of each of `form`'s {@link FormSecretFieldnames}, by fieldname, each deleted from `form`, used or not. */
-function takeSecretFields(form: FormData): Partial<Record<typeof FormSecretFieldnames[number], unknown>> {
-  const taken: Partial<Record<typeof FormSecretFieldnames[number], unknown>> = {}
+function extractSecretFields(form: FormData): Partial<Record<typeof FormSecretFieldnames[number], unknown>> {
+  const extracted: Partial<Record<typeof FormSecretFieldnames[number], unknown>> = {}
   for (const fieldname of FormSecretFieldnames) {
     const val = form.get(fieldname)
     form.delete(fieldname)
-    if (val !== null) { taken[fieldname] = val }
+    if (val !== null) { extracted[fieldname] = val }
   }
-  return taken
+  return extracted
 }
 
 /** True of an object that names any field `…Cleartext`: cleartexts in the names a gating's body takes. */
@@ -329,7 +334,7 @@ function isInCleartextNames(params: unknown): boolean {
 }
 
 // Every object kept is the gating's own, its fields read once here, so nothing a vacate reaches can be a host's getter.
-/** A copy of `answer` with PRF bytes of its own, the PRF bytes of `answer` itself zeroed (G2), or anything but an object as given. */
+/** Copy `answer` with PRF bytes of its own, and zero the PRF bytes of `answer` itself (G2). Anything but an object is returned as given. */
 function adoptedAnswerOf(answer: unknown): unknown {
   if ((typeof answer !== 'object') || (answer === null)) { return answer }
   const adopted: { prfBytes?: unknown } = { ...answer }

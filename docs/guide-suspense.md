@@ -7,7 +7,7 @@ as there. A pencil sketch; *Not built yet* is at the foot.
 
 ## Where things suspend, and where they never do
 
-* **The stage never suspends.** `useWorld()` is synchronous at every stage. The screen's first
+* **The stage never suspends.** `useBank()` is synchronous at every stage. The screen's first
   branch (signed out, starting, create, the app) is a `switch`, never a fallback.
 * **A record suspends on its first fetch**, and never after: not on a lock, nor on a newer revision.
   A record overtaken shows until the newer one arrives; a box deleted and written anew elsewhere

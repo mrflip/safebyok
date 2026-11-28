@@ -219,8 +219,8 @@ async function storeFakeBox(keyDeriver: KeyDeriver): Promise<VaultDB> {
 /** Expect `device` to unlock with the test passphrase, and unseal the stored box to {@link FakeWhisper}. */
 async function expectBoxUnseals(device: Device): Promise<void> {
   await device.signin(TH.WorldScope.userid)
-  await device.bank!.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
-  const record = await device.vaultTSQ.getOnce({ ...device.bank!.scope, labelpath: Openai })
+  await device.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+  const record = await device.vaultTSQ.getOnce({ modelkind: 'box', ...device.bank.scope, labelpath: Openai })
   const { whisper } = await device.vault!.unsealBox(record as LiveOf<BoxRecord>)
   expect(whisper).to.deep.equal(FakeWhisper)
 }
@@ -241,7 +241,7 @@ describe("a vault shared between the two derivers", () => {
     const vaultDB = await storeFakeBox(argon2idWebV1Deriver)
     const device  = deviceOf(argon2idWasmWebV1Deriver, vaultDB)
     await device.signin(TH.WorldScope.userid)
-    await TH.expectRefusal(device.bank!.gate.unlock({ passphraseCleartext: 'correct horse battery stapler' }), 'wrong_passphrase')
+    await TH.expectRefusal(device.bank.gate.unlock({ passphraseCleartext: 'correct horse battery stapler' }), 'wrong_passphrase')
     await expectBoxUnseals(device)
   })
 })

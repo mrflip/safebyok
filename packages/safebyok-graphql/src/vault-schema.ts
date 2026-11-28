@@ -22,14 +22,13 @@ const thingAskFields = `${bankAskFields}
   labelpath: String!
   modelkind: SafebyokModelkind!`
 
-// The fields every answer carries. `val` is typed per verb.
+// The fields every answer carries. `val` and `dbhas` are typed per verb.
 const answerFields = `
   ok:      Boolean!
   act:     String!
   banktok: String!
   tracked: SafebyokJson!
   read_tc: String!
-  dbhas:   SafebyokJson
   err:     SafebyokErr`
 
 /** The GraphQL schema (SDL) for a vaultDB's verbs. Every name is prefixed `safebyok`, so it can be merged into your own schema. */
@@ -39,7 +38,7 @@ scalar SafebyokJson
 """safebyok's name for the reason a call was refused."""
 enum SafebyokRefusalkind { ${DB.refusalkindVals.join(' ')} }
 
-"""The kind of Thing an ask is aimed at."""
+"""The kind of a Thing: of the Thing an ask is aimed at, or of the one a notice carries."""
 enum SafebyokModelkind { ${DB.thingkindVals.join(' ')} }
 
 """A get's policy for a Thing that was never stored or is deleted: refuse, or answer null."""
@@ -79,14 +78,14 @@ input SafebyokWriteAsk {${thingAskFields}
   options:   SafebyokOptions
 }
 
-"""An ask to write a new bank's three roots in one step."""
+"""An ask to write a new bank's two roots in one step: its gate and its root box, each over the root its put cites under cited."""
 input SafebyokBirthBankAsk {${bankAskFields}
-  bank:      SafebyokJson!
+  cited:     SafebyokJson!
   gate:      SafebyokJson!
   root:      SafebyokJson!
 }
 
-"""An ask for a bank's three roots, or for its storage stats, read in one step."""
+"""An ask for a bank's two roots, or for its storage stats, read in one step."""
 input SafebyokBankAsk {${bankAskFields}
 }
 
@@ -117,6 +116,7 @@ type SafebyokErr {
 """The answer to a get or a write: val is the Thing, or null for none live; dbhas the Thing stored or its shell, where the answer has one."""
 type SafebyokThingAnswer {${answerFields}
   val:     SafebyokJson
+  dbhas:   SafebyokJson
 }
 
 """The children of one live life of a Thing, by label: the live ones in items, the tombstones in gones."""
@@ -131,6 +131,7 @@ type SafebyokKids {
 
 """A child that fails its kind's checks: its scope."""
 type SafebyokIncompatibleThing {
+  modelkind: SafebyokModelkind!
   userid:    String!
   banklabel: String!
   labelpath: String!
@@ -140,21 +141,22 @@ type SafebyokIncompatibleThing {
 """The answer to a listing: its children, the parent and each child as stored, and the children that fail their checks. Each list is empty when refused."""
 type SafebyokListAnswer {${answerFields}
   val:               SafebyokKids
+  dbhas:             SafebyokJson
   parentage:         [SafebyokJson!]!
   deltas:            [SafebyokJson!]!
   incompatible_rows: [SafebyokIncompatibleThing!]!
 }
 
-"""A bank's three roots."""
+"""A bank's two roots: its gate, at its banklabel, and its root box."""
 type SafebyokRoots {
-  bank: SafebyokJson!
   gate: SafebyokJson!
   root: SafebyokJson!
 }
 
-"""The answer to a birth or a get of the world: the bank's three roots."""
+"""The answer to a birth or a get of the bank: the bank's two roots, as val, or as dbhas where a birth is refused."""
 type SafebyokRootsAnswer {${answerFields}
   val:     SafebyokRoots
+  dbhas:   SafebyokRoots
 }
 
 """One kind's Things as stored: how many, how many live, and their weight in bytes. Each a whole number."""
@@ -180,15 +182,17 @@ type SafebyokStats {
 """The answer to an ask for stats."""
 type SafebyokStatsAnswer {${answerFields}
   val:     SafebyokStats
+  dbhas:   SafebyokJson
 }
 
-"""One change a watch heard: the Thing, its bank's banktok and when it was read; or, with those null, the trouble the watch met. isEnded is true on the last notice of a watch that ended itself, which says why."""
+"""One change a watch heard: the Thing, its kind, its bank's banktok and when it was read; or, with those null, the trouble the watch met. isEnded is true on the last notice of a watch that ended itself, which says why."""
 type SafebyokNotice {
-  record:  SafebyokJson
-  banktok: String
-  read_tc: String
-  err:     SafebyokErr
-  isEnded: Boolean!
+  record:    SafebyokJson
+  modelkind: SafebyokModelkind
+  banktok:   String
+  read_tc:   String
+  err:       SafebyokErr
+  isEnded:   Boolean!
 }
 
 # Operations
@@ -196,7 +200,7 @@ type SafebyokNotice {
 type Query {
   safebyokGetThing(ask: SafebyokGetAsk!):    SafebyokThingAnswer!
   safebyokListThings(ask: SafebyokListAsk!): SafebyokListAnswer!
-  safebyokGetWorld(ask: SafebyokBankAsk!):   SafebyokRootsAnswer!
+  safebyokGetBank(ask: SafebyokBankAsk!):   SafebyokRootsAnswer!
   safebyokStats(ask: SafebyokBankAsk!):      SafebyokStatsAnswer!
 }
 

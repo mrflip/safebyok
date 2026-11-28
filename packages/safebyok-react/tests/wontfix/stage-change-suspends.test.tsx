@@ -1,6 +1,6 @@
 // A demonstration of a row in notes/wontfix.md (STYLE.md, *Tests*): it asserts the behaviour the row leaves as it is.
 // It mocks and injects nothing; a cast at `useSuspenseQuery` is for the types alone. To reopen the row, bring something this test does not already show.
-// If it fails, the behaviour has changed: invert it into a promise, move it beside useWorld's tests, and delete the row.
+// If it fails, the behaviour has changed: invert it into a promise, move it beside useBank's tests, and delete the row.
 /** The row "A stage change that reveals a suspending subtree shows its fallback". */
 import { type UseSuspenseQueryOptions, useSuspenseQuery } from '@tanstack/react-query'
 import { act, render, screen, waitFor } from '@testing-library/react'
@@ -29,7 +29,7 @@ describe("wontfix: a stage switch that shows a suspending subtree once unlocked"
       return <p>{`The box is for ${box?.sidecar['service'] as string}`}</p>
     }
     function StageSwitch() {
-      const stage = world.Bank.useWorld((snap) => snap.stage)
+      const stage = world.Bank.useBank((snap) => snap.stage)
       if (stage !== 'unlocked') { return <p>{`The stage is ${stage}`}</p> }
       return <BoxReader />
     }
@@ -39,7 +39,7 @@ describe("wontfix: a stage switch that shows a suspending subtree once unlocked"
     await act(() => device.signin(TH.ProviderUser))
     await screen.findByText('The stage is locked')
     expect(fallbacksShown).to.eq(0)
-    await act(() => device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
+    await act(() => device.bank.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
     await screen.findByText('The box is for jokes')
     expect(fallbacksShown, RowChanged).to.be.greaterThan(0)
   })

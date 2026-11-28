@@ -94,7 +94,7 @@ export function makeUseDraft(bank: DraftFriend) {
    */
   function useDraft(labelpath: string): Draft {
     const stored = bank.useBox(labelpath, { select: wholeThingOf }).data
-    const isLocked = bank.useWorld((snap) => snap.isLocked)
+    const isLocked = bank.useBank((snap) => snap.isLocked)
     const [pinned, setPinned] = useState<BoxShown | undefined>(undefined)
     const [sidecarSet, setSidecarSet] = useState<Sidecar | null>(null)
     const [dirtyFieldnames, setDirtyFieldnames] = useState<ReadonlySet<string>>(NoFieldnames)
@@ -242,7 +242,7 @@ function isMovedPast(pinned: BoxShown, stored: BoxShown): boolean {
 function citedOf(vault: Vault, pinned: BoxShown | undefined, unsealed: BoxUnsealed): Sealable<LiveOf<BoxRecord>> {
   if (pinned === undefined) { return Thing.sparseOf(unsealed) }
   if (pinned !== null) { return pinned }
-  const scope = { userid: unsealed.userid, banklabel: unsealed.banklabel, labelpath: unsealed.labelpath }
+  const scope = { modelkind: unsealed.modelkind, userid: unsealed.userid, banklabel: unsealed.banklabel, labelpath: unsealed.labelpath }
   return Shell.of(scope, vault.bank.rootBox)
 }
 

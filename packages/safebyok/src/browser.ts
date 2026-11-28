@@ -1,4 +1,4 @@
-// Kept off the front door (`safebyok`) so an app that derives, writes or judges some other way never ships the Argon2id code,
+// Kept out of the main entry (`safebyok`) so an app that derives, writes or judges some other way never ships the Argon2id code,
 // idb-keyval or zxcvbn (notes/good_bank_opts_are_in_browser.md).
 /** `safebyok/browser`: the key deriver, device database and strength checker a browser app gives to `Device.make`, the wrapper that runs a vaultDB's watch in one tab, and the rest of `safebyok-big/browser`. */
 

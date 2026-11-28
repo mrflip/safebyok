@@ -109,6 +109,6 @@ function b64Of(source: BufferSource): string {
 export async function _cheat_passkeyHeaderOf(world: ProviderWorld): Promise<PasskeyWayinHeader | null> {
   const device = LeanTH.makeDevice({}, { vaultDB: world.vaultDB })
   await device.signin(LeanTH.WorldScope.userid)
-  return (device.bank!.gate.passkey0?.toJSON() as PasskeyWayinHeader | undefined) ?? null
+  return (device.bank.gate.passkey0?.toJSON() as PasskeyWayinHeader | undefined) ?? null
 }
 // --

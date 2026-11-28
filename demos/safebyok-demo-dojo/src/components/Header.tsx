@@ -6,14 +6,14 @@ import { resetStores, signinAs, signOut } from '../lib/session'
 
 /** Who is signed in and the bank's stage, Lock/Unlock, Sign out, Reset, and a button for each fixture user, with their passphrase. */
 export function Header({ userid }: Readonly<{ userid: string | null }>) {
-  const world = Dojo.useWorld()
+  const bank = Dojo.useBank()
   return (
     <header>
       <h1>Dojo</h1>
       <p className="row">
         {(userid === null) ? 'Nobody is signed in.' : <>Signed in as <strong>{userid}</strong></>}
-        <span>Stage: <strong>{world.stage}</strong></span>
-        {(world.lastErr !== null) && <span className="gripe">{world.lastErr.message}</span>}
+        <span>Stage: <strong>{bank.stage}</strong></span>
+        {(bank.lastErr !== null) && <span className="gripe">{bank.lastErr.message}</span>}
       </p>
       <div className="row">
         <LockButton />
@@ -34,7 +34,7 @@ export function Header({ userid }: Readonly<{ userid: string | null }>) {
 
 /** Lock an unlocked bank; on a locked one, ask for the passphrase in a dialog, with the kit's unlock form. */
 function LockButton() {
-  const stage = Dojo.useWorld((snap) => snap.stage)
+  const stage = Dojo.useBank((snap) => snap.stage)
   const [isAsking, setIsAsking] = useState(false)
   const titleId = useId()
   Dojo.useStageChange((nextStage) => { if (nextStage !== 'locked') { setIsAsking(false) } })

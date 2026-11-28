@@ -3,7 +3,7 @@ import { describe } from 'vitest'
 import { type Helpers, Validator } from 'safebyok-big/internals'
 import { expectGood } from 'safebyok-big/testing'
 import type { Labelpath, Lifepath } from '../../src/shapes/primitives'
-import { type BoxRecord, type GateRecord, type ThingRecord, type ThingScope, Shell } from '../../src/shapes/shapes-thing'
+import { type BoxRecord, type GateRecord, type ThingScope, type ThingRecord, type Thingkind, Shell } from '../../src/shapes/shapes-thing'
 
 import type { VaultDB } from '../../src/storage/vault-db'
 import { Life0, birthAskOf, birthBankAskOf, gateThingOf, getAskAt } from './vaultdb-world'
@@ -13,14 +13,14 @@ import { describeVaultDBBirths } from './vaultdb-battery-births'
 import { describeVaultDBWatch } from './vaultdb-battery-watch'
 import { describeVaultDBBanktok } from './vaultdb-battery-banktok'
 import { describeVaultDBTracked } from './vaultdb-battery-tracked'
-import { describeVaultDBGetWorld } from './vaultdb-battery-getworld'
+import { describeVaultDBGetBank } from './vaultdb-battery-getbank'
 import { describeVaultDBStats } from './vaultdb-battery-stats'
 
 // == [The hooks a vaultDB hands the battery]: VaultDBRowCheats, BatteryVaultDB, VaultDBBatteryOpts
 
 /** A vaultDB's Things, reached past its verbs: the cheat the battery plants an incompatible Thing with, or removes one with. */
 export type VaultDBRowCheats = {
-  /** Plants `raw` as the Thing at `scope`, unchecked. A concrete adapter that cannot write `raw` throws. */
+  /** Plants `raw` as the Thing at `scope`, in its kind's table, unchecked. A concrete adapter that cannot write `raw` throws. */
   plant:  (scope: ThingScope, raw: unknown) => Helpers.Awaitable<void>
   /** Takes away the Thing at `scope`, if any, unchecked. */
   remove: (scope: ThingScope) => Helpers.Awaitable<void>
@@ -37,6 +37,8 @@ export type VaultDBBatteryOpts<DBT extends BatteryVaultDB = VaultDB> = {
   _cheat_rowsOf: (vaultDB: DBT) => VaultDBRowCheats
   /** False to leave out the cases of a raw vaultDB's watch: for a vaultDB whose watch notifies nothing, or one with no watch (a `VaultMinder`). */
   watches?:      boolean
+  /** True to leave out the cases of a bank other than the battery's own: for a vaultDB that serves one bank (a `VaultMinder`). */
+  servesOneBank?: boolean
 }
 // --
 
@@ -45,6 +47,7 @@ const batteryOpts = Validator.objCheck(({ fn, bool }) => ({
   makeVaultDB:   fn<VaultDBBatteryOpts['makeVaultDB']>(),
   _cheat_rowsOf: fn<VaultDBBatteryOpts['_cheat_rowsOf']>(),
   watches:       bool.optional(),
+  servesOneBank: bool.optional(),
 }), 'bad_record')
 
 // == [The world the cases share]: VaultDBBatteryWorld, worldOf
@@ -53,19 +56,21 @@ const batteryOpts = Validator.objCheck(({ fn, bool }) => ({
 export type VaultDBBatteryWorld = {
   /** A fresh, empty vaultDB. */
   fresh:     () => Promise<VaultDB>
-  /** A fresh vaultDB with a bank born in it, its three roots as `birthBankAskOf` makes them. */
+  /** A fresh vaultDB with a bank born in it, its two roots as `birthBankAskOf` makes them. */
   bornBank:  () => Promise<VaultDB>
-  /** A fresh vaultDB with the main gate alone written in it, by a birth, and no bank. */
+  /** A fresh vaultDB with the gate alone written in it, by a put over the shell, and no root box. */
   withGate:  (gate?: GateRecord) => Promise<VaultDB>
   /** Write `thing` into `vaultDB`, born under its parent's life at `parentLifepath`. */
   bornUnder: (vaultDB: VaultDB, thing: ThingRecord, parentLifepath: Lifepath) => Promise<void>
   /** Write each of `boxes` into `vaultDB`, born under the root box's life 0, and return them. */
   boxesBorn: (vaultDB: VaultDB, ...boxes: BoxRecord[]) => Promise<BoxRecord[]>
-  /** The live Thing `vaultDB` has at `labelpath`, or null for a tombstone or none; throws on a refusal. */
-  gotAt:     (vaultDB: VaultDB, labelpath: Labelpath) => Promise<ThingRecord | null>
+  /** The live Thing of `modelkind` `vaultDB` has at `labelpath`, or null for a tombstone or none; throws on a refusal. */
+  gotAt:     (vaultDB: VaultDB, modelkind: Thingkind, labelpath: Labelpath) => Promise<ThingRecord | null>
   /** The cheat into what `vaultDB` has. */
   rowsOf:    (vaultDB: VaultDB) => VaultDBRowCheats
   watches:   boolean
+  /** True where the vaultDB serves the battery's own bank alone. */
+  servesOneBank: boolean
 }
 
 /** Write `thing` into `vaultDB`, born under `parentLifepath`; throws on a refusal. */
@@ -74,15 +79,15 @@ async function bornUnder(vaultDB: VaultDB, thing: ThingRecord, parentLifepath: L
   await expectGood(vaultDB.tryWriteThing(ask))
 }
 
-/** The live Thing `vaultDB` has at `labelpath`, or null for a tombstone or none; throws on a refusal. */
-async function gotAt(vaultDB: VaultDB, labelpath: Labelpath): Promise<ThingRecord | null> {
-  const answer = await vaultDB.tryGetThing(getAskAt(labelpath))
+/** The live Thing of `modelkind` `vaultDB` has at `labelpath`, or null for a tombstone or none; throws on a refusal. */
+async function gotAt(vaultDB: VaultDB, modelkind: Thingkind, labelpath: Labelpath): Promise<ThingRecord | null> {
+  const answer = await vaultDB.tryGetThing(getAskAt(modelkind, labelpath))
   return await expectGood<ThingRecord | null>(answer)
 }
 
 // Every vaultDB a world's hooks are handed is one its own factory made, so narrowing one to DBT is safe. One made with no
 // watch is handed over only with `watches: false`, so no case calls its watch.
-function worldOf<DBT extends BatteryVaultDB>({ makeVaultDB, _cheat_rowsOf, watches = true }: VaultDBBatteryOpts<DBT>): VaultDBBatteryWorld {
+function worldOf<DBT extends BatteryVaultDB>({ makeVaultDB, _cheat_rowsOf, watches = true, servesOneBank = false }: VaultDBBatteryOpts<DBT>): VaultDBBatteryWorld {
   async function fresh(): Promise<VaultDB> { return await makeVaultDB() as BatteryVaultDB as VaultDB }
   async function bornBank(): Promise<VaultDB> {
     const vaultDB = await fresh()
@@ -98,7 +103,7 @@ function worldOf<DBT extends BatteryVaultDB>({ makeVaultDB, _cheat_rowsOf, watch
     for (const box of boxes) { await bornUnder(vaultDB, box, Life0) }
     return boxes
   }
-  return { fresh, bornBank, withGate, bornUnder, boxesBorn, gotAt, rowsOf: (vaultDB) => _cheat_rowsOf(vaultDB as BatteryVaultDB as DBT), watches }
+  return { fresh, bornBank, withGate, bornUnder, boxesBorn, gotAt, rowsOf: (vaultDB) => _cheat_rowsOf(vaultDB as BatteryVaultDB as DBT), watches, servesOneBank }
 }
 // --
 
@@ -110,7 +115,7 @@ export function describeVaultDBBattery<DBT extends BatteryVaultDB>(label: string
     describeVaultDBWrites(world)
     describeVaultDBLists(world)
     describeVaultDBBirths(world)
-    describeVaultDBGetWorld(world)
+    describeVaultDBGetBank(world)
     describeVaultDBStats(world)
     describeVaultDBBanktok(world)
     describeVaultDBTracked(world)

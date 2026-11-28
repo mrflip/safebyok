@@ -1,10 +1,10 @@
 /** The vaultDB in memory. */
 
 import { AdapterVaultDB } from './adapter-vault-db'
-import type { BirthManifest, GetManifest, ListManifest, StatsManifest, WorldManifest, WriteManifest } from '../shapes/shapes-manifest'
-import type { Labelpath } from '../shapes/primitives'
-import type { BirthBankAsk, BirthPuts, GetAsk, GetWorldAsk, ListAsk, StatsAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
-import { MemoryDatastore, type Watcher } from './memory-datastore'
+import type { BirthManifest, GetManifest, ListManifest, StatsManifest, GetBankManifest, WriteManifest } from '../shapes/shapes-manifest'
+import type { Thingkind } from '../shapes/shapes-thing'
+import type { BirthBankAsk, BirthPuts, GetAsk, GetBankAsk, ListAsk, StatsAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
+import { type BankRows, MemoryDatastore, type Watcher } from './memory-datastore'
 
 /** A vaultDB in this tab's memory, gone when the tab closes: each `do*` hands its ask to one function of its {@link MemoryDatastore}. */
 export class MemoryVaultDB extends AdapterVaultDB {
@@ -12,11 +12,11 @@ export class MemoryVaultDB extends AdapterVaultDB {
 
   readonly #datastore = new MemoryDatastore()
 
-  /** For tests: the Things stored in `scope`'s bank, by labelpath, to read or change in place. */
-  _cheat_things(scope: ThingWatchScope): Map<Labelpath, unknown> { return this.#datastore._cheat_things(scope) } // eslint-disable-line unicorn/prefer-private-class-fields
+  /** For tests: the Things stored in `scope`'s bank, in each kind's table, to read or change in place. */
+  _cheat_things(scope: ThingWatchScope): Readonly<Record<Thingkind, BankRows>> { return this.#datastore._cheat_things(scope) } // eslint-disable-line unicorn/prefer-private-class-fields
   // --
 
-  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats, doWatch
+  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetBank, doStats, doWatch
 
   protected doGetThing(ask: GetAsk): GetManifest { return this.#datastore.getThing(ask) }
 
@@ -26,7 +26,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
 
   protected doBirthBank(ask: BirthBankAsk, puts: BirthPuts): BirthManifest { return this.#datastore.birthBank(ask, puts) }
 
-  protected doGetWorld(ask: GetWorldAsk): WorldManifest { return this.#datastore.getWorld(ask) }
+  protected doGetBank(ask: GetBankAsk): GetBankManifest { return this.#datastore.getBank(ask) }
 
   protected doStats(ask: StatsAsk): StatsManifest { return this.#datastore.stats(ask) }
 

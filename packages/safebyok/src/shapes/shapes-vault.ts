@@ -4,8 +4,8 @@ import { Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { Labelpath } from './primitives'
 import type { VaultTSQ } from '../minding/vault-tsq'
-import type { World } from '../models/world'
-import { type BoxUnsealed, isWorld } from './shapes-bankish'
+import type { Bank } from '../models/bank'
+import { type BoxUnsealed, isBank } from './shapes-bankish'
 import { BoxChecks } from './shapes-thingkinds'
 import { isVaultTSQ } from './shapes-vault-tsq'
 
@@ -13,7 +13,7 @@ import { isVaultTSQ } from './shapes-vault-tsq'
 
 /** The checks of `Vault.make`'s arguments, of a box's labelpath, never the root box's, and of the `fn` `Vault.withWhisper` and `Vault.withUnlockedWhisper` call. */
 export const VaultChecks = Validator.Checkers('bad_record', ({ obj, custom, fn }) => ({
-  makeArgs:     obj({ world: custom<World>(isWorld, Phrases.WorldExpected), vaultTSQ: custom<VaultTSQ>(isVaultTSQ, Phrases.VaultTSQExpected) }),
+  makeArgs:     obj({ bank: custom<Bank>(isBank, Phrases.BankExpected), vaultTSQ: custom<VaultTSQ>(isVaultTSQ, Phrases.VaultTSQExpected) }),
   // The root box is the bank's: a vault writes and reads only the boxes under it.
   boxLabelpath: BoxChecks.labelpath.refine((given) => given !== Labelpath.RootBox, Phrases.VaultBoxIsRoot),
   fn:           fn<(box: BoxUnsealed) => unknown>(),

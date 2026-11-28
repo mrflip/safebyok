@@ -43,7 +43,7 @@ function PassphraseField({ name, label }: Readonly<{ name: string, label: string
 // It submits from a handler, never as an Action: its caller may be a pending Action, and React batches transitions together.
 function UnlockDialog() {
   const vault = useVault()
-  const isUnlockWanted = useWorld((snap) => snap.isUnlockWanted)
+  const isUnlockWanted = useBank((snap) => snap.isUnlockWanted)
   const unlock = useMutation({ mutationFn: vault.unlock })   // a mutation's updates are ordinary ones, shown at once
   return (
     <Dialog open={isUnlockWanted} onOpenChange={(open) => { if (! open) { vault.dismissUnlock() } }}>

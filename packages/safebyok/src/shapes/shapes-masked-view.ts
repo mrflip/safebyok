@@ -12,7 +12,7 @@ export type MaskedRow = Readonly<{
   queryKey:        readonly unknown[]
   status:          TSQ.QueryStatus
   fetchStatus:     TSQ.FetchStatus
-  /** When a record or listing last landed under this key, or 0 for none. */
+  /** When the record or listing under this key was last updated, or 0 for none. */
   dataUpdatedAt:   EpochMillis
   isInvalidated:   boolean
   /** The refusalkind of the last fetch under this key, or null where it did not refuse. */

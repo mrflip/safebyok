@@ -15,11 +15,11 @@ export type Adoptable<RecordT extends ThingRecord> = RecordT | Tombstone<RecordT
 // TypeScript cannot type a static `make` here that returns the subclass while its constructor is private, so each
 // subclass declares its own: `make(begun, opts[, friend])`, which checks what it is given, constructs the Thing at its
 // shell, and has it receive `begun` where that is an item event.
-/** A model of the stored Thing at one labelpath, across its lives: it reads as the record it holds, the shell until it adopts one, and knows nothing else.
+/** A model of the stored Thing at one labelpath, across its lives: it reads as the record it models, the shell until it adopts one, and knows nothing else.
  * Its Thing fields are its own read-only enumerable props, so a spread, `{ ...thing }`, or `JSON.stringify` shows nothing secret and nothing opaque.
  * A subclass reads its kind's body off the record with getters, and has no other member under a record field's name: over the shell each reads as
- * undefined, after a tombstone as the tombstone's. Its scope fields never change. Narrow {@link pickle} for the rest of a kind's fields.
- * It holds records as the vaultDB has them, never a cleartext, a key or a lease. A listener can {@link subscribe} to hear of each record it adopts.
+ * undefined, after a tombstone as the tombstone's. Its scope fields and its modelkind never change. Narrow {@link pickle} for the rest of a kind's fields.
+ * It models records as the vaultDB has them, never a cleartext, a CryptoKey or a lease. A listener can {@link subscribe} to hear of each record it adopts.
  */
 export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT extends Adoptable<RecordT> = Adoptable<RecordT>> extends BaseThing {
   // == [Props]: #record, #bulletproofCallback, #subscribers, #subscribe
@@ -39,28 +39,28 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
 
   // == [Construction]: constructor, adopt
 
-  /** A Thing at `shell`, the shell at its labelpath, which has received nothing, each subscriber wrapped by `bulletproofCallback` where given. */
+  /** Make a Thing at `shell`, the shell at its labelpath, that has received nothing. Each subscriber is wrapped by `bulletproofCallback` where it is given. */
   protected constructor(shell: ShellOf<RecordT>, bulletproofCallback: BulletproofCallback = callAsIs) {
     super()
     this.#bulletproofCallback = bulletproofCallback
-    const { userid, banklabel, labelpath } = shell
-    Helpers.tattoo(this, { userid, banklabel, labelpath }, { configurable: false })
+    const { userid, banklabel, labelpath, modelkind } = shell
+    Helpers.tattoo(this, { userid, banklabel, labelpath, modelkind }, { configurable: false })
     this.adopt(shell)
   }
 
-  // The scope fields are the constructor's: `receive` refuses a record of another scope before it adopts one.
+  // The scope fields and the modelkind are the constructor's: `receive` refuses a record of another scope before it adopts one.
   // A record from an adapter is frozen already; one that reaches a Thing another way is frozen here.
   /** Make `record` the one this Thing models, of whatever life, its Thing fields shown as read-only props. */
   protected adopt(record: Adoptable<RecordT>): void {
     this.#record = deepFreeze(record)
-    const { label, fmt, lifepath, lifeseq, revtok, revseq, born_at, written_at, am } = record
-    Helpers.tattoo(this, { label, fmt, lifepath, lifeseq, revtok, revseq, born_at, written_at, am })
+    const { label, banktok, fmt, lifepath, lifeseq, revtok, revseq, born_at, written_at, am } = record
+    Helpers.tattoo(this, { label, banktok, fmt, lifepath, lifeseq, revtok, revseq, born_at, written_at, am })
   }
   // --
 
   // == [Receiving]: receive, take
 
-  /** Take the record of `proposed`, an item event of this Thing, and publish to each subscriber where it is adopted. Returns whether it was.
+  /** Receive `proposed`, an item event of this Thing, and publish to each subscriber where its record is adopted. Returns whether it was.
    * {@link take} says which records are adopted, and what refuses.
    */
   receive(proposed: VaultEvent<RecordT>): boolean {
@@ -70,11 +70,11 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
   }
 
   // A car moves how far its Thing has been seen between the two halves of a receive, so that a subscriber finds the car past the record.
-  /** Adopt the record of `proposed` where it is whole, a tombstone or the void sentinel, and newer than the record held, and return whether it did. No subscriber is told: call {@link publish} after.
+  /** Adopt the record of `proposed` where it is whole, a tombstone or the void sentinel, and newer than the record it models, and return whether it did. No subscriber is told: call {@link publish} after.
    * A live box's sparse form, a record no newer, and a `life` or `aged` event change nothing. Refuses an event of another Thing, and a record in any other form.
    */
   take(proposed: VaultEvent<RecordT>): boolean {
-    SeenChecks.event.parseConsistent(proposed, pick(this, ['userid', 'banklabel', 'labelpath']))
+    SeenChecks.event.parseConsistent(proposed, pick(this, ['userid', 'banklabel', 'labelpath', 'modelkind']))
     if (proposed.eventkind !== 'item') { return false }
     SeenChecks.item.parse(proposed)
     const { val, liveness } = proposed
@@ -114,7 +114,7 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT, PickleT
    */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
 
-  /** Call each subscriber, as {@link receive} does once a record is adopted. */
+  /** Call each subscriber. */
   publish(): void {
     for (const told of this.#subscribers.values()) { told() }
   }
