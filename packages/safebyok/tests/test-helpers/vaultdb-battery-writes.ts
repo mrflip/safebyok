@@ -142,7 +142,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     const ActCases = [
       // the datastore moved on:
       ["stale",  replaceAskOf(prior, nextGateOf(prior, { revtok: revtokOf('1b') })), 'expects a revision the datastore has moved past'],
-      ["retcon", replaceAskOf(prior, next),                                         'resends a write that already landed'],
+      ["retcon", replaceAskOf(prior, next),                                         'proposes the revision the datastore already has'],
       ["forked", replaceAskOf({ ...next, revtok: revtokOf('fork') }, nextGateOf(next)), 'expects the prior revseq under another revtok'],
       // the caller is ahead of the datastore, or confused:
       ["ahead",  replaceAskOf(later, nextGateOf(later)),                            'expects a revision the datastore has not reached'],
@@ -377,7 +377,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       expect(await vaultDB.tryWriteThing(replaceAskOf(box, next))).to.deep.include({ ok: true, act: 'replaced', val: next })
     })
 
-    it("refuses a del resent after it landed, and a del of nothing", async () => {
+    it("refuses a del whose tombstone the datastore already has, and a del of nothing", async () => {
       const vaultDB = await fresh()
       await boxesBorn(vaultDB, box)
       await expectGood(vaultDB.tryWriteThing(delAskFor(box, tomb)))
