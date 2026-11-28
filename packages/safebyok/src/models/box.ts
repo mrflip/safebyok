@@ -12,7 +12,7 @@ import * as Phrases from '../phrases'
 export class Box extends BaseBox {
   // == [Construction]: make, constructor
 
-  // A box keeps nothing of its bank but the wrapper of its subscribers.
+  // A box has nothing of its bank but the wrapper of its subscribers.
   /** Make the box at `begun`, its shell, or an item event of its record, which it then receives. Nothing is fetched or stored.
    * Each subscriber is wrapped by `opts.bank`'s `bulletproofCallback`. Throws where it refuses `begun`'s record, and refuses `record_conflict` where `begun` is of another bank.
    */
