@@ -818,7 +818,7 @@ describe("device.inspectable()", () => {
     expect(bankTSQ.map(({ queryKey }) => queryKey.slice(0, 2))).to.have.deep.members([['sok', 'gate'], ['sok', 'box']])
   })
 
-  it("shows the refusal a root's Thing last raised at a record as its row's lastRefusalkind, and when the record it holds was read as its dataUpdatedAt", async () => {
+  it("shows the refusal a root's Thing last threw at a record as its row's lastRefusalkind, and when the record it holds was read as its dataUpdatedAt", async () => {
     const { bank, device } = await TH.buildBornVault()
     const gateRow = () => device.inspectable().bankTSQ.find(({ val }) => (val as { labelpath: string }).labelpath === TH.GateScope.labelpath)
     expect(gateRow()).to.include({ dataUpdatedAt: readAtOf(device.bank.demandVaultMinder().carAt(bank.gate)!.read_tc), lastRefusalkind: null })

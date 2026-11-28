@@ -705,7 +705,7 @@ describe("VaultMinder.ensureRootCars()", () => {
 })
 
 describe("VaultMinder.carAt(scoped)", () => {
-  it("holds the refusal its Thing last raised at a record, and when, and clears it at a record taken, keeping when", async () => {
+  it("holds the refusal its Thing last threw at a record, and when, and clears it at a record taken, keeping when", async () => {
     const { vaultDB, inner } = refusingOverQuietMemory()
     const { badNews } = heardOf(vaultDB)
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
@@ -934,7 +934,7 @@ describe("VaultMinder.tryGetOnce(scoped) and getOnce(scoped)", () => {
     await TH.expectRefusal(vaultDB.getOnce(TH.GateScope))
   })
 
-  it("throw the refusal a newer record raises at a Thing already kept, which keeps its older record, and its try form answers it", async () => {
+  it("throw the refusal a cached Thing throws at a newer record, which keeps its older record, and its try form answers it", async () => {
     const { vaultDB, inner } = refusingOverQuietMemory()
     const { badNews } = heardOf(vaultDB)
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
@@ -949,7 +949,7 @@ describe("VaultMinder.tryGetOnce(scoped) and getOnce(scoped)", () => {
     expect(badNews).to.deep.equal([err, badNews[1]])
   })
 
-  it("throw the refusal a first record raises, its car staying with the Thing holding the shell", async () => {
+  it("throw the refusal thrown at a first record, its car staying with the Thing holding the shell", async () => {
     const { vaultDB, inner } = refusingOverQuietMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     cheatPlant(inner, Revs.three)
@@ -1095,7 +1095,7 @@ describe("VaultMinder's writes: tryPutOnce, putOnce, tryDelOnce and delOnce", ()
     expect(asked).not.toHaveBeenCalled()
   })
 
-  it("throw the refusal the record written raises at its Thing, which keeps its older record, and the try forms answer it", async () => {
+  it("throw the refusal its Thing throws at the record written, which keeps its older record, and the try forms answer it", async () => {
     for (const record of [Revs.three, TH.boxTombOf(Revs.two)]) {
       const { vaultDB } = refusingOverQuietMemory()
       await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))

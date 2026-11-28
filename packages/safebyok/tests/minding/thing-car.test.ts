@@ -690,7 +690,7 @@ describe("car.receive(event)", () => {
     expect([car.lastErr, car.erred_at]).to.deep.equal([null, erred_at])
   })
 
-  it("throws the refusal its Thing raised, as a refusal", () => {
+  it("throws the refusal its Thing threw", () => {
     const car = ThingCar.make(Thing.shellOf(Revs.two), { bank: TH.PlainCarBank })
     const err = TH.expectSyncRefusal(() => car.receive({ ...TH.thingEventOf(Revs.two), labelpath: 'box/other' }), 'bad_record')
     expect(car.lastErr).to.equal(err)

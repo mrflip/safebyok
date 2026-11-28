@@ -27,13 +27,13 @@ type Dispatch = Readonly<{ sourcelabel: string, read_tc: ReadTc, banktok: Bankto
 /** One call of `listen`, holding its listener: a listener that listens twice is told twice, and each end stops one. */
 type Listening = Readonly<{ listener: VaultMinderListener }>
 
-/** A vaultDB's answer, once its records are told, with the refusal raised by the record it carries at the ask's labelpath, or null. */
+/** A vaultDB's answer, once its records are told, with the refusal thrown at the record it carries at the ask's labelpath, or null. */
 type Told<AnswerT> = Readonly<{ answer: AnswerT, refusal: Errors.VaultError | null }>
 
 /** A vaultDB's verbs over another vaultDB, for one bank, telling its listeners each record it learns of that is news, in order.
  * It learns of the records each answer carries, of what the wrapped vaultDB's watch notifies, and of the events a device database rings, handed to its `receive`.
  * It makes a car for each Thing it learns of a record of, by its modelkind and labelpath, for as long as it lives: {@link carAt}. The car's `receive` says what is news,
- * and the car has the Thing, what a write over it cites, how far it has been seen, and the refusal it last raised at a record.
+ * and the car has the Thing, what a write over it cites, how far it has been seen, and the refusal it last threw at a record.
  * It builds the bank's asks, and its once verbs send them, each answering only once its records have been told.
  * It watches the wrapped vaultDB from its `connect` to its `disconnect`. A record it learns of while no one listens still
  * reaches its Thing, but no listener, then or later: listen before asking it anything.
@@ -338,7 +338,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   /** The Thing at `scoped`, in this vaultDB's bank, or undefined where no record of it has been learned of. The same object across records and lives. */
   thingAt(scoped: ThingScope): ThingT | undefined { return this.carAt(scoped)?.thing }
 
-  /** The car of the Thing at `scoped`: what a write over it cites, how far it has been seen, and the refusal it last raised at a record; or undefined where {@link thingAt} is.
+  /** The car of the Thing at `scoped`: what a write over it cites, how far it has been seen, and the refusal it last threw at a record; or undefined where {@link thingAt} is.
    * Its `lastErr` is for a devtool, never for an app's own logic.
    */
   carAt(scoped: ThingScope): ThingCar<ThingT> | undefined {
@@ -390,7 +390,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   // == [Telling]: #tellAnswer, #tellNotice, #banktokOr, #tell, #receiveAtThing, #ensureCar, #tellBadNews
 
   /** Tell every listener the events of `roots` then `owns`, the records `answer` carries, from the wrapped vaultDB at the answer's `read_tc` and `banktok`.
-   * Returns the first refusal a record of `owns` raised, or null.
+   * Returns the first refusal thrown at a record of `owns`, or null.
    */
   #tellAnswer(answer: { banktok: Banktok, read_tc: ReadTc }, roots: readonly SeenThing[], owns: readonly SeenThing[]): Errors.VaultError | null {
     const { banktok, read_tc } = answer
@@ -409,7 +409,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   /** `banktok`, or where it is the void banktok, that of the newest answer that read the bank */
   #banktokOr(banktok: Banktok): Banktok { return (banktok === SX.VoidLifeTok) ? this.#newestBanktok : banktok }
 
-  /** Tell every listener each event the Things return for `seens`, in order, each carrying `dispatch`, and return the first refusal a record raised, or null.
+  /** Tell every listener each event the Things return for `seens`, in order, each carrying `dispatch`, and return the first refusal thrown at a record, or null.
    * A record refused goes to every listener's `onBadNews`, with its scope, or null where that is refused too.
    */
   #tell(seens: readonly SeenThing[], dispatch: Dispatch): Errors.VaultError | null {
@@ -471,7 +471,7 @@ function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepat
 // == [Refused once]: ownRefusedAnswerOf
 
 // A good answer's act names what the datastore did, which no refused answer may carry.
-/** `answer` as a refused answer: its error is `err`, the refusal its own record raised as it was told, and its `dbhas` is that record */
+/** `answer` as a refused answer: its error is `err`, the refusal thrown at its own record as it was told, and its `dbhas` is that record */
 function ownRefusedAnswerOf(answer: GetThingAnswer | WriteThingAnswer, err: Errors.VaultError): BadAnswer {
   if (! answer.ok) { return { ...answer, err } }
   const { ask, banktok, tracked, read_tc } = answer

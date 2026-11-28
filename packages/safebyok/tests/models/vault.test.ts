@@ -309,7 +309,7 @@ describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
     expect(answer).to.have.nested.property('dbhas.revtok', planted.revtok)
   })
 
-  it("answers the refusal its box raises at the record its answer carries, though written", async () => {
+  it("answers the refusal its box throws at the record its answer carries, though written", async () => {
     const { bank, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     answerWritesUntimed(bank)
@@ -447,7 +447,7 @@ describe("vault.tryDelBoxOnce(labelpath)", () => {
     expect(written.mock.calls[0]![0]).to.deep.include({ ...bank.scope, op: 'del', labelpath: Openai, modelkind: 'box', cited: Thing.sparseOf(box), record: tombstone, track: TH.trackOf(TH.livePickleOf(bank.gate), bank.rootBox) })
   })
 
-  it("answers the refusal its box raises at the tombstone its answer carries, though written", async () => {
+  it("answers the refusal its box throws at the tombstone its answer carries, though written", async () => {
     const { bank, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     answerWritesUntimed(bank)

@@ -246,7 +246,7 @@ describe("VaultTSQ's items", () => {
     expect(Thing.isGone(boxHeldIn(world))).to.eq(true)
   })
 
-  it("show the refusal a newer record raises at the box's Thing as the item's error, its data kept", async () => {
+  it("show the refusal the box's Thing throws at a newer record as the item's error, its data kept", async () => {
     const world = await tsqWorldOf(new MemoryVaultDB(), (shell) => TH.RefusingThing.make(shell))
     const box2  = TH.nextOf(Box1)
     cheatPlant(world.vaultDB, box2)

@@ -1,4 +1,4 @@
-/** `ThingCar`, which a VaultMinder keeps for each Thing: the Thing, how far it has been seen, and the refusal it last raised at a record. */
+/** `ThingCar`, which a VaultMinder keeps for each Thing: the Thing, how far it has been seen, and the refusal it last threw at a record. */
 
 import { pick } from 'es-toolkit'
 import { Clock, type Errors } from 'safebyok-big/internals'
@@ -16,7 +16,7 @@ import * as Throwers from '../refusals/throwers'
 // == [ThingCar]: ThingCar
 
 /** A Thing, and how far it has been seen: what a write over it cites, its agerank, and when its newest revision was read.
- * It decides which records of the Thing are news, and hands the Thing those that are whole. It keeps the refusal the Thing last raised, for a devtool.
+ * It decides which records of the Thing are news, and hands the Thing those that are whole. It keeps the refusal the Thing last threw, for a devtool.
  */
 export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
   // == [Props]: thing, #lastErr, #erredAt, #citable, #agerank, #readTc
@@ -59,7 +59,7 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
 
   // == [Bookkeeping]: lastErr, erred_at, citable, agerank, agekind, read_tc, read_at
 
-  /** The refusal the Thing raised at the last record it was handed, or null where it took that record. For a devtool, never for an app's own logic. */
+  /** The refusal the Thing threw at the last record it was handed, or null where it took that record. For a devtool, never for an app's own logic. */
   get lastErr(): Errors.VaultError | null { return this.#lastErr }
 
   /** When the Thing last refused a record, or null where it has refused none. */
