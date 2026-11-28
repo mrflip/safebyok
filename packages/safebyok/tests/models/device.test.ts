@@ -129,9 +129,16 @@ describe("Device.make(record, opts)", () => {
     expect(device.vaultTsqClient).to.not.equal(TH.makeDevice({ userid: null }).vaultTsqClient)
   })
 
+  it("refuses its scope before signin, with 'need_user'", async () => {
+    const device = TH.makeDevice({ userid: null })
+    TH.expectSyncRefusal(() => device.scope, 'need_user')
+    await device.signin(TH.WorldScope.userid)
+    expect(device.scope).to.deep.equal(TH.WorldScope)
+  })
+
   it("makes the vault TSQ at signin, refusing it before then", async () => {
     const device = TH.makeDevice({ userid: null })
-    TH.expectSyncRefusal(() => device.vaultTSQ, 'absent_vault')
+    TH.expectSyncRefusal(() => device.vaultTSQ, 'need_user')
     await device.signin(TH.WorldScope.userid)
     expect(device.vaultTSQ).to.be.instanceOf(VaultTSQ)
     expect(device.vaultTSQ).to.equal(device.vaultTSQ)

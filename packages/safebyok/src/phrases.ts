@@ -2,7 +2,7 @@
 
 import { Phrases as BigPhrases } from 'safebyok-big/internals'
 
-// == [Models]: VaultDBExpected, DeviceDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, SigninUnanswered, RootOfOtherKind, NobodySignedIn, ThingNotLive, UnlockDismissed, GatingSpent, HostedVaultExpected, RootShelfExpected, ThingSoonestBare, BankExpected, ThingExpected, BegunOfOtherKind, WayinExpected, WayinKeyExpected, WayinOfOtherHeader
+// == [Models]: VaultDBExpected, DeviceDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, SigninUnanswered, RootOfOtherKind, NeedUser, ThingNotLive, UnlockDismissed, GatingSpent, HostedVaultExpected, RootShelfExpected, ThingSoonestBare, BankExpected, ThingExpected, BegunOfOtherKind, WayinExpected, WayinKeyExpected, WayinOfOtherHeader
 
 /** A vaultDB that lacks one of its verbs or watch. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs and watch.'
@@ -32,7 +32,7 @@ export const SigninUnanswered = "This device's sign-in has not answered yet: cal
 export const RootOfOtherKind = "A bank's gate is a Gate and its root box a Box: its VaultMinder has a Thing of another kind there."
 
 /** A call that needs a user, on a device nobody is signed in to. */
-export const NobodySignedIn = "Nobody is signed in on this device: call `signin` with the user's id first."
+export const NeedUser = "Nobody is signed in on this device: call `signin` with the user's id first."
 
 /** A call that needs a live bank or gate, on one not born yet or deleted. */
 export const ThingNotLive = "This bank or gate is not stored live: it is not born yet, or was deleted. Wait for the stage to show 'locked' or 'unlocked'."

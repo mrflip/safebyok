@@ -104,9 +104,9 @@ export class Device {
   /** The user signed in on this device, or null until `signin`. */
   get userid(): Userid | null { return this.#userid }
 
-  /** The scope of the signed-in user's bank. Refuses `absent_vault` until `signin`. */
+  /** The scope of the signed-in user's bank. Refuses `need_user` until `signin`. */
   get scope(): BankScope {
-    if (this.#userid === null) { throw Throwers.nobodySignedIn() }
+    if (this.#userid === null) { throw Throwers.needUser() }
     return { userid: this.#userid, banklabel: this.banklabel }
   }
 
@@ -116,9 +116,9 @@ export class Device {
   /** The QueryClient the vault TSQ caches the signed-in user's boxes in: `opts.queryClient`, the host's own, or one the device made. The same one from `Device.make` on. */
   get vaultTsqClient(): QueryClient { return this.#vaultTsqClient }
 
-  /** The vault TSQ of the signed-in user's boxes, in {@link vaultTsqClient}. Refuses `absent_vault` until `signin`, and `disabled` until the sign-in has started the bank. */
+  /** The vault TSQ of the signed-in user's boxes, in {@link vaultTsqClient}. Refuses `need_user` until `signin`, and `disabled` until the sign-in has started the bank. */
   get vaultTSQ(): VaultTSQ {
-    if (this.#userid === null) { throw Throwers.nobodySignedIn() }
+    if (this.#userid === null) { throw Throwers.needUser() }
     if (this.#vaultTSQ === null) { throw Throwers.signinUnanswered() }
     return this.#vaultTSQ
   }

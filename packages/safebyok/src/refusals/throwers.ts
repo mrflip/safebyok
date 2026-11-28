@@ -24,13 +24,13 @@ export * from 'safebyok-big/refusals/throwers'
 export function refusalOfThrown(thrown: unknown): Errors.VaultError { return Errors.isVaultError(thrown) ? thrown : unexpectedError(thrown) }
 // --
 
-// == [Model Throwers]: signinUnanswered, nobodySignedIn, rootOfOtherKind, thingNotLive, unlockDismissed, gatingSpent, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, thingSoonestBare
+// == [Model Throwers]: signinUnanswered, needUser, rootOfOtherKind, thingNotLive, unlockDismissed, gatingSpent, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, thingSoonestBare
 
 /** A `disabled` refusal: the device's sign-in has not answered yet. */
 export function signinUnanswered(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.SigninUnanswered) }
 
-/** An `absent_vault` refusal: nobody is signed in on the device. */
-export function nobodySignedIn(): Errors.VaultError { return new Errors.VaultError('absent_vault', Phrases.NobodySignedIn) }
+/** A `need_user` refusal: nobody is signed in on the device. */
+export function needUser(): Errors.VaultError { return new Errors.VaultError('need_user', Phrases.NeedUser) }
 
 /** An `unexpected_error` refusal: the Thing a VaultMinder has at one of its bank's roots is not of that root's kind. */
 export function rootOfOtherKind(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.RootOfOtherKind) }

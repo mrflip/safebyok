@@ -86,12 +86,12 @@ export class Bank {
   /** The VaultMinder of the signed-in user's bank, as handed to {@link signin}, or null until then. */
   get vaultMinder(): VaultMinder | null { return this.#vaultMinder }
 
-  /** This bank's scope: its `userid` and `banklabel`. Refuses `absent_vault` until someone signs in. */
+  /** This bank's scope: its `userid` and `banklabel`. Refuses `need_user` until someone signs in. */
   get scope(): BankScope { return this.#device.scope }
 
   /** The bank's gate: the wayins a user unlocks with, and the form verbs that change them.
    * The same object from sign-in on, whatever its record: it models the shell until a gate is stored.
-   * Refuses `absent_vault` until someone signs in.
+   * Refuses `need_user` until someone signs in.
    */
   get gate(): Gate {
     const { thing } = this.#rootCars().gate
@@ -641,7 +641,7 @@ export class Bank {
 
   /** Demand that someone has signed in, and return the {@link vaultMinder}. */
   demandVaultMinder(): VaultMinder {
-    if (this.#vaultMinder === null) { throw Throwers.nobodySignedIn() }
+    if (this.#vaultMinder === null) { throw Throwers.needUser() }
     return this.#vaultMinder
   }
 
