@@ -18,7 +18,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  *   or the dev overlay. Never show it to the user, and never retry it. `bad_scope`,
  *   `bad_record`, `insecure_context`, `unexpected_error`, `gate_issue`, `disabled`, `gating_unlaunched`.
  * * **Condition**: something the app handles at run time, which may reach the user: ask again,
- *   show a message, retry, or have the user free room. `bank_locked`, `wrong_passphrase`,
+ *   show a message, retry, or have the user free room. `bank_locked`, `need_user`, `wrong_passphrase`,
  *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`,
  *   `absent_box`, `absent_vault`, `absent_wayin`, `absent_thing`, `box_too_large`, `vault_full`,
  *   `stale_write`, `stale_read`, `record_conflict`, `storage_unavailable`, `storage_blocked`, `gate_made_elsewhere`,
@@ -41,6 +41,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  */
 export const refusalkindVals = [
   'bank_locked',         // a whisper was asked for before the bank was unlocked
+  'need_user',           // a call needs a signed-in user and nobody is signed in: the host answers with `device.signin(userid)`
   'wrong_passphrase',    // the passphrase given did not unlock the vault
   'weak_passphrase',     // a new passphrase the vault's strengthChecker finds too easy to guess
   'wrong_passkey',       // the passkey's answer did not unlock the vault, or was for another salt
@@ -92,6 +93,7 @@ export type RefusalFamily = typeof refusalFamilyVals[number]
 /** The family of each refusalkind in {@link refusalkindVals}, which a VaultError's `family` is read from. */
 export const RefusalFamilyForKind = {
   bank_locked:         'condition',
+  need_user:           'condition',
   wrong_passphrase:    'condition',
   weak_passphrase:     'condition',
   wrong_passkey:       'condition',
