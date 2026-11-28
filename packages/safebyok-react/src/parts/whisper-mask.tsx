@@ -13,7 +13,7 @@ import { whisperTextOf } from '../giver/use-reveal'
 /** The props of a {@link WhisperMask}. */
 export interface WhisperMaskProps {
   /** The giver's bank, `SOK.bank(banklabel)`: the provider's, when left out. */
-  bank?:     Pick<BankGiver, 'useWorld' | 'useBox' | 'withLockableWhisper'> | undefined
+  bank?:     Pick<BankGiver, 'useBank' | 'useBox' | 'withLockableWhisper'> | undefined
   /** The box's labelpath, as the bank's other hooks take it. */
   labelpath: string
   /** The field of the box's whisper to mask. */
@@ -33,7 +33,7 @@ export interface WhisperMaskProps {
  */
 export function WhisperMask({ bank: bankProp, labelpath, field, tail, ifLocked = storedMaskOf, onError }: Readonly<WhisperMaskProps>) {
   const bank = useGivenBank(bankProp)
-  const stage = bank.useWorld((snap) => snap.stage)
+  const stage = bank.useBank((snap) => snap.stage)
   const revtok = bank.useBox(labelpath).data?.revtok
   const maskRef = useRef<HTMLElement>(null)
 

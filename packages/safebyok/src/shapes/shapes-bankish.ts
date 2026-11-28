@@ -3,14 +3,13 @@
 import type { QueryClient } from '@tanstack/query-core'
 import type * as Z from 'zod'
 import { CX, type Deriver, type EX, type Errors, type Logger, Validator } from 'safebyok-big/internals'
-import type { Bank } from '../models/bank'
 import type { DefaultOnBadNews, DefaultOnLifecycle, Device } from '../models/device'
-import type { World } from '../models/world'
+import type { Bank } from '../models/bank'
 import type { DeviceDB } from '../storage/device-db'
 import type { VaultDB } from '../storage/vault-db'
 import type { StrengthChecker } from './shapes-gateish'
 import type { BoxCleartexts, UnsealedOf } from './shapes-sealers'
-import type { BoxRecord } from './shapes-thing'
+import { type BoxRecord, type Thingkind, ThingChecks } from './shapes-thing'
 import type { GetAsk, ListAsk } from './shapes-asks'
 import type { Banklabel, Devicetok, EpochMillis, Labelpath, Userid } from './primitives'
 import * as Phrases from '../phrases'
@@ -23,52 +22,52 @@ export type BoxUnsealed = UnsealedOf<BoxRecord, BoxCleartexts>
 
 // == [The bank's drafts and asks]: BankAskDraft
 
-/** The draft of a get or list ask, for `VaultMinder.makeGetAsk` or `makeListAsk`: a labelpath in the bank, and for a get, `ifAbsent`, the answer when nothing is stored there.
+/** The draft of a get or list ask, for `VaultMinder.makeGetAsk` or `makeListAsk`: a modelkind and a labelpath in the bank, and for a get, `ifAbsent`, the answer when nothing is stored there.
  * The VaultMinder fills in the rest of the {@link GetAsk} or {@link ListAsk}.
  */
-export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent }>
+export type BankAskDraft = Readonly<{ modelkind: Thingkind, labelpath: Labelpath, ifAbsent?: EX.IfAbsent }>
 // --
 
-// == [The bank's making]: ThingMakeOpts, ThingMakeChecks, isWorld, WorldMembernames, WorldOpts, HostedVault, WorldChecks, isHostedVault
+// == [The bank's making]: ThingMakeOpts, ThingMakeChecks, isBank, BankMembernames, BankOpts, HostedVault, HostedVaultChecks, isHostedVault
 
 /** The options every kind of Thing is made with, beside the shell or item event it is made from. */
 export type ThingMakeOpts = Readonly<{
-  /** The device's world, which the Thing's bank is locked, unlocked and ended in, and whose `bulletproofCallback` wraps each of its subscribers. */
-  world: World
+  /** The device's bank, which the Thing is locked, unlocked and ended in, and whose `bulletproofCallback` wraps each of its subscribers. */
+  bank: Bank
 }>
 
 /** The check of {@link ThingMakeOpts}. */
 export const ThingMakeChecks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
-  thingMakeOpts: obj({ world: custom<World>(isWorld, Phrases.WorldExpected) }),
+  thingMakeOpts: obj({ bank: custom<Bank>(isBank, Phrases.BankExpected) }),
 }))
 
-/** True for an object with a function for each of {@link World}'s verbs. */
-export function isWorld(val: unknown): val is World {
+/** True for an object with a function for each of {@link Bank}'s verbs. */
+export function isBank(val: unknown): val is Bank {
   if ((typeof val !== 'object') || (val === null)) { return false }
   const members: Partial<Record<string, unknown>> = val
-  return WorldMembernames.every((membername) => typeof members[membername] === 'function')
+  return BankMembernames.every((membername) => typeof members[membername] === 'function')
 }
 
-/** The members of {@link World} that are functions. */
-const WorldMembernames = ['makeThing', 'seal', 'unseal', 'lock', 'connect', 'disconnect', 'signin', 'ensureUnlocked', 'dismissUnlock', 'demandEnabled', 'hostVault', 'bulletproofCallback'] as const satisfies readonly (keyof World)[]
+/** The members of {@link Bank} that are functions. */
+const BankMembernames = ['makeThing', 'seal', 'unseal', 'lock', 'connect', 'disconnect', 'signin', 'ensureUnlocked', 'dismissUnlock', 'demandEnabled', 'hostVault', 'bulletproofCallback'] as const satisfies readonly (keyof Bank)[]
 
-/** The options of {@link World.make}. */
-export interface WorldOpts {
-  /** The device the world is made with. */
+/** The options of {@link Bank.make}. */
+export interface BankOpts {
+  /** The device the bank is made with. */
   device: Device
 }
 
 // `safebyok/core` carries no caching, so the bank knows its vaults by this method alone, not by the Vault class.
-/** A vault a world hosts: it connects and disconnects with the world. */
+/** A vault a bank hosts: it connects and disconnects with the bank. */
 export interface HostedVault {
-  /** Start what the vault keeps running, as its world connects. */
+  /** Start what the vault keeps running, as its bank connects. */
   connect(): unknown
-  /** Stop what the vault keeps running, as its world disconnects. */
+  /** Stop what the vault keeps running, as its bank disconnects. */
   disconnect(): unknown
 }
 
-/** The check of the vault `World.hostVault` is handed. */
-export const WorldChecks = Validator.Checkers('bad_record', ({ custom }) => ({
+/** The check of the vault `Bank.hostVault` is handed. */
+export const HostedVaultChecks = Validator.Checkers('bad_record', ({ custom }) => ({
   hostedVault: custom<HostedVault>(isHostedVault, Phrases.HostedVaultExpected),
 }))
 
@@ -85,8 +84,8 @@ function isHostedVault(val: unknown): val is HostedVault {
 export const DefaultBanklabel = 'main'
 
 /** The checks of a {@link DeviceRecord}, of the userid `Device.signin` is handed, and of a devicetok. */
-export const BankishChecks = Validator.Checkers('bad_record', ({ obj, user_id, banklabel, devicetok }) => ({
-  deviceRecord: obj({ banklabel: banklabel.default(DefaultBanklabel) }).strict(),
+export const BankishChecks = Validator.Checkers('bad_record', ({ obj, user_id, devicetok }) => ({
+  deviceRecord: obj({ banklabel: ThingChecks.banklabel.default(DefaultBanklabel) }).strict(),
   userid:       user_id,
   devicetok,
 }), [CX])
@@ -124,7 +123,7 @@ export type Lifecyclekind = typeof lifecyclekindVals[number]
  */
 export type LeaseAnnouncement = Readonly<{ kind: typeof leasekindVals[number] }>
 
-/** A change of the world's stage, from the stage it was at to the one it is at now. The tab that caused it hears it too. */
+/** A change of the bank's stage, from the stage it was at to the one it is at now. The tab that caused it hears it too. */
 export type StageCrossing = Readonly<{ kind: 'stage_crossed', from: BankStage, to: BankStage }>
 
 /** The device's watch of its bank ended of itself, before anything stopped it. */
@@ -142,7 +141,7 @@ export type LifecycleHandler = (event: DeviceEvent) => unknown
 /** `onLifecycle` as a device keeps it, wrapped by `guardOnLifecycle`. It never throws. */
 export type GuardedLifecycleHandler = (event: DeviceEvent) => Promise<void>
 
-/** Where a device keeps the signed-in bank's three roots between page loads: `localStorage`, or anything with its three methods. */
+/** Where a device keeps the signed-in bank's two roots between page loads: `localStorage`, or anything with its three methods. */
 export type RootShelf = Readonly<{
   getItem:    (ckey: string) => string | null
   setItem:    (ckey: string, val: string) => void
@@ -175,7 +174,7 @@ export interface DeviceOpts {
   softlockMinutes?:  number | undefined
   /** How often the device locks a lease past its end, and, while connected, starts the watch where it is not running and checks whether its gate is stale, in minutes. Autolock is a best-effort time, not a deadline. Default: 10. */
   janitorMinutes?:   number | undefined
-  /** How long after this device last read the bank's gate it reads the gate again, with the bank and root box, in minutes. Default: 720, twelve hours. */
+  /** How long after this device last read the bank's gate it reads the gate again, with the root box, in minutes. Default: 720, twelve hours. */
   gateStaleMinutes?: number | undefined
   /** Hears each refusal no caller waits on. Default: {@link DefaultOnBadNews}, a warning on the device's logger. */
   onBadNews?:        BadNewsHandler | undefined
@@ -183,7 +182,7 @@ export interface DeviceOpts {
   onLifecycle?:      LifecycleHandler | undefined
   /** The QueryClient the signed-in user's boxes are kept in, under their bank's key: your own, so one client serves your queries and the vault's. Default: one the device makes. */
   queryClient?:      QueryClient | undefined
-  /** Where the device keeps the signed-in bank's three roots between page loads: hand it `localStorage`. Without one, nothing is kept, and each page load waits on the vaultDB for the bank. */
+  /** Where the device keeps the signed-in bank's two roots between page loads: hand it `localStorage`. Without one, nothing is kept, and each page load waits on the vaultDB for the bank. */
   rootShelf?:        RootShelf | undefined
   /** Where the device keeps the signed-in bank's lease, which every tab given the same one shares, and which outlasts a page load: `browserOpts()` from `safebyok/browser` hands an `IdbDeviceDB`. Default: one in the device's memory, so this tab's lease is its own and ends with the page. It keeps this device's devicetok for each user too. */
   deviceDB?:         DeviceDB | undefined
@@ -192,7 +191,7 @@ export interface DeviceOpts {
 }
 // --
 
-// == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, WorldSnapshot, PendingWorld, SignedOutWorld
+// == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, BankSnapshot, PendingBank, SignedOutBank
 
 /** The stages of a bank, each described at {@link BankStage}. */
 export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'disabled', 'failed'] as const
@@ -214,8 +213,8 @@ export interface RefusalSnapshot {
   readonly message:     string
 }
 
-/** Where the user stands with their bank, as the device's world shows it, for a host to render. */
-export interface WorldSnapshot {
+/** Where the user stands with their bank, for a host to render. */
+export interface BankSnapshot {
   readonly stage:       BankStage
   /** True at every stage but `'unlocked'`. */
   readonly isLocked:    boolean
@@ -234,11 +233,11 @@ export interface WorldSnapshot {
 }
 
 // isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
-/** The world snapshot a device shows from `signin` until it finds its user's bank stored or not. */
-export const PendingWorld: WorldSnapshot = Object.freeze({
+/** The bank snapshot a device shows from `signin` until it finds its user's bank stored or not. */
+export const PendingBank: BankSnapshot = Object.freeze({
   stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false,
 })
 
-/** The world snapshot a device shows until `signin`, while nobody is signed in on it. */
-export const SignedOutWorld: WorldSnapshot = Object.freeze({ ...PendingWorld, stage: 'signed_out' })
+/** The bank snapshot a device shows until `signin`, while nobody is signed in on it. */
+export const SignedOutBank: BankSnapshot = Object.freeze({ ...PendingBank, stage: 'signed_out' })
 // --

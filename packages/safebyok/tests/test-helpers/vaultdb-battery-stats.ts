@@ -4,7 +4,7 @@ import { SX } from 'safebyok-big/internals'
 import { expectBad, expectGood } from 'safebyok-big/testing'
 
 import { StoreLimitCap, type VaultStats } from '../../src/shapes/shapes-vault-stats'
-import { bankThingOf, boxThingOf, boxTombOf, gateThingOf, rootBoxOf, statsAskOf, trackOf } from './vaultdb-world'
+import { boxThingOf, boxTombOf, gateThingOf, rootBoxOf, statsAskOf, trackOf } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 
 /** Register the battery's cases of a bank's storage stats. */
@@ -15,7 +15,7 @@ export function describeVaultDBStats({ fresh, bornBank, boxesBorn, rowsOf }: Vau
   }
 
   describe("tryStats(ask)", () => {
-    it("answers no boxes and no gates for a bank none of whose Things is stored, to an ask with the void lifetok", async () => {
+    it("answers no boxes and no gates for a bank none of whose Things is stored, to an ask with the void banktok", async () => {
       const vaultDB = await fresh()
       const answer  = await vaultDB.tryStats(statsAskOf({ banktok: SX.VoidLifeTok }))
       const none    = { count: 0, live_count: 0, size: 0 }
@@ -23,10 +23,10 @@ export function describeVaultDBStats({ fresh, bornBank, boxesBorn, rowsOf }: Vau
       expect(answer.ok && answer.val).to.deep.include({ box: none, gate: none })
     })
 
-    it("answers the root box and the main gate of a bank born, with the bank's lifetok, and not the bank itself", async () => {
+    it("answers the root box and the gate of a bank born, with the gate's banktok", async () => {
       const vaultDB = await bornBank()
       const answer  = await vaultDB.tryStats(statsAskOf())
-      expect(answer).to.deep.include({ ok: true, act: 'got', banktok: bankThingOf().lifetok })
+      expect(answer).to.deep.include({ ok: true, act: 'got', banktok: gateThingOf().banktok })
       const stats = await expectGood<VaultStats>(answer)
       expect(stats.box).to.deep.include({ count: 1, live_count: 1 })
       expect(stats.gate).to.deep.include({ count: 1, live_count: 1 })
@@ -63,13 +63,13 @@ export function describeVaultDBStats({ fresh, bornBank, boxesBorn, rowsOf }: Vau
 
     it("answers 'same' for each root stored at the revision the ask tracks, else the actual root", async () => {
       const vaultDB = await bornBank()
-      const track   = trackOf(bankThingOf(), gateThingOf(), rootBoxOf({ revseq: 3 }))
-      expect(await vaultDB.tryStats(statsAskOf({ track }))).to.deep.include({ ok: true, tracked: { bank: 'same', gate: 'same', box: rootBoxOf() } })
+      const track   = trackOf(gateThingOf(), rootBoxOf({ revseq: 3 }))
+      expect(await vaultDB.tryStats(statsAskOf({ track }))).to.deep.include({ ok: true, tracked: { gate: 'same', root: rootBoxOf() } })
     })
 
     it("refuses an ask with a labelpath", async () => {
       const vaultDB = await bornBank()
-      await expectBad(vaultDB.tryStats({ ...statsAskOf(), labelpath: 'bank' } as never), 'bad_record')
+      await expectBad(vaultDB.tryStats({ ...statsAskOf(), labelpath: 'box' } as never), 'bad_record')
     })
   })
 }

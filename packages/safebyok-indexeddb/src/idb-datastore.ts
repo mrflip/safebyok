@@ -3,7 +3,7 @@
 import type { UseStore } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
 import type {
-  AnyAsk, BankObserved, BirthBankAsk, BirthManifest, BirthPuts, GetAsk, GetManifest, GetWorldAsk, ListAsk, ListManifest, Received, RootRows, StatsAsk, StatsManifest, ThingScope, ThingWatchScope, VaultError, WorldManifest, WriteAsk, WriteManifest,
+  AnyAsk, BankObserved, BirthBankAsk, BirthManifest, BirthPuts, GetAsk, GetManifest, GetBankAsk, ThingScope, ListAsk, ListManifest, Received, RootRows, StatsAsk, StatsManifest, ThingWatchScope, VaultError, GetBankManifest, WriteAsk, WriteManifest,
 } from 'safebyok/storage'
 import { bankThingsIn, bellnameOf, childrenIn, shelfOf, thingScopepathOf } from './vault-shelf'
 
@@ -26,7 +26,7 @@ async function quotaNow(): Promise<number | undefined> {
 }
 
 /** `shelf`, but its first use refuses `storage_blocked` where the browser's quota is under {@link DB.StoreLimitFloor}. Where the browser gives no estimate, nothing is refused.
- * The quota is known only asynchronously, so the refusal cannot come from the constructor: it comes at the first call of any kind, which at startup is the world read at sign-in.
+ * The quota is known only asynchronously, so the refusal cannot come from the constructor: it comes at the first call of any kind, which at startup is the read of the bank's roots at sign-in.
  */
 function shelfRefusingSmallQuota(shelf: UseStore): UseStore {
   let isQuotaPending = true
@@ -43,33 +43,30 @@ function shelfRefusingSmallQuota(shelf: UseStore): UseStore {
 
 // == [Rows]: rowAt, ancestorOf, rootsOf, bankObservedOf
 
-/** The raw row at `scope` in `store`'s transaction, or null for none. */
+/** The raw row of kind `modelkind` at `scope` in `store`'s transaction, or null for none. */
 async function rowAt(store: IDBObjectStore, scope: ThingScope): Promise<unknown> { return await DB.rowAt(store, thingScopepathOf(scope)) }
 
 /** The nearest row above `ask`'s scope in `store`'s transaction, read only where `actual` is null; otherwise null. */
 async function ancestorOf(store: IDBObjectStore, ask: GetAsk | WriteAsk, actual: unknown): Promise<unknown> {
   if (actual !== null) { return null }
-  const { userid, banklabel } = ask
-  const aboves = await Promise.all(DB.Labelpath.ancestorsOf(ask.labelpath).map(async (labelpath) => await rowAt(store, { userid, banklabel, labelpath })))
+  // A Thing's ancestors are of its own kind (a box's are boxes, and a gate has none), so they are in its key range.
+  const { modelkind, userid, banklabel } = ask
+  const aboves = await Promise.all(DB.Labelpath.ancestorsOf(ask.labelpath).map(async (labelpath) => await rowAt(store, { modelkind, userid, banklabel, labelpath })))
   return aboves.find((raw) => raw !== null) ?? null
 }
 
 /** The raw roots of `scope`'s bank in `store`'s transaction, each null for none. */
 async function rootsOf(store: IDBObjectStore, scope: ThingWatchScope): Promise<RootRows> {
-  const { userid, banklabel } = scope
-  const [bank, gate, root] = await Promise.all([
-    rowAt(store, { userid, banklabel, labelpath: DB.RootLabelpaths.bank }),
-    rowAt(store, { userid, banklabel, labelpath: DB.RootLabelpaths.gate }),
-    rowAt(store, { userid, banklabel, labelpath: DB.RootLabelpaths.root }),
-  ])
-  return { bank, gate, root }
+  const scopes = DB.rootScopesOf(scope)
+  const [gate, root] = await Promise.all([rowAt(store, scopes.gate), rowAt(store, scopes.root)])
+  return { gate, root }
 }
 
 /** The banktok of `ask`'s bank as `store`'s transaction now has it, its `tracked` for what `ask` tracks, and when they were read. */
 async function bankObservedOf(store: IDBObjectStore, ask: AnyAsk): Promise<BankObserved> {
   const read_tc = DB.readTcNow()
-  const { bank, gate, root } = await rootsOf(store, ask)
-  return { banktok: DB.ManifestTags.banktokOf(bank), tracked: DB.ManifestTags.trackedOf(ask, { bank, [DB.Labelpath.MainGate]: gate, [DB.Labelpath.RootBox]: root }), read_tc }
+  const { gate, root } = await rootsOf(store, ask)
+  return { banktok: DB.ManifestTags.banktokOf(gate), tracked: DB.ManifestTags.trackedOf(ask, { gate, root }), read_tc }
 }
 // --
 
@@ -91,7 +88,7 @@ export class IdbDatastore {
   }
   // --
 
-  // == [Verbs]: getThing, writeThing, listThings, birthBank, getWorld, stats, watch
+  // == [Verbs]: getThing, writeThing, listThings, birthBank, getBank, stats, watch
 
   /** The Thing at `ask`'s scope, observed in one transaction. */
   async getThing(ask: GetAsk): Promise<GetManifest> {
@@ -110,7 +107,7 @@ export class IdbDatastore {
       const actual = await rowAt(store, ask)
       return { tags: DB.ManifestTags.writeTagsOf(ask, ante, isWritten), actual, ancestor: await ancestorOf(store, ask, actual), ...(await bankObservedOf(store, ask)) }
     })
-    if (manifest.tags.written) { this.#ring([{ scope: ask, received: { record: manifest.actual, banktok: manifest.banktok } }]) }
+    if (manifest.tags.written) { this.#ring([{ scope: ask, received: { record: manifest.actual, modelkind: ask.modelkind, banktok: manifest.banktok } }]) }
     return manifest
   }
 
@@ -124,24 +121,24 @@ export class IdbDatastore {
     })
   }
 
-  /** Write a new bank's three roots, each put's record, where {@link DB.isBirthWritable} allows, and observe the result, in one transaction. */
+  /** Write a new bank's two roots, each put's record, where {@link DB.isBirthWritable} allows, and observe the result, in one transaction. */
   async birthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthManifest> {
     const manifest = await DB.inOneStep(this.#shelf, 'readwrite', async (store): Promise<BirthManifest> => {
       const ante      = await rootsOf(store, ask)
-      const isWritten = DB.isBirthWritable(ante)
+      const isWritten = DB.isBirthWritable(puts, ante)
       if (isWritten) { for (const put of puts) { store.put(put.record, thingScopepathOf(put)) } }
       const actual = await rootsOf(store, ask)
       return { tags: DB.ManifestTags.birthTagsOf(puts, ante, isWritten), actual, ...(await bankObservedOf(store, ask)) }
     })
     if (manifest.tags.written) {
-      const { bank, gate, root } = manifest.actual
-      this.#ring([bank, gate, root].map((record) => ({ scope: ask, received: { record, banktok: manifest.banktok } })))
+      const { actual, banktok } = manifest
+      this.#ring((['gate', 'root'] as const).map((rootckey) => ({ scope: ask, received: { record: actual[rootckey], modelkind: DB.RootModelkinds[rootckey], banktok } })))
     }
     return manifest
   }
 
-  /** The three roots of `ask`'s bank, observed in one transaction. */
-  async getWorld(ask: GetWorldAsk): Promise<WorldManifest> {
+  /** The two roots of `ask`'s bank, observed in one transaction. */
+  async getBank(ask: GetBankAsk): Promise<GetBankManifest> {
     return await DB.inOneStep(this.#shelf, 'readonly', async (store) => ({ actual: await rootsOf(store, ask), ...(await bankObservedOf(store, ask)) }))
   }
 
@@ -150,8 +147,8 @@ export class IdbDatastore {
   async stats(ask: StatsAsk): Promise<StatsManifest> {
     const quota = await quotaNow()
     return await DB.inOneStep(this.#shelf, 'readonly', async (store) => {
-      const filed = await bankThingsIn(store, ask)
-      return { stats: DB.vaultStatsOf(filed, (quota === undefined) ? {} : { size: quota }), ...(await bankObservedOf(store, ask)) }
+      const [gate, box] = await Promise.all([bankThingsIn(store, { ...ask, modelkind: 'gate' }), bankThingsIn(store, { ...ask, modelkind: 'box' })])
+      return { stats: DB.vaultStatsOf({ gate, box }, (quota === undefined) ? {} : { size: quota }), ...(await bankObservedOf(store, ask)) }
     })
   }
 

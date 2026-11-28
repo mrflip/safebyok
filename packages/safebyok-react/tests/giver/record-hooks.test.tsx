@@ -1,7 +1,7 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { type ReactNode, useEffect, useLayoutEffect } from 'react'
 import { type BadNewsHandler, type BoxRecord, type GateRecord, type PasskeyWayinHeader, VaultMinder, VaultTSQ } from 'safebyok'
-import { VoidLifeTok, readTcNow, storageUnavailable } from 'safebyok/storage'
+import { VoidBanktok, readTcNow, storageUnavailable } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { type BoxSelected, passkeyHeaderOf } from '../../src/index'
@@ -11,17 +11,17 @@ import * as TH from '../test-helpers'
 const JokesBoxPath = `box/${TH.JokesPath}`
 
 /** The scope of the jokes box. */
-const JokesScope = { ...LeanTH.WorldScope, labelpath: JokesBoxPath }
+const JokesScope = { modelkind: 'box', ...LeanTH.WorldScope, labelpath: JokesBoxPath } as const
 
 /** The key the vault TSQ keeps the jokes box under, which the hooks observe. */
 const JokesKey = VaultTSQ.itemQueryKeyOf(JokesScope)
 
 /** The key the vault TSQ keeps the listing of the root box's children under. */
-const BoxListKey = VaultTSQ.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
+const BoxListKey = VaultTSQ.listQueryKeyOf({ modelkind: 'box', ...LeanTH.WorldScope, labelpath: 'box' })
 
 /** The stage of the world's bank, as a page shows it. */
 function StageShown({ world }: Readonly<{ world: TH.ProviderWorld }>) {
-  return <p>{world.Bank.useWorld((snap) => snap.stage)}</p>
+  return <p>{world.Bank.useBank((snap) => snap.stage)}</p>
 }
 
 /** What `useBox` of the jokes box showed at its latest commit, read in render as a component reads it: React Query re-renders a hook only for the fields it has read. */
@@ -172,7 +172,7 @@ describe("useBox over the vault TSQ's own items", () => {
     const gets = { count: 0 }
     world.vaultDB.tryGetThing = (ask) => {
       gets.count += 1
-      return Promise.resolve({ ok: false, ask, act: 'unclassified_storing', banktok: VoidLifeTok, tracked: 'unread', read_tc: readTcNow(), dbhas: null, err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
+      return Promise.resolve({ ok: false, ask, act: 'unclassified_storing', banktok: VoidBanktok, tracked: 'unread', read_tc: readTcNow(), dbhas: null, err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
     }
     await act(async () => { await expect(vaultTSQ.getOnce(JokesScope, { staleTime: 0 })).rejects.toHaveProperty('refusalkind', 'storage_unavailable') })
     await waitFor(() => { expect(seen.current?.isError).to.eq(true) })
@@ -280,7 +280,7 @@ describe("useBoxList over the vault TSQ's own listing", () => {
 
   it("shows a list refused as its error", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
-    world.vaultDB.tryListThings = (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', banktok: VoidLifeTok, tracked: 'unread', read_tc: readTcNow(), dbhas: null, parentage: [], deltas: [], incompatible_rows: [], err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
+    world.vaultDB.tryListThings = (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', banktok: VoidBanktok, tracked: 'unread', read_tc: readTcNow(), dbhas: null, parentage: [], deltas: [], incompatible_rows: [], err: storageUnavailable(new Error('The test vaultDB is down'), 'The test vaultDB is down') })
     function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
     const { result } = renderHook(() => world.Bank.useBoxList(), { wrapper: Wrapper })
     await waitFor(() => { expect(result.current.isError).to.eq(true) })
@@ -288,7 +288,7 @@ describe("useBoxList over the vault TSQ's own listing", () => {
   })
 })
 
-describe("useGate over the world's gate Thing", () => {
+describe("useGate over the bank's gate Thing", () => {
   it("shows a passkey another device adds, without fetching again, and without the bankKey it wraps", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     let header: PasskeyWayinHeader | null | undefined
@@ -300,18 +300,18 @@ describe("useGate over the world's gate Thing", () => {
     const { container } = render(TH.providerTreeOf(world, <GateProbe />, { userid: TH.ProviderUser }))
     await waitFor(() => { expect(header).to.be.null })
     // The VaultMinder freezes, so the spy goes on its class, counting the giver's device's calls alone.
-    const { vaultMinder } = world._cheat_device().world
+    const { vaultMinder } = world._cheat_device().bank
     const get = vi.spyOn(VaultMinder.prototype, 'tryGetThing')
     onTestFinished(() => { get.mockRestore() })
     const other = LeanTH.makeDevice({}, { vaultDB: world.vaultDB })
     await act(async () => {
       await other.signin(TH.ProviderUser)
-      await other.bank!.gate.addPasskey({ passphraseCleartext: LeanTH.TestPassphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })
+      await other.bank.gate.addPasskey({ passphraseCleartext: LeanTH.TestPassphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })
     })
     await waitFor(() => { expect(header?.wayinkind).to.eq('passkey') })
     expect(get.mock.contexts.filter((context) => context === vaultMinder)).to.have.lengthOf(0)
     // The gate's Thing has the whole gate, by design; the giver's client and the page have none of it.
-    const stored = world.vaultDB._cheat_things(LeanTH.WorldScope).get('gate') as GateRecord
+    const stored = world.vaultDB._cheat_things(LeanTH.WorldScope).gate.get(LeanTH.WorldScope.banklabel) as GateRecord
     TH.expectTextUnheld(stored.wayins.passkey0!.bank_key_wayin_wrapped.ciphertext_b64, container, world.client)
   })
 })
@@ -324,8 +324,8 @@ describe("useGate, mounted twice", () => {
     render(TH.providerTreeOf(world, <><StageShown world={world} /><GateProbe /><GateProbe /></>, { userid: TH.ProviderUser }))
     await screen.findByText('locked')
     await waitFor(() => { expect(screen.getAllByText('gate')).to.have.lengthOf(2) })
-    world.vaultDB._cheat_things(LeanTH.WorldScope).set('box/bad', { ...LeanTH.boxThingOf('bad'), revseq: -2 })
-    await act(async () => { await world._cheat_device().world.demandVaultMinder().tryListOnce('box') })
+    world.vaultDB._cheat_things(LeanTH.WorldScope).box.set('box/bad', { ...LeanTH.boxThingOf('bad'), revseq: -2 })
+    await act(async () => { await world._cheat_device().bank.demandVaultMinder().tryListOnce({ ...LeanTH.WorldScope, modelkind: 'box', labelpath: 'box' }) })
     await waitFor(() => { expect(onBadNews).toHaveBeenCalled() })
     // The host's handler is called on a later turn: give a second report one to land.
     await new Promise((resolve) => { setTimeout(resolve, 0) })
@@ -337,7 +337,7 @@ describe("the record hooks outside every provider", () => {
   it("show signed_out and fetch nothing", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     const { result } = renderHook(() => ({
-      stage: world.Bank.useWorld((snap) => snap.stage), box: world.Bank.useBox(TH.JokesPath), gate: world.Bank.useGate(), list: world.Bank.useBoxList(),
+      stage: world.Bank.useBank((snap) => snap.stage), box: world.Bank.useBox(TH.JokesPath), gate: world.Bank.useGate(), list: world.Bank.useBoxList(),
     }))
     const { stage, box, gate, list } = result.current
     expect([stage, box.data, box.fetchStatus, gate.data, list.data]).to.deep.equal(['signed_out', undefined, 'idle', undefined, undefined])

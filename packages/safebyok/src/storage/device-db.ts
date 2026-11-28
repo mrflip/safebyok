@@ -20,8 +20,7 @@ export abstract class DeviceDB {
   /** The lease record stored at `scope`, a lease's own, or null for none. Refuses `damaged_lease` when that record fails its checks. */
   async peekLease(scope: LeaseScope): Promise<LeaseRecord | null> {
     try {
-      const { userid, banklabel, labelpath } = StampChecks.leaseScope.parse(scope)
-      const raw = await this.doPeekLease({ userid, banklabel, labelpath })
+      const raw = await this.doPeekLease(StampChecks.leaseScope.parse(scope))
       return (raw === null) ? null : checkedLeaseOf(raw)
     } catch (err) { throw refusalOf(err, 'peekLease') }
   }
@@ -36,7 +35,7 @@ export abstract class DeviceDB {
       const leaseRecord = StampChecks.leaseRecord.parse(record)
       const before      = await this.doStowLease(leaseRecord, (raw) => isReplaced(raw, leaseRecord))
       if (! isReplaced(before, leaseRecord)) { return checkedLeaseOf(before) }
-      this.doRing({ userid: leaseRecord.userid, banklabel: leaseRecord.banklabel, labelpath: leaseRecord.labelpath })
+      this.doRing(StampChecks.leaseScope.parse(leaseRecord))
       return leaseRecord
     } catch (err) { throw refusalOf(err, 'stowLease') }
   }

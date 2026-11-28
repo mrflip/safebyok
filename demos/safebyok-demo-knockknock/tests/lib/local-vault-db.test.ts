@@ -3,11 +3,11 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { LocalStorageVaultDB } from '../../src/lib/local-vault-db'
 import * as TH from '../test-helpers'
 
-/** The stage a fresh device over `vaultDB` finds the world's bank at. */
+/** The stage a fresh device over `vaultDB` finds its bank at. */
 async function stageFoundOver(vaultDB: LocalStorageVaultDB): Promise<string> {
   const device = TH.makeDevice({}, { vaultDB })
   await device.signin(TH.WorldScope.userid)
-  return device.world.getSnapshot().stage
+  return device.bank.getSnapshot().stage
 }
 
 beforeEach(() => { localStorage.clear() })
@@ -18,7 +18,7 @@ describe("LocalStorageVaultDB", () => {
     await vault.putBoxOnce('box/anthropic', { sidecar: { mask: 'sk-ant-…' } }, { whisper: TH.Whisper })
     const device = TH.makeDevice({}, { vaultDB: new LocalStorageVaultDB() })
     await device.signin(TH.WorldScope.userid)
-    await device.bank!.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await device.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await device.vault!.withWhisper('box/anthropic', (box) => box.whisper)).to.deep.equal(TH.Whisper)
   })
 

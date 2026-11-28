@@ -18,7 +18,7 @@ function serviceOf(box: Parameters<NonNullable<WhisperMaskProps['ifLocked']>>[0]
 
 /** The bank's stage as a line of text, and the joke service's key as a `WhisperMask`. */
 function KeyScreen({ world, ...props }: Readonly<{ world: TH.ProviderWorld } & Partial<WhisperMaskProps>>) {
-  const stage = world.Bank.useWorld((snap) => snap.stage)
+  const stage = world.Bank.useBank((snap) => snap.stage)
   return (
     <>
       <p>{stage}</p>
@@ -38,7 +38,7 @@ async function renderKey(props: Partial<WhisperMaskProps> = {}) {
 /** Unlock the world's bank with the stored passphrase. */
 async function unlock(world: TH.ProviderWorld): Promise<void> {
   const device = world._cheat_device()
-  await act(async () => { await device.bank!.gate.unlock({ passphraseCleartext: TH.TestPassphrase }) })
+  await act(async () => { await device.bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase }) })
 }
 
 /** The text the mask's element shows. */

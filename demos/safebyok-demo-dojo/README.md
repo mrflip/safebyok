@@ -50,12 +50,12 @@ pnpm --filter safebyok-demo-dojo fixture     # writes src/fixture/fixture.json a
   and test cards are made up (`src/lib/made-up-service.ts`): they call nothing. The cards that save write boxes of their
   own (`practice_…`): sign in as Hero or Thierry and unlock.
 * **Inspect**: the vault database's rows (there), the root shelf's roots (here, in localStorage),
-  the device's bank TSQ (its bank, main gate and root box) and vault TSQ (its boxes and their listings), through the
+  the device's bank TSQ (its gate and root box) and vault TSQ (its boxes and their listings), through the
   library's back door, `SOK.maskedView()`, which cuts each ciphertext to its last 2 characters and its length, and its
   lease, by its loggable and when it ends (Lock and Unlock change it), and the host's mutations. Each is a table, grouped by modelkind: a group's first row names it,
   with its count, and the fields of its rows, in the order the rows have them. A Thing's scope (`userid`, `banklabel`,
   `labelpath`), `scope` and `modelkind` are left out: a row's first cell, its ckey, says them. Ciphertext is cut short, and nothing is decrypted. A
-  `revtok`, `lifetok` or `read_tc` column shows its first ten characters and its last two, by `maskUuid` from
+  `revtok`, `banktok` or `read_tc` column shows its first ten characters and its last two, by `maskUuid` from
   `safebyok/utils`.
 * **Scenarios**: two whole forms as a user would meet them (`src/components/scenarios/`), each with a checklist of the
   Coach's claims about it and what the dojo found today (`claims.ts`). **Envman** edits Hero's stored box `github` on
@@ -84,8 +84,8 @@ submits the one form. Each arrangement lasts until that outcome lands.
 
 ## The stores
 
-* **There**: an `IdbVaultDB` in the database `safebyok-dojo:vault-v001-001-001`, standing in for a backend.
-* **Here**: the root shelf, `localStorage`: each bank's roots (its bank, main gate and root box) under `safebyok:roots:dojo:<userid>`. No box is kept here.
+* **There**: an `IdbVaultDB` in the database `safebyok-dojo:vault-v002-001-001`, standing in for a backend.
+* **Here**: the root shelf, `localStorage`: each bank's roots (its gate and root box) under `safebyok:roots:dojo:<userid>`. No box is kept here.
 * **Reset** signs out and reloads the page, which empties both stores and writes the fixture's rows into them before
   it makes a device (`src/lib/session.ts`, `src/lib/stores.ts`). The first visit to a browser loads the fixture too.
 * **Switching users** reloads the page: a device serves its first user for its life.

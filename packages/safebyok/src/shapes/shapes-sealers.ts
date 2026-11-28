@@ -5,7 +5,7 @@ import { exactOptional } from 'zod'
 import { CX, type Crypto, type SX, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import type { EpochMillis, VoidLifeseq } from './primitives'
-import type { BoxRecord, BoxSparse, Sealed, Sparse, ThingRecord } from './shapes-thing'
+import type { BoxRecord, BoxSparse, Sealed, Sparse, ThingRecord, ThingShaped } from './shapes-thing'
 
 export type { Sealed } from './shapes-thing'
 
@@ -34,7 +34,7 @@ export type SparseOf<RecordT> = RecordT extends BoxRecord ? BoxSparse : never
 /** The shell of `RecordT`: the void record, without a body, that its first revision is sealed over and cites.
  * Its revision is the void one: revseq -1, and the void revtok and lifeseq.
  */
-export type ShellOf<RecordT extends Sparse<ThingRecord>> = Sparse<TombstoneOf<RecordT>> & Readonly<{
+export type ShellOf<RecordT extends ThingShaped> = Sparse<TombstoneOf<RecordT>> & Readonly<{
   revtok:  typeof SX.VoidRevisionTok
   revseq:  typeof SX.VoidRevisionSeq
   lifeseq: typeof VoidLifeseq
@@ -50,7 +50,7 @@ export type BodyOf<RecordT, CleartextsT> = Omit<LiveOf<RecordT>, keyof Sparse<Th
 /** The record of `RecordT`'s kind that a seal makes the next revision from: whole, sparse or unsealed, live, a tombstone or the shell.
  * The seal carries over its Thing fields and its body, and never its secrets.
  */
-export type Sealable<RecordT extends Sparse<ThingRecord>> = Omit<Sparse<RecordT>, 'am'> & Readonly<{ am: Sparse<ThingRecord>['am'] }> & {
+export type Sealable<RecordT extends ThingShaped> = Omit<Sparse<RecordT>, 'am'> & Readonly<{ am: Sparse<ThingRecord>['am'] }> & {
   [FieldT in Exclude<keyof LiveOf<RecordT>, keyof Sparse<ThingRecord>>]?: LiveOf<RecordT>[FieldT] | undefined
 }
 
@@ -83,7 +83,7 @@ export interface SealPurposes {
  * `RecordT` is the stored record, with its part sealed. `CleartextsT` is the part's cleartexts.
  * Each member must check what it is given: the lease passes its caller's arguments on unchecked.
  */
-export interface Sealer<RecordT extends Sparse<ThingRecord>, CleartextsT> {
+export interface Sealer<RecordT extends ThingShaped, CleartextsT> {
   /** The Thing fields and body of `donorProps`, with every other field dropped. Refuses anything but a record of this kind or its shell. */
   donorPropsOf(donorProps: unknown): Sealable<RecordT>
   /** The body, `am` and `written_at` of `publicProps`. Refuses any other field. */

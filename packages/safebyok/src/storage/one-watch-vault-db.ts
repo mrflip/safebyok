@@ -3,9 +3,9 @@
 import { deepFreeze, noop } from 'es-toolkit'
 import { type Errors, Outcome } from 'safebyok-big/internals'
 import { bulletproofHandlerOf } from '../helpers/bulletproof'
-import type { BirthBankAsk, GetAsk, GetWorldAsk, ListAsk, StatsAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
+import type { BirthBankAsk, GetAsk, GetBankAsk, ListAsk, StatsAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
 import { AskChecks } from '../shapes/shapes-asks'
-import type { BirthBankAnswer, GetThingAnswer, GetWorldAnswer, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
+import type { BirthBankAnswer, GetThingAnswer, GetBankAnswer, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import { ThingChecks } from '../shapes/shapes-thing'
 import { type VaultEvent, SeenChecks } from '../shapes/shapes-vault-event'
 import * as Throwers from '../refusals/throwers'
@@ -43,7 +43,7 @@ export class OneWatchVaultDB implements VaultDB {
   }
   // --
 
-  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetWorld, tryStats, watch, #holdWatch, #whileLocked
+  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetBank, tryStats, watch, #holdWatch, #whileLocked
 
   /** The wrapped vaultDB's {@link VaultDB.tryGetThing}. */
   tryGetThing(ask: GetAsk): Promise<GetThingAnswer> { return this.#vaultDB.tryGetThing(ask) }
@@ -57,8 +57,8 @@ export class OneWatchVaultDB implements VaultDB {
   /** The wrapped vaultDB's {@link VaultDB.tryBirthBank}. */
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer> { return this.#vaultDB.tryBirthBank(ask) }
 
-  /** The wrapped vaultDB's {@link VaultDB.tryGetWorld}. */
-  tryGetWorld(ask: GetWorldAsk): Promise<GetWorldAnswer> { return this.#vaultDB.tryGetWorld(ask) }
+  /** The wrapped vaultDB's {@link VaultDB.tryGetBank}. */
+  tryGetBank(ask: GetBankAsk): Promise<GetBankAnswer> { return this.#vaultDB.tryGetBank(ask) }
 
   /** The wrapped vaultDB's {@link VaultDB.tryStats}. */
   tryStats(ask: StatsAsk): Promise<StatsAnswer> { return this.#vaultDB.tryStats(ask) }

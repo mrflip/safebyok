@@ -59,6 +59,13 @@ describe("IdbVaultDB's databases", () => {
     expect(gotten).to.deep.equal(TH.gateThingOf())
   })
 
+  it("keeps a bank's gate in the key range of gates, and its root box in the key range of boxes, each key its scope, kind first", async () => {
+    const idbVaultDB = TH.makeIdbVaultDB()
+    await TH.expectGood(idbVaultDB.tryBirthBank(TH.birthBankAskOf()))
+    const { userid, banklabel } = TH.ThingBank
+    expect(await TH._cheat_idbThingsOf(idbVaultDB).scopepaths()).to.deep.equal([['box', userid, banklabel, 'box'], ['gate', userid, banklabel, banklabel]])
+  })
+
   it("lists the children of a Thing in its own bank alone, one label under it", async () => {
     const idbVaultDB = TH.makeIdbVaultDB()
     await TH.expectGood(idbVaultDB.tryBirthBank(TH.birthBankAskOf()))
@@ -70,7 +77,7 @@ describe("IdbVaultDB's databases", () => {
     const grandchild = { ...TH.boxThingOf('deep'), labelpath: 'box/openai/deep' }
     await rows.plant(otherBankBox, otherBankBox)
     await rows.plant(grandchild, grandchild)
-    const answer = await idbVaultDB.tryListThings(TH.listAskAt('box'))
+    const answer = await idbVaultDB.tryListThings(TH.listAskAt('box', 'box'))
     await TH.expectGood(answer)
     expect(answer.deltas.map(({ labelpath }) => labelpath)).to.deep.equal([box.labelpath])
   })
@@ -110,9 +117,9 @@ describe("IdbVaultDB's quota at open", () => {
     expect(refusal.message).to.match(/offers the page 4999 bytes/)
   })
 
-  it("refuses storage_blocked at the world read, the first call a device makes at sign-in, where the quota is under StoreLimitFloor", async () => {
+  it("refuses storage_blocked at the read of the bank's roots, the first call a device makes at sign-in, where the quota is under StoreLimitFloor", async () => {
     vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: StoreLimitFloor - 1 }) } })
-    await TH.expectBad(TH.makeIdbVaultDB().tryGetWorld(TH.getWorldAskOf()), 'storage_blocked')
+    await TH.expectBad(TH.makeIdbVaultDB().tryGetBank(TH.getBankAskOf()), 'storage_blocked')
   })
 
   it("refuses a quota of 0", async () => {
@@ -139,7 +146,7 @@ describe("IdbVaultDB's watch", () => {
     const unwatch = twin.watch(TH.ThingBank, (event) => { events.push(event) }, noop)
     await TH.expectGood(idbVaultDB.tryWriteThing(TH.birthAskOf()))
     await TH.eventually(() => events.length > 0)
-    expect(TH.maskedReadTcsOf(events)).to.deep.equal([TH.itemEventOf(TH.gateThingOf())])
+    expect(TH.maskedReadTcsOf(events)).to.deep.equal([TH.itemEventOf(TH.gateThingOf(), TH.gateThingOf().banktok)])
     unwatch()
   })
 })

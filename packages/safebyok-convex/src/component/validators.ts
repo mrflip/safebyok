@@ -15,17 +15,17 @@ export const askArgs = { ask: v.any() }
 export const watchArgs = { scope: v.any(), cursor: v.union(v.null(), v.int64()) }
 // --
 
-// == [Manifests]: bankObserved, filed, rootRows, getManifest, writeManifest, listManifest, birthManifest, worldManifest, statsManifest, thingsWatched
+// == [Manifests]: bankObserved, filed, rootRows, getManifest, writeManifest, listManifest, birthManifest, getBankManifest, statsManifest, thingsWatched
 // What each function observed in its one query or mutation, each row raw and null for none. The client adds the `read_tc`.
 
 /** The bank fields of every manifest: its `banktok` and its `tracked`. */
 const bankObserved = { banktok: v.any(), tracked: v.any() }
 
-/** A raw Thing, with the labelpath it is stored at. */
-const filed = v.object({ labelpath: v.string(), raw: v.any() })
+/** A raw Thing, with the labelpath it is stored at and the kind of the table it is in. */
+const filed = v.object({ labelpath: v.string(), modelkind: v.union(v.literal('gate'), v.literal('box')), raw: v.any() })
 
-/** A bank's three roots, raw. */
-const rootRows = v.object({ bank: v.any(), gate: v.any(), root: v.any() })
+/** A bank's two roots, raw: its gate and its root box. */
+const rootRows = v.object({ gate: v.any(), root: v.any() })
 
 /** The `GetManifest` that `getThing` returns, without its `read_tc`. */
 export const getManifest = v.object({ tags: v.any(), actual: v.any(), ancestor: v.any(), ...bankObserved })
@@ -39,12 +39,12 @@ export const listManifest = v.object({ tags: v.any(), actual: v.any(), children:
 /** The `BirthManifest` that `birthBank` returns, without its `read_tc`. */
 export const birthManifest = v.object({ tags: v.any(), actual: rootRows, ...bankObserved })
 
-/** The `WorldManifest` that `getWorld` returns, without its `read_tc`. */
-export const worldManifest = v.object({ actual: rootRows, ...bankObserved })
+/** The `GetBankManifest` that `getBank` returns, without its `read_tc`. */
+export const getBankManifest = v.object({ actual: rootRows, ...bankObserved })
 
 /** The `StatsManifest` that `stats` returns, without its `read_tc`. */
 export const statsManifest = v.object({ stats: v.any(), ...bankObserved })
 
-/** The result of `watchThings`: the Things committed after the cursor, the banktok of their bank, and the next cursor. */
+/** The result of `watchThings`: the Things committed after the cursor, each with its kind, the banktok of their bank, and the next cursor. */
 export const thingsWatched = v.object({ things: v.array(filed), banktok: v.any(), cursor: v.int64() })
 // --

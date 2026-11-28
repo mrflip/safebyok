@@ -43,7 +43,7 @@ describe("wontfix: the form status of a form that hands mutate its FormData", ()
     const device = await waitFor(() => world._cheat_device())
     await act(async () => {
       await device.signin(TH.ProviderUser)
-      await device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase })
+      await device.bank.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase })
     })
     fireEvent.change(screen.getByLabelText('Key'), { target: { value: TypedKey } })
     fireEvent.click(screen.getByText('Save'))

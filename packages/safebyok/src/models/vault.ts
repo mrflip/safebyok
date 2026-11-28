@@ -4,7 +4,6 @@ import type { Bank } from './bank'
 import { BaseBox } from './base-box'
 import { Box } from './box'
 import { Thing } from './thing'
-import type { World } from './world'
 import type { VaultTSQ } from '../minding/vault-tsq'
 import * as Throwers from '../refusals/throwers'
 import type { BoxUnsealed } from '../shapes/shapes-bankish'
@@ -12,7 +11,7 @@ import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, Li
 import type { BoxLabelpath } from '../shapes/primitives'
 import { type GetOnceOpts, VaultTSQChecks } from '../shapes/shapes-vault-tsq'
 import type { PutOnceArgs } from '../shapes/shapes-vault-minder'
-import type { BoxRecord, ScopeAt, ThingScope } from '../shapes/shapes-thing'
+import type { BoxRecord, ScopeAt, Sparse } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 import { VaultChecks } from '../shapes/shapes-vault'
 import { type ProbeArgs, ProbeChecks, type ProbeLabelpath, type ProbeReport, type ProbeStep, type ProbeStepkind } from '../shapes/shapes-vault-probe'
@@ -20,40 +19,43 @@ import type { VaultStats } from '../shapes/shapes-vault-stats'
 import type { VaultMinder } from '../minding/vault-minder'
 import type { ThingCar } from '../minding/thing-car'
 
+/** The scope of a box of this vault's bank. */
+type BoxAt = ScopeAt<BoxLabelpath> & Readonly<{ modelkind: 'box' }>
+
 /** One bank's boxes in this tab: the verbs to seal and write them, to use their whispers, and to probe storage and keys with one.
  * Each seal is made under the bank's lease, so it needs the bank unlocked. A write answers the actual record.
  */
 export class Vault {
-  // == [Props]: #world, #vaultTSQ
+  // == [Props]: #bank, #vaultTSQ
 
-  /** The bank's world, which holds its Things and its lease. */
-  readonly #world:    World
+  /** The bank, which holds its Things and its lease. */
+  readonly #bank:    Bank
   readonly #vaultTSQ: VaultTSQ
   // --
 
-  // == [Getters]: bank, #bank
+  // == [Getters]: bank, #liveBank
 
-  /** The bank whose boxes this vault carries. Refuses `absent_thing` while the bank, its main gate or its root box is not live. */
+  /** The bank whose boxes this vault carries, at whatever stage: the device's bank. */
   get bank(): Bank { return this.#bank }
 
-  /** The world's bank, refusing while it, its main gate or its root box is not live */
-  get #bank(): Bank { return this.#world.demandRootsLive() }
+  /** Demand that the bank's gate and root box are live, and return the bank. */
+  get #liveBank(): Bank { return this.#bank.demandRootsLive() }
   // --
 
   // == [Construction]: make, constructor
 
-  /** Make the vault of the boxes of `world`'s bank, reading them through `vaultTSQ`, the vault TSQ of the same bank.
-   * It connects and disconnects with the world. Refuses a world that has ended. Its verbs refuse while the bank is not live.
+  /** Make the vault of the boxes of `bank`, reading them through `vaultTSQ`, the vault TSQ of the same bank.
+   * It connects and disconnects with the bank. Refuses a bank that has ended. Its verbs refuse while the bank is not live.
    */
-  static make(world: World, vaultTSQ: VaultTSQ): Vault {
-    const args = VaultChecks.makeArgs.parse({ world, vaultTSQ })
-    const vault = new Vault(args.world, args.vaultTSQ)
-    args.world.hostVault(vault)
+  static make(bank: Bank, vaultTSQ: VaultTSQ): Vault {
+    const args = VaultChecks.makeArgs.parse({ bank, vaultTSQ })
+    const vault = new Vault(args.bank, args.vaultTSQ)
+    args.bank.hostVault(vault)
     return vault
   }
 
-  private constructor(world: World, vaultTSQ: VaultTSQ) {
-    this.#world    = world
+  private constructor(bank: Bank, vaultTSQ: VaultTSQ) {
+    this.#bank    = bank
     this.#vaultTSQ = vaultTSQ
     Object.freeze(this)
   }
@@ -126,14 +128,14 @@ export class Vault {
    *   const { box, gate, max } = await vault.stats()
    *   const isNearlyFull = (box.size + gate.size) > 0.9 * max.size
    */
-  stats(): Promise<VaultStats> { return this.#world.stats() }
+  stats(): Promise<VaultStats> { return this.#bank.stats() }
 
   /** {@link stats}, resolving an `Outcome` instead of throwing. */
   tryStats(): Promise<Outcome.Outcome<VaultStats>> { return Outcome.outcomeOf(() => this.stats()) }
   // --
 
   // == [Sealing boxes]: sealBox, trySealBox, unsealBox, tryUnsealBox
-  // The world's seal and unseal, for this vault's own boxes: the root box's lifeseq begins each box's lifepath. They
+  // The bank's seal and unseal, for this vault's own boxes: the root box's lifeseq begins each box's lifepath. They
   // refuse a locked bank; only withWhisper waits for the unlock.
 
   /** Seal and return the next revision of the box `donorProps`. Needs the bank unlocked.
@@ -151,9 +153,9 @@ export class Vault {
   sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<LiveOf<BoxRecord>>
   sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxRecord>
   async sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxRecord> {
-    this.#bank.demandEnabled()
+    this.#liveBank.demandEnabled()
     this.#demandOwnBox(donorProps)
-    return await this.#world.seal(BaseBox, donorProps, publicProps, secretProps)
+    return await this.#bank.seal(BaseBox, donorProps, publicProps, secretProps)
   }
 
   /** {@link sealBox}, resolving an `Outcome` instead of throwing. */
@@ -168,9 +170,9 @@ export class Vault {
    * It authenticates the box, all but its sidecar. For a tombstone, that checks its seal.
    */
   async unsealBox(box: BoxRecord): Promise<BoxUnsealed> {
-    this.#bank.demandEnabled()
+    this.#liveBank.demandEnabled()
     this.#demandOwnBox(box)
-    return await this.#world.unseal(BaseBox, box)
+    return await this.#bank.unseal(BaseBox, box)
   }
 
   /** {@link unsealBox}, resolving an `Outcome` instead of throwing. */
@@ -188,7 +190,7 @@ export class Vault {
     const scope = this.#scopeAt(labelpath)
     VaultTSQChecks.getOnceOpts.parse(opts)
     // Both settle before either refusal is thrown, so which one rejects never depends on which came first.
-    const [unlocked, got] = await Promise.allSettled([this.#bank.ensureUnlocked(), this.#vaultTSQ.getOnce(scope, opts)])
+    const [unlocked, got] = await Promise.allSettled([this.#liveBank.ensureUnlocked(), this.#vaultTSQ.getOnce(scope, opts)])
     if (unlocked.status === 'rejected') { throw unlocked.reason }
     if (got.status === 'rejected')      { throw got.reason }
     this.#demandReadableBox(scope)
@@ -204,7 +206,7 @@ export class Vault {
     // Checked before the wait, so a call that would refuse never asks the user to unlock.
     this.#scopeAt(labelpath)
     VaultChecks.fn.parse(fn)
-    await this.#bank.ensureUnlocked()
+    await this.#liveBank.ensureUnlocked()
     return await this.withUnlockedWhisper(labelpath, fn)
   }
 
@@ -222,8 +224,8 @@ export class Vault {
   async withUnlockedWhisper<ResultT>(labelpath: BoxLabelpath, fn: (box: BoxUnsealed) => Helpers.Awaitable<ResultT>): Promise<ResultT> {
     const scope = this.#scopeAt(labelpath)
     VaultChecks.fn.parse(fn)
-    this.#bank.demandEnabled()
-    if (this.#bank.isLocked) { throw Throwers.needUnlocked() }
+    this.#liveBank.demandEnabled()
+    if (this.#liveBank.isLocked) { throw Throwers.needUnlocked() }
     // Storage out of reach is no news of the box: the page already shows the box this device holds, and so may its whisper.
     // The vault TSQ's get is TanStack's, which rejects: there is no outcome to branch on.
     try {
@@ -237,7 +239,7 @@ export class Vault {
   /** The live record the box at `scope` holds, of the newest life heard of, behind within that life or not.
    * Refuses `stale_read` where the box is unknown or known only sparse in its newest life, then `absent_box` where it holds a tombstone or the shell.
    */
-  #demandReadableBox(scope: ScopeAt<BoxLabelpath>): LiveOf<BoxRecord> {
+  #demandReadableBox(scope: BoxAt): LiveOf<BoxRecord> {
     const car = this.#boxCarAt(scope)
     if ((car === undefined) || (car.agekind === 'bare')) { throw Throwers.thingSoonestBare(scope.labelpath) }
     const record = car.thing.pickle()
@@ -260,8 +262,8 @@ export class Vault {
   async probe(args: ProbeArgs = {}): Promise<ProbeReport> {
     const { labelpath, whisper, sidecar } = ProbeChecks.probeArgs.parse(args)
     const scope = this.#scopeAt(labelpath as BoxLabelpath)
-    this.#bank.demandEnabled()
-    if (this.#bank.isLocked) { throw Throwers.needUnlocked() }
+    this.#liveBank.demandEnabled()
+    if (this.#liveBank.isLocked) { throw Throwers.needUnlocked() }
     const put    = await timeStep('put', () => this.putBoxOnce(scope.labelpath, { sidecar }, { whisper }))
     // The vault TSQ's get may answer from its item even under a staleTime of 0, since storage's clock dates the item: the minder's get always asks storage.
     // Its answer's own record is checked, never the box this device holds, which right after the put is the put's record whatever storage kept.
@@ -291,7 +293,7 @@ export class Vault {
   // == [Helpers]: #vaultMinder, #sealedWriteOf, #donorAt, #boxCarAt, #scopeAt, #demandOwnBox
 
   /** The bank's VaultMinder, which holds its Things and sends its writes */
-  get #vaultMinder(): VaultMinder { return this.#world.demandVaultMinder() }
+  get #vaultMinder(): VaultMinder { return this.#bank.demandVaultMinder() }
 
   /** The write of the next revision after `cited`, or after the newest revision seen at a labelpath, applying `publicProps` and sealing `secretProps` */
   async #sealedWriteOf(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<PutOnceArgs<BoxRecord>> {
@@ -306,24 +308,25 @@ export class Vault {
     if (this.#boxCarAt(scope) === undefined) { await this.#vaultTSQ.getOnce(scope) }
     const car = this.#boxCarAt(scope)
     if (car === undefined) { throw Throwers.storageIssue() }
-    return (car.agekind === 'here') ? car.thing.pickle() : car.citable
+    // A box's car cites a box.
+    return (car.agekind === 'here') ? car.thing.pickle() : car.citable as Sparse<BoxRecord>
   }
 
   /** The car of the box at `scope`, or undefined where this device has seen no record of it */
-  #boxCarAt(scope: ThingScope): ThingCar<Box> | undefined {
+  #boxCarAt(scope: BoxAt): ThingCar<Box> | undefined {
     const car = this.#vaultMinder.carAt(scope)
     return isBoxCar(car) ? car : undefined
   }
 
   /** The scope of the box at `labelpath`, in this vault's bank. Refuses the root box's labelpath. */
-  #scopeAt(labelpath: BoxLabelpath): ScopeAt<BoxLabelpath> {
-    return { ...this.#bank.scope, labelpath: VaultChecks.boxLabelpath.parse(labelpath) as BoxLabelpath }
+  #scopeAt(labelpath: BoxLabelpath): BoxAt {
+    return { modelkind: 'box', ...this.#liveBank.scope, labelpath: VaultChecks.boxLabelpath.parse(labelpath) as BoxLabelpath }
   }
 
   /** Demand that `box` is a box of this vault's bank, under its current root box. */
   #demandOwnBox(box: unknown): void {
-    const { lifepath } = BoxChecks.sealable.parseConsistent(box, this.#bank.scope, { kind: 'record_conflict' })
-    if (lifepath.split('/', 1)[0] !== this.#bank.rootBox.lifeseq) { throw Throwers.boxOfOtherRoot() }
+    const { lifepath } = BoxChecks.sealable.parseConsistent(box, this.#liveBank.scope, { kind: 'record_conflict' })
+    if (lifepath.split('/', 1)[0] !== this.#liveBank.rootBox.lifeseq) { throw Throwers.boxOfOtherRoot() }
   }
   // --
 }

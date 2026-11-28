@@ -5,13 +5,13 @@ import { anyApi } from 'convex/server'
 import type { FunctionReference } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import type { ConvexClient } from 'convex/browser'
-import { type BoxRecord, type ThingScope, type VaultEvent, Shell, VoidLifeTok } from 'safebyok/storage'
+import { type BoxRecord, type ThingScope, type VaultEvent, Shell, VoidBanktok } from 'safebyok/storage'
 import * as TH from './test-helpers'
 import { ConvexVaultDB } from '../src/index'
 import { fakeDeployment } from '../src/testing'
 import type { FakeDeployment, FakeHost } from '../src/testing'
 import type { SafebyokVaultApi } from '../src/server'
-import schema, { tableOf } from '../src/component/schema'
+import schema, { ThingTables } from '../src/component/schema'
 import type { TableNames } from '../src/component/_generated/dataModel'
 
 type ComponentDeployment = FakeDeployment<ReturnType<typeof TH.componentHost>>
@@ -50,8 +50,8 @@ function madeOf(convexVaultDB: ConvexVaultDB) {
 }
 
 /** The document of the Thing at `scope`, or null for none. */
-async function thingDocAt(db: ComponentDb, { userid, banklabel, labelpath }: ThingScope) {
-  return await db.query(tableOf(labelpath)).withIndex('by_scope', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel).eq('labelpath', labelpath)).unique()
+async function thingDocAt(db: ComponentDb, { userid, banklabel, modelkind, labelpath }: ThingScope) {
+  return await db.query(ThingTables[modelkind]).withIndex('by_scope', (idx) => idx.eq('userid', userid).eq('banklabel', banklabel).eq('labelpath', labelpath)).unique()
 }
 
 // As Postgres's plant (`jsonb_populate_record`), a field of `raw` its table has no field for is dropped; one of the wrong type is refused.
@@ -59,7 +59,7 @@ async function thingDocAt(db: ComponentDb, { userid, banklabel, labelpath }: Thi
 async function plantIn(db: ComponentDb, scope: ThingScope, raw: unknown): Promise<void> {
   const doc = await thingDocAt(db, scope)
   if (doc) { await db.delete(doc._id) }
-  const table = tableOf(scope.labelpath)
+  const table = ThingTables[scope.modelkind]
   const fields = Object.entries(raw as object).filter(([fieldname]) => Object.hasOwn(schema.tables[table].validator.fields, fieldname))
   await db.insert(table, { ...Object.fromEntries(fields), commit_ts: db.vars.commitTs } as never)
 }
@@ -120,7 +120,7 @@ async function thingLabelpathsOf(convexVaultDB: ConvexVaultDB): Promise<Record<s
       const docs = await db.query(table).withIndex('by_scope').collect()
       return docs.map(({ labelpath }) => labelpath)
     }
-    return { bank_things: await labelpathsIn('bank_things'), gate_things: await labelpathsIn('gate_things'), box_things: await labelpathsIn('box_things') }
+    return { gate_things: await labelpathsIn('gate_things'), box_things: await labelpathsIn('box_things') }
   })
 }
 
@@ -151,7 +151,7 @@ describe("ConvexVaultDB's refusals", () => {
     const convexVaultDB = makeConvexVaultDB()
     const thrown = new ConvexError({ code: 'over_quota' })
     failNextCallWith(convexVaultDB, thrown)
-    const refusal = await TH.expectBad(convexVaultDB.tryListThings(TH.listAskAt('box')), 'storage_issue')
+    const refusal = await TH.expectBad(convexVaultDB.tryListThings(TH.listAskAt('box', 'box')), 'storage_issue')
     expect(refusal.cause).to.equal(thrown)
   })
 
@@ -196,7 +196,7 @@ describe("ConvexVaultDB's component", () => {
   it("writes one document for each Thing a bank is born with, each in the table of its kind", async () => {
     const convexVaultDB = makeConvexVaultDB()
     await TH.expectGood(convexVaultDB.tryBirthBank(TH.birthBankAskOf()))
-    expect(await thingLabelpathsOf(convexVaultDB)).to.deep.equal({ bank_things: ['bank'], gate_things: ['gate'], box_things: ['box'] })
+    expect(await thingLabelpathsOf(convexVaultDB)).to.deep.equal({ gate_things: [TH.GateScope.labelpath], box_things: ['box'] })
   })
 
   it("writes each of a Thing's fields as a field of its document, beside the commit timestamp", async () => {
@@ -212,8 +212,8 @@ describe("ConvexVaultDB's component", () => {
     // The backend refuses a transaction that writes a second document, so a write over the cited Thing alone succeeds.
     const deployment = deploy(TH.componentHostWritingAtMost(1))
     const backend = deployment._cheat_backendAs(null)
-    for (const thing of [TH.bankThingOf(), TH.gateThingOf(), TH.rootBoxOf()]) {
-      await backend.run(async ({ db }) => { await plantIn(db, { ...TH.ThingBank, labelpath: thing.labelpath }, thing) })
+    for (const thing of [TH.gateThingOf(), TH.rootBoxOf()]) {
+      await backend.run(async ({ db }) => { await plantIn(db, { ...TH.ThingBank, modelkind: thing.modelkind, labelpath: thing.labelpath }, thing) })
     }
     const convexVaultDB = new ConvexVaultDB({ client: deployment.client(null), api: TH.rootVaultApi })
     const box = TH.boxThingOf()
@@ -235,9 +235,9 @@ type SloppyCase = readonly [keyof SafebyokVaultApi, Record<string, unknown>, str
 
 const SloppyQueryCases: readonly SloppyCase[] = [
   ["listThings",  { ask: null },                                          'refuses a list with no ask'],
-  ["listThings",  { ask: { ...TH.listAskAt('box'), labelpath: 42 } },     'refuses a list whose labelpath is a number'],
-  ["getWorld",    { ask: "acme" },                                        'refuses a world asked as a bare string'],
-  ["getWorld",    { ask: { ...TH.getWorldAskOf(), userid: undefined } },  'refuses a world asked without its userid'],
+  ["listThings",  { ask: { ...TH.listAskAt('box', 'box'), labelpath: 42 } },     'refuses a list whose labelpath is a number'],
+  ["getBank",    { ask: "acme" },                                        'refuses a bank asked as a bare string'],
+  ["getBank",    { ask: { ...TH.getBankAskOf(), userid: undefined } },  'refuses a bank asked without its userid'],
   ["stats",       { ask: {} },                                            'refuses stats asked of an empty object'],
   ["watchThings", { scope: { userid: 'u1' }, cursor: null },              'refuses a watch whose scope has no banklabel'],
   ["watchThings", { scope: [], cursor: null },                            'refuses a watch whose scope is an array'],
@@ -344,7 +344,7 @@ describe("ConvexVaultDB's component watch", () => {
     const box = TH.boxThingOf()
     await backend.mutation(TH.rootVaultApi.writeThing, { ask: boxBirthAskOf(box) })
     const since = await backend.query(TH.rootVaultApi.watchThings, { scope: TH.ThingBank, cursor: start.cursor })
-    expect(since).to.deep.include({ things: [{ labelpath: box.labelpath, raw: box }], banktok: TH.bankThingOf().lifetok })
+    expect(since).to.deep.include({ things: [{ labelpath: box.labelpath, modelkind: 'box', raw: box }], banktok: TH.gateThingOf().banktok })
     expect(Number(since.cursor - start.cursor)).to.be.above(0)
     expect(await backend.query(TH.rootVaultApi.watchThings, { scope: TH.ThingBank, cursor: since.cursor })).to.deep.include({ things: [], cursor: since.cursor })
   })
@@ -353,7 +353,7 @@ describe("ConvexVaultDB's component watch", () => {
     const backend = TH.componentTest()
     await backend.mutation(TH.rootVaultApi.birthBank, { ask: TH.birthBankAskOf() })
     const other = await backend.query(TH.rootVaultApi.watchThings, { scope: { ...TH.ThingBank, banklabel: 'other' }, cursor: 0n })
-    expect(other).to.deep.include({ things: [], banktok: VoidLifeTok, cursor: 0n })
+    expect(other).to.deep.include({ things: [], banktok: VoidBanktok, cursor: 0n })
   })
 })
 
@@ -365,9 +365,9 @@ describe("ConvexVaultDB's watch", () => {
     const unwatch = convexVaultDB.watch(TH.ThingBank, (event) => { events.push(event) }, () => undefined)
     await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
     await TH.expectGood(convexVaultDB.tryBirthBank(TH.birthBankAskOf()))
-    await vi.waitFor(() => { expect(events).to.have.lengthOf(3) })
+    await vi.waitFor(() => { expect(events).to.have.lengthOf(2) })
     await TH.expectGood(convexVaultDB.tryWriteThing(boxBirthAskOf()))
-    await vi.waitFor(() => { expect(events).to.have.lengthOf(4) })
+    await vi.waitFor(() => { expect(events).to.have.lengthOf(3) })
     await TH.aWhile()
     expect(deployment.watching()).to.have.lengthOf(1)
     unwatch()
@@ -382,9 +382,9 @@ describe("ConvexVaultDB's watch", () => {
     await TH.expectGood(convexVaultDB.tryBirthBank(TH.birthBankAskOf()))
     const boxes = [TH.boxThingOf('openai'), TH.boxThingOf('anthropic')]
     for (const box of boxes) { await TH.expectGood(convexVaultDB.tryWriteThing(boxBirthAskOf(box))) }
-    await vi.waitFor(() => { expect(events).to.have.lengthOf(5) })
+    await vi.waitFor(() => { expect(events).to.have.lengthOf(4) })
     await TH.aWhile()
-    expect(events.slice(3).map((event) => (event.eventkind === 'item') && event.val)).to.deep.equal(boxes)
+    expect(events.slice(2).map((event) => (event.eventkind === 'item') && event.val)).to.deep.equal(boxes)
     unwatch()
   })
 
@@ -429,7 +429,7 @@ describe("ConvexVaultDB's watch over a client with watchQuery, as a ConvexReactC
     await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
     await TH.expectGood(convexVaultDB.tryWriteThing(TH.birthAskOf()))
     await vi.waitFor(() => { expect(events).to.have.lengthOf(1) })
-    expect(TH.maskedReadTcsOf(events)).to.deep.equal([TH.itemEventOf(TH.gateThingOf())])
+    expect(TH.maskedReadTcsOf(events)).to.deep.equal([TH.itemEventOf(TH.gateThingOf(), TH.gateThingOf().banktok)])
     unwatch()
   })
 })

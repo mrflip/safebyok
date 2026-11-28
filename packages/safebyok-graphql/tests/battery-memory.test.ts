@@ -25,8 +25,8 @@ function memoryOf(vaultDB: GraphQLVaultDB): MemoryVaultDB {
 TH.describeVaultDBBattery('GraphQLVaultDB over a MemoryVaultDB', {
   makeVaultDB,
   _cheat_rowsOf: (vaultDB) => ({
-    plant:  (scope, raw) => { memoryOf(vaultDB)._cheat_things(scope).set(scope.labelpath, structuredClone(raw)) },
-    remove: (scope) => { memoryOf(vaultDB)._cheat_things(scope).delete(scope.labelpath) },
+    plant:  (scope, raw) => { memoryOf(vaultDB)._cheat_things(scope)[scope.modelkind].set(scope.labelpath, structuredClone(raw)) },
+    remove: (scope) => { memoryOf(vaultDB)._cheat_things(scope)[scope.modelkind].delete(scope.labelpath) },
   }),
 })
 

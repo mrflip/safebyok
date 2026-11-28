@@ -3,23 +3,23 @@
 import { sortBy } from 'es-toolkit'
 import { CX, EX, SX, Validator } from 'safebyok-big/internals'
 import { BaseThing } from '../models/base-thing'
-import { Labelpath, type Lifetok } from '../shapes/primitives'
-import { type BoxSparse, type ThingRecord, type ThingScope, type VoidSentinel, PerKindChecks, Shell, ThingChecks } from '../shapes/shapes-thing'
-import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
+import { Labelpath, type Banktok } from '../shapes/primitives'
+import { type BoxSparse, type TableScope, type ThingRecord, type ThingScope, type VoidSentinel, PerKindChecks, Shell, ThingChecks } from '../shapes/shapes-thing'
+import { BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
 import {
-  type AnyAsk, type BirthBankAsk, type GetAsk, type GetWorldAsk, type ListAsk, type StatsAsk, type ThingWatchScope, type Track, type Tracked, type WorldRoots, type WriteAsk, RootLabelpaths, birthPutsOf, loggableAskOf,
+  type AnyAsk, type BirthBankAsk, type GetAsk, type GetBankAsk, type ListAsk, type StatsAsk, type ThingWatchScope, type Track, type Tracked, type ActualRoots, type WriteAsk, birthPutsOf, loggableAskOf, rootScopesOf,
 } from '../shapes/shapes-asks'
-import type { BirthBankAnswer, IncompatibleThing, GetThingAnswer, GetWorldAnswer, KidEntry, Kids, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
+import type { BirthBankAnswer, IncompatibleThing, GetThingAnswer, GetBankAnswer, KidEntry, Kids, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import {
   type BankObserved, type CheckedBankObserved, type CheckedBirthManifest, type CheckedGetManifest, type CheckedListManifest, type CheckedManifestRows, type CheckedRoots, type CheckedStatsManifest,
-  type CheckedWorldManifest, type CheckedWriteManifest, type BirthManifest, type GetManifest, type ListManifest, type ListedChild, type PolicyTag, type Presence, type Refusaltag, type RevseqCmp, type RevtokCmp, type RootTags, type ScribedBirthManifest, type ScribedGetManifest,
-  type ScribedListManifest, type ScribedWriteManifest, type StatsManifest, type WorldManifest, type WriteManifest, type WriteTags, ManifestChecks,
+  type CheckedGetBankManifest, type CheckedWriteManifest, type BirthManifest, type GetManifest, type ListManifest, type ListedChild, type PolicyTag, type Presence, type Refusaltag, type RevseqCmp, type RevtokCmp, type ScribedBirthManifest, type ScribedGetManifest,
+  type ScribedListManifest, type ScribedWriteManifest, type StatsManifest, type GetBankManifest, type WriteManifest, type WriteTags, ManifestChecks,
 } from '../shapes/shapes-manifest'
 import { VaultStatsChecks } from '../shapes/shapes-vault-stats'
 import * as ManifestTags from './manifest-tags'
 import * as Throwers from '../refusals/throwers'
 
-// == [Observations]: checkGetObservations, checkWriteObservations, checkListObservations, checkBirthObservations, checkWorldObservations, checkStatsObservations, checkedRowsOf, checkedRowOf, checkedChildrenOf, checkedRootsOf, checkedRootOf, checkedAncestorOf, checkedBankObservedOf, banktokOrVoidOf, checkedTrackedOf, trackedEntryOf, checkedWatchedOf
+// == [Observations]: checkGetObservations, checkWriteObservations, checkListObservations, checkBirthObservations, checkGetBankObservations, checkStatsObservations, checkedRowsOf, checkedRowOf, checkedChildrenOf, checkedRootsOf, checkedRootOf, checkedAncestorOf, checkedBankObservedOf, banktokOrVoidOf, checkedTrackedOf, trackedEntryOf, checkedWatchedOf
 // A row that fails its kind's checks is incompatible: a record our code would not write, which refuses `incompatible_row`. A manifest
 // that is malformed, or a row that is no object, means the datastore or its concrete adapter is broken, and refuses `storage_issue`.
 
@@ -45,8 +45,8 @@ export function checkBirthObservations(ask: BirthBankAsk, manifest: BirthManifes
   Object.assign(manifest, { ...checkedBankObservedOf(ask, manifest), tags: ManifestChecks.birthTags.parse(manifest.tags), actual: checkedRootsOf(manifest.actual) })
 }
 
-/** Check a get of the world's manifest in place: each root once. */
-export function checkWorldObservations(ask: GetWorldAsk, manifest: WorldManifest): asserts manifest is WorldManifest & CheckedWorldManifest {
+/** Check a get of the bank's manifest in place: each root once. */
+export function checkGetBankObservations(ask: GetBankAsk, manifest: GetBankManifest): asserts manifest is GetBankManifest & CheckedGetBankManifest {
   Object.assign(manifest, { ...checkedBankObservedOf(ask, manifest), actual: checkedRootsOf(manifest.actual) })
 }
 
@@ -61,31 +61,31 @@ function checkedRowsOf(ask: GetAsk | WriteAsk, manifest: GetManifest | WriteMani
   return { ...checkedBankObservedOf(ask, manifest), actual, ancestor: (actual === null) ? checkedAncestorOf(ask, manifest.ancestor) : null }
 }
 
-/** The raw `row` a datastore read at `labelpath`, checked by its kind but not its address, or null for none. */
-function checkedRowOf({ labelpath }: Pick<ThingScope, 'labelpath'>, row: unknown): ThingRecord | null {
+/** The raw `row` a datastore read in the table of the ask's modelkind, checked by that kind but not its address, or null for none. */
+function checkedRowOf({ modelkind }: Pick<ThingScope, 'modelkind'>, row: unknown): ThingRecord | null {
   if (row === null) { return null }
   if (! CX.isPlainBag(row)) { throw Throwers.storageIssue() }
-  return ThingkindChecks.ofLabelpath(labelpath).stored.parse(row)
+  return ThingkindChecks.byModelkind[modelkind].stored.parse(row)
 }
 
 // A child is checked by the listing's modelkind, not by the labelpath it is listed at: `demandListConsistency` checks that.
 /** A listing's raw children, each checked by its kind but not its address: those that pass, and those that fail as `incompatible_rows`. */
-function checkedChildrenOf({ userid, banklabel, modelkind }: ListAsk, children: unknown): Pick<CheckedListManifest, 'children' | 'incompatible_rows'> {
+function checkedChildrenOf({ modelkind, userid, banklabel }: ListAsk, children: unknown): Pick<CheckedListManifest, 'children' | 'incompatible_rows'> {
   const check = ThingkindChecks.byModelkind[modelkind].stored
   const listed: ListedChild[] = []
   const incompatible_rows: IncompatibleThing[] = []
   for (const { labelpath, raw } of ManifestChecks.children.parse(children)) {
     if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
     const childReport = check.safeParse(raw)
-    if (childReport.success) { listed.push({ labelpath, record: childReport.data }) } else { incompatible_rows.push({ userid, banklabel, labelpath, am: 'd' }) }
+    if (childReport.success) { listed.push({ labelpath, record: childReport.data }) } else { incompatible_rows.push({ modelkind, userid, banklabel, labelpath, am: 'd' }) }
   }
   return { children: listed, incompatible_rows }
 }
 
-/** A birth's or a world's raw roots, each checked by its kind but not its address, null for none. */
+/** A birth's or a bank's raw roots, each checked by its kind but not its address, null for none. */
 function checkedRootsOf(roots: unknown): CheckedRoots {
   const rows = ManifestChecks.roots.parse(roots)
-  return { bank: checkedRootOf(BankChecks.stored, rows.bank), gate: checkedRootOf(GateChecks.stored, rows.gate), root: checkedRootOf(BoxChecks.stored, rows.root) }
+  return { gate: checkedRootOf(GateChecks.stored, rows.gate), root: checkedRootOf(BoxChecks.stored, rows.root) }
 }
 
 /** The raw root `row`, checked by `check`, or null for none. */
@@ -96,28 +96,29 @@ function checkedRootOf<RecordT>(check: Readonly<{ parse: (row: unknown) => Recor
 }
 
 // The ancestor is found by a prefix of the scope, not by an address, and the shell is built from it: its address is checked here, where it is read.
-/** The nearest row above `scope`, checked by its kind and its address, or null for none. */
-function checkedAncestorOf({ userid, banklabel, labelpath }: ThingScope, row: unknown): ThingRecord | null {
+// A Thing's ancestors are of its own kind, in the table the ask names.
+/** The nearest row above `scope`, checked by the ask's kind and its address, or null for none. */
+function checkedAncestorOf({ modelkind, userid, banklabel, labelpath }: ThingScope, row: unknown): ThingRecord | null {
   if (row === null) { return null }
   const abovepath = ManifestTags.fieldOf(row, 'labelpath')
   if ((typeof abovepath !== 'string') || (! labelpath.startsWith(`${abovepath}/`))) { throw Throwers.rowOfOtherAddress(['labelpath']) }
-  const ancestor: ThingRecord = ThingkindChecks.ofLabelpath(abovepath).stored.parse(row)
-  const fieldnames = Validator.disagreeingFieldnames(ancestor, { userid, banklabel, labelpath: abovepath })
+  const ancestor: ThingRecord = ThingkindChecks.byModelkind[modelkind].stored.parse(row)
+  const fieldnames = Validator.disagreeingFieldnames(ancestor, { modelkind, userid, banklabel, labelpath: abovepath })
   if (fieldnames.length > 0) { throw Throwers.rowOfOtherAddress(fieldnames) }
   return ancestor
 }
 
-// A manifest with no banktok is a datastore that forgot it; one whose banktok is no lifetok read an incompatible bank row, whose own check speaks for it.
+// A manifest with no banktok is a datastore that forgot it; one whose banktok is no UUID read an incompatible gate row, which its own check reports.
 /** The bank's part of a manifest, checked. */
 function checkedBankObservedOf(ask: AnyAsk, manifest: BankObserved): CheckedBankObserved {
   if (! ('banktok' in manifest)) { throw Throwers.banktokMissing() }
   return { banktok: banktokOrVoidOf(manifest.banktok), tracked: checkedTrackedOf(ask, manifest.tracked), read_tc: ManifestChecks.read_tc.parse(manifest.read_tc) }
 }
 
-// A banktok is news, never the verdict: one that is no lifetok reads as the void lifetok, and the step's answer stands.
+// A banktok is news, never the verdict: one that is no UUID reads as the void banktok, and the step's answer stands.
 // Unspecified for an incompatible row: notes/wontfix.md.
-/** A banktok a datastore read, or the void lifetok where it is no lifetok. */
-export function banktokOrVoidOf(banktok: unknown): Lifetok {
+/** A banktok a datastore read, or the void banktok where it is no UUID. */
+export function banktokOrVoidOf(banktok: unknown): Banktok {
   const banktokReport = PerKindChecks.banktok.safeParse(banktok)
   return banktokReport.success ? banktokReport.data : SX.VoidLifeTok
 }
@@ -125,37 +126,33 @@ export function banktokOrVoidOf(banktok: unknown): Lifetok {
 /** A manifest's raw `tracked`, each row checked by its kind but not its address. */
 function checkedTrackedOf({ track }: AnyAsk, tracked: unknown): Tracked {
   const rows = ManifestChecks.tracked.parse(tracked)
-  return {
-    bank:                 trackedEntryOf(BankChecks.stored, track.bank, rows['bank']),
-    [Labelpath.MainGate]: trackedEntryOf(GateChecks.stored, track[Labelpath.MainGate], rows[Labelpath.MainGate]),
-    [Labelpath.RootBox]:  trackedEntryOf(BoxChecks.stored,  track[Labelpath.RootBox], rows[Labelpath.RootBox]),
-  }
+  return { gate: trackedEntryOf(GateChecks.stored, track.gate, rows['gate']), root: trackedEntryOf(BoxChecks.stored, track.root, rows['root']) }
 }
 
 // Nothing stored is at the void revision, as the shell is: a pair there is the same as no row, and differs from any row.
 /** `'same'`, or the raw `row` checked by `check`: `'same'` where the datastore says so, or where there is no row and `pair` is at the void revision. */
-function trackedEntryOf<RecordT>(check: Readonly<{ parse: (row: unknown) => RecordT }>, pair: Track['bank'], row: unknown): RecordT | 'same' {
+function trackedEntryOf<RecordT>(check: Readonly<{ parse: (row: unknown) => RecordT }>, pair: Track['gate'], row: unknown): RecordT | 'same' {
   const isVoidSame = (row === null) && (pair.revseq === Shell.Cited.revseq) && (pair.lifepath === Shell.Cited.lifepath)
   if ((row === 'same') || isVoidSame) { return 'same' }
   if (! CX.isPlainBag(row)) { throw Throwers.storageIssue() }
   return check.parse(row)
 }
 
-// A watched Thing is read by no address: the datastore hands over what changed. Its labelpath is its own, and its bank the
-// watch's, so that one of another bank refuses.
-/** The raw Thing in a notice from a watch on `bankScope`, checked by its kind and its address. */
-export function checkedWatchedOf(bankScope: ThingWatchScope, raw: unknown): ThingRecord {
+// A watched Thing is read by no address: the datastore hands over what changed, and the kind of the table it changed in.
+// Its labelpath is its own, and its bank the watch's, so that one of another bank refuses.
+/** The raw Thing in a notice from a watch, in `table`, the watched bank's table of one kind, checked by that kind and its address. */
+export function checkedWatchedOf(table: TableScope, raw: unknown): ThingRecord {
   if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
-  const scopeReport = ThingChecks.thingScope.safeParse({ ...bankScope, labelpath: raw['labelpath'] })
-  if (! scopeReport.success) { throw Throwers.storageIssue() }
-  const watched: ThingRecord = ThingkindChecks.ofLabelpath(scopeReport.data.labelpath).stored.parse(raw)
-  const fieldnames = Validator.disagreeingFieldnames(watched, scopeReport.data)
+  const labelpathReport = ThingChecks.labelpath.safeParse(raw['labelpath'])
+  if (! labelpathReport.success) { throw Throwers.storageIssue() }
+  const watched: ThingRecord = ThingkindChecks.byModelkind[table.modelkind].stored.parse(raw)
+  const fieldnames = Validator.disagreeingFieldnames(watched, { ...table, labelpath: labelpathReport.data })
   if (fieldnames.length > 0) { throw Throwers.rowOfOtherAddress(fieldnames) }
   return watched
 }
 // --
 
-// == [Tables]: RevisionGrid, MatchActs, StaleActs, GetActs, ListActs, writeTableActOf, rootActOf, refusaltagOf, policyFailureOf, isGoodAct, isRefusedAct, isWriteAct
+// == [Tables]: RevisionGrid, MatchActs, StaleActs, GetActs, ListActs, writeTableActOf, refusaltagOf, policyFailureOf, isGoodAct, isRefusedAct, isWriteAct
 // The act tables of `notes/answer-contract.md`, each by the tags that decide it. A write's revisions are judged first, by the
 // grid of its *Revisions* section; where they match, or are stale, the act is then found by the op, the presence of the ante
 // row, and the flag that applies over it: `ifPresent` over a live row, `ifAbsent` over a tombstone or none.
@@ -211,21 +208,14 @@ function writeTableActOf(ask: WriteAsk, tags: Pick<WriteTags, 'presence' | 'revt
   return revision
 }
 
-// A root's put cites the shell, so its revseq is always a birth's. Its lifepath agreement is read only where its revtok is
-// the shell's, which a birth's revseq makes a clash already.
-/** The act of one root's put in a birth: see the put table in `notes/answer-contract.md`. */
-function rootActOf(put: WriteAsk, tags: RootTags): EX.PutAct | EX.DelAct | EX.RefusedAct {
-  return writeTableActOf(put, { ...tags, revseq_cmp: 'birth', lifepath_eq: true })
-}
-
 /** The name of the phrase a write is refused with where it changes a field fixed for the Thing's life or fails a storage policy `ask` names, or null.
- * A changed born_at wins over a failed policy, and a failed policy over a changed lifetok.
+ * A changed born_at wins over a failed policy, and a failed policy over a changed banktok.
  */
 function refusaltagOf(ask: WriteAsk, tags: WriteTags): Refusaltag | null {
   const policyTag = policyFailureOf(ask, tags)
   if (tags.born_at_cmp === 'changed') { return 'BornAtMoved' }
   if (policyTag !== null)             { return policyTag }
-  return (tags.lifetok_cmp === 'changed') ? 'LifetokMoved' : null
+  return (tags.banktok_cmp === 'changed') ? 'BanktokMoved' : null
 }
 
 /** The refusal tag of the first storage policy `ask` names that refuses it, or null where each is met. */
@@ -278,24 +268,26 @@ export function scribeListAct(_ask: ListAsk, manifest: CheckedListManifest): ass
   Object.assign(manifest, { ok: (act === 'gotlive'), act })
 }
 
-// The bank's put passes over a live bank, whose gate and root box are stored with it: a live bank without both is a broken
-// state. Otherwise a birth writes all three roots or none, so it is born only where no root's put refuses.
-/** Write onto a birth's manifest the act the put table finds for its three roots, and whether it answers good: `passed` over a live bank, else the first root's refusal, else `born`. */
+// The gate's put passes over a live gate, whose root box is stored with it: a live gate without it is a broken state.
+// Otherwise a birth writes both roots or neither, so it is born only where neither root's put refuses. A root's put writes
+// only over a tombstone or none, where no born_at or banktok is held to the ante row's, and names no storage policy, so the
+// put table alone judges it.
+/** Write onto a birth's manifest the act the put table finds for its two roots, each judged as a write is, and whether it answers good: `passed` over a live gate, else the first root's refusal, else `born`. */
 export function scribeBirthAct(ask: BirthBankAsk, manifest: CheckedBirthManifest): asserts manifest is ScribedBirthManifest {
-  const [bankPut, gatePut, rootPut] = birthPutsOf(ask)
+  const [gatePut, rootPut] = birthPutsOf(ask)
   const { tags, actual } = manifest
-  const acts = { bank: rootActOf(bankPut, tags.bank), gate: rootActOf(gatePut, tags.gate), root: rootActOf(rootPut, tags.root) }
-  if (acts.bank === 'passed') {
-    if ((actual.bank === null) || (actual.gate === null) || (actual.root === null)) { throw Throwers.bankRootsMissing() }
+  const acts = { gate: writeTableActOf(gatePut, tags.gate), root: writeTableActOf(rootPut, tags.root) }
+  if (acts.gate === 'passed') {
+    if ((actual.gate === null) || (actual.root === null)) { throw Throwers.bankRootsMissing() }
     Object.assign(manifest, { ok: true, act: 'passed' })
     return
   }
-  const refusedrootckey = (['bank', 'gate', 'root'] as const).find((rootckey) => isRefusedAct(acts[rootckey]))
-  if (refusedrootckey === undefined) { Object.assign(manifest, { ok: true, act: 'born' }) } else { Object.assign(manifest, { ok: false, act: acts[refusedrootckey], refusedrootckey }) }
+  const refusedAct = [acts.gate, acts.root].find((act) => isRefusedAct(act))
+  if (refusedAct === undefined) { Object.assign(manifest, { ok: true, act: 'born' }) } else { Object.assign(manifest, { ok: false, act: refusedAct }) }
 }
 // --
 
-// == [Answers]: getAnswerOf, writeAnswerOf, listAnswerOf, voidParentOf, listedOf, kidsOf, birthAnswerOf, worldAnswerOf, worldRootsOf, statsAnswerOf
+// == [Answers]: getAnswerOf, writeAnswerOf, listAnswerOf, voidParentOf, listedOf, kidsOf, birthAnswerOf, getBankAnswerOf, actualRootsOf, statsAnswerOf
 
 /** The answer to a get, stripped from its scribed manifest. Where there is no actual row, its `dbhas` is the shell under the ancestor. */
 export function getAnswerOf(ask: GetAsk, manifest: ScribedGetManifest): GetThingAnswer {
@@ -342,7 +334,7 @@ export function voidParentOf(ask: ListAsk): VoidSentinel | null { return (Labelp
 
 /** `thing` as a listing carries it: a live box's sparse form, or any other Thing whole, a tombstone among them. */
 function listedOf(thing: ThingRecord): ThingRecord | BoxSparse {
-  return ((thing.am === 'a') && Labelpath.isOfModelkind(thing.labelpath, 'box')) ? BaseThing.sparseOf(thing) as BoxSparse : thing
+  return ((thing.am === 'a') && (thing.modelkind === 'box')) ? BaseThing.sparseOf(thing) as BoxSparse : thing
 }
 
 // Object.fromEntries makes each label an own key, `__proto__` among them.
@@ -359,26 +351,26 @@ function kidsOf(ask: ListAsk, parent: ThingRecord, deltas: readonly (ThingRecord
   }
 }
 
-/** The answer to a birth, stripped from its scribed manifest: the three actual roots. Refused, its `dbhas` is the root that refused it, or the shell there for none. */
+/** The answer to a birth, stripped from its scribed manifest: the two actual roots, as its `val`, or refused, as its `dbhas`, each the shell where none is stored. */
 export function birthAnswerOf(ask: BirthBankAsk, manifest: ScribedBirthManifest): BirthBankAnswer {
   const { banktok, tracked, read_tc } = manifest
   const beside = { ask: loggableAskOf(ask), banktok, tracked, read_tc }
   if (manifest.ok) { return { ok: true, ...beside, act: manifest.act, val: manifest.actual } }
   const err = Throwers.actRefused('vault', manifest.act, { oplabel: 'birthBank', ask: beside.ask })
-  return { ok: false, ...beside, act: manifest.act, dbhas: worldRootsOf(ask, manifest.actual)[manifest.refusedrootckey], err }
+  return { ok: false, ...beside, act: manifest.act, dbhas: actualRootsOf(ask, manifest.actual), err }
 }
 
-/** The answer to a get of the world, stripped from its checked manifest. */
-export function worldAnswerOf(ask: GetWorldAsk, manifest: CheckedWorldManifest): GetWorldAnswer {
+/** The answer to a get of the bank, stripped from its checked manifest. */
+export function getBankAnswerOf(ask: GetBankAsk, manifest: CheckedGetBankManifest): GetBankAnswer {
   const { banktok, tracked, read_tc } = manifest
-  return { ok: true, ask: loggableAskOf(ask), banktok, tracked, read_tc, act: 'got', val: worldRootsOf(ask, manifest.actual) }
+  return { ok: true, ask: loggableAskOf(ask), banktok, tracked, read_tc, act: 'got', val: actualRootsOf(ask, manifest.actual) }
 }
 
 // A root has nothing above it, so where none is stored its shell stands alone.
 /** The roots of `ask`'s bank, each the shell at its labelpath where none is stored. */
-export function worldRootsOf({ userid, banklabel }: ThingWatchScope, roots: CheckedRoots): WorldRoots {
-  const shellAt = (rootckey: keyof CheckedRoots): VoidSentinel => Shell.under({ userid, banklabel, labelpath: RootLabelpaths[rootckey] }, null)
-  return { bank: roots.bank ?? shellAt('bank'), gate: roots.gate ?? shellAt('gate'), root: roots.root ?? shellAt('root') }
+export function actualRootsOf(bankScope: ThingWatchScope, roots: CheckedRoots): ActualRoots {
+  const scopes = rootScopesOf(bankScope)
+  return { gate: roots.gate ?? Shell.under(scopes.gate, null), root: roots.root ?? Shell.under(scopes.root, null) }
 }
 
 /** The answer to an ask for stats, stripped from its checked manifest. */

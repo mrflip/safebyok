@@ -125,7 +125,7 @@ export function describeDeviceDBLeaseBattery<DBT extends DeviceDB>(dbname: strin
       [(live: LiveLeaseRecord) => ({ ...live, lifeseq: leaseTombstoneOf().lifeseq, lifepath: leaseTombstoneOf().lifepath }), 'a live lease on an odd life'],
       [(live: LiveLeaseRecord) => ({ ...live, lifepath: live.lifeseq }),         'a lease whose lifepath lacks its placeholder'],
       [(live: LiveLeaseRecord) => ({ ...live, lifepath: `0000000002/${live.lifeseq}` }), 'a lease with a life above its own'],
-      [(live: LiveLeaseRecord) => ({ ...live, labelpath: 'gate', label: 'gate' }),         "a lease at a gate's labelpath"],
+      [(live: LiveLeaseRecord) => ({ ...live, labelpath: live.gate_labelpath, label: live.gate_labelpath }), "a lease at its gate's labelpath"],
       [(live: LiveLeaseRecord) => ({ ...live, labelpath: 'lease/passkeys', label: 'passkeys' }), "a live lease whose labelpath is not its gate's"],
       [(live: LiveLeaseRecord) => ({ ...live, gate_labelpath: 'box/openai' }),             "a live lease whose gate_labelpath is no gate's"],
       [(live: LiveLeaseRecord) => ({ ...live, label: 'passkeys' }),                        "a lease whose label is not its labelpath's last"],

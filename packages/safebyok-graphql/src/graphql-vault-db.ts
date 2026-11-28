@@ -60,7 +60,7 @@ export class GraphQLVaultDB implements DB.VaultDB {
   }
   // --
 
-  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetWorld, tryStats
+  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetBank, tryStats
   // Each checks its ask, sends it, checks the answer that crosses back by its form and then by its scopes, and answers it:
   // as its own verb's answer, the only one its form check lets through. Every throw in it lands in `answerForThrown`.
 
@@ -94,24 +94,24 @@ export class GraphQLVaultDB implements DB.VaultDB {
     } catch (err) { return { ...answerForThrown(err, 'listThings', ask), parentage: [], deltas: [], incompatible_rows: [] } }
   }
 
-  /** Write a new bank's three roots, or answer the actual roots of a bank already live ({@link DB.VaultDB.tryBirthBank}). */
+  /** Write a new bank's two roots, or answer the actual roots of a bank already live ({@link DB.VaultDB.tryBirthBank}). */
   async tryBirthBank(ask: DB.BirthBankAsk): Promise<DB.BirthBankAnswer> {
     try {
       const birthBankAsk = DB.checkedBirthBankAsk(ask)
       const crossed      = WireChecks.birthAnswer.parse(rootsAnswerDrop(await this.#runMutation(VaultOperations.birthBank, 'safebyokBirthBank', { ask: birthBankAsk })))
       checkRootsAt(birthBankAsk, crossed)
-      return answerOf(birthBankAsk, crossed) as DB.BirthBankAnswer
+      return answerOf(birthBankAsk, crossed, null) as DB.BirthBankAnswer
     } catch (err) { return answerForThrown(err, 'birthBank', ask) }
   }
 
-  /** The bank's three roots, read in one step ({@link DB.VaultDB.tryGetWorld}). */
-  async tryGetWorld(ask: DB.GetWorldAsk): Promise<DB.GetWorldAnswer> {
+  /** The bank's two roots, read in one step ({@link DB.VaultDB.tryGetBank}). */
+  async tryGetBank(ask: DB.GetBankAsk): Promise<DB.GetBankAnswer> {
     try {
-      const worldAsk = DB.AskChecks.getWorldAsk.parse(ask)
-      const crossed  = WireChecks.worldAnswer.parse(rootsAnswerDrop(await this.#runQuery(VaultOperations.getWorld, 'safebyokGetWorld', { ask: worldAsk })))
-      checkRootsAt(worldAsk, crossed)
-      return answerOf(worldAsk, crossed) as DB.GetWorldAnswer
-    } catch (err) { return answerForThrown(err, 'getWorld', ask) }
+      const bankAsk = DB.AskChecks.getBankAsk.parse(ask)
+      const crossed = WireChecks.getBankAnswer.parse(rootsAnswerDrop(await this.#runQuery(VaultOperations.getBank, 'safebyokGetBank', { ask: bankAsk })))
+      checkRootsAt(bankAsk, crossed)
+      return answerOf(bankAsk, crossed, null) as DB.GetBankAnswer
+    } catch (err) { return answerForThrown(err, 'getBank', ask) }
   }
 
   /** The bank's storage stats, read in one step ({@link DB.VaultDB.tryStats}). */
@@ -189,17 +189,17 @@ export class GraphQLVaultDB implements DB.VaultDB {
 
 // A record crosses checked for its scope and citation alone, and is typed here as the answer has it: whoever reads it
 // checks the rest where a Thing takes it, as for an answer from any vaultDB.
-/** The answer to `ask` that `crossed` carries, deeply frozen, with a refusal made a VaultError again.
- * Its `ask` is the loggable part of `ask`.
+/** The answer to `ask` that `crossed` carries, deeply frozen, with a refusal made a VaultError again, naming `named`: the answer's `dbhas` unless given.
+ * Its `ask` is the loggable part of `ask`. A birth's or a bank's refusal names no one Thing: its `dbhas`, where it has one, is both roots.
  */
-function answerOf(ask: DB.AnyAsk, crossed: CheckedAnswer): AnyAnswer {
+function answerOf(ask: DB.AnyAsk, crossed: CheckedAnswer, named: unknown = crossed.dbhas): AnyAnswer {
   const loggableAsk = DB.loggableAskOf(ask)
   if (crossed.ok) {
     const { val, dbhas, err: _err, ...beside } = crossed
     return DB.frozenAnswerOf((dbhas === null) ? { ...beside, ask: loggableAsk, val } : { ...beside, ask: loggableAsk, val, dbhas }) as unknown as AnyAnswer
   }
   const { val: _val, err, ...beside } = crossed
-  const refusal = DB.refusedOverWire(err, { act: crossed.act, dbhas: crossed.dbhas as DB.ThingRecord | DB.VoidSentinel | null })
+  const refusal = DB.refusedOverWire(err, { act: crossed.act, dbhas: named as DB.ThingRecord | DB.VoidSentinel | null })
   Object.assign(refusal, { meta: { ...refusal.meta, ask: loggableAsk } })
   return DB.frozenAnswerOf({ ...beside, ask: loggableAsk, err: refusal }) as unknown as AnyAnswer
 }
@@ -212,7 +212,7 @@ function answerForThrown(thrown: unknown, oplabel: string, ask: unknown): DB.Bad
   const err         = DB.storageRefusalOf(thrown)
   const loggableAsk = DB.loggableAskOf(ask)
   Object.assign(err, { meta: { ...err.meta, oplabel, ask: loggableAsk } })
-  return { ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', banktok: DB.VoidLifeTok, tracked: 'unread', read_tc: DB.readTcNow(), dbhas: null, err }
+  return { ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', banktok: DB.VoidBanktok, tracked: 'unread', read_tc: DB.readTcNow(), dbhas: null, err }
 }
 
 /** The `onEnded` of a watch given none. */
@@ -288,7 +288,7 @@ const thingAnswerDrop: Drop = (answer) => dropTypename(answer, { err: errDrop })
 const listAnswerDrop: Drop = (answer) => dropTypename(answer, {
   err: errDrop, val: dropTypename, incompatible_rows: (rows) => (Array.isArray(rows) ? rows.map((row) => dropTypename(row)) : rows),
 })
-const rootsAnswerDrop: Drop = (answer) => dropTypename(answer, { err: errDrop, val: dropTypename })
+const rootsAnswerDrop: Drop = (answer) => dropTypename(answer, { err: errDrop, val: dropTypename, dbhas: dropTypename })
 const statsAnswerDrop: Drop = (answer) => dropTypename(answer, { err: errDrop, val: (stats) => dropTypename(stats, { box: dropTypename, gate: dropTypename, max: dropTypename }) })
 const noticeDrop: Drop = (notice) => dropTypename(notice, { err: errDrop })
 // --

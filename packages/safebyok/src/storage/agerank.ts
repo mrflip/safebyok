@@ -2,7 +2,7 @@
 
 import { v7 as uuidv7 } from 'uuid'
 import { BaseThing } from '../models/base-thing'
-import { type EpochMillis, type Lifepath, Labelpath, Lifeseq, Revseq } from '../shapes/primitives'
+import { type EpochMillis, type Lifepath, Lifeseq, Revseq } from '../shapes/primitives'
 import type { Sparse, ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
 import type { Agekind, Agerank, ItemSeen, ReadTc, SeenThing, VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
 
@@ -90,12 +90,12 @@ export function itemSeenOf(seen: SeenThing): ItemSeen {
   return { liveness: 'gone', val: seen as Tombstone<ThingRecord> }
 }
 
-/** The `item` event of `seen`, at its scope, as `dispatch` says who dispatched it, when it was read and its bank's lifetok, with the vacant ageranks, frozen. */
+/** The `item` event of `seen`, at its scope and of its modelkind, with the `sourcelabel`, `read_tc` and `banktok` that `dispatch` gives it and the vacant ageranks, frozen. */
 export function itemEventOf(seen: SeenThing, dispatch: Pick<VaultItemEvent, 'sourcelabel' | 'read_tc' | 'banktok'>): VaultItemEvent {
-  const { userid, banklabel, labelpath } = seen
+  const { userid, banklabel, labelpath, modelkind } = seen
   const { sourcelabel, read_tc, banktok } = dispatch
   return Object.freeze({
-    eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: VacantAgerank, agerankWas: VacantAgerank,
+    eventkind: 'item', userid, banklabel, labelpath, modelkind, agerank: VacantAgerank, agerankWas: VacantAgerank,
     sourcelabel, read_tc, banktok, ...itemSeenOf(seen),
   })
 }

@@ -33,7 +33,7 @@ export default app
 import { SafebyokVaultComponent } from 'safebyok-convex/server'
 import { components } from './_generated/api'
 
-export const { getThing, writeThing, listThings, birthBank, getWorld, stats, watchThings } =
+export const { getThing, writeThing, listThings, birthBank, getBank, stats, watchThings } =
   new SafebyokVaultComponent(components.safebyok).api({
     getUserId: async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null,
   })
@@ -86,10 +86,10 @@ call made before then refuses as `identity_revoked`.
 
 ## What is stored
 
-Three tables inside the component, one for each kind of Thing: `bank_things`, `gate_things` and `box_things`, as
-`safebyok-postgres` has. Each document is a Thing as the core wrote it, a field for each of its fields; a field that is
-an object (a gate's `wayins`, `auth`, `sigs` and `meta`, a box's `sidecar` and `whisper_sealed`) is stored as it is.
-Each table is indexed `by_scope` on `userid`, `banklabel` and `labelpath`, so one range fetches the children of a
+Two tables inside the component, one for each kind of Thing, as `safebyok-postgres` has: `gate_things`, a document
+per bank, its gate, stored at the banklabel, and `box_things`, a document per box. Each document is a Thing as the
+core wrote it, a field for each of its fields, its `modelkind` fixed to its table's kind; a field that is an object (a gate's `wayins`, `auth`, `sigs` and
+`meta`, a box's `sidecar` and `whisper_sealed`) is stored as it is. Each table is indexed `by_scope` on the rest of a Thing's scope, `userid`, `banklabel` and `labelpath`, so one range fetches the children of a
 Thing. Each document also holds `commit_ts`, the timestamp Convex committed its last write at, indexed `by_commit`
 after `userid` and `banklabel`, so one range of each table fetches what a bank's watch has not yet heard. A deleted
 Thing stays as its tombstone.

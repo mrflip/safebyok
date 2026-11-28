@@ -2,7 +2,7 @@
 
 import { Phrases as BigPhrases } from 'safebyok-big/internals'
 
-// == [Models]: VaultDBExpected, DeviceDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, RootShelfExpected, ThingSoonestBare, WorldExpected, ThingExpected, BegunOfOtherKind, WayinExpected, WayinKeyExpected, WayinOfOtherHeader
+// == [Models]: VaultDBExpected, DeviceDBExpected, VaultMinderExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, SigninUnanswered, NobodySignedIn, ThingNotLive, UnlockDismissed, HostedVaultExpected, RootShelfExpected, ThingSoonestBare, BankExpected, ThingExpected, BegunOfOtherKind, WayinExpected, WayinKeyExpected, WayinOfOtherHeader
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
@@ -49,14 +49,14 @@ export const RootShelfExpected = 'Expected a root shelf, such as localStorage: a
 /** A box the device has heard a newer revision of, with no whole record of its newest life to unseal. */
 export const ThingSoonestBare = 'This device has heard of a newer revision of this record but has not fetched it yet.'
 
-/** What a Thing or a car is made with in place of a device's world. */
-export const WorldExpected = "Expected a device's world: an object with a function for each of its verbs, makeThing, seal, unseal, lock, connect and disconnect."
+/** A Thing or a car given something that is not a device's bank. */
+export const BankExpected = "Expected a device's bank: an object with a function for each of its verbs."
 
 /** What a car is made from that is neither a Thing, the shell, nor an item event. */
 export const ThingExpected = 'Expected a Thing, the shell at its labelpath, or an item event of its record.'
 
 /** What a kind of Thing is made from that is another kind's. */
-export const BegunOfOtherKind = "A Thing is made from the shell or an item event at a labelpath of its own kind."
+export const BegunOfOtherKind = "A Thing is made from the shell or an item event of its own modelkind."
 
 /** What a proving is made with, as the wayin it proves, that is not a Wayin. */
 export const WayinExpected = 'Expected a Wayin, or null for a new wayin.'
@@ -70,11 +70,14 @@ export const WayinOfOtherHeader = "A proving's stored wayin has the proving's he
 
 // == [Things]: the sentences of a Thing's checks, of a shell's, and of a vaultDB's asks
 
-/** A labelpath that is not a modelkind and then labels. */
-export const LabelpathShape = "A labelpath is a Thing's modelkind (bank, gate or box), then labels, each after a '/': none under bank, at most one under gate or box."
+/** A labelpath that is neither a gate's nor a box's. */
+export const LabelpathShape = "A labelpath is a gate's, its bank's banklabel alone, or a box's: 'box', or 'box' then one label after a '/'."
 
-/** A record whose labelpath is another kind's. */
-export const LabelpathOfOtherKind = "A Thing's labelpath starts with its own modelkind."
+/** A gate stored at a labelpath other than its bank's banklabel. */
+export const GateNotAtBanklabel = "A bank's gate is stored at the bank's banklabel: its labelpath is the banklabel alone."
+
+/** A Thing, an ask or a shell whose labelpath breaks the labelpath rule of its modelkind. */
+export const LabelpathOfOtherKind = "A Thing's labelpath follows its modelkind's rule: a gate's is its bank's banklabel, and a box's is 'box', or 'box' then one label after a '/'."
 
 /** A lifeseq that is not 10 base-32 digits. */
 export const LifeseqShape = "A lifeseq is 10 base-32 digits, 0-9 and a-v."
@@ -82,17 +85,17 @@ export const LifeseqShape = "A lifeseq is 10 base-32 digits, 0-9 and a-v."
 /** A revtok not of a UUID's shape. */
 export const RevtokShape = "A revtok is a UUID: hex digits in groups of 8, 4, 4, 4 and 12, joined by '-'."
 
-/** A lifetok not of a UUID's shape. */
-export const LifetokShape = "A lifetok is a UUID: hex digits in groups of 8, 4, 4, 4 and 12, joined by '-'."
+/** A banktok not of a UUID's shape. */
+export const BanktokShape = "A banktok is a UUID: hex digits in groups of 8, 4, 4, 4 and 12, joined by '-'."
 
-/** An ask other than a get whose banktok is the void lifetok. */
-export const BanktokVoid = "Only a get may carry the void banktok: a list, a write or a birth carries its bank's lifetok."
+/** An ask other than a get whose banktok is the void banktok. */
+export const BanktokVoid = "Only a get may carry the void banktok: a list, a write or a birth carries its bank's banktok."
 
 /** A lifepath that is not lifeseqs, each after a '/'. */
 export const LifepathShape = "A lifepath is one or more lifeseqs, joined by '/'."
 
 /** A Thing whose label is not its labelpath's last. */
-export const LabelNotLast = "A Thing's label is the last segment of its labelpath: a root's is its modelkind."
+export const LabelNotLast = "A Thing's label is the last segment of its labelpath: a gate's is its banklabel, and the root box's is `box`."
 
 /** A Thing whose lifeseq is not its lifepath's last. */
 export const LifeseqNotOwn = "A Thing's lifeseq is the last of its lifepath."
@@ -107,7 +110,7 @@ export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tomb
 export const LeaseLifepathOwn = "A lease record's lifepath is `0000000000/` and its own lifeseq: no life is above a lease's own."
 
 /** A lease record whose labelpath is not `lease/` and one label. */
-export const LeaseLabelpathShape = "A lease's labelpath is `lease/` and its label, such as `lease/gate`."
+export const LeaseLabelpathShape = "A lease's labelpath is `lease/` and its label, such as `lease/main`."
 
 /** A tombstone of a lease asked of a lease that is not live. */
 export const LeaseTombstoneOfLiveOnly = "Only a live lease has a tombstone: a tombstone or the shell has none."
@@ -124,8 +127,8 @@ export const TombstoneSidecarNotEmpty = "A box tombstone's sidecar is always `{}
 /** A void event whose val is not the void sentinel. */
 export const VoidSentinelExpected = "A void event's val is the void sentinel: a tombstone at revseq -1, with the void revtok and lifeseq."
 
-/** An event whose modelkind is not its labelpath's. */
-export const EventModelkind = "An event's modelkind is the kind its labelpath begins with."
+/** An event whose modelkind is not its record's. */
+export const EventModelkind = "An event's modelkind is its record's."
 
 /** An event whose val is at another scope than the event. */
 export const EventOfOtherThing = "An event's val is at the event's own scope: its userid, banklabel and labelpath."
@@ -133,7 +136,7 @@ export const EventOfOtherThing = "An event's val is at the event's own scope: it
 /** An event whose liveness is not its val's. */
 export const EventLiveness = "An event's liveness is its val's: soon for a live box's sparse form, full for a whole live record, gone for a tombstone, void for the void sentinel."
 /** A record seen in no form a Thing receives. */
-export const SeenFormUnknown = "A record seen is whole, the void sentinel, or a live box's sparse form: a tombstone, a bank and a gate are never sparse."
+export const SeenFormUnknown = "A record seen is whole, the void sentinel, or a live box's sparse form: a tombstone and a gate are never sparse."
 
 /** An event that is not void, whose val is not a Thing's fields, or is the void sentinel. */
 export const ThingFieldsExpected = "An event that is not void has a Thing's fields as its val, whole or a live box's sparse form, never the void sentinel."
@@ -174,17 +177,11 @@ export const BornAtNotNow = "A write over a tombstone or none is a birth: its bo
 /** A write over a live Thing that changes its born_at. */
 export const BornAtMoved = "A write over a live Thing leaves its born_at unchanged."
 
-/** A write of the bank over a live bank that changes its lifetok. */
-export const LifetokMoved = "A write of the bank over a live bank leaves its lifetok unchanged."
-
-/** A deleted main gate. */
-export const MainGateDeleted = "The main gate is never deleted: its record is always live (am: 'a')."
+/** A write of a gate over a live gate that changes its banktok. */
+export const BanktokMoved = "A write of a gate over a live gate leaves its banktok unchanged."
 
 /** A policy that needs testimony the citation lacks. */
 export const TestimonyMissing = "The replace_passphrase policy reads the cited gate's wayins: cite them."
-
-/** An ask whose modelkind is not its labelpath's. */
-export const ModelkindNotOwn = "An ask's modelkind is the first segment of its labelpath."
 
 /** A write whose op does not match its record. */
 export const OpNotOfRecord = "A put writes a live record (am: 'a'), and a del a tombstone (am: 'x')."
@@ -193,10 +190,10 @@ export const OpNotOfRecord = "A put writes a live record (am: 'a'), and a del a 
 export const DelFlagsFixed = "A del's flags are fixed, ifAbsent 'fail' and ifPresent 'repl', and it names no storage policy."
 
 /** A write naming a storage policy its kind lacks. */
-export const PolicyNotOwn = "Only a gate's writes name storage policies: a bank and a box have none."
+export const PolicyNotOwn = "Only a gate's writes name storage policies: a box has none."
 
-/** A bank stored without one of its roots, or with one incompatible. */
-export const BankRootsMissing = "A bank is stored without its main gate or its root box, or with its bank or main gate incompatible: the datastore needs mending by hand."
+/** A bank's roots stored broken: a live gate without a live root box, a live root box without a live gate, or an incompatible gate. */
+export const BankRootsMissing = "A bank's roots are stored broken: a live gate without a live root box, a live root box without a live gate, or an incompatible gate. The datastore needs mending by hand."
 
 /** A list whose parent holds a tombstone or nothing. */
 export const ListParentNotLive = "The Thing listed is not stored live: it was never stored, or was deleted, and has no children."
@@ -204,10 +201,10 @@ export const ListParentNotLive = "The Thing listed is not stored live: it was ne
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: QueryClientExpected, VaultTSQExpected, ListOfBoxes, NotMinded, WorldNotHeard, StaleTimeShape, ChildrenIncompatible
+// == [Minding]: QueryClientExpected, VaultTSQExpected, ListOfBoxes, NotMinded, RootBoxNotHeard, StaleTimeShape, ChildrenIncompatible
 
 /** A VaultTSQ made without a TanStack Query client. */
-export const QueryClientExpected = 'Expected a TanStack Query QueryClient: an object with setQueryDefaults, setMutationDefaults, getQueryData, setQueryData, query, invalidateQueries and resetQueries.'
+export const QueryClientExpected = 'Expected a TanStack Query QueryClient: an object with setQueryDefaults, getQueryData, setQueryData, query, invalidateQueries and resetQueries.'
 
 /** What a vault is made with that lacks one of a VaultTSQ's members. */
 export const VaultTSQExpected = 'Expected a VaultTSQ: an object with a function for each of its verbs, itemQueryOptions, getOnce, listOnce, connect and disconnect.'
@@ -216,10 +213,10 @@ export const VaultTSQExpected = 'Expected a VaultTSQ: an object with a function 
 export const ListOfBoxes = "A VaultTSQ lists only a box's children: the root box's, or a box's under it."
 
 /** A box's item asked of a vault TSQ for a Thing other than a box under the root box. */
-export const NotMinded = "A vault TSQ keeps an item only for a box under the root box: not for the bank, its main gate or its root box."
+export const NotMinded = "A vault TSQ keeps an item only for a box under the root box: not for the bank's gate or its root box."
 
-/** A bank's root box read while its world holds none live. */
-export const WorldNotHeard = "This bank's root box is not known live on this device: bring the device up, or birth the bank, first."
+/** A bank's root box read while none is known live. */
+export const RootBoxNotHeard = "This bank's root box is not known live on this device: bring the device up, or birth the bank, first."
 
 /** A staleTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
 export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
@@ -276,7 +273,7 @@ export const TagsOfOtherRow = "The vault's storage reported comparisons that are
 export const TagsOfOtherAsk = "The vault's storage reported comparisons that disagree with the write asked of it: the storage adapter needs mending."
 
 /** The datastore's manifest has no banktok. */
-export const BanktokMissing = "The vault's storage handed back no banktok, the lifetok of the bank it read: the storage adapter needs mending."
+export const BanktokMissing = "The vault's storage handed back no banktok, the token of the life of the bank it read: the storage adapter needs mending."
 
 /** The vaultDB's answer is not its manifest's. */
 export const AnswerOfOtherManifest = "The vaultDB made an answer that is not a copy of what its storage handed back: a bug in safebyok."
@@ -294,10 +291,10 @@ export const PolicyPhrases = {
   PasskeyNotRevoked: BigPhrases.PasskeyNotRevoked,
 } as const
 
-/** The message a `policied` write is refused with, by the name of its phrase: a changed born_at's, a changed lifetok's, or a storage policy's in {@link PolicyPhrases}. */
+/** The message a `policied` write is refused with, by the name of its phrase: a changed born_at's, a changed banktok's, or a storage policy's in {@link PolicyPhrases}. */
 export const PhraseForRefusaltag = {
   BornAtMoved,
-  LifetokMoved,
+  BanktokMoved,
   ProvedWayinMoved:  BigPhrases.gateIssue(PolicyPhrases.ProvedWayinMoved),
   OtherWayinMoved:   BigPhrases.gateIssue(PolicyPhrases.OtherWayinMoved),
   PasskeyStored:     BigPhrases.gateIssue(PolicyPhrases.PasskeyStored),

@@ -86,22 +86,22 @@ export function formMutationKeyOf({ userid, banklabel, verb }: Readonly<{ userid
 }
 
 // While nobody is signed in, a hook still needs a key: one of no user's, `null` where the userid goes, whose fetch is
-// skipped. It never matches a key the vault TSQ keeps anything under.
+// skipped. It never matches a key the vault TSQ keeps anything under, and starts with the kind as every box's key does.
 /** The React Query key for the record of the box at `labelpath`: the key the bank's vault TSQ keeps its item under, or one of no user's while `userid` is null. */
 export function boxQueryKeyOf({ userid, banklabel, labelpath }: Readonly<{ userid: Userid | null, banklabel: string, labelpath: string }>): QueryKey {
-  return (userid === null) ? ['sok', null, banklabel, labelpath] : VaultTSQ.itemQueryKeyOf({ userid, banklabel, labelpath })
+  return (userid === null) ? ['sok', 'box', null, banklabel, labelpath] : VaultTSQ.itemQueryKeyOf({ modelkind: 'box', userid, banklabel, labelpath })
 }
 
 // An item's key is its labelpath's labels and then the mark '!', so the key less its mark starts the key of every box
 // under it, and of none beside it.
 /** The key that starts the React Query key of the box at `labelpath` and of every box under it: for `invalidateQueries`. While `userid` is null, the key that starts every one of no user's. */
 export function boxesQueryKeyUnder({ userid, banklabel, labelpath }: Readonly<{ userid: Userid | null, banklabel: string, labelpath: string }>): QueryKey {
-  return (userid === null) ? ['sok', null, banklabel] : VaultTSQ.itemQueryKeyOf({ userid, banklabel, labelpath }).slice(0, -1)
+  return (userid === null) ? ['sok', 'box', null, banklabel] : VaultTSQ.itemQueryKeyOf({ modelkind: 'box', userid, banklabel, labelpath }).slice(0, -1)
 }
 
 // The vault TSQ's keys put the kind of query before the labels, so no key that starts a box's also starts a listing's.
 /** The React Query key for the listing of the root box's children: the key the bank's vault TSQ keeps it under, or one of no user's while `userid` is null. */
 export function boxListQueryKeyOf({ userid, banklabel }: Readonly<{ userid: Userid | null, banklabel: string }>): QueryKey {
-  return (userid === null) ? ['sok', null, banklabel, 'box', '#', 'kids'] : VaultTSQ.listQueryKeyOf({ userid, banklabel, labelpath: 'box' })
+  return (userid === null) ? ['sok', 'box', null, banklabel, 'box', '#', 'kids'] : VaultTSQ.listQueryKeyOf({ modelkind: 'box', userid, banklabel, labelpath: 'box' })
 }
 // --

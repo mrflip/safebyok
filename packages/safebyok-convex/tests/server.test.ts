@@ -22,9 +22,9 @@ async function seeded(): Promise<Backend> {
 const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['getThing',    (caller) => caller.query(fns.getThing, { ask: TH.getGateAskOf() })],
   ['writeThing',  (caller) => caller.mutation(fns.writeThing, { ask: TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)) })],
-  ['listThings',  (caller) => caller.query(fns.listThings, { ask: TH.listAskAt('box') })],
+  ['listThings',  (caller) => caller.query(fns.listThings, { ask: TH.listAskAt('box', 'box') })],
   ['birthBank',   (caller) => caller.mutation(fns.birthBank, { ask: TH.birthBankAskOf() })],
-  ['getWorld',    (caller) => caller.query(fns.getWorld, { ask: TH.getWorldAskOf() })],
+  ['getBank',    (caller) => caller.query(fns.getBank, { ask: TH.getBankAskOf() })],
   ['stats',       (caller) => caller.query(fns.stats, { ask: TH.statsAskOf() })],
   ['watchThings', (caller) => caller.query(fns.watchThings, { scope: TH.ThingBank, cursor: 0n })],
 ]
@@ -47,7 +47,7 @@ describe("SafebyokVaultComponent.api, for the user a call names", () => {
   it("hands back the component's answers as they came", async () => {
     const backend = await seeded()
     const fetched = await backend.withIdentity({ subject: 'u1' }).query(fns.getThing, { ask: TH.getGateAskOf() })
-    expect(fetched).to.deep.include({ actual: TH.gateThingOf(), banktok: TH.bankThingOf().lifetok })
+    expect(fetched).to.deep.include({ actual: TH.gateThingOf(), banktok: TH.gateThingOf().banktok })
   })
 })
 
@@ -112,16 +112,16 @@ describe("SafebyokVaultComponent.api, with the host's getUserId", () => {
       return identity ? `user|${identity.subject}` : null
     })
     const caller = host.createTest().withIdentity({ subject: 'u1' })
-    const ask = TH.getWorldAskOf()
-    expect(await caller.query(host.api.safebyokVault.getWorld, { ask: { ...ask, userid: 'user|u1' } })).to.deep.nested.include({ 'actual.bank': null })
-    const refusal = await TH.convexRefusalOf(caller.query(host.api.safebyokVault.getWorld, { ask }))
+    const ask = TH.getBankAskOf()
+    expect(await caller.query(host.api.safebyokVault.getBank, { ask: { ...ask, userid: 'user|u1' } })).to.deep.nested.include({ 'actual.gate': null })
+    const refusal = await TH.convexRefusalOf(caller.query(host.api.safebyokVault.getBank, { ask }))
     expect(refusal).to.deep.equal({ kind: 'identity_revoked' })
   })
 
   it("calls getUserId as a method, keeping its this", async () => {
     const { app, component } = TH.installedVaultComponent()
     const host = app.defineModules({ safebyokVault: component.api(new SignedInAs('u1')) })
-    expect(await host.createTest().query(host.api.safebyokVault.getWorld, { ask: TH.getWorldAskOf() })).to.deep.nested.include({ 'actual.bank': null })
+    expect(await host.createTest().query(host.api.safebyokVault.getBank, { ask: TH.getBankAskOf() })).to.deep.nested.include({ 'actual.gate': null })
   })
 })
 
