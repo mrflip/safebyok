@@ -1,5 +1,5 @@
 /** The world of an IdbVaultDB under test: each on a fresh database, its twin, and the cheat into its stored Things. */
-import { createStore } from 'idb-keyval'
+import { createStore, promisifyRequest } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
 import type { ThingScope } from 'safebyok/storage'
 import { _cheat_forgetShelf } from 'safebyok/testing'
@@ -29,12 +29,13 @@ export function makeTwin(idbVaultDB: IdbVaultDB): IdbVaultDB {
   return twin
 }
 
-/** Unchecked access to the Things `idbVaultDB` has, on a connection of its own: plant, remove or read one raw. */
+/** Unchecked access to the Things `idbVaultDB` has, on a connection of its own: plant, remove or read one raw, or list every key. */
 export function _cheat_idbThingsOf(idbVaultDB: IdbVaultDB) {
   const shelf = createStore(databasenameOf(dbNameIn(idbVaultDB)), 'things')
   return {
-    plant:  async (scope: ThingScope, raw: unknown): Promise<void> => { await DB.inOneStep(shelf, 'readwrite', (store) => { store.put(raw, thingScopepathOf(scope)) }) },
-    remove: async (scope: ThingScope): Promise<void> => { await DB.inOneStep(shelf, 'readwrite', (store) => { store.delete(thingScopepathOf(scope)) }) },
-    rawAt:  async (scope: ThingScope): Promise<unknown> => await DB.inOneStep(shelf, 'readonly', (store) => DB.rowAt(store, thingScopepathOf(scope))),
+    plant:      async (scope: ThingScope, raw: unknown): Promise<void> => { await DB.inOneStep(shelf, 'readwrite', (store) => { store.put(raw, thingScopepathOf(scope)) }) },
+    remove:     async (scope: ThingScope): Promise<void> => { await DB.inOneStep(shelf, 'readwrite', (store) => { store.delete(thingScopepathOf(scope)) }) },
+    rawAt:      async (scope: ThingScope): Promise<unknown> => await DB.inOneStep(shelf, 'readonly', (store) => DB.rowAt(store, thingScopepathOf(scope))),
+    scopepaths: async (): Promise<IDBValidKey[]> => await DB.inOneStep(shelf, 'readonly', async (store) => await promisifyRequest(store.getAllKeys())),
   }
 }

@@ -27,6 +27,9 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
 
   // == [Kind]: modelkind
 
+  /** Always `'box'`: its record's modelkind. */
+  declare readonly modelkind: 'box'
+
   /** A box's modelkind: the guards this class inherits answer for boxes alone. */
   static override readonly modelkind = 'box'
   // --
@@ -62,16 +65,16 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
    * Its `written_at` is `publicProps.written_at`, or now.
    */
   static nextRevisionOf(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps = {}): RevisionOf<LiveOf<BoxRecord>, BoxCleartexts> {
-    const { sidecar: donorSidecar, ...thing } = BoxChecks.sealable.parse(donorProps)
+    const { sidecar: donorSidecar, ...donor } = BoxChecks.sealable.parse(donorProps)
     // A tombstone's `{}` is not inherited: the next life's sidecar is given, as it is after the shell.
-    const heirSidecar = (thing.am === 'a') ? donorSidecar : undefined
+    const heirSidecar = (donor.am === 'a') ? donorSidecar : undefined
     const { sidecar = heirSidecar, written_at = Clock.nowMillis() } = BoxChecks.publicProps.parse(publicProps)
     if (sidecar === undefined) { throw Throwers.sidecarMissing() }
-    const revision = { ...BaseThing.revisionAfter(thing, written_at), am: 'a', sidecar } as const
-    if (thing.am === 'a') {
-      return { ...thing, ...revision }
+    const revision = { ...BaseThing.revisionAfter(donor, written_at), am: 'a', sidecar } as const
+    if (donor.am === 'a') {
+      return { ...donor, ...revision }
     }
-    return { ...thing, ...BaseThing.nextLifeOf(thing), ...revision, born_at: written_at }
+    return { ...donor, ...BaseThing.nextLifeOf(donor), ...revision, born_at: written_at }
   }
 
   /** The tombstone of the live box `donorProps`, without its sealed whisper.
@@ -80,10 +83,10 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
    * `publicProps` may give `am: 'x'`, a tombstone's own, and `am: 'a'` refuses.
    */
   static tombstoneOf(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps = {}): RevisionOf<TombstoneOf<BoxRecord>, BoxCleartexts> {
-    const thing                              = BoxChecks.liveSealable.parse(donorProps)
+    const donor                              = BoxChecks.liveSealable.parse(donorProps)
     const { written_at = Clock.nowMillis() } = BoxChecks.tombstonePublicProps.parse(publicProps)
-    const revision = { ...BaseThing.revisionAfter(thing, written_at), am: 'x', sidecar: {} } as const
-    return { ...thing, ...BaseThing.nextLifeOf(thing), ...revision }
+    const revision = { ...BaseThing.revisionAfter(donor, written_at), am: 'x', sidecar: {} } as const
+    return { ...donor, ...BaseThing.nextLifeOf(donor), ...revision }
   }
   // --
 

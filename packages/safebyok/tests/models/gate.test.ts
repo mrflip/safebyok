@@ -7,50 +7,52 @@ import { Lease } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
 import type { BadNews } from '../../src/shapes/shapes-bankish'
-import type { WorldGateFriend } from '../../src/shapes/shapes-gateish'
-import type { ShellOf } from '../../src/shapes/shapes-sealers'
+import type { BankGateFriend } from '../../src/shapes/shapes-gateish'
+import type { LiveOf, ShellOf } from '../../src/shapes/shapes-sealers'
 import { type GateRecord, ThingFormat } from '../../src/shapes/shapes-thing'
-import { Thing } from '../../src/models/thing'
 import { Lifeseq } from '../../src/shapes/primitives'
 import { readTcNow } from '../../src/storage/agerank'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
 
-const ThingFields = ['userid', 'banklabel', 'labelpath', 'label', 'fmt', 'lifepath', 'lifeseq', 'revtok', 'revseq', 'born_at', 'written_at', 'am']
+const ThingFields = ['userid', 'banklabel', 'labelpath', 'modelkind', 'label', 'fmt', 'banktok', 'lifepath', 'lifeseq', 'revtok', 'revseq', 'born_at', 'written_at', 'am']
 const GateFields = [...ThingFields, 'wayins', 'auth', 'sigs', 'meta']
 
-/** The lease verbs of a world, for a gate made alone, on which no test here builds a lease. */
-const AloneFriend: WorldGateFriend = {
+/** The lease verbs of a bank, for a gate made alone, on which no test here builds a lease. */
+const AloneFriend: BankGateFriend = {
   leaseGateOf:   () => { throw new Error("No lease is built on a gate made alone.") },
   leaseFollowed: () => { throw new Error("No lease is built on a gate made alone.") },
   attachLease:   noop,
 }
 
 /** The gate of `record`, made alone on `device`, by default a new device of {@link TH.WorldScope}. */
-function makeGate(record: GateRecord | ShellOf<GateRecord>, device = TH.makeDevice()): Gate { return Gate.make(TH.begunOf(record), { world: device.world }, AloneFriend) }
+function makeGate(record: GateRecord | ShellOf<GateRecord>, device = TH.makeDevice()): Gate { return Gate.make(TH.begunOf(record), { bank: device.bank }, AloneFriend) }
 
 interface DnaWayins { main: Wayin, passkey0: Wayin | null }
 
-/** The wayins of a new gate of {@link TH.WorldGateStamp}: its passphrase's, and a passkey's if `isPasskeyed`. */
+/** What a new gate of {@link TH.WorldGateLife} is made of beside its wayins: its life. */
+const GateDnaLife = TH.WorldGateLife
+
+/** The wayins of a new gate of {@link TH.WorldGateLife}: its passphrase's, and a passkey's if `isPasskeyed`. */
 async function wayinsOf(isPasskeyed = false): Promise<DnaWayins> {
-  const proving = await PassphraseProving.buildNovel(TH.provingDeviceOf(), TH.WorldBankStamp, TH.WorldGateStamp, TH.TestPassphrase)
+  const proving = await PassphraseProving.buildNovel(TH.provingDeviceOf(), TH.WorldGateLife, TH.TestPassphrase)
   const main = await proving.buildWayin(NOVEL)
   if (! isPasskeyed) { return { main, passkey0: null } }
-  const passkeyProving = await PasskeyProving.buildNovel(TH.provingDeviceOf(), TH.WorldBankStamp, TH.WorldGateStamp, TH.passkeyAnswerOf())
+  const passkeyProving = await PasskeyProving.buildNovel(TH.provingDeviceOf(), TH.WorldGateLife, TH.passkeyAnswerOf())
   return { main, passkey0: await passkeyProving.buildWayin(proving) }
 }
 
-/** The record of a new gate of {@link TH.WorldGateStamp}, with a passkey's wayin if `isPasskeyed`. */
-async function gateRecordOf(isPasskeyed = false): Promise<GateRecord> {
-  return Gate.makeRecord({ ...TH.WorldGateStamp, wayins: await wayinsOf(isPasskeyed) })
+/** The record of a new gate of {@link TH.WorldGateLife}, with a passkey's wayin if `isPasskeyed`. */
+async function gateRecordOf(isPasskeyed = false): Promise<LiveOf<GateRecord>> {
+  return Gate.makeRecord({ ...GateDnaLife, wayins: await wayinsOf(isPasskeyed) })
 }
 
 describe("Gate.makeRecord(dna)", () => {
-  it("is a gate Thing at the first revision of its life, of the stamp, with the wayins handed", async () => {
+  it("is a gate Thing at the first revision of its life, of the life, with the wayins handed", async () => {
     const wayins = await wayinsOf()
-    const record = Gate.makeRecord({ ...TH.WorldGateStamp, wayins })
-    expect(record).to.include({ ...TH.WorldGateStamp, label: 'gate', fmt: ThingFormat, revseq: 0, lifepath: TH.WorldGateStamp.lifeseq, written_at: TH.T0, am: 'a' })
+    const record = Gate.makeRecord({ ...GateDnaLife, wayins })
+    expect(record).to.include({ ...GateDnaLife, label: TH.WorldScope.banklabel, fmt: ThingFormat, revseq: 0, lifepath: TH.WorldGateLife.lifepath, written_at: TH.T0, am: 'a' })
     expect(record.wayins).to.deep.equal({ main: wayins.main.pickle(), passkey0: null })
     expect(record).to.deep.include({ auth: {}, sigs: {}, meta: {} })
     const gate = makeGate(record)
@@ -60,22 +62,24 @@ describe("Gate.makeRecord(dna)", () => {
 
   it("lays a passkey's wayin beside the passphrase's", async () => {
     const wayins = await wayinsOf(true)
-    const record = Gate.makeRecord({ ...TH.WorldGateStamp, wayins })
+    const record = Gate.makeRecord({ ...GateDnaLife, wayins })
     expect(record.wayins).to.deep.equal({ main: wayins.main.pickle(), passkey0: wayins.passkey0!.pickle() })
   })
 
   it("mints a new revtok for each record", async () => {
     const wayins = await wayinsOf()
-    const one = Gate.makeRecord({ ...TH.WorldGateStamp, wayins })
-    const two = Gate.makeRecord({ ...TH.WorldGateStamp, wayins })
+    const one = Gate.makeRecord({ ...GateDnaLife, wayins })
+    const two = Gate.makeRecord({ ...GateDnaLife, wayins })
     expect(one.revtok).to.not.eq(two.revtok)
   })
 
   const DnaCases = [
-    [(wayins: DnaWayins) => ({ ...TH.WorldGateStamp, wayins: { main: wayins.main } }),                    'no passkey0, where a gate with no passkey has null'],
-    [(wayins: DnaWayins) => ({ ...TH.WorldGateStamp, labelpath: 'box/gate', wayins }),                    'the labelpath of a box'],
-    [(wayins: DnaWayins) => ({ ...TH.WorldGateStamp, lifeseq: undefined, wayins }),                       'no lifeseq'],
-    [(wayins: DnaWayins) => ({ ...TH.WorldGateStamp, lifeseq: Lifeseq.ofLifenum(1), wayins }),                    'the lifeseq of a gone life'],
+    [(wayins: DnaWayins) => ({ ...GateDnaLife, wayins: { main: wayins.main } }),                    'no passkey0, where a gate with no passkey has null'],
+    [(wayins: DnaWayins) => ({ ...GateDnaLife, labelpath: 'box/gate', wayins }),                    'the labelpath of a box'],
+    [(wayins: DnaWayins) => ({ ...GateDnaLife, lifepath: undefined, wayins }),                      'no lifepath'],
+    [(wayins: DnaWayins) => ({ ...GateDnaLife, banktok: undefined, wayins }),                       'no banktok'],
+    [(wayins: DnaWayins) => ({ ...GateDnaLife, labelpath: 'other', wayins }),                       'a labelpath other than its banklabel'],
+    [(wayins: DnaWayins) => ({ ...GateDnaLife, lifepath: Lifeseq.ofLifenum(1), wayins }),           'the lifepath of a gone life'],
     [() => null,                                                                                        'null'],
   ] as const
 
@@ -87,7 +91,7 @@ describe("Gate.makeRecord(dna)", () => {
   }
 })
 
-describe("Gate.make(begun, { world }, friend)", () => {
+describe("Gate.make(begun, { bank }, friend)", () => {
   it("pickles to the very record its item event carried", async () => {
     const record = await gateRecordOf(true)
     expect(makeGate(record).pickle()).to.eq(record)
@@ -107,7 +111,7 @@ describe("Gate.make(begun, { world }, friend)", () => {
     [(record: GateRecord) => ({ ...record, wayins: { main: record.wayins.main } }),                                   'no passkey0, where a gate with no passkey has null'],
     [(record: GateRecord) => TH.omitting(record, 'revtok'),                                                           'no revtok'],
     [(record: GateRecord) => ({ ...record, lifeseq: Lifeseq.ofLifenum(2) }),                                                  'a lifeseq its lifepath does not end with'],
-    [(record: GateRecord) => ({ ...record, am: 'x', lifeseq: Lifeseq.ofLifenum(1), lifepath: Lifeseq.ofLifenum(1) }),                 'am x, where the main gate is never deleted'],
+    [(record: GateRecord) => ({ ...record, labelpath: 'other', label: 'other' }),                                     'a labelpath other than its banklabel'],
     [(record: GateRecord) => ({ ...record, maingate: record }),                                                       'a field no gate Thing has'],
   ] as const
 
@@ -119,8 +123,8 @@ describe("Gate.make(begun, { world }, friend)", () => {
   }
 
   const OtherBankCases = [
-    [{ banklabel: 'other' }, 'another banklabel'],
-    [{ userid: 'u2' },       'another userid'],
+    [{ banklabel: 'other', labelpath: 'other', label: 'other' }, 'another banklabel'],
+    [{ userid: 'u2' },                                           'another userid'],
   ] as const
 
   for (const [moved, blurb] of OtherBankCases) {
@@ -131,7 +135,12 @@ describe("Gate.make(begun, { world }, friend)", () => {
     })
   }
 
-  for (const [moved, blurb] of OtherBankCases) {
+  const OtherDeviceCases = [
+    [{ banklabel: 'other' }, 'another banklabel'],
+    [{ userid: 'u2' },       'another userid'],
+  ] as const
+
+  for (const [moved, blurb] of OtherDeviceCases) {
     it(`refuses a device of ${blurb} than its bank's`, async () => {
       const record = await gateRecordOf()
       const device = TH.makeDevice(moved)
@@ -148,16 +157,16 @@ describe("Gate.make(begun, { world }, friend)", () => {
 
   it("refuses no opts at all, or no friend", async () => {
     const record = await gateRecordOf()
-    TH.expectSyncRefusal(() => Gate.make(TH.thingEventOf(record), undefined as never, undefined as never))
-    TH.expectSyncRefusal(() => Gate.make(TH.thingEventOf(record), { world: TH.makeDevice().world }, undefined as never), 'bad_record')
+    TH.expectSyncRefusal(() => Gate.make(TH.thingEventOf<GateRecord>(record), undefined as never, undefined as never))
+    TH.expectSyncRefusal(() => Gate.make(TH.thingEventOf<GateRecord>(record), { bank: TH.makeDevice().bank }, undefined as never), 'bad_record')
   })
 
   it("refuses nothing at all, a whole record with no item event, and another kind's shell", async () => {
-    const { world } = TH.makeDevice()
+    const { bank } = TH.makeDevice()
     const record    = await gateRecordOf()
-    TH.expectSyncRefusal(() => Gate.make(null as never, { world }, AloneFriend), 'bad_record')
-    TH.expectSyncRefusal(() => Gate.make(record as never, { world }, AloneFriend), 'bad_record')
-    TH.expectSyncRefusal(() => Gate.make(TH.bankShellOf(), { world }, AloneFriend), 'bad_record')
+    TH.expectSyncRefusal(() => Gate.make(null as never, { bank }, AloneFriend), 'bad_record')
+    TH.expectSyncRefusal(() => Gate.make(record as never, { bank }, AloneFriend), 'bad_record')
+    TH.expectSyncRefusal(() => Gate.make(TH.boxShellOf() as never, { bank }, AloneFriend), 'bad_record')
   })
 
   it("quotes none of a refused record in its refusal: no ciphertext", async () => {
@@ -208,20 +217,20 @@ describe("what a gate shows", () => {
     expect(() => { (gate as { banklabel: unknown }).banklabel = 'other' }).to.throw(TypeError)
   })
 
-  it("has the device it was given and its own stamp, and refuses its bank's stamp while its world has no bank", async () => {
+  it("has the device it was given, its own life and its own stamp", async () => {
     const record = await gateRecordOf()
     const device = TH.makeDevice()
     const gate = makeGate(record, device)
     expect(gate.device).to.eq(device)
-    TH.expectSyncRefusal(() => gate.bankStamp, 'absent_thing')
-    expect(gate.stamp).to.deep.equal(TH.WorldGateStamp)
-    expect(gate.scope).to.deep.equal({ userid: TH.WorldScope.userid, banklabel: TH.WorldScope.banklabel, labelpath: 'gate' })
+    expect(gate.life).to.deep.equal(TH.WorldGateLife)
+    expect(gate.stamp).to.deep.equal({ ...TH.WorldGate, revtok: record.revtok })
+    expect(gate.scope).to.deep.equal({ modelkind: 'gate', userid: TH.WorldScope.userid, banklabel: TH.WorldScope.banklabel, labelpath: TH.WorldScope.banklabel })
     expect([gate.revtok, gate.revseq, gate.written_at]).to.deep.equal([record.revtok, 0, TH.T0])
   })
 
-  it("has its bank's stamp from its world, once a bank is there", async () => {
+  it("has the life of its bank's gate once the bank is born", async () => {
     const { bank } = await TH.buildBornBank()
-    expect(bank.gate.bankStamp).to.deep.equal(bank.stamp)
+    expect(bank.gate.life).to.deep.equal(TH.WorldGateLife)
   })
 
   it("is a gate by its modelkind", async () => {
@@ -253,7 +262,15 @@ describe("a gate over the shell or a tombstone", () => {
   })
 
   it("refuses a shell of another bank than its bank's", () => {
-    TH.expectSyncRefusal(() => makeGate({ ...TH.gateShellOf(), banklabel: 'other' }), 'record_conflict')
+    TH.expectSyncRefusal(() => makeGate({ ...TH.gateShellOf(), banklabel: 'other', labelpath: 'other', label: 'other' }), 'record_conflict')
+  })
+
+  it("is made from a whole tombstone, the bank's end, which keeps its bank's banktok", async () => {
+    const tomb = TH.gateTombOf(await gateRecordOf())
+    const gate = makeGate(tomb)
+    expect(gate.pickle()).to.equal(tomb)
+    expect([gate.am, gate.banktok]).to.deep.equal(['x', TH.WorldBankLife.banktok])
+    TH.expectSyncRefusal(() => gate.main, 'absent_thing')
   })
 
   it("takes in a gating's cleartexts over the shell, and refuses and vacates it at its attempt", async () => {
@@ -277,8 +294,8 @@ describe("a gate over the shell or a tombstone", () => {
   it("receives a whole record over the shell, and then answers its wayins, frozen", async () => {
     const gate = makeGate(TH.gateShellOf())
     const record = await gateRecordOf(true)
-    expect(gate.receive(TH.thingEventOf(record))).to.eq(true)
-    expect(gate.stamp).to.deep.equal(TH.WorldGateStamp)
+    expect(gate.receive(TH.thingEventOf<GateRecord>(record))).to.eq(true)
+    expect(gate.stamp).to.deep.equal({ ...TH.WorldGate, revtok: record.revtok })
     expect(gate.main.pickle()).to.deep.equal(record.wayins.main)
     expect(gate.passkey0!.pickle()).to.deep.equal(record.wayins.passkey0)
     expect(gate.wayins).to.deep.equal(record.wayins)
@@ -286,22 +303,19 @@ describe("a gate over the shell or a tombstone", () => {
     expect(Object.isFrozen(gate.wayins?.main)).to.be.true
   })
 
-  it("refuses a tombstone of the main gate, sparse or whole, still answering its wayins", async () => {
+  it("adopts the gate's tombstone it receives, the bank's end, which keeps its banktok", async () => {
     const record = await gateRecordOf()
     const gate = makeGate(record)
-    const later = Lifeseq.ofLifenum(1)
-    const tombstone = { ...record, revtok: TH.revtokOf('gone'), revseq: 1, am: 'x', lifeseq: later, lifepath: later, written_at: TH.T0 + 1 } as const
-    for (const val of [tombstone, Thing.sparseOf(tombstone)]) {
-      TH.expectSyncRefusal(() => gate.receive(TH.thingEventOf<GateRecord>(val as never)), 'bad_record')
-    }
-    expect(gate.pickle()).to.equal(record)
-    expect(gate.wayins).to.deep.equal(record.wayins)
+    const tombstone = TH.gateTombOf(record)
+    gate.receive(TH.thingEventOf<GateRecord>(tombstone))
+    expect(gate.pickle()).to.equal(tombstone)
+    expect(gate.banktok).to.equal(record.banktok)
   })
 
   it("adopts a newer revision it receives, answering that revision's wayins", async () => {
     const gate = makeGate(await gateRecordOf())
     const next = Gate.makeNextRecord(TH.livePickleOf(gate), await wayinsOf(true))
-    gate.receive(TH.thingEventOf(next))
+    gate.receive(TH.thingEventOf<GateRecord>(next))
     expect(gate.revseq).to.eq(1)
     expect(gate.passkey0!.pickle()).to.deep.equal(next.wayins.passkey0)
   })
@@ -332,7 +346,7 @@ describe("gate.subscribe(listener)", () => {
     expect(counter.calls).to.eq(1)
     expect(gate.pickle()).to.not.equal(before)
     const elsewhere = { ...gate.pickle(), revtok: Crypto.randomId(), revseq: gate.revseq + 1, written_at: TH.T0 + 1 }
-    device.world.demandVaultMinder().receive({ ...TH.itemEventOf(elsewhere), sourcelabel: 'other_device', read_tc: readTcNow() })
+    device.bank.demandVaultMinder().receive({ ...TH.itemEventOf(elsewhere), sourcelabel: 'other_device', read_tc: readTcNow() })
     expect(counter.calls).to.eq(2)
     expect(gate.pickle()).to.deep.equal(elsewhere)
   })
@@ -396,7 +410,7 @@ describe("the lease a proof grants a gate", () => {
 
   it("shows its loggable through the gate's leaseLoggable, and null once the gate locks", async () => {
     const { bank } = await TH.buildBornBank()
-    expect(bank.gate.leaseLoggable).to.include({ born_at: TH.T0, proved_at: TH.T0, labelpath: 'lease/gate', gate_labelpath: 'gate', wayinkind: 'passphrase', isEvicted: false })
+    expect(bank.gate.leaseLoggable).to.include({ born_at: TH.T0, proved_at: TH.T0, labelpath: `lease/${TH.WorldScope.banklabel}`, gate_labelpath: TH.WorldScope.banklabel, wayinkind: 'passphrase', isEvicted: false })
     bank.gate.lock()
     expect(bank.gate.leaseLoggable).to.be.null
   })

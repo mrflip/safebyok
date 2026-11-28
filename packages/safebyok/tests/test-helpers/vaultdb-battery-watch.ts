@@ -7,7 +7,7 @@ import type { VaultDB } from '../../src/storage/vault-db'
 import type { VaultEvent } from '../../src/shapes/shapes-vault-event'
 import { Shell } from '../../src/shapes/shapes-thing'
 import {
-  BankStaleTrack, GateStaleTrack, Life0, RootStaleTrack, ThingBank, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, boxTombOf, delAskFor, gateThingOf, getAskAt, itemEventOf, listAskAt, maskedReadTcsOf, nextGateOf, replaceAskOf, rootBoxOf,
+  GateStaleTrack, Life0, RootStaleTrack, ThingBank, birthAskOf, birthBankAskOf, boxThingOf, boxTombOf, delAskFor, gateThingOf, getAskAt, itemEventOf, listAskAt, maskedReadTcsOf, nextGateOf, replaceAskOf, rootBoxOf,
 } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 import { OtherRevtok } from './models-world'
@@ -34,7 +34,7 @@ export function describeVaultDBWatch({ fresh, bornBank }: VaultDBBatteryWorld): 
       await vaultDB.tryWriteThing(birthAskOf())
       await eventually(() => events.length === 1)
       await aWhile()
-      expect(maskedReadTcsOf(events)).to.deep.equal([itemEventOf(gateThingOf())])
+      expect(maskedReadTcsOf(events)).to.deep.equal([itemEventOf(gateThingOf(), gateThingOf().banktok)])
       expect(badNews).to.deep.equal([])
     })
 
@@ -42,13 +42,27 @@ export function describeVaultDBWatch({ fresh, bornBank }: VaultDBBatteryWorld): 
       const vaultDB = await fresh()
       const { events, badNews } = noticesOf(vaultDB)
       await vaultDB.tryBirthBank(birthBankAskOf())
-      await eventually(() => events.length === 3)
+      await eventually(() => events.length === 2)
       await aWhile()
-      expect(recordsOf(events)).to.have.deep.members([bankThingOf(), gateThingOf(), rootBoxOf()])
+      expect(recordsOf(events)).to.have.deep.members([gateThingOf(), rootBoxOf()])
       expect(badNews).to.deep.equal([])
     })
 
-    it("notifies of a box written in a born bank, and of nothing in the bank or main gate, or in another bank", async () => {
+    it("notifies of the gate and the root box of a bank labelled box at its birth, both at box, each of its own kind", async () => {
+      const vaultDB   = await fresh()
+      const banklabel = 'box'
+      const gate      = gateThingOf({ banklabel, labelpath: banklabel, label: banklabel })
+      const root      = rootBoxOf({ banklabel })
+      const { events, badNews } = noticesOf(vaultDB, { ...ThingBank, banklabel })
+      await vaultDB.tryBirthBank(birthBankAskOf({ banklabel, gate, root }))
+      await eventually(() => events.length === 2)
+      await aWhile()
+      expect(events.map((event) => [event.modelkind, event.labelpath])).to.have.deep.members([['gate', 'box'], ['box', 'box']])
+      expect(recordsOf(events)).to.have.deep.members([gate, root])
+      expect(badNews).to.deep.equal([])
+    })
+
+    it("notifies of a box written in a born bank, and of nothing at its roots, or in another bank", async () => {
       const vaultDB = await bornBank()
       const own = noticesOf(vaultDB)
       const other = noticesOf(vaultDB, { ...ThingBank, banklabel: 'other' })
@@ -56,7 +70,7 @@ export function describeVaultDBWatch({ fresh, bornBank }: VaultDBBatteryWorld): 
       await vaultDB.tryWriteThing(birthAskOf(box, Shell.childCited(Life0)))
       await eventually(() => own.events.length === 1)
       await aWhile()
-      expect(maskedReadTcsOf(own.events)).to.deep.equal([itemEventOf(box, bankThingOf().lifetok)])
+      expect(maskedReadTcsOf(own.events)).to.deep.equal([itemEventOf(box, gateThingOf().banktok)])
       expect([...other.events, ...other.badNews]).to.deep.equal([])
     })
 
@@ -67,14 +81,14 @@ export function describeVaultDBWatch({ fresh, bornBank }: VaultDBBatteryWorld): 
       await vaultDB.tryWriteThing(delAskFor(box, boxTombOf(box)))
       await aWhile()
       const { events, badNews } = noticesOf(vaultDB)
-      const track = { bank: BankStaleTrack.bank, gate: GateStaleTrack.gate, box: RootStaleTrack.box }
+      const track = { gate: GateStaleTrack.gate, root: RootStaleTrack.root }
       const gate  = gateThingOf()
       const theirs = gateThingOf({ revtok: OtherRevtok })
       expect(await vaultDB.tryWriteThing({ ...birthAskOf(theirs), track })).to.deep.include({ ok: false, dbhas: gate })
       const policied = replaceAskOf(gate, nextGateOf(gate), { policies: ['revoke_passkey'] })
       expect(await vaultDB.tryWriteThing(policied)).to.deep.include({ ok: false, act: 'policied' })
-      expect(await vaultDB.tryGetThing({ ...getAskAt(box.labelpath), track })).to.deep.include({ ok: true, act: 'gotgone' })
-      expect(await vaultDB.tryListThings({ ...listAskAt('box'), track })).to.deep.include({ ok: true })
+      expect(await vaultDB.tryGetThing({ ...getAskAt('box', box.labelpath), track })).to.deep.include({ ok: true, act: 'gotgone' })
+      expect(await vaultDB.tryListThings({ ...listAskAt('box', 'box'), track })).to.deep.include({ ok: true })
       await aWhile()
       expect(events).to.deep.equal([])
       expect(badNews).to.deep.equal([])
@@ -96,8 +110,8 @@ export function describeVaultDBWatch({ fresh, bornBank }: VaultDBBatteryWorld): 
       const events: VaultEvent[] = []
       vaultDB.watch(ThingBank, (event) => { events.push(event); throw new Error('host bug') }, (news) => { badNews.push(news) })
       await vaultDB.tryBirthBank(birthBankAskOf())
-      await eventually(() => badNews.length === 3)
-      expect(events).to.have.lengthOf(3)
+      await eventually(() => badNews.length === 2)
+      expect(events).to.have.lengthOf(2)
       expect(new Set(badNews.map((news) => news.refusalkind))).to.deep.equal(new Set(['unexpected_error']))
     })
 

@@ -1,11 +1,9 @@
 import { QueryClient } from '@tanstack/query-core'
 import { Consts, Crypto, Deriver, Errors, type GX, Helpers, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
-import type { Bank } from './bank'
+import { Bank } from './bank'
 import type { BirthGating } from './gating'
 import { Proving, guardKeyDeriver } from './proving'
 import { Vault } from './vault'
-import { World } from './world'
-import { BaseThing } from './base-thing'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import { guardRootShelf } from '../minding/root-shelf'
 import { VaultTSQ } from '../minding/vault-tsq'
@@ -19,8 +17,9 @@ import type { VaultDB } from '../storage/vault-db'
 import type { DeviceDB } from '../storage/device-db'
 import { MemoryDeviceDB } from '../storage/memory-device-db'
 import { DeviceDBChecks } from '../shapes/shapes-device-db'
-import type { WorldRoots } from '../shapes/shapes-asks'
+import { type ActualRoots, rootScopesOf } from '../shapes/shapes-asks'
 import { VaultMinder } from '../minding/vault-minder'
+import type { ThingCar } from '../minding/thing-car'
 import { type Modelkind, ThingChecks } from '../shapes/shapes-thing'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
@@ -39,18 +38,18 @@ export const DefaultJanitorMillis = 10 * 60_000
 /** How long after the gate was last read it is read again when the host gives no `gateStaleMinutes`: twelve hours. */
 export const DefaultGateStaleMillis = 12 * 60 * 60_000
 // --
-/** This browser, before and after anyone signs in: the host's functions, guarded, its world, and the signed-in user's bank and vault.
+/** This browser, before and after anyone signs in: the host's functions, guarded, and the signed-in user's bank and vault.
  * Make it with `Device.make(record, opts)`, which does no I/O, touches no browser global and subscribes to nothing; call
  * `hello()` to start it, `connect()` to keep it in step with the vaultDB until `disconnect()`, and `signin(userid)` once
  * the host knows who is signed in, which brings up that user's bank
- * from the roots kept on the host's root shelf. Its world's snapshot shows the stage `'signed_out'` until then, `'starting'` while it
+ * from the roots kept on the host's root shelf. Its bank's snapshot shows the stage `'signed_out'` until then, `'starting'` while it
  * starts the user's bank, then `'locked'` for a bank stored, or `'unborn'` for none, which a
  * {@link birthGating} on this device fills.
  * It serves the first user it is told of for its life: another user signing in is a sign-out, which the host answers by
  * reloading the page.
  */
 export class Device {
-  // == [Props]: banklabel, vaultDB, deviceDB, keyDeriver, strengthChecker, logger, leaseMillis, softlockMillis, janitorMillis, gateStaleMillis, #onBadNews, #onLifecycle, #rootShelf, #vaultTsqClient, #world, #userid, #vaultTSQ, #vault, #signinAnswer, #endCause, #devicetok, toJSON
+  // == [Props]: banklabel, vaultDB, deviceDB, keyDeriver, strengthChecker, logger, leaseMillis, softlockMillis, janitorMillis, gateStaleMillis, #onBadNews, #onLifecycle, #rootShelf, #vaultTsqClient, #bank, #userid, #vaultTSQ, #vault, #signinAnswer, #endCause, #devicetok, toJSON
 
   /** The label of the bank this device serves each user. */
   readonly banklabel:          Banklabel
@@ -66,9 +65,9 @@ export class Device {
   readonly leaseMillis:        number
   /** How near its end, in milliseconds, a lease asks the user again: `softlockMinutes`, at most a twentieth of {@link leaseMillis}, or 0 where that is under a minute. */
   readonly softlockMillis:     number
-  /** How often, in milliseconds, the world's janitor locks a lease past its end, and, while connected, starts the watch where it is not running and checks whether the gate is stale. */
+  /** How often, in milliseconds, the bank's janitor locks a lease past its end, and, while connected, starts the watch where it is not running and checks whether the gate is stale. */
   readonly janitorMillis:      number
-  /** How long after this device last read the gate, in milliseconds, the world reads it again. */
+  /** How long after this device last read the gate, in milliseconds, the bank reads it again. */
   readonly gateStaleMillis:    number
 
   /** The host's `onBadNews`, or the default. */
@@ -79,8 +78,8 @@ export class Device {
   readonly #rootShelf: RootShelf | null
   /** The QueryClient the vault TSQ keeps the boxes in: the host's, or one made with the device. */
   readonly #vaultTsqClient: QueryClient
-  /** The world of the signed-in user's bank, made with the device. */
-  readonly #world: World
+  /** The signed-in user's bank, made with the device. */
+  readonly #bank: Bank
   /** The user signed in on this device, from `signin`. Null until then. */
   #userid: Userid | null = null
   /** The vault TSQ of the signed-in user's boxes, made as `signin` starts the bank. */
@@ -101,7 +100,7 @@ export class Device {
   }
   // --
 
-  // == [Getters]: userid, scope, autolockMinutes, vaultTsqClient, vaultTSQ, world, bank, vault
+  // == [Getters]: userid, scope, autolockMinutes, vaultTsqClient, vaultTSQ, bank, vault
 
   /** The user signed in on this device, or null until `signin`. */
   get userid(): Userid | null { return this.#userid }
@@ -125,14 +124,13 @@ export class Device {
     return this.#vaultTSQ
   }
 
-  /** The world of the signed-in user's bank: what locks, unlocks and ends it, holds its lease, and has the snapshot a host renders. The same one from `Device.make` on. */
-  get world(): World { return this.#world }
-
-  /** The signed-in user's bank, or null until its world has it live, with its main gate and root box: found stored, or born on this device. */
-  get bank(): Bank | null { return this.#world.areRootsLive ? this.#world.bank : null }
+  /** The signed-in user's bank: what locks, unlocks and ends it, holds its lease, and has the snapshot a host renders. The same one from `Device.make` on.
+   * It is the bank of {@link banklabel} from the start, and unsealable until its gate and root box are live, found stored or born on this device: its snapshot's stage says which.
+   */
+  get bank(): Bank { return this.#bank }
 
   /** The vault of this device's bank's boxes, or null until `signin` starts the bank. The same one from then on.
-   * Its verbs refuse `absent_thing` while {@link bank} is null.
+   * Its verbs refuse `absent_thing` while the bank's gate or root box is not live.
    */
   get vault(): Vault | null { return this.#vault }
   // --
@@ -159,7 +157,7 @@ export class Device {
     this.#onLifecycle = guardOnLifecycle(onLifecycle)
     this.#rootShelf = (rootShelf === undefined) ? null : guardRootShelf(rootShelf, (news) => { this.tellBadNews([news]) })
     this.#vaultTsqClient = queryClient
-    this.#world = World.make({ device: this })
+    this.#bank = Bank.make({ device: this })
     if (Deriver.isTestDeriver(keyDeriver)) { this.logger.warn(PhrasesX.TestDeriverNotice, { oplabel: 'Device.make' }) }
     Object.freeze(this)
   }
@@ -175,7 +173,7 @@ export class Device {
 
   // == [The devicetok]: ensureDevicetok
 
-  // As a refused lease stow is (World.#stowLease), a refused devicetok is bad news: the wayin is still built.
+  // As a refused lease stow is (Bank.#stowLease), a refused devicetok is bad news: the wayin is still built.
   /** The token each wayin this device builds records: the host's `devicetok`, or the one the deviceDB keeps for the user `userid`, made at its first use.
    * Where the deviceDB refuses, it tells `onBadNews`, and answers a fresh token for this call alone.
    */
@@ -210,7 +208,7 @@ export class Device {
     checkSecureContext()
     if (this.#signinAnswer !== null) { return this.#signinAnswer }
     this.#userid = signedIn
-    this.#world.align()
+    this.#bank.align()
     this.#signinAnswer = this.#doSignin()
     return this.#signinAnswer
   }
@@ -221,8 +219,8 @@ export class Device {
   birthGating(params: FormData | BirthDna | BirthCleartexts): BirthGating {
     // Made before the stage is checked, so a refusal here zeroes the host's passkey answer, and empties a form's secret
     // fields, as every gating does (G2).
-    const gating = this.#world.birthGating(params)
-    if (['signed_out', 'starting'].includes(this.#world.getSnapshot().stage)) {
+    const gating = this.#bank.birthGating(params)
+    if (['signed_out', 'starting'].includes(this.#bank.getSnapshot().stage)) {
       gating.vacate()
       throw Throwers.signinUnanswered()
     }
@@ -236,32 +234,32 @@ export class Device {
    */
   async gatingBirthAttempt(params: FormData | BirthDna): Promise<Bank> { return await this.birthGating(params).attempt() }
 
-  // The roots fetched land in the world's Things, which the stage is read from. A root its Thing refuses reaches the host
-  // once, as bad news told by the VaultMinder; sign-in then reports only what the roots amount to: all three live, the
+  // The roots fetched land in the bank's Things, which the stage is read from. A root its Thing refuses reaches the host
+  // once, as bad news told by the VaultMinder; sign-in then reports only what the roots amount to: both live, the
   // bank unborn, or broken. A failure to fetch them, once a bank is up from what was restored, is no caller's to hear.
-  // The VaultMinder, the vault TSQ, the world's hold on them and the vault are made with nothing awaited between: the
+  // The VaultMinder, the vault TSQ, the bank's hold on them and the vault are made with nothing awaited between: the
   // VaultMinder's cars remember what they take, so a record it took with no one listening would reach them later only
   // as a repeat, which it drops. The vault TSQ listens from the vault's making where the device is connected, and else
-  // from its next connect, which refetches what the vault TSQ caches. The world takes the roots shelved before the
+  // from its next connect, which refetches what the vault TSQ caches. The bank takes the roots shelved before the
   // vaultDB is asked. The vault is made last, on everything made before it.
-  /** Start the signed-in user's bank over a VaultMinder of it: from the roots shelved, where there are any, and from the three roots the vaultDB answers. */
+  /** Start the signed-in user's bank over a VaultMinder of it: from the roots shelved, where there are any, and from the two roots the vaultDB answers. */
   async #doSignin(): Promise<void> {
     try {
-      const vaultMinder = VaultMinder.make(this.scope, { vaultDB: this.vaultDB, world: this.#world })
+      const vaultMinder = VaultMinder.make(this.scope, { vaultDB: this.vaultDB, bank: this.#bank })
       this.#vaultTSQ = VaultTSQ.make({ vaultMinder, queryClient: this.#vaultTsqClient, scope: this.scope, onBadNews: (news) => { this.tellBadNews([news]) } })
-      this.#world.signin(vaultMinder, this.#rootShelf)
-      this.#vault = Vault.make(this.#world, this.#vaultTSQ)
-      const answer = await vaultMinder.tryGetWorldOnce()
+      this.#bank.signin(vaultMinder, this.#rootShelf)
+      this.#vault = Vault.make(this.#bank, this.#vaultTSQ)
+      const answer = await vaultMinder.tryGetBankOnce()
       if (! answer.ok) { throw answer.err }
-      // A root void at signin is no newer than the shell its Thing holds, so no subscriber hears it: the world is told here.
-      this.#world.align()
-      if (! (this.#world.areRootsLive || isUnbornIn(answer.val))) { throw Throwers.bankRootsMissing() }
+      // A root void at signin is no newer than the shell its Thing holds, so no subscriber hears it: the bank is told here.
+      this.#bank.align()
+      if (! (this.#bank.areRootsLive || isUnbornIn(answer.val))) { throw Throwers.bankRootsMissing() }
     } catch (err) {
-      if (this.bank !== null) {
+      if (this.#bank.areRootsLive) {
         this.tellBadNews([err])
         return
       }
-      this.#world.showSigninRefusal(err)
+      this.#bank.showSigninRefusal(err)
     }
   }
   // --
@@ -269,38 +267,38 @@ export class Device {
   // == [Locking and connecting]: lock, connect, disconnect, disable
 
   // #lock-is-intent: a lock asks the user again at the next promptable action, and is not an alarm.
-  /** Lock the signed-in user's bank, in every tab sharing this device's deviceDB ({@link World.lock}). Never throws. */
+  /** Lock the signed-in user's bank, in every tab sharing this device's deviceDB ({@link Bank.lock}). Never throws. */
   lock(): this {
-    this.#world.lock()
+    this.#bank.lock()
     return this
   }
 
   // Call it as a QueryClient's `mount` is called, from an effect whose cleanup calls `disconnect`.
-  /** Keep the device in step with the vaultDB and the deviceDB: watch the signed-in user's bank in the vaultDB, from now or from `signin`, and follow the lease the deviceDB has ({@link World.connect}). Never throws; a second call, or a call once the device is disabled, does nothing.
+  /** Keep the device in step with the vaultDB and the deviceDB: watch the signed-in user's bank in the vaultDB, from now or from `signin`, and follow the lease the deviceDB has ({@link Bank.connect}). Never throws; a second call, or a call once the device is disabled, does nothing.
    * @example
    *   useEffect(() => { device.connect(); return () => { device.disconnect() } }, [device])
    */
   connect(): this {
-    this.#world.connect()
+    this.#bank.connect()
     return this
   }
 
-  /** Lock the signed-in user's bank in this tab alone, and stop watching the vaultDB and following the deviceDB, until the next {@link connect} ({@link World.disconnect}). Never throws; calling it twice in a row is the same as once.
+  /** Lock the signed-in user's bank in this tab alone, and stop watching the vaultDB and following the deviceDB, until the next {@link connect} ({@link Bank.disconnect}). Never throws; calling it twice in a row is the same as once.
    * The device stays enabled: its verbs still work, and a call waiting for an `unlock` gating still waits. The next connect takes up the lease the deviceDB has.
    */
   disconnect(): this {
-    this.#world.disconnect()
+    this.#bank.disconnect()
     return this
   }
 
   // It shuts first, so that a subscriber told of the lock, or a vault as it disconnects, finds every call refusing.
   /** End the device for good: lock its bank in this tab alone, reject every call waiting for an `unlock` gating, and disconnect. Never throws; calling it twice in a row is the same as once.
-   * Every call on its bank, gate, vault or world after refuses `disabled`, and its world's snapshot shows the stage `'disabled'`.
+   * Every call on its bank, gate or vault after refuses `disabled`, and its bank's snapshot shows the stage `'disabled'`.
    */
   disable(): this {
     if (this.#endCause !== null) { return this }
     this.#endCause = Throwers.deviceDisabled()
-    this.#world.disable()
+    this.#bank.disable()
     return this
   }
   // --
@@ -318,7 +316,7 @@ export class Device {
   }
 
   // Not awaited: an announcement is news of what happened, and nothing waits on the host's answer.
-  /** Tell the host's `onLifecycle` of `announcement`. What the handler throws or rejects with is reported to the platform, never thrown. Internal: the world calls it. */
+  /** Tell the host's `onLifecycle` of `announcement`. What the handler throws or rejects with is reported to the platform, never thrown. Internal: the bank calls it. */
   announce(announcement: DeviceAnnouncement): void {
     Checks.announcement.parse(announcement)
     void this.#onLifecycle({ ...announcement, device: this })
@@ -351,11 +349,11 @@ export class Device {
    */
   inspectable(): MaskedView {
     if (this.#userid === null) { return EmptyMaskedView }
-    const { bank, gate, rootBox } = this.#world
+    const { scope, vaultMinder } = this.#bank
     return {
-      bankTSQ:  [bank, gate, rootBox].filter((thing) => thing !== null).flatMap((thing) => this.#world.vaultMinder?.carAt(thing)?.inspectable() ?? []),
+      bankTSQ:  rootCarsOf(scope, vaultMinder).flatMap((car) => car?.inspectable() ?? []),
       vaultTSQ: this.#vaultTSQ?.inspectable() ?? [],
-      lease:    this.#world.inspectable(),
+      lease:    this.#bank.inspectable(),
     }
   }
   // --
@@ -409,7 +407,7 @@ function guardOnLifecycle(onLifecycle: LifecycleHandler): GuardedLifecycleHandle
 }
 // --
 
-// == [Helpers]: millisOf, softlockMillisOf, checkSecureContext, isUnbornIn
+// == [Helpers]: millisOf, softlockMillisOf, checkSecureContext, isUnbornIn, rootCarsOf
 
 // A host's Infinity minutes, for never, becomes ForeverMillis: past the entrypoint, nothing is infinite.
 /** `minutes` in milliseconds, capped at `ForeverMillis`, or `fallback` for none. */
@@ -426,9 +424,15 @@ function checkSecureContext(): void {
   if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw Throwers.insecureContext() }
 }
 
-// A bank's tombstone alone is unborn too: a root stored beside a bank not live is broken.
-/** True where `roots` keep no live bank, and no main gate or root box: the bank is unborn. */
-function isUnbornIn({ bank, gate, root }: WorldRoots): boolean { return (bank.am !== 'a') && BaseThing.isVoidSentinel(gate) && BaseThing.isVoidSentinel(root) }
+// A root's tombstone is unborn as its shell is, since a birth writes over either: a live root box beside a gate not live is broken.
+/** True where `roots` keep no live gate, and no live root box: the bank is unborn. */
+function isUnbornIn({ gate, root }: ActualRoots): boolean { return (gate.am !== 'a') && (root.am !== 'a') }
+
+/** The car `vaultMinder` keeps of each of `scope`'s bank's roots, undefined for none or for no VaultMinder */
+function rootCarsOf(scope: BankScope, vaultMinder: VaultMinder | null): (ThingCar | undefined)[] {
+  const scopes = rootScopesOf(scope)
+  return [vaultMinder?.carAt(scopes.gate), vaultMinder?.carAt(scopes.root)]
+}
 
 // --
 

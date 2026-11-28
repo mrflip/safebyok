@@ -7,7 +7,7 @@ import { Client, cacheExchange, makeErrorResult, mapExchange } from '@urql/core'
 import { executeExchange } from '@urql/exchange-execute'
 import type { Operation } from '@urql/core'
 import type { GraphQLSchema } from 'graphql'
-import { type ThingScope, type Userid, type VaultDB, Labelpath } from 'safebyok/storage'
+import { type Userid, type VaultDB } from 'safebyok/storage'
 import * as VT from 'safebyok/testing'
 import { PostgresVaultDB, VaultFunctionsSql, VaultTablesSql, thingsChannelOf } from 'safebyok-postgres'
 import { GraphQLVaultDB } from '../src/index'
@@ -77,7 +77,7 @@ export function browserOver(schema: GraphQLSchema, signing: Signing = signedInAs
 export const BootMillis = 60_000
 
 // The tables safebyok-postgres keeps each kind's Things in, which the cheat plants into directly.
-const ThingTables = { bank: 'safebyok_bank_things', gate: 'safebyok_gate_things', box: 'safebyok_box_things' } as const
+const ThingTables = { gate: 'safebyok_gate_things', box: 'safebyok_box_things' } as const
 
 const made: { db?: Promise<PGlite> } = {}
 const onNotifies = new Set<(text: string) => void>()
@@ -123,15 +123,12 @@ export const postgresRows: VT.VaultDBRowCheats = {
   plant: async (scope, raw) => {
     await postgresRows.remove(scope)
     const db = await database()
-    const table = tableOf(scope)
+    const table = ThingTables[scope.modelkind]
     await db.query(`INSERT INTO ${table} SELECT * FROM jsonb_populate_record(NULL::${table}, $1::text::jsonb)`, [JSON.stringify(raw)])
   },
-  remove: async ({ userid, banklabel, labelpath }) => {
+  remove: async ({ userid, banklabel, modelkind, labelpath }) => {
     const db = await database()
-    await db.query(`DELETE FROM ${tableOf({ labelpath })} WHERE (userid, banklabel, labelpath) = ($1, $2, $3)`, [userid, banklabel, labelpath])
+    await db.query(`DELETE FROM ${ThingTables[modelkind]} WHERE (userid, banklabel, labelpath) = ($1, $2, $3)`, [userid, banklabel, labelpath])
   },
 }
-
-/** The table that keeps the Thing at `labelpath`. */
-function tableOf({ labelpath }: Pick<ThingScope, 'labelpath'>): string { return ThingTables[Labelpath.modelkindOf(labelpath)] }
 // --

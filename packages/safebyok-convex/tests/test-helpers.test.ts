@@ -11,7 +11,7 @@ describe("convexRefusalOf", () => {
 
   it("reads a refusal from the host's functions", async () => {
     const { api, createTest } = TH.vaultHostWith(TH.bySubject)
-    const refusal = await TH.convexRefusalOf(createTest().query(api.safebyokVault.getWorld, { ask: TH.getWorldAskOf() }))
+    const refusal = await TH.convexRefusalOf(createTest().query(api.safebyokVault.getBank, { ask: TH.getBankAskOf() }))
     expect(refusal.kind).to.eq('identity_revoked')
   })
 

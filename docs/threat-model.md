@@ -154,7 +154,7 @@ A form with a whisper in it is one of two kinds, and they differ in what stays o
 * **A marker on the parts for session-replay tools.** A revealed secret is plain text in the DOM,
   and a replay tool records it. The parts need a stable attribute a host can tell its tool to mask.
 * **Masking a revealed field again** when the tab is hidden, or on a timer.
-* **Locking when a lease ends.** Today the world's snapshot reports the time (`leaseEndsAt`), and
+* **Locking when a lease ends.** Today the bank's snapshot reports the time (`leaseEndsAt`), and
   nothing acts on it.
 * **A second lease clock, for idleness,** as a host's option beside the lease's length.
 * **A freshness bound on the gate:** a lease that needs its gate confirmed from the vaultDB within

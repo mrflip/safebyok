@@ -90,7 +90,7 @@ sending, so a caller that skips those checks, or is not a browser at all, is ref
 
 ## What crosses the wire
 
-Each verb is one operation: `safebyokGetThing`, `safebyokListThings`, `safebyokGetWorld` and
+Each verb is one operation: `safebyokGetThing`, `safebyokListThings`, `safebyokGetBank` and
 `safebyokStats` are queries, `safebyokWriteThing` (every write, whatever its flags) and
 `safebyokBirthBank` are mutations, and `safebyokWatchThings` is a subscription. Every name the schema
 adds begins `safebyok` or `Safebyok`, to sit beside your own. `VaultOperations` has the documents
@@ -100,8 +100,9 @@ Each operation takes the verb's ask, typed, and returns an object with the field
 `try*` answer, less its ask. A Thing, a `tracked` and a track cross as `SafebyokJson`, carried whole;
 everything else is typed. The browser half answers what the server's vaultDB answered, once it has
 checked the answer's form and that each Thing it carries sits where the ask reaches: at the ask's
-scope, one label under a listing's parent, or at a root's labelpath, always in the ask's bank. It
-leaves the act, and the body of each Thing, to the server's vaultDB, which made them.
+scope, one label under a listing's parent in the ask's table, or at a root's scope, always in the
+ask's bank and of the kind it is checked against. It leaves the act, and the body of each Thing, to
+the server's vaultDB, which made them.
 
 **A refusal of the vaultDB's is the answer's `err` field, never a GraphQL error.** It carries its `refusalkind`, its
 message, and in `meta` the `oplabel` it refused, its `act`, the `capacity` of a `vault_full`, and the

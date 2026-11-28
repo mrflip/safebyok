@@ -2,7 +2,7 @@
 
 import * as DB from 'safebyok/storage'
 import type {
-  BirthBankAsk, BirthManifest, BirthPuts, GetAsk, GetManifest, GetWorldAsk, ListAsk, ListManifest, Received, StatsAsk, StatsManifest, ThingWatchScope, VaultError, WorldManifest, WriteAsk, WriteManifest,
+  BirthBankAsk, BirthManifest, BirthPuts, GetAsk, GetManifest, GetBankAsk, ListAsk, ListManifest, Received, StatsAsk, StatsManifest, ThingWatchScope, VaultError, GetBankManifest, WriteAsk, WriteManifest,
 } from 'safebyok/storage'
 import { IdbDatastore } from './idb-datastore'
 
@@ -33,7 +33,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   }
   // --
 
-  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats, doWatch
+  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetBank, doStats, doWatch
 
   protected async doGetThing(ask: GetAsk): Promise<GetManifest> { return await this.#datastore.getThing(ask) }
 
@@ -43,7 +43,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
 
   protected async doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthManifest> { return await this.#datastore.birthBank(ask, puts) }
 
-  protected async doGetWorld(ask: GetWorldAsk): Promise<WorldManifest> { return await this.#datastore.getWorld(ask) }
+  protected async doGetBank(ask: GetBankAsk): Promise<GetBankManifest> { return await this.#datastore.getBank(ask) }
 
   protected async doStats(ask: StatsAsk): Promise<StatsManifest> { return await this.#datastore.stats(ask) }
 

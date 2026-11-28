@@ -3,28 +3,26 @@
 // Each statement returns one row, the call's manifest (notes/vault-adapter-contract.md), each Thing as one JSON object
 // shaped like the record it was stored from, so that a bigint column arrives as a number (a driver returns a bare bigint
 // as text). The `thing_record` function drops the null columns: the record had no such field. Each statement reads what it
-// asks for and the bank's roots in one statement, so both come from the same snapshot, and returns beside it the bank's
-// `banktok`, `tracked`, how the bank, main gate and root box compare with the track the ask passes as JSON, and `read_tc`,
-// when Postgres read them (bankObservedSqlOf).
+// asks for and the bank's two roots, as `roots`, in one statement, so both come from the same snapshot, and returns beside
+// it the bank's `banktok`, `tracked`, how its gate and root box compare with the track the ask passes as JSON, and
+// `read_tc`, when Postgres read them (bankObservedSqlOf).
 
-import { type Thingkind, VoidLifeTok } from 'safebyok/storage'
+import type { Thingkind } from 'safebyok/storage'
 import { VaultFunctionNames } from './vault-functions'
 
 // == [What every manifest carries]: bankObservedSqlOf, ThingTables
 
 // Postgres 18's uuidv7() is monotonic within a connection, so two reads in one session are dated in the order they ran.
-// The banktok is ManifestTags.banktokOf: a bank row with no lifetok, which its NOT NULL column forbids, would hand back null, never drop the key.
-/** The SQL of the `banktok`, `tracked` and `read_tc` columns every manifest carries. */
+/** The SQL of the `banktok`, `tracked` and `read_tc` columns every manifest carries, of the bank's roots in a column `roots`. */
 function bankObservedSqlOf(track: string): string {
-  const banktok = `CASE WHEN ((world->'bank') = 'null'::jsonb) THEN to_jsonb('${VoidLifeTok}'::text) ELSE (world->'bank'->'lifetok') END AS banktok`
-  return `${banktok}, ${VaultFunctionNames.tracked}(world, root, ${track}::text::jsonb) AS tracked, uuidv7()::text AS read_tc`
+  return `${VaultFunctionNames.banktok_of}(roots->'gate') AS banktok, ${VaultFunctionNames.tracked}(roots, ${track}::text::jsonb) AS tracked, uuidv7()::text AS read_tc`
 }
 
 /** The table that keeps each kind of Thing. */
-const ThingTables = { bank: 'safebyok_bank_things', gate: 'safebyok_gate_things', box: 'safebyok_box_things' } as const satisfies Record<Thingkind, string>
+const ThingTables = { gate: 'safebyok_gate_things', box: 'safebyok_box_things' } as const satisfies Record<Thingkind, string>
 // --
 
-// == [Reads]: ancestorSqlOf, GetThingSql, ListThingsSql, GetWorldSql, StatsSql
+// == [Reads]: ancestorSqlOf, GetThingSql, ListThingsSql, GetBankSql, StatsSql
 
 // A Thing's ancestors are of its own kind, so they are in its table. starts_with compares text as text: a '%' or '_' in a
 // labelpath is no wildcard, as it would be to LIKE.
@@ -41,14 +39,12 @@ function ancestorSqlOf(table: string, { userid, banklabel, labelpath }: Readonly
 
 /** A get's manifest of each kind at a scope ($1 userid, $2 banklabel, $3 labelpath), its roots compared with the track ($4). */
 export const GetThingSql: Readonly<Record<Thingkind, string>> = {
-  bank: getThingSqlOf(ThingTables.bank),
   gate: getThingSqlOf(ThingTables.gate),
   box:  getThingSqlOf(ThingTables.box),
 }
 
 /** A listing's manifest of each kind at a scope ($1 userid, $2 banklabel, $3 labelpath), each child in labelpath order, its roots compared with the track ($4). */
 export const ListThingsSql: Readonly<Record<Thingkind, string>> = {
-  bank: listThingsSqlOf(ThingTables.bank),
   gate: listThingsSqlOf(ThingTables.gate),
   box:  listThingsSqlOf(ThingTables.box),
 }
@@ -62,7 +58,7 @@ function getThingSqlOf(table: string): string {
   FROM (SELECT (
     SELECT ${VaultFunctionNames.thing_record}(to_jsonb(thing)) FROM ${table} AS thing
     WHERE  (thing.userid, thing.banklabel, thing.labelpath) = ($1::text, $2::text, $3::text)
-  ) AS actual, ${VaultFunctionNames.world}($1::text, $2::text) AS world, ${VaultFunctionNames.root_box}($1::text, $2::text) AS root) AS observed
+  ) AS actual, ${VaultFunctionNames.bank_roots}($1::text, $2::text) AS roots) AS observed
 `
 }
 
@@ -80,14 +76,14 @@ function listThingsSqlOf(table: string): string {
       AND  (child.labelpath >= ($3::text || '/'))
       AND  (child.labelpath <  ($3::text || '0'))
       AND  (strpos(substr(child.labelpath, length($3::text) + 2), '/') = 0)
-  ), '[]'::jsonb) AS children, ${VaultFunctionNames.world}($1::text, $2::text) AS world, ${VaultFunctionNames.root_box}($1::text, $2::text) AS root) AS observed
+  ), '[]'::jsonb) AS children, ${VaultFunctionNames.bank_roots}($1::text, $2::text) AS roots) AS observed
 `
 }
 
-/** A get of the world's manifest: a bank's three roots at its scope ($1 userid, $2 banklabel), compared with the track ($3). */
-export const GetWorldSql = `
-  SELECT jsonb_build_object('bank', world->'bank', 'gate', world->'maingate', 'root', root) AS actual, ${bankObservedSqlOf('$3')}
-  FROM (SELECT ${VaultFunctionNames.world}($1::text, $2::text) AS world, ${VaultFunctionNames.root_box}($1::text, $2::text) AS root) AS observed
+/** A get of the bank's manifest: a bank's two roots at its scope ($1 userid, $2 banklabel), compared with the track ($3). */
+export const GetBankSql = `
+  SELECT roots AS actual, ${bankObservedSqlOf('$3')}
+  FROM (SELECT ${VaultFunctionNames.bank_roots}($1::text, $2::text) AS roots) AS observed
 `
 
 // A row's size is Postgres's own measure of it as a value, pg_column_size: its columns as stored, compressed where Postgres compressed them.
@@ -104,7 +100,7 @@ function thingkindStatsSqlOf(table: string): string {
 export const StatsSql = `
   SELECT box, gate, ${bankObservedSqlOf('$3')}
   FROM (SELECT ${thingkindStatsSqlOf(ThingTables.box)} AS box, ${thingkindStatsSqlOf(ThingTables.gate)} AS gate,
-    ${VaultFunctionNames.world}($1::text, $2::text) AS world, ${VaultFunctionNames.root_box}($1::text, $2::text) AS root) AS observed
+    ${VaultFunctionNames.bank_roots}($1::text, $2::text) AS roots) AS observed
 `
 // --
 
@@ -123,15 +119,14 @@ function writeThingSqlOf(table: string, call: string): string {
 
 /** A write's manifest of each kind: its write function over the record ($1), what it cites ($2), its ifAbsent ($3) and ifPresent ($4), its roots after compared with the track ($5); the gate's also takes the storage policies ($6). */
 export const WriteThingSql: Readonly<Record<Thingkind, string>> = {
-  bank: writeThingSqlOf(ThingTables.bank, `${VaultFunctionNames.write_bank}($1::text::jsonb, $2::text::jsonb, $3::text, $4::text)`),
   gate: writeThingSqlOf(ThingTables.gate, `${VaultFunctionNames.write_gate}($1::text::jsonb, $2::text::jsonb, $3::text, $4::text, $6::text[])`),
   box:  writeThingSqlOf(ThingTables.box,  `${VaultFunctionNames.write_box}($1::text::jsonb, $2::text::jsonb, $3::text, $4::text)`),
 }
 
-/** A birth's manifest: its bank ($1), main gate ($2) and root box ($3), the roots after compared with the track ($4). */
+/** A birth's manifest: its gate ($1) and what its put cites ($2), its root box ($3) and what its put cites ($4), the roots after compared with the track ($5). */
 export const BirthRootsSql = `
-  SELECT tags, jsonb_build_object('bank', bank, 'gate', gate, 'root', root) AS actual, ${bankObservedSqlOf('$4')}
-  FROM (SELECT tags, bank, gate, root, jsonb_build_object('bank', bank, 'maingate', gate) AS world
-        FROM   ${VaultFunctionNames.birth_roots}($1::text::jsonb, $2::text::jsonb, $3::text::jsonb)) AS observed
+  SELECT tags, roots AS actual, ${bankObservedSqlOf('$5')}
+  FROM (SELECT tags, jsonb_build_object('gate', gate, 'root', root) AS roots
+        FROM   ${VaultFunctionNames.birth_roots}($1::text::jsonb, $2::text::jsonb, $3::text::jsonb, $4::text::jsonb)) AS observed
 `
 // --

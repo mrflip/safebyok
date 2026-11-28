@@ -5,7 +5,7 @@ import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex
 import { ConvexError, convexToJson } from 'convex/values'
 import * as DB from 'safebyok/storage'
 import type {
-  BirthBankAsk, BirthManifest, GetAsk, GetManifest, GetWorldAsk, ListAsk, ListManifest, Received, StatsAsk, StatsManifest, ThingWatchScope, VaultError, WorldManifest, WriteAsk, WriteManifest,
+  BirthBankAsk, BirthManifest, GetAsk, GetManifest, GetBankAsk, ListAsk, ListManifest, Received, StatsAsk, StatsManifest, ThingWatchScope, VaultError, GetBankManifest, WriteAsk, WriteManifest,
 } from 'safebyok/storage'
 import * as Phrases from './phrases'
 import { safebyokRefusal } from './refusals'
@@ -73,7 +73,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
   }
   // --
 
-  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats, doWatch
+  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetBank, doStats, doWatch
   // Each call is one query or mutation of the component, which hands back the manifest of what it observed but its
   // `read_tc`. That is made here, before the call is sent, so no later than the snapshot it reads, and a watch's notice is
   // dated as it arrives. Convex's own clock is no better: a query's Date.now() is frozen as it starts, and Convex serves a
@@ -102,9 +102,9 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
     return { ...(await runOrRefuse('birthBank', () => this.#client.mutation(this.#api.birthBank, { ask }))), read_tc }
   }
 
-  protected async doGetWorld(ask: GetWorldAsk): Promise<WorldManifest> {
+  protected async doGetBank(ask: GetBankAsk): Promise<GetBankManifest> {
     const read_tc = DB.readTcNow()
-    return { ...(await runOrRefuse('getWorld', () => this.#client.query(this.#api.getWorld, { ask }))), read_tc }
+    return { ...(await runOrRefuse('getBank', () => this.#client.query(this.#api.getBank, { ask }))), read_tc }
   }
 
   protected async doStats(ask: StatsAsk): Promise<StatsManifest> {
@@ -129,7 +129,7 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
     }
     // A listener told of a Thing may stop the watch then and there, and a stopped watch subscribes no more.
     const hearThings = (watched: Watched): void => {
-      for (const { raw } of watched.things) { receive({ record: raw, banktok: watched.banktok }) }
+      for (const { raw, modelkind } of watched.things) { receive({ record: raw, modelkind, banktok: watched.banktok }) }
       if ((! isWatching) || (watched.cursor === cursor)) { return }
       unsubscribe()
       watchFrom(watched.cursor)
@@ -230,7 +230,7 @@ function isConvexClient(candidate: unknown): candidate is ConvexVaultClient {
 }
 
 /** The names of the safebyok vaultDB functions the adapter calls. */
-const SafebyokVaultFnnames = ['getThing', 'writeThing', 'listThings', 'birthBank', 'getWorld', 'stats', 'watchThings'] as const
+const SafebyokVaultFnnames = ['getThing', 'writeThing', 'listThings', 'birthBank', 'getBank', 'stats', 'watchThings'] as const
 
 // Each reference must have a name of the form `<module>:<function>`. The generated `api` returns a reference for any
 // property, so `api.getThing` exists, but it names no module and `getFunctionName` throws on it.

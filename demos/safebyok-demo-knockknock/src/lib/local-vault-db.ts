@@ -1,12 +1,12 @@
 /** A vaultDB in this tab's memory, saved to localStorage after each write, so a reload finds the vault again. Demo code: a real host stores its vault on its backend. */
 
-import { type BirthBankAsk, type BirthManifest, type BirthPuts, type Labelpath, MemoryDatastore, MemoryVaultDB, type ThingWatchScope, type WriteAsk, type WriteManifest } from 'safebyok/storage'
+import { type BirthBankAsk, type BirthManifest, type BirthPuts, type Labelpath, MemoryDatastore, MemoryVaultDB, type Thingkind, type ThingWatchScope, type WriteAsk, type WriteManifest, thingkindVals } from 'safebyok/storage'
 
 /** The prefix of each bank's entry in localStorage. */
 const SavedPrefix = 'knockknock:vault:'
 
-/** One bank's entry in localStorage: its scope, and its Things by labelpath. */
-type SavedBank = Readonly<{ userid: string, banklabel: string, things: [Labelpath, unknown][] }>
+/** One bank's entry in localStorage: its scope, and each of its Things beside the kind of table it is kept in and its labelpath. */
+type SavedBank = Readonly<{ userid: string, banklabel: string, rows: [Thingkind, Labelpath, unknown][] }>
 
 // Cheat (react_life): the new core has no browser vaultDB yet. This one reaches into the memory vaultDB's Things through
 // its test door, `_cheat_things`, to load and save them. Another tab writing meanwhile is not heard, and the last tab to write wins.
@@ -18,8 +18,8 @@ export class LocalStorageVaultDB extends MemoryVaultDB {
     super()
     this.#storage = storage
     for (const saved of savedBanksIn(storage)) {
-      const things = this._cheat_things(saved)
-      for (const [labelpath, raw] of saved.things) { things.set(labelpath, raw) }
+      const tables = this._cheat_things(saved)
+      for (const [modelkind, labelpath, raw] of saved.rows) { tables[modelkind].set(labelpath, raw) }
     }
   }
 
@@ -37,7 +37,9 @@ export class LocalStorageVaultDB extends MemoryVaultDB {
 
   /** Save the Things of `scope`'s bank to storage. */
   #save({ userid, banklabel }: ThingWatchScope): void {
-    const saved: SavedBank = { userid, banklabel, things: [...this._cheat_things({ userid, banklabel })] }
+    const tables = this._cheat_things({ userid, banklabel })
+    const rows   = thingkindVals.flatMap((modelkind) => [...tables[modelkind]].map(([labelpath, raw]): SavedBank['rows'][number] => [modelkind, labelpath, raw]))
+    const saved: SavedBank = { userid, banklabel, rows }
     this.#storage.setItem(`${SavedPrefix}${MemoryDatastore.ckeyOf({ userid, banklabel })}`, JSON.stringify(saved))
   }
 }
@@ -50,7 +52,7 @@ function savedBanksIn(storage: Storage): SavedBank[] {
     if (ckey?.startsWith(SavedPrefix) !== true) { continue }
     try {
       const bank = JSON.parse(storage.getItem(ckey) ?? 'null') as Partial<SavedBank> | null
-      if ((typeof bank?.userid === 'string') && (typeof bank.banklabel === 'string') && Array.isArray(bank.things)) { saved.push(bank as SavedBank) }
+      if ((typeof bank?.userid === 'string') && (typeof bank.banklabel === 'string') && Array.isArray(bank.rows)) { saved.push(bank as SavedBank) }
     } catch {
       // A mangled entry reads as no bank.
     }

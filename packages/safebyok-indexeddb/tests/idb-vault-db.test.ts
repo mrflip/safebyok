@@ -4,7 +4,7 @@
 import 'fake-indexeddb/auto'
 import { noop } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { type StatsAnswer, type StoreLimits, type VaultEvent, Shell, StoreLimitCap, StoreLimitFloor, VaultError } from 'safebyok/storage'
+import { type DatastoreLimits, type StatsAnswer, type VaultEvent, DatastoreLimitCap, DatastoreLimitFloor, Shell, VaultError } from 'safebyok/storage'
 import { IdbVaultDB } from '../src/idb-vault-db'
 import { VaultDBVersion } from '../src/vault-shelf'
 import * as TH from './test-helpers'
@@ -59,6 +59,13 @@ describe("IdbVaultDB's databases", () => {
     expect(gotten).to.deep.equal(TH.gateThingOf())
   })
 
+  it("keeps a bank's gate in the key range of gates, and its root box in the key range of boxes, each key its scope, kind first", async () => {
+    const idbVaultDB = TH.makeIdbVaultDB()
+    await TH.expectGood(idbVaultDB.tryBirthBank(TH.birthBankAskOf()))
+    const { userid, banklabel } = TH.ThingBank
+    expect(await TH._cheat_idbThingsOf(idbVaultDB).scopepaths()).to.deep.equal([['box', userid, banklabel, 'box'], ['gate', userid, banklabel, banklabel]])
+  })
+
   it("lists the children of a Thing in its own bank alone, one label under it", async () => {
     const idbVaultDB = TH.makeIdbVaultDB()
     await TH.expectGood(idbVaultDB.tryBirthBank(TH.birthBankAskOf()))
@@ -70,7 +77,7 @@ describe("IdbVaultDB's databases", () => {
     const grandchild = { ...TH.boxThingOf('deep'), labelpath: 'box/openai/deep' }
     await rows.plant(otherBankBox, otherBankBox)
     await rows.plant(grandchild, grandchild)
-    const answer = await idbVaultDB.tryListThings(TH.listAskAt('box'))
+    const answer = await idbVaultDB.tryListThings(TH.listAskAt('box', 'box'))
     await TH.expectGood(answer)
     expect(answer.deltas.map(({ labelpath }) => labelpath)).to.deep.equal([box.labelpath])
   })
@@ -83,18 +90,18 @@ async function statsWhere(navigatorStub: object): Promise<StatsAnswer> {
 }
 
 /** The limits a good `answer` reports, or null for a refusal. */
-function maxOf(answer: StatsAnswer): StoreLimits | null { return answer.ok ? answer.val.max : null }
+function maxOf(answer: StatsAnswer): DatastoreLimits | null { return answer.ok ? answer.val.max : null }
 
 describe("IdbVaultDB's stats", () => {
   it("reports the quota the browser estimates as its size limit, capped, and the cap as its count limit", async () => {
     const estimated = await statsWhere({ storage: { estimate: () => Promise.resolve({ quota: 5_000_000, usage: 10 }) } })
-    expect(maxOf(estimated)).to.deep.equal({ count: StoreLimitCap, size: 5_000_000 })
-    const vast = await statsWhere({ storage: { estimate: () => Promise.resolve({ quota: 10 * StoreLimitCap }) } })
-    expect(maxOf(vast)).to.deep.equal({ count: StoreLimitCap, size: StoreLimitCap })
+    expect(maxOf(estimated)).to.deep.equal({ count: DatastoreLimitCap, size: 5_000_000 })
+    const vast = await statsWhere({ storage: { estimate: () => Promise.resolve({ quota: 10 * DatastoreLimitCap }) } })
+    expect(maxOf(vast)).to.deep.equal({ count: DatastoreLimitCap, size: DatastoreLimitCap })
   })
 
   it("reports the cap for each limit where the browser gives no estimate", async () => {
-    expect(maxOf(await statsWhere({}))).to.deep.equal({ count: StoreLimitCap, size: StoreLimitCap })
+    expect(maxOf(await statsWhere({}))).to.deep.equal({ count: DatastoreLimitCap, size: DatastoreLimitCap })
   })
 
   it("refuses storage_unavailable where the browser's estimate fails", async () => {
@@ -103,16 +110,16 @@ describe("IdbVaultDB's stats", () => {
 })
 
 describe("IdbVaultDB's quota at open", () => {
-  it("refuses storage_blocked on opening its database where the browser's quota is under StoreLimitFloor", async () => {
-    vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: StoreLimitFloor - 1 }) } })
+  it("refuses storage_blocked on opening its database where the browser's quota is under DatastoreLimitFloor", async () => {
+    vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: DatastoreLimitFloor - 1 }) } })
     const idbVaultDB = TH.makeIdbVaultDB()
     const refusal = await TH.expectBad(idbVaultDB.tryGetThing(TH.getGateAskOf()), 'storage_blocked')
     expect(refusal.message).to.match(/offers the page 4999 bytes/)
   })
 
-  it("refuses storage_blocked at the world read, the first call a device makes at sign-in, where the quota is under StoreLimitFloor", async () => {
-    vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: StoreLimitFloor - 1 }) } })
-    await TH.expectBad(TH.makeIdbVaultDB().tryGetWorld(TH.getWorldAskOf()), 'storage_blocked')
+  it("refuses storage_blocked at the read of the bank's roots, the first call a device makes at sign-in, where the quota is under DatastoreLimitFloor", async () => {
+    vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: DatastoreLimitFloor - 1 }) } })
+    await TH.expectBad(TH.makeIdbVaultDB().tryGetBank(TH.getBankAskOf()), 'storage_blocked')
   })
 
   it("refuses a quota of 0", async () => {
@@ -120,8 +127,8 @@ describe("IdbVaultDB's quota at open", () => {
     await TH.expectBad(TH.makeIdbVaultDB().tryStats(TH.statsAskOf()), 'storage_blocked')
   })
 
-  it("opens its database where the browser's quota is StoreLimitFloor", async () => {
-    vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: StoreLimitFloor }) } })
+  it("opens its database where the browser's quota is DatastoreLimitFloor", async () => {
+    vi.stubGlobal('navigator', { storage: { estimate: () => Promise.resolve({ quota: DatastoreLimitFloor }) } })
     await TH.expectGood(TH.makeIdbVaultDB().tryGetThing(TH.getGateAskOf()))
   })
 
@@ -139,7 +146,7 @@ describe("IdbVaultDB's watch", () => {
     const unwatch = twin.watch(TH.ThingBank, (event) => { events.push(event) }, noop)
     await TH.expectGood(idbVaultDB.tryWriteThing(TH.birthAskOf()))
     await TH.eventually(() => events.length > 0)
-    expect(TH.maskedReadTcsOf(events)).to.deep.equal([TH.itemEventOf(TH.gateThingOf())])
+    expect(TH.maskedReadTcsOf(events)).to.deep.equal([TH.itemEventOf(TH.gateThingOf(), TH.gateThingOf().banktok)])
     unwatch()
   })
 })

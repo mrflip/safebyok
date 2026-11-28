@@ -27,7 +27,7 @@ const Users = [
 
 const Banklabel = 'dojo'
 const DojoDBName = 'dojo'
-const VaultDBName = 'safebyok-dojo:vault-v001-001-001'
+const VaultDBName = 'safebyok-dojo:vault-v002-001-001'
 const LoginLabelpath = 'box/login'
 
 const dojoDeriver = makeArgon2idDeriver({ ...Argon2idWebV1, key_deriver_label: 'dojo_light', memory_kib: 1024, iterations: 1 })

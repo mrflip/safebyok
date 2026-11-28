@@ -1,4 +1,4 @@
-/** `ThingCar`, which a VaultMinder keeps at each labelpath: the Thing, how far it has been seen, and the refusal it last raised at a record. */
+/** `ThingCar`, which a VaultMinder keeps for each Thing: the Thing, how far it has been seen, and the refusal it last raised at a record. */
 
 import { pick } from 'es-toolkit'
 import { Clock, type Errors } from 'safebyok-big/internals'
@@ -6,11 +6,11 @@ import type { EpochMillis } from '../shapes/primitives'
 import type { MaskedRow } from '../shapes/shapes-masked-view'
 import type { Sparse, ThingCited, ThingRecord, VoidSentinel } from '../shapes/shapes-thing'
 import { type Agekind, type Agerank, type ReadTc, type VaultEvent, type VaultItemEvent, SeenChecks } from '../shapes/shapes-vault-event'
-import { type CarWorld, type ReceivingThing, type ThingCarOpts, ThingCarChecks } from '../shapes/shapes-vault-minder'
+import { type CarBank, type ReceivingThing, type ThingCarOpts, ThingCarChecks } from '../shapes/shapes-vault-minder'
 import { BaseThing } from '../models/base-thing'
 import { maskedOf } from '../helpers/mask-ciphertexts'
 import { VaultTSQ } from './vault-tsq'
-import { VacantReadTc, agekindOf, eventsOf, heldAgerankOf, nextAgerankOf, readAtOf } from '../storage/agerank'
+import { VacantReadTc, agekindOf, cachedAgerankOf, eventsOf, nextAgerankOf, readAtOf } from '../storage/agerank'
 import * as Throwers from '../refusals/throwers'
 
 // == [ThingCar]: ThingCar
@@ -34,12 +34,12 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
   // == [Construction]: make, constructor
 
   // A refused first record leaves the car all the same, its Thing at the shell: the car keeps the refusal.
-  /** Make the car of `begun`: a Thing, or the Thing `opts.world` makes at the shell or at an item event's record, which the car then receives.
+  /** Make the car of `begun`: a Thing, or the Thing `opts.bank` makes at the shell or at an item event's record, which the car then receives.
    * Hand it the shell and call {@link receive} for the events of the first record: here they are dropped.
    */
   static make<ThingT extends ReceivingThing>(begun: ThingT | VoidSentinel | VaultItemEvent, opts: ThingCarOpts<ThingT>): ThingCar<ThingT> {
     ThingCarChecks.makeArgs.parse({ begun, opts })
-    const car = new ThingCar(thingOf(begun, opts.world))
+    const car = new ThingCar(thingOf(begun, opts.bank))
     if (isItemEvent(begun)) {
       try { car.receive(begun) } catch { /* kept as the car's lastErr */ }
     }
@@ -50,9 +50,9 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
   // calls news an older record the Thing would decline.
   private constructor(thing: ThingT) {
     this.thing = thing
-    const held = thing.pickle()
-    this.#citable = citedOf(held)
-    this.#agerank = heldAgerankOf(held)
+    const cached = thing.pickle()
+    this.#citable = citedOf(cached)
+    this.#agerank = cachedAgerankOf(cached)
     Object.freeze(this)
   }
   // --
@@ -109,7 +109,7 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
   // subscriber finds the car past the record.
   /** The events of `proposed` that are news, this car moved past it */
   #take(proposed: VaultEvent): readonly VaultEvent[] {
-    SeenChecks.event.parseConsistent(proposed, pick(this.thing, ['userid', 'banklabel', 'labelpath']))
+    SeenChecks.event.parseConsistent(proposed, pick(this.thing, ['modelkind', 'userid', 'banklabel', 'labelpath']))
     if (proposed.eventkind !== 'item') { return NoEvents }
     const { read_tc } = SeenChecks.item.parse(proposed)
     const { val, liveness } = proposed
@@ -160,10 +160,10 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
 /** What `receive` returns for an event that is not news. */
 const NoEvents: readonly never[] = Object.freeze([])
 
-/** The Thing `begun` is, or the one `world` makes at the shell `begun` is or names */
-function thingOf<ThingT extends ReceivingThing>(begun: ThingT | VoidSentinel | VaultItemEvent, world: CarWorld<ThingT>): ThingT {
-  if (isItemEvent(begun)) { return world.makeThing(BaseThing.shellOf(begun.val)) }
-  if (isShell(begun)) { return world.makeThing(begun) }
+/** The Thing `begun` is, or the one `bank` makes at the shell `begun` is or names */
+function thingOf<ThingT extends ReceivingThing>(begun: ThingT | VoidSentinel | VaultItemEvent, bank: CarBank<ThingT>): ThingT {
+  if (isItemEvent(begun)) { return bank.makeThing(BaseThing.shellOf(begun.val)) }
+  if (isShell(begun)) { return bank.makeThing(begun) }
   return begun
 }
 

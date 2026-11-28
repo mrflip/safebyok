@@ -26,7 +26,7 @@ export class PlainThing extends Thing<ThingRecord, ThingScope, undefined, Adopta
   // == [Shapes]: scope, stamp
 
   /** Where this Thing is stored. */
-  get scope(): ThingScope { return Object.freeze({ userid: this.userid, banklabel: this.banklabel, labelpath: this.labelpath }) }
+  get scope(): ThingScope { return Object.freeze({ modelkind: this.modelkind, userid: this.userid, banklabel: this.banklabel, labelpath: this.labelpath }) }
 
   /** No stamp: a plain Thing binds no ctx. */
   get stamp(): undefined { return }
@@ -52,7 +52,7 @@ export class RefusingThing extends Thing<ThingRecord, ThingScope, undefined, Ado
   private constructor(shell: VoidSentinel) { super(shell) }
 
   /** Where this Thing is stored. */
-  get scope(): ThingScope { return Object.freeze({ userid: this.userid, banklabel: this.banklabel, labelpath: this.labelpath }) }
+  get scope(): ThingScope { return Object.freeze({ modelkind: this.modelkind, userid: this.userid, banklabel: this.banklabel, labelpath: this.labelpath }) }
 
   /** No stamp. */
   get stamp(): undefined { return }

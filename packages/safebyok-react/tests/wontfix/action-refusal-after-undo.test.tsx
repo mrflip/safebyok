@@ -48,7 +48,7 @@ describe("wontfix: a draft's form Action that resolves its refusal as the Action
     const device = await waitFor(() => world._cheat_device())
     await act(async () => {
       await device.signin(TH.ProviderUser)
-      await device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase })
+      await device.bank.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase })
     })
     const keyInput = await screen.findByLabelText<HTMLInputElement>('Key')
     act(() => { screen.getByText('Go pro').click() })

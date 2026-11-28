@@ -41,12 +41,13 @@ function boxHeldIn({ sorted }: TSQWorld<MemoryVaultDB>) {
 }
 
 describe("VaultTSQ.make", () => {
-  it("sets its query and mutation defaults under the bank's key, and nothing outside it", async () => {
+  it("sets its query defaults under the key of the bank's boxes, and nothing outside it, and no mutation defaults", async () => {
     const { queryClient } = await tsqWorldOf(new MemoryVaultDB())
     expect(queryClient.getQueryDefaults(BoxKey)).to.include({ networkMode: 'always', retry: false }).and.not.have.property('structuralSharing')
     expect(queryClient.getQueryDefaults(VaultTSQ.listQueryKeyOf(TH.RootScope))).to.include({ networkMode: 'always', retry: false, gcTime: Infinity })
-    expect(queryClient.getMutationDefaults(VaultTSQ.bankQueryKeyOf(TH.ThingBank))).to.deep.equal({ networkMode: 'always', retry: false })
+    expect(queryClient.getMutationDefaults(VaultTSQ.tableQueryKeyOf({ ...TH.ThingBank, modelkind: 'box' }))).to.deep.equal({})
     expect(queryClient.getQueryDefaults(VaultTSQ.itemQueryKeyOf({ ...TH.BoxScope, banklabel: 'other' }))).to.deep.equal({})
+    expect(queryClient.getQueryDefaults(VaultTSQ.itemQueryKeyOf(TH.GateScope))).to.deep.equal({})
     expect(queryClient.getQueryDefaults(['todos'])).to.deep.equal({})
     expect(queryClient.getMutationDefaults(['todos'])).to.deep.equal({})
   })
@@ -64,10 +65,16 @@ describe("VaultTSQ.make", () => {
 })
 
 describe("VaultTSQ's keys", () => {
-  it("start with the bank, then the kind of query, the labels and a mark", () => {
-    expect(VaultTSQ.bankQueryKeyOf(TH.ThingBank)).to.deep.equal(['sok', 'u1', 'acme'])
-    expect(VaultTSQ.itemQueryKeyOf(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'item', 'box', '/', 'openai', '!'])
-    expect(VaultTSQ.listQueryKeyOf(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'list', 'box', '#', 'kids'])
+  it("start with the table, its kind first, then the kind of query, the labels and a mark", () => {
+    expect(VaultTSQ.tableQueryKeyOf({ ...TH.ThingBank, modelkind: 'box' })).to.deep.equal(['sok', 'box', 'u1', 'acme'])
+    expect(VaultTSQ.itemQueryKeyOf(TH.BoxScope)).to.deep.equal(['sok', 'box', 'u1', 'acme', 'item', 'box', '/', 'openai', '!'])
+    expect(VaultTSQ.listQueryKeyOf(TH.RootScope)).to.deep.equal(['sok', 'box', 'u1', 'acme', 'list', 'box', '#', 'kids'])
+    expect(VaultTSQ.itemQueryKeyOf(TH.GateScope)).to.deep.equal(['sok', 'gate', 'u1', 'acme', 'item', 'acme', '!'])
+  })
+
+  it("tell a bank labelled box's gate from its root box", () => {
+    const bank = { userid: 'u1', banklabel: 'box' }
+    expect(VaultTSQ.itemQueryKeyOf({ ...bank, modelkind: 'gate', labelpath: 'box' })).to.not.deep.equal(VaultTSQ.itemQueryKeyOf({ ...bank, modelkind: 'box', labelpath: 'box' }))
   })
 })
 
@@ -323,7 +330,7 @@ describe("VaultTSQ.itemQueryOptions", () => {
     const world = await worldWithBox()
     world.notify(noticeOf(TH.boxSparseOf(Reborn)))
     expect(world.vaultTSQ.itemQueryOptions(TH.BoxScope)).to.deep.equal({ queryKey: BoxKey })
-    const otherScope = { ...TH.ThingBank, labelpath: 'box/anthropic' }
+    const otherScope = { ...TH.BoxScope, labelpath: 'box/anthropic' }
     expect(world.vaultTSQ.itemQueryOptions(otherScope)).to.deep.equal({ queryKey: VaultTSQ.itemQueryKeyOf(otherScope) })
   })
 
@@ -388,7 +395,7 @@ describe("VaultTSQ.getOnce and listOnce", () => {
     await TH.expectRefusal(vaultTSQ.getOnce(TH.RootScope))
     await TH.expectRefusal(vaultTSQ.getOnce(TH.BoxScope, { staleTime: -1 }))
     await TH.expectRefusal(vaultTSQ.listOnce('gate'))
-    expect(() => vaultTSQ.itemQueryOptions({ ...TH.ThingBank, labelpath: 'gate' })).to.throw('A vault TSQ keeps an item only for a box under the root box')
+    expect(() => vaultTSQ.itemQueryOptions(TH.GateScope)).to.throw('A vault TSQ keeps an item only for a box under the root box')
   })
 
   it("list each time asked, the listing replaced by each answer", async () => {

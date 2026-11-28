@@ -118,7 +118,7 @@ VOCABULARY.md *Shapes*: `VaultRecord`, `VaultSparse`, `VaultStamp`; never a bare
 `FooRecord` is a plain object's type, always and only; a bare `Foo` is a class.
 
 **A plain string type's helpers ride on a companion object of the same name**, beside the type:
-`Lifeseq.ofLifenum(lifenum)`, `Labelpath.modelkindOf(labelpath)`. **A module of related functions
+`Lifeseq.ofLifenum(lifenum)`, `Labelpath.parentOf(labelpath)`. **A module of related functions
 is imported whole**: `import * as ManifestActs from './manifest-acts'`, `import * as Throwers from '../refusals/throwers'`.
 
 **A name is the doc block's first line, compressed.** Write that line (*Comments and doc
@@ -602,7 +602,7 @@ A member that will not describe in a line is a smell: report it.
   verb: `Create a new box for whisper (encrypted) and sidecar (readable), sealed against the box metadata`. A first line
   opens with the noun it is, the thing it returns, or (most commonly) an imperative verb and its object:
   - `The cached record for a scope` (never "What the cache holds for a scope")
-  - `The bank's three roots` (never "What a birth writes")
+  - `The bank's two roots` (never "What a birth writes")
   - `Remove every one of this minder's stored records from the cache.`
 
   When that noun needs a clause to describe it, open with the verb instead: `Classify a vault request's outcome, based on the stored row`. Read the

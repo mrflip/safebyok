@@ -14,7 +14,7 @@ package is from it. The other guides ([Suspense](guide-suspense.md), [Next.js](g
    typed into an uncontrolled input. A passphrase travels in the form's `FormData`, which the verb
    empties of it before it first awaits.
 3. **One bank, labelled `'main'`.** No call names a bank. Each means the bank `'main'`: its keys are
-   `['sok', userid, 'main', …]`, and its stored scope is `banklabel: 'main'`. A second bank, when
+   `['sok', 'box', userid, 'main', …]`, and its stored scope is `banklabel: 'main'`. A second bank, when
    there is one, wraps a subtree (`<BankScope banklabel="work">`) and changes no call written today.
 
 ## The root, the stage, the handle
@@ -26,16 +26,16 @@ package is from it. The other guides ([Suspense](guide-suspense.md), [Next.js](g
 </QueryClientProvider>
 //   A userid starts that user's device; null or undefined shows 'signed_out'. The config is read when the device starts.
 
-const world = useWorld()                     // synchronous, never suspends, never null
-switch (world.stage) {                       // one field drives the screen
+const bank = useBank()                      // synchronous, never suspends, never null
+switch (bank.stage) {                        // one field drives the screen
   case 'signed_out': return <Signin />
   case 'starting':   return <Spinner />
   case 'unborn':     return <CreateVault />  // nothing stored for this user yet
   case 'locked':                             // records show, sealed; a whisper needs the user
   case 'unlocked':   return <App />          // one component for both, so unlocking unmounts nothing
-  case 'failed':     return <ErrorPanel err={world.lastErr} />
+  case 'failed':     return <ErrorPanel err={bank.lastErr} />
 }
-const isLocked = useWorld((snap) => snap.isLocked) // with a selector: re-renders only when the pick changes
+const isLocked = useBank((snap) => snap.isLocked) // with a selector: re-renders only when the pick changes
 
 const vault = useVault()   // the calls and the query factories, for whoever is signed in. The same object until that changes.
 ```
@@ -48,7 +48,7 @@ const keyMask = useBox('openai', { select: (thing) => liveOf(thing)?.sidecar.mas
 
 // Using the key: it stays inside mutationFn. The prompt is the variable.
 const ask = useMutation({ mutationFn: (prompt: string) => vault.withWhisper('openai', ({ apiKey }) => callOpenAI(apiKey, prompt)) })
-//   On a locked bank, withWhisper waits for the unlock form: show it while useWorld((snap) => snap.isUnlockWanted).
+//   On a locked bank, withWhisper waits for the unlock form: show it while useBank((snap) => snap.isUnlockWanted).
 
 // Saving the key: putBoxMutationOptions pops it from the form before anything is awaited, and runs offline, so nothing TanStack retains contains it.
 const save = useMutation(vault.putBoxMutationOptions('openai', {
