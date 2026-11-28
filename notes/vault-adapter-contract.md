@@ -88,9 +88,9 @@ when it was sealed, and no datastore compares the two. A labelpath is a label al
 
 **Write** (`WriteManifest`):
 
-- `tags`: the write's tags, made of the **ante row** (the row at the scope before the write, null for none) against the
+- `tags`: the write's tags, made of the **prior row** (the row at the scope before the write, null for none) against the
   ask, with `written` (`ManifestTags.writeTagsOf`).
-- `actual`: the row written where the datastore wrote, else the ante row.
+- `actual`: the row written where the datastore wrote, else the prior row.
 - `ancestor`: as the get's, of `actual`.
 
 **Listing** (`ListManifest`):
@@ -112,13 +112,13 @@ when it was sealed, and no datastore compares the two. A labelpath is a label al
 **Get of the bank** (`GetBankManifest`): `actual`, the bank's two roots, as the birth's.
 
 **Stats** (`StatsManifest`): `stats`, the bank's `VaultStats`: the count, the live count and the size in bytes of its
-boxes and of its gates, and `max`, the datastore's limits, each capped by `storeLimitsOf`,
+boxes and of its gates, and `max`, the datastore's limits, each capped by `datastoreLimitsOf`,
 which gives the cap for one the datastore lacks. `vaultStatsOf({ gate, box }, limits)` measures it from the raw rows
 of each table, kind by kind.
 
 ## The tags
 
-Each tag spells the field it compares, and is made of the ante row (a get's and a listing's, of the row read).
+Each tag spells the field it compares, and is made of the prior row (a get's and a listing's, of the row read).
 
 | Tag           | Values                                     | Meaning                                                                                                                                                                         |
 |---------------|--------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -136,7 +136,7 @@ tombstone, and is judged as any put is.
 
 ## The write predicate
 
-The datastore writes `ask.record` whole at the ask's scope, and only where this holds of the ante row. It is a copy of
+The datastore writes `ask.record` whole at the ask's scope, and only where this holds of the prior row. It is a copy of
 Postgres's write functions in `VaultFunctionsSql`, and `MemoryDatastore`'s `isWritable` copies it in TypeScript. Port it
 clause by clause, and drop none. The tags see only some of the clauses, and not `fmt` or `lifeseq`, so the loss of one
 of those goes uncaught; where the datastore writes and the act tables find no write, or the reverse, the ask refuses
@@ -159,7 +159,7 @@ the predicate let through, which the ask alone makes (`ManifestTags.writtenTagsO
 
 ## The birth predicate
 
-The datastore writes both puts' records where the write predicate holds of each put over its ante root, and
+The datastore writes both puts' records where the write predicate holds of each put over its prior root, and
 otherwise neither (Postgres's `birth_roots`; `MemoryDatastore`'s `isBirthWritable`). A put over no row writes its
 root's first revision; one over a tombstone, its next life, a gate's with whatever banktok it carries.
 

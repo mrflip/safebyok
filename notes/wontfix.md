@@ -352,7 +352,7 @@ thread 1b, 2026-11-25; its announcement to `onLifecycle` added by thread 6, 2026
 
 ### Two tabs that stow a lease record at once keep only what stow-keeps-newest keeps
 
-* current outcome: each `stowLease` reads the ante record and writes its own in one transaction, and writes only a record
+* current outcome: each `stowLease` reads the prior record and writes its own in one transaction, and writes only a record
   newer by life, then revision; each answers the actual record. Two tabs that stow at once (a renewal in each,
   or a renewal in one and a lock's tombstone in the other) keep the newer record, and every tab takes it up as the bell
   rings. Two records of the same life and revision keep whichever landed first, though their other fields
@@ -628,15 +628,15 @@ bankDB, and nothing secret is held. Written by adapter_port thread G (postgres_l
 
 ### A write over a row that fails its kind's checks lands when the write predicate's clauses match
 
-* current outcome: a datastore checks no ante row against its kind. A write whose cited revision and the predicate's
-  equality clauses (`fmt`, `lifeseq`, the revision pins, `born_at`, `banktok`) match the ante row overwrites it, and
-  answers `replaced`. A gate policy reads the raw ante wayins, so a `passkey0` that is a string of garbage reads as a
+* current outcome: a datastore checks no prior row against its kind. A write whose cited revision and the predicate's
+  equality clauses (`fmt`, `lifeseq`, the revision pins, `born_at`, `banktok`) match the prior row overwrites it, and
+  answers `replaced`. A gate policy reads the raw prior wayins, so a `passkey0` that is a string of garbage reads as a
   passkey stored, and a write under `revoke_passkey` that cites the gate lands. Without a policy, safebyok-big
   overwrote such a row as well; under a policy, it refused `damaged_row`.
 * alternatives:
-  - check the ante row in each datastore before the write: puts a check outside its owner, in every datastore, on the
+  - check the prior row in each datastore before the write: puts a check outside its owner, in every datastore, on the
     critical path of every write. A datastore reads no check.
-  - have AdapterVaultDB check the manifest's ante row and refuse: the write has already landed in the atomic step, so
+  - have AdapterVaultDB check the manifest's prior row and refuse: the write has already landed in the atomic step, so
     the refusal would misreport what the bankDB stores.
 * workaround: none needed. The row was already broken, and every get of it refused `incompatible_row` before the write.
 
