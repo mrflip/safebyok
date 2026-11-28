@@ -24,7 +24,7 @@ import * as Throwers from '../refusals/throwers'
 /** A bank's gate: its passphrase wayin and its passkey wayin if it has one.
  * Its form verbs prove the user's cleartexts against its wayins, and an `unlock` gating builds a lease, which it attaches to its device's bank.
  * A gate change puts the gate's next revision, and this object then models the revision put.
- * Over the shell or a tombstone, its stamp, its life, `main` and `passkey0` refuse `absent_thing`, and so does a gating's attempt. A gating can still be made, and it still takes in the cleartexts.
+ * Over the shell or a tombstone, its stamp, its life, `main` and `passkey0` refuse `absent_thing`, and so does a gating's attempt. A gating can still be made, and it still accepts the cleartexts.
  */
 export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<GateRecord>> implements GateStamp {
   // == [Props]: #bank, #friend
@@ -83,7 +83,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   /** Make the gate at `begun`, its shell or an item event of its record, which it then receives. Locked, and nothing is fetched or stored.
    * The leases it builds are attached to `opts.bank` through `friend`.
    * Throws where it refuses `begun`'s record.
-   * Internal: the device's bank makes the gate its VaultMinder keeps.
+   * Internal: the device's bank makes the gate its VaultMinder caches.
    */
   static make(begun: Sealers.ShellOf<GateRecord> | VaultItemEvent<GateRecord>, opts: ThingMakeOpts, friend: BankGateFriend): Gate {
     Checks.gateMakeArgs.parse({ begun, opts, friend })

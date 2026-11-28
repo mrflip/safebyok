@@ -318,7 +318,7 @@ export class Bank {
     return isStale ? Lease.tombstoneOf(stowedLease) : stowedLease
   }
 
-  /** Attach `lease`, and stow it in the deviceDB for every tab to take up. */
+  /** Attach `lease`, and stow it in the deviceDB for every tab to adopt. */
   #attachAndStow(lease: Lease): void {
     this.#attachLease(lease)
     void this.#stowLease(lease)
@@ -359,7 +359,7 @@ export class Bank {
   }
 
   // The watch starts before the vaults hear it, so that what a vault refetches as it connects is fetched under the watch.
-  /** Start this bank's watch and listeners, and take up the lease the deviceDB has. Never throws.
+  /** Start this bank's watch and listeners, and adopt the lease the deviceDB has. Never throws.
    * A call once the device is disabled does nothing.
    * What the host's vaultDB or deviceDB throws goes to the device's `onBadNews`; a later call, or the janitor's next tick, starts the watch again. A call while the watch runs leaves it running.
    */
@@ -376,7 +376,7 @@ export class Bank {
   // A disconnect drops this tab's lease alone, and stows no tombstone: one tab unmounting its provider locks no other.
   // Only a lock, the janitor's autolock among them, ends the lease in every tab.
   /** Drop this bank's lease in this tab alone, and stop its watch and listeners. Never throws, and calling it twice in a row is the same as once.
-   * The bank stays enabled: its verbs still work, a call waiting in {@link ensureUnlocked} still waits, and {@link connect} resumes it, taking up the lease the deviceDB has.
+   * The bank stays enabled: its verbs still work, a call waiting in {@link ensureUnlocked} still waits, and {@link connect} resumes it, adopting the lease the deviceDB has.
    * What the host's vaultDB or deviceDB throws as they stop goes to the device's `onBadNews`.
    */
   disconnect(): this {
@@ -426,7 +426,7 @@ export class Bank {
 
   // == [Following the stored lease]: followStored, isNewerThanLease, attachOrDropLease, canUnlock, softlockPastGate, peekStored, stowLease, stowTombstoneOf
   // Each tab's lease is the one the deviceDB has, compared by life, then revision. The newest stow wins there, so a
-  // late stow never brings a locked lease back. A stow or a peek refused is bad news, and the tab keeps its lease.
+  // late stow never brings a locked lease back. A stow or a peek refused is bad news, and the tab's lease is unchanged.
 
   /** Make this bank's lease the one the deviceDB has for its gate, where that one is newer, then softlock it where the gate has moved past it. Does nothing until the roots are live. Never throws: a refusal goes to the device's `onBadNews`. */
   async #followStored(): Promise<void> {
@@ -463,7 +463,7 @@ export class Bank {
   }
 
   // A softlock only ever brings the end nearer, so every tab that hears the same gate change writes the same revision,
-  // and the first stow keeps it (notes/wontfix.md).
+  // and the first stow wins (notes/wontfix.md).
   /** Attach, stow and announce the next revision of this bank's lease, ending the device's `softlockMillis` from now, where the gate has moved past the revision the lease cites and that end is the nearer */
   #softlockPastGate(): void {
     const lease = this.#lease
@@ -520,7 +520,7 @@ export class Bank {
   }
 
   // #lock-is-intent: autolock is a best-effort time, not a deadline. A lease past its end still seals and unseals until
-  // the next tick, which may come a janitor period late, or later while the page sleeps. Meanwhile isSoftlocked holds,
+  // the next tick, which may come a janitor period late, or later while the page sleeps. Meanwhile isSoftlocked is true,
   // so a call to ensureUnlocked asks the user first.
   /** Lock this bank, and announce it, where its lease has passed its end */
   #lockPastLeaseEnd(): void {
@@ -674,7 +674,7 @@ export class Bank {
 
   // The two roots may arrive in either order, one at a time: one live alone is never shown as a stage of its own. The
   // last of them to arrive live brings `'locked'`, so a birth shows no stage between `'unborn'` and `'locked'`.
-  // The softlock is at once, so a grant under way in this tab follows it; the lease stored is taken up once the roots
+  // The softlock is at once, so a grant under way in this tab follows it; the lease stored is adopted once the roots
   // are live, as when they first arrive.
   /** Bring the lease and the snapshot up to date with a change to a root. */
   #hearRoot(): void {
