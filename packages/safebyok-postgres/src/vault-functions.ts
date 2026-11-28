@@ -31,7 +31,7 @@ export const VaultFunctionNames = Object.freeze(Object.fromEntries(VaultFunction
 
 // Each kind's write function is the same statement over its own table and body columns; the gate's alone also checks that
 // a write over a live gate keeps its banktok, and the storage policies its write names. Each is written out from
-// writeFunctionOf, and its clauses from shellClausesOf and anteClausesOf, which birth_roots judges each of its two puts by,
+// writeFunctionOf, and its clauses from shellClausesOf and priorClausesOf, which birth_roots judges each of its two puts by,
 // so none of them can drift apart. MemoryDatastore's isWritable copies the predicate, clause for clause, in TypeScript, and
 // notes/vault-adapter-contract.md states it.
 
@@ -49,7 +49,7 @@ function sqlTagOf(tag: PolicyTag): string { return `'${tag}'` }
 /** The clauses, joined by AND, of a WHERE. */
 function clausesSqlOf(clauses: readonly string[]): string { return clauses.join('\n      AND  ') }
 
-/** The write predicate's clauses over the shell, where there is no ante row: a birth. */
+/** The write predicate's clauses over the shell, where there is no prior row: a birth. */
 function shellClausesOf({ proposed, cited, ifAbsent }: WriteNames): string[] {
   return [
     `(${cited}.revtok = ${VoidRevtok})`,
@@ -62,31 +62,31 @@ function shellClausesOf({ proposed, cited, ifAbsent }: WriteNames): string[] {
   ]
 }
 
-/** The write predicate's clauses over the ante row `ante`, the row the write is judged against. */
-function anteClausesOf({ kind, proposed, cited, proposedJson, citedJson, ifAbsent, ifPresent, policies }: WriteNames, ante: string): string[] {
+/** The write predicate's clauses over the prior row `prior`, the row the write is judged against. */
+function priorClausesOf({ kind, proposed, cited, proposedJson, citedJson, ifAbsent, ifPresent, policies }: WriteNames, prior: string): string[] {
   const gateClauses = [
-    `((${ante}.am <> 'a') OR (${ante}.banktok = ${proposed}.banktok))                   -- a write over a live gate keeps its banktok`,
-    `${VaultFunctionNames.policies_met}(${VaultFunctionNames.policies_of}('${kind}', ${policies}, ${citedJson}, ${proposedJson}, to_jsonb(${ante})))  -- a live gate meets its storage policies`,
+    `((${prior}.am <> 'a') OR (${prior}.banktok = ${proposed}.banktok))                 -- a write over a live gate keeps its banktok`,
+    `${VaultFunctionNames.policies_met}(${VaultFunctionNames.policies_of}('${kind}', ${policies}, ${citedJson}, ${proposedJson}, to_jsonb(${prior}))) -- a live gate meets its storage policies`,
   ]
   return [
-    `((${ante}.userid, ${ante}.banklabel, ${ante}.labelpath) = (${proposed}.userid, ${proposed}.banklabel, ${proposed}.labelpath))`,
-    `(${ante}.revtok   = ${cited}.revtok)`,
-    `(${ante}.am       = ${cited}.am)`,
-    `(${ante}.lifepath = ${cited}.lifepath)`,
-    `(${ante}.revseq   = (${proposed}.revseq - 1))`,
-    `(${ante}.revtok  <> ${proposed}.revtok)`,
-    `(${ante}.fmt      = ${proposed}.fmt)`,
-    `(CASE WHEN (${ante}.am = 'a') THEN (${ifPresent} = 'repl') ELSE (${ifAbsent} = 'add') END)  -- the ask's flag allows a write over this row`,
-    `((${ante}.am = 'a') OR (${proposed}.am = 'a'))                                  -- no tombstone over a tombstone`,
-    `((${ante}.am <> ${proposed}.am) OR (${ante}.born_at = ${proposed}.born_at))            -- a live Thing keeps its born_at`,
-    `((${ante}.am = 'a') OR (${proposed}.born_at = ${proposed}.written_at))             -- a rebirth is born when written`,
-    `${VaultFunctionNames.lifeseq_ok}(${ante}.lifeseq, ${ante}.am, ${proposed}.lifeseq, ${proposed}.am)`,
-    `${VaultFunctionNames.lifepath_kept}(${ante}.lifepath, ${proposed}.lifepath)`,
+    `((${prior}.userid, ${prior}.banklabel, ${prior}.labelpath) = (${proposed}.userid, ${proposed}.banklabel, ${proposed}.labelpath))`,
+    `(${prior}.revtok   = ${cited}.revtok)`,
+    `(${prior}.am       = ${cited}.am)`,
+    `(${prior}.lifepath = ${cited}.lifepath)`,
+    `(${prior}.revseq   = (${proposed}.revseq - 1))`,
+    `(${prior}.revtok  <> ${proposed}.revtok)`,
+    `(${prior}.fmt      = ${proposed}.fmt)`,
+    `(CASE WHEN (${prior}.am = 'a') THEN (${ifPresent} = 'repl') ELSE (${ifAbsent} = 'add') END) -- the ask's flag allows a write over this row`,
+    `((${prior}.am = 'a') OR (${proposed}.am = 'a'))                                 -- no tombstone over a tombstone`,
+    `((${prior}.am <> ${proposed}.am) OR (${prior}.born_at = ${proposed}.born_at))          -- a live Thing keeps its born_at`,
+    `((${prior}.am = 'a') OR (${proposed}.born_at = ${proposed}.written_at))            -- a rebirth is born when written`,
+    `${VaultFunctionNames.lifeseq_ok}(${prior}.lifeseq, ${prior}.am, ${proposed}.lifeseq, ${proposed}.am)`,
+    `${VaultFunctionNames.lifepath_kept}(${prior}.lifepath, ${proposed}.lifepath)`,
     ...((kind === 'gate') ? gateClauses : []),
   ]
 }
 
-/** The columns a write sets over its ante row, of a kind whose body columns are `body`. */
+/** The columns a write sets over its prior row, of a kind whose body columns are `body`. */
 function setColumnsOf(body: readonly string[]): string[] { return ['banktok', 'fmt', 'am', 'lifepath', 'lifeseq', 'revtok', 'revseq', 'born_at', 'written_at', ...body] }
 
 /** The SQL of one kind's write function, from what sets it apart. */
@@ -105,18 +105,18 @@ DECLARE
   cited    ${table} := jsonb_populate_record(NULL::${table}, cited_record);
 BEGIN
   IF (cited.revseq = -1) THEN
-    -- Over the shell: a birth, where there is no ante row.
+    -- Over the shell: a birth, where there is no prior row.
     INSERT INTO ${table} AS written
     SELECT (proposed).*
     WHERE  ${clausesSqlOf(shellClausesOf(names))}
     ON CONFLICT DO NOTHING  -- variation approved for birth calls: a birth is an ensure, so a conflict is the present case, which the read below answers
     RETURNING ${VaultFunctionNames.thing_record}(to_jsonb(written)) INTO actual;
   ELSE
-    -- Over the ante row, the row the write is judged against: its WHERE sees the row a concurrent writer left.
-    UPDATE ${table} AS ante
+    -- Over the prior row, the row the write is judged against: its WHERE sees the row a concurrent writer left.
+    UPDATE ${table} AS prior
     SET    (${columns.join(', ')})
          = (${columns.map((column) => `proposed.${column}`).join(', ')})
-    WHERE  ${clausesSqlOf(anteClausesOf(names, 'ante'))}
+    WHERE  ${clausesSqlOf(priorClausesOf(names, 'prior'))}
     RETURNING WITH (NEW AS written) ${VaultFunctionNames.thing_record}(to_jsonb(written)) INTO actual;
   END IF;
 
@@ -129,13 +129,13 @@ BEGIN
     RETURN NEXT;  RETURN;
   END IF;
 
-  -- Nothing written: the ante row is the actual one, read back as it now stands, and the tags are made of that same row.
-  SELECT (SELECT ${VaultFunctionNames.thing_record}(to_jsonb(ante))),
+  -- Nothing written: the prior row is the actual one, read back as it now stands, and the tags are made of that same row.
+  SELECT (SELECT ${VaultFunctionNames.thing_record}(to_jsonb(prior))),
          ${VaultFunctionNames.bank_roots}(proposed.userid, proposed.banklabel)
   INTO   actual, roots
   FROM   (SELECT) AS one
-  LEFT JOIN ${table} AS ante
-    ON   ((ante.userid, ante.banklabel, ante.labelpath) = (proposed.userid, proposed.banklabel, proposed.labelpath));
+  LEFT JOIN ${table} AS prior
+    ON   ((prior.userid, prior.banklabel, prior.labelpath) = (proposed.userid, proposed.banklabel, proposed.labelpath));
   tags := ${VaultFunctionNames.write_tags_of}('${kind}', proposed_record, cited_record, actual, ${policiesVal}, false);
   RETURN NEXT;
 END $$;
@@ -171,7 +171,7 @@ export const VaultFunctionsSql = `-- safebyok-postgres: the functions PostgresVa
 -- another writer of the row, Postgres checks them again against the row that writer left.
 --
 -- Each write function writes its record in one statement, which waits only on a writer of the same row. It does not
--- throw when it writes nothing. It returns one row: the write's tags (made of the ante row, the row the write was judged
+-- throw when it writes nothing. It returns one row: the write's tags (made of the prior row, the row the write was judged
 -- against, as ManifestTags.writeTagsOf makes them), the actual row (the row written, or where it wrote nothing, the row
 -- as it now stands, which the tags are then made of), and the bank's roots (its gate and root box rows, each null for
 -- none). When it wrote the record, the roots are read just after, in the same transaction; when it wrote nothing, in the
@@ -273,25 +273,25 @@ BEGIN
 END $$;
 
 -- Each check below returns true or false and takes plain values, so one function serves every kind's table. A rule
--- about one row alone is a CHECK on the table; a function holds only what compares the proposed record with the ante
+-- about one row alone is a CHECK on the table; a function holds only what compares the proposed record with the prior
 -- row or the cited one.
 
--- Whether proposed_lifeseq follows ante_lifeseq: one past the ante when am flips, the same when not. A null ante is the
+-- Whether proposed_lifeseq follows prior_lifeseq: one past the prior when am flips, the same when not. A null prior is the
 -- shell: life -1, gone. So a birth is life 0. The parity of each lifeseq is a CHECK on the row, not this.
-CREATE OR REPLACE FUNCTION ${VaultFunctionNames.lifeseq_ok}(ante_lifeseq text, ante_am text, proposed_lifeseq text, proposed_am text) RETURNS boolean
+CREATE OR REPLACE FUNCTION ${VaultFunctionNames.lifeseq_ok}(prior_lifeseq text, prior_am text, proposed_lifeseq text, proposed_am text) RETURNS boolean
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT (
     proposed_lifeseq = ${VaultFunctionNames.base32_of_bigint}(
-      (COALESCE(${VaultFunctionNames.bigint_of_base32}(ante_lifeseq), -1))
-      + (CASE WHEN (COALESCE(ante_am, 'x') <> proposed_am) THEN 1 ELSE 0 END)
+      (COALESCE(${VaultFunctionNames.bigint_of_base32}(prior_lifeseq), -1))
+      + (CASE WHEN (COALESCE(prior_am, 'x') <> proposed_am) THEN 1 ELSE 0 END)
     )
   )
 $$;
 
--- Whether proposed_lifepath keeps the lives above its own in ante_lifepath: the lifeseqs of the Things above it.
-CREATE OR REPLACE FUNCTION ${VaultFunctionNames.lifepath_kept}(ante_lifepath text, proposed_lifepath text) RETURNS boolean
+-- Whether proposed_lifepath keeps the lives above its own in prior_lifepath: the lifeseqs of the Things above it.
+CREATE OR REPLACE FUNCTION ${VaultFunctionNames.lifepath_kept}(prior_lifepath text, proposed_lifepath text) RETURNS boolean
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
-  SELECT (regexp_replace(ante_lifepath, '[^/]*$', '') = regexp_replace(proposed_lifepath, '[^/]*$', ''))
+  SELECT (regexp_replace(prior_lifepath, '[^/]*$', '') = regexp_replace(proposed_lifepath, '[^/]*$', ''))
 $$;
 
 -- The tags of a write, each a copy of its TypeScript in safebyok's ManifestTags, comparison for comparison (the function
@@ -299,24 +299,24 @@ $$;
 -- a row agree whatever is stored in it: AdapterVaultDB makes them again of an unwritten write's actual row, and refuses
 -- tags that disagree.
 
--- The liveness of the raw row ante: 'void' for none, 'live' where its am is 'a', else 'gone'. ManifestTags.presenceOf.
-CREATE OR REPLACE FUNCTION ${VaultFunctionNames.presence_of}(ante jsonb) RETURNS text
+-- The liveness of the raw row prior: 'void' for none, 'live' where its am is 'a', else 'gone'. ManifestTags.presenceOf.
+CREATE OR REPLACE FUNCTION ${VaultFunctionNames.presence_of}(prior jsonb) RETURNS text
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT CASE
-    WHEN (ante IS NULL)          THEN 'void'
-    WHEN ((ante->>'am') = 'a')   THEN 'live'
+    WHEN (prior IS NULL)         THEN 'void'
+    WHEN ((prior->>'am') = 'a')  THEN 'live'
     ELSE                              'gone'
   END
 $$;
 
--- The raw row ante's revtok against the cited and proposed revtoks: 'birth' where there is no row and the shell is cited,
+-- The raw row prior's revtok against the cited and proposed revtoks: 'birth' where there is no row and the shell is cited,
 -- '=next' where the row has the proposed revtok, 'eq' where it has the cited one, else 'neq'. ManifestTags' revtokCmpOf.
-CREATE OR REPLACE FUNCTION ${VaultFunctionNames.revtok_cmp_of}(cited_revtok text, proposed_revtok text, ante jsonb) RETURNS text
+CREATE OR REPLACE FUNCTION ${VaultFunctionNames.revtok_cmp_of}(cited_revtok text, proposed_revtok text, prior jsonb) RETURNS text
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT CASE
-    WHEN (ante IS NULL)                         THEN (CASE WHEN (cited_revtok = ${VoidRevtok}) THEN 'birth' ELSE 'neq' END)
-    WHEN ((ante->>'revtok') = proposed_revtok)  THEN '=next'
-    WHEN ((ante->>'revtok') = cited_revtok)     THEN 'eq'
+    WHEN (prior IS NULL)                        THEN (CASE WHEN (cited_revtok = ${VoidRevtok}) THEN 'birth' ELSE 'neq' END)
+    WHEN ((prior->>'revtok') = proposed_revtok) THEN '=next'
+    WHEN ((prior->>'revtok') = cited_revtok)    THEN 'eq'
     ELSE                                             'neq'
   END
 $$;
@@ -326,51 +326,51 @@ $$;
 -- A gate's passkey0 is an object, or JSON null for none.
 
 -- Why a write that names replace_passphrase refuses: it must replace the passphrase wayin the gating proved against, and nothing else.
-CREATE OR REPLACE FUNCTION ${VaultFunctionNames.replace_passphrase_refusal}(ante_wayins jsonb, cited_wayins jsonb, proposed_wayins jsonb) RETURNS text
+CREATE OR REPLACE FUNCTION ${VaultFunctionNames.replace_passphrase_refusal}(prior_wayins jsonb, cited_wayins jsonb, proposed_wayins jsonb) RETURNS text
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT CASE
-    WHEN (NOT COALESCE(((ante_wayins->'main') = (cited_wayins->'main')), false))           THEN ${sqlTagOf('ProvedWayinMoved')}
-    WHEN (NOT COALESCE(((ante_wayins - 'main') = (proposed_wayins - 'main')), false))      THEN ${sqlTagOf('OtherWayinMoved')}
+    WHEN (NOT COALESCE(((prior_wayins->'main') = (cited_wayins->'main')), false))          THEN ${sqlTagOf('ProvedWayinMoved')}
+    WHEN (NOT COALESCE(((prior_wayins - 'main') = (proposed_wayins - 'main')), false))     THEN ${sqlTagOf('OtherWayinMoved')}
   END
 $$;
 
 -- Why a write that names add_passkey refuses: it must add a passkey wayin to a gate that has none, and change nothing else.
-CREATE OR REPLACE FUNCTION ${VaultFunctionNames.add_passkey_refusal}(ante_wayins jsonb, proposed_wayins jsonb) RETURNS text
+CREATE OR REPLACE FUNCTION ${VaultFunctionNames.add_passkey_refusal}(prior_wayins jsonb, proposed_wayins jsonb) RETURNS text
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT CASE
-    WHEN (jsonb_typeof(ante_wayins->'passkey0') IS DISTINCT FROM 'null')                   THEN ${sqlTagOf('PasskeyStored')}
+    WHEN (jsonb_typeof(prior_wayins->'passkey0') IS DISTINCT FROM 'null')                  THEN ${sqlTagOf('PasskeyStored')}
     WHEN (jsonb_typeof(proposed_wayins->'passkey0') IS DISTINCT FROM 'object')             THEN ${sqlTagOf('PasskeyNotAdded')}
-    WHEN (NOT COALESCE(((ante_wayins - 'passkey0') = (proposed_wayins - 'passkey0')), false)) THEN ${sqlTagOf('OtherWayinMoved')}
+    WHEN (NOT COALESCE(((prior_wayins - 'passkey0') = (proposed_wayins - 'passkey0')), false)) THEN ${sqlTagOf('OtherWayinMoved')}
   END
 $$;
 
 -- Why a write that names revoke_passkey refuses: it must remove the gate's passkey wayin, and change nothing else.
-CREATE OR REPLACE FUNCTION ${VaultFunctionNames.revoke_passkey_refusal}(ante_wayins jsonb, proposed_wayins jsonb) RETURNS text
+CREATE OR REPLACE FUNCTION ${VaultFunctionNames.revoke_passkey_refusal}(prior_wayins jsonb, proposed_wayins jsonb) RETURNS text
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT CASE
-    WHEN (jsonb_typeof(ante_wayins->'passkey0') IS DISTINCT FROM 'object')                 THEN ${sqlTagOf('NoPasskeyStored')}
+    WHEN (jsonb_typeof(prior_wayins->'passkey0') IS DISTINCT FROM 'object')                THEN ${sqlTagOf('NoPasskeyStored')}
     WHEN (jsonb_typeof(proposed_wayins->'passkey0') IS DISTINCT FROM 'null')               THEN ${sqlTagOf('PasskeyNotRevoked')}
-    WHEN (NOT COALESCE(((ante_wayins - 'passkey0') = (proposed_wayins - 'passkey0')), false)) THEN ${sqlTagOf('OtherWayinMoved')}
+    WHEN (NOT COALESCE(((prior_wayins - 'passkey0') = (proposed_wayins - 'passkey0')), false)) THEN ${sqlTagOf('OtherWayinMoved')}
   END
 $$;
 
--- The verdict of policy on a write of proposed citing cited over the raw row ante: met wherever that is no live gate,
+-- The verdict of policy on a write of proposed citing cited over the raw row prior: met wherever that is no live gate,
 -- since a policy judges only a live gate's replacement. ManifestTags' policyVerdictOf.
-CREATE OR REPLACE FUNCTION ${VaultFunctionNames.policy_verdict_of}(policy text, modelkind text, cited jsonb, proposed jsonb, ante jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION ${VaultFunctionNames.policy_verdict_of}(policy text, modelkind text, cited jsonb, proposed jsonb, prior jsonb) RETURNS jsonb
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT CASE WHEN (refusaltag IS NULL) THEN jsonb_build_object('ok', true) ELSE jsonb_build_object('ok', false, 'refusaltag', refusaltag) END
   FROM (SELECT CASE
-    WHEN ((modelkind <> 'gate') OR (${VaultFunctionNames.presence_of}(ante) <> 'live')) THEN NULL
-    WHEN (policy = 'replace_passphrase') THEN ${VaultFunctionNames.replace_passphrase_refusal}(ante->'wayins', cited->'wayins', proposed->'wayins')
-    WHEN (policy = 'add_passkey')        THEN ${VaultFunctionNames.add_passkey_refusal}(ante->'wayins', proposed->'wayins')
-    WHEN (policy = 'revoke_passkey')     THEN ${VaultFunctionNames.revoke_passkey_refusal}(ante->'wayins', proposed->'wayins')
+    WHEN ((modelkind <> 'gate') OR (${VaultFunctionNames.presence_of}(prior) <> 'live')) THEN NULL
+    WHEN (policy = 'replace_passphrase') THEN ${VaultFunctionNames.replace_passphrase_refusal}(prior->'wayins', cited->'wayins', proposed->'wayins')
+    WHEN (policy = 'add_passkey')        THEN ${VaultFunctionNames.add_passkey_refusal}(prior->'wayins', proposed->'wayins')
+    WHEN (policy = 'revoke_passkey')     THEN ${VaultFunctionNames.revoke_passkey_refusal}(prior->'wayins', proposed->'wayins')
   END AS refusaltag) AS judged
 $$;
 
 -- A verdict for each storage policy in policies, keyed by the policy. ManifestTags.policiesOf.
-CREATE OR REPLACE FUNCTION ${VaultFunctionNames.policies_of}(modelkind text, policies text[], cited jsonb, proposed jsonb, ante jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION ${VaultFunctionNames.policies_of}(modelkind text, policies text[], cited jsonb, proposed jsonb, prior jsonb) RETURNS jsonb
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
-  SELECT COALESCE(jsonb_object_agg(policy, ${VaultFunctionNames.policy_verdict_of}(policy, modelkind, cited, proposed, ante)), '{}'::jsonb)
+  SELECT COALESCE(jsonb_object_agg(policy, ${VaultFunctionNames.policy_verdict_of}(policy, modelkind, cited, proposed, prior)), '{}'::jsonb)
   FROM   unnest(policies) AS policy
 $$;
 
@@ -380,39 +380,39 @@ LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT NOT EXISTS (SELECT FROM jsonb_each(verdicts) AS verdict WHERE ((verdict.value->'ok') = 'false'::jsonb))
 $$;
 
--- The tags of a write of proposed over the raw row ante, citing cited, beside whether it wrote. ManifestTags.writeTagsOf.
+-- The tags of a write of proposed over the raw row prior, citing cited, beside whether it wrote. ManifestTags.writeTagsOf.
 -- modelkind is the write's, and policies the storage policies it names.
-CREATE OR REPLACE FUNCTION ${VaultFunctionNames.write_tags_of}(modelkind text, proposed jsonb, cited jsonb, ante jsonb, policies text[], written boolean) RETURNS jsonb
+CREATE OR REPLACE FUNCTION ${VaultFunctionNames.write_tags_of}(modelkind text, proposed jsonb, cited jsonb, prior jsonb, policies text[], written boolean) RETURNS jsonb
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT jsonb_build_object(
-    'presence',    ${VaultFunctionNames.presence_of}(ante),
-    'revtok_cmp',  ${VaultFunctionNames.revtok_cmp_of}(cited->>'revtok', proposed->>'revtok', ante),
+    'presence',    ${VaultFunctionNames.presence_of}(prior),
+    'revtok_cmp',  ${VaultFunctionNames.revtok_cmp_of}(cited->>'revtok', proposed->>'revtok', prior),
     'revseq_cmp',  CASE                                                                     -- revseqCmpOf
                      WHEN ((cited->'revseq') = '-1'::jsonb)          THEN 'birth'
-                     WHEN ((ante->'revseq') = (cited->'revseq'))     THEN 'eq'
-                     WHEN ((jsonb_typeof(ante->'revseq') = 'number') AND ((cited->>'revseq')::numeric < (ante->>'revseq')::numeric)) THEN 'stale'
+                     WHEN ((prior->'revseq') = (cited->'revseq'))    THEN 'eq'
+                     WHEN ((jsonb_typeof(prior->'revseq') = 'number') AND ((cited->>'revseq')::numeric < (prior->>'revseq')::numeric)) THEN 'stale'
                      ELSE                                                 'ahead'
                    END,
-    'lifepath_eq', ((ante IS NULL) OR COALESCE(((ante->'lifepath') = (cited->'lifepath')), false)),
+    'lifepath_eq', ((prior IS NULL) OR COALESCE(((prior->'lifepath') = (cited->'lifepath')), false)),
     'born_at_cmp', CASE                                                                     -- bornAtCmpOf
-                     WHEN (((proposed->>'am') <> 'a') OR (${VaultFunctionNames.presence_of}(ante) <> 'live')) THEN 'moot'
-                     WHEN ((ante->'born_at') = (proposed->'born_at'))                                         THEN 'same'
-                     ELSE                                                                                          'changed'
+                     WHEN (((proposed->>'am') <> 'a') OR (${VaultFunctionNames.presence_of}(prior) <> 'live')) THEN 'moot'
+                     WHEN ((prior->'born_at') = (proposed->'born_at'))                                         THEN 'same'
+                     ELSE                                                                                           'changed'
                    END,
     'banktok_cmp', CASE                                                                     -- banktokCmpOf
-                     WHEN ((modelkind <> 'gate') OR (${VaultFunctionNames.presence_of}(ante) <> 'live'))      THEN 'moot'
-                     WHEN ((ante->'banktok') = (proposed->'banktok'))                                         THEN 'same'
-                     ELSE                                                                                          'changed'
+                     WHEN ((modelkind <> 'gate') OR (${VaultFunctionNames.presence_of}(prior) <> 'live'))      THEN 'moot'
+                     WHEN ((prior->'banktok') = (proposed->'banktok'))                                         THEN 'same'
+                     ELSE                                                                                           'changed'
                    END,
-    'policies',    ${VaultFunctionNames.policies_of}(modelkind, policies, cited, proposed, ante),
+    'policies',    ${VaultFunctionNames.policies_of}(modelkind, policies, cited, proposed, prior),
     'written',     written
   )
 $$;
 
--- The tags of a write that wrote, of proposed citing cited. Its WHERE pinned the ante row's revtok, am and lifepath to the
+-- The tags of a write that wrote, of proposed citing cited. Its WHERE pinned the prior row's revtok, am and lifepath to the
 -- cited ones, and its revseq to the proposed one's less one, which past the vaultDB's checks of the ask is the cited one's;
--- or, citing the shell, found no row. It held the ante row's born_at and banktok to the proposed ones, and met each storage
--- policy. So each tag is the one ${VaultFunctionNames.write_tags_of} would make of that ante row: ManifestTags.writtenTagsOf.
+-- or, citing the shell, found no row. It held the prior row's born_at and banktok to the proposed ones, and met each storage
+-- policy. So each tag is the one ${VaultFunctionNames.write_tags_of} would make of that prior row: ManifestTags.writtenTagsOf.
 CREATE OR REPLACE FUNCTION ${VaultFunctionNames.written_tags_of}(modelkind text, proposed jsonb, cited jsonb, policies text[]) RETURNS jsonb
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT jsonb_build_object(
@@ -428,19 +428,19 @@ LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
 $$;
 
 -- The tags of a birth that wrote nothing, by gate_record citing gate_cited and root_record citing root_cited, over the
--- raw roots ante_gate and ante_root: each root's tags as ${VaultFunctionNames.write_tags_of} makes them, less written.
+-- raw roots prior_gate and prior_root: each root's tags as ${VaultFunctionNames.write_tags_of} makes them, less written.
 -- ManifestTags.birthTagsOf.
-CREATE OR REPLACE FUNCTION ${VaultFunctionNames.birth_tags_of}(gate_record jsonb, gate_cited jsonb, root_record jsonb, root_cited jsonb, ante_gate jsonb, ante_root jsonb) RETURNS jsonb
+CREATE OR REPLACE FUNCTION ${VaultFunctionNames.birth_tags_of}(gate_record jsonb, gate_cited jsonb, root_record jsonb, root_cited jsonb, prior_gate jsonb, prior_root jsonb) RETURNS jsonb
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT jsonb_build_object(
-    'gate',    ${VaultFunctionNames.write_tags_of}('gate', gate_record, gate_cited, ante_gate, ARRAY[]::text[], false) - 'written',
-    'root',    ${VaultFunctionNames.write_tags_of}('box',  root_record, root_cited, ante_root, ARRAY[]::text[], false) - 'written',
+    'gate',    ${VaultFunctionNames.write_tags_of}('gate', gate_record, gate_cited, prior_gate, ARRAY[]::text[], false) - 'written',
+    'root',    ${VaultFunctionNames.write_tags_of}('box',  root_record, root_cited, prior_root, ARRAY[]::text[], false) - 'written',
     'written', false
   )
 $$;
 
 -- Each kind's write function: write proposed_record over the row cited_record cites, or over the shell where none is
--- stored, where the ask's flags if_absent and if_present allow it and every check holds of the ante row.
+-- stored, where the ask's flags if_absent and if_present allow it and every check holds of the prior row.
 ${writeFunctionOf({ kind: 'gate', table: 'safebyok_gate_things', body: GateBody })}
 ${writeFunctionOf({ kind: 'box', table: 'safebyok_box_things', body: BoxBody })}
 
@@ -468,13 +468,13 @@ BEGIN
   WITH writable AS (
     SELECT
     FROM   (SELECT) AS one
-    LEFT JOIN safebyok_box_things AS root_ante
-      ON   ((root_ante.userid, root_ante.banklabel, root_ante.labelpath) = (new_root.userid, new_root.banklabel, new_root.labelpath))
+    LEFT JOIN safebyok_box_things AS root_prior
+      ON   ((root_prior.userid, root_prior.banklabel, root_prior.labelpath) = (new_root.userid, new_root.banklabel, new_root.labelpath))
     WHERE  ((new_root.userid, new_root.banklabel) = (new_gate.userid, new_gate.banklabel))
       AND  (new_gate.labelpath = new_gate.banklabel) AND (new_root.labelpath = 'box')
       AND  (CASE WHEN (root_cited.revseq = -1)
-             THEN ((root_ante.userid IS NULL) AND ${clausesSqlOf(shellClausesOf(BirthRootNames))})
-             ELSE (${clausesSqlOf(anteClausesOf(BirthRootNames, 'root_ante'))})
+             THEN ((root_prior.userid IS NULL) AND ${clausesSqlOf(shellClausesOf(BirthRootNames))})
+             ELSE (${clausesSqlOf(priorClausesOf(BirthRootNames, 'root_prior'))})
            END)
   ), gate_added AS (
     INSERT INTO safebyok_gate_things AS written SELECT (new_gate).* FROM writable
@@ -483,12 +483,12 @@ BEGIN
     ON CONFLICT DO NOTHING  -- variation approved for birth calls: a birth is an ensure, so a conflict is the present case, which the read below answers
     RETURNING ${VaultFunctionNames.thing_record}(to_jsonb(written)) AS written
   ), gate_reborn AS (
-    UPDATE safebyok_gate_things AS ante
+    UPDATE safebyok_gate_things AS prior
     SET    (${GateColumns.join(', ')})
          = (${GateColumns.map((column) => `new_gate.${column}`).join(', ')})
     FROM   writable
     WHERE  (gate_cited.revseq <> -1)
-      AND  ${clausesSqlOf(anteClausesOf(BirthGateNames, 'ante'))}
+      AND  ${clausesSqlOf(priorClausesOf(BirthGateNames, 'prior'))}
     RETURNING WITH (NEW AS written) ${VaultFunctionNames.thing_record}(to_jsonb(written)) AS written
   ), gated AS (
     SELECT written AS gate_written FROM gate_added UNION ALL SELECT written FROM gate_reborn  -- named apart from written, which the root box's UPDATE returns
@@ -497,12 +497,12 @@ BEGIN
     WHERE  (root_cited.revseq = -1)  -- only once the gate is written; a conflict here fails the whole statement
     RETURNING ${VaultFunctionNames.thing_record}(to_jsonb(written)) AS written
   ), root_reborn AS (
-    UPDATE safebyok_box_things AS ante
+    UPDATE safebyok_box_things AS prior
     SET    (${BoxColumns.join(', ')})
          = (${BoxColumns.map((column) => `new_root.${column}`).join(', ')})
     FROM   gated
     WHERE  (root_cited.revseq <> -1)
-      AND  ${clausesSqlOf(anteClausesOf(BirthRootNames, 'ante'))}
+      AND  ${clausesSqlOf(priorClausesOf(BirthRootNames, 'prior'))}
     RETURNING WITH (NEW AS written) ${VaultFunctionNames.thing_record}(to_jsonb(written)) AS written
   )
   SELECT (SELECT gate_written FROM gated), (SELECT written FROM root_added UNION ALL SELECT written FROM root_reborn)
@@ -523,11 +523,11 @@ BEGIN
   END IF;
 
   SELECT (
-    SELECT ${VaultFunctionNames.thing_record}(to_jsonb(ante)) FROM safebyok_gate_things AS ante
-    WHERE  (ante.userid, ante.banklabel, ante.labelpath) = (new_gate.userid, new_gate.banklabel, new_gate.banklabel)
+    SELECT ${VaultFunctionNames.thing_record}(to_jsonb(prior)) FROM safebyok_gate_things AS prior
+    WHERE  (prior.userid, prior.banklabel, prior.labelpath) = (new_gate.userid, new_gate.banklabel, new_gate.banklabel)
   ), (
-    SELECT ${VaultFunctionNames.thing_record}(to_jsonb(ante)) FROM safebyok_box_things AS ante
-    WHERE  (ante.userid, ante.banklabel, ante.labelpath) = (new_gate.userid, new_gate.banklabel, 'box')
+    SELECT ${VaultFunctionNames.thing_record}(to_jsonb(prior)) FROM safebyok_box_things AS prior
+    WHERE  (prior.userid, prior.banklabel, prior.labelpath) = (new_gate.userid, new_gate.banklabel, 'box')
   )
   INTO gate, root;
   tags := ${VaultFunctionNames.birth_tags_of}(gate_record, gate_cited_record, root_record, root_cited_record, gate, root);

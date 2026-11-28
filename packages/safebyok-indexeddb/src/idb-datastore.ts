@@ -25,7 +25,7 @@ async function quotaNow(): Promise<number | undefined> {
   return quota
 }
 
-/** `shelf`, but its first use refuses `storage_blocked` where the browser's quota is under {@link DB.StoreLimitFloor}. Where the browser gives no estimate, nothing is refused.
+/** `shelf`, but its first use refuses `storage_blocked` where the browser's quota is under {@link DB.DatastoreLimitFloor}. Where the browser gives no estimate, nothing is refused.
  * The quota is known only asynchronously, so the refusal cannot come from the constructor: it comes at the first call of any kind, which at startup is the read of the bank's roots at sign-in.
  */
 function shelfRefusingSmallQuota(shelf: UseStore): UseStore {
@@ -33,7 +33,7 @@ function shelfRefusingSmallQuota(shelf: UseStore): UseStore {
   return async (txMode, callback) => {
     if (isQuotaPending) {
       const quota = await quotaNow()
-      if ((quota !== undefined) && (quota < DB.StoreLimitFloor)) { throw DB.storeQuotaTooSmall(quota) }
+      if ((quota !== undefined) && (quota < DB.DatastoreLimitFloor)) { throw DB.datastoreQuotaTooSmall(quota) }
       isQuotaPending = false
     }
     return await shelf(txMode, callback)
@@ -101,11 +101,11 @@ export class IdbDatastore {
   /** Write `ask.record` where {@link DB.isWritable} allows, and observe the result, in one transaction. */
   async writeThing(ask: WriteAsk): Promise<WriteManifest> {
     const manifest = await DB.inOneStep(this.#shelf, 'readwrite', async (store): Promise<WriteManifest> => {
-      const ante      = await rowAt(store, ask)
-      const isWritten = DB.isWritable(ask, ante)
+      const prior     = await rowAt(store, ask)
+      const isWritten = DB.isWritable(ask, prior)
       if (isWritten) { store.put(ask.record, thingScopepathOf(ask)) }
       const actual = await rowAt(store, ask)
-      return { tags: DB.ManifestTags.writeTagsOf(ask, ante, isWritten), actual, ancestor: await ancestorOf(store, ask, actual), ...(await bankObservedOf(store, ask)) }
+      return { tags: DB.ManifestTags.writeTagsOf(ask, prior, isWritten), actual, ancestor: await ancestorOf(store, ask, actual), ...(await bankObservedOf(store, ask)) }
     })
     if (manifest.tags.written) { this.#ring([{ scope: ask, received: { record: manifest.actual, modelkind: ask.modelkind, banktok: manifest.banktok } }]) }
     return manifest
@@ -124,11 +124,11 @@ export class IdbDatastore {
   /** Write a new bank's two roots, each put's record, where {@link DB.isBirthWritable} allows, and observe the result, in one transaction. */
   async birthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthManifest> {
     const manifest = await DB.inOneStep(this.#shelf, 'readwrite', async (store): Promise<BirthManifest> => {
-      const ante      = await rootsOf(store, ask)
-      const isWritten = DB.isBirthWritable(puts, ante)
+      const prior     = await rootsOf(store, ask)
+      const isWritten = DB.isBirthWritable(puts, prior)
       if (isWritten) { for (const put of puts) { store.put(put.record, thingScopepathOf(put)) } }
       const actual = await rootsOf(store, ask)
-      return { tags: DB.ManifestTags.birthTagsOf(puts, ante, isWritten), actual, ...(await bankObservedOf(store, ask)) }
+      return { tags: DB.ManifestTags.birthTagsOf(puts, prior, isWritten), actual, ...(await bankObservedOf(store, ask)) }
     })
     if (manifest.tags.written) {
       const { actual, banktok } = manifest

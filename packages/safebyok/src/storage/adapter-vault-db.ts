@@ -182,12 +182,12 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doWriteThing(ask: WriteAsk): Helpers.Awaitable<WriteManifest>
   /** In one step, read the Thing at `ask`'s scope and each Thing one label under it, and hand back what was observed ({@link ListManifest}). */
   protected abstract doListThings(ask: ListAsk): Helpers.Awaitable<ListManifest>
-  /** In one step, write the two `puts`' records where the ante roots are both null, and hand back what was observed ({@link BirthManifest}). */
+  /** In one step, write the two `puts`' records where the prior roots are both null, and hand back what was observed ({@link BirthManifest}). */
   protected abstract doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Helpers.Awaitable<BirthManifest>
   /** In one step, read the bank's two roots, and hand back what was observed ({@link GetBankManifest}). */
   protected abstract doGetBank(ask: GetBankAsk): Helpers.Awaitable<GetBankManifest>
   /** In one step, measure the bank's boxes and gates, and hand back what was observed ({@link StatsManifest}).
-   * Report the datastore's limits where it has them; `storeLimitsOf` caps each, and gives the cap for one it lacks.
+   * Report the datastore's limits where it has them; `datastoreLimitsOf` caps each, and gives the cap for one it lacks.
    */
   protected abstract doStats(ask: StatsAsk): Helpers.Awaitable<StatsManifest>
   /** Start watching the datastore: call `receive` with each changed Thing, one at a time ({@link Received}), and `onBadNews` with any trouble,

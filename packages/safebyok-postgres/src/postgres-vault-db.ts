@@ -3,7 +3,7 @@
 import {
   type AnyAsk, type Awaitable, type BadAnswer, type BankObserved, type BirthBankAsk, type BirthManifest, type BirthPuts, type GetAsk, type GetManifest, type GetBankAsk, type ListAsk, type ListManifest, type Received,
   type StatsAsk, type StatsManifest, type ThingWatchScope, type VaultError, type GetBankManifest, type WriteAsk, type WriteManifest, AdapterVaultDB, VoidBanktok, VoidTrack, getAskOf, isVaultError, objCheck,
-  storeLimitsOf,
+  datastoreLimitsOf,
 } from 'safebyok/storage'
 import { type ThingNotification, thingNotificationOf, thingsChannelOf } from './notifications'
 import * as Phrases from './phrases'
@@ -109,7 +109,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
   protected async doStats(ask: StatsAsk): Promise<StatsManifest> {
     const { userid, banklabel } = ask
     const { box, gate, ...observed } = await this.#queryRow<BankObserved & Record<'box' | 'gate', unknown>>(StatsSql, [userid, banklabel, trackParam(ask)])
-    return { stats: { box, gate, max: storeLimitsOf() }, ...observed }
+    return { stats: { box, gate, max: datastoreLimitsOf() }, ...observed }
   }
 
   // A notification may come before or after a read or a write made beside it, and before or after another notification.

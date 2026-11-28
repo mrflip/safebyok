@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import { expectBad, expectGood } from 'safebyok-big/testing'
 
-import { StoreLimitCap, type VaultStats } from '../../src/shapes/shapes-vault-stats'
+import { DatastoreLimitCap, type VaultStats } from '../../src/shapes/shapes-vault-stats'
 import { boxThingOf, boxTombOf, gateThingOf, rootBoxOf, statsAskOf, trackOf } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 
@@ -57,7 +57,7 @@ export function describeVaultDBStats({ fresh, bornBank, boxesBorn, rowsOf }: Vau
       const { max } = await statsOf(await fresh())
       for (const limit of [max.count, max.size]) {
         expect(Number.isSafeInteger(limit)).to.equal(true)
-        expect(limit).to.be.within(0, StoreLimitCap)
+        expect(limit).to.be.within(0, DatastoreLimitCap)
       }
     })
 

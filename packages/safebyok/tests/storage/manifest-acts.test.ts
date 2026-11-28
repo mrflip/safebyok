@@ -152,12 +152,12 @@ describe("ManifestActs.scribeWriteAct(ask, manifest), a del, row by row of the d
 })
 
 describe("ManifestActs.scribeWriteAct(ask, manifest), the life and liveness a matching revtok cites", () => {
-  it("scribes clash where the ante row's lifepath is not the cited one", () => {
+  it("scribes clash where the prior row's lifepath is not the cited one", () => {
     expect(scribedActOf(askOf(PutAsk, 'live', 'repl'), tagsOf('live', 'eq', 'eq', { lifepath_eq: false }))).to.eq('clash')
     expect(scribedActOf(withCitedAm(DelAsk, 'a'), tagsOf('live', 'eq', 'eq', { lifepath_eq: false }))).to.eq('clash')
   })
 
-  it("scribes clash where the ante row is live and the ask cites a tombstone, or the reverse", () => {
+  it("scribes clash where the prior row is live and the ask cites a tombstone, or the reverse", () => {
     const citingGone = withCitedAm(askOf(PutAsk, 'live', 'repl'), 'x')
     const citingLive = withCitedAm(askOf(PutAsk, 'gone', 'add'), 'a')
     expect(scribedActOf(citingGone, tagsOf('live', 'eq', 'eq'))).to.eq('clash')

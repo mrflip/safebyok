@@ -56,14 +56,14 @@ export class IdbDeviceDB extends DeviceDB {
   // == [Protected, the calls of DeviceDB]: doPeekLease, doStowLease, doRing, doListen, doStowDevicetok
 
   protected async doPeekLease(scope: LeaseScope): Promise<unknown> {
-    return await inOneStep(this.#shelf, 'readonly', (store) => rowAt(store, scopepathOf(scope)))
+    return await inOneStep(this.#shelf, 'readonly', (objectStore) => rowAt(objectStore, scopepathOf(scope)))
   }
 
   protected async doStowLease(record: LeaseRecord, isReplaced: (raw: unknown) => boolean): Promise<unknown> {
-    return await inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const before = await rowAt(store, scopepathOf(record))
-      if (isReplaced(before)) { store.put(record, scopepathOf(record)) }
-      return before
+    return await inOneStep(this.#shelf, 'readwrite', async (objectStore) => {
+      const prior = await rowAt(objectStore, scopepathOf(record))
+      if (isReplaced(prior)) { objectStore.put(record, scopepathOf(record)) }
+      return prior
     })
   }
 
@@ -74,17 +74,17 @@ export class IdbDeviceDB extends DeviceDB {
     channel.close()
   }
 
-  protected doListen(hear: (rung: unknown) => void): () => void {
+  protected doListen(listener: (rung: unknown) => void): () => void {
     const channel = new BroadcastChannel(this.#bellname)
-    channel.addEventListener('message', ({ data }: MessageEvent<unknown>) => { hear(data) })
+    channel.addEventListener('message', ({ data }: MessageEvent<unknown>) => { listener(data) })
     return () => { channel.close() }
   }
 
   protected async doStowDevicetok(userid: Userid, devicetok: Devicetok, isReplaced: (raw: unknown) => boolean): Promise<unknown> {
-    return await inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const before = await rowAt(store, devicetokScopepathOf(userid))
-      if (isReplaced(before)) { store.put(devicetok, devicetokScopepathOf(userid)) }
-      return before
+    return await inOneStep(this.#shelf, 'readwrite', async (objectStore) => {
+      const prior = await rowAt(objectStore, devicetokScopepathOf(userid))
+      if (isReplaced(prior)) { objectStore.put(devicetok, devicetokScopepathOf(userid)) }
+      return prior
     })
   }
   // --

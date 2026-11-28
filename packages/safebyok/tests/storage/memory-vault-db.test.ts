@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { getAskOf } from '../../src/shapes/shapes-asks'
 import { Shell } from '../../src/shapes/shapes-thing'
-import { StoreLimitCap, type VaultStats } from '../../src/shapes/shapes-vault-stats'
+import { DatastoreLimitCap, type VaultStats } from '../../src/shapes/shapes-vault-stats'
 import { rowWeightOf } from '../../src/storage/vault-stats'
 import * as TH from '../test-helpers'
 
@@ -127,7 +127,7 @@ describe("MemoryVaultDB.tryStats(ask), a datastore in memory", () => {
     expect(stats).to.deep.equal({
       box:  { count: 1, live_count: 1, size: rowWeightOf(TH.rootBoxOf()) },
       gate: { count: 1, live_count: 1, size: rowWeightOf(TH.gateThingOf()) },
-      max:  { count: StoreLimitCap, size: StoreLimitCap },
+      max:  { count: DatastoreLimitCap, size: DatastoreLimitCap },
     })
   })
 })

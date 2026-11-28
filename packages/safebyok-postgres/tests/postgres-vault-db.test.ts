@@ -141,8 +141,8 @@ VT.describeVaultDBBattery('PostgresVaultDB', { makeVaultDB, _cheat_rowsOf: rowsO
 
 describe("PostgresVaultDB, what only Postgres can show", () => {
   // AdapterVaultDB makes an unwritten write's tags again of its actual row, so the battery proves those; a written write's
-  // are made in SQL alone, of the ante row its WHERE pinned, and only this compares them with ManifestTags'.
-  it("makes, called past the adapter, the tags ManifestTags makes of the ante row, whether it writes or not", async () => {
+  // are made in SQL alone, of the prior row its WHERE pinned, and only this compares them with ManifestTags'.
+  it("makes, called past the adapter, the tags ManifestTags makes of the prior row, whether it writes or not", async () => {
     const db   = await database()
     const box  = VT.boxThingOf()
     const tomb = VT.boxTombOf(box)
@@ -150,7 +150,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     const passkeyGate = VT.gateThingOf({ wayins: VT.WithPasskey })
     const gateTomb = VT.gateTombOf(gate)
     const otherMain = { ...VT.MainOnly, main: VT.OtherMainWayin }
-    const cases: [ante: ThingRecord | null, ask: WriteAsk, written: boolean][] = [
+    const cases: [prior: ThingRecord | null, ask: WriteAsk, written: boolean][] = [
       [null, VT.birthAskOf(), true],
       [box,  VT.replaceAskOf(box, VT.nextOf(box)), true],
       [box,  VT.delAskFor(box, tomb), true],
@@ -175,16 +175,16 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
       [gate, VT.replaceAskOf(gate, VT.nextGateOf(gate, { wayins: VT.WithPasskey }), { policies: ['revoke_passkey', 'replace_passphrase'] }), false],
       [gate, VT.replaceAskOf({ ...gate, wayins: otherMain }, VT.nextGateOf(gate, { wayins: otherMain }), { policies: ['replace_passphrase'] }), false],
     ]
-    for (const [ante, ask, written] of cases) {
+    for (const [prior, ask, written] of cases) {
       await makeVaultDB()
-      if (ante !== null) { await plant(ask, ante) }
+      if (prior !== null) { await plant(ask, prior) }
       const { rows } = await db.query<{ tags: unknown }>(WriteThingSql[ask.modelkind], writeParamsOf(ask))
-      expect(rows[0]?.tags, `${ask.labelpath} citing ${ask.cited.revtok}`).to.deep.equal(ManifestTags.writeTagsOf(ask, ante, written))
+      expect(rows[0]?.tags, `${ask.labelpath} citing ${ask.cited.revtok}`).to.deep.equal(ManifestTags.writeTagsOf(ask, prior, written))
     }
   })
 
-  // A written birth's tags, like a written write's, are made in SQL alone, of the ante roots its puts cite.
-  it("makes, called past the adapter, the birth's tags ManifestTags makes of the ante roots, whether it writes or not", async () => {
+  // A written birth's tags, like a written write's, are made in SQL alone, of the prior roots its puts cite.
+  it("makes, called past the adapter, the birth's tags ManifestTags makes of the prior roots, whether it writes or not", async () => {
     const db       = await database()
     const gateTomb = VT.gateTombOf(VT.gateThingOf())
     const rootTomb = VT.boxTombOf(VT.rootBoxOf())

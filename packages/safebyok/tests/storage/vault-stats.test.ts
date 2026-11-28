@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { StoreLimitCap, storeLimitsOf } from '../../src/shapes/shapes-vault-stats'
+import { DatastoreLimitCap, datastoreLimitsOf } from '../../src/shapes/shapes-vault-stats'
 import { rowWeightOf, vaultStatsOf } from '../../src/storage/vault-stats'
 import * as TH from '../test-helpers'
 
@@ -22,12 +22,12 @@ describe("vaultStatsOf(filed, limits)", () => {
   })
 })
 
-describe("storeLimitsOf(limits)", () => {
+describe("datastoreLimitsOf(limits)", () => {
   it("caps each limit given, Infinity among them, and reports the cap for each left out", () => {
-    expect(storeLimitsOf()).to.deep.equal({ count: StoreLimitCap, size: StoreLimitCap })
-    expect(storeLimitsOf({ size: Infinity })).to.deep.equal({ count: StoreLimitCap, size: StoreLimitCap })
-    expect(storeLimitsOf({ count: 10, size: 2 * StoreLimitCap })).to.deep.equal({ count: 10, size: StoreLimitCap })
+    expect(datastoreLimitsOf()).to.deep.equal({ count: DatastoreLimitCap, size: DatastoreLimitCap })
+    expect(datastoreLimitsOf({ size: Infinity })).to.deep.equal({ count: DatastoreLimitCap, size: DatastoreLimitCap })
+    expect(datastoreLimitsOf({ count: 10, size: 2 * DatastoreLimitCap })).to.deep.equal({ count: 10, size: DatastoreLimitCap })
   })
 
-  it("caps at 1-900-MIX-A-LOT", () => { expect(StoreLimitCap).to.equal(19_006_492_568) })
+  it("caps at 1-900-MIX-A-LOT", () => { expect(DatastoreLimitCap).to.equal(19_006_492_568) })
 })

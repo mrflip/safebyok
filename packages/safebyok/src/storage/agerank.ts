@@ -6,7 +6,7 @@ import { type EpochMillis, type Lifepath, Lifeseq, Revseq } from '../shapes/prim
 import type { Sparse, ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
 import type { Agekind, Agerank, ItemSeen, ReadTc, SeenThing, VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
 
-// == [Agerank]: TcchunkDigits, NoRevseq, VacantAgerank, VacantReadTc, AgerankFields, readTcNow, readAtOf, tcchunkOf, nextAgerankOf, heldAgerankOf, lifeAgerankOf, tcchunkAfter, laterOf, itemSeenOf, itemEventOf, eventsOf, agekindOf, seenAgekindOf, fieldsOf, isOfLife
+// == [Agerank]: TcchunkDigits, NoRevseq, VacantAgerank, VacantReadTc, AgerankFields, readTcNow, readAtOf, tcchunkOf, nextAgerankOf, cachedAgerankOf, lifeAgerankOf, tcchunkAfter, laterOf, itemSeenOf, itemEventOf, eventsOf, agekindOf, seenAgekindOf, fieldsOf, isOfLife
 
 // Eight digits make a span of 65.536 seconds: a record seen again at its revision a minute or two later is news, which
 // sits well with TanStack Query's five minutes before it collects a query.
@@ -57,10 +57,10 @@ export function nextAgerankOf(agerankWas: Agerank, seen: Pick<ThingCited, 'lifep
   return laterOrNone(agerankWas, agerank)
 }
 
-/** The agerank of a Thing holding `held`, seen whole at the {@link VacantReadTc}: the {@link VacantAgerank} for the shell. */
-export function heldAgerankOf(held: Sparse<ThingRecord>): Agerank {
-  if (BaseThing.isVoidSentinel(held)) { return VacantAgerank }
-  return lifeAgerankOf(held.lifepath, Revseq.padded(held.revseq), true, tcchunkOf(VacantReadTc))
+/** The agerank of a Thing holding `cached`, seen whole at the {@link VacantReadTc}: the {@link VacantAgerank} for the shell. */
+export function cachedAgerankOf(cached: Sparse<ThingRecord>): Agerank {
+  if (BaseThing.isVoidSentinel(cached)) { return VacantAgerank }
+  return lifeAgerankOf(cached.lifepath, Revseq.padded(cached.revseq), true, tcchunkOf(VacantReadTc))
 }
 
 /** The agerank of a life whose first record seen is `revseq`, read in `tcchunk`: the newest whole revision is itself, or none for a sparse one */

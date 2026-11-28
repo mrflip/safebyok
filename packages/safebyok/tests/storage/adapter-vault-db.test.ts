@@ -5,7 +5,7 @@ import { AdapterVaultDB } from '../../src/storage/adapter-vault-db'
 import type { BirthManifest, GetManifest, ListManifest, Received, RootRows, StatsManifest, GetBankManifest, WriteManifest } from '../../src/shapes/shapes-manifest'
 import * as ManifestTags from '../../src/storage/manifest-tags'
 import { type BirthBankAsk, type GetAsk, type GetBankAsk, type ListAsk, type StatsAsk, type ThingWatchScope, type WriteAsk, birthPutsOf } from '../../src/shapes/shapes-asks'
-import { StoreLimitCap, StoreLimitFloor, StoreLimitLeastBoxes } from '../../src/shapes/shapes-vault-stats'
+import { DatastoreLimitCap, DatastoreLimitFloor, DatastoreLimitLeastBoxes } from '../../src/shapes/shapes-vault-stats'
 import { Shell } from '../../src/shapes/shapes-thing'
 import type { VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
 import * as Throwers from '../../src/refusals/throwers'
@@ -49,8 +49,8 @@ class ScriptedVaultDB extends AdapterVaultDB {
 /** A get's manifest whose actual row is `actual`, null for none, with its tags made from that row. */
 function getManifestOf(actual: unknown): object { return { tags: ManifestTags.getTagsOf(actual), actual } }
 
-/** A write's manifest of `ask` over the `ante` row, null for none, with its tags made from that row: the ask's record where `written`, else the ante row. */
-function writeManifestOf(ask: WriteAsk, ante: unknown, written: boolean): object { return { tags: ManifestTags.writeTagsOf(ask, ante, written), actual: written ? ask.record : ante } }
+/** A write's manifest of `ask` over the `prior` row, null for none, with its tags made from that row: the ask's record where `written`, else the prior row. */
+function writeManifestOf(ask: WriteAsk, prior: unknown, written: boolean): object { return { tags: ManifestTags.writeTagsOf(ask, prior, written), actual: written ? ask.record : prior } }
 
 /** A listing's manifest whose parent is `actual`, null for none, with its tags made from that row, and `children`, each at its own labelpath. */
 function listManifestOf(actual: unknown, children: readonly { labelpath: string }[] = []): object {
@@ -60,9 +60,9 @@ function listManifestOf(actual: unknown, children: readonly { labelpath: string 
 /** A bank with neither of its two roots. */
 const NoRoots: RootRows = { gate: null, root: null }
 
-/** A birth's manifest of `ask` over the `ante` roots, with its tags made from them: the ask's records where `written`, else the ante roots. */
-function birthManifestOf(ask: BirthBankAsk, ante: RootRows, written: boolean): object {
-  return { tags: ManifestTags.birthTagsOf(birthPutsOf(ask), ante, written), actual: written ? { gate: ask.gate, root: ask.root } : ante }
+/** A birth's manifest of `ask` over the `prior` roots, with its tags made from them: the ask's records where `written`, else the prior roots. */
+function birthManifestOf(ask: BirthBankAsk, prior: RootRows, written: boolean): object {
+  return { tags: ManifestTags.birthTagsOf(birthPutsOf(ask), prior, written), actual: written ? { gate: ask.gate, root: ask.root } : prior }
 }
 
 /** The two roots `TH.birthBankAskOf()` writes. */
@@ -268,7 +268,7 @@ describe("AdapterVaultDB.tryGetBank(ask), a datastore that reports oddly", () =>
 
 describe("AdapterVaultDB.tryStats(ask), a datastore that reports oddly", () => {
   const Counted = { count: 2, live_count: 1, size: 300 }
-  const statsOf = (overrides: object) => ({ box: Counted, gate: Counted, max: { count: StoreLimitCap, size: StoreLimitCap }, ...overrides })
+  const statsOf = (overrides: object) => ({ box: Counted, gate: Counted, max: { count: DatastoreLimitCap, size: DatastoreLimitCap }, ...overrides })
 
   it("answers the stats a concrete adapter reports", async () => {
     const vaultDB = new ScriptedVaultDB(() => ({ stats: statsOf({}) }))
@@ -276,15 +276,15 @@ describe("AdapterVaultDB.tryStats(ask), a datastore that reports oddly", () => {
   })
 
   it("answers a limit of exactly two boxes and the floor in bytes", async () => {
-    const stats = statsOf({ max: { count: StoreLimitLeastBoxes, size: StoreLimitFloor } })
+    const stats = statsOf({ max: { count: DatastoreLimitLeastBoxes, size: DatastoreLimitFloor } })
     const vaultDB = new ScriptedVaultDB(() => ({ stats }))
     expect(await vaultDB.tryStats(TH.statsAskOf())).to.deep.include({ ok: true, val: stats })
   })
 
   it("refuses, as a broken datastore, stats with a field missing, a count that is no whole number, or a limit of Infinity, past the cap, or under two boxes or the floor in bytes", async () => {
     for (const stats of [statsOf({ gate: undefined }), statsOf({ box: { ...Counted, size: 1.5 } }), statsOf({ box: { ...Counted, live_count: -1 } }),
-      statsOf({ max: { count: Infinity, size: StoreLimitCap } }), statsOf({ max: { count: StoreLimitCap, size: StoreLimitCap + 1 } }),
-      statsOf({ max: { count: StoreLimitLeastBoxes - 1, size: StoreLimitCap } }), statsOf({ max: { count: StoreLimitCap, size: StoreLimitFloor - 1 } }),
+      statsOf({ max: { count: Infinity, size: DatastoreLimitCap } }), statsOf({ max: { count: DatastoreLimitCap, size: DatastoreLimitCap + 1 } }),
+      statsOf({ max: { count: DatastoreLimitLeastBoxes - 1, size: DatastoreLimitCap } }), statsOf({ max: { count: DatastoreLimitCap, size: DatastoreLimitFloor - 1 } }),
       statsOf({ extra: 1 })]) {
       const vaultDB = new ScriptedVaultDB(() => ({ stats }))
       await TH.expectBad(vaultDB.tryStats(TH.statsAskOf()), 'storage_issue')

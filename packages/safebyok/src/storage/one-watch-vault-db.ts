@@ -43,7 +43,7 @@ export class OneWatchVaultDB implements VaultDB {
   }
   // --
 
-  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetBank, tryStats, watch, #holdWatch, #whileLocked
+  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, tryGetBank, tryStats, watch, #watchUnderWebLock, #whileLocked
 
   /** The wrapped vaultDB's {@link VaultDB.tryGetThing}. */
   tryGetThing(ask: GetAsk): Promise<GetThingAnswer> { return this.#vaultDB.tryGetThing(ask) }
@@ -76,10 +76,10 @@ export class OneWatchVaultDB implements VaultDB {
     const notify  = bulletproofHandlerOf(onNotice, { ifError: 'tell', transformer: Throwers.refusalOfThrown, onBadNews })
     const channel = new BroadcastChannel(watchnameOf(bankScope))
     channel.addEventListener('message', ({ data }: MessageEvent<unknown>) => {
-      const heardReport = SeenChecks.itemEvent.safeParse(data)
-      if (heardReport.success) { notify(deepFreeze(heardReport.data as VaultEvent)) }
+      const eventReport = SeenChecks.itemEvent.safeParse(data)
+      if (eventReport.success) { notify(deepFreeze(eventReport.data as VaultEvent)) }
     })
-    const release = this.#holdWatch(locks, bankScope, channel, notify, onBadNews, (err) => {
+    const release = this.#watchUnderWebLock(locks, bankScope, channel, notify, onBadNews, (err) => {
       channel.close()
       onEnded()
       onBadNews(Outcome.storageRefusalOf(err))
@@ -91,7 +91,7 @@ export class OneWatchVaultDB implements VaultDB {
   }
 
   /** Ask for the bank's lock, and while this tab holds it, run the wrapped vaultDB's watch, posting each notice on `channel`; answers the function that lets the lock go */
-  #holdWatch(
+  #watchUnderWebLock(
     locks: LockManager, bankScope: ThingWatchScope, channel: BroadcastChannel,
     notify: (event: VaultEvent) => void, onBadNews: (news: Errors.VaultError) => void, onFailed: (err: unknown) => void,
   ): () => void {
@@ -112,10 +112,10 @@ export class OneWatchVaultDB implements VaultDB {
     return () => { release() }
   }
 
-  /** Call `hold` once this tab is handed the bank's lock, and keep the lock until the promise it answers settles; what `hold` throws, or the lock request itself, goes to `onFailed` */
-  async #whileLocked(locks: LockManager, bankScope: ThingWatchScope, onFailed: (err: unknown) => void, hold: () => Promise<void>): Promise<void> {
+  /** Call `onGranted` once this tab is handed the bank's lock, and keep the lock until the promise it answers settles; what `onGranted` throws, or the lock request itself, goes to `onFailed` */
+  async #whileLocked(locks: LockManager, bankScope: ThingWatchScope, onFailed: (err: unknown) => void, onGranted: () => Promise<void>): Promise<void> {
     try {
-      await locks.request(watchnameOf(bankScope), hold)
+      await locks.request(watchnameOf(bankScope), onGranted)
     } catch (err) {
       onFailed(err)
     }

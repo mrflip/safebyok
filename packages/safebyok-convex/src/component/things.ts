@@ -63,11 +63,11 @@ export const writeThing = mutation({
   returns: CVX.writeManifest,
   handler: async (ctx, { ask: sent }): Promise<Observed<WriteManifest>> => {
     const ask       = askFor(() => DB.checkedWriteAsk(sent))
-    const ante      = await rowAt(ctx.db, ask)
-    const isWritten = DB.isWritable(ask, ante)
+    const prior     = await rowAt(ctx.db, ask)
+    const isWritten = DB.isWritable(ask, prior)
     if (isWritten) { await writeAt(ctx.db, ask) }
     const actual = await rowAt(ctx.db, ask)
-    return { tags: DB.ManifestTags.writeTagsOf(ask, ante, isWritten), actual, ancestor: await ancestorOf(ctx.db, ask, actual), ...(await bankObservedOf(ctx.db, ask)) }
+    return { tags: DB.ManifestTags.writeTagsOf(ask, prior, isWritten), actual, ancestor: await ancestorOf(ctx.db, ask, actual), ...(await bankObservedOf(ctx.db, ask)) }
   },
 })
 
@@ -78,10 +78,10 @@ export const birthBank = mutation({
   handler: async (ctx, { ask: sent }): Promise<Observed<BirthManifest>> => {
     const ask       = askFor(() => DB.checkedBirthBankAsk(sent))
     const puts      = DB.birthPutsOf(ask)
-    const ante      = await rootsOf(ctx.db, ask)
-    const isWritten = DB.isBirthWritable(puts, ante)
+    const prior     = await rootsOf(ctx.db, ask)
+    const isWritten = DB.isBirthWritable(puts, prior)
     if (isWritten) { for (const put of puts) { await writeAt(ctx.db, put) } }
-    return { tags: DB.ManifestTags.birthTagsOf(puts, ante, isWritten), actual: await rootsOf(ctx.db, ask), ...(await bankObservedOf(ctx.db, ask)) }
+    return { tags: DB.ManifestTags.birthTagsOf(puts, prior, isWritten), actual: await rootsOf(ctx.db, ask), ...(await bankObservedOf(ctx.db, ask)) }
   },
 })
 // --
@@ -222,9 +222,9 @@ async function committedAfterIn(db: DatabaseReader, { userid, banklabel }: Thing
 
 /** Write `ask.record` at its scope, over the document there or as a new one, stamped with the commit's timestamp. */
 async function writeAt(db: DatabaseWriter, ask: WriteAsk): Promise<void> {
-  const doc     = { ...ask.record, commit_ts: db.vars.commitTs }
-  const table   = ThingTables[ask.modelkind]
-  const anteDoc = await docAt(db, ask)
-  if (anteDoc === null) { await db.insert(table, doc) } else { await db.replace(table, anteDoc._id, doc) }
+  const doc      = { ...ask.record, commit_ts: db.vars.commitTs }
+  const table    = ThingTables[ask.modelkind]
+  const priorDoc = await docAt(db, ask)
+  if (priorDoc === null) { await db.insert(table, doc) } else { await db.replace(table, priorDoc._id, doc) }
 }
 // --

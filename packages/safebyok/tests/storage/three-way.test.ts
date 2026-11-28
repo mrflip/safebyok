@@ -15,9 +15,9 @@ import * as TH from '../test-helpers'
 /** The bank's part of every manifest here: the void banktok, each root the same as tracked, and a read_tc made now. */
 function besideOf() { return { banktok: SX.VoidLifeTok, tracked: { gate: 'same', root: 'same' }, read_tc: readTcNow() } }
 
-/** A sound write's manifest and answer: `ask` over the `ante` row, written or not, checked, scribed and answered. `doctor` changes the manifest before the answer is made. */
-function wroteOf(ask: WriteAsk, ante: unknown, written: boolean, doctor: (manifest: WriteManifest) => void = () => undefined): { manifest: ScribedWriteManifest, answer: WriteThingAnswer } {
-  const manifest: WriteManifest = { tags: ManifestTags.writeTagsOf(ask, ante, written), actual: written ? structuredClone(ask.record) : ante, ancestor: null, ...besideOf() }
+/** A sound write's manifest and answer: `ask` over the `prior` row, written or not, checked, scribed and answered. `doctor` changes the manifest before the answer is made. */
+function wroteOf(ask: WriteAsk, prior: unknown, written: boolean, doctor: (manifest: WriteManifest) => void = () => undefined): { manifest: ScribedWriteManifest, answer: WriteThingAnswer } {
+  const manifest: WriteManifest = { tags: ManifestTags.writeTagsOf(ask, prior, written), actual: written ? structuredClone(ask.record) : prior, ancestor: null, ...besideOf() }
   doctor(manifest)
   ManifestActs.checkWriteObservations(ask, manifest)
   ManifestActs.scribeWriteAct(ask, manifest)
@@ -42,10 +42,10 @@ function listedOf(parent: unknown, children: readonly { labelpath: string }[], d
   return { manifest, answer: ManifestActs.listAnswerOf(ListBox, manifest) }
 }
 
-/** A sound birth's manifest and answer over the `ante` roots, written or not. `doctor` changes the manifest before the answer is made. */
-function bornOf(ante: RootRows, written: boolean, doctor: (manifest: BirthManifest) => void = () => undefined): { manifest: ScribedBirthManifest, answer: BirthBankAnswer } {
-  const actual = written ? { gate: BirthBank.gate, root: BirthBank.root } : ante
-  const manifest: BirthManifest = { tags: ManifestTags.birthTagsOf(birthPutsOf(BirthBank), ante, written), actual: structuredClone(actual), ...besideOf() }
+/** A sound birth's manifest and answer over the `prior` roots, written or not. `doctor` changes the manifest before the answer is made. */
+function bornOf(prior: RootRows, written: boolean, doctor: (manifest: BirthManifest) => void = () => undefined): { manifest: ScribedBirthManifest, answer: BirthBankAnswer } {
+  const actual = written ? { gate: BirthBank.gate, root: BirthBank.root } : prior
+  const manifest: BirthManifest = { tags: ManifestTags.birthTagsOf(birthPutsOf(BirthBank), prior, written), actual: structuredClone(actual), ...besideOf() }
   doctor(manifest)
   ManifestActs.checkBirthObservations(BirthBank, manifest)
   ManifestActs.scribeBirthAct(BirthBank, manifest)
@@ -74,8 +74,8 @@ const RootReplace = TH.replaceAskOf(Root, TH.nextOf(Root))
 
 describe("ThreeWay.demandWriteConsistency(ask, manifest, answer)", () => {
   it("passes a sound write, written or not", () => {
-    for (const [ask, ante, written] of [[Birth, null, true], [Birth, OtherGate, false], [Replace, Gate, true], [Replace, null, false]] as const) {
-      const { manifest, answer } = wroteOf(ask, ante, written)
+    for (const [ask, prior, written] of [[Birth, null, true], [Birth, OtherGate, false], [Replace, Gate, true], [Replace, null, false]] as const) {
+      const { manifest, answer } = wroteOf(ask, prior, written)
       expect(() => { ThreeWay.demandWriteConsistency(ask, manifest, answer) }).not.to.throw()
     }
   })
@@ -91,9 +91,9 @@ describe("ThreeWay.demandWriteConsistency(ask, manifest, answer)", () => {
     [Phrases.TagsOfOtherAsk,     RootReplace, Root, true, (manifest: WriteManifest) => { manifest.tags = { ...manifest.tags, banktok_cmp: 'same' } },                     'refuses written tags that are not those of a write the ask lets through: a box\'s banktok judged'],
   ] as const
 
-  for (const [message, ask, ante, written, doctor, blurb] of DoctoredCases) {
+  for (const [message, ask, prior, written, doctor, blurb] of DoctoredCases) {
     it(blurb, () => {
-      const { manifest, answer } = wroteOf(ask, ante, written, doctor)
+      const { manifest, answer } = wroteOf(ask, prior, written, doctor)
       const err = TH.expectSyncRefusal(() => { ThreeWay.demandWriteConsistency(ask, manifest, answer) }, 'storage_issue')
       expect(err.message).to.eq(message)
     })
@@ -192,8 +192,8 @@ describe("ThreeWay.demandListConsistency(ask, manifest, answer)", () => {
 
 describe("ThreeWay.demandBirthConsistency(ask, manifest, answer)", () => {
   it("passes a sound birth, written or not", () => {
-    for (const [ante, written] of [[NoRoots, true], [{ gate: OtherGate, root: OtherRoot }, false], [{ ...NoRoots, root: OtherRoot }, false]] as const) {
-      const { manifest, answer } = bornOf(ante, written)
+    for (const [prior, written] of [[NoRoots, true], [{ gate: OtherGate, root: OtherRoot }, false], [{ ...NoRoots, root: OtherRoot }, false]] as const) {
+      const { manifest, answer } = bornOf(prior, written)
       expect(() => { ThreeWay.demandBirthConsistency(BirthBank, manifest, answer) }).not.to.throw()
     }
   })

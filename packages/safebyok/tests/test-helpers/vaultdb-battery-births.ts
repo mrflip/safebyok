@@ -101,10 +101,10 @@ export function describeVaultDBBirths({ fresh, bornBank, withGate, gotAt, rowsOf
     })
 
     it("refuses over a root box stored with no gate, writing no gate, with the gate's shell and the root box", async () => {
-      const ante    = rootBoxOf({ revtok: OtherRevtok })
+      const prior   = rootBoxOf({ revtok: OtherRevtok })
       const vaultDB = await fresh()
-      await rowsOf(vaultDB).plant(RootScope, ante)
-      expect(await vaultDB.tryBirthBank(birthBankAskOf())).to.deep.include({ ok: false, act: 'stale', dbhas: { gate: Shells.gate, root: ante } })
+      await rowsOf(vaultDB).plant(RootScope, prior)
+      expect(await vaultDB.tryBirthBank(birthBankAskOf())).to.deep.include({ ok: false, act: 'stale', dbhas: { gate: Shells.gate, root: prior } })
       await expectRootsVoidBut(vaultDB, 'root')
     })
 
@@ -135,11 +135,11 @@ export function describeVaultDBBirths({ fresh, bornBank, withGate, gotAt, rowsOf
     it("refuses over the root box of a bank labelled box stored with no gate, with the gate's shell and the root box, writing no gate", async () => {
       const vaultDB   = await fresh()
       const banklabel = 'box'
-      const ante      = rootBoxOf({ banklabel, revtok: OtherRevtok })
+      const prior     = rootBoxOf({ banklabel, revtok: OtherRevtok })
       const boxRoots  = { gate: gateThingOf({ banklabel, labelpath: banklabel, label: banklabel }), root: rootBoxOf({ banklabel }) }
-      await rowsOf(vaultDB).plant({ ...RootScope, banklabel }, ante)
+      await rowsOf(vaultDB).plant({ ...RootScope, banklabel }, prior)
       const gateShell = Shell.under({ ...GateScope, banklabel, labelpath: banklabel }, null)
-      expect(await vaultDB.tryBirthBank(birthBankAskOf({ banklabel, ...boxRoots }))).to.deep.include({ ok: false, act: 'stale', dbhas: { gate: gateShell, root: ante } })
+      expect(await vaultDB.tryBirthBank(birthBankAskOf({ banklabel, ...boxRoots }))).to.deep.include({ ok: false, act: 'stale', dbhas: { gate: gateShell, root: prior } })
       const gateAsk = getAskOf({ userid: ThingBank.userid, banklabel, modelkind: 'gate', labelpath: banklabel, ...SenderKnows })
       expect(await vaultDB.tryGetThing(gateAsk)).to.deep.include({ ok: true, act: 'gotvoid' })
     })

@@ -44,8 +44,8 @@ export function demandListConsistency(ask: ListAsk, manifest: ScribedListManifes
     carried:  answer.ok ? answer.val.parentlife : answer.dbhas,
     expected: manifest.ok ? manifest.actual.lifepath : (manifest.actual ?? ManifestActs.voidParentOf(ask)),
   }
-  const rows = manifest.children.map(({ labelpath, record }): RowAt => [record, labelpath])
-  demandSharedConsistency(ask, manifest, answer, copy, [[manifest.actual, ask.labelpath], ...rows])
+  const childRows = manifest.children.map(({ labelpath, record }): RowAt => [record, labelpath])
+  demandSharedConsistency(ask, manifest, answer, copy, [[manifest.actual, ask.labelpath], ...childRows])
 }
 
 /** Refuse a birth whose ask, manifest and answer disagree, among them a datastore that says it wrote where the act is no birth, or the reverse. */
@@ -78,18 +78,18 @@ export function demandStatsConsistency(ask: StatsAsk, manifest: CheckedStatsMani
 // The checks every verb makes alike.
 
 /** A row the datastore read by its address, null for none, and the labelpath it was read at. */
-type RowAt = readonly [row: ThingRecord | null, labelpath: Labelpath]
+type RowAt = readonly [record: ThingRecord | null, labelpath: Labelpath]
 
 /** The part of a manifest an answer copies beyond the bank, as the answer carries it and as the manifest has it. */
 type Copy = Readonly<{ carried: unknown, expected: unknown }>
 
 // Each row is read by its address, so one at another is the datastore disagreeing with the ask.
-/** Refuse an answer that does not copy its manifest, or a row among `rows` or in `tracked` at another address than it was read at. */
-function demandSharedConsistency({ userid, banklabel }: ThingWatchScope, manifest: CheckedBankObserved, answer: Pick<CheckedBankObserved, 'banktok' | 'read_tc'> & { tracked: unknown }, copy: Copy, rows: readonly RowAt[]): void {
+/** Refuse an answer that does not copy its manifest, or a row among `rowsAt` or in `tracked` at another address than it was read at. */
+function demandSharedConsistency({ userid, banklabel }: ThingWatchScope, manifest: CheckedBankObserved, answer: Pick<CheckedBankObserved, 'banktok' | 'read_tc'> & { tracked: unknown }, copy: Copy, rowsAt: readonly RowAt[]): void {
   const isCopied = isEqual(copy.carried, copy.expected) && (answer.banktok === manifest.banktok) && (answer.tracked === manifest.tracked) && (answer.read_tc === manifest.read_tc)
   if (! isCopied) { throw Throwers.answerOfOtherManifest() }
-  for (const [row, labelpath] of [...rows, ...trackedRowsOf({ userid, banklabel }, manifest.tracked)]) {
-    const fieldnames = (row === null) ? [] : Validator.disagreeingFieldnames(row, { userid, banklabel, labelpath })
+  for (const [record, labelpath] of [...rowsAt, ...trackedRowsOf({ userid, banklabel }, manifest.tracked)]) {
+    const fieldnames = (record === null) ? [] : Validator.disagreeingFieldnames(record, { userid, banklabel, labelpath })
     if (fieldnames.length > 0) { throw Throwers.rowOfOtherAddress(fieldnames) }
   }
 }
@@ -108,8 +108,8 @@ function rootRowsOf(bankScope: ThingWatchScope, roots: CheckedRoots): RowAt[] {
 /** The roots `tracked` carries of the bank at `bankScope`, each at its labelpath: none where it is the same as tracked. */
 function trackedRowsOf(bankScope: ThingWatchScope, tracked: Tracked): RowAt[] {
   const labelpaths = rootLabelpathsOf(bankScope)
-  const rows = [[tracked.gate, labelpaths.gate], [tracked.root, labelpaths.root]] as const
-  return rows.filter((rowAt): rowAt is Extract<typeof rows[number], readonly [ThingRecord, Labelpath]> => rowAt[0] !== 'same')
+  const rowsAt = [[tracked.gate, labelpaths.gate], [tracked.root, labelpaths.root]] as const
+  return rowsAt.filter((rowAt): rowAt is Extract<typeof rowsAt[number], readonly [ThingRecord, Labelpath]> => rowAt[0] !== 'same')
 }
 // --
 
@@ -123,7 +123,7 @@ function demandProposedWritten(record: ThingRecord, actual: ThingRecord | null):
   if ((actual === null) || (! isEqual(pick(actual, ProposedPins), pick(record, ProposedPins)))) { throw Throwers.proposedNotWritten() }
 }
 
-// Unwritten, the ante row is the actual row, so its tags are made again from the row as checked.
+// Unwritten, the prior row is the actual row, so its tags are made again from the row as checked.
 /** Refuse an unwritten write's tags where they are not the actual row's. */
 function demandTagsOfActual(ask: WriteAsk, manifest: ScribedWriteManifest): void {
   if (! isEqual(ManifestTags.writeTagsOf(ask, manifest.actual, false), manifest.tags)) { throw Throwers.tagsOfOtherRow() }
