@@ -244,7 +244,7 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   }
   // --
 
-  // == [Asks]: makeGetAsk, makeListAsk, makePutAsk, makeDelAsk, knownRoots, heldRoots, #heldAt, #bankFields
+  // == [Asks]: makeGetAsk, makeListAsk, makePutAsk, makeDelAsk, knownRoots, cachedRoots, #cachedAt, #bankFields
   // Each fills in the modelkind and default flags `getAskOf` and the rest give it, and the verb checks the rest. A bank
   // whose gate is not yet heard of stored, as at sign-in or before its first birth, has asks with the void banktok, which
   // only a get may carry, and a root not yet heard of stored is tracked at the void revision.
@@ -267,28 +267,28 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
 
   // A root known newer only sparse is given at its older whole record, so that the answer sends it whole. A root's
   // shell is at the void revision, as Shell.Cited is.
-  /** The roots this bank's asks track: the revision of each of its {@link heldRoots}. */
+  /** The roots this bank's asks track: the revision of each of its {@link cachedRoots}. */
   get knownRoots(): Track {
-    const { gate, root } = this.heldRoots
+    const { gate, root } = this.cachedRoots
     return { gate: trackPairOf(gate), root: trackPairOf(root) }
   }
 
   // A Thing holds a whole record: a live box's sparse form is never adopted.
   /** The record each of this bank's roots' Things holds, live or a tombstone, or the root's shell where no Thing is kept: what a birth writes over. */
-  get heldRoots(): ActualRoots {
+  get cachedRoots(): ActualRoots {
     const scopes = rootScopesOf(this.#scope)
-    return { gate: this.#heldAt(scopes.gate) as ActualRoots['gate'], root: this.#heldAt(scopes.root) as ActualRoots['root'] }
+    return { gate: this.#cachedAt(scopes.gate) as ActualRoots['gate'], root: this.#cachedAt(scopes.root) as ActualRoots['root'] }
   }
 
   /** The record the Thing at `scope` holds, or the shell there where none is kept */
-  #heldAt(scope: ThingScope): ThingRecord | VoidSentinel {
+  #cachedAt(scope: ThingScope): ThingRecord | VoidSentinel {
     return this.#cars[scope.modelkind].get(scope.labelpath)?.thing.pickle() ?? Shell.under(scope, null)
   }
 
   // The record held among the gates is a gate's, live or a tombstone: the vaultDB checked it as one.
   /** The `banktok` and `track` of this bank's asks: the banktok of the bank's gate wherever a record of it is held, live or a tombstone, else the void banktok, and its {@link knownRoots}. */
   #bankFields(): { banktok: Banktok, track: Track } {
-    const gate = this.heldRoots.gate as Partial<GateRecord>
+    const gate = this.cachedRoots.gate as Partial<GateRecord>
     return { banktok: gate.banktok ?? SX.VoidLifeTok, track: this.knownRoots }
   }
   // --
@@ -440,8 +440,8 @@ export class VaultMinder<ThingT extends ReceivingThing = ReceivingThing> impleme
   /** The car of `seen`'s Thing, made and kept where there is none, its Thing holding the shell in the lives `seen` names above it */
   #ensureCar(seen: SeenThing): ThingCar<ThingT> {
     const cars = this.#cars[seen.modelkind]
-    const kept = cars.get(seen.labelpath)
-    if (kept !== undefined) { return kept }
+    const existing = cars.get(seen.labelpath)
+    if (existing !== undefined) { return existing }
     const car = ThingCar.make(BaseThing.shellOf(seen), { bank: this.#bank })
     cars.set(seen.labelpath, car)
     return car

@@ -83,20 +83,20 @@ export abstract class BaseThing implements Sparse<ThingRecord> {
 
   /** True when `val` is a live Thing of this class's kind: whole, or a live box's sparse form. */
   static isLive<KindT extends Thingkind | null, ValT>(this: Kinded<KindT>, val: ValT): val is LiveOfKind<KindT, ValT> {
-    const report = ThingChecks.scopedLive.safeParse(val)
-    return report.success && isOfKind(this.modelkind, report.data.modelkind)
+    const liveReport = ThingChecks.scopedLive.safeParse(val)
+    return liveReport.success && isOfKind(this.modelkind, liveReport.data.modelkind)
   }
 
   /** True when `val` is a tombstone of this class's kind, the void sentinel among them. */
   static isTombstone<KindT extends Thingkind | null, ValT>(this: Kinded<KindT>, val: ValT): val is TombstoneOfKind<KindT, ValT> {
-    const report = ThingChecks.scopedTombstone.safeParse(val)
-    return report.success && isOfKind(this.modelkind, report.data.modelkind)
+    const tombstoneReport = ThingChecks.scopedTombstone.safeParse(val)
+    return tombstoneReport.success && isOfKind(this.modelkind, tombstoneReport.data.modelkind)
   }
 
   /** True when `val` is the tombstone of a deleted Thing of this class's kind: any tombstone but the void sentinel. */
   static isGone<KindT extends Thingkind | null, ValT>(this: Kinded<KindT>, val: ValT): val is TombstoneOfKind<KindT, ValT> {
-    const report = ThingChecks.scopedTombstone.safeParse(val)
-    return report.success && isOfKind(this.modelkind, report.data.modelkind) && (! isVoidCited(report.data))
+    const tombstoneReport = ThingChecks.scopedTombstone.safeParse(val)
+    return tombstoneReport.success && isOfKind(this.modelkind, tombstoneReport.data.modelkind) && (! isVoidCited(tombstoneReport.data))
   }
 
   /** True when `val` is a void sentinel of this class's kind: a tombstone at the shell's revision, its revseq -1 and its revtok and lifeseq the void ones. */
@@ -125,9 +125,9 @@ export abstract class BaseThing implements Sparse<ThingRecord> {
     return (isVoidSentinelOfKind(null, seen) ? seen : Shell.inParentLivesOf<Thingkind>(seen)) as ShellOf<RecordT>
   }
 
-  /** True when `ante` and `post` name one Thing: of one kind, at one labelpath of one bank. */
-  static haveSameScope(ante: ThingScope, post: ThingScope): boolean {
-    return (ante.modelkind === post.modelkind) && (ante.labelpath === post.labelpath) && (ante.userid === post.userid) && (ante.banklabel === post.banklabel)
+  /** True when `scoped` and `other` name one Thing: of one kind, at one labelpath of one bank. */
+  static haveSameScope(scoped: ThingScope, other: ThingScope): boolean {
+    return (scoped.modelkind === other.modelkind) && (scoped.labelpath === other.labelpath) && (scoped.userid === other.userid) && (scoped.banklabel === other.banklabel)
   }
 
   // The lifepath decides first: a Thing born under a new life of its parent starts again at revseq 0, and the parent's later
@@ -175,8 +175,8 @@ function isVoidCited({ revseq, revtok, lifepath }: Pick<ThingCited, 'revseq' | '
 
 /** True when `val` is a tombstone of `modelkind` at the shell's revision */
 function isVoidSentinelOfKind(modelkind: Thingkind | null, val: unknown): boolean {
-  const report = ThingChecks.scopedTombstone.safeParse(val)
-  return report.success && isOfKind(modelkind, report.data.modelkind) && isVoidCited(report.data)
+  const tombstoneReport = ThingChecks.scopedTombstone.safeParse(val)
+  return tombstoneReport.success && isOfKind(modelkind, tombstoneReport.data.modelkind) && isVoidCited(tombstoneReport.data)
 }
 
 /** True when `record` is whole and of `modelkind`, or is its void sentinel */

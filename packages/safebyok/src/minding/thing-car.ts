@@ -10,7 +10,7 @@ import { type CarBank, type ReceivingThing, type ThingCarOpts, ThingCarChecks } 
 import { BaseThing } from '../models/base-thing'
 import { maskedOf } from '../helpers/mask-ciphertexts'
 import { VaultTSQ } from './vault-tsq'
-import { VacantReadTc, agekindOf, eventsOf, heldAgerankOf, nextAgerankOf, readAtOf } from '../storage/agerank'
+import { VacantReadTc, agekindOf, cachedAgerankOf, eventsOf, nextAgerankOf, readAtOf } from '../storage/agerank'
 import * as Throwers from '../refusals/throwers'
 
 // == [ThingCar]: ThingCar
@@ -50,9 +50,9 @@ export class ThingCar<ThingT extends ReceivingThing = ReceivingThing> {
   // calls news an older record the Thing would decline.
   private constructor(thing: ThingT) {
     this.thing = thing
-    const held = thing.pickle()
-    this.#citable = citedOf(held)
-    this.#agerank = heldAgerankOf(held)
+    const cached = thing.pickle()
+    this.#citable = citedOf(cached)
+    this.#agerank = cachedAgerankOf(cached)
     Object.freeze(this)
   }
   // --

@@ -151,7 +151,7 @@ describe("Thing.cmp(ante, post)", () => {
   }
 })
 
-describe("Thing.haveSameScope(ante, post)", () => {
+describe("Thing.haveSameScope(scoped, other)", () => {
   it("is true of two revisions at one labelpath of one bank, and false across labelpaths, banks, users or kinds", () => {
     const box = TH.boxThingOf()
     expect(Thing.haveSameScope(box, TH.nextOf(box))).to.be.true

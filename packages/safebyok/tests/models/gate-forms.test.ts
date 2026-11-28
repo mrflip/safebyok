@@ -150,12 +150,12 @@ describe("bank.gate.replacePassphrase(cleartexts)", () => {
     const { bank } = await TH.buildBornBank({ passkeyCleartext })
     bank.lock()
     const { gate } = bank
-    const ante = gate.pickle()
+    const prior = gate.pickle()
     const make = vi.spyOn(Lease, 'make')
     expect(await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })).to.equal(bank.gate)
-    expect(bank.gate).to.include({ revseq: ante.revseq + 1, lifeseq: ante.lifeseq })
-    expect(bank.gate.main.pickle()).to.not.deep.equal(ante.wayins.main)
-    expect(bank.gate.passkey0!.pickle()).to.deep.equal(ante.wayins.passkey0)
+    expect(bank.gate).to.include({ revseq: prior.revseq + 1, lifeseq: prior.lifeseq })
+    expect(bank.gate.main.pickle()).to.not.deep.equal(prior.wayins.main)
+    expect(bank.gate.passkey0!.pickle()).to.deep.equal(prior.wayins.passkey0)
     expect(await actualGateOf(bank)).to.deep.equal(bank.gate.pickle())
     expect(bank.gate).to.equal(gate)
     expect(bank.isUnlocked).to.be.true
@@ -211,13 +211,13 @@ describe("bank.gate.replacePassphrase(cleartexts)", () => {
   it("refuses a wrong current passphrase before it derives from the new one, writing nothing", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
-    const ante = bank.gate.pickle()
+    const prior = bank.gate.pickle()
     const buildNovel = vi.spyOn(PassphraseProving, 'buildNovel')
     const tryWriteThing = vi.spyOn(device.vaultDB, 'tryWriteThing')
     await TH.expectRefusal(bank.gate.replacePassphrase({ passphraseCleartext: 'not the passphrase', nextPassphraseCleartext: NextPassphrase }), 'wrong_passphrase')
     expect(buildNovel).not.toHaveBeenCalled()
     expect(tryWriteThing).not.toHaveBeenCalled()
-    expect(bank.gate.pickle()).to.equal(ante)
+    expect(bank.gate.pickle()).to.equal(prior)
     expect(bank.isLocked).to.be.true
   })
 
@@ -250,12 +250,12 @@ describe("bank.gate.replacePassphrase(cleartexts)", () => {
 
   it("throws the vaultDB's refusal unchanged, leaving the main gate and the lease it had", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const ante = bank.gate.pickle()
+    const prior = bank.gate.pickle()
     const refusal = new Errors.VaultError('storage_unavailable', 'the disk is full')
     vi.spyOn(device.vaultDB, 'tryWriteThing').mockImplementationOnce((ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', banktok: SX.VoidLifeTok, tracked: 'unread', read_tc: readTcNow(), dbhas: null, err: refusal }))
     const make = vi.spyOn(Lease, 'make')
     expect(await TH.expectRefusal(bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase }))).to.equal(refusal)
-    expect(bank.gate.pickle()).to.equal(ante)
+    expect(bank.gate.pickle()).to.equal(prior)
     expect(make).not.toHaveBeenCalled()
     expect(bank.isUnlocked).to.be.true
   })
@@ -273,13 +273,13 @@ describe("bank.gate.addPasskey(cleartexts)", () => {
   it("writes the main gate's next revision with the passkey's wayin beside the passphrase's, unlocks under a lease citing it, and the passkey then unlocks", async () => {
     const { bank } = await TH.buildBornBank()
     bank.lock()
-    const ante = bank.gate.pickle()
+    const prior = bank.gate.pickle()
     const answer = TH.passkeyAnswerOf()
     const prfBytes = new Uint8Array(answer.prfBytes)
     const make = vi.spyOn(Lease, 'make')
     expect(await bank.gate.addPasskey({ passphraseCleartext: TH.TestPassphrase, nextPasskeyCleartext: answer })).to.equal(bank.gate)
-    expect(bank.gate).to.include({ revseq: ante.revseq + 1 })
-    expect(bank.gate.main.pickle()).to.deep.equal(ante.wayins.main)
+    expect(bank.gate).to.include({ revseq: prior.revseq + 1 })
+    expect(bank.gate.main.pickle()).to.deep.equal(prior.wayins.main)
     expect(bank.gate.passkey0).to.deep.include({ wayinkind: 'passkey', credential_id: answer.credential_id })
     expect(await actualGateOf(bank)).to.deep.equal(bank.gate.pickle())
     expect(make.mock.calls[0]![0]).to.include({ gate_revtok: bank.gate.revtok, wayinkind: 'passphrase' })
@@ -326,10 +326,10 @@ describe("bank.gate.revokePasskey(cleartexts)", () => {
   it("writes the main gate's next revision without the passkey's wayin, unlocks under a lease citing it, and the passphrase still unlocks", async () => {
     const { bank } = await TH.buildBornBank({ passkeyCleartext: TH.passkeyAnswerOf() })
     bank.lock()
-    const ante = bank.gate.pickle()
+    const prior = bank.gate.pickle()
     const make = vi.spyOn(Lease, 'make')
     expect(await bank.gate.revokePasskey({ passphraseCleartext: TH.TestPassphrase })).to.equal(bank.gate)
-    expect(bank.gate).to.include({ revseq: ante.revseq + 1 })
+    expect(bank.gate).to.include({ revseq: prior.revseq + 1 })
     expect(bank.gate.passkey0).to.be.null
     expect(await actualGateOf(bank)).to.deep.equal(bank.gate.pickle())
     expect(make.mock.calls[0]![0]).to.include({ gate_revtok: bank.gate.revtok, wayinkind: 'passphrase' })
@@ -353,11 +353,11 @@ describe("bank.gate.revokePasskey(cleartexts)", () => {
   it("with no passkey, unlocks by the proof and writes nothing", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
-    const ante = bank.gate.pickle()
+    const prior = bank.gate.pickle()
     const tryWriteThing = vi.spyOn(device.vaultDB, 'tryWriteThing')
     await bank.gate.revokePasskey({ passphraseCleartext: TH.TestPassphrase })
     expect(tryWriteThing).not.toHaveBeenCalled()
-    expect(bank.gate.pickle()).to.equal(ante)
+    expect(bank.gate.pickle()).to.equal(prior)
     expect(bank.isUnlocked).to.be.true
   })
 

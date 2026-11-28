@@ -653,7 +653,7 @@ describe("lease.stow(deviceDB)", () => {
     expect(await reloaded.unseal(BaseBox, sealed)).to.deep.include(Cleartexts)
   })
 
-  it("leaves a newer ante record in place", async () => {
+  it("leaves a newer prior record in place", async () => {
     const { lease } = await leaseWorld()
     const deviceDB = new MemoryDeviceDB()
     const tombstone = Lease.tombstoneOf(lease)

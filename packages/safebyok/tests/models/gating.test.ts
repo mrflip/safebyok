@@ -92,15 +92,15 @@ describe("Bank.birth(device, cleartexts)", () => {
     expect(births.tryBirthBank.mock.calls[0]![0]).to.deep.include({ banktok: bank.banktok })
   })
 
-  it("refuses where the device holds a live gate, asking the vaultDB nothing and leaving the ante bank unchanged", async () => {
+  it("refuses where the device holds a live gate, asking the vaultDB nothing and leaving the prior bank unchanged", async () => {
     const device = TH.makeDevice()
-    const ante = await birth(device, { passphraseCleartext: TH.TestPassphrase })
-    const anteGate = ante.gate.pickle()
+    const prior = await birth(device, { passphraseCleartext: TH.TestPassphrase })
+    const priorGate = prior.gate.pickle()
     const births = TH.spyBirths(device)
     const err = await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase }), 'gate_made_elsewhere')
     expect(err.message).to.match(/another device/)
     expect(births.tryBirthBank).not.toHaveBeenCalled()
-    expect(device.bank.gate.pickle()).to.equal(anteGate)
+    expect(device.bank.gate.pickle()).to.equal(priorGate)
   })
 
   it("refuses where a live bank was stored after its sign-in, the vaultDB passing on it, making no bank of its own", async () => {

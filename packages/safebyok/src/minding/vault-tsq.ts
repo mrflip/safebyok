@@ -231,9 +231,9 @@ export class VaultTSQ {
 
   /** `scope`, refused unless it is of a box under the root box in this bank */
   #parseItemScope(scope: ThingScope): ThingScope {
-    const parsed = ThingChecks.thingScope.parseConsistent(scope, this.#scope)
-    if (! isItemScope(parsed)) { throw Throwers.notMinded() }
-    return parsed
+    const scopeChecked = ThingChecks.thingScope.parseConsistent(scope, this.#scope)
+    if (! isItemScope(scopeChecked)) { throw Throwers.notMinded() }
+    return scopeChecked
   }
   // --
 

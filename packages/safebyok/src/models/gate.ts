@@ -7,7 +7,7 @@ import type { Proving } from './proving'
 import { Wayin } from './wayin'
 import type { Bank } from './bank'
 import type {
-  AddPasskeyDna, GateDna, GateGatingFriend, PasskeyAddCleartexts, PasskeyRevokeCleartexts, PassphraseReplaceCleartexts, ReplacePassphraseDna,
+  AddPasskeyCleartexts, AddPasskeyDna, GateDna, GateGatingFriend, ReplacePassphraseCleartexts, ReplacePassphraseDna, RevokePasskeyCleartexts,
   RevokePasskeyDna, UnlockCleartexts, UnlockDna, BankGateFriend,
 } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
@@ -154,7 +154,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   }
 
   /** The gating of {@link replacePassphrase} over `params`, for a form mutation to attempt. A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once. */
-  replacePassphraseGating(params: FormData | ReplacePassphraseDna | PassphraseReplaceCleartexts): ReplacePassphraseGating { return new ReplacePassphraseGating(this, params, this.#gatingFriend()) }
+  replacePassphraseGating(params: FormData | ReplacePassphraseDna | ReplacePassphraseCleartexts): ReplacePassphraseGating { return new ReplacePassphraseGating(this, params, this.#gatingFriend()) }
 
   /** Replace the passphrase by `nextPassphrase`, proved by the `passphrase` or the passkey's answer, in a form or a dna, as {@link replacePassphrase} does.
    * A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields before anything is awaited; its other fields stay. A dna's fields are never changed, but a passkey answer's PRF bytes are zeroed.
@@ -165,13 +165,13 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
    * The passkey stays, and the bankKey does not change.
    * A new passphrase that is weak, or the same as the current one, refuses (`weak_passphrase`, `same_passphrase`).
    */
-  async replacePassphrase(cleartexts: PassphraseReplaceCleartexts): Promise<this> {
+  async replacePassphrase(cleartexts: ReplacePassphraseCleartexts): Promise<this> {
     await this.replacePassphraseGating(cleartexts).attempt()
     return this
   }
 
   /** The gating of {@link addPasskey} over `params`, for a form mutation to attempt. */
-  addPasskeyGating(params: FormData | AddPasskeyDna | PasskeyAddCleartexts): AddPasskeyGating { return new AddPasskeyGating(this, params, this.#gatingFriend()) }
+  addPasskeyGating(params: FormData | AddPasskeyDna | AddPasskeyCleartexts): AddPasskeyGating { return new AddPasskeyGating(this, params, this.#gatingFriend()) }
 
   // A FormData cannot carry a passkey's answer, so only a dna can add one.
   /** Add the passkey whose answer is `nextPasskeyAnswer`, proved by the `passphrase`, as {@link addPasskey} does. The dna is never changed, but the answer's PRF bytes are zeroed. */
@@ -180,13 +180,13 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   /** Add a passkey, proved by the passphrase, and leave the gate unlocked.
    * A gate has one passkey at most, so this refuses while it has one: revoke that one first.
    */
-  async addPasskey(cleartexts: PasskeyAddCleartexts): Promise<this> {
+  async addPasskey(cleartexts: AddPasskeyCleartexts): Promise<this> {
     await this.addPasskeyGating(cleartexts).attempt()
     return this
   }
 
   /** The gating of {@link revokePasskey} over `params`, for a form mutation to attempt. A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields at once. */
-  revokePasskeyGating(params: FormData | RevokePasskeyDna | PasskeyRevokeCleartexts): RevokePasskeyGating { return new RevokePasskeyGating(this, params, this.#gatingFriend()) }
+  revokePasskeyGating(params: FormData | RevokePasskeyDna | RevokePasskeyCleartexts): RevokePasskeyGating { return new RevokePasskeyGating(this, params, this.#gatingFriend()) }
 
   /** Revoke the passkey, proved by the `passphrase` or the passkey's answer, in a form or a dna, as {@link revokePasskey} does.
    * A `FormData` loses its `passphrase`, `nextPassphrase` and `confirmation` fields before anything is awaited; its other fields stay. A dna's fields are never changed, but a passkey answer's PRF bytes are zeroed.
@@ -196,7 +196,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
   /** Revoke the passkey, proved by the passphrase or the passkey itself, and leave the gate unlocked.
    * With no passkey, the proof only unlocks the gate. The bankKey does not change.
    */
-  async revokePasskey(cleartexts: PasskeyRevokeCleartexts): Promise<this> {
+  async revokePasskey(cleartexts: RevokePasskeyCleartexts): Promise<this> {
     await this.revokePasskeyGating(cleartexts).attempt()
     return this
   }

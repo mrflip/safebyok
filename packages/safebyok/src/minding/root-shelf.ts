@@ -66,14 +66,14 @@ function shelvedOf(roots: ShelvedRoots): string { return JSON.stringify([Shelved
 
 /** The two roots in `shelved`, unchecked, or null where it is no value of version {@link ShelvedVersion}. */
 function rootsOfShelved(shelved: string): readonly unknown[] | null {
-  let parsed: unknown
+  let versionAndRoots: unknown
   try {
-    parsed = JSON.parse(shelved)
+    versionAndRoots = JSON.parse(shelved)
   } catch {
     return null
   }
-  if ((! Array.isArray(parsed)) || (parsed.length !== 3) || (parsed[0] !== ShelvedVersion)) { return null }
-  const roots: readonly unknown[] = parsed.slice(1)
+  if ((! Array.isArray(versionAndRoots)) || (versionAndRoots.length !== 3) || (versionAndRoots[0] !== ShelvedVersion)) { return null }
+  const roots: readonly unknown[] = versionAndRoots.slice(1)
   return roots
 }
 

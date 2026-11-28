@@ -183,7 +183,7 @@ export class Bank {
   }
   // --
 
-  // == [Signing in]: signin, seedFromShelf, keepOnShelf, showSigninRefusal, birthGating, birth, birthFriend
+  // == [Signing in]: signin, seedFromShelf, startShelving, showSigninRefusal, birthGating, birth, birthFriend
 
   // Its Things are seeded before it listens to keep them on the shelf, which would only put back what it read.
   /** Give this bank `vaultMinder`, the VaultMinder of the signed-in user's bank; where `shelf` is given, seed it from the roots on `shelf` and put the roots there as they change. A second call does nothing.
@@ -195,7 +195,7 @@ export class Bank {
     this.#vaultMinder = vaultMinder
     if (shelf !== null) {
       this.#seedFromShelf(vaultMinder, shelf)
-      this.#keepOnShelf(vaultMinder, shelf)
+      this.#startShelving(vaultMinder, shelf)
     }
     if (this.#isConnected) { this.#startWatch() }
     this.#startJanitor()
@@ -214,7 +214,7 @@ export class Bank {
 
   // The Things hear each root first, so the roots put are the ones this bank shows.
   /** Put this bank's roots on `shelf` at each root `vaultMinder` tells of, or remove them while they are not all live. */
-  #keepOnShelf(vaultMinder: VaultMinder, shelf: RootShelf): void {
+  #startShelving(vaultMinder: VaultMinder, shelf: RootShelf): void {
     const hear = this.#bulletproofCallback((event: VaultEvent) => {
       if ((event.eventkind === 'item') && this.#isRootScope(event)) { stowRoots(shelf, this.#device.scope, this) }
     })
@@ -429,7 +429,7 @@ export class Bank {
   }
   // --
 
-  // == [Following the stored lease]: followStored, isNewerThanLease, takeUp, canUnlock, softlockPastGate, peekStored, stowLease, stowTombstoneOf
+  // == [Following the stored lease]: followStored, isNewerThanLease, attachOrDropLease, canUnlock, softlockPastGate, peekStored, stowLease, stowTombstoneOf
   // Each tab's lease is the one the deviceDB has, compared by life, then revision. The newest stow wins there, so a
   // late stow never brings a locked lease back. A stow or a peek refused is bad news, and the tab keeps its lease.
 
@@ -438,7 +438,7 @@ export class Bank {
     if (! this.areRootsLive) { return }
     const stored = await this.#peekStored({ modelkind: 'lease', ...this.#device.scope, labelpath: LeaseLabelpath.of(Labelpath.gateOf(this.#device.banklabel)) })
     try {
-      if (this.#isNewerThanLease(stored)) { this.#takeUp(stored) }
+      if (this.#isNewerThanLease(stored)) { this.#attachOrDropLease(stored) }
       this.#softlockPastGate()
     } catch (err) {
       this.#device.tellBadNews([err])
@@ -451,7 +451,7 @@ export class Bank {
   }
 
   /** Attach the Lease of `stored` where it can unlock the bank, or else drop this bank's lease where it has one, announcing either */
-  #takeUp(stored: LeaseRecord): void {
+  #attachOrDropLease(stored: LeaseRecord): void {
     if ((stored.am === 'a') && this.#canUnlock(stored)) {
       const gate = this.#leaseGateOf(this.#demandGateLive().life)
       this.#attachLease(Lease.make(stored, { gate }))
@@ -769,8 +769,8 @@ const ShelvedSourcelabel = 'root_shelf'
 
 /** The banktok of the shelved root `shelved`, where it is a gate's record, else the void banktok. */
 function banktokOf(shelved: unknown): Banktok {
-  const report = Checks.shelvedGate.safeParse(shelved)
-  return report.success ? report.data.record.banktok : SX.VoidLifeTok
+  const gateReport = Checks.shelvedGate.safeParse(shelved)
+  return gateReport.success ? gateReport.data.record.banktok : SX.VoidLifeTok
 }
 
 /** The `item` event of `record`, a root peeked from the root shelf, at the `read_tc` it was shelved with and in the bank of `banktok`, with the vacant agerank. */

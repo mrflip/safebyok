@@ -165,7 +165,7 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
     return Lease.make(Lease.makeNextRecord(this.#record!, { ends_at }), { gate: this.#gate })
   }
 
-  /** Stow this lease's record, its keys with it, in `deviceDB`, where it is newer than the ante record there. Refuses as `deviceDB.stowLease` does, and once this lease is evicted. */
+  /** Stow this lease's record, its keys with it, in `deviceDB`, where it is newer than the prior record there. Refuses as `deviceDB.stowLease` does, and once this lease is evicted. */
   async stow(deviceDB: DeviceDB): Promise<void> {
     Checks.stowArgs.parse({ deviceDB })
     this.demandEnabled()
@@ -180,7 +180,7 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
   evict(): void { this.#record = null }
   // --
 
-  // == [Sealing under the bankKey]: seal, unseal, sealText, openSealed, ctxOf, bankKey
+  // == [Sealing under the bankKey]: seal, unseal, sealText, unsealText, ctxOf, bankKey
 
   /** Seal and return the next revision after `donorProps`, with `publicProps` applied and `secretProps` encrypted.
    * The seal checks its arguments (`BaseBox` refuses an unknown key in `publicProps` or `secretProps`) and the record it returns, so pass `donorProps` as you have it: whole, sparse, sealed or unsealed. None of its secrets reaches the revision.
@@ -203,11 +203,11 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
     sealer: Sealers.Sealer<RecordT, CleartextsT>, donorProps: Sealers.Sealable<RecordT>, publicProps: Sealers.PublicPropsOf<RecordT, CleartextsT>, secretProps?: CleartextsT,
   ): Promise<RecordT> {
     Checks.sealer.parse(sealer)
-    const kept = withoutSecrets(sealer.donorPropsOf(donorProps))
+    const donated = withoutSecrets(sealer.donorPropsOf(donorProps))
     const given = sealer.publicPropsOf(publicProps)
     const isGone = (given.am === 'x')
     if (isGone && (secretProps !== undefined)) { throw Throwers.tombstoneSecretsGiven() }
-    const revision   = { ...(isGone ? sealer.tombstoneOf(kept, given) : sealer.nextRevisionOf(kept, given)), banktok: this.banktok }
+    const revision   = { ...(isGone ? sealer.tombstoneOf(donated, given) : sealer.nextRevisionOf(donated, given)), banktok: this.banktok }
     const cleartexts = isGone ? sealer.tombstoneSecrets         : sealer.secretPropsOf(secretProps)
     const sealed = await this.#sealText(sealer, revision, sealer.encode(cleartexts))
     return sealer.recordOf(revision, sealed)
@@ -221,7 +221,7 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
     Checks.sealer.parse(sealer)
     // The answer is built from the record as the sealer checks a stored one, never from the caller's object.
     const recordChecked = sealer.recordOf(record, sealer.sealedOf(record))
-    const cleartexts = sealer.decode(await this.#openSealed(sealer, recordChecked))
+    const cleartexts = sealer.decode(await this.#unsealText(sealer, recordChecked))
     // The spread's type is UnsealedOf's, which TypeScript cannot see through for a record of any kind.
     return Object.freeze({ ...withoutSecrets(recordChecked), ...cleartexts }) as Sealers.UnsealedOf<RecordT, CleartextsT>
   }
@@ -243,7 +243,7 @@ export class Lease implements LeaseStamp, Sparse<LiveOf<LeaseRecord>> {
   }
 
   /** The cleartext sealed in `record`, the part `sealer` seals. */
-  async #openSealed<RecordT extends ThingShaped>(sealer: Pick<Sealers.Sealer<RecordT, unknown>, 'sealedOf' | 'stampOf' | 'purposes'>, record: RecordT): Promise<string> {
+  async #unsealText<RecordT extends ThingShaped>(sealer: Pick<Sealers.Sealer<RecordT, unknown>, 'sealedOf' | 'stampOf' | 'purposes'>, record: RecordT): Promise<string> {
     const { key_wrapped, ciphered, ...tags } = sealer.sealedOf(record)
     const stamp   = sealer.stampOf(record)
     const { purposes } = sealer

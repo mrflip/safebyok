@@ -10,7 +10,7 @@ import type { LiveOf, ShellOf, TombstoneOf } from '../../src/shapes/shapes-seale
 import { type BoxLabelpath, Lifeseq } from '../../src/shapes/primitives'
 import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
-import { StoreLimitCap } from '../../src/shapes/shapes-vault-stats'
+import { DatastoreLimitCap } from '../../src/shapes/shapes-vault-stats'
 import { Thing } from '../../src/models/thing'
 import type { ThingCar } from '../../src/minding/thing-car'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -1174,7 +1174,7 @@ describe("vault.stats() and vault.tryStats()", () => {
     const stats = await vault.stats()
     expect(stats.box).to.deep.include({ count: 2, live_count: 2 })
     expect(stats.gate).to.deep.include({ count: 1, live_count: 1 })
-    expect(stats.max).to.deep.equal({ count: StoreLimitCap, size: StoreLimitCap })
+    expect(stats.max).to.deep.equal({ count: DatastoreLimitCap, size: DatastoreLimitCap })
     expect(stats.box.size + stats.gate.size).to.be.below(0.9 * stats.max.size)
     expect(await vault.tryStats()).to.deep.equal({ ok: true, val: stats })
   })

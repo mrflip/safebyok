@@ -132,9 +132,9 @@ describe("gate.gatingReplacePassphraseAttempt(params)", () => {
 
   it("refuses a wrong current passphrase from a dna as `replacePassphrase` does, writing nothing", async () => {
     const { bank } = await lockedBank()
-    const ante = bank.gate.pickle()
+    const prior = bank.gate.pickle()
     await TH.expectRefusal(bank.gate.gatingReplacePassphraseAttempt({ passphrase: 'not the passphrase', nextPassphrase: NextPassphrase }), 'wrong_passphrase')
-    expect(bank.gate.pickle()).to.equal(ante)
+    expect(bank.gate.pickle()).to.equal(prior)
   })
 })
 

@@ -66,7 +66,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   }
   // --
 
-  // == [Methods]: judgeStrength, buildWayin, buildLease, wrapBankKey, unwrapBankKey, wayinCtx
+  // == [Methods]: judgeStrength, buildWayin, buildLease, doBuildWayin, unwrapBankKey, wayinCtx
 
   /** The strength checker's verdict on `passphraseCleartext`.
    * A throw from the checker is replaced, so no error quotes the passphrase.
@@ -85,7 +85,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
       Validator.checkedConsistent(source.gateLife, this.gateLife, { kind: 'unexpected_error', message: BigPhrases.ProvingOfOtherGate })
     }
     const bankKey = source === NOVEL ? await Crypto.makeBankKey() : await source.#unwrapBankKey()
-    return this.#wrapBankKey(bankKey)
+    return this.#doBuildWayin(bankKey)
   }
 
   // The bankKey is unwrapped, wrapped again under the leaseKey and dropped here, crossing no method boundary (G3).
@@ -124,7 +124,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
   }
 
   /** The wayin of this proving's header, with `bankKey` wrapped under its wayinKey */
-  async #wrapBankKey(bankKey: CryptoKey): Promise<Wayin> {
+  async #doBuildWayin(bankKey: CryptoKey): Promise<Wayin> {
     const bank_key_wayin_wrapped = await Crypto.wrapKeyUnder(this.#wayinKey, bankKey, this.#wayinCtx())
     this.#wayin = Wayin.make({ ...this.header, bank_key_wayin_wrapped })
     return this.#wayin
