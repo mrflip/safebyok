@@ -42,6 +42,11 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-28 (new core, commit "vault: a bank always has its gate from sign-in on"): **In `packages/safebyok`, from sign-in on a `Bank` always holds a `Gate` and a root box Thing (from `VaultMinder.ensureRootCars()`), each modelling the shell, the never-stored void sentinel, until a record is received. The bank's own null checks and its private `#demandGateLive` are removed.**
+  Unchanged: a seal or unseal needs an attached lease (`#demandLease`); a lease is made only by `Lease.make` given `gate.life`; `gate.life`, `gate.stamp` and the wayins refuse `absent_thing` over the shell or a tombstone (`Thing.demandLive`); `demandRootsLive` still refuses unless both roots are live.
+  Loosened: `bank.rootBox` no longer demands a live gate first, and answers a live root box record (ciphertext and visible fields only) whatever the gate's record. `bank.life` over a gate tombstone answers the life that ended, and over the shell refuses `bad_record` at its lifeseq check instead of `absent_thing`. Before sign-in, `bank.gate`, `bank.banktok`, `demandRootsLive` and `stats` refuse `absent_vault`.
+  The stage `'unborn'` is now read from the gate's car having been read (`agekind` not `vacant`) and its record not live.
+
 * 2026-11-27 (bank_fold thread 12, one_stamp): **In `packages/safebyok`, each AES-GCM ctx now lists one stamp, and the bank's stamp (`BankStamp`), which every ctx listed first, is gone; the bank's life is bound through `banktok`, a stored field of every Thing, bound into every stamp.** The Coach: "there's no reason to double-count properties that are forced to be equal".
   Unchanged: the primitives, `Crypto.cipherCtx(stamp, purpose, header?)` and its construction, the purposes, the HKDF info (the wayin's whole ctx), the wrap helpers, and every key's usages and extractability. Each ctx lists one stamp where it listed two (the bank's, then the Thing's or lease's).
   Banktok (formerly the gate's `lifetok`): a stored field of every Thing, minted at each birth of a bank and kept by every write of that life; a box copies its gate's banktok at each seal. No datastore compares a box's banktok with its gate's yet, and nothing hides boxes of an older life.
