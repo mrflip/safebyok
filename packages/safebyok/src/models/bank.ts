@@ -547,13 +547,12 @@ export class Bank {
   // == [Stats]: stats, tryStats
 
   /** The bank's storage stats, read from the vaultDB once: how many boxes and gates it has, live and in all, their size in bytes, and the datastore's limits.
-   * Works on a locked bank. Nothing refuses a write for being over a limit.
+   * Works on a locked bank, and on one not yet born. Refuses `need_user` until someone signs in. Nothing refuses a write for being over a limit.
    * @example
    *   const { box, gate, max } = await bank.stats()
    *   const isNearlyFull = (box.size + gate.size) > 0.9 * max.size
    */
   async stats(): Promise<VaultStats> {
-    this.demandRootsLive()
     this.demandEnabled()
     return Outcome.valOf(await this.demandVaultMinder().tryStatsOnce())
   }

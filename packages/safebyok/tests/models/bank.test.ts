@@ -816,6 +816,13 @@ describe("bank.stats() and bank.tryStats()", () => {
     expect(await device.bank.tryStats()).to.deep.equal({ ok: true, val: stats })
   })
 
+  it("answer for a bank not yet born, which has no box or gate", async () => {
+    const { bank } = await signedInDevice()
+    const { box, gate } = await bank.stats()
+    expect(box).to.deep.include({ count: 0, live_count: 0 })
+    expect(gate).to.deep.include({ count: 0, live_count: 0 })
+  })
+
   it("refuse before signin, and a disabled device, reading nothing", async () => {
     await TH.expectRefusal(TH.makeDevice({ userid: null }).bank.stats(), 'need_user')
     const { bank, device } = await TH.buildBornVault()
