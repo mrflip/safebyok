@@ -92,7 +92,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp, Adoptable<Gat
     const { bank } = opts
     const seen = ('eventkind' in begun) ? begun.val : begun
     // A gate's life is its own, so only the bank's scope is checked: a gate of another life of the bank passes.
-    Validator.checkedConsistent(StampChecks.bankScope.parse(seen), bank.device.scope, { kind: 'record_conflict' })
+    Validator.demandConsistent(StampChecks.bankScope.parse(seen), bank.device.scope, { kind: 'record_conflict' })
     const gate = new Gate(super.shellOf(seen), bank, friend)
     if ('eventkind' in begun) { gate.receive(begun) }
     return gate
