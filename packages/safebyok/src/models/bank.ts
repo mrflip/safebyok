@@ -13,7 +13,7 @@ import { PendingBank, SignedOutBank, HostedVaultChecks, isRootShelf } from '../s
 import type { BirthCleartexts, BirthDna, BirthGatingFriend, GateFound, LeaseShellScope, BankGateFriend } from '../shapes/shapes-gateish'
 import { type MaskedViewLease, EmptyMaskedView } from '../shapes/shapes-masked-view'
 import type * as Sealers from '../shapes/shapes-sealers'
-import { type BankLife, type BankScope, type GateLife, type GateStamp, type LeaseLoggable, type LeaseRecord, type LeaseScope, LeaseLabelpath, StampChecks } from '../shapes/shapes-stamps'
+import { type BankLife, type BankScope, type GateLife, type GateStamp, type LeaseLoggable, type LeaseRecord, type LeaseScope, StampChecks } from '../shapes/shapes-stamps'
 import { type BoxRecord, type BulletproofCallback, type GateRecord, type Sparse, type ThingScope, type ThingShaped, type Thingkind, type VoidSentinel, ThingChecks } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { rootScopesOf } from '../shapes/shapes-asks'
@@ -305,9 +305,8 @@ export class Bank {
   // this bank's lease where that is newer, as a softlock not yet stowed is.
   /** The Thing fields a lease granted under the gate at `gateScope` follows: the lease record stored, or this bank's lease where none is stored or this one is newer, or else the gate's lease shell. */
   async #leaseFollowed(gateScope: LeaseShellScope): Promise<Sparse<LeaseRecord>> {
-    const shell  = Lease.shellOf(gateScope)
-    const { modelkind, userid, banklabel, labelpath } = shell
-    const stowedLease = await this.#peekStored({ modelkind, userid, banklabel, labelpath })
+    const shell       = Lease.shellOf(gateScope)
+    const stowedLease = await this.#peekStored(shell)
     if (this.#isNewerThanLease(stowedLease)) { return this.#endedIfStale(stowedLease) }
     return this.#lease ?? shell
   }
@@ -434,7 +433,7 @@ export class Bank {
   /** Make this bank's lease the one the deviceDB has for its gate, where that one is newer, then softlock it where the gate has moved past it. Does nothing until the roots are live. Never throws: a refusal goes to the device's `onBadNews`. */
   async #followStored(): Promise<void> {
     if (! this.areRootsLive) { return }
-    const stowedLease = await this.#peekStored({ modelkind: 'lease', ...this.#device.scope, labelpath: LeaseLabelpath.of(Labelpath.gateOf(this.#device.banklabel)) })
+    const stowedLease = await this.#peekStored(Lease.shellOf(this.gate))
     try {
       if (this.#isNewerThanLease(stowedLease)) { this.#attachOrDropLease(stowedLease) }
       this.#softlockPastGate()
@@ -810,17 +809,20 @@ function makeWait(): Wait {
 
 // Defined here, not with the shapes: they name a model class.
 /** The checks of the arguments of {@link Bank.make}, {@link Bank.signin}, {@link Bank.birth}, {@link Bank.birthGating} and {@link Bank.mintLife}, and of a root peeked from the root shelf. */
-const Checks = Validator.Checkers('bad_record', ({ obj, lit, custom, union }) => ({
-  device:      custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
-  bankOpts:   obj({ device: custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected) }),
-  signinArgs:  obj({
-    vaultMinder: custom<VaultMinder>(isVaultMinder, Phrases.VaultMinderExpected),
-    shelf:       custom<RootShelf>(isRootShelf, Phrases.RootShelfExpected).nullable(),
-  }),
-  // The shelf has the roots only while both are live, each whole.
-  shelvedRoot: obj({ record: union([GateChecks.record, BoxChecks.record]), read_tc: SeenChecks.readTc }),
-  shelvedGate: obj({ record: GateChecks.record }),
-  // A birth is never over a live gate: its gating refuses that first.
-  mintLifeArgs:   obj({ ...StampChecks.bankScope.shape, am: lit('x'), lifeseq: ThingChecks.anyLifeseq, lifepath: ThingChecks.anyLifepath }),
-}))
+const Checks = Validator.Checkers('bad_record', ({ obj, lit, custom, union }) => {
+  const device = custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected)
+  return {
+    device,
+    bankOpts:     obj({ device }),
+    signinArgs:   obj({
+      vaultMinder: custom<VaultMinder>(isVaultMinder, Phrases.VaultMinderExpected),
+      shelf:       custom<RootShelf>(isRootShelf, Phrases.RootShelfExpected).nullable(),
+    }),
+    // The shelf has the roots only while both are live, each whole.
+    shelvedRoot:  obj({ record: union([GateChecks.record, BoxChecks.record]), read_tc: SeenChecks.readTc }),
+    shelvedGate:  obj({ record: GateChecks.record }),
+    // A birth is never over a live gate: its gating refuses that first.
+    mintLifeArgs: obj({ ...StampChecks.bankScope.shape, am: lit('x'), lifeseq: ThingChecks.anyLifeseq, lifepath: ThingChecks.anyLifepath }),
+  }
+})
 // --
