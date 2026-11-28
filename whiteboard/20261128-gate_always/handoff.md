@@ -38,14 +38,27 @@ A workshop (`/workshop`): the Coach and the agent decide by consensus, and worke
   2026-11-28): "not necessary, not wanted. There's been no public release."
 * **An obvious Goofus pass** over `bank.ts` and `gate.ts` (the Coach, 2026-11-28). Done: nine commits, no contract changed.
 
+* **`bank.life` is removed, "as other unneeded code is too"** (the Coach, 2026-11-28). Done, with `BankLife`.
+* **`Bank.makeThing` dispatches by modelkind to the right `make`, "which actually knows what to validate"** (the Coach).
+  Done: `Box.make` now checks its bank's scope, as `Gate.make` does.
+* **`bank.stats` "should not look for trouble it doesn't need"** (the Coach). Done: it demands no live roots.
+* **`need_user` only where it is honest** (the Coach): "if a natural condition check is clearly due to the absence of a
+  user, that will be a better refusal name than the second order consequence of it... But I don't want code with more
+  branching, or claiming a reason which is a guess. For react, same thing." It replaces the earlier ruling above.
+* **Callers pass the gate and the callee picks; `gate.life` and the nested `ProvableGate` go; `GateLife` names the six
+  bound fields** (the Coach: "Go for it"). The places that use the shape "can slice down if needed; chances are decent
+  they don't need to: consistency checks only insist on overlapping fields being equal."
+* **The bank hands the gating's friend what it needs of the device; `gate.device` goes** (the Coach: "That sounds right").
+* **The bank trusts its stage** (the Coach: "Perfectly put"): "The bank learns what it has at its lifecycle verbs, once.
+  Code that runs inside a stage trusts that stage." The test: "if the false branch can be reached only by a mis-built
+  bank, or by a stage the caller cannot be in, delete the check." Without `as` casts: "Throwing accessors or stub mimics
+  help." It does not remove a branch whose two answers are both normal, a public entrypoint's one guard, or validation of
+  what storage or a host hands in.
+* **`areRootsLive` is the VaultMinder's, and the bank forwards** (the Coach: "Go ahead on your proposals").
+* **Unread public members go**: the gate's forwarders to the bank, its unread record getters, and the bank's `banktok`,
+  `tryStats`, `tellBadNews`, `leaseLoggable`. The gate's form verbs and `Bank.birth` stay (the same go-ahead).
+* **"Leave react react-y"** (the Coach): `const unlock = bank.useUnlock()` stands, and VOCABULARY says so.
+
 ## Open, awaiting the Coach
 
-1. **`bank.life`**: read by nothing in any `src/`; VOCABULARY calls it "a view, bound into nothing by itself". The
-   agent's recommendation, firm: delete it with `BankLife`, `BankChecks.life` and `StampChecks.bankLife`.
-2. **safebyok-react's no-user refusal** throws `absent_vault` with its own `NobodySignedIn` phrase, in `react-giver.tsx`.
-   The agent's lean, firm: make it `need_user` too, one name for one thing.
-3. **`const unlock = bank.useUnlock()`**, three times in safebyok-react, breaks the softened rule. The agent's lean:
-   `unlocking`, loosely.
-4. **`bank.stats()` demands live roots it does not use.** The agent's lean, moderate: drop `demandRootsLive`.
-5. **`Gate.make` repeats the bank-scope check `bank.makeThing` ran.** The agent's lean, loose: drop the gate's.
-6. **#952 wants a `thread-reviewer`** (opus) before it leaves draft, once the rulings above are built.
+1. **#952 wants a `thread-reviewer`** (opus) before it leaves draft, once the two rounds under way are in.

@@ -326,7 +326,8 @@ Use these only where the precise word does not apply:
   gating is considered a verb.) It also describes: an unlock event, an unlock form, the `unlock` gating. Prose
   may say "an unlock in another tab". Never name a variable, a field or a type `unlock`: the verb is
   usually in scope beside it. Name the object for what it is: a way in is a wayin, and what a gating grants
-  is a lease.
+  is a lease. A React hook's result takes its hook's name, as React code does: `const unlock = bank.useUnlock()`,
+  beside `birth`, `replace`, `add` and `revoke`.
 * **proof or ask, for the request for cleartext.** The user hands in cleartext through the
   host's form, and a proof is that cleartext (`ProvedCleartexts`), never the request. Made into a
   key, it is a proving. An ask is what a storage verb is asked.
