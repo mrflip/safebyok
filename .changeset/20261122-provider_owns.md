@@ -1,4 +1,0 @@
----
----
-
-safebyok-react-lean, private: the provider makes, at its mount, the QueryClient its record hooks observe, and in an effect makes its user's device on that client and starts it, so a server render makes no device and shows `starting` for a userid or `signed_out` for none. Records no longer pass through the host's QueryClient: a hook mounted while nobody is signed in shows the record after sign-in. `useQuery` over `boxQuery` or `useQueryOptions` runs in the giver's client, `Knock.queryClient()` or `sok.knock.client`. A record hook takes only `select`, `placeholderData` and `notifyOnChangeProps` (`useGate`, `select` and `notifyOnChangeProps`). The calls that are not hooks act on the device of the provider mounted, and refuse once it unmounts; mounting again makes a new device. The provider no longer needs a `QueryClientProvider`; the form verbs' mutations still do. Nothing published changes, and nothing stored.

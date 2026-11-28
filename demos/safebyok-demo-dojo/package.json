@@ -1,7 +1,7 @@
 {
   "name": "safebyok-demo-dojo",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "The dojo: a page for producing, on demand, each outcome of the forms around a safebyok vault, and looking at what the form and the stores behind it hold afterwards. Never published.",
   "type": "module",
   "scripts": {

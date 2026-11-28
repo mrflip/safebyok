@@ -1,7 +1,7 @@
 {
   "name": "safebyok-graphql-big",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "GraphQL storage for safebyok: the schema and resolvers that carry a server's bankDB to the browser, and the bankDB over an urql Client that calls them.",
   "keywords": [
     "safebyok",

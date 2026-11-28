@@ -1,6 +1,6 @@
 {
   "name": "safebyok",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "The lean core of safebyok: the device, bank, gate, gating, wayins, provings and lease, with no storage of their own",
   "license": "Apache-2.0",

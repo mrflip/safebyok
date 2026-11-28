@@ -1,4 +1,0 @@
----
----
-
-Empty: the new `safebyok` is private, and nothing published reaches what changed. `BaseBox.tombstoneOf` now takes `sidecar: {}` in its public props, a tombstone's own sidecar, where it refused any sidecar before (`A tombstone's sidecar is always {}: give { am: 'x' } with no sidecar.`); any other sidecar still refuses as `bad_record`, now with the phrase the stored box's check uses, `A box tombstone's sidecar is always {}.` A lease's `seal(BaseBox, live, { am: 'x', sidecar: {} })` and the bank's `tombstoneBox(live, { sidecar: {} })` write the tombstone too, and their types allow it: the bank's take the new `BoxTombstonePublicProps`, whose sidecar is typed as `{}`, and the lease's tombstone overload takes the record's body fields, for its sealer to check. The thrower `tombstoneSidecarGiven` and the phrase `TombstoneSidecarGiven` are gone. Nothing stored changes.

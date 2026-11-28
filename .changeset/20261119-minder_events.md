@@ -1,4 +1,0 @@
----
----
-
-Empty: the new `safebyok` is private and the giver is not yet exported. What a caller of `ThingMinder.listen` will see: its listener is handed a `MinderEvent`, a union told apart by `carkind`, where it was handed a `TSQGotAnswer`. Today every event is a `ThingEvent`, `{ carkind: 'thing', modelkind, labelpath, car }`: `car` is the cached car itself, the same object until a record changes it, and undefined where none is cached (the car is removed, or its first get was refused); its `modelkind` types it (`BoxCar` for `'box'`). The event no longer carries `ok`, `ask`, `act`, `val`, `isTimely`, `refreshedAt`, `isFetching` or `lastErr`: `tryAt` still answers them. `ListingEvent` and `InvalidationEvent` are typed and exported, and nothing tells them yet. All four types are exported from `safebyok`.

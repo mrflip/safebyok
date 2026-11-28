@@ -1,7 +1,7 @@
 {
   "name": "safebyok-demo-envman",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Envman, a doppler-lite on the new core: a fake sign-in, a vault saved to this browser's localStorage, and a list of secrets, each with its title, description and rotation period. Never published.",
   "type": "module",
   "scripts": {

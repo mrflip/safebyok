@@ -1,7 +1,7 @@
 {
   "name": "safebyok-indexeddb-big",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "IndexedDB storage for safebyok: a bankDB that keeps a bank's rows as ciphertext in this browser, each call one IndexedDB transaction.",
   "keywords": [
     "safebyok",

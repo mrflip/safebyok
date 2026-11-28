@@ -1,7 +1,7 @@
 {
   "name": "safebyok-demo-knockknock",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "The Knock-Knock Machine on the new core: a fake sign-in, a vault saved to this browser's localStorage, and an Anthropic key that tells knock-knock jokes. Never published.",
   "type": "module",
   "scripts": {

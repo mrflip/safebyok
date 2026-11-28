@@ -1,5 +1,64 @@
 # safebyok-fastkey
 
+## 0.6.0
+
+### Minor Changes
+
+- [#484](https://github.com/mrflip/safebyok/pull/484) [`18da7df`](https://github.com/mrflip/safebyok/commit/18da7dfaaed13370301d8d9ad0437323000eef92) Thanks [@mrflip](https://github.com/mrflip)! - **The core splits in two.** `safebyok` is now the new design, exporting `Bank`, `Vault`, `Box`, `Gating` and their snapshot types, through `.` and `./testing`. The old design moves to a private `safebyok-old`, which the adapters and `safebyok-react` peer on until they move to the new core.
+
+- [#488](https://github.com/mrflip/safebyok/pull/488) [`6b09d54`](https://github.com/mrflip/safebyok/commit/6b09d54541acca4ee5c53c8d887b8b7dfa05be43) Thanks [@mrflip](https://github.com/mrflip)! - `safebyok` also exports `VaultError`, `isVaultError` and the `BankOpts` and `RequestCleartext` types.
+
+- [#565](https://github.com/mrflip/safebyok/pull/565) [`ccb6e12`](https://github.com/mrflip/safebyok/commit/ccb6e12b0c0e994dfdd733d74d1a2fbc5b136842) Thanks [@mrflip](https://github.com/mrflip)! - **`safebyok/browser` exports what another key deriver needs to wear the core's specs: `Argon2idWebV1`, `parseKeyDeriverSpec` and `checkSaltFits`; `safebyok/testing` exports `makeBankWorld`, `makeBankWithVault`, `useBankWorlds`, `byPassphrase`, `Passphrase` and `VaultScopeGiven`.** **`safebyok-fastkey` now peers on `safebyok`, not `safebyok-old`,** and its derivers are `safebyok`'s own `KeyDeriver`s: same keyDeriverSpecs and labels, same bytes, refusals as the core's. A host of the new core imports `Argon2idWebV1` from `safebyok/browser`; fastkey's own exports are unchanged. **Stored format:** unchanged.
+
+- [#580](https://github.com/mrflip/safebyok/pull/580) [`b3217cc`](https://github.com/mrflip/safebyok/commit/b3217ccf7838d907f6e4ec787e78e191dfb9787e) Thanks [@mrflip](https://github.com/mrflip)! - **`safebyok` exports `Patterns`, `MaxLabelChars` and `MaxUserIdChars`**, so an input can check a label or a `user_id` by the same pattern and length the vault does (`<input pattern={Patterns.label.source} maxLength={MaxLabelChars} />`); each `source` compiles under the `v` flag a browser gives an input's pattern. **A passphrase salt is 16 bytes, always:** a key deriver's `salt_bytes`, in a `keyDeriverSpec` and in the deriver a host hands `Bank.make`, must be 16 (`KeyDeriver['salt_bytes']` is the type `16`), and any other is refused as `bad_option`; a stored passphrase wayin whose `salt_b64` is not 22 base64url characters reads as damaged (`bad_record`). `checkSaltFits` leaves `safebyok/browser`, and `argon2idDeriver` and `safebyok-fastkey`'s derivers no longer check the salt they are handed. Whatever a key deriver throws from `deriveKeyBytes`, a `VaultError` too, reaches the host as `unexpected_error`, naming nothing it said. `safebyok-convex`'s README names the limit on a bank (past Convex's 16 MiB read, `tidyGone` throws and the watch goes quiet), and doc blocks in the storage packages are shortened. **`safebyok/testing` exports `_cheat_forgetShelf(dbname)`**, for tests only: the page forgets its shelf for that database, so the next store made over it opens a connection of its own. **`DeviceDB.listRawLeases()` answers each stored lease row beside the scopepath it is filed under**, `{ scopepath, row }` (`RawLease`), every row unchecked, not only those that are bags; **`delRawLease` takes that scopepath** (`LeaseScopepath`, the `[applabel, user_id, vaultlabel]` triple), checked only as three strings, so a host can delete a row filed under labels today's checks refuse, or one whose value has lost its scope. A `DeviceDB` subclass's `doListLeases` answers `RawLease`s and its `doDelRawLease` takes a `LeaseScopepath`. `safebyok` and `safebyok/storage` export both types, and `safebyok/storage` exports the `leaseScopepath` check; `safebyok` also exports the `LeaseDated`, `LeaseQuery` and `LeaseRow` types its `DeviceDB` names. Not publicly released, so nothing migrates. **Stored format:** a passphrase wayin's `salt_b64` is 22 characters only; one written at another length reads as damaged, and its vault opens by its other wayin, if it has one. **`KeyDeriver['salt_bytes']` is the literal 16**, so a host's deriver declared as a plain object needs `salt_bytes: 16 as const` or a `KeyDeriver` annotation; `PassphraseSaltBytes` is now exported from `safebyok` and `safebyok/browser`. **Types a signature names are now importable:** `safebyok` also exports `BankScope`, `Boxscope`, `Sidecar`, `FetchOpts`, `TimelyOpts`, `BoxPut`, `BoxPatch`, `BoxHalves`, `ClearsForGatingkind`, `VaultForGatingkind`, `Capacity`, `Awaitable`, `GoodOutcome`, `BadOutcome`, `RefusalFamilyForKind`, `RefusalMeta` and `VaultErrorOpts`; `safebyok/storage` also exports `Damagekind`, `Story`, `ConsistencyRefusal`, `RefusalFamily` and `RefusalFamilyForKind`. `safebyok/browser`, `safebyok/dom` and `safebyok/utils` add only `PassphraseSaltBytes` (browser).
+
+- [#570](https://github.com/mrflip/safebyok/pull/570) [`16f779a`](https://github.com/mrflip/safebyok/commit/16f779a70e6abd1c6e7766dff67a81a4d4f5a21e) Thanks [@mrflip](https://github.com/mrflip)! - Each IndexedDB database now carries a layout version in its name, three zero-padded parts: the device store's is `${dbName}:device-v001-001-001`, and `safebyok-indexeddb`'s vault store is `${dbName}:vaults-v001-001-001`. Each store deletes, unread and on its first call, its older databases of that `dbName`: the old core's `device_db`, `device-v1` and any lower version, and the unversioned `vaults` and any lower `vaults-v...`. A browser that held vaults in `${dbName}:vaults` finds them gone, as safebyok is not yet released and keeps no migration; a host that runs the old and the new device store under one `dbName` has the new one wipe the old one's live database. `safebyok/storage` adds `versionedShelfOf` and `VaultsDBVersion`, for an IndexedDB adapter's own versioned shelf. A key deriver's spec must now ask for a `salt_bytes` of 16 to 32, not 8 to 32, as the stored `salt_b64` already did, and `safebyok-fastkey` refuses the same specs; `salt_b64` is checked as 22 to 43 base64url characters through `Patterns.b64url`, which joins the label and user_id patterns in one internal `Patterns`.
+  
+  A passphrase wayin whose stored `salt_b64` passes that check but will not decode (a length no unpadded base64url has, or stray padding bits in its last character) now refuses a passphrase unlock as `bad_record`, not with a raw Error.
+  
+  `DeviceDB` gains `delRawLease(scope)` and `tryDelRawLease(scope)`, which delete whatever row stands at a vault scope, unchecked, so a host can clear a lease row that fails its check (neither `listLeases` lists it nor `forget` erases it); a `DeviceDB` subclass writes one more hook, `doDelRawLease(scope)`.
+  
+  `versionedShelfOf` now answers one shelf for each database name on a page, so a store made again under the same `dbName` (a hot reload, or several banks) shares one connection and the wipe of older databases runs once; it checks its spec on entry, refusing `bad_option` for an empty name or a `version` that is not three zero-padded parts.
+
+- [#650](https://github.com/mrflip/safebyok/pull/650) [`782aee1`](https://github.com/mrflip/safebyok/commit/782aee1ab747713f564745b21860a210522c28f8) Thanks [@mrflip](https://github.com/mrflip)! - **Renamed exports, with no change in behaviour.** A host that imports one of these renames it. Nothing stored changes.
+  
+  - `safebyok`:
+    - `Gating.checkStrength` is `judgeStrength`.
+    - `Box.isFUBag` is gone: use `isWhisperedBag`.
+    - `PassphraseSaltBytes`, `PasskeySaltBytes` and `PrfAnswerBytes` are `PassphraseSaltSize`, `PasskeySaltSize` and `PrfAnswerSize`.
+    - `DefaultMaxRecordBytes` is `DefaultMaxRecordSizeEst`.
+    - A `KeyDeriver`'s `salt_bytes` is `salt_size`, and a key deriver spec's `output_bytes` is `output_size`.
+    - The `ModelkindClasses` type is `ClassForModelkind`.
+  - `safebyok/browser`: `argon2idDeriver` is `makeArgon2idDeriver`.
+  - `safebyok/storage`:
+    - An adapter's `maxRecordBytes` option is `maxRecordSizeEst`.
+    - `sentinelVaultOf` and `sentinelBoxOf` are `shellVaultOf` and `shellBoxOf`.
+    - `foundVaultRow` and `foundBoxRow` are `storedVaultRowOrNull` and `storedBoxRowOrNull`.
+    - `storageTroubleOf` is `storageRefusalOf`.
+  - `safebyok-react`: `attemptOnce` is `attemptThenZero`.
+  - `safebyok-fastkey`: `argon2idWasmDeriver` is `makeArgon2idWasmDeriver`.
+  - `safebyok-graphql`: the `userIdOf` option of `vaultResolvers` is `getUserId`, as Convex's is.
+
+- [#696](https://github.com/mrflip/safebyok/pull/696) [`0944a43`](https://github.com/mrflip/safebyok/commit/0944a4398ba8f53770a4fc70e63048c15956afbb) Thanks [@mrflip](https://github.com/mrflip)! - The core moves to `safebyok-big`, which is private while a new `safebyok` is built: import from `safebyok-big`, `safebyok-big/browser`, `safebyok-big/storage`, `safebyok-big/dom`, `safebyok-big/utils` and `safebyok-big/testing` where you imported from `safebyok`. The adapters and `safebyok-react` take `safebyok-big` as their peer dependency, which npm does not have, so hold releases until the new core ships.
+
+- [#723](https://github.com/mrflip/safebyok/pull/723) [`c3104c4`](https://github.com/mrflip/safebyok/commit/c3104c4ca311a245c051c4159f4e9029f98cb37e) Thanks [@mrflip](https://github.com/mrflip)! - The refusal kind `bad_option` is merged into `bad_record`. Every refusal that was `bad_option` is now `bad_record`: an option, an argument or a record handed in that fails its check. `Refusalkind` and `refusalkindVals` no longer have `'bad_option'`, so a host that matched on `bad_option` matches `bad_record`. Its family is `misuse`, as before. In `safebyok-graphql`, the schema's `refusalkind` enum loses `bad_option`. In `safebyok-convex`, a refusal inside the component that was `bad_option` did not cross to the client as a `ConvexError`, and now does, of kind `bad_record` and with the core's message. The stored format is unchanged.
+
+- [#923](https://github.com/mrflip/safebyok/pull/923) [`c45bc0a`](https://github.com/mrflip/safebyok/commit/c45bc0a1622ecb27a2e3dd157210e41a0f2b36d4) Thanks [@mrflip](https://github.com/mrflip)! - safebyok-fastkey imports from `safebyok`, its peer dependency in place of safebyok-big, and derives for the new core's devices; what it derives is unchanged.
+
+### Patch Changes
+
+- [#647](https://github.com/mrflip/safebyok/pull/647) [`efdc2bb`](https://github.com/mrflip/safebyok/commit/efdc2bbdd014cbbc9fda712838c6948db8068cae) Thanks [@mrflip](https://github.com/mrflip)! - The READMEs are reworded in plain English. The fastkey README's `Bank.make` sample passes the required `device_id`, and it no longer says the vault logs a key deriver's refusal kind: a throwing deriver refuses `unexpected_error`, carrying neither its message nor its kind. No code changes.
+
+- [#657](https://github.com/mrflip/safebyok/pull/657) [`86a23dd`](https://github.com/mrflip/safebyok/commit/86a23dd34d5cec83173dc27c4f6bc607045aff15) Thanks [@mrflip](https://github.com/mrflip)! - `applabel` is `banklabel`, and a scope names `user_id` before it: `{ user_id, banklabel, vaultlabel }`. The rename reaches every stored and host-facing name: `Device.make({ banklabel })`, `BankProvider`'s `banklabel` prop, every scope, ask and record field, the Postgres columns, the Convex fields, and the GraphQL arguments and fields. The order reaches everything that spells a scope in sequence: a scopepath is `vault^u1^acme^main`, the Postgres primary and foreign keys are `(user_id, banklabel, ...)`, and the IndexedDB and DeviceDB rows are keyed the same way. **Stored format:** a row written before is not read. IndexedDB looks its rows up under the new keys, so an old row is never found, and Postgres and Convex check each row, so one with an `applabel` reads as damaged. Nothing is worth moving by hand: the bank design later in this release reads none of the old rows. The removal of the vaultDB says what each store does with them.
+
+- [#763](https://github.com/mrflip/safebyok/pull/763) [`445abb4`](https://github.com/mrflip/safebyok/commit/445abb41a6b2ede4efc3c3f17fffee8680b1ae31) Thanks [@mrflip](https://github.com/mrflip)! - safebyok-fastkey's refusal for WebAssembly that will not compile names a Content-Security-Policy without 'wasm-unsafe-eval' as the likely cause, rather than the certain one.
+
+- [#735](https://github.com/mrflip/safebyok/pull/735) [`2abf5a1`](https://github.com/mrflip/safebyok/commit/2abf5a1e9ca3f5a1df2d84071550edc4e7689652) Thanks [@dependabot](https://github.com/apps/dependabot)! - Dependabot moved a runtime dependency:
+  
+  * `hash-wasm` (safebyok-fastkey dependencies): `^4.12.0` -> `^4.13.0`
+- Updated dependencies [[`ec96798`](https://github.com/mrflip/safebyok/commit/ec967987dd69fa310ddb5c97b16f86e78ddaf5bd)]:
+  - safebyok@0.1.0
+
 ## 0.5.0
 
 ### Minor Changes
