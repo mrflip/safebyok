@@ -28,12 +28,24 @@ A workshop (`/workshop`): the Coach and the agent decide by consensus, and worke
   in `d515f3f`, from sign-in on. Before sign-in there is no userid to make a gate under: `bank.gate` refuses
   `absent_vault` there, and `areRootsLive` answers false. The Coach has not ruled on that boundary.
 
+* **Before sign-in, a "need user" refusal** (the Coach, 2026-11-28). Built as the kind `need_user`, thrown by
+  `needUser()`, in the core. safebyok-react's own no-user refusal still throws `absent_vault`: not ruled.
+* **No gate when there is no user** (the Coach, 2026-11-28, "I don't feel strongly about it"). The boundary stays;
+  eleven checks in the core's `src/` cover it, one of them about the gate (`areRootsLive`). No stand-in gate is built.
+* **VOCABULARY forbids unlock as the name of an object, not as a noun** (the Coach, 2026-11-28): "code-wise it's an
+  action, with adjectivally unlock events". Done. Prose such as "an unlock in another tab" stands.
+* **Report a refusal that changes, never hold clean code back for it; back compat is out of bounds** (the Coach,
+  2026-11-28): "not necessary, not wanted. There's been no public release."
+* **An obvious Goofus pass** over `bank.ts` and `gate.ts` (the Coach, 2026-11-28). Done: nine commits, no contract changed.
+
 ## Open, awaiting the Coach
 
-1. **"unlock" as a noun**, about 25 times in the core's comments and test titles, and in VOCABULARY.md's lease row. Which
-   words replace it? The agent's lean: "the unlock gating", held loosely.
-2. **`bank.life` over a gate's tombstone** answers the life that ended. Should it refuse? The agent's lean: leave it,
-   held loosely; nothing in the core reads `bank.life`.
-3. **The boundary before sign-in** (above): accept it, or give the bank a gate with no user?
-4. **`models/gate.ts`** was not swept by the hunt.
-5. **#952 wants a `thread-reviewer`** before it leaves draft.
+1. **`bank.life`**: read by nothing in any `src/`; VOCABULARY calls it "a view, bound into nothing by itself". The
+   agent's recommendation, firm: delete it with `BankLife`, `BankChecks.life` and `StampChecks.bankLife`.
+2. **safebyok-react's no-user refusal** throws `absent_vault` with its own `NobodySignedIn` phrase, in `react-giver.tsx`.
+   The agent's lean, firm: make it `need_user` too, one name for one thing.
+3. **`const unlock = bank.useUnlock()`**, three times in safebyok-react, breaks the softened rule. The agent's lean:
+   `unlocking`, loosely.
+4. **`bank.stats()` demands live roots it does not use.** The agent's lean, moderate: drop `demandRootsLive`.
+5. **`Gate.make` repeats the bank-scope check `bank.makeThing` ran.** The agent's lean, loose: drop the gate's.
+6. **#952 wants a `thread-reviewer`** (opus) before it leaves draft, once the rulings above are built.
