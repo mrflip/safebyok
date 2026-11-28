@@ -30,7 +30,7 @@ function spyBirthsAfterAnother(device: Device): ReturnType<typeof TH.spyBirths> 
   })
 }
 
-/** Expect `device` to have no bank born, the gate its bank keeps holding the shell its sign-in found. */
+/** Expect `device` to have no bank born, the gate its bank has at the shell its sign-in found. */
 function expectNoBankBorn(device: Device): void {
   expect(device.bank.areRootsLive).to.be.false
   expect(device.bank.gate.pickle()).to.deep.equal(TH.gateShellOf())
@@ -92,7 +92,7 @@ describe("Bank.birth(device, cleartexts)", () => {
     expect(births.tryBirthBank.mock.calls[0]![0]).to.deep.include({ banktok: bank.banktok })
   })
 
-  it("refuses where the device holds a live gate, asking the vaultDB nothing and leaving the prior bank unchanged", async () => {
+  it("refuses where the device has a live gate, asking the vaultDB nothing and leaving the prior bank unchanged", async () => {
     const device = TH.makeDevice()
     const prior = await birth(device, { passphraseCleartext: TH.TestPassphrase })
     const priorGate = prior.gate.pickle()
@@ -123,7 +123,7 @@ describe("Bank.birth(device, cleartexts)", () => {
     expectNoBankBorn(device)
   })
 
-  // A broken state: the device holds the live root box, and its birth cites it, so the root box's put refuses over it.
+  // A broken state: the device has the live root box, and its birth cites it, so the root box's put refuses over it.
   const BrokenPairCases = [
     ["no gate stored",       null],
     ["the gate's tombstone", TH.gateTombOf(TH.gateThingOf())],
@@ -313,7 +313,7 @@ describe("a gating's vacating of the passkey answers it is handed", () => {
   })
 })
 
-/** A form holding a username and every secret field, obvious fakes. */
+/** A form with a username and every secret field, obvious fakes. */
 function secretForm(): FormData {
   const form = new FormData()
   for (const [fieldname, text] of [['username', 'hue'], ['passphrase', 'a fake passphrase'], ['nextPassphrase', 'a fake next one'], ['confirmation', 'a fake next one']] as const) { form.append(fieldname, text) }

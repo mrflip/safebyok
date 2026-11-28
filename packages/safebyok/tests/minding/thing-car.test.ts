@@ -577,7 +577,7 @@ function shorthandOf(event: VaultEvent, record: SeenThing, chunk: Chunk = 0): Sh
 /** True when `event`'s agerank is above the one before it */
 function isNewer(event: VaultEvent): boolean { return event.agerank > event.agerankWas }
 
-/** What `car` holds of its refusal and its read_tc, as a plain object */
+/** The refusal and the read_tc of `car`, as a plain object */
 function carFieldsOf(car: ThingCar): Pick<ThingCar, 'thing' | 'lastErr' | 'erred_at' | 'read_tc'> {
   return { thing: car.thing, lastErr: car.lastErr, erred_at: car.erred_at, read_tc: car.read_tc }
 }
@@ -730,7 +730,7 @@ describe("car.read_tc", () => {
     expect(readAtOf(car.read_tc), 'a newer revision').to.eq(300_000)
   })
 
-  it("moves for the newest revision seen again a chunk later, its Thing holding the record it held", () => {
+  it("moves for the newest revision seen again a chunk later, its Thing's record unchanged", () => {
     const record = TH.boxThingOf('openai', { sidecar: { account: 'work' } })
     const car    = carReceived(undefined, record, readTcAt(0))
     carReceived(car, structuredClone(record), readTcAt(70_000))
@@ -756,7 +756,7 @@ describe("car.read_tc", () => {
 })
 
 describe("car.citable", () => {
-  it("made from a Thing, cites what the Thing holds: the shell, or a record", () => {
+  it("made from a Thing, cites what the Thing has: the shell, or a record", () => {
     const shell = Thing.shellOf(TH.boxThingOf())
     expect(ThingCar.make(TH.PlainThing.make(shell), { bank: TH.PlainCarBank }).citable).to.deep.equal(Thing.sparseOf(shell))
     const record = TH.boxThingOf('openai', { revseq: 2 })
@@ -775,7 +775,7 @@ describe("car.citable", () => {
     }
   })
 
-  it("moves on a newer soon, its Thing holding its record, then stays as the whole record that catches up is adopted", () => {
+  it("moves on a newer soon, its Thing's record unchanged, then stays as the whole record that catches up is adopted", () => {
     const whole2 = TH.boxThingOf('openai', { revseq: 2 })
     const whole4 = TH.boxThingOf('openai', { revseq: 4, revtok: TH.revtokOf('four') })
     const car = carReceived(undefined, whole2)
@@ -843,7 +843,7 @@ describe("car.receive, over the feed table", () => {
   }
 })
 
-describe("a car made from a Thing that holds a record", () => {
+describe("a car made from a Thing that has a record", () => {
   const whole2 = TH.boxThingOf('openai', { revseq: 2 })
 
   it("starts from that record, seen whole at the VacantReadTc, and from the vacant agerank over the shell", () => {
@@ -972,8 +972,8 @@ describe("car.agekind", () => {
   }
 })
 
-describe("Thing's held record, the same object", () => {
-  it("stays the record held for an equal one seen again a chunk later, while the agerank moves", () => {
+describe("Thing's record, the same object", () => {
+  it("stays the Thing's record for an equal one seen again a chunk later, while the agerank moves", () => {
     const record  = TH.boxThingOf('openai', { sidecar: { account: 'work' } })
     const [car] = received(undefined, record)
     const events  = car.receive(eventOf(structuredClone(record), readTcOf(1)))

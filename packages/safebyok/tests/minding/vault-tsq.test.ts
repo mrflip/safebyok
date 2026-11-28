@@ -148,7 +148,7 @@ describe("VaultTSQ's writer, on each event the VaultMinder tells", () => {
     expect(itemQueryAt(world)?.state).to.deep.include({ data: null, isInvalidated: true })
   })
 
-  it("makes no item, when a newer life is known only sparse, of a box whose item holds nothing", async () => {
+  it("makes no item, when a newer life is known only sparse, of a box whose item has nothing", async () => {
     const world = await worldWithBox()
     world.queryClient.removeQueries({ queryKey: BoxKey })
     world.notify(noticeOf(TH.boxSparseOf(Reborn)))
@@ -230,7 +230,7 @@ describe("VaultTSQ.connect and disconnect", () => {
 })
 
 describe("VaultTSQ's items", () => {
-  it("hold a record deeply equal to their Thing's, which getOnce resolves", async () => {
+  it("have a record deeply equal to their Thing's, which getOnce resolves", async () => {
     const world = await tsqWorldOf(new MemoryVaultDB())
     cheatPlant(world.vaultDB, Box0)
     const got = await world.vaultTSQ.getOnce(TH.BoxScope)
@@ -238,7 +238,7 @@ describe("VaultTSQ's items", () => {
     expect(world.queryClient.getQueryData(BoxKey)).to.deep.equal(got)
   })
 
-  it("hold null for a tombstone or nothing stored", async () => {
+  it("are null for a tombstone or nothing stored", async () => {
     const world = await tsqWorldOf(new MemoryVaultDB())
     expect(await world.vaultTSQ.getOnce(TH.BoxScope)).to.be.null
     cheatPlant(world.vaultDB, TH.boxTombOf(Box0))
@@ -289,7 +289,7 @@ describe("VaultTSQ's items", () => {
     expect(isObservedStale(world.queryClient, BoxKey)).to.eq(false)
   })
 
-  it("are stale while cold, after a get answers with the record held, with nothing invalidated", async () => {
+  it("are stale while cold, after a get answers with the cached record, with nothing invalidated", async () => {
     const world = await worldWithBox()
     world.notify(noticeOf(TH.boxSparseOf(Box1)))
     expect(await world.vaultTSQ.getOnce(TH.BoxScope)).to.deep.equal(boxRecordIn(world))
@@ -311,7 +311,7 @@ describe("VaultTSQ's items", () => {
 })
 
 describe("VaultTSQ.itemQueryOptions", () => {
-  it("seeds an item with the live record its Thing holds, as of when it was read", async () => {
+  it("seeds an item with the live record its Thing has, as of when it was read", async () => {
     const world = await worldWithBox()
     const car = world.sorted.carAt(TH.BoxScope)
     expect(world.vaultTSQ.itemQueryOptions(TH.BoxScope)).to.deep.equal({ queryKey: BoxKey, initialData: car?.thing.pickle(), initialDataUpdatedAt: readAtOf(car!.read_tc) })

@@ -218,8 +218,8 @@ describe("OneWatchVaultDB", () => {
 
   const WatchnameCases = [
     [{ userid: "u1",           banklabel: "notes" },     "safebyok/u1/notes/bank",                'a plain userid and banklabel'],
-    [{ userid: "a:b@x.com",    banklabel: "notes" },     "safebyok/a:b@x.com/notes/bank",         'a userid may hold a colon and an at sign'],
-    [{ userid: "a",            banklabel: "b_notes" },   "safebyok/a/b_notes/bank",               'a banklabel may hold an underbar'],
+    [{ userid: "a:b@x.com",    banklabel: "notes" },     "safebyok/a:b@x.com/notes/bank",         'a userid may contain a colon and an at sign'],
+    [{ userid: "a",            banklabel: "b_notes" },   "safebyok/a/b_notes/bank",               'a banklabel may contain an underbar'],
   ] as const
 
   describe("watchnameOf(scope)", () => {

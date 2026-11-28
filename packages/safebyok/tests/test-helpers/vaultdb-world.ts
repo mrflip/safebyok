@@ -206,7 +206,7 @@ export function maskedReadTcsOf(events: readonly VaultEvent[]): VaultEvent[] {
   return events.map((event) => (ReadTcPattern.test(event.read_tc) ? { ...event, read_tc: AnyReadTc } : event))
 }
 
-/** The Thing a test's VaultMinder keeps at each labelpath: a plain one, at its shell. */
+/** The Thing a test's VaultMinder caches at each labelpath: a plain one, at its shell. */
 export function makePlainThing(shell: VoidSentinel): PlainThing { return PlainThing.make(shell) }
 
 /** The world of a test's VaultMinder, which makes a plain Thing at each labelpath. */

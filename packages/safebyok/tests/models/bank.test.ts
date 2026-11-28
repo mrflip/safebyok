@@ -31,7 +31,7 @@ async function signedInDevice(): Promise<Device> {
 }
 
 describe("bank.makeThing(begun)", () => {
-  it("makes a Gate or a Box by the modelkind of the item event's labelpath, holding the record it received", () => {
+  it("makes a Gate or a Box by the modelkind of the item event's labelpath, with the record it received", () => {
     const { bank } = TH.makeDevice()
     const [gateRecord, boxRecord] = [TH.gateThingOf(), TH.boxThingOf()]
     const [gate, box] = [bank.makeThing(TH.thingEventOf(gateRecord)), bank.makeThing(TH.thingEventOf(boxRecord))]
@@ -71,7 +71,7 @@ describe("bank.makeThing(begun)", () => {
 })
 
 describe("bank.gate, bank.rootBox, bank.life, bank.banktok and bank.scope", () => {
-  it("are the gate and root box its VaultMinder keeps, and the life and banktok of its gate", async () => {
+  it("are the gate and root box its VaultMinder caches, and the life and banktok of its gate", async () => {
     const { device, bank, gateRecord } = await TH.buildBornBank()
     expect(device.bank).to.equal(bank)
     expect(bank.gate).to.equal(bank.vaultMinder!.thingAt(TH.GateScope))

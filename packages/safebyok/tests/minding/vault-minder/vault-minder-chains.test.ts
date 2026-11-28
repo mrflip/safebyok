@@ -20,7 +20,7 @@ type Precis = readonly [Liveness, number, number]
 /** What the box at `TH.BoxScope` shows in brief, each key left out where it shows none, and whether the root box's listing is marked stale.
  * - `item` -- its item's data: the record, or null
  * - `soon` -- the newest revision of the box known, while no whole record of it is
- * - `dead` -- the tombstone its Thing holds, while the item is null and nothing newer is known
+ * - `dead` -- the tombstone its Thing has, while the item is null and nothing newer is known
  */
 type CachePrecis = Readonly<{ item?: Precis | null, soon?: Precis, dead?: Precis, isListingStale?: true }>
 

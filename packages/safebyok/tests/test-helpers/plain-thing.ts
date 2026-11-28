@@ -6,8 +6,8 @@ import { type Adoptable, Thing } from '../../src/models/thing'
 
 // == [PlainThing]: PlainThing, RefusingThing
 
-/** A Thing of any kind that holds only the records seen of it, with no device, gate or lease.
- * It holds the shell until it receives a whole record. It binds no ctx, so it has no stamp.
+/** A Thing of any kind that has only the records seen of it, with no device, gate or lease.
+ * It has the shell until it receives a whole record. It binds no ctx, so it has no stamp.
  */
 export class PlainThing extends Thing<ThingRecord, ThingScope, undefined, Adoptable<ThingRecord>> {
   // == [Construction]: make, constructor

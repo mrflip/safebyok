@@ -398,7 +398,7 @@ describe("a gate whose device is disabled", () => {
 })
 
 describe("the lease a proof grants a gate", () => {
-  it("renews the lease the gate holds: it keeps that lease's born_at, and is proved now", async () => {
+  it("renews the lease the gate has: it keeps that lease's born_at, and is proved now", async () => {
     const { bank } = await TH.buildBornBank()
     vi.setSystemTime(TH.T0 + 5)
     const make = vi.spyOn(Lease, 'make')
@@ -414,7 +414,7 @@ describe("the lease a proof grants a gate", () => {
     expect(bank.gate.leaseLoggable).to.be.null
   })
 
-  it("is born when it is proved, where the gate holds no lease", async () => {
+  it("is born when it is proved, where the gate has no lease", async () => {
     const { bank } = await TH.buildBornBank()
     bank.gate.lock()
     vi.setSystemTime(TH.T0 + 5)
@@ -423,7 +423,7 @@ describe("the lease a proof grants a gate", () => {
     expect(make.mock.calls[0]![0]).to.include({ born_at: TH.T0 + 5, proved_at: TH.T0 + 5 })
   })
 
-  it("renews the lease the gate holds across a gate verb, citing the revision it writes, and leaves it out of its softlock", async () => {
+  it("renews the lease the gate has across a gate verb, citing the revision it writes, and leaves it out of its softlock", async () => {
     const { bank } = await TH.buildBornBank()
     vi.setSystemTime(TH.T0 + 5)
     const make = vi.spyOn(Lease, 'make')

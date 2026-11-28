@@ -818,7 +818,7 @@ describe("device.inspectable()", () => {
     expect(bankTSQ.map(({ queryKey }) => queryKey.slice(0, 2))).to.have.deep.members([['sok', 'gate'], ['sok', 'box']])
   })
 
-  it("shows the refusal a root's Thing last threw at a record as its row's lastRefusalkind, and when the record it holds was read as its dataUpdatedAt", async () => {
+  it("shows the refusal a root's Thing last threw at a record as its row's lastRefusalkind, and when the record it has was read as its dataUpdatedAt", async () => {
     const { bank, device } = await TH.buildBornVault()
     const gateRow = () => device.inspectable().bankTSQ.find(({ val }) => (val as { labelpath: string }).labelpath === TH.GateScope.labelpath)
     expect(gateRow()).to.include({ dataUpdatedAt: readAtOf(device.bank.demandVaultMinder().carAt(bank.gate)!.read_tc), lastRefusalkind: null })
@@ -833,7 +833,7 @@ describe("device.inspectable()", () => {
     const { device, vault, gateRecord } = await TH.buildBornVault()
     const { whisper_sealed } = await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const named = [gateRecord.wayins.main.bank_key_wayin_wrapped, whisper_sealed.key_wrapped, whisper_sealed.ciphered].map(({ ciphertext_b64 }) => ciphertext_b64)
-    // Every ciphertext the vault TSQ and the roots' Things hold, the root box's among them, not only those named above.
+    // Every ciphertext the vault TSQ and the roots' Things have, the root box's among them, not only those named above.
     const roots     = [TH.GateScope, TH.RootScope].map((root) => device.bank.demandVaultMinder().thingAt({ ...TH.WorldScope, ...root })?.pickle())
     const cachedJsons = [...device.vaultTsqClient.getQueryCache().getAll().map(({ state }) => state.data), ...roots].map((val) => JSON.stringify(val ?? null))
     const ciphertexts = new Set(cachedJsons.flatMap((json) => [...json.matchAll(/"ciphertext_b64":"([^"]+)"/g)].map(([, ciphertext]) => ciphertext!)))

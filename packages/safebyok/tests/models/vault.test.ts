@@ -40,21 +40,21 @@ function openaiShellOf(bank: Bank): ShellOf<BoxRecord> { return Shell.of(openaiS
 /** The rows of `bank`'s MemoryVaultDB, by labelpath, to plant a record as another device would, notifying no watch. */
 function rowsOf(bank: Bank): Map<string, unknown> { return (bank.device.vaultDB as MemoryVaultDB)._cheat_things(bank.scope).box }
 
-/** The Thing `vault`'s device's bank holds at {@link Openai}, or undefined for none. */
+/** The Thing `vault`'s device's bank has at {@link Openai}, or undefined for none. */
 function boxAt(vault: Vault): Box | undefined {
   const thing = vault.bank.device.bank.demandVaultMinder().thingAt(openaiScopeOf(vault.bank))
   return (thing instanceof Box) ? thing : undefined
 }
 
-/** The car `vault`'s device's bank keeps at {@link Openai}, or undefined for none. */
+/** The car `vault`'s device's bank caches at {@link Openai}, or undefined for none. */
 function carAt(vault: Vault): ThingCar | undefined { return vault.bank.device.bank.demandVaultMinder().carAt(openaiScopeOf(vault.bank)) }
 
-/** What `vault`'s device's QueryClient keeps in the item of {@link Openai}. */
+/** The item of {@link Openai} in `vault`'s device's QueryClient. */
 function itemAt(vault: Vault): unknown {
   return vault.bank.device.vaultTsqClient.getQueryData(VaultTSQ.itemQueryKeyOf(openaiScopeOf(vault.bank)))
 }
 
-/** Unseal the whole record `vault`'s box at {@link Openai} holds once its vault TSQ gets it: the live box or its tombstone. */
+/** Unseal the whole record `vault`'s box at {@link Openai} has once its vault TSQ gets it: the live box or its tombstone. */
 async function unsealedAt(vault: Vault): Promise<BoxUnsealed> {
   await vault.bank.device.vaultTSQ.getOnce(openaiScopeOf(vault.bank))
   const record = boxAt(vault)?.pickle()
@@ -279,7 +279,7 @@ describe("the box flows, through a vault and its bank's MemoryVaultDB", () => {
 })
 
 describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
-  it("answers the actual record, which its box then holds, and its item", async () => {
+  it("answers the actual record, which its box then has, and its item", async () => {
     // tryPutBoxOnce @example
     const { vault } = await TH.buildBornVault()
     const { ok, val: box, err } = await vault.tryPutBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
@@ -356,7 +356,7 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
     expect(next).to.deep.equal(boxAt(other)!.pickle())
   })
 
-  it("refuses stale_write over an older revision, and writes nothing, the box then holding the actual one", async () => {
+  it("refuses stale_write over an older revision, and writes nothing, the box then having the actual one", async () => {
     const { bank, vault } = await TH.buildBornVault()
     const first = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const firstRevtok = first.revtok
@@ -430,7 +430,7 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
 })
 
 describe("vault.tryDelBoxOnce(labelpath)", () => {
-  it("answers the actual tombstone, which its box then holds", async () => {
+  it("answers the actual tombstone, which its box then has", async () => {
     const { vault } = await TH.buildBornVault()
     const { revseq } = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const tombstone = await TH.expectGood(vault.tryDelBoxOnce(Openai))
@@ -464,7 +464,7 @@ describe("vault.tryDelBoxOnce(labelpath)", () => {
 })
 
 describe("vault.delBoxOnce(labelpath)", () => {
-  it("writes the tombstone over the newest revision: its item is null, and the box holds the tombstone", async () => {
+  it("writes the tombstone over the newest revision: its item is null, and the box has the tombstone", async () => {
     const { vault } = await TH.buildBornVault()
     const { revseq } = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const tombstone = await vault.delBoxOnce(Openai)
@@ -518,7 +518,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     expect(await other.withWhisper(Openai, ({ whisper }) => whisper)).to.deep.equal(TH.Whisper)
   })
 
-  it("unseals the revision it holds where a newer sparse record of the same life is seen and storage answers no newer", async () => {
+  it("unseals the revision it has where a newer sparse record of the same life is seen and storage answers no newer", async () => {
     const { bank, vault, vaultTSQ } = await TH.buildBornVault()
     const first = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const planted = await vault.sealBox(first, {}, { whisper: { apiKey: 'sk-test-1111' } })
@@ -529,7 +529,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     expect(carAt(vault)!.citable).to.include({ revtok: planted.revtok })
   })
 
-  it("unseals the revision it holds where its get is refused", async () => {
+  it("unseals the revision it has where its get is refused", async () => {
     const { bank, vault, vaultTSQ } = await TH.buildBornVault()
     const first = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const firstRevtok = first.revtok
@@ -700,7 +700,7 @@ describe("vault.withUnlockedWhisper(labelpath, fn)", () => {
     expect(await vault.withUnlockedWhisper(Openai, ({ whisper }) => `asked with ${String(whisper['apiKey'])}`)).to.equal('asked with sk-test-0000')
   })
 
-  it("gets nothing for a box it holds the newest revision of", async () => {
+  it("gets nothing for a box it has the newest revision of", async () => {
     const { bank, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const asked = vi.spyOn(bank.device.vaultDB, 'tryGetThing')
@@ -728,7 +728,7 @@ describe("vault.withUnlockedWhisper(labelpath, fn)", () => {
     expect(fn).not.toHaveBeenCalled()
   })
 
-  it("runs on the box it holds where storage is out of reach, the box's item showing the refusal beside its record", async () => {
+  it("runs on the box it has where storage is out of reach, the box's item showing the refusal beside its record", async () => {
     const { bank, vault } = await TH.buildBornVault()
     const box = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const queryKey = VaultTSQ.itemQueryKeyOf(openaiScopeOf(bank))
@@ -740,7 +740,7 @@ describe("vault.withUnlockedWhisper(labelpath, fn)", () => {
     expect(bank.device.vaultTsqClient.getQueryState(queryKey)?.error).to.include({ refusalkind: 'storage_unavailable' })
   })
 
-  it("rejects with any other refusal of the get, for a box it holds, never calling fn", async () => {
+  it("rejects with any other refusal of the get, for a box it has, never calling fn", async () => {
     const { bank, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     await bank.device.vaultTsqClient.invalidateQueries({ queryKey: VaultTSQ.itemQueryKeyOf(openaiScopeOf(bank)) })
@@ -789,7 +789,7 @@ describe("vault.forceTimelyUnlocked(labelpath, opts)", () => {
     await forcing
   })
 
-  it("rejects with the get's refusal, for a box it holds and for one it has seen nothing of", async () => {
+  it("rejects with the get's refusal, for a box it has and for one it has seen nothing of", async () => {
     const { bank, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     refuseGets(bank)

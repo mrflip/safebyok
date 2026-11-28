@@ -11,7 +11,7 @@ const NextPassphrase = 'a different passphrase, just as long'
 /** A username a form carries beside its secrets, an obvious fake. */
 const Username = 'hue@example.com'
 
-/** A `FormData` holding `texts`, by fieldname, as a form would hand its action. */
+/** A `FormData` with `texts`, by fieldname, as a form would hand its action. */
 function formOf(texts: Readonly<Record<string, string>>): FormData {
   const form = new FormData()
   for (const [fieldname, text] of Object.entries(texts)) { form.append(fieldname, text) }
