@@ -166,9 +166,7 @@ export class Bank {
   makeThing(begun: VoidSentinel | VaultItemEvent): SomeThing {
     SeenChecks.begun.parse(begun)
     const seen = ('eventkind' in begun) ? begun.val : begun
-    Validator.demandConsistent(StampChecks.bankScope.parse(seen), this.#device.scope, { kind: 'record_conflict' })
-    const thingClass: ThingClass = thingClassOf(seen.modelkind)
-    const thing = thingClass.make(BaseThing.shellOf(seen), { bank: this }, this.#gateFriend())
+    const thing = thingClassOf(seen.modelkind).make(BaseThing.shellOf(seen), { bank: this }, this.#gateFriend())
     if (this.#isRootScope(seen)) { thing.subscribe(() => { this.#hearRoot() }) }
     if ('eventkind' in begun) { receiveFirst(thing, begun) }
     return thing

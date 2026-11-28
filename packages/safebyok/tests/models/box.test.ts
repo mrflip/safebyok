@@ -67,6 +67,11 @@ describe("Box.make(begun, { bank })", () => {
     TH.expectSyncRefusal(() => Box.make(TH.boxShellInParentLivesOf(TH.boxThingOf()), undefined as never), 'bad_record')
     TH.expectSyncRefusal(() => Box.make(TH.boxShellInParentLivesOf(TH.boxThingOf()), { bank: {} } as never), 'bad_record')
   })
+
+  it("refuses an item event or a shell of another bank than its bank's", () => {
+    TH.expectSyncRefusal(() => boxOf({ ...TH.boxThingOf(), userid: 'u2' }), 'record_conflict')
+    TH.expectSyncRefusal(() => Box.make(TH.boxShellInParentLivesOf({ ...TH.boxThingOf(), banklabel: 'other' }), { bank }), 'record_conflict')
+  })
 })
 
 describe("a Box's props", () => {
