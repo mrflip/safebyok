@@ -55,7 +55,7 @@ describe("OneWatchVaultDB", () => {
       await TH.eventually(() => other.events.length === 1)
       await TH.aWhile()
       expect(innerWatch).toHaveBeenCalledTimes(1)
-      expect(TH.maskedReadTcsOf(holder.events)).to.deep.equal([TH.itemEventOf(TH.gateThingOf())])
+      expect(TH.maskedReadTcsOf(holder.events)).to.deep.equal([TH.itemEventOf(TH.gateThingOf(), TH.gateThingOf().banktok)])
       expect(other.events).to.deep.equal(holder.events)
       expect([...holder.badNews, ...other.badNews]).to.deep.equal([])
     })
@@ -82,7 +82,7 @@ describe("OneWatchVaultDB", () => {
       await memory.tryWriteThing(TH.birthAskOf())
       await TH.eventually(() => other.events.length === 1)
       await TH.aWhile()
-      expect(TH.maskedReadTcsOf(other.events)).to.deep.equal([TH.itemEventOf(TH.gateThingOf())])
+      expect(TH.maskedReadTcsOf(other.events)).to.deep.equal([TH.itemEventOf(TH.gateThingOf(), TH.gateThingOf().banktok)])
       expect(holder.events).to.deep.equal([])
     })
 
@@ -169,7 +169,7 @@ describe("OneWatchVaultDB", () => {
       const listener = openTab()
       await TH.aWhile()
       const poster = new BroadcastChannel(watchnameOf(TH.ThingBank))
-      const good = TH.itemEventOf(TH.gateThingOf())
+      const good = TH.itemEventOf(TH.gateThingOf(), TH.gateThingOf().banktok)
       poster.postMessage('not an event')
       poster.postMessage({ ...good, eventkind: 'aged' })
       poster.postMessage({ ...good, labelpath: 'elsewhere' })
@@ -218,8 +218,8 @@ describe("OneWatchVaultDB", () => {
 
   const WatchnameCases = [
     [{ userid: "u1",           banklabel: "notes" },     "safebyok/u1/notes/bank",                'a plain userid and banklabel'],
-    [{ userid: "a:b@x.com",    banklabel: "notes" },     "safebyok/a:b@x.com/notes/bank",         'a userid may hold a colon and an at sign'],
-    [{ userid: "a",            banklabel: "b_notes" },   "safebyok/a/b_notes/bank",               'a banklabel may hold an underbar'],
+    [{ userid: "a:b@x.com",    banklabel: "notes" },     "safebyok/a:b@x.com/notes/bank",         'a userid may contain a colon and an at sign'],
+    [{ userid: "a",            banklabel: "b_notes" },   "safebyok/a/b_notes/bank",               'a banklabel may contain an underbar'],
   ] as const
 
   describe("watchnameOf(scope)", () => {

@@ -20,7 +20,7 @@ type Precis = readonly [Liveness, number, number]
 /** What the box at `TH.BoxScope` shows in brief, each key left out where it shows none, and whether the root box's listing is marked stale.
  * - `item` -- its item's data: the record, or null
  * - `soon` -- the newest revision of the box known, while no whole record of it is
- * - `dead` -- the tombstone its Thing holds, while the item is null and nothing newer is known
+ * - `dead` -- the tombstone its Thing has, while the item is null and nothing newer is known
  */
 type CachePrecis = Readonly<{ item?: Precis | null, soon?: Precis, dead?: Precis, isListingStale?: true }>
 
@@ -225,12 +225,12 @@ function lifeOf(cache: CachePrecis): number | 'vacant' {
 function cachePrecisOf(world: TSQWorld<MemoryVaultDB>): CachePrecis {
   const car     = world.sorted.carAt(TH.BoxScope)
   const item    = itemQueryAt(world)?.state.data as ThingRecord | null | undefined
-  const held    = car?.thing.pickle()
+  const record  = car?.thing.pickle()
   const listing = listQueryAt(world)?.state
   return {
     ...((item !== undefined) && { item: (item === null) ? null : precisOf(item) }),
     ...((car !== undefined) && (car.agekind !== 'here') && { soon: precisOf(car.citable) }),
-    ...((item === null) && (car?.agekind === 'here') && (held !== undefined) && Thing.isGone(held) && { dead: precisOf(held) }),
+    ...((item === null) && (car?.agekind === 'here') && (record !== undefined) && Thing.isGone(record) && { dead: precisOf(record) }),
     ...((listing !== undefined) && (listing.isInvalidated || (listing.data === undefined)) && { isListingStale: true }),
   }
 }

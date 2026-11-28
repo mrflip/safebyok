@@ -1,4 +1,4 @@
-/** The checks and types of a wayin, as a gate record keeps it under `wayins`. */
+/** The checks and types of a wayin, as a gate record has it under `wayins`. */
 
 import type * as Z from 'zod'
 import { CX, Validator } from 'safebyok-big/internals'
@@ -8,7 +8,7 @@ import { CX, Validator } from 'safebyok-big/internals'
 // Its own module, not shapes-gateish.ts: the gate's record checks it, and shapes-gateish.ts reads the Thing checks.
 /** The checks of a wayin's forms, and of a gate's bag of them.
  * Each kind's record, its header (the record without the wrapped bankKey), and the union of each on `wayinkind`.
- * Each kind has the one `label` it is kept under in the bag: `main` for the passphrase, `passkey0` for the passkey.
+ * Each kind has the one `label` it is stored under in the bag: `main` for the passphrase, `passkey0` for the passkey.
  */
 export const WayinChecks = Validator.Checkers('bad_record', ({ obj, lit, discrim, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, devicetok, bank_key_wayin_wrapped }) => {
   const passphraseWayinRecord = obj({ wayinkind: lit('passphrase'), label: lit('main'), key_deriver_label, salt_b64, devicetok, born_at: epochMillis, bank_key_wayin_wrapped }).strict()

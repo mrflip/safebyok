@@ -20,7 +20,7 @@ export type VaultResolversOpts<ContextT> = {
 export type VaultFieldArgs = {
   safebyokGetThing:    { ask: DB.GetAsk }
   safebyokListThings:  { ask: DB.ListAsk }
-  safebyokGetWorld:    { ask: DB.GetWorldAsk }
+  safebyokGetBank:     { ask: DB.GetBankAsk }
   safebyokStats:       { ask: DB.StatsAsk }
   safebyokWriteThing:  { ask: DB.WriteAsk }
   safebyokBirthBank:   { ask: DB.BirthBankAsk }
@@ -36,7 +36,7 @@ export type VaultResolvers<ContextT> = {
   Query: {
     safebyokGetThing:   VaultFieldResolver<ContextT, 'safebyokGetThing'>
     safebyokListThings: VaultFieldResolver<ContextT, 'safebyokListThings'>
-    safebyokGetWorld:   VaultFieldResolver<ContextT, 'safebyokGetWorld'>
+    safebyokGetBank:    VaultFieldResolver<ContextT, 'safebyokGetBank'>
     safebyokStats:      VaultFieldResolver<ContextT, 'safebyokStats'>
   }
   Mutation: {
@@ -132,7 +132,7 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
     Query: {
       safebyokGetThing:   async (_parent, { ask }, context) => await serveSignedIn(context, ask, (given) => DB.AskChecks.getAsk.parse(given), async (checked) => await vaultDB.tryGetThing(checked)),
       safebyokListThings: async (_parent, { ask }, context) => await serveSignedIn(context, ask, (given) => DB.AskChecks.listAsk.parse(given), async (checked) => await vaultDB.tryListThings(checked)),
-      safebyokGetWorld:   async (_parent, { ask }, context) => await serveSignedIn(context, ask, (given) => DB.AskChecks.getWorldAsk.parse(given), async (checked) => await vaultDB.tryGetWorld(checked)),
+      safebyokGetBank:    async (_parent, { ask }, context) => await serveSignedIn(context, ask, (given) => DB.AskChecks.getBankAsk.parse(given), async (checked) => await vaultDB.tryGetBank(checked)),
       safebyokStats:      async (_parent, { ask }, context) => await serveSignedIn(context, ask, (given) => DB.AskChecks.statsAsk.parse(given), async (checked) => await vaultDB.tryStats(checked)),
     },
     Mutation: {
@@ -165,16 +165,16 @@ function wireAnswerOf({ ask: _ask, ...answer }: AnyAnswer): WireAnswer {
 /** The answer in wire form for an ask refused before its verb ran, as a verb that threw answers. A listing's lists are empty. */
 function refusedAnswerOf(refusal: DB.VaultError): WireAnswer {
   return {
-    ok: false, act: 'unclassified_storing', banktok: DB.VoidLifeTok, tracked: 'unread', read_tc: DB.readTcNow(), val: null, dbhas: null,
+    ok: false, act: 'unclassified_storing', banktok: DB.VoidBanktok, tracked: 'unread', read_tc: DB.readTcNow(), val: null, dbhas: null,
     err: DB.crossedErrOf(refusal), parentage: [], deltas: [], incompatible_rows: [],
   }
 }
 
-/** The notice in wire form for an item event: its Thing, its bank's banktok, and when it was read. */
-function goodNoticeOf({ val, banktok, read_tc }: DB.VaultItemEvent): WireNotice { return { record: val, banktok, read_tc, err: null, isEnded: false } }
+/** The notice in wire form for an item event: its Thing, its kind, its bank's banktok, and when it was read. */
+function goodNoticeOf({ val, modelkind, banktok, read_tc }: DB.VaultItemEvent): WireNotice { return { record: val, modelkind, banktok, read_tc, err: null, isEnded: false } }
 
 /** The notice in wire form for the trouble a watch met, and whether the watch ended with it. */
-function badNoticeOf(refusal: DB.VaultError, isEnded: boolean): WireNotice { return { record: null, banktok: null, read_tc: null, err: DB.crossedErrOf(refusal), isEnded } }
+function badNoticeOf(refusal: DB.VaultError, isEnded: boolean): WireNotice { return { record: null, modelkind: null, banktok: null, read_tc: null, err: DB.crossedErrOf(refusal), isEnded } }
 
 /** The iterator for a watch refused before it started: it yields one notice carrying the refusal, then ends. */
 function endingWith(refusal: DB.VaultError): AsyncIterableIterator<WireNotice> {

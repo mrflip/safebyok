@@ -35,6 +35,12 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
 * **`cleartext` names two things.** VOCABULARY.md's cleartext is the passphrase or passkey answer a gating accepts.
   `BoxCleartexts`, in `shapes/shapes-sealers.ts`, uses it for what a seal ciphers: a box's whisper. One of them needs
   another name. Every other name tried so far has been worse.
+* **Cite banktok.** A write's `cited` carries the banktok of the row it found, and the write predicate holds the stored
+  row's banktok to the cited one, as it does its revtok, `am` and lifepath. Today the banktok is compared for a gate
+  alone, only over a live one, and as the proposed record's against the stored row's (`isBanktokSame`, `banktok_cmp`,
+  Postgres's banktok clause): over a tombstone or no row it is not compared at all. Cited, it is one rule for every
+  kind, and a birth over a tombstone cites the ended life's banktok and writes its own (the Coach, 2026-11-27, bank_fold:
+  "Add a TODO: cite banktok").
 * **A box birth does not check that its parent is live.** Neither store looks at the root box when a box under it is
   born, so a box can be born under a deleted root box. Whatever checks it belongs in the store's write, beside the other
   preconditions, not in a check before it.

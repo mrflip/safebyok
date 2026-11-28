@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { type WorldSnapshot, isVaultError } from 'safebyok'
+import { type BankSnapshot, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { popField } from '../../src/index'
 import * as TH from '../test-helpers'
@@ -23,8 +23,8 @@ const NewPassphrase = 'a fake new passphrase'
 function makeKnockKnockApp(world: TH.ProviderWorld) {
   const { SOK, Bank: Knock } = world
   const heard: string[] = []
-  /** Every world snapshot the app rendered with. */
-  const shown: WorldSnapshot[] = []
+  /** Every bank snapshot the app rendered with. */
+  const shown: BankSnapshot[] = []
 
   /** The joke service: it answers a line sent with its key. */
   function tellJoke(apiKey: unknown, line: string): string {
@@ -75,7 +75,7 @@ function makeKnockKnockApp(world: TH.ProviderWorld) {
 
   /** The unlock dialog, open while a call waits for the bank to be unlocked. */
   function UnlockDialog() {
-    const isUnlockWanted = Knock.useWorld((snap) => snap.isUnlockWanted)
+    const isUnlockWanted = Knock.useBank((snap) => snap.isUnlockWanted)
     if (! isUnlockWanted) { return null }
     return <dialog open aria-label="Unlock"><UnlockForm /></dialog>
   }
@@ -96,7 +96,7 @@ function makeKnockKnockApp(world: TH.ProviderWorld) {
 
   /** The app: one screen for each stage of the bank. */
   function App() {
-    const snap = Knock.useWorld()
+    const snap = Knock.useBank()
     shown.push(snap)
     switch (snap.stage) {
     case 'signed_out': { return <p>Signed out</p> }
@@ -123,7 +123,7 @@ async function renderKnockKnock(stored: 'none' | 'jokes' = 'jokes') {
   const { container } = render(TH.providerTreeOf(world, <app.App />, { userid: TH.ProviderUser }))
   if (stored === 'jokes') { await screen.findByText('Locked') }
   const derivedBefore = world.deriver.heard
-  /** Assert `passphrase` is in no world snapshot the app rendered with, in nothing React has of the tree, and in no query or mutation of the host's QueryClient or the giver's. */
+  /** Assert `passphrase` is in no bank snapshot the app rendered with, in nothing React has of the tree, and in no query or mutation of the host's QueryClient or the giver's. */
   function expectUnheld(passphrase: string): void {
     expect(app.shown.filter((snap) => TH.holdsText(snap, passphrase))).to.have.lengthOf(0)
     expect(TH.holdsText(TH.reactTreeOf(container), passphrase)).to.eq(false)

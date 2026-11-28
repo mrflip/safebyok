@@ -10,7 +10,7 @@ import * as TH from '../test-helpers'
 TH.useFakeClock()
 
 /** The rows of `bank`'s MemoryVaultDB, by labelpath, to plant a record as another device would, notifying no watch. */
-function rowsOf(bank: Bank): Map<string, unknown> { return (bank.device.vaultDB as MemoryVaultDB)._cheat_things(bank.scope) }
+function rowsOf(bank: Bank): Map<string, unknown> { return (bank.device.vaultDB as MemoryVaultDB)._cheat_things(bank.scope).box }
 
 /** The asks `bank`'s vaultDB was sent for the box at `labelpath`, of each verb, in the order they came. */
 function spyAsksAt(bank: Bank, labelpath: string) {
@@ -43,9 +43,9 @@ function loseProbePut(bank: Bank): void {
   vi.spyOn(vaultDB, 'tryWriteThing').mockImplementation(async (ask) => {
     if ((ask.labelpath !== ProbeLabelpath) || (ask.op !== 'put')) { return await write(ask) }
 
-    const before = rowsOf(bank).get(ProbeLabelpath)
+    const prior = rowsOf(bank).get(ProbeLabelpath)
     const answer = await write(ask)
-    if (before === undefined) { rowsOf(bank).delete(ProbeLabelpath) } else { rowsOf(bank).set(ProbeLabelpath, before) }
+    if (prior === undefined) { rowsOf(bank).delete(ProbeLabelpath) } else { rowsOf(bank).set(ProbeLabelpath, prior) }
     return answer
   })
 }
@@ -132,7 +132,7 @@ describe("vault.probe(args)", () => {
     expect(err.meta?.stepkind).to.be.undefined
     expect(asks.gets()).to.equal(0)
     expect(asks.writes()).to.deep.equal([])
-    expect(bank.device.world.getSnapshot().isUnlockWanted).to.be.false
+    expect(bank.device.bank.getSnapshot().isUnlockWanted).to.be.false
   })
 
   it("refuses the root box's labelpath, an unknown key or a bad whisper, before it gets or writes anything", async () => {

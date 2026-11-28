@@ -241,7 +241,7 @@ sweep         device: disable it; lock its bank, which is disabled by then, so t
               dismiss its open gating
 vacate        device: as sweep; then forget every lease of the bank scope cached on this device, and its device row; tell
               the host 'vacated'
-del_bank      bank, through a gating: proved; lock; bank.listing.del(ante): the bank's tombstone, storage deleting its gate,
+del_bank      bank, through a gating: proved; lock; bank.listing.del(prior): the bank's tombstone, storage deleting its gate,
               vaults and boxes, transactionally; delivered, the Bank disabled for good, its open gating dismissed
 vault.del     vault, unlocked: vaultListing.del(vault.sparse): a tombstone under a new vault_tok, storage deleting its boxes,
               transactionally; delivered, the old box listing no longer answers; only the vault stays, tombstoned. Nothing locks
@@ -378,8 +378,8 @@ bank does not already have:
 
 ```text
 each gate change's act, past its provings
-├─ written = await gateListing.putGate(ante, wayins, { policies: [policy] })    ← the commit; ante, the gate record the attempt read
-│  ├─ expected = ante; record = ante at nextRevisionOf(expected), with the next wayins
+├─ written = await gateListing.putGate(prior, wayins, { policies: [policy] })   ← the commit; prior, the gate record the attempt read
+│  ├─ expected = prior; record = prior at nextRevisionOf(expected), with the next wayins
 │  ├─ bankDB.putGate({ expected, record, options })        a put of the gate row; moved → 'stale_write', its policy refusing → 'gate_issue', nothing stored
 │  └─ the answer delivered                           checked against what it sent
 │     no lock: adopt never locks on a gate's next revision
@@ -390,8 +390,8 @@ each gate change's act, past its provings
   has nothing to clean up. The old lease stays in force in between, so the bank does
   not report locked. That is safe, because the bankKey did not change. A crash between the two leaves a cached
   lease citing the old revision, which `Lease.buildFromCache` forgets, so the next session asks for a passphrase: a normal state.
-* **One record through the attempt.** The attempt reads `ante`, the gate's record (`gate.pickle()`), after its timeliness
-  request, and proves against that gate. The next record is minted from `ante`, not the live gate, so `ante` is the put's
+* **One record through the attempt.** The attempt reads `prior`, the gate's record (`gate.pickle()`), after its timeliness
+  request, and proves against that gate. The next record is minted from `prior`, not the live gate, so `prior` is the put's
   `expected`. Anything the watch delivers during the attempt therefore makes the put refuse: a passkey revoked elsewhere is
   not brought back, and a passphrase replaced elsewhere is not overwritten.
 * **A write made after the timeliness request.** The put refuses with 'stale_write'. The gating concludes with
@@ -400,7 +400,7 @@ each gate change's act, past its provings
 * **A gate change locks no device.** Another device's session keeps its lease until its own lock or next `bank.autolock`; its
   cached lease, citing the older gate revision, is forgotten at its next session (Decided).
 * **The bankDB applies the gating's storage policy, in the step that puts the record.** The record is built from
-  `ante`, so it changes only its gating's wayin, and the policy refuses one that changes more (`gate_issue`). The device
+  `prior`, so it changes only its gating's wayin, and the policy refuses one that changes more (`gate_issue`). The device
   never meets that refusal: `add_passkey` refuses before proving when the gate the attempt read has a passkey
   (`bad_record`). The bankDB cannot tell whether a wrap unwraps, so a bad `bank_key_wayin_wrapped` is still written.
 
@@ -420,15 +420,15 @@ gate.replacePassphrasePrompt()
    →→→ user hits enter key →→→
 gating.attempt({ antePassphraseClear, nextPassphraseClear })
 ├─ the two cleartexts equal → 'same_passphrase', may re-enter
-├─ { ante, gate } = timelyAnte(bank)                 ensureTimely(Promptly), demandPromptable; ante = gate.pickle(); this attempt's, from here on
+├─ { prior, gate } = timelyPrior(bank)               ensureTimely(Promptly), demandPromptable; prior = gate.pickle(); this attempt's, from here on
 ├─ anteProving = PassphraseProving.buildStored(gate, antePassphraseClear, bank)
 │    wrong → may re-enter
 ├─ nextProving = PassphraseProving.buildNovel(bank.stamp, gate.stamp, nextPassphraseClear, bank)
 │    weak → may re-enter
-└─ then the change, from { ante, anteProving, nextProving }           ── no cleartext is used past here ──
+└─ then the change, from { prior, anteProving, nextProving }          ── no cleartext is used past here ──
    ├─ nextWayin = nextProving.buildWayin(anteProving)    unwrap the bankKey; wrap; dropped
    └─ gateListing.putGate, then unlockByProving(bank, anteProving, written)
-      commit: gateListing.putGate(ante, { ...ante.wayins, main }, { policies: ['replace_passphrase'] })    ← the commit; main is nextWayin.pickle()
+      commit: gateListing.putGate(prior, { ...prior.wayins, main }, { policies: ['replace_passphrase'] })  ← the commit; main is nextWayin.pickle()
 ```
 
 The current passphrase is proved before the next is judged, so the `strengthChecker` is given a next
@@ -443,15 +443,15 @@ gate.addPasskeyPrompt()
    →→→ user hits enter key →→→
 gating.attempt({ passphraseClear, passkeyClear })
 │                                                    passkeyClear spent after, unless correctable (G2)
-├─ { ante, gate } = timelyAnte(bank)                 this attempt's, from here on
+├─ { prior, gate } = timelyPrior(bank)               this attempt's, from here on
 ├─ proved = PassphraseProving.buildStored(gate, passphraseClear, bank)
 │    wrong → may re-enter, passkeyClear unspent
 ├─ passkeyProving = PasskeyProving.buildNovel(bank.stamp, gate.stamp, passkeyClear, bank)
-└─ then the change, from { ante, proved, passkeyProving }             ── no cleartext is used past here ──
+└─ then the change, from { prior, proved, passkeyProving }            ── no cleartext is used past here ──
    ├─ passkeyWayin = passkeyProving.buildWayin(proved)   unwrap the bankKey; wrap; dropped
    └─ gateListing.putGate, then unlockByProving(bank, proved, written)
-      commit: gateListing.putGate(ante, { ...ante.wayins, passkey0 }, { policies: ['add_passkey'] })    ← the commit; passkey0 is passkeyWayin.pickle()
-           one added before the attempt read ante → 'bad_record', nothing proved; after it → 'stale_write'
+      commit: gateListing.putGate(prior, { ...prior.wayins, passkey0 }, { policies: ['add_passkey'] })  ← the commit; passkey0 is passkeyWayin.pickle()
+           one added before the attempt read prior → 'bad_record', nothing proved; after it → 'stale_write'
 ```
 
 ### `revoke_passkey`
@@ -462,13 +462,13 @@ gate.revokePasskeyPrompt()
 └─ bank.prompt('revoke_passkey')
    →→→ user hits enter key →→→
 gating.attempt({ passphraseClear })
-├─ { ante, gate } = timelyAnte(bank)                 this attempt's, from here on
+├─ { prior, gate } = timelyPrior(bank)               this attempt's, from here on
 ├─ proved = PassphraseProving.buildStored(gate, passphraseClear, bank)
 │    wrong → may re-enter
-└─ then the change, from { ante, proved }                             ── no cleartext is used past here ──
+└─ then the change, from { prior, proved }                            ── no cleartext is used past here ──
    └─ gateListing.putGate, then unlockByProving(bank, proved, written)
-      commit: gateListing.putGate(ante, { main: ante.wayins.main }, { policies: ['revoke_passkey'] })    ← the commit
-           revoked before the attempt read ante → the next revision stored, with no passkey still; after it → 'stale_write'
+      commit: gateListing.putGate(prior, { main: prior.wayins.main }, { policies: ['revoke_passkey'] })  ← the commit
+           revoked before the attempt read prior → the next revision stored, with no passkey still; after it → 'stale_write'
 ```
 
 ## `del_bank`
@@ -482,13 +482,13 @@ bank.delPrompt()
    →→→ user hits enter key →→→
 gating.attempt({ passphraseClear })
 ├─ gate = timelyGate(bank)                           at most one fetch; a bank found deleted refuses 'disabled' here
-├─ ante = bank.sparse                                the bank row the gate came with
+├─ prior = bank.sparse                               the bank row the gate came with
 ├─ PassphraseProving.buildStored(gate, passphraseClear, bank)
 │    wrong → may re-enter
 └─ then the change                                                    ── no cleartext is used past here ──
    ├─ bank.lock()                                    first: no box unseals under a lease while the tombstone goes out
-   └─ bank.listing.del(ante)
-      ├─ bankDB.tryDelBank({ op: 'del', ...scope, expected: ante, record: tombstone })    ← the commit: the bank's tombstone, under a
+   └─ bank.listing.del(prior)
+      ├─ bankDB.tryDelBank({ op: 'del', ...scope, expected: prior, record: tombstone })   ← the commit: the bank's tombstone, under a
       │    new bank_tok; every gate, vault and box row under it deleted
       │    moved → 'stale_write', nothing stored; the bank stays locked
       └─ the tombstone delivered → bank.adopt
@@ -555,8 +555,8 @@ A Box operation naming a stale or missing vault_tok will fail `vault_reborn` (or
 * `ifPresent` is customer-facing, and `putVault` and `putBox` accept it alike in `PutOpts`, with `ifAbsent` ('add' or
   'fail'). Only `repl` puts, and only within the live row's own life: at its revision under another `vault_tok` or
   `box_tok` it refuses `camped`. `fail` refuses `camped` with the corpse (`dbhas`, the request), not as a `stale_write`;
-  `get` answers the live row in place of the request, `passed`. `isVaultPutAllowed(ante, record, opts)` and
-  `isBoxPutAllowed(ante, record, opts)` decide inside each adapter's transaction.
+  `get` answers the live row in place of the request, `passed`. `isVaultPutAllowed(prior, record, opts)` and
+  `isBoxPutAllowed(prior, record, opts)` decide inside each adapter's transaction.
 * Every box query names scope and `vault_tok`, and a box row under another `vault_tok` is treated as no row. Only a
   fetch of a vault record has a reason to go by scope alone.
 

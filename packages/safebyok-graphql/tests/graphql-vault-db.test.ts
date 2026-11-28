@@ -62,9 +62,9 @@ async function servedOf(document: string, ask: object): Promise<Record<string, u
 /** A refusal as it crosses, with no meta. */
 function bareCrossedErrOf(refusalkind: DB.Refusalkind, message: string) { return { refusalkind, message, meta: null } }
 
-const gotNotice     = { safebyokWatchThings: { __typename: 'SafebyokNotice', record: TH.gateThingOf(), banktok: TH.SenderKnows.banktok, read_tc: DB.readTcNow(), err: null, isEnded: false } }
-const troubleNotice = { safebyokWatchThings: { record: null, banktok: null, read_tc: null, err: bareCrossedErrOf('storage_unavailable', 'The datastore hiccuped'), isEnded: false } }
-const revokedNotice = { safebyokWatchThings: { record: null, banktok: null, read_tc: null, err: bareCrossedErrOf('identity_revoked', 'Signed out'), isEnded: true } }
+const gotNotice     = { safebyokWatchThings: { __typename: 'SafebyokNotice', record: TH.gateThingOf(), modelkind: 'gate', banktok: TH.SenderKnows.banktok, read_tc: DB.readTcNow(), err: null, isEnded: false } }
+const troubleNotice = { safebyokWatchThings: { record: null, modelkind: null, banktok: null, read_tc: null, err: bareCrossedErrOf('storage_unavailable', 'The datastore hiccuped'), isEnded: false } }
+const revokedNotice = { safebyokWatchThings: { record: null, modelkind: null, banktok: null, read_tc: null, err: bareCrossedErrOf('identity_revoked', 'Signed out'), isEnded: true } }
 // --
 
 // == [Misanswers]: VerbsByField, Served, refusedOf, MisanswerCases
@@ -75,7 +75,7 @@ const VerbsByField = {
   safebyokWriteThing: { document: VaultOperations.writeThing, call: async (vaultDB: DB.VaultDB, ask: object) => await vaultDB.tryWriteThing(ask as DB.WriteAsk) },
   safebyokListThings: { document: VaultOperations.listThings, call: async (vaultDB: DB.VaultDB, ask: object) => await vaultDB.tryListThings(ask as DB.ListAsk) },
   safebyokBirthBank:  { document: VaultOperations.birthBank,  call: async (vaultDB: DB.VaultDB, ask: object) => await vaultDB.tryBirthBank(ask as DB.BirthBankAsk) },
-  safebyokGetWorld:   { document: VaultOperations.getWorld,   call: async (vaultDB: DB.VaultDB, ask: object) => await vaultDB.tryGetWorld(ask as DB.GetWorldAsk) },
+  safebyokGetBank:    { document: VaultOperations.getBank,    call: async (vaultDB: DB.VaultDB, ask: object) => await vaultDB.tryGetBank(ask as DB.GetBankAsk) },
   safebyokStats:      { document: VaultOperations.stats,      call: async (vaultDB: DB.VaultDB, ask: object) => await vaultDB.tryStats(ask as DB.StatsAsk) },
 } as const
 
@@ -88,38 +88,39 @@ function refusedOf(served: Served, dbhas: unknown): Served {
 }
 
 const ForeignGate = TH.gateThingOf({ userid: 'u2' })
-const ChildOfGate = { ...TH.ThingBank, labelpath: 'gate/zz', am: 'd' }
+const ChildOfGate = { ...TH.ThingBank, modelkind: 'box', labelpath: `${TH.GateScope.labelpath}/zz`, am: 'd' }
 const ParentOfOpenai = TH.boxThingOf('openai')
-const MisplacedRoots = { bank: TH.bankThingOf(), gate: TH.rootBoxOf(), root: TH.rootBoxOf() }
+const MisplacedRoots = { gate: TH.rootBoxOf(), root: TH.rootBoxOf() }
 
 // Each case: the root field, an ask over the born test bank, how the server's answer to it is altered, and the blurb.
 const MisanswerCases = [
   // what no vaultDB answers:
-  ["safebyokGetThing",   TH.getGateAskOf(),          () => ({ ok: true }),                                                                    'an answer missing its fields'],
-  ["safebyokGetThing",   TH.getGateAskOf(),          (served: Served) => ({ ...served, act: 'gotsomething' }),                               'a get of an act no vaultDB answers'],
-  ["safebyokGetThing",   TH.getGateAskOf(),          (served: Served) => ({ ...served, dbhas: TH.gateThingOf() }),                           'a live get that also names a dbhas'],
-  ["safebyokGetThing",   TH.getGateAskOf(),          (served: Served) => ({ ...served, val: { labelpath: 'gate' } }),                        'a get of a Thing with no revision'],
-  ["safebyokGetThing",   TH.getGateAskOf(),          (served: Served) => ({ ...served, err: bareCrossedErrOf('bad_record', 'No') }),         'a good answer carrying a refusal'],
-  ["safebyokListThings", TH.listAskAt('box'),        (served: Served) => ({ ...served, parentage: [] }),                                     'a good listing with no parent'],
+  ["safebyokGetThing",   TH.getGateAskOf(),                 () => ({ ok: true }),                                                                    'an answer missing its fields'],
+  ["safebyokGetThing",   TH.getGateAskOf(),                 (served: Served) => ({ ...served, act: 'gotsomething' }),                               'a get of an act no vaultDB answers'],
+  ["safebyokGetThing",   TH.getGateAskOf(),                 (served: Served) => ({ ...served, dbhas: TH.gateThingOf() }),                           'a live get that also names a dbhas'],
+  ["safebyokGetThing",   TH.getGateAskOf(),                 (served: Served) => ({ ...served, val: { labelpath: 'gate' } }),                        'a get of a Thing with no revision'],
+  ["safebyokGetThing",   TH.getGateAskOf(),                 (served: Served) => ({ ...served, err: bareCrossedErrOf('bad_record', 'No') }),         'a good answer carrying a refusal'],
+  ["safebyokListThings", TH.listAskAt('box', 'box'),        (served: Served) => ({ ...served, parentage: [] }),                                     'a good listing with no parent'],
   // a Thing where the ask reaches none:
-  ["safebyokGetThing",   TH.getGateAskOf(),          (served: Served) => ({ ...served, val: TH.rootBoxOf() }),                               "a get's Thing at another labelpath"],
-  ["safebyokGetThing",   TH.getGateAskOf(),          (served: Served) => ({ ...served, val: ForeignGate }),                                  "a get's Thing in another user's bank"],
-  ["safebyokGetThing",   TH.getAskAt('box/openai'),  (served: Served) => ({ ...served, dbhas: DB.Shell.of(TH.GateScope) }),                  "a void get's shell at another labelpath"],
-  ["safebyokGetThing",   TH.getGateAskOf(),          (served: Served) => refusedOf(served, TH.rootBoxOf()),                                  "a get's refusal naming a Thing at another labelpath"],
-  ["safebyokGetThing",   TH.getGateAskOf(),          (served: Served) => ({ ...served, tracked: { ...(served['tracked'] as object), bank: TH.gateThingOf() } }), 'a tracked root at another labelpath'],
-  ["safebyokWriteThing", TH.birthAskOf(),            (served: Served) => ({ ...served, dbhas: ForeignGate }),                                "a write's refusal naming a Thing in another user's bank"],
-  ["safebyokListThings", TH.listAskAt('box'),        (served: Served) => ({ ...served, parentage: [TH.gateThingOf()] }),                     "a listing's parent at another labelpath"],
-  ["safebyokListThings", TH.listAskAt('box'),        (served: Served) => ({ ...served, deltas: [TH.gateThingOf()] }),                        "a listing's child under another parent"],
-  ["safebyokListThings", TH.listAskAt('box'),        (served: Served) => ({ ...served, deltas: [TH.boxThingOf('zz', { userid: 'u2' })] }),   "a listing's child in another user's bank"],
-  ["safebyokListThings", TH.listAskAt('box'),        (served: Served) => ({ ...served, incompatible_rows: [ChildOfGate] }),                  "a listing's incompatible child under another parent"],
-  ["safebyokListThings", TH.listAskAt('box'),        (served: Served) => ({ ...served, val: { ...(served['val'] as object), parentpath: 'gate' } }),            "a good listing's kids of another parentpath"],
-  ["safebyokListThings", TH.listAskAt('box'),        (served: Served) => ({ ...served, val: { ...(served['val'] as object), parentlife: '9' } }),                "a good listing's kids of another parentlife than its parent's"],
-  ["safebyokListThings", TH.listAskAt('box/openai'), (served: Served) => ({ ...served, ok: true, act: 'gotlive', err: null, dbhas: null, parentage: [ParentOfOpenai], deltas: [{ ...ParentOfOpenai, labelpath: 'box/openai/zz', label: 'zz' }], val: { modelkind: 'kids', parentpath: 'box/openai', parentlife: ParentOfOpenai.lifepath, items: {}, gones: {}, read_tc: served['read_tc'] } }), "a listing's child too deep to be of the ask's modelkind"],
-  ["safebyokListThings", TH.listAskAt('box/openai'), (served: Served) => ({ ...served, parentage: [TH.gateThingOf()] }),                                                                                                       "a refused listing's parentage at another labelpath"],
-  ["safebyokBirthBank",  TH.birthBankAskOf(),        (served: Served) => ({ ...served, ok: true, act: 'born', dbhas: null, err: null, val: MisplacedRoots }), "a birth's root at another root's labelpath"],
-  ["safebyokBirthBank",  TH.birthBankAskOf(),        (served: Served) => ({ ...refusedOf(served, TH.boxThingOf()), act: 'stale' }),          "a birth's refusal naming a Thing that is no root"],
-  ["safebyokGetWorld",   TH.getWorldAskOf(),         (served: Served) => ({ ...served, val: { ...(served['val'] as object), gate: ForeignGate } }),     "a world's root in another user's bank"],
-  ["safebyokStats",      TH.statsAskOf(),            (served: Served) => refusedOf(served, TH.boxThingOf()),                                 "a stats' refusal naming a Thing that is no root"],
+  ["safebyokGetThing",   TH.getGateAskOf(),                 (served: Served) => ({ ...served, val: TH.rootBoxOf() }),                               "a get's Thing at another labelpath"],
+  ["safebyokGetThing",   TH.getGateAskOf(),                 (served: Served) => ({ ...served, val: ForeignGate }),                                  "a get's Thing in another user's bank"],
+  ["safebyokGetThing",   TH.getAskAt('box', 'box/openai'),  (served: Served) => ({ ...served, dbhas: DB.Shell.of(TH.GateScope) }),                  "a void get's shell at another labelpath"],
+  ["safebyokGetThing",   TH.getGateAskOf(),                 (served: Served) => refusedOf(served, TH.rootBoxOf()),                                  "a get's refusal naming a Thing at another labelpath"],
+  ["safebyokGetThing",   TH.getGateAskOf(),                 (served: Served) => ({ ...served, tracked: { ...(served['tracked'] as object), root: TH.gateThingOf() } }), 'a tracked root at another labelpath'],
+  ["safebyokWriteThing", TH.birthAskOf(),                   (served: Served) => ({ ...served, dbhas: ForeignGate }),                                "a write's refusal naming a Thing in another user's bank"],
+  ["safebyokListThings", TH.listAskAt('box', 'box'),        (served: Served) => ({ ...served, parentage: [TH.gateThingOf()] }),                     "a listing's parent at another labelpath"],
+  ["safebyokListThings", TH.listAskAt('box', 'box'),        (served: Served) => ({ ...served, deltas: [TH.gateThingOf()] }),                        "a listing's child under another parent"],
+  ["safebyokListThings", TH.listAskAt('box', 'box'),        (served: Served) => ({ ...served, deltas: [TH.boxThingOf('zz', { userid: 'u2' })] }),   "a listing's child in another user's bank"],
+  ["safebyokListThings", TH.listAskAt('box', 'box'),        (served: Served) => ({ ...served, incompatible_rows: [ChildOfGate] }),                  "a listing's incompatible child under another parent"],
+  ["safebyokListThings", TH.listAskAt('box', 'box'),        (served: Served) => ({ ...served, val: { ...(served['val'] as object), parentpath: 'gate' } }),            "a good listing's kids of another parentpath"],
+  ["safebyokListThings", TH.listAskAt('box', 'box'),        (served: Served) => ({ ...served, val: { ...(served['val'] as object), parentlife: '9' } }),                "a good listing's kids of another parentlife than its parent's"],
+  ["safebyokListThings", TH.listAskAt('box', 'box/openai'), (served: Served) => ({ ...served, ok: true, act: 'gotlive', err: null, dbhas: null, parentage: [ParentOfOpenai], deltas: [{ ...ParentOfOpenai, labelpath: 'box/openai/zz', label: 'zz' }], val: { modelkind: 'kids', parentpath: 'box/openai', parentlife: ParentOfOpenai.lifepath, items: {}, gones: {}, read_tc: served['read_tc'] } }), "a listing's child too deep to be of the ask's modelkind"],
+  ["safebyokListThings", TH.listAskAt('box', 'box/openai'), (served: Served) => ({ ...served, parentage: [TH.gateThingOf()] }),                                                                                                       "a refused listing's parentage at another labelpath"],
+  ["safebyokBirthBank",  TH.birthBankAskOf(),               (served: Served) => ({ ...served, ok: true, act: 'born', dbhas: null, err: null, val: MisplacedRoots }), "a birth's root at another root's labelpath"],
+  ["safebyokBirthBank",  TH.birthBankAskOf(),               (served: Served) => ({ ...served, dbhas: TH.rootBoxOf() }),                             "a birth's refusal naming one root, not both"],
+  ["safebyokBirthBank",  TH.birthBankAskOf(),               (served: Served) => ({ ...served, dbhas: MisplacedRoots }),                             "a birth's refusal naming a root at another root's scope"],
+  ["safebyokGetBank",    TH.getBankAskOf(),                 (served: Served) => ({ ...served, val: { ...(served['val'] as object), gate: ForeignGate } }),     "a bank's root in another user's bank"],
+  ["safebyokStats",      TH.statsAskOf(),                   (served: Served) => refusedOf(served, TH.boxThingOf()),                                 "a stats' refusal naming a Thing that is no root"],
 ] as const
 // --
 
@@ -190,7 +191,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
 
   it("refuses a server serving some other schema", async () => {
     const { vaultDB } = fakeClient({ data: { somethingElse: 1 } })
-    const err = await TH.expectBad(vaultDB.tryGetWorld(TH.getWorldAskOf()), 'unexpected_error')
+    const err = await TH.expectBad(vaultDB.tryGetBank(TH.getBankAskOf()), 'unexpected_error')
     expect(err.message).to.eq(Phrases.SchemaNotServed)
   })
 
@@ -214,10 +215,17 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     expect(refusal.meta).to.deep.include({ act: 'policied', fieldnames: ['wayins'], ask: DB.loggableAskOf(TH.birthAskOf()) })
   })
 
+  it("answers a birth's refusal with the bank's two roots as the server's vaultDB read them", async () => {
+    const served = await servedOf(VaultOperations.birthBank, TH.birthBankAskOf())
+    expect(served).to.deep.include({ ok: false, act: 'retcon', dbhas: { gate: TH.gateThingOf(), root: TH.rootBoxOf() } })
+    const { vaultDB } = fakeClient({ data: { safebyokBirthBank: served } })
+    expect(await vaultDB.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ ok: false, act: 'retcon', dbhas: served['dbhas'] })
+  })
+
   it("deeply freezes each record it answers", async () => {
-    const served = await servedOf(VaultOperations.getWorld, TH.getWorldAskOf())
-    const { vaultDB } = fakeClient({ data: { safebyokGetWorld: served } })
-    const roots = await TH.expectGood(vaultDB.tryGetWorld(TH.getWorldAskOf()))
+    const served = await servedOf(VaultOperations.getBank, TH.getBankAskOf())
+    const { vaultDB } = fakeClient({ data: { safebyokGetBank: served } })
+    const roots = await TH.expectGood(vaultDB.tryGetBank(TH.getBankAskOf()))
     expect(Object.isFrozen(roots)).to.be.true
     expect(Object.isFrozen(roots.gate)).to.be.true
     expect(Object.isFrozen((roots.gate as DB.GateRecord).wayins)).to.be.true
@@ -250,7 +258,7 @@ describe("GraphQLVaultDB's watch", () => {
     streams[0]?.({ data: gotNotice, hasNext: true })
     stop()
     await Promise.resolve()
-    expect(told).to.deep.eq(['gate'])
+    expect(told).to.deep.eq([TH.GateScope.labelpath])
   })
 
   it("ends a stream the server closes, once: onEnded, then why, and never resubscribes", async () => {
@@ -261,7 +269,7 @@ describe("GraphQLVaultDB's watch", () => {
     await Promise.resolve()
     stop()
     expect(streams).to.have.lengthOf(1)
-    expect(told).to.deep.eq(['gate', 'ended', 'storage_unavailable'])
+    expect(told).to.deep.eq([TH.GateScope.labelpath, 'ended', 'storage_unavailable'])
     expect(badnews[0]).to.include({ message: Phrases.WatchEnded })
     expect(counts.unsubscribed).to.be.greaterThanOrEqual(1)
   })
@@ -283,7 +291,7 @@ describe("GraphQLVaultDB's watch", () => {
     streams[0]?.({ data: gotNotice, hasNext: true })
     stop()
     await Promise.resolve()
-    expect(told).to.deep.eq(['storage_unavailable', 'storage_issue', 'gate'])
+    expect(told).to.deep.eq(['storage_unavailable', 'storage_issue', TH.GateScope.labelpath])
   })
 
   it("tells a notice of a Thing in another user's bank as bad news, not a notice", async () => {
@@ -305,7 +313,7 @@ describe("GraphQLVaultDB's watch", () => {
     streams[0]?.({ data: { safebyokWatchThings: { ...gotNotice.safebyokWatchThings, read_tc: DB.readTcNow() } }, hasNext: true })
     stop()
     await Promise.resolve()
-    expect(told).to.deep.eq(['gate', 'unexpected_error', 'gate', 'unexpected_error'])
+    expect(told).to.deep.eq([TH.GateScope.labelpath, 'unexpected_error', TH.GateScope.labelpath, 'unexpected_error'])
   })
 
   it("hands on each notice's Thing deeply frozen, with the banktok and read_tc it crossed with", () => {
@@ -315,7 +323,7 @@ describe("GraphQLVaultDB's watch", () => {
     streams[0]?.({ data: gotNotice, hasNext: true })
     stop()
     const [event] = heard
-    expect(event).to.deep.include({ eventkind: 'item', labelpath: 'gate', val: TH.gateThingOf(), banktok: TH.SenderKnows.banktok, read_tc: gotNotice.safebyokWatchThings.read_tc })
+    expect(event).to.deep.include({ eventkind: 'item', labelpath: TH.GateScope.labelpath, val: TH.gateThingOf(), banktok: TH.SenderKnows.banktok, read_tc: gotNotice.safebyokWatchThings.read_tc })
     expect(Object.isFrozen((event as DB.VaultItemEvent).val)).to.be.true
   })
 

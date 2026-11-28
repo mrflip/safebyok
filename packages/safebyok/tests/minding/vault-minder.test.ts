@@ -2,7 +2,7 @@ import { noop, omit } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import { type Errors, SX } from 'safebyok-big/internals'
 import { Thing } from '../../src/models/thing'
-import { type ThingRecord, Shell } from '../../src/shapes/shapes-thing'
+import { type ThingRecord, type ThingScope, Shell } from '../../src/shapes/shapes-thing'
 import type { ReadTc, SeenThing, VaultEvent, VaultItemEvent } from '../../src/shapes/shapes-vault-event'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { VaultMinder } from '../../src/minding/vault-minder'
@@ -13,21 +13,25 @@ import { VoidTrack } from '../../src/shapes/shapes-asks'
 import type { VaultDB } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
+/** Where the test bank's gate is stored: at its banklabel. */
+const Gatepath = TH.GateScope.labelpath
+
 /** The datastore in memory each VaultMinder the battery makes stands over. */
 const InnerOf = new WeakMap<VaultMinder, MemoryVaultDB>()
 
 TH.describeVaultDBBattery('VaultMinder over a MemoryVaultDB', {
+  servesOneBank: true,
   makeVaultDB: () => {
     const inner = new MemoryVaultDB()
-    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, bank: TH.PlainCarBank })
     InnerOf.set(vaultDB, inner)
     return vaultDB
   },
   _cheat_rowsOf: (vaultDB) => {
     const inner = InnerOf.get(vaultDB)!
     return {
-      plant:  (scope, raw) => { inner._cheat_things(scope).set(scope.labelpath, structuredClone(raw)) },
-      remove: (scope) => { inner._cheat_things(scope).delete(scope.labelpath) },
+      plant:  (scope, raw) => { inner._cheat_things(scope)[scope.modelkind].set(scope.labelpath, structuredClone(raw)) },
+      remove: (scope) => { inner._cheat_things(scope)[scope.modelkind].delete(scope.labelpath) },
     }
   },  // It has no watch: what it tells its listeners is below.
   watches: false,
@@ -43,7 +47,7 @@ function stubVaultDBOf(stop: () => void) {
     tryWriteThing: vi.fn<VaultDB['tryWriteThing']>(() => Promise.resolve(stubAnswerOf('wrote'))),
     tryListThings: vi.fn<VaultDB['tryListThings']>(() => Promise.resolve(stubAnswerOf('listed'))),
     tryBirthBank:  vi.fn<VaultDB['tryBirthBank']>(() => Promise.resolve(stubAnswerOf('born'))),
-    tryGetWorld:   vi.fn<VaultDB['tryGetWorld']>(() => Promise.resolve(stubAnswerOf('world'))),
+    tryGetBank:    vi.fn<VaultDB['tryGetBank']>(() => Promise.resolve(stubAnswerOf('bank'))),
     tryStats:      vi.fn<VaultDB['tryStats']>(() => Promise.resolve(stubAnswerOf('stats'))),
     watch:         vi.fn<VaultDB['watch']>(() => stop),
   } satisfies VaultDB
@@ -52,11 +56,11 @@ function stubVaultDBOf(stop: () => void) {
 /** A VaultMinder over a MemoryVaultDB, watching it, and that MemoryVaultDB, to write beside it. */
 function sortedOverMemory(): { vaultDB: VaultMinder<TH.PlainThing>, inner: MemoryVaultDB } {
   const inner = new MemoryVaultDB()
-  return { vaultDB: VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld }).connect(), inner }
+  return { vaultDB: VaultMinder.make(TH.ThingBank, { vaultDB: inner, bank: TH.PlainCarBank }).connect(), inner }
 }
 
 /** The track of a sender that knows only the root box, at its revision. */
-const RootOnlyTrack = TH.trackOf(TH.bankShellOf(), TH.gateShellOf())
+const RootOnlyTrack = TH.trackOf(TH.gateShellOf())
 
 /** A box's revisions: `two`, which a {@link TH.RefusingThing} takes, and `three` after it, which it refuses. */
 const Revs = (() => {
@@ -71,14 +75,14 @@ function isThingRefusal(news: Errors.VaultError): boolean { return (news.refusal
 function refusingOverQuietMemory(): { vaultDB: VaultMinder<TH.RefusingThing>, inner: MemoryVaultDB } {
   const inner = new MemoryVaultDB()
   vi.spyOn(inner, 'watch').mockReturnValue(noop)
-  return { vaultDB: VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: { makeThing: (shell) => TH.RefusingThing.make(shell) } }), inner }
+  return { vaultDB: VaultMinder.make(TH.ThingBank, { vaultDB: inner, bank: { makeThing: (shell) => TH.RefusingThing.make(shell) } }), inner }
 }
 
 /** A VaultMinder over a MemoryVaultDB whose own watch notifies nothing, so that every event it tells is of an answer's records. */
 function sortedOverQuietMemory(): { vaultDB: VaultMinder<TH.PlainThing>, inner: MemoryVaultDB } {
   const inner = new MemoryVaultDB()
   vi.spyOn(inner, 'watch').mockReturnValue(noop)
-  return { vaultDB: VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld }), inner }
+  return { vaultDB: VaultMinder.make(TH.ThingBank, { vaultDB: inner, bank: TH.PlainCarBank }), inner }
 }
 
 /** The item event a device database might ring for `record`, from `'other_tab'` at `read_tc`. */
@@ -87,7 +91,7 @@ function rungOf(record: SeenThing, read_tc: ReadTc = readTcNow()): VaultItemEven
 }
 
 /** Put `record` in `inner`'s datastore past its verbs. */
-function cheatPlant(inner: MemoryVaultDB, record: ThingRecord): void { inner._cheat_things(record).set(record.labelpath, structuredClone(record)) }
+function cheatPlant(inner: MemoryVaultDB, record: ThingRecord): void { inner._cheat_things(record)[record.modelkind].set(record.labelpath, structuredClone(record)) }
 
 /** A listener to `vaultDB`: the events it hears, the bad news it is told, and the end of its listen. */
 function heardOf(vaultDB: VaultMinder): { events: VaultEvent[], badNews: Errors.VaultError[], end: () => void } {
@@ -97,7 +101,7 @@ function heardOf(vaultDB: VaultMinder): { events: VaultEvent[], badNews: Errors.
   return { events, badNews, end }
 }
 
-/** What `car` holds, as a plain object. */
+/** The fields of `car`, as a plain object. */
 function carFieldsOf(car: ThingCar): Pick<ThingCar, 'thing' | 'lastErr' | 'erred_at' | 'read_tc'> {
   return { thing: car.thing, lastErr: car.lastErr, erred_at: car.erred_at, read_tc: car.read_tc }
 }
@@ -122,25 +126,25 @@ function firstSeenSparse(labelpath: string): string[][] { return [['item', label
 describe("VaultMinder, what only a wrapper can show", () => {
   it("hands each verb's ask to the vaultDB it wraps, and answers that vaultDB's own answer", async () => {
     const inner = stubVaultDBOf(() => undefined)
-    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
-    const asks = { get: TH.getGateAskOf(), write: TH.birthAskOf(), list: TH.listAskAt('box'), birth: TH.birthBankAskOf(), world: TH.getWorldAskOf(), stats: TH.statsAskOf() }
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, bank: TH.PlainCarBank })
+    const asks = { get: TH.getGateAskOf(), write: TH.birthAskOf(), list: TH.listAskAt('box', 'box'), birth: TH.birthBankAskOf(), bank: TH.getBankAskOf(), stats: TH.statsAskOf() }
     expect(await vaultDB.tryGetThing(asks.get)).to.equal(await inner.tryGetThing.mock.results[0]!.value)
     expect(await vaultDB.tryWriteThing(asks.write)).to.equal(await inner.tryWriteThing.mock.results[0]!.value)
     expect(await vaultDB.tryListThings(asks.list)).to.equal(await inner.tryListThings.mock.results[0]!.value)
     expect(await vaultDB.tryBirthBank(asks.birth)).to.equal(await inner.tryBirthBank.mock.results[0]!.value)
-    expect(await vaultDB.tryGetWorld(asks.world)).to.equal(await inner.tryGetWorld.mock.results[0]!.value)
+    expect(await vaultDB.tryGetBank(asks.bank)).to.equal(await inner.tryGetBank.mock.results[0]!.value)
     expect(await vaultDB.tryStats(asks.stats)).to.equal(await inner.tryStats.mock.results[0]!.value)
     expect(inner.tryGetThing.mock.calls[0]![0]).to.equal(asks.get)
     expect(inner.tryWriteThing.mock.calls[0]![0]).to.equal(asks.write)
     expect(inner.tryListThings.mock.calls[0]![0]).to.equal(asks.list)
     expect(inner.tryBirthBank.mock.calls[0]![0]).to.equal(asks.birth)
-    expect(inner.tryGetWorld.mock.calls[0]![0]).to.equal(asks.world)
+    expect(inner.tryGetBank.mock.calls[0]![0]).to.equal(asks.bank)
     expect(inner.tryStats.mock.calls[0]![0]).to.equal(asks.stats)
   })
 
   it("watches nothing until connected", () => {
     const inner = stubVaultDBOf(vi.fn())
-    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, bank: TH.PlainCarBank })
     heardOf(vaultDB)
     expect([inner.watch.mock.calls.length, vaultDB.isWatching]).to.deep.equal([0, false])
   })
@@ -148,7 +152,7 @@ describe("VaultMinder, what only a wrapper can show", () => {
   it("watches its bank in the vaultDB it wraps once while connected, however often connected and whoever listens to it, asking nothing", () => {
     const stop = vi.fn()
     const inner = stubVaultDBOf(stop)
-    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, bank: TH.PlainCarBank })
     expect(vaultDB.connect().connect()).to.equal(vaultDB)
     expect(inner.watch.mock.calls.map(([scope]) => scope)).to.deep.equal([TH.ThingBank])
     const ends = [heardOf(vaultDB).end, heardOf(vaultDB).end]
@@ -167,13 +171,13 @@ describe("VaultMinder, what only a wrapper can show", () => {
     await TH.aWhile()
     expect(events).to.deep.equal([])
     await vaultDB.tryGetThing(TH.getGateAskOf())
-    expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ...firstSeen('box')])
+    expect(shorthandsOf(events)).to.deep.equal([...firstSeen(Gatepath), ...firstSeen('box')])
   })
 
   it("calls the wrapped watch's stop once, however often disconnected, and watches again at its next connect", () => {
     const stop = vi.fn()
     const inner = stubVaultDBOf(stop)
-    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld }).connect()
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, bank: TH.PlainCarBank }).connect()
     vaultDB.disconnect()
     vaultDB.disconnect()
     expect(stop).toHaveBeenCalledTimes(1)
@@ -184,7 +188,7 @@ describe("VaultMinder, what only a wrapper can show", () => {
   it("watches nothing once the wrapped watch ends of itself, and watches again at its next connect", () => {
     const stop = vi.fn()
     const inner = stubVaultDBOf(stop)
-    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld }).connect()
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, bank: TH.PlainCarBank }).connect()
     const onEnded = inner.watch.mock.calls[0]![3]!
     onEnded()
     expect([vaultDB.isWatching, stop.mock.calls.length]).to.deep.equal([false, 0])
@@ -194,7 +198,7 @@ describe("VaultMinder, what only a wrapper can show", () => {
 
   it("calls the onEnded handed to connect once the wrapped watch ends of itself, already watching nothing", () => {
     const inner = stubVaultDBOf(vi.fn())
-    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, bank: TH.PlainCarBank })
     const watchingWhenEnded: boolean[] = []
     vaultDB.connect(() => { watchingWhenEnded.push(vaultDB.isWatching) })
     inner.watch.mock.calls[0]![3]!()
@@ -205,14 +209,14 @@ describe("VaultMinder, what only a wrapper can show", () => {
     const inner = stubVaultDBOf(vi.fn())
     const first = vi.fn()
     const second = vi.fn()
-    VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld }).connect(first).connect(second)
+    VaultMinder.make(TH.ThingBank, { vaultDB: inner, bank: TH.PlainCarBank }).connect(first).connect(second)
     inner.watch.mock.calls[0]![3]!()
     expect([first.mock.calls.length, second.mock.calls.length, inner.watch.mock.calls.length]).to.deep.equal([1, 0, 1])
   })
 
   it("refuses an onEnded that is not a function, and watches nothing", () => {
     const inner = stubVaultDBOf(vi.fn())
-    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, bank: TH.PlainCarBank })
     TH.expectSyncRefusal(() => { vaultDB.connect('tell me' as never) }, 'bad_record')
     expect([inner.watch.mock.calls.length, vaultDB.isWatching]).to.deep.equal([0, false])
   })
@@ -221,7 +225,7 @@ describe("VaultMinder, what only a wrapper can show", () => {
     const inner = stubVaultDBOf(vi.fn())
     const thrown = new Error('watch refused')
     inner.watch.mockImplementation(() => { throw thrown })
-    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, bank: TH.PlainCarBank })
     expect(() => vaultDB.connect()).to.throw(thrown)
     expect(vaultDB.isWatching).to.equal(false)
   })
@@ -230,10 +234,10 @@ describe("VaultMinder, what only a wrapper can show", () => {
     [TH.ThingBank,                        undefined,                          'no options'],
     [TH.ThingBank,                        {},                                 'no vaultDB'],
     [TH.ThingBank,                        { vaultDB: { tryGetThing: noop } }, 'a vaultDB missing a verb'],
-    [TH.ThingBank,                        { vaultDB: new MemoryVaultDB() },   'no world'],
-    [TH.ThingBank,                        { vaultDB: new MemoryVaultDB(), world: { makeThing: 'plain' } }, 'a world whose makeThing is no function'],
-    [undefined,                           { vaultDB: new MemoryVaultDB(), world: TH.PlainWorld }, 'no scope'],
-    [{ userid: TH.ThingBank.userid },     { vaultDB: new MemoryVaultDB(), world: TH.PlainWorld }, 'a scope with no banklabel'],
+    [TH.ThingBank,                        { vaultDB: new MemoryVaultDB() },   'no bank'],
+    [TH.ThingBank,                        { vaultDB: new MemoryVaultDB(), bank: { makeThing: 'plain' } }, 'a bank whose makeThing is no function'],
+    [undefined,                           { vaultDB: new MemoryVaultDB(), bank: TH.PlainCarBank }, 'no scope'],
+    [{ userid: TH.ThingBank.userid },     { vaultDB: new MemoryVaultDB(), bank: TH.PlainCarBank }, 'a scope with no banklabel'],
   ] as const
 
   for (const [scope, opts, blurb] of BadArgs) {
@@ -262,21 +266,21 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await inner.tryBirthBank(TH.birthBankAskOf())
     const { events, badNews } = heardOf(vaultDB)
-    const track = { bank: TH.BankStaleTrack.bank, gate: TH.GateStaleTrack.gate, box: TH.RootStaleTrack.box }
+    const track = { gate: TH.GateStaleTrack.gate, root: TH.RootStaleTrack.root }
     const answer = await vaultDB.tryWriteThing({ ...TH.birthAskOf(TH.gateThingOf({ revtok: TH.OtherRevtok })), track })
     expect(answer).to.deep.include({ ok: false, dbhas: TH.gateThingOf() })
-    expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ...firstSeen('box')])
+    expect(shorthandsOf(events)).to.deep.equal([...firstSeen(Gatepath), ...firstSeen('box')])
     expect(badNews).to.deep.equal([])
   })
 
-  it("tells of the three roots a get of the world answers, in root order, the shell at each where none is stored, before it answers", async () => {
+  it("tells of the three roots a get of the bank answers, in root order, the shell at each where none is stored, before it answers", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     const { events, badNews } = heardOf(vaultDB)
-    expect(await vaultDB.tryGetWorldOnce()).to.deep.include({ ok: true, act: 'got' })
-    expect(shorthandsOf(events)).to.deep.equal([...voidSeen('bank'), ...voidSeen('gate'), ...voidSeen('box')])
+    expect(await vaultDB.tryGetBankOnce()).to.deep.include({ ok: true, act: 'got' })
+    expect(shorthandsOf(events)).to.deep.equal([...voidSeen(Gatepath), ...voidSeen('box')])
     await inner.tryBirthBank(TH.birthBankAskOf())
-    expect(await vaultDB.tryGetWorldOnce()).to.deep.include({ ok: true, act: 'got' })
-    expect(shorthandsOf(events.slice(6))).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ...firstSeen('box')])
+    expect(await vaultDB.tryGetBankOnce()).to.deep.include({ ok: true, act: 'got' })
+    expect(shorthandsOf(events.slice(4))).to.deep.equal([...firstSeen(Gatepath), ...firstSeen('box')])
     expect(badNews).to.deep.equal([])
   })
 
@@ -285,12 +289,12 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     await inner.tryBirthBank(TH.birthBankAskOf())
     for (const label of ['openai', 'anthropic']) { await inner.tryWriteThing(TH.birthAskOf(TH.boxThingOf(label), Shell.childCited(TH.Life0))) }
     const { events } = heardOf(vaultDB)
-    await vaultDB.tryListThings({ ...TH.listAskAt('box'), track: RootOnlyTrack })
+    await vaultDB.tryListThings({ ...TH.listAskAt('box', 'box'), track: RootOnlyTrack })
     expect(shorthandsOf(events)).to.deep.equal([
-      ...firstSeen('bank'), ...firstSeen('gate'), ...firstSeenSparse('box'), ...firstSeenSparse('box/anthropic'), ...firstSeenSparse('box/openai'),
+      ...firstSeen(Gatepath), ...firstSeenSparse('box'), ...firstSeenSparse('box/anthropic'), ...firstSeenSparse('box/openai'),
     ])
     expect(events.filter((event) => event.eventkind === 'item').map((event) => event.val)).to.deep.equal(
-      [TH.bankThingOf(), TH.gateThingOf(), ...[TH.rootBoxOf(), TH.boxThingOf('anthropic'), TH.boxThingOf('openai')].map((thing) => TH.boxSparseOf(thing))],
+      [TH.gateThingOf(), ...[TH.rootBoxOf(), TH.boxThingOf('anthropic'), TH.boxThingOf('openai')].map((thing) => TH.boxSparseOf(thing))],
     )
   })
 
@@ -298,15 +302,15 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     const { events } = heardOf(vaultDB)
     const born = await vaultDB.tryBirthBank(TH.birthBankAskOf({ track: TH.trackOf() }))
-    expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ...firstSeen('box')])
+    expect(shorthandsOf(events)).to.deep.equal([...firstSeen(Gatepath), ...firstSeen('box')])
     const box = TH.boxThingOf()
     const written = await vaultDB.tryWriteThing(TH.birthAskOf(box, Shell.childCited(TH.Life0)))
     const next = TH.nextOf(box)
     cheatPlant(inner, next)
-    const got = await vaultDB.tryGetThing(TH.getAskAt(box.labelpath))
+    const got = await vaultDB.tryGetThing(TH.getAskAt('box', box.labelpath))
     const records = events.filter((event) => event.eventkind === 'item').map((event) => event.val)
-    expect(records).to.deep.equal([TH.bankThingOf(), TH.gateThingOf(), TH.rootBoxOf(), box, next])
-    expect([records[2], records[3], records[4]]).to.have.ordered.members([born.ok && born.val.root, written.ok && written.val, got.ok && got.val])
+    expect(records).to.deep.equal([TH.gateThingOf(), TH.rootBoxOf(), box, next])
+    expect([records[1], records[2], records[3]]).to.have.ordered.members([born.ok && born.val.root, written.ok && written.val, got.ok && got.val])
   })
 
   it("tells of nothing for a repeat or an older record", async () => {
@@ -314,14 +318,14 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     await inner.tryBirthBank(TH.birthBankAskOf())
     const { events } = heardOf(vaultDB)
     await vaultDB.tryGetThing(TH.getGateAskOf())
-    expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ...firstSeen('box')])
+    expect(shorthandsOf(events)).to.deep.equal([...firstSeen(Gatepath), ...firstSeen('box')])
     await vaultDB.tryGetThing(TH.getGateAskOf())
     const next = TH.nextGateOf(TH.gateThingOf())
     await vaultDB.tryWriteThing(TH.replaceAskOf(TH.gateThingOf(), next))
     const gate = TH.gateThingOf()
     vaultDB.receive(rungOf(gate))
     await TH.aWhile()
-    expect(shorthandsOf(events.slice(6))).to.deep.equal([['item', 'gate', 'full']])
+    expect(shorthandsOf(events.slice(4))).to.deep.equal([['item', Gatepath, 'full']])
   })
 
   it("tells of the newest revision seen again in a later span of time, and of nothing for it again in that span", async () => {
@@ -335,7 +339,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     vaultDB.receive(rungOf(gate, read_tc))
     vaultDB.receive(rungOf(gate, later))
     vaultDB.receive(rungOf(gate, later))
-    expect(shorthandsOf(events)).to.deep.equal([...firstSeen('gate'), ['item', 'gate', 'full']])
+    expect(shorthandsOf(events)).to.deep.equal([...firstSeen(Gatepath), ['item', Gatepath, 'full']])
     expect(events[2]).to.deep.include({ read_tc: later })
   })
 
@@ -346,10 +350,10 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     const root = TH.rootBoxOf()
     const rootNext = TH.nextOf(root)
     vaultDB.receive(rungOf(TH.boxSparseOf(root)))
-    await vaultDB.tryGetThing(TH.getAskAt('box'))
+    await vaultDB.tryGetThing(TH.getAskAt('box', 'box'))
     vaultDB.receive(rungOf(TH.boxSparseOf(rootNext)))
     expect(shorthandsOf(events)).to.deep.equal([
-      ...firstSeenSparse('box'), ...firstSeen('bank'), ...firstSeen('gate'), ['item', 'box', 'full'], ['item', 'box', 'soon'], ['aged', 'box', 'cold'],
+      ...firstSeenSparse('box'), ...firstSeen(Gatepath), ['item', 'box', 'full'], ['item', 'box', 'soon'], ['aged', 'box', 'cold'],
     ])
   })
 
@@ -357,9 +361,9 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     const { vaultDB } = sortedOverMemory()
     const { events } = heardOf(vaultDB)
     await vaultDB.tryBirthBank(TH.birthBankAskOf())
-    const answer = await vaultDB.tryGetThing(TH.getAskAt('box/openai'))
+    const answer = await vaultDB.tryGetThing(TH.getAskAt('box', 'box/openai'))
     expect(answer).to.deep.include({ act: 'gotvoid' })
-    expect(shorthandsOf(events.slice(6))).to.deep.equal([['item', 'box/openai', 'void'], ['life', 'box/openai', 'died']])
+    expect(shorthandsOf(events.slice(4))).to.deep.equal([['item', 'box/openai', 'void'], ['life', 'box/openai', 'died']])
     const voided = events.find((event) => event.labelpath === 'box/openai')
     const lifepath = `${TH.rootBoxOf().lifepath}/${Shell.VoidLifeseq}`
     expect(voided).to.deep.include({ val: answer.ok && answer.act === 'gotvoid' && answer.dbhas, agerank: `${lifepath}|-000000001|-000000001|${answer.read_tc.slice(0, 8)}` })
@@ -370,11 +374,11 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await inner.tryBirthBank(TH.birthBankAskOf())
     const { events } = heardOf(vaultDB)
-    expect(await vaultDB.tryGetThing({ ...TH.getAskAt('box/openai'), track: RootOnlyTrack })).to.deep.include({ act: 'gotvoid' })
-    expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ['item', 'box/openai', 'void'], ['life', 'box/openai', 'died']])
+    expect(await vaultDB.tryGetThing({ ...TH.getAskAt('box', 'box/openai'), track: RootOnlyTrack })).to.deep.include({ act: 'gotvoid' })
+    expect(shorthandsOf(events)).to.deep.equal([...firstSeen(Gatepath), ['item', 'box/openai', 'void'], ['life', 'box/openai', 'died']])
     const unborn = sortedOverMemory()
     const unbornEvents = heardOf(unborn.vaultDB).events
-    await unborn.vaultDB.tryGetThing(TH.getAskAt('box/openai'))
+    await unborn.vaultDB.tryGetThing(TH.getAskAt('box', 'box/openai'))
     expect(unbornEvents[0]).to.deep.include({ val: Shell.of({ ...TH.BoxScope, lifepath: `${Shell.VoidLifeseq}/${Shell.VoidLifeseq}` }) })
   })
 
@@ -384,8 +388,8 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     const { events } = heardOf(vaultDB)
     const answer = await vaultDB.tryWriteThing({ ...TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)), ifAbsent: 'fail' })
     expect(answer).to.deep.include({ ok: false, act: 'void' })
-    expect(shorthandsOf(events)).to.deep.equal([...firstSeen('bank'), ...firstSeen('gate'), ...firstSeen('box'), ['item', 'box/openai', 'void'], ['life', 'box/openai', 'died']])
-    expect(events[6]).to.deep.include({ val: Shell.of({ ...TH.BoxScope, lifepath: `${TH.Life0}/${Shell.VoidLifeseq}` }) })
+    expect(shorthandsOf(events)).to.deep.equal([...firstSeen(Gatepath), ...firstSeen('box'), ['item', 'box/openai', 'void'], ['life', 'box/openai', 'died']])
+    expect(events[4]).to.deep.include({ val: Shell.of({ ...TH.BoxScope, lifepath: `${TH.Life0}/${Shell.VoidLifeseq}` }) })
   })
 
   it("tells of the void at a root as the root's own shell", async () => {
@@ -393,7 +397,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     const { events } = heardOf(vaultDB)
     const answer = await vaultDB.tryGetThing(TH.getGateAskOf())
     expect(answer).to.deep.include({ act: 'gotvoid' })
-    expect(shorthandsOf(events)).to.deep.equal([['item', 'gate', 'void'], ['life', 'gate', 'died']])
+    expect(shorthandsOf(events)).to.deep.equal([['item', Gatepath, 'void'], ['life', Gatepath, 'died']])
     expect(events[0]).to.deep.include({ agerank: `${Shell.VoidLifeseq}|-000000001|-000000001|${answer.read_tc.slice(0, 8)}` })
   })
 
@@ -415,7 +419,7 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
     for (const userOrBank of [{ banklabel: 'other' }, { userid: 'u2' }]) {
       await TH.expectBad(vaultDB.tryGetThing({ ...TH.getGateAskOf(), ...userOrBank }), 'bad_record')
       await TH.expectBad(vaultDB.tryWriteThing({ ...TH.birthAskOf(), ...userOrBank }), 'bad_record')
-      expect(await vaultDB.tryListThings({ ...TH.listAskAt('box'), ...userOrBank })).to.deep.include({ ok: false, dbhas: null, parentage: [], deltas: [], incompatible_rows: [] })
+      expect(await vaultDB.tryListThings({ ...TH.listAskAt('box', 'box'), ...userOrBank })).to.deep.include({ ok: false, dbhas: null, parentage: [], deltas: [], incompatible_rows: [] })
       await TH.expectBad(vaultDB.tryBirthBank({ ...TH.birthBankAskOf(), ...userOrBank }), 'bad_record')
     }
     for (const spy of asked) { expect(spy).not.toHaveBeenCalled() }
@@ -424,9 +428,9 @@ describe("VaultMinder's listeners, of what an answer carries", () => {
   })
 
   it("tells every listener's onBadNews of a record of an answer it refuses, and answers unchanged", async () => {
-    const theirs = { ok: true, act: 'born', ask: TH.ThingBank, banktok: SX.VoidLifeTok, tracked: { bank: 'same', gate: 'same', box: 'same' }, read_tc: readTcNow(), val: TH.gateThingOf({ lifepath: 'not a lifepath' }) }
+    const theirs = { ok: true, act: 'born', ask: TH.ThingBank, banktok: SX.VoidLifeTok, tracked: { gate: 'same', root: 'same' }, read_tc: readTcNow(), val: TH.gateThingOf({ lifepath: 'not a lifepath' }) }
     const inner  = { ...stubVaultDBOf(noop), tryWriteThing: vi.fn<VaultDB['tryWriteThing']>(() => Promise.resolve(theirs as never)) }
-    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, bank: TH.PlainCarBank })
     const listeners = [heardOf(vaultDB), heardOf(vaultDB)]
     expect(await vaultDB.tryWriteThing(TH.birthAskOf())).to.equal(theirs)
     for (const { events, badNews } of listeners) {
@@ -441,27 +445,27 @@ describe("VaultMinder's listeners, where each event came from and when it was re
     const { vaultDB, inner } = sortedOverQuietMemory()
     await inner.tryBirthBank(TH.birthBankAskOf())
     const { events } = heardOf(vaultDB)
-    const track = { bank: TH.BankStaleTrack.bank, gate: TH.GateStaleTrack.gate, box: TH.RootStaleTrack.box }
+    const track = { gate: TH.GateStaleTrack.gate, root: TH.RootStaleTrack.root }
     const answer = await vaultDB.tryGetThing({ ...TH.getGateAskOf(), track })
-    expect(events).to.have.lengthOf(6)
-    for (const event of events) { expect(event).to.deep.include({ sourcelabel: VaultMinder.VaultDBSourcelabel, read_tc: answer.read_tc, banktok: TH.bankThingOf().lifetok }) }
+    expect(events).to.have.lengthOf(4)
+    for (const event of events) { expect(event).to.deep.include({ sourcelabel: VaultMinder.VaultDBSourcelabel, read_tc: answer.read_tc, banktok: TH.gateThingOf().banktok }) }
     expect(VaultMinder.VaultDBSourcelabel).to.eq('vault_db')
   })
 
   it("stamps an answer's events with its own banktok, never its ask's, and a received event's with its own, else the newest banktok heard", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     const { events } = heardOf(vaultDB)
-    const { lifetok } = TH.bankThingOf()
-    const [askLifetok, rungLifetok] = [crypto.randomUUID(), crypto.randomUUID()]
+    const { banktok } = TH.gateThingOf()
+    const [askBanktok, rungBanktok] = [crypto.randomUUID(), crypto.randomUUID()]
     vaultDB.receive(rungOf(TH.boxThingOf('mistral')))
     await vaultDB.tryBirthBank(TH.birthBankAskOf())
     await inner.tryWriteThing(TH.birthAskOf(TH.boxThingOf(), Shell.childCited(TH.Life0)))
-    await vaultDB.tryGetThing({ ...TH.getAskAt('box/openai'), banktok: askLifetok })
+    await vaultDB.tryGetThing({ ...TH.getAskAt('box', 'box/openai'), banktok: askBanktok })
     vaultDB.receive(rungOf(TH.boxThingOf('anthropic')))
-    vaultDB.receive({ ...rungOf(TH.boxThingOf('cohere')), banktok: rungLifetok })
-    // Each box first seen gives two events, an item and a life; the birth, six.
+    vaultDB.receive({ ...rungOf(TH.boxThingOf('cohere')), banktok: rungBanktok })
+    // Each box first seen gives two events, an item and a life; the birth, four.
     expect(events.map((event) => event.banktok)).to.deep.equal([
-      SX.VoidLifeTok, SX.VoidLifeTok, ...Array.from({ length: 6 }, () => lifetok), lifetok, lifetok, lifetok, lifetok, rungLifetok, rungLifetok,
+      SX.VoidLifeTok, SX.VoidLifeTok, ...Array.from({ length: 4 }, () => banktok), banktok, banktok, banktok, banktok, rungBanktok, rungBanktok,
     ])
   })
 
@@ -489,12 +493,12 @@ describe("VaultMinder.receive(event)", () => {
     const read_tc = readTcNow()
     vaultDB.receive(rungOf(next, read_tc))
     vaultDB.receive(rungOf(TH.boxThingOf(), read_tc))
-    const rung = events.slice(6)
-    expect(shorthandsOf(rung)).to.deep.equal([['item', 'gate', 'full'], ...firstSeen('box/openai')])
+    const rung = events.slice(4)
+    expect(shorthandsOf(rung)).to.deep.equal([['item', Gatepath, 'full'], ...firstSeen('box/openai')])
     for (const event of rung) { expect(event).to.deep.include({ sourcelabel: 'other_tab', read_tc }) }
     expect(rung[0]).to.deep.include({ val: next })
     await vaultDB.tryGetThing(TH.getGateAskOf())
-    expect(events).to.have.lengthOf(9)
+    expect(events).to.have.lengthOf(7)
   })
 
   it("tells of nothing for a repeat received, or for a life or aged event, whatever its agerank", async () => {
@@ -518,8 +522,8 @@ describe("VaultMinder.receive(event)", () => {
     expect(shorthandsOf(events)).to.deep.equal([['item', 'box/openai', 'void'], ['life', 'box/openai', 'died']])
     expect(events[0]).to.deep.include({ val: voidSentinel })
     await vaultDB.tryBirthBank(TH.birthBankAskOf())
-    expect(await vaultDB.tryGetThing(TH.getAskAt('box/openai'))).to.deep.include({ act: 'gotvoid' })
-    expect(events).to.have.lengthOf(8)
+    expect(await vaultDB.tryGetThing(TH.getAskAt('box', 'box/openai'))).to.deep.include({ act: 'gotvoid' })
+    expect(events).to.have.lengthOf(6)
   })
 
   const BoxTomb = TH.boxTombOf(TH.boxThingOf())
@@ -530,15 +534,15 @@ describe("VaultMinder.receive(event)", () => {
     [{ ...rungOf(TH.gateThingOf()), eventkind: 'told' },                                'an eventkind it does not know'],
     [undefined,                                                                          'no event'],
     [{ ...rungOf(TH.gateThingOf()), val: 'not a Thing' },                                'a val that is not a Thing'],
-    [rungOf(TH.gateThingOf({ banklabel: 'other' })),                                    'an event of another bank'],
-    [{ ...rungOf(TH.gateThingOf({ banklabel: 'other' })), banklabel: 'acme' },          'a record of another bank than its event'],
+    [rungOf(TH.gateThingOf({ banklabel: 'other', labelpath: 'other', label: 'other' })), 'an event of another bank'],
+    [{ ...rungOf(TH.boxThingOf('openai', { banklabel: 'other' })), banklabel: 'acme' }, 'a record of another bank than its event'],
+    [rungOf(TH.gateThingOf({ labelpath: 'other', label: 'other' })),                    "a gate at another labelpath than its banklabel"],
     [{ ...rungOf(TH.boxThingOf()), labelpath: 'box/anthropic' },                         'a record of another Thing than its event'],
     [rungOf(TH.boxThingOf('openai', { lifepath: TH.Life0 })),                           'a lifepath shallower than its labelpath'],
     [{ ...rungOf(TH.gateThingOf()), liveness: 'dead' },                                 'a liveness it does not know'],
     [{ ...rungOf(TH.gateThingOf()), liveness: 'void' },                                 'a void event whose val is not the void sentinel'],
     [{ ...rungOf(Shell.of({ ...TH.BoxScope, lifepath: Shell.childCited(TH.Life0).lifepath })), liveness: 'gone' }, 'an event not void whose val is the void sentinel'],
     [rungOf(Thing.sparseOf(TH.gateThingOf()) as never),                                 "a gate's sparse record"],
-    [rungOf(Thing.sparseOf(TH.bankThingOf()) as never),                                 "a bank's sparse record"],
     [rungOf(Thing.sparseOf(BoxTomb) as never),                                          "a box tombstone's sparse record"],
     [rungOf(omit(TH.boxThingOf(), ['sidecar']) as never),                               'a live box with half its body'],
   ] as const
@@ -554,7 +558,7 @@ describe("VaultMinder.receive(event)", () => {
 })
 
 describe("VaultMinder.thingAt(scoped)", () => {
-  it("answers the one Thing it keeps at a labelpath, the same object across records and lives", async () => {
+  it("answers the one Thing it caches at a labelpath, the same object across records and lives", async () => {
     const { vaultDB } = sortedOverQuietMemory()
     await vaultDB.tryBirthBank(TH.birthBankAskOf())
     const thing = vaultDB.thingAt(TH.RootScope)!
@@ -568,9 +572,9 @@ describe("VaultMinder.thingAt(scoped)", () => {
     expect(thing).to.include({ am: 'x', lifepath: tomb.lifepath })
   })
 
-  it("answers undefined for a labelpath it has learned of no record at, and a Thing holding the shell where it learned only of a record its Thing refused", () => {
+  it("answers undefined for a labelpath it has learned of no record at, and a Thing at the shell where it learned only of a record its Thing refused", () => {
     const inner = stubVaultDBOf(noop)
-    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, world: TH.PlainWorld }).connect()
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: inner, bank: TH.PlainCarBank }).connect()
     const { badNews } = heardOf(vaultDB)
     expect(vaultDB.thingAt(TH.BoxScope)).to.eq(undefined)
     const [, onNotice] = inner.watch.mock.calls[0]!
@@ -583,7 +587,7 @@ describe("VaultMinder.thingAt(scoped)", () => {
     const found: unknown[] = []
     const vaultDB: VaultMinder<TH.PlainThing> = VaultMinder.make(TH.ThingBank, {
       vaultDB: new MemoryVaultDB(),
-      world:   {
+      bank:   {
         makeThing: (shell) => {
           const thing = TH.makePlainThing(shell)
           thing.subscribe(() => { found.push(vaultDB.thingAt(shell)) })
@@ -596,9 +600,9 @@ describe("VaultMinder.thingAt(scoped)", () => {
     expect(found[0]).to.equal(vaultDB.thingAt(TH.BoxScope))
   })
 
-  it("makes each Thing once, holding the shell at the first record it learns of at that labelpath", () => {
+  it("makes each Thing once, at the shell, at the first record it learns of at that labelpath", () => {
     const makeThing = vi.fn(TH.makePlainThing)
-    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: new MemoryVaultDB(), world: { makeThing } })
+    const vaultDB = VaultMinder.make(TH.ThingBank, { vaultDB: new MemoryVaultDB(), bank: { makeThing } })
     heardOf(vaultDB)
     const soon = TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 2 }))
     vaultDB.receive(rungOf(soon))
@@ -617,15 +621,15 @@ describe("VaultMinder.thingAt(scoped)", () => {
 })
 
 describe("VaultMinder's listeners, of bad news", () => {
-  it("are told the labelpath of a record its Thing refuses, and null for what their hear throws", () => {
+  it("are told the scope of a record its Thing refuses, and null for what their hear throws", () => {
     const { vaultDB } = refusingOverQuietMemory()
-    const told: [string, string | null][] = []
-    vaultDB.listen({ hear: () => { throw new Error('host bug') }, onBadNews: (news, labelpath) => { told.push([news.refusalkind, labelpath]) } })
+    const told: [string, ThingScope | null][] = []
+    vaultDB.listen({ hear: () => { throw new Error('host bug') }, onBadNews: (news, scope) => { told.push([news.refusalkind, scope]) } })
     vaultDB.receive(rungOf(Revs.three))
-    expect(told).to.deep.equal([['unexpected_error', 'box/openai']])
+    expect(told).to.deep.equal([['unexpected_error', TH.BoxScope]])
     told.length = 0
     vaultDB.receive(rungOf(Revs.two))
-    expect(told.every(([, labelpath]) => labelpath === null)).to.equal(true)
+    expect(told.every(([, scope]) => scope === null)).to.equal(true)
     expect(told.length).to.be.greaterThan(0)
   })
   it("are told once of a root its Thing refuses, carried in an answer's tracked", async () => {
@@ -634,16 +638,74 @@ describe("VaultMinder's listeners, of bad news", () => {
     const gateTwo = TH.nextGateOf(TH.nextGateOf(TH.gateThingOf()))
     const gate    = TH.nextGateOf(gateTwo)
     cheatPlant(inner, gate)
-    const told: [string, string | null][] = []
-    vaultDB.listen({ hear: noop, onBadNews: (news, labelpath) => { told.push([news.refusalkind, labelpath]) } })
-    await TH.expectGood(vaultDB.tryGetThing(TH.getAskAt('box')))
+    const told: [string, ThingScope | null][] = []
+    vaultDB.listen({ hear: noop, onBadNews: (news, scope) => { told.push([news.refusalkind, scope]) } })
+    await TH.expectGood(vaultDB.tryGetThing(TH.getAskAt('box', 'box')))
     expect(gate.revseq).to.eq(TH.RefusingThing.RefusedRevseq)
-    expect(told).to.deep.equal([['unexpected_error', 'gate']])
+    expect(told).to.deep.equal([['unexpected_error', TH.GateScope]])
+  })
+  it("are told once of a root its Thing refuses, carried in a refused birth's dbhas and its tracked", async () => {
+    const { vaultDB, inner } = refusingOverQuietMemory()
+    const gateTwo  = TH.nextGateOf(TH.nextGateOf(TH.gateThingOf()))
+    const gateGone = TH.gateTombOf(gateTwo)
+    cheatPlant(inner, gateGone)
+    const told: [string, ThingScope | null][] = []
+    vaultDB.listen({ hear: noop, onBadNews: (news, scope) => { told.push([news.refusalkind, scope]) } })
+    expect(await vaultDB.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ ok: false, act: 'stale' })
+    expect(gateGone.revseq).to.eq(TH.RefusingThing.RefusedRevseq)
+    expect(told).to.deep.equal([['unexpected_error', TH.GateScope]])
+  })
+})
+
+describe("VaultMinder, a bank labelled box", () => {
+  it("keeps the car of the gate and the car of the root box apart, both at box", () => {
+    const bank    = { ...TH.ThingBank, banklabel: 'box' }
+    const vaultDB = VaultMinder.make(bank, { vaultDB: new MemoryVaultDB(), bank: TH.PlainCarBank }).connect()
+    const gate    = TH.gateThingOf({ banklabel: 'box', labelpath: 'box', label: 'box' })
+    const root    = TH.rootBoxOf({ banklabel: 'box' })
+    vaultDB.receive(rungOf(gate))
+    vaultDB.receive(rungOf(root))
+    expect(vaultDB.thingAt({ ...bank, modelkind: 'gate', labelpath: 'box' })?.pickle()).to.deep.equal(gate)
+    expect(vaultDB.thingAt({ ...bank, modelkind: 'box', labelpath: 'box' })?.pickle()).to.deep.equal(root)
+    expect(vaultDB.carAt({ ...bank, modelkind: 'gate', labelpath: 'box' })).to.not.equal(vaultDB.carAt({ ...bank, modelkind: 'box', labelpath: 'box' }))
+  })
+
+  it("answers the gate's ask and the root box's ask from the table of each kind", async () => {
+    const bank    = { ...TH.ThingBank, banklabel: 'box' }
+    const inner   = new MemoryVaultDB()
+    const vaultDB = VaultMinder.make(bank, { vaultDB: inner, bank: TH.PlainCarBank }).connect()
+    const gate    = TH.gateThingOf({ banklabel: 'box', labelpath: 'box', label: 'box' })
+    const root    = TH.rootBoxOf({ banklabel: 'box' })
+    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf({ ...bank, gate, root })))
+    expect(await vaultDB.tryGetOnce({ ...bank, modelkind: 'gate', labelpath: 'box' })).to.deep.include({ ok: true, act: 'gotlive' })
+    expect(await vaultDB.getOnce({ ...bank, modelkind: 'box', labelpath: 'box' })).to.deep.include({ modelkind: 'box', labelpath: 'box' })
+    expect(await vaultDB.getOnce({ ...bank, modelkind: 'gate', labelpath: 'box' })).to.deep.include({ modelkind: 'gate', labelpath: 'box' })
+  })
+})
+
+describe("VaultMinder.ensureRootCars()", () => {
+  it("makes each root a vacant car whose Thing models the shell, where no record of it was received", () => {
+    const { vaultDB } = sortedOverQuietMemory()
+    expect(vaultDB.carAt(TH.GateScope)).to.equal(undefined)
+    const { gate, root } = vaultDB.ensureRootCars()
+    expect([gate.agekind, root.agekind]).to.deep.equal(['vacant', 'vacant'])
+    expect(gate.thing.pickle()).to.deep.equal(TH.gateShellOf())
+    expect(root.thing.pickle()).to.deep.include({ modelkind: 'box', labelpath: 'box', revseq: -1 })
+  })
+
+  it("answers the same cars again, and those a record was received at", async () => {
+    const { vaultDB } = sortedOverQuietMemory()
+    const made = vaultDB.ensureRootCars()
+    await vaultDB.tryBirthBank(TH.birthBankAskOf())
+    const { gate, root } = vaultDB.ensureRootCars()
+    expect([gate, root]).to.deep.equal([made.gate, made.root])
+    expect(gate).to.equal(vaultDB.carAt(TH.GateScope))
+    expect(root.thing.pickle()).to.deep.include({ am: 'a', revseq: 0 })
   })
 })
 
 describe("VaultMinder.carAt(scoped)", () => {
-  it("holds the refusal its Thing last raised at a record, and when, and clears it at a record taken, keeping when", async () => {
+  it("has the refusal its Thing last threw at a record, and when, and clears it at a record taken, keeping when", async () => {
     const { vaultDB, inner } = refusingOverQuietMemory()
     const { badNews } = heardOf(vaultDB)
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
@@ -661,7 +723,7 @@ describe("VaultMinder.carAt(scoped)", () => {
     expect(carFieldsOf(vaultDB.carAt(TH.BoxScope)!)).to.deep.equal({ thing: refused.thing, lastErr: null, erred_at: erredAt, read_tc })
   })
 
-  it("holds when its Thing's last news was read: the vacant read_tc before any, unchanged at a repeat in the same tcchunk, moved in a later one", () => {
+  it("has when its Thing's last news was read: the vacant read_tc before any, unchanged at a repeat in the same tcchunk, moved in a later one", () => {
     const { vaultDB } = refusingOverQuietMemory()
     const earlierAt = (Math.floor(Date.now() / 65_536) - 10) * 65_536
     const earlier   = uuidv7({ msecs: earlierAt })
@@ -676,7 +738,7 @@ describe("VaultMinder.carAt(scoped)", () => {
     expect(vaultDB.carAt(TH.BoxScope)!.read_tc).to.eq(later)
   })
 
-  it("is the same object across a refusal and a record taken, which change what it holds", () => {
+  it("is the same object across a refusal and a record taken, which change what it has", () => {
     const { vaultDB } = refusingOverQuietMemory()
     heardOf(vaultDB)
     vaultDB.receive(rungOf(Revs.two))
@@ -702,7 +764,7 @@ describe("VaultMinder.listen(listener)", () => {
     const { vaultDB } = sortedOverMemory()
     const listeners = [heardOf(vaultDB), heardOf(vaultDB)]
     await vaultDB.tryBirthBank(TH.birthBankAskOf())
-    expect(listeners[0]!.events).to.have.lengthOf(6)
+    expect(listeners[0]!.events).to.have.lengthOf(4)
     expect(listeners[1]!.events).to.have.ordered.members(listeners[0]!.events)
     expect(listeners[0]!.events.every((event) => Object.isFrozen(event))).to.be.true
   })
@@ -714,8 +776,8 @@ describe("VaultMinder.listen(listener)", () => {
     vaultDB.listen({ hear: (event) => { thrown.push(event); throw new Error('host bug') }, onBadNews: (news) => { badNews.push(news) } })
     const other = heardOf(vaultDB)
     expect(await vaultDB.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ ok: true, act: 'born' })
-    expect(thrown).to.have.lengthOf(6)
-    expect(other.events).to.have.lengthOf(6)
+    expect(thrown).to.have.lengthOf(4)
+    expect(other.events).to.have.lengthOf(4)
     expect(new Set(badNews.map((news) => news.refusalkind))).to.deep.equal(new Set(['unexpected_error']))
     expect(other.badNews).to.deep.equal([])
   })
@@ -737,7 +799,7 @@ describe("VaultMinder.listen(listener)", () => {
     vaultDB.listen(listener)
     const gate = TH.gateThingOf()
     vaultDB.receive(rungOf(gate))
-    expect(shorthandsOf(heard)).to.deep.equal([['item', 'gate', 'full'], ['item', 'gate', 'full'], ['life', 'gate', 'born'], ['life', 'gate', 'born']])
+    expect(shorthandsOf(heard)).to.deep.equal([['item', Gatepath, 'full'], ['item', Gatepath, 'full'], ['life', Gatepath, 'born'], ['life', Gatepath, 'born']])
     endFirst()
     vaultDB.receive(rungOf(TH.nextGateOf(gate)))
     expect(heard).to.have.lengthOf(5)
@@ -745,91 +807,91 @@ describe("VaultMinder.listen(listener)", () => {
 })
 
 describe("VaultMinder's asks: makeGetAsk, makeListAsk, makePutAsk and makeDelAsk", () => {
-  it("fill in the bank's scope, the modelkind and the default flags, and carry the void lifetok and track each root at the void revision before the bank is heard of", () => {
+  it("fill in the bank's scope, the modelkind and the default flags, and carry the void banktok and track each root at the void revision before the bank is heard of", () => {
     const { vaultDB } = sortedOverMemory()
     const unknown = { track: VoidTrack, banktok: SX.VoidLifeTok }
-    expect(vaultDB.makeGetAsk({ labelpath: 'box/openai' })).to.deep.equal({ ...TH.ThingBank, labelpath: 'box/openai', op: 'get', modelkind: 'box', ifAbsent: 'nil', ...unknown })
-    expect(vaultDB.makeListAsk({ labelpath: 'box' })).to.deep.equal({ ...TH.ThingBank, labelpath: 'box', op: 'list', modelkind: 'box', ...unknown })
+    expect(vaultDB.makeGetAsk({ modelkind: 'box', labelpath: 'box/openai' })).to.deep.equal({ ...TH.ThingBank, labelpath: 'box/openai', op: 'get', modelkind: 'box', ifAbsent: 'nil', ...unknown })
+    expect(vaultDB.makeListAsk({ modelkind: 'box', labelpath: 'box' })).to.deep.equal({ ...TH.ThingBank, labelpath: 'box', op: 'list', modelkind: 'box', ...unknown })
     const box = TH.boxThingOf()
     expect(vaultDB.makePutAsk({ cited: Shell.childCited(TH.Life0), record: box })).to.deep.include(unknown)
   })
 
-  it("carry the bank's lifetok, and track the revision each root's Thing holds once all three are kept", async () => {
+  it("carry the bank's banktok, and track the revision each root's Thing has once both are cached", async () => {
     const { vaultDB } = sortedOverMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
-    const known = { track: TH.trackOf(), banktok: TH.bankThingOf().lifetok }
-    expect(vaultDB.makeGetAsk({ labelpath: 'box/openai' })).to.deep.equal({ ...TH.ThingBank, labelpath: 'box/openai', op: 'get', modelkind: 'box', ifAbsent: 'nil', ...known })
-    expect(vaultDB.makeListAsk({ labelpath: 'box' })).to.deep.include(known)
-    const next = { ...TH.bankThingOf(), revtok: TH.revtokOf('next'), revseq: 1, written_at: TH.T0 + 1 }
-    expect(vaultDB.makePutAsk({ cited: TH.bankThingOf(), record: next })).to.deep.include({ ...TH.ThingBank, labelpath: 'bank', op: 'put', modelkind: 'bank', ifAbsent: 'add', ifPresent: 'repl', ...known })
+    const known = { track: TH.trackOf(), banktok: TH.gateThingOf().banktok }
+    expect(vaultDB.makeGetAsk({ modelkind: 'box', labelpath: 'box/openai' })).to.deep.equal({ ...TH.ThingBank, labelpath: 'box/openai', op: 'get', modelkind: 'box', ifAbsent: 'nil', ...known })
+    expect(vaultDB.makeListAsk({ modelkind: 'box', labelpath: 'box' })).to.deep.include(known)
+    const next = TH.nextGateOf(TH.gateThingOf())
+    expect(vaultDB.makePutAsk({ cited: TH.gateThingOf(), record: next })).to.deep.include({ ...TH.GateScope, op: 'put', modelkind: 'gate', ifAbsent: 'add', ifPresent: 'repl', ...known })
     const box = TH.boxThingOf()
     expect(vaultDB.makeDelAsk({ cited: box, record: TH.boxTombOf(box) })).to.deep.include({ ...TH.ThingBank, op: 'del', modelkind: 'box', ifAbsent: 'fail', ...known })
   })
 
-  it("track each root at the void revision while its Thing is not kept, or holds only its shell, so a get's answer sends each actual root whole", async () => {
+  it("track each root at the void revision while its Thing is not cached, or has only its shell, so a get's answer sends each actual root whole", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await TH.expectGood(inner.tryBirthBank(TH.birthBankAskOf()))
-    expect(vaultDB.makeGetAsk({ labelpath: 'box/openai' }).track).to.deep.equal(VoidTrack)
+    expect(vaultDB.makeGetAsk({ modelkind: 'box', labelpath: 'box/openai' }).track).to.deep.equal(VoidTrack)
     const soon = TH.boxSparseOf(TH.rootBoxOf({ revseq: 3 }))
     vaultDB.receive(rungOf(soon))
     expect(vaultDB.thingAt(TH.RootScope)?.pickle()).to.deep.equal(Shell.of(TH.RootScope))
-    expect(vaultDB.makeGetAsk({ labelpath: 'box/openai' }).track).to.deep.equal(VoidTrack)
-    const answer = await vaultDB.tryGetThing(vaultDB.makeGetAsk({ labelpath: 'bank' }))
-    expect(answer).to.deep.include({ ok: true, tracked: { bank: TH.bankThingOf(), gate: TH.gateThingOf(), box: TH.rootBoxOf() } })
-    expect(vaultDB.makeGetAsk({ labelpath: 'box/openai' })).to.deep.include({ banktok: TH.bankThingOf().lifetok, track: TH.trackOf() })
+    expect(vaultDB.makeGetAsk({ modelkind: 'box', labelpath: 'box/openai' }).track).to.deep.equal(VoidTrack)
+    const answer = await vaultDB.tryGetThing(vaultDB.makeGetAsk({ modelkind: 'gate', labelpath: Gatepath }))
+    expect(answer).to.deep.include({ ok: true, tracked: { gate: TH.gateThingOf(), root: TH.rootBoxOf() } })
+    expect(vaultDB.makeGetAsk({ modelkind: 'box', labelpath: 'box/openai' })).to.deep.include({ banktok: TH.gateThingOf().banktok, track: TH.trackOf() })
   })
 
-  it("track a root known newer only sparse at the whole record its Thing holds, so the answer sends the newer whole", async () => {
+  it("track a root known newer only sparse at the whole record its Thing has, so the answer sends the newer whole", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     const root1 = TH.nextOf(TH.rootBoxOf())
     cheatPlant(inner, root1)
     vaultDB.receive(rungOf(TH.boxSparseOf(root1)))
-    expect(vaultDB.makeGetAsk({ labelpath: 'bank' }).track.box).to.deep.equal({ revseq: 0, lifepath: TH.Life0 })
-    const answer = await vaultDB.tryGetThing(vaultDB.makeGetAsk({ labelpath: 'bank' }))
-    expect(answer).to.deep.include({ ok: true, tracked: { bank: 'same', gate: 'same', box: root1 } })
+    expect(vaultDB.makeGetAsk({ modelkind: 'gate', labelpath: Gatepath }).track.root).to.deep.equal({ revseq: 0, lifepath: TH.Life0 })
+    const answer = await vaultDB.tryGetThing(vaultDB.makeGetAsk({ modelkind: 'gate', labelpath: Gatepath }))
+    expect(answer).to.deep.include({ ok: true, tracked: { gate: 'same', root: root1 } })
     expect(vaultDB.thingAt(TH.RootScope)?.pickle()).to.deep.equal(root1)
   })
 
-  it("carry the void lifetok over the bank's tombstone, and track it", async () => {
+  it("carry the banktok of the gate's tombstone, the bank's end, which keeps it, and track it", async () => {
     const { vaultDB } = sortedOverMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
-    const tomb = TH.bankThingOf({ am: 'x', lifeseq: TH.lifepathPlus(TH.Life0, 1), lifepath: TH.lifepathPlus(TH.Life0, 1), revtok: TH.revtokOf('gone'), revseq: 1, written_at: TH.T0 + 1 })
+    const tomb = TH.gateTombOf(TH.gateThingOf())
     vaultDB.receive(rungOf(tomb))
-    const ask = vaultDB.makeGetAsk({ labelpath: 'box' })
-    expect(ask).to.deep.include({ banktok: SX.VoidLifeTok })
-    expect(ask.track.bank).to.deep.equal({ revseq: 1, lifepath: tomb.lifepath })
+    const ask = vaultDB.makeGetAsk({ modelkind: 'box', labelpath: 'box' })
+    expect(ask).to.deep.include({ banktok: TH.FirstBanktok })
+    expect(ask.track.gate).to.deep.equal({ revseq: 1, lifepath: tomb.lifepath })
   })
 
-  it("carry the bank's lifetok to the answer's ask, which a vaultDB neither compares with the actual bank nor refuses on", async () => {
+  it("carry the bank's banktok to the answer's ask, which a vaultDB neither compares with the actual bank nor refuses on", async () => {
     const { vaultDB, inner } = sortedOverMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
-    const answer = await inner.tryGetThing(vaultDB.makeGetAsk({ labelpath: 'bank' }))
+    const answer = await inner.tryGetThing(vaultDB.makeGetAsk({ modelkind: 'gate', labelpath: Gatepath }))
     expect(answer).to.deep.include({ ok: true, act: 'gotlive' })
-    expect(answer.ask).to.deep.include({ banktok: TH.bankThingOf().lifetok })
-    const elsewise = await inner.tryGetThing({ ...vaultDB.makeGetAsk({ labelpath: 'bank' }), banktok: TH.OtherLifetok })
+    expect(answer.ask).to.deep.include({ banktok: TH.gateThingOf().banktok })
+    const elsewise = await inner.tryGetThing({ ...vaultDB.makeGetAsk({ modelkind: 'gate', labelpath: Gatepath }), banktok: TH.OtherBanktok })
     expect(elsewise).to.deep.include({ ok: true, act: 'gotlive' })
   })
 
-  it("track the bank a watch notified it of, written elsewhere", async () => {
+  it("track the gate a watch notified it of, written elsewhere", async () => {
     const { vaultDB, inner } = sortedOverMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
-    const next = TH.nextOf(TH.bankThingOf())
-    const ask  = TH.replaceAskOf(TH.bankThingOf(), next)
+    const next = TH.nextGateOf(TH.gateThingOf())
+    const ask  = TH.replaceAskOf(TH.gateThingOf(), next)
     await TH.expectGood(inner.tryWriteThing(ask))
-    expect(vaultDB.makeGetAsk({ labelpath: 'bank' }).track.bank).to.deep.equal({ revseq: 1, lifepath: next.lifepath })
+    expect(vaultDB.makeGetAsk({ modelkind: 'gate', labelpath: Gatepath }).track.gate).to.deep.equal({ revseq: 1, lifepath: next.lifepath })
   })
 })
 
 describe("VaultMinder.tryGetOnce(scoped) and getOnce(scoped)", () => {
-  it("resolve the record the Thing at the scope holds, its events told before it resolves, with the bank's own get ask", async () => {
+  it("resolve the record the Thing at the scope has, its events told before it resolves, with the bank's own get ask", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     const box = TH.boxThingOf()
     cheatPlant(inner, box)
     const asked = vi.spyOn(inner, 'tryGetThing')
     const { events } = heardOf(vaultDB)
-    const ask   = vaultDB.makeGetAsk({ labelpath: 'box/openai', ifAbsent: 'nil' })
+    const ask   = vaultDB.makeGetAsk({ modelkind: 'box', labelpath: 'box/openai', ifAbsent: 'nil' })
     const record = await vaultDB.getOnce(TH.BoxScope)
     expect(record).to.equal(vaultDB.thingAt(TH.BoxScope)?.pickle()).and.deep.equal(box)
     expect(shorthandsOf(events)).to.deep.equal(firstSeen('box/openai'))
@@ -842,7 +904,7 @@ describe("VaultMinder.tryGetOnce(scoped) and getOnce(scoped)", () => {
     expect(await vaultDB.getOnce(TH.BoxScope)).to.deep.equal(Shell.of(TH.BoxScope, TH.rootBoxOf()))
   })
 
-  it("resolve the record the Thing holds for an answer older than a whole record it knows", async () => {
+  it("resolve the record the Thing has for an answer older than a whole record it knows", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     cheatPlant(inner, TH.boxThingOf())
@@ -872,7 +934,7 @@ describe("VaultMinder.tryGetOnce(scoped) and getOnce(scoped)", () => {
     await TH.expectRefusal(vaultDB.getOnce(TH.GateScope))
   })
 
-  it("throw the refusal a newer record raises at a Thing already kept, which keeps its older record, and its try form answers it", async () => {
+  it("throw the refusal a cached Thing throws at a newer record, which keeps its older record, and its try form answers it", async () => {
     const { vaultDB, inner } = refusingOverQuietMemory()
     const { badNews } = heardOf(vaultDB)
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
@@ -887,7 +949,7 @@ describe("VaultMinder.tryGetOnce(scoped) and getOnce(scoped)", () => {
     expect(badNews).to.deep.equal([err, badNews[1]])
   })
 
-  it("throw the refusal a first record raises, its car staying with the Thing holding the shell", async () => {
+  it("throw the refusal thrown at a first record, its car staying with the Thing at the shell", async () => {
     const { vaultDB, inner } = refusingOverQuietMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     cheatPlant(inner, Revs.three)
@@ -930,14 +992,14 @@ describe("VaultMinder.tryGetOnce(scoped) and getOnce(scoped)", () => {
   })
 })
 
-describe("VaultMinder.tryListOnce(labelpath) and listOnce(labelpath)", () => {
+describe("VaultMinder.tryListOnce(scoped) and listOnce(scoped)", () => {
   it("resolve the listing once the parent and each child are told, with the bank's own list ask", async () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     cheatPlant(inner, TH.boxThingOf())
     const listed = vi.spyOn(inner, 'tryListThings')
-    const ask  = vaultDB.makeListAsk({ labelpath: 'box' })
-    const kids = await vaultDB.listOnce('box')
+    const ask  = vaultDB.makeListAsk({ modelkind: 'box', labelpath: 'box' })
+    const kids = await vaultDB.listOnce(TH.RootScope)
     expect(Object.keys(kids.items)).to.deep.equal(['openai'])
     expect(vaultDB.carAt(TH.BoxScope)?.citable).to.deep.equal(TH.boxSparseOf(TH.boxThingOf()))
     expect(listed.mock.calls).to.deep.equal([[ask]])
@@ -946,10 +1008,10 @@ describe("VaultMinder.tryListOnce(labelpath) and listOnce(labelpath)", () => {
   it("refuse a parent never stored, and one deleted, telling its tombstone", async () => {
     const { vaultDB } = sortedOverMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
-    await TH.expectRefusal(vaultDB.listOnce('box/nope'), 'absent_thing')
+    await TH.expectRefusal(vaultDB.listOnce({ ...TH.RootScope, labelpath: 'box/nope' }), 'absent_thing')
     const box = await vaultDB.putOnce({ cited: Shell.childCited(TH.Life0), record: TH.boxThingOf() })
     const tomb = await vaultDB.delOnce({ record: TH.boxTombOf(box) })
-    expect(await vaultDB.tryListOnce(box.labelpath)).to.deep.include({ ok: false, act: 'gone', dbhas: tomb })
+    expect(await vaultDB.tryListOnce(box)).to.deep.include({ ok: false, act: 'gone', dbhas: tomb })
     expect(vaultDB.thingAt(box)?.pickle()).to.deep.equal(tomb)
   })
 
@@ -957,22 +1019,22 @@ describe("VaultMinder.tryListOnce(labelpath) and listOnce(labelpath)", () => {
     const { vaultDB, inner } = sortedOverQuietMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     cheatPlant(inner, TH.boxThingOf())
-    inner._cheat_things(TH.ThingBank).set('box/bad', { ...TH.boxThingOf('bad'), revseq: -2 })
+    inner._cheat_things(TH.ThingBank).box.set('box/bad', { ...TH.boxThingOf('bad'), revseq: -2 })
     const { badNews } = heardOf(vaultDB)
-    const answer = await vaultDB.tryListOnce('box')
+    const answer = await vaultDB.tryListOnce(TH.RootScope)
     expect(answer).to.deep.include({ ok: true })
     expect(badNews.map((news) => [news.refusalkind, news.meta?.labelpaths])).to.deep.equal([['incompatible_row', ['box/bad']]])
   })
 
   it("answer, or throw, the vaultDB's refusal", async () => {
     const { vaultDB } = sortedOverMemory()
-    await TH.expectBad(vaultDB.tryListOnce('Box'), 'bad_record')
-    await TH.expectRefusal(vaultDB.listOnce('Box'), 'bad_record')
+    await TH.expectBad(vaultDB.tryListOnce({ ...TH.RootScope, labelpath: 'Box' }), 'bad_record')
+    await TH.expectRefusal(vaultDB.listOnce({ ...TH.RootScope, labelpath: 'Box' }), 'bad_record')
   })
 })
 
 describe("VaultMinder's writes: tryPutOnce, putOnce, tryDelOnce and delOnce", () => {
-  it("put over the citable of the Thing at the record's labelpath, resolving the actual record, which the Thing holds", async () => {
+  it("put over the citable of the Thing at the record's labelpath, resolving the actual record, which the Thing has", async () => {
     const { vaultDB } = sortedOverQuietMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     await vaultDB.getOnce(TH.BoxScope)
@@ -1007,7 +1069,7 @@ describe("VaultMinder's writes: tryPutOnce, putOnce, tryDelOnce and delOnce", ()
     expect(await vaultDB.tryPutOnce({ record: TH.nextOf(root1) })).to.deep.include({ ok: true })
   })
 
-  it("cite the void revision where no Thing is kept at the labelpath and no cited is given", async () => {
+  it("cite the void revision where no Thing is cached at the labelpath and no cited is given", async () => {
     const { vaultDB, inner } = sortedOverMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     const asked = vi.spyOn(inner, 'tryWriteThing')
@@ -1019,7 +1081,7 @@ describe("VaultMinder's writes: tryPutOnce, putOnce, tryDelOnce and delOnce", ()
     expect(await vaultDB.tryPutOnce({ record })).to.deep.include({ ok: false, act: 'stale', dbhas: planted })
   })
 
-  it("refuse a record past its first revision where no Thing is kept and no cited is given, which the void revision cannot precede", async () => {
+  it("refuse a record past its first revision where no Thing is cached and no cited is given, which the void revision cannot precede", async () => {
     const { vaultDB } = sortedOverMemory()
     const record = TH.nextOf(TH.gateThingOf())
     await TH.expectBad(vaultDB.tryPutOnce({ record }), 'bad_record')
@@ -1033,7 +1095,7 @@ describe("VaultMinder's writes: tryPutOnce, putOnce, tryDelOnce and delOnce", ()
     expect(asked).not.toHaveBeenCalled()
   })
 
-  it("throw the refusal the record written raises at its Thing, which keeps its older record, and the try forms answer it", async () => {
+  it("throw the refusal its Thing throws at the record written, which keeps its older record, and the try forms answer it", async () => {
     for (const record of [Revs.three, TH.boxTombOf(Revs.two)]) {
       const { vaultDB } = refusingOverQuietMemory()
       await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
@@ -1048,7 +1110,7 @@ describe("VaultMinder's writes: tryPutOnce, putOnce, tryDelOnce and delOnce", ()
     }
   })
 
-  it("delete over the citable of the Thing, resolving the actual tombstone, which the Thing holds", async () => {
+  it("delete over the citable of the Thing, resolving the actual tombstone, which the Thing has", async () => {
     const { vaultDB } = sortedOverMemory()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     const box = await vaultDB.putOnce({ record: TH.boxThingOf(), cited: Shell.childCited(TH.Life0) })

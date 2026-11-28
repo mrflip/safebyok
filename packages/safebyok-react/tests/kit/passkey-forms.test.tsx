@@ -12,7 +12,7 @@ const WrongPassphrase = 'correct horse battery stable'
 
 /** The bank's stage as a line of text, beside the form `kind` names: an unlock button handed `passkeyHeader`, or none when it is undefined. */
 function StageScreen({ world, kind, passkeyHeader }: Readonly<{ world: TH.ProviderWorld, kind: 'add' | 'revoke' | 'unlock', passkeyHeader?: WayinHeader | null | undefined }>) {
-  const stage = world.Bank.useWorld((snap) => snap.stage)
+  const stage = world.Bank.useBank((snap) => snap.stage)
   return (
     <>
       <p>{stage}</p>

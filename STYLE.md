@@ -19,9 +19,9 @@ Use plain words, and write in clear, understandable full sentences. (In a doc bl
 
 * No barrel files beyond the package's entry points: import from the file that defines the thing.
 * **A module of related functions around one concern is imported whole**, under its Startcase
-  name: `import * as Scopepath from './scopepath'`, then `Scopepath.vault(scope)`. Its exports
-  have bare names, either vigorous verbs or the noun they make: `check`, not `namesCheck`, and
-  `vault`, not `vaultScopepath`.
+  name: safebyok-big's `import * as Scopepath from './scopepath'`, then `Scopepath.vault(scope)`.
+  Its exports have bare names, either vigorous verbs or the noun they make: `check`, not
+  `namesCheck`, and `vault`, not `vaultScopepath`.
 * **A module with one primary noun** is imported by name, along with its companions:
   `import { Box, BoxKinds } from './box'`.
 * **Validators are reached through a namespace**, tests included: a `src/shapes/` module is
@@ -33,8 +33,8 @@ Use plain words, and write in clear, understandable full sentences. (In a doc bl
   `safebyok/storage` as `DB` (`DB.vaultRow`). The new core's shapes modules export a bundle instead
   (*Validation*).
 * **The core's `src/shapes/` has the validators a module exports**, and no other module exports
-  one. A validator a module keeps to itself stays beside its only user, made in a `Checkers` call
-  at module level (`helpers/validator.ts`'s and `gate.ts`'s `Checks`, `device.ts`'s `HostChecks`).
+  one. A validator only one module uses stays beside its user, made in a `Checkers` call at module
+  level (the `Checks` of `bank.ts`, `box.ts` and `device.ts`).
   A collection of validators is UpperCamelCase (`Checks`, `ThingChecks`); a single validator is
   lowercase (`lifepathWithParentageChecker`, `bankScope`).
 * **Pick fields by destructuring the parsed output.** Where a pick by a list of names is truly
@@ -51,16 +51,31 @@ for a `for` loop's own counter or the index a `map` callback is handed. An index
 outside, as a parameter or a field, is an `idx` or a `fooIdx`.
 
 **Never bare `name`, `value`, `node`, `error` or `query` as a variable name.** There is almost
-always a salient prefix: `vaultlabel`, `profilename`. The linter refuses these, and `key`, as a
+always a salient prefix: `banklabel`, `profilename`. The linter refuses these, and `key`, as a
 variable, parameter or destructured name; a property spelled that way (`{ name: 'AES-GCM' }`)
 is someone else's interface, and fine.
 
 **The cast is named in VOCABULARY.md** -- whisper, box, vault, passphrase, each key and its
-encrypted form -- and those names are used as written, never a synonym. Never `data`, `contents`
-or `payload` for a variable or field we control: it is a whisper, or a whisperCiphered.
+encrypted form -- and those names are used as written, never a synonym. Never `data` or `contents`
+for a variable or field we control: it is a whisper, or a whisperCiphered.
 
 **A secret is a `cleartext`, never `clear`.** `passphraseCleartext`, not `passphraseClear`: `clear` reads as a verb, and
 carries no warning. VOCABULARY.md has the term.
+
+**Never a bland name.** Bland names (`held`, `kept`, `entry`, `query`, `row`, and the others VOCABULARY.md lists
+under *Avoid these* and *Words safebyok does not use*) are unacceptable in variable names, where they are cause and
+symptom of a muddy narrative. Ask of the item: what is its purpose? Its time aspect? Its fieldname? Name it for its
+most salient role. A bland word qualified into a role is a name (`rowAt`, `RootRows`), and a library's own names stay
+(`queryKey`). In prose they are discouraged: a precise term is always preferable (a bank `attach`es leases, a thing
+sets a whole `record`).
+
+| Was | Is |
+| --- | --- |
+| `vaultMinder.heldRoots`, `#heldAt(scope)` | `vaultMinder.cachedRoots`, `#cachedAt(scope)` |
+| `const before = await this.doStowLease(…)` | `const prior = await this.doStowLease(…)` |
+| `checkedRowOf(scope, row)`, only ever handed `manifest.actual` | `checkedActualOf(scope, actual)` |
+| `const thing = BoxChecks.liveSealable.parse(donorProps)` | `const donor = BoxChecks.liveSealable.parse(donorProps)` |
+| `#keepOnShelf(vaultMinder, shelf)` | `#startShelving(vaultMinder, shelf)` |
 
 **Never bare `key`.** In this package a key is cryptographic until proven otherwise, so:
 
@@ -70,61 +85,64 @@ carries no warning. VOCABULARY.md has the term.
   `Uint8Array`.
 * a **map key** is a `ckey` (see *Tags*).
 
-**Smush the tags `name`, `kind`, `label`, `path` and `bag` into one word**: `vaultlabel`,
-`boxlabel`, `woodkind`, `scopepath`, `scopepathkind`, `ScopepathDelimiter`, `Fieldname` -- but not
-`fooCount` or `fooIter`.
+**Smush the tags `name`, `kind`, `label`, `path` and `bag` into one word**: `banklabel`,
+`labelpath`, `modelkind`, `woodkind`, `scopepath`, `DeviceDBMembernames` -- but not `fooCount` or
+`fooIter`.
 
-**`Boxscope` is the only named exception** that smushes a noun into `scope`, there to show the
-rule. `VaultScope` and `BankScope` keep their two words. The exception stops at the scope: a box's
-scopepath is a `boxScopepath` (`BoxScopepath`), like every other `fooScopepath`.
+**`scope` is not smushed**: `ThingScope`, `BankScope` and `LeaseScope` keep their two words.
+safebyok-big's `Boxscope` is the one exception.
 
 **Never `type` to mean "kind"**, not even inside an identifier. `type` is reserved for a datatype;
-a menu choice is a `kind` (`scopepathkind`) or a `flavor`.
+a menu choice is a `kind` (`modelkind`) or a `flavor`.
 
 **A boolean is `isFoo`, an enumeration a plain noun, and `state` is a smell.** A boolean is `isFoo` on an
-instance and in a snapshot alike: `box.isVeiled` and the snapshot's `isVeiled`, never a bare
-adjective (`veiled`). `wasFoo` or `hasFoo` are acceptable where it's more natural or the
-distinction is important: `wasRefused`, of the last attempt. An enumeration is named for what it tells, a plain noun: `box.exposure`,
-typed `BoxExposure`. **A two-valued enumeration is a boolean**: `isLocked`, never a `lockState` of
+instance and in a snapshot alike: `bank.isLocked` and the snapshot's `isLocked`, never a bare
+adjective (`locked`). `wasFoo` or `hasFoo` are acceptable where it's more natural or the
+distinction is important: `wasRefused`, of the last attempt. An enumeration is named for what it tells, a plain noun: the
+snapshot's `stage`, typed `BankStage`. **A two-valued enumeration is a boolean**: `isLocked`, never a `lockState` of
 `'locked' | 'unlocked'`. **`state` names nothing public**: a React app already means its own
 component state by it, and the word says only that something changes. Name a status for what it is
 about: a thing's stage in its life is its `stage`. A stored field keeps its stored spelling
 (below).
 
-**A function returning a predicate ends in `Pred`**: `withinVaultScopepathPred(scope)`.
+**A function returning a predicate ends in `Pred`**: `withinLabelpathPred(labelpath)`.
 
-**A boolean is true in the unsafe state, says the positive, and is named for what it means to the
-customer**, wherever a name can manage it:
+**A boolean's name has no negation, is true in the unsafe state, says what it means to the customer,
+and leans positive** wherever a name can manage all four. Where they pull apart, they rank in that order
+(`#say-the-positive` in `notes/gallant.md` has specimens):
 
-* **True is the unsafe state**, so that a value left out, or falsy, never trips it: `isRevealed`,
-  true while a whisper shows on screen.
-* **No negation**: no dis-, un- or non-. `isEnabled`, not `isDisabled`, whose every negation reads
-  as a double negative.
-* **Positive valence**, with the grain of the sentence it sits in: no negative posing as a positive, such as `isInvalidated`
-  where `isTimely` says what holds.
-* **Named for its impact on the customer**: `isBehind`, not `hasLatestUpdates`, which is true in
-  the safe state, nor `needsRefreshToMergePut`, which names one consequence, and not always truly.
+1. **No negation**: no non-, un- or dis-. `isEnabled`, not `isDisabled`, whose every negation reads
+   as a double negative.
+2. **True is the unsafe state**, so that a value left out, or falsy, never trips it: `isRevealed`,
+   true while a whisper shows on screen.
+3. **Named for its impact on the customer**: `isBehind`, not `hasLatestUpdates`, which is true in
+   the safe state, nor `needsRefreshToMergePut`, which names one consequence, and not always truly.
+4. **Last, a positive valence**, with the grain of the sentence it sits in. Between `isEnabled` and
+   `isStopped` neither is negated, but enabled is the sunnier, more dynamic word. No negative posing
+   as a positive either, such as `isInvalidated` where `isTimely` says what is true.
 
-**A validator is named for the parameter it checks**, in that parameter's case (`user_id`,
+**A validator is named for the parameter it checks**, in that parameter's case (`banklabel`,
 `salt_size`); for a function's whole input, `fooArgs` (`leaseSealArgs`); for a shape, its type's
 name lowerCamelCased (`boxSparse` checks a `BoxSparse`). No `Shape` suffix, except where a local
 or option wants the plain name (`keyDeriverShape`, `loggerShape`).
 
-**An enumeration's values are a `fooVals` list in `shapes/shapes-enums.ts`**, its type
-`typeof fooVals[number]`; its validator, `oneof(EX.fooVals)`, sits with the shapes that use it.
+**An enumeration's values are a `fooVals` list**, its type `typeof fooVals[number]`. In the new
+core the list sits with the shapes that use it (`bankStageVals` in `shapes/shapes-bankish.ts`, and
+`ThingChecks.thingkindVals`); safebyok-big keeps them in `shapes/shapes-enums.ts`, checked as
+`oneof(EX.fooVals)`.
 
 **A thing's shapes are named for their purpose, prefixed with the type**, from the set in
 VOCABULARY.md *Shapes*: `VaultRecord`, `VaultSparse`, `VaultStamp`; never a bare `Stamp`.
 `FooRecord` is a plain object's type, always and only; a bare `Foo` is a class.
 
 **A plain string type's helpers ride on a companion object of the same name**, beside the type:
-`Lifeseq.ofLifenum(lifenum)`, `Labelpath.modelkindOf(labelpath)`. **A module of related functions
+`Lifeseq.ofLifenum(lifenum)`, `Labelpath.parentOf(labelpath)`. **A module of related functions
 is imported whole**: `import * as ManifestActs from './manifest-acts'`, `import * as Throwers from '../refusals/throwers'`.
 
 **A name is the doc block's first line, compressed.** Write that line (*Comments and doc
 blocks*), then read the name against it: the verb promises what the line says, in the vocabulary
-of the verbs below. A method that does its work by calling `getBox` keeps that verb
-(`getBoxOrThrow`), not `readBox`; one that creates a vault on every call is `createVault`, not
+of the verbs below. A method that does its work by calling `getBox` takes its name from that
+verb (`getBoxOrThrow`), not `readBox`; one that creates a vault on every call is `createVault`, not
 `ensureVault`, because `ensure` promises idempotence. A name that promises more or less than its
 first line is a bug in the name.
 
@@ -156,7 +174,7 @@ is named for the act.
 | `fooOf(thing)` | Pure: the foo derived from `thing`. |
 | `tryFoo` | `foo`, resolving an `Outcome` instead of throwing. |
 
-**The front door is `foo`; a captive layer beneath it is `doFoo`.** When a function splits into
+**The entry point is `foo`; a captive layer beneath it is `doFoo`.** When a function splits into
 the entrypoint callers call and the part that does the work, the entrypoint keeps the plain verb,
 and `doFoo` is called by `foo` alone (`tryGetThing` and its protected `doGetThing`). One function
 that does both is plain `foo`, with no `doFoo`. Never coin a synonym for the second layer: a `tell`
@@ -181,25 +199,26 @@ cleaned value. An `ensure` that returns nothing is misnamed.
 so (`bank.ensureUnlocked()`). The query is the non-throwing form, so there is no `tryDemandFoo`.
 
 **A guard that asks several things is named for what it asks, with `-able` where that reads
-well**: `demandDeletable`, `demandUnsealable`, not `demandReadyToDelete`; a plain phrase where
-`-able` reads badly (`demandBoxesUsable`). Its `ensure` takes the same name. A guard that asks one
-thing states that fact: `demandUnlocked`, `demandPresent`.
+well**: `demandDeletable`, `demandPasskeyAddable`, not `demandReadyToDelete`; a plain phrase where
+`-able` reads badly (`demandRootsLive`). Its `ensure` takes the same name. A guard that asks one
+thing states that fact: `demandEnabled`, `demandUnlocked`.
 
 **`put` resolves what is stored.** On success, `putFoo` resolves the foo as storage now has it,
-not what was sent: not the argument it was handed, not `this`, not a boolean. Where the stored foo has
-key material, a model's verb resolves its summary: `vault.putWayin()` resolves the vault, whose
-`vault.snapshot.gate` then shows the way in as stored; `BankDB.putBox()` resolves the record.
+not what was sent: not the argument it was handed, not `this`, not a boolean. `vault.putBoxOnce()`
+resolves the actual box record (VOCABULARY.md, *actual*). Where the stored foo has key material, a
+model's verb resolves the model, which reads as the record now stored: `gate.addPasskey()`
+resolves the gate.
 
 **Stored fields are underbar_case** (`salt_b64`, `written_at`): they are written to someone
 else's database, and stay one spelling from the wire to the code. **One name for one thing,
 everywhere**: a field with a stored value keeps its stored spelling wherever it goes, in the
 facades a record passes through, a host's options and a snapshot alike. A key deriver's
-`key_deriver_label` is written into a wayin as it is, and `box_key_wrapped` is never `boxKeyWrapped`. Other
-names are camelCase: a field with no stored counterpart (a snapshot's `damagedBoxes`), a verb
-(`getUserId`), a concept (`keyDeriverLabel`, "the label of the key deriver").
-The tag smushing above is for a label that names a thing (`boxlabel`).
+`key_deriver_label` is written into a wayin as it is, and `bank_key_lease_wrapped` is never `bankKeyLeaseWrapped`. Other
+names are camelCase: a field with no stored counterpart (a snapshot's `leaseEndsAt`), a verb
+(`ensureDevicetok`), a concept (`keyDeriverLabel`, "the label of the key deriver").
+The tag smushing above is for a label that names a thing (`banklabel`).
 
-**A time is UTC epoch milliseconds, an integer** (`registered_at: 1760000000000`), in a stored
+**A time is UTC epoch milliseconds, an integer** (`born_at: 1760000000000`), in a stored
 record, a snapshot, a test fixture and the demo alike: not an ISO string or a `Date`. `nowMillis()`
 yields one, and a field named `*_at` is one, checked by `epochMillis`. **A field named `*_tc`, a time code, is a
 string that sorts by time** as text, never an integer of milliseconds: a list's `read_tc` is a UUID version 7, compared
@@ -214,16 +233,17 @@ Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obviou
 ### Tags
 
 * `ckey` -- a collection key: a string for a map, an index for an array. `ckeys` for several.
-  Never a storage address, which is a scopepath.
-* `scopepath` -- where storage files a scope's record (*Scopepaths*); `vaultScopepath`,
-  `boxScopepath` for a particular kind.
+  Never a storage address, which is a labelpath (VOCABULARY.md, *ckey*).
+* `scopepath` -- where a store files a scope's record (*Scopepaths*); `LeaseScopepath`,
+  `DevicetokScopepath` for a particular kind.
 * `idx` -- an array index, known to be an integer.
 * `val` -- a truly generic value. `vv` and `kk` are second choices inside a lambda.
 * `kind`, `flavor` -- an identifier picked from a fixed menu. `label`, `handle` -- an identifier
-  freely chosen, usually by a user (`vaultlabel`, `boxlabel`). All four are strict: `\w` only,
-  starting with a letter, ending with a letter or digit, two or more characters.
-* `_id`, `_tok` -- a stored `_id` is a hard identifier a record is found by (`credential_id`); a
-  random token that is only ever compared is a `_tok` (`revision_tok`, `vault_tok`, `device_tok`). VOCABULARY.md
+  freely chosen, usually by a user (`banklabel`). All four are strict: lowercase letters, digits
+  and single underscores, starting with a letter and ending with a letter or digit, two or more
+  characters (`Patterns.label`).
+* `id`, `tok` -- an id is a hard identifier a record is found by (`userid`, `credential_id`); a
+  random token that is only ever compared is a tok (`revtok`, `banktok`, `devicetok`). VOCABULARY.md
   has the rule.
 * `bytes` -- a `Uint8Array`; `fooBytes` for a particular one. `b64` -- base64url text of bytes;
   `fooB64`.
@@ -233,9 +253,9 @@ Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obviou
 * `str`, `num`, `obj` -- a generic string, number, or something specifically object-like.
 * `err` -- an error. **Never** `error`.
 * `count` -- a reported quantity; `qty` or `nFoos` -- a requested one.
-* `beg`/`end` for a range, `prev`/`curr`/`next` for a chain, `ante`/`post` for before and after
-  a step, `prior` for what stood before the value in hand arrived (the record a cache held when a
-  get began).
+* `beg`/`end` for a range, `prev`/`curr`/`next` for a chain, `prior` for the row in the datastore
+  before an action, the one a write cites, beside `proposed` and `actual` (VOCABULARY.md, *prior*),
+  `ante`/`post` for any other before and after (`BaseThing.cmp(ante, post)`).
 * `name` -- an identifier exactly isomorphic with what it names. Prefer `title`, `kind`, `label`
   or `handle` when one fits better. `title` is human-readable, never an identifier.
 
@@ -252,7 +272,8 @@ two apart, so this is kept by hand.
 * **Build for ease of maintenance, not ease of implementation.** A module's customer uses one
   method; that method should read whole on its own, without tracing into a generic.
 * **Don't DRY short bodies through a generic.** Spelled out, a maker and its inverse read as
-  mirror images, each clear at a glance (`CX` is the core's scope checks, `shapes/shapes-core.ts`):
+  mirror images, each clear at a glance (safebyok-big's `Scopepath` module, in its old names; `CX`
+  is its scope checks, `shapes/shapes-core.ts`):
 
   ```ts
   export function box(scope: Boxscope): BoxScopepath {
@@ -273,11 +294,11 @@ two apart, so this is kept by hand.
   says what it is (`_scopepathkind`), never a hole (`[, banklabel]`) and never a bare `_`. The name
   records that the part exists, where it sits, and that skipping it is deliberate. The linter
   passes only a named ignore: `_` and a letter or digit.
-* **Write the crucial detail where it shows.** A prefix of every box in a vault ends in the
-  delimiter; say so with `+ ScopepathDelimiter`, not with an empty last part that `join` turns
-  into one.
-* **Don't unwind what you will only rewind.** When you have a scopepath and need a related one,
-  work on the text. Don't parse it into a scope to join it again.
+* **Write the crucial detail where it shows.** In safebyok-big, a prefix of every box in a vault
+  ends in the delimiter; say so with `+ ScopepathDelimiter`, not with an empty last part that
+  `join` turns into one.
+* **Don't unwind what you will only rewind.** When you have a path and need a related one, work on
+  the path (`Labelpath.parentOf(labelpath)`). Don't parse it into a scope to join it again.
 * **Accept one form of input.** A function accepting a scope *or* its scopepath branches on its
   argument and trusts one branch; accept the scope.
 * **A method's shape.** Validate its arguments and field preconditions (a zod parse); check its
@@ -286,12 +307,12 @@ two apart, so this is kept by hand.
   at either end (a lock came down). End every operation in a state that already exists: a
   nice-to-have that needs a new state is not built. State the invariants; don't add a check to the
   end of every method.
-* **Constants shared across modules** (`ScopepathDelimiter`) live in `consts.ts`, which
+* **Constants shared across modules** (`ScopepathDelimiter`) live in `helpers/consts.ts`, which
   imports no runtime value, so any module can name them without a cycle.
 * **Familiar over cute.** A named target and `===` beats an equality-predicate factory:
-  `const target = Scopepath.vault(thing)`, then `scopepaths.some((scopepath) => scopepath === target)`.
-  A predicate factory earns its place where it hides a detail that is easy to get wrong, as the
-  scopepath prefix test does (*Scopepaths*).
+  `const target = Labelpath.parentOf(labelpath)`, then `labelpaths.some((other) => other === target)`.
+  A predicate factory earns its place where it hides a detail that is easy to get wrong, as
+  safebyok-big's scopepath prefix test does (*Scopepaths*).
 
 ## Braces and layout
 
@@ -303,7 +324,7 @@ two apart, so this is kept by hand.
   guards something that matters is spread out to be noticed:
 
   ```ts
-  if (! opts.vaultlabel) { throw new VaultError('missing_label', 'A vault needs a label.') }
+  if (! opts.banklabel) { throw new VaultError('missing_label', 'A bank needs a label.') }
   //
   if (stored.key_deriver_label !== Argon2idWebV1.key_deriver_label) {
     throw new VaultError('unknown_key_deriver', 'This vault was written by a newer version of safebyok: update the package to open it.')
@@ -327,8 +348,9 @@ between columns lets the editor align them (see *Tests*).
 
 A function's input rules are declared once, in a validator, and its TypeScript types come from it
 (`Z.infer`) or are checked against it by an assertion (*Shapes and duck typing*), so the signature and the
-checks cannot drift apart. Validators are made with `helpers/validator.ts`'s kit (`Checkers`,
-`Checker`, `objCheck`, `objStrict`, `objStrip`), whose doc blocks are its manual. A check of an
+checks cannot drift apart. Validators are made with safebyok-big's `helpers/validator.ts` kit
+(`Checkers`, `Checker`, `objCheck`, `objStrict`, `objStrip`), which the new core imports as
+`Validator`, and whose doc blocks are its manual. A check of an
 object whole (`.refine()`, `.readonly()`) goes inside the builder: chained onto the validator the
 kit returns, it would refuse as plain Zod does.
 
@@ -341,7 +363,7 @@ is a refusal with a `kind` the caller can branch on.
 **A constructor validates its arguments**, in a parse as its first line, even when the `make` or
 `build` that calls it parsed them already: it is an entry point of its own.
 
-**Generous at the customer's door, strict past it.**
+**Generous at the customer's entry point, strict past it.**
 
 * **A customer entry point is generous.** It offers defaults, duck-typed validators, overloads and
   shorthands where they earn their place, and takes an object or its handle, looking it up for the
@@ -356,7 +378,7 @@ is a refusal with a `kind` the caller can branch on.
   helper is generous too: `putAskOf` fills in an ask's flags.
 
 **For preconditions, one line is the norm.** A function pulls what it needs out of what it was
-handed, and checks it, in one parse: `const { user_id, banklabel } = CX.bankScope.parse(thing)`.
+handed, and checks it, in one parse: `const { userid, banklabel } = StampChecks.bankScope.parse(thing)`.
 Where a validator exists, prefer that parse to a hand-pick (`{ banklabel: x.banklabel, ... }`), an
 if-then precondition, or a `safeParse` followed by a sentence of its own: the kit's refusal names
 the failing field. A module-local variation is made at module level, not per call. Add a check
@@ -366,9 +388,9 @@ has.
 * **A boundary belongs to the export, not the caller.** An export checks every time, an internal
   caller included; one function with one behaviour beats a checked public twin and an unchecked
   private one. Inside the package, don't re-check what was checked where it entered.
-* **Clear intent at the door, clean values inside.** An entrypoint accepts a host's plain way of
-  saying a thing and fills in defaults in the schema. What it keeps, and every stored field, is
-  bounded: `leaseHours: Infinity` becomes the longest finite window.
+* **Clear intent at the entry point, clean values inside.** An entrypoint accepts a host's plain way of
+  saying a thing and fills in defaults in the schema. What it passes inward, and every stored field, is
+  bounded: `autolockMinutes: Infinity` becomes the longest finite window.
 * **Not Zod's job**: rules about state ("the vault is locked"), which are control flow; rules
   needing async I/O; properties Zod cannot see (whether a CryptoKey is usable). A rule relating
   several arguments does fit: check one object built from them, with `.refine` across its fields.
@@ -402,34 +424,34 @@ a required field is missing, when a field it knows but ignores has the wrong typ
 it does not know is mixed in. If a real object fails a duckish check, add its fields to the
 checker's ignored set; never convert the checker to strip.
 
-**Declare what they hold** `#declare-what-they-hold`. Consider the type your caller has in hand:
+**Declare what the caller has** `#declare-what-callers-have`. Consider the type your caller has in hand:
 most likely an ask, an answer, a record, a field, or something scoped. Declare that type. Picking
 or checking is the called function's business, not the caller's. Pick down only when you must, and
 then duckishly. A type used only once complicates your function and every caller's, but if it is
-necessary, use a module-local Checker. If a function's declared type is not what you hold, broaden
+necessary, use a module-local Checker. If a function's declared type is not what you have, broaden
 its signature type; don't contort yours.
 
 **No transform that changes a name's value** (trim, lowercase, coerce, normalize): a name is bound
-into storage and crypto, so refuse instead. A structural transform is fine: a scopepath's
-validator splits it into its parts before checking them.
+into storage and crypto, so refuse instead. A structural transform is fine: safebyok-big's
+scopepath validator splits it into its parts before checking them.
 
 ## Shapes and duck typing
 
 * **Duck typing is the design for data.** A thing that has a scope *is* one: it carries
-  `user_id`, `banklabel` and `vaultlabel` as its own fields, never a nested `.scope`. A nested copy
+  `modelkind`, `userid`, `banklabel` and `labelpath` as its own fields, never a nested `.scope`. A nested copy
   poses the question of whether the thing and its scope agree; a duck-typed thing has one copy of
   each name, and a function accepting a scope accepts the thing itself. The more things duck type, the
   more a one-off case is plain `Pick`, `&` and `Omit` surgery. A bag between our modules, a test's
-  fake and a world are ducks; a DB or a function a host hands in to be called is not (below).
+  fake and a view of a class (below) are ducks; a DB or a function a host hands in to be called is not (below).
 * **A parameter for data accepts any duck of the shape it reads.** The shapes are there to cut
   the number of types, not to narrow what a function accepts: one that reads a few fields says so
   with an ad hoc `Pick` or `Partial` of a named shape where it is declared, never a type literal
   written out, which loses cmd-click and the shape's doc blocks. A function's behaviour never
   changes to fit a named shape.
-* **A world is a `Pick` of its class.** What a listing reaches back into is
-  `Pick<Vault, 'clock' | 'sealStampedString' | ...>` or `Pick<Bank, ...>`, never a third interface
-  beside the class: cmd-click goes to the class's member and its doc block, and a test's fake
-  world still passes.
+* **A view of a class is a `Pick` of it.** What a collaborator reaches back into (safebyok-big's
+  `world`) is `Pick<Vault, 'clock' | 'sealStampedString' | ...>` or `Pick<Bank, ...>`, never a third
+  interface beside the class: cmd-click goes to the class's member and its doc block, and a test's
+  fake still passes.
 * **A field a thing ducks as is frozen, or fixed for the thing's life.**
 * **Each main type (vault, box, lease, ...) has a small, fixed set of shapes**, VOCABULARY.md
   *Shapes* names them: record, sparse, stamp, scope, dna, tombstone, snapshot. They are one family,
@@ -447,36 +469,36 @@ validator splits it into its parts before checking them.
   `Thing.isTombstone(rec)` answers for any kind. Kind-generic code calls them through `Thing`. Pass
   one as `(rec) => Gate.isTombstone(rec)`, never detached: without its class it has no kind.
 * **Freeze what we can**: each record handed out, each object's own fields, each snapshot.
-* **Name each outcome a reader must tell apart, even where the types overlap**: `Fetched` says
-  whole, sparse or dead, though every record is a sparse to the compiler.
+* **Name each outcome a reader must tell apart, even where the types overlap**: safebyok-big's
+  `Fetched` says whole, sparse or dead, though every record is a sparse to the compiler.
 * **A shape's type is `Z.infer` of its validator, or an interface checked against it: choose by
   the reader.** An in-repo bag's is `Z.infer`, with a `/** */` on each prop. A host-facing contract,
   whose `.d.ts` is the product, gets an `interface` with a doc block on each member, and an
   equality assertion beside its checker keeps the two from drifting (`DeviceOpts`).
 * **Name the important primitives.** A value a host writes by hand gets a plain alias
-  (`Boxlabel`); one it never writes is branded by its validator (`PassphraseSalt`, `PrfSalt`,
+  (`Banklabel`, `Labelpath`); one it never writes is branded by its validator (`PassphraseSalt`, `PrfSalt`,
   `PassphraseCleartext`), so it exists only once parsed and two of a kind never trade places.
-* **A facet a type gains is a generic named for the facet**: `Tombstone<SparseT>`,
-  `Refusing<SchemaT>`, not a slice named for its only consumer.
+* **A facet a type gains is a generic named for the facet**: `TombstoneOf<RecordT>`,
+  `LiveOf<RecordT>`, not a slice named for its only consumer.
 
 **Records, stamps and what is bound.**
 
 * **Prescribe the logical record and the atomic unit, never the physical row.** What is read in
   one step and written in one compare-and-write is the contract; how an adapter lays it out
   (columns, jsonb, documents) is its own.
-* **Bind whatever is fixed for the thing's life**, and the stamps of what it lives in: a box binds
-  the vault's stamp and its own.
+* **Bind whatever is fixed for the thing's life**, and what fixes the life of what it lives in: a
+  box's stamp binds its bank's `banktok` beside its own fields.
 * **Bind what is fixed; never bind what counts.** The stamp is bound into every ciphertext the
   record owns; a counter that moves within the record's life (an epoch) is never bound into
   long-lived ciphertext, which would have to be resealed at every move. A short-lived thing made
   under one value of a counter has that value in its own stamp: a lease is granted under one
-  `gate_epoch`, so its stamp has it.
+  revision of its gate, so its stamp has it (`gate_revtok`).
 * **A reference to another thing's part keeps a flat field, named as in the owner**: a lease's
-  `gate_epoch` names the gate it was granted under, as a foreign key would.
+  `gate_revtok` names the revision of the gate it was granted under, as a foreign key would.
 * **What one atomic step reads travels together**, its halves apart until checked, so a damaged
-  row cannot collide with its own fields: `{ world, boxes }` (`BoxesFetched`). Checked, it
-  is the thing it describes, written out where it is used: a vault's record and its box listing
-  are a vault, `VaultRecord & { boxes: readonly BoxSparse[] }`.
+  row cannot collide with its own fields: a manifest (`ListManifest`; safebyok-big's
+  `BoxesFetched`). Checked, it is the thing it describes, written out where it is used
+  (`CheckedListManifest`).
 
 **Interfaces a host implements** (brands, a host's function wrapped once, what a browser checks of
 a server) are designed in `notes/more_style.md` *Interfaces a host implements*.
@@ -487,11 +509,11 @@ a server) are designed in `notes/more_style.md` *Interfaces a host implements*.
   only own enumerable fields: a getter on the prototype is lost while TypeScript types it as
   present, and every other own field comes along. The linter refuses a spread of a class instance
   (`no-misused-spread`). When a caller wants a thing's fields as plain data, a getter returns a
-  frozen shallow copy of its fields (`vault.stamp`).
+  frozen shallow copy of its fields (`box.stamp`).
 * **Strip before crossing into host code.** A host's storage, callback or checker gets plain data
-  picked by its validator, never the thing: `deviceDB.getLease(vault)` would hand the host's DeviceDB
-  the Vault object, `lock()` and all. Nothing that crosses needs a method.
-* **Build a stored record from a parsed part**, `{ format, ...CX.vaultScope.parse(thing), ... }`,
+  picked by its validator, never the thing: `deviceDB.peekLease(bank)` would hand the host's DeviceDB
+  the Bank object, `lock()` and all. Nothing that crosses needs a method.
+* **Build a stored record from a parsed part**, `{ fmt, ...ThingChecks.thingScope.parse(thing), ... }`,
   never from a spread of the object that has it, which would put its other fields into the record too.
 * **Spreading a model is harmless.** Its own enumerable fields are what a log line, a spread or
   `JSON.stringify` sees, so `{ ...thing }` shows only what belongs in a log: nothing secret and
@@ -511,7 +533,7 @@ a server) are designed in `notes/more_style.md` *Interfaces a host implements*.
   on a collaborator instead.
 * **A method handed out unbound is a getter on the prototype returning a private arrow**:
   `get subscribe() { return this.#subscribe }`. It stays bound, keeps one identity (as
-  `useSyncExternalStore(vault.subscribe, vault.getSnapshot)` wants), and no spread sees it.
+  `useSyncExternalStore(bank.subscribe, bank.getSnapshot)` wants), and no spread sees it.
 * **What changes is read through one snapshot accessor**, never through a per-field getter that
   duplicates it: two ways to read one value is a split personality, and per-field reads across an
   await can mix two snapshots.
@@ -521,8 +543,8 @@ a server) are designed in `notes/more_style.md` *Interfaces a host implements*.
   (`useSyncExternalStore`'s contract). No methods that act (a stale snapshot would act on the live
   object); no cycles (its change check stringifies it).
 * **A snapshot carries what a host renders, and nothing it has no use for**, above all nothing we
-  would rather not share: a vault's snapshot has its scope, `format` and `vault_tok`, not its
-  epochs or a passphrase's salt. Its scope sits flat, so it duck-types as one.
+  would rather not share: a bank's snapshot has its `stage` and its `leaseEndsAt`, not its lease
+  or a passphrase's salt. A snapshot that carries a scope carries it flat, so it duck-types as one.
 * **Changing structured parts are slices** that keep their own identity until they change, so a
   memoized component or a selector given one slice skips the others' changes.
 * **No derived field the snapshot already implies.** A three-way status computed from two fields
@@ -539,17 +561,18 @@ Zod's output order is undocumented, and JavaScript puts integer-like keys first.
 
 ## Scopepaths
 
-A **scopepath** is where a storage files a scope's record (VOCABULARY.md): the kind first, then the
-scope's names in order, joined on `ScopepathDelimiter` (`^`, from `consts.ts`), such as
-`box^u1^acme^main^openai`. `Scopepath` is a public module: a host's own key-value adapter files
-rows with it.
+A **scopepath** is where a store files a scope's record (VOCABULARY.md): the kind first, then the
+scope's names in order. In the new core it is an IndexedDB key, an array (`scopepathOf`, giving a
+`LeaseScopepath` such as `['lease', 'u1', 'acme', 'lease/acme']`). In safebyok-big it is a string
+joined on `ScopepathDelimiter` (`^`, from `helpers/consts.ts`), such as `box^u1^acme^main^openai`,
+and `Scopepath` is a public module: a host's own key-value adapter files rows with it.
 
 * The kind goes first: a kind suffix sorts each scope before its children only while every segment
-  is a lowercase label, and a user_id is not one.
+  is a lowercase label, and a userid is not one.
 * **Lookups go by key** (`Map.get`, a storage's get, an IndexedDB range), never by scanning. A
   listing is for showing; a lookup goes through a keyed map beside it.
-* **A prefix test goes through the module's predicate**, not a hand-written `.startsWith`: the
-  prefix must end in the delimiter, or `vault^u1^acme^main` matches `main2`'s rows.
+* **A prefix test goes through the module's predicate**, not a hand-written `.startsWith`: in
+  safebyok-big the prefix must end in the delimiter, or `vault^u1^acme^main` matches `main2`'s rows.
 
 ## Control flow and refusals
 
@@ -602,7 +625,7 @@ A member that will not describe in a line is a smell: report it.
   verb: `Create a new box for whisper (encrypted) and sidecar (readable), sealed against the box metadata`. A first line
   opens with the noun it is, the thing it returns, or (most commonly) an imperative verb and its object:
   - `The cached record for a scope` (never "What the cache holds for a scope")
-  - `The bank's three roots` (never "What a birth writes")
+  - `The bank's two roots` (never "What a birth writes")
   - `Remove every one of this minder's stored records from the cache.`
 
   When that noun needs a clause to describe it, open with the verb instead: `Classify a vault request's outcome, based on the stored row`. Read the
@@ -638,14 +661,14 @@ whatever it takes to show it, and names at its head what it mocks: the mocking m
 contrived the case is. Before reopening a row, ask: have you learned something that would show it
 without the mock? When a demonstration fails, the behaviour has changed: invert it into a promise,
 move it to the test file of the code it covers, and delete the row. A module reached only through another's
-public verb (`vault-opts.ts` through `Device.make`) is tested beside that verb. Every export is
+public verb is tested beside that verb. Every export is
 tested, in proportion to what it does and what a caller could get wrong.
 
-* **Test helpers come through one door, `tests/test-helpers.ts`, star-imported as `TH`**
-  (`TH.scopeOf('u1')`). A new helper goes in its part under `tests/test-helpers/` and is
-  re-exported from the door. The core's door is published as `safebyok/testing`, and another
-  package's door re-exports it, so each test has one `TH`. A helper that builds JSX lives in
-  `tests/test-helpers-react.tsx`, which the door re-exports.
+* **Test helpers come through one module, `tests/test-helpers.ts`, star-imported as `TH`**
+  (`TH.WorldScope`). A new helper goes in its part under `tests/test-helpers/` and is
+  re-exported from that module. The core's is published as `safebyok/testing`, and another
+  package's re-exports it, so each test has one `TH`. A helper that builds JSX lives in
+  `tests/test-helpers-react.tsx`, which `tests/test-helpers.ts` re-exports.
 * **Assertions are chai-style**: `expect(foo).to.eq(bar)`, `to.deep.equal` for an object or
   array, `to.have.lengthOf`, `to.throw`, `to.have.members`, and `to.be.null` rather than
   `to.eq(null)`; not Vitest's `toBe`, `toEqual` or `toHaveLength`. Two Vitest forms have no chai
@@ -667,8 +690,8 @@ tested, in proportion to what it does and what a caller could get wrong.
   validates.
 * **Test an entrypoint with sloppy input**: that is its job. Code past the validation boundary is
   entitled to clean input.
-* **A test's way past the API has a loud `_cheat_` name**, for what it returns (`_cheat_central`,
-  `_cheat_clock`), on a test-world subclass or a test-facing adapter such as the memory DBs, never
+* **A test's way past the API has a loud `_cheat_` name**, for what it returns (`_cheat_things`,
+  `_cheat_leases`), on a test-world subclass or a test-facing adapter such as the memory DBs, never
   a coined verb that could pass for the API (`keptOf`). On a class that has keys, prefer a
   constructor seam: an optional callback handed a typed cheater object, so nothing sits on the
   instance.
@@ -696,7 +719,7 @@ tested, in proportion to what it does and what a caller could get wrong.
 ## Mechanically enforced, and deliberately not
 
 The core's `eslint.config.mjs` is strict. These are **off on purpose**, so don't "fix" code for
-them: `camelcase` (`vaultlabel` is right), `no-use-before-define` (define helpers below their callers
+them: `camelcase` (`banklabel` is right), `no-use-before-define` (define helpers below their callers
 when that reads better), `@stylistic/quotes` (the convention above is kept by hand),
 `@stylistic/space-unary-ops` (it mistakes the non-null `arr[0]!` for a negation, so `(! foo)` is
 kept by hand), `@stylistic/no-multi-spaces` (parallel construction is padded into columns, *Braces

@@ -2,11 +2,11 @@
 
 import { v7 as uuidv7 } from 'uuid'
 import { BaseThing } from '../models/base-thing'
-import { type EpochMillis, type Lifepath, Labelpath, Lifeseq, Revseq } from '../shapes/primitives'
+import { type EpochMillis, type Lifepath, Lifeseq, Revseq } from '../shapes/primitives'
 import type { Sparse, ThingCited, ThingRecord, Tombstone } from '../shapes/shapes-thing'
 import type { Agekind, Agerank, ItemSeen, ReadTc, SeenThing, VaultEvent, VaultItemEvent } from '../shapes/shapes-vault-event'
 
-// == [Agerank]: TcchunkDigits, NoRevseq, VacantAgerank, VacantReadTc, AgerankFields, readTcNow, readAtOf, tcchunkOf, nextAgerankOf, heldAgerankOf, lifeAgerankOf, tcchunkAfter, laterOf, itemSeenOf, itemEventOf, eventsOf, agekindOf, seenAgekindOf, fieldsOf, isOfLife
+// == [Agerank]: TcchunkDigits, NoRevseq, VacantAgerank, VacantReadTc, AgerankFields, readTcNow, readAtOf, tcchunkOf, nextAgerankOf, cachedAgerankOf, lifeAgerankOf, tcchunkAfter, laterOf, itemSeenOf, itemEventOf, eventsOf, agekindOf, seenAgekindOf, fieldsOf, isOfLife
 
 // Eight digits make a span of 65.536 seconds: a record seen again at its revision a minute or two later is news, which
 // sits well with TanStack Query's five minutes before it collects a query.
@@ -57,10 +57,10 @@ export function nextAgerankOf(agerankWas: Agerank, seen: Pick<ThingCited, 'lifep
   return laterOrNone(agerankWas, agerank)
 }
 
-/** The agerank of a Thing holding `held`, seen whole at the {@link VacantReadTc}: the {@link VacantAgerank} for the shell. */
-export function heldAgerankOf(held: Sparse<ThingRecord>): Agerank {
-  if (BaseThing.isVoidSentinel(held)) { return VacantAgerank }
-  return lifeAgerankOf(held.lifepath, Revseq.padded(held.revseq), true, tcchunkOf(VacantReadTc))
+/** The agerank of a Thing that has `cached`, seen whole at the {@link VacantReadTc}: the {@link VacantAgerank} for the shell. */
+export function cachedAgerankOf(cached: Sparse<ThingRecord>): Agerank {
+  if (BaseThing.isVoidSentinel(cached)) { return VacantAgerank }
+  return lifeAgerankOf(cached.lifepath, Revseq.padded(cached.revseq), true, tcchunkOf(VacantReadTc))
 }
 
 /** The agerank of a life whose first record seen is `revseq`, read in `tcchunk`: the newest whole revision is itself, or none for a sparse one */
@@ -72,7 +72,7 @@ function lifeAgerankOf(lifepath: Lifepath, revseq: string, isWhole: boolean, tcc
 function laterOrNone(agerankWas: Agerank, agerank: Agerank): Agerank | undefined { return (agerank > agerankWas) ? agerank : undefined }
 
 // The tcchunk belongs to the newest revision: it is when the newest revision was last read.
-/** The tcchunk an agerank of `fieldsWas` gives once `revseq` is read in `tcchunk`: its own above the newest revision, the later of the two at it, and the one before below it */
+/** The tcchunk an agerank of `fieldsWas` gives once `revseq` is read in `tcchunk`: `tcchunk` where `revseq` is newer than the newest revision, the later of the two where it is that revision, else the earlier one */
 function tcchunkAfter([, highWas, , tcchunkWas]: AgerankFields, revseq: string, tcchunk: string): string {
   if (revseq > highWas) { return tcchunk }
   if (revseq < highWas) { return tcchunkWas }
@@ -90,12 +90,12 @@ export function itemSeenOf(seen: SeenThing): ItemSeen {
   return { liveness: 'gone', val: seen as Tombstone<ThingRecord> }
 }
 
-/** The `item` event of `seen`, at its scope, as `dispatch` says who dispatched it, when it was read and its bank's lifetok, with the vacant ageranks, frozen. */
+/** The `item` event of `seen`, at its scope and of its modelkind, with the `sourcelabel`, `read_tc` and `banktok` that `dispatch` gives it and the vacant ageranks, frozen. */
 export function itemEventOf(seen: SeenThing, dispatch: Pick<VaultItemEvent, 'sourcelabel' | 'read_tc' | 'banktok'>): VaultItemEvent {
-  const { userid, banklabel, labelpath } = seen
+  const { userid, banklabel, labelpath, modelkind } = seen
   const { sourcelabel, read_tc, banktok } = dispatch
   return Object.freeze({
-    eventkind: 'item', userid, banklabel, labelpath, modelkind: Labelpath.modelkindOf(labelpath), agerank: VacantAgerank, agerankWas: VacantAgerank,
+    eventkind: 'item', userid, banklabel, labelpath, modelkind, agerank: VacantAgerank, agerankWas: VacantAgerank,
     sourcelabel, read_tc, banktok, ...itemSeenOf(seen),
   })
 }

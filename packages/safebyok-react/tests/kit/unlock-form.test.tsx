@@ -13,18 +13,18 @@ const WrongPassphrase = 'correct horse battery stable'
 
 /** The bank's stage as a line of text, with the unlock form while it is locked. */
 function StageScreen({ world }: Readonly<{ world: TH.ProviderWorld }>) {
-  const stage = world.Bank.useWorld((snap) => snap.stage)
+  const stage = world.Bank.useBank((snap) => snap.stage)
   return (stage === 'locked') ? <UnlockForm username="hue@example.com" /> : <p>{stage}</p>
 }
 
 /** The bank's stage as a line of text. */
 function StageLine({ world }: Readonly<{ world: TH.ProviderWorld }>) {
-  return <p>{world.Bank.useWorld((snap) => snap.stage)}</p>
+  return <p>{world.Bank.useBank((snap) => snap.stage)}</p>
 }
 
 /** The bank's stage as a line of text, beside the unlock dialog. */
 function DialogScreen({ world }: Readonly<{ world: TH.ProviderWorld }>) {
-  const stage = world.Bank.useWorld((snap) => snap.stage)
+  const stage = world.Bank.useBank((snap) => snap.stage)
   return <><p>{stage}</p><UnlockDialog /></>
 }
 
@@ -153,7 +153,7 @@ describe("UnlockForm", () => {
     }, 'Unlock')
     expect(heard).to.not.be.empty
     typePassphrase(Passphrase)
-    await waitFor(() => { expect(world._cheat_device().bank?.isUnlocked).to.eq(true) })
+    await waitFor(() => { expect(world._cheat_device().bank.isUnlocked).to.eq(true) })
   })
 
   it("refuses to render outside every provider with no bank handed to it", () => {

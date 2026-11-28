@@ -27,11 +27,11 @@ function withCitedAm(ask: WriteAsk, am: 'a' | 'x'): WriteAsk { return { ...ask, 
 
 /** Write tags of `presence` and the two revision comparisons, the life and liveness as cited, every fixed field the same and no storage policy. */
 function tagsOf(presence: WriteTags['presence'], revtok_cmp: WriteTags['revtok_cmp'], revseq_cmp: WriteTags['revseq_cmp'], overrides: Partial<WriteTags> = {}): WriteTags {
-  return { presence, revtok_cmp, revseq_cmp, lifepath_eq: true, born_at_cmp: 'moot', lifetok_cmp: 'moot', policies: {}, written: false, ...overrides }
+  return { presence, revtok_cmp, revseq_cmp, lifepath_eq: true, born_at_cmp: 'moot', banktok_cmp: 'moot', policies: {}, written: false, ...overrides }
 }
 
 /** The bank's part of every manifest here: the void banktok, each root the same as tracked, and a read_tc made now. */
-function besideOf() { return { banktok: SX.VoidLifeTok, tracked: { bank: 'same', gate: 'same', box: 'same' }, read_tc: readTcNow() } as const }
+function besideOf() { return { banktok: SX.VoidLifeTok, tracked: { gate: 'same', root: 'same' }, read_tc: readTcNow() } as const }
 
 /** The answer `writeAnswerOf` makes of a checked manifest of `tags` over the `actual` row, scribed for `ask`. */
 function writeAnsweredOf(ask: WriteAsk, tags: WriteTags, actual: CheckedWriteManifest['actual'] = null) {
@@ -69,7 +69,7 @@ describe("ManifestActs.scribeGetAct(ask, manifest), row by row of the get table"
     it(`${abbr}: ${act}`, () => {
       for (const ifAbsent of flags) {
         const manifest: CheckedGetManifest = { tags: { presence }, actual: null, ancestor: null, ...besideOf() }
-        ManifestActs.scribeGetAct(TH.getAskAt('box', ifAbsent), manifest)
+        ManifestActs.scribeGetAct(TH.getAskAt('box', 'box', ifAbsent), manifest)
         expect(manifest.act, ifAbsent).to.eq(act)
       }
     })
@@ -152,12 +152,12 @@ describe("ManifestActs.scribeWriteAct(ask, manifest), a del, row by row of the d
 })
 
 describe("ManifestActs.scribeWriteAct(ask, manifest), the life and liveness a matching revtok cites", () => {
-  it("scribes clash where the ante row's lifepath is not the cited one", () => {
+  it("scribes clash where the prior row's lifepath is not the cited one", () => {
     expect(scribedActOf(askOf(PutAsk, 'live', 'repl'), tagsOf('live', 'eq', 'eq', { lifepath_eq: false }))).to.eq('clash')
     expect(scribedActOf(withCitedAm(DelAsk, 'a'), tagsOf('live', 'eq', 'eq', { lifepath_eq: false }))).to.eq('clash')
   })
 
-  it("scribes clash where the ante row is live and the ask cites a tombstone, or the reverse", () => {
+  it("scribes clash where the prior row is live and the ask cites a tombstone, or the reverse", () => {
     const citingGone = withCitedAm(askOf(PutAsk, 'live', 'repl'), 'x')
     const citingLive = withCitedAm(askOf(PutAsk, 'gone', 'add'), 'a')
     expect(scribedActOf(citingGone, tagsOf('live', 'eq', 'eq'))).to.eq('clash')
@@ -168,9 +168,9 @@ describe("ManifestActs.scribeWriteAct(ask, manifest), the life and liveness a ma
 describe("ManifestActs.scribeWriteAct(ask, manifest), a write the tables let through and its fixed fields or policies forbid", () => {
   const PoliciedCases = [
     ["policied", PutAsk, { born_at_cmp: "changed" },                                     'scribes policied for a replacement that changes the born_at'],
-    ["policied", PutAsk, { lifetok_cmp: "changed" },                                     'scribes policied for a replacement that changes the lifetok'],
-    ["policied", DelAsk, { lifetok_cmp: "changed" },                                     'scribes policied for a deletion that changes the lifetok'],
-    ["replaced", PutAsk, { born_at_cmp: "same", lifetok_cmp: "same" },                   'scribes the write where each fixed field is the same'],
+    ["policied", PutAsk, { banktok_cmp: "changed" },                                     'scribes policied for a replacement that changes the banktok'],
+    ["policied", DelAsk, { banktok_cmp: "changed" },                                     'scribes policied for a deletion that changes the banktok'],
+    ["replaced", PutAsk, { born_at_cmp: "same", banktok_cmp: "same" },                   'scribes the write where each fixed field is the same'],
   ] as const
   for (const [act, ask, overrides, blurb] of PoliciedCases) {
     it(blurb, () => {
@@ -191,7 +191,7 @@ describe("ManifestActs.scribeWriteAct(ask, manifest), a write the tables let thr
   })
 
   it("leaves an act that writes nothing as it is, whatever its fixed fields", () => {
-    const changed = { born_at_cmp: 'changed', lifetok_cmp: 'changed' } as const
+    const changed = { born_at_cmp: 'changed', banktok_cmp: 'changed' } as const
     expect(scribedActOf(askOf(PutAsk, 'live', 'get'), tagsOf('live', 'eq', 'eq', changed))).to.eq('passed')
     expect(scribedActOf(askOf(PutAsk, 'live', 'repl'), tagsOf('live', 'neq', 'stale', changed))).to.eq('stale')
   })
@@ -201,9 +201,9 @@ describe("ManifestActs.writeAnswerOf(ask, manifest), a policied write", () => {
   const PoliciedAsk = { ...askOf(PutAsk, 'live', 'repl'), options: { policies: ['add_passkey'] } } as WriteAsk
   const Failed      = { add_passkey: { ok: false, refusaltag: 'PasskeyStored' } } as const
   const RefusalCases = [
-    ["bad_record", Phrases.BornAtMoved,                                            { born_at_cmp: "changed", lifetok_cmp: "changed", policies: Failed }, 'refuses bad_record for a changed born_at, before a failed storage policy or a changed lifetok'],
-    ["gate_issue", BigPhrases.gateIssue(Phrases.PolicyPhrases.PasskeyStored),       { lifetok_cmp: "changed", policies: Failed },                         'refuses gate_issue with a failed storage policy\'s message, before a changed lifetok'],
-    ["bad_record", Phrases.LifetokMoved,                                           { lifetok_cmp: "changed", policies: { add_passkey: { ok: true } } },  'refuses bad_record for a changed lifetok'],
+    ["bad_record", Phrases.BornAtMoved,                                            { born_at_cmp: "changed", banktok_cmp: "changed", policies: Failed }, 'refuses bad_record for a changed born_at, before a failed storage policy or a changed banktok'],
+    ["gate_issue", BigPhrases.gateIssue(Phrases.PolicyPhrases.PasskeyStored),       { banktok_cmp: "changed", policies: Failed },                         'refuses gate_issue with a failed storage policy\'s message, before a changed banktok'],
+    ["bad_record", Phrases.BanktokMoved,                                           { banktok_cmp: "changed", policies: { add_passkey: { ok: true } } },  'refuses bad_record for a changed banktok'],
   ] as const
   for (const [refusalkind, message, overrides, blurb] of RefusalCases) {
     it(blurb, () => {

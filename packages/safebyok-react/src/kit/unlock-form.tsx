@@ -84,7 +84,7 @@ export function UsernameField({ username }: Readonly<{ username?: string | undef
 /** The props of an {@link UnlockDialog}. */
 export interface UnlockDialogProps {
   /** The giver's bank, `SOK.bank(banklabel)`: the provider's, when left out. */
-  bank?:     Pick<BankGiver, 'useWorld' | 'useUnlock' | 'dismissUnlock'> | undefined
+  bank?:     Pick<BankGiver, 'useBank' | 'useUnlock' | 'dismissUnlock'> | undefined
   /** The account the passphrase is saved under in a password manager: the user's email, say. */
   username?: string | undefined
 }
@@ -97,7 +97,7 @@ export interface UnlockDialogProps {
  */
 export function UnlockDialog({ bank: bankProp, username }: Readonly<UnlockDialogProps>) {
   const bank = useGivenBank(bankProp)
-  const isUnlockWanted = bank.useWorld((snap) => snap.isUnlockWanted)
+  const isUnlockWanted = bank.useBank((snap) => snap.isUnlockWanted)
   const titleId = useId()
   if (! isUnlockWanted) { return null }
   return (

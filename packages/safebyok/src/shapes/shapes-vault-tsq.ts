@@ -28,11 +28,11 @@ export const MaxTimerMillis = MaxTimerHours * 60 * 60 * 1000
 export type VaultTSQOpts = Readonly<{
   /** The VaultMinder of the bank, whose Things the items are read from. */
   vaultMinder: VaultMinder
-  /** The client the items and listings are kept in: a host's own, or one made for the bank. */
+  /** The client the items and listings are cached in: a host's own, or one made for the bank. */
   queryClient: TSQ.QueryClient
-  /** The bank. */
+  /** The bank's scope. */
   scope:       BankScope
-  /** Hears each refusal no caller waits on: a record the VaultMinder refuses, or what the vault TSQ fails to keep. Default: none hears it. */
+  /** Hears each refusal no caller waits on: a record the VaultMinder refuses, or what the vault TSQ fails to cache. Default: none hears it. */
   onBadNews?:  ((news: Errors.VaultError) => void) | undefined
 }>
 
@@ -61,7 +61,7 @@ export type GetOnceOpts = Z.input<typeof VaultTSQChecks.getOnceOpts>
 
 // == [Checks]: VaultTSQChecks, isQueryClient, VaultTSQMembernames, isVaultTSQ
 
-/** The checks of `VaultTSQ.make`'s arguments, of the scope of a listing it keeps, of a mutationFn, and of a get's options. */
+/** The checks of `VaultTSQ.make`'s arguments, of the scope of a listing it caches, of a mutationFn, and of a get's options. */
 export const VaultTSQChecks = Validator.Checkers('bad_record', ({ obj, custom, fn, uint, lit, union }) => {
   const tsqStaleTime = union([uint.max(MaxTimerMillis, Phrases.StaleTimeShape), lit(Infinity)])
   return {
@@ -81,7 +81,7 @@ export const VaultTSQChecks = Validator.Checkers('bad_record', ({ obj, custom, f
 })
 
 /** The members of a QueryClient a VaultTSQ calls. */
-const QueryClientMembernames = ['setQueryDefaults', 'setMutationDefaults', 'getQueryData', 'setQueryData', 'query', 'invalidateQueries', 'resetQueries'] as const
+const QueryClientMembernames = ['setQueryDefaults', 'getQueryData', 'setQueryData', 'query', 'invalidateQueries', 'resetQueries'] as const
 
 /** True for an object with a function for each member of a QueryClient a VaultTSQ calls. */
 export function isQueryClient(val: unknown): val is TSQ.QueryClient {

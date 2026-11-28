@@ -35,18 +35,19 @@ async function worldWithBox(): Promise<TSQWorld<MemoryVaultDB>> {
   return world
 }
 
-/** The record the Thing at `TH.BoxScope` holds in `world`. */
-function boxHeldIn({ sorted }: TSQWorld<MemoryVaultDB>) {
+/** The record the Thing at `TH.BoxScope` has in `world`. */
+function boxRecordIn({ sorted }: TSQWorld<MemoryVaultDB>) {
   return sorted.thingAt(TH.BoxScope)?.pickle()
 }
 
 describe("VaultTSQ.make", () => {
-  it("sets its query and mutation defaults under the bank's key, and nothing outside it", async () => {
+  it("sets its query defaults under the key of the bank's boxes, and nothing outside it, and no mutation defaults", async () => {
     const { queryClient } = await tsqWorldOf(new MemoryVaultDB())
     expect(queryClient.getQueryDefaults(BoxKey)).to.include({ networkMode: 'always', retry: false }).and.not.have.property('structuralSharing')
     expect(queryClient.getQueryDefaults(VaultTSQ.listQueryKeyOf(TH.RootScope))).to.include({ networkMode: 'always', retry: false, gcTime: Infinity })
-    expect(queryClient.getMutationDefaults(VaultTSQ.bankQueryKeyOf(TH.ThingBank))).to.deep.equal({ networkMode: 'always', retry: false })
+    expect(queryClient.getMutationDefaults(VaultTSQ.tableQueryKeyOf({ ...TH.ThingBank, modelkind: 'box' }))).to.deep.equal({})
     expect(queryClient.getQueryDefaults(VaultTSQ.itemQueryKeyOf({ ...TH.BoxScope, banklabel: 'other' }))).to.deep.equal({})
+    expect(queryClient.getQueryDefaults(VaultTSQ.itemQueryKeyOf(TH.GateScope))).to.deep.equal({})
     expect(queryClient.getQueryDefaults(['todos'])).to.deep.equal({})
     expect(queryClient.getMutationDefaults(['todos'])).to.deep.equal({})
   })
@@ -64,10 +65,16 @@ describe("VaultTSQ.make", () => {
 })
 
 describe("VaultTSQ's keys", () => {
-  it("start with the bank, then the kind of query, the labels and a mark", () => {
-    expect(VaultTSQ.bankQueryKeyOf(TH.ThingBank)).to.deep.equal(['sok', 'u1', 'acme'])
-    expect(VaultTSQ.itemQueryKeyOf(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'item', 'box', '/', 'openai', '!'])
-    expect(VaultTSQ.listQueryKeyOf(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'list', 'box', '#', 'kids'])
+  it("start with the table, its kind first, then the kind of query, the labels and a mark", () => {
+    expect(VaultTSQ.tableQueryKeyOf({ ...TH.ThingBank, modelkind: 'box' })).to.deep.equal(['sok', 'box', 'u1', 'acme'])
+    expect(VaultTSQ.itemQueryKeyOf(TH.BoxScope)).to.deep.equal(['sok', 'box', 'u1', 'acme', 'item', 'box', '/', 'openai', '!'])
+    expect(VaultTSQ.listQueryKeyOf(TH.RootScope)).to.deep.equal(['sok', 'box', 'u1', 'acme', 'list', 'box', '#', 'kids'])
+    expect(VaultTSQ.itemQueryKeyOf(TH.GateScope)).to.deep.equal(['sok', 'gate', 'u1', 'acme', 'item', 'acme', '!'])
+  })
+
+  it("tell a bank labelled box's gate from its root box", () => {
+    const bank = { userid: 'u1', banklabel: 'box' }
+    expect(VaultTSQ.itemQueryKeyOf({ ...bank, modelkind: 'gate', labelpath: 'box' })).to.not.deep.equal(VaultTSQ.itemQueryKeyOf({ ...bank, modelkind: 'box', labelpath: 'box' }))
   })
 })
 
@@ -80,7 +87,7 @@ describe("an item's structural sharing", () => {
     const prior    = world.queryClient.getQueryData<BoxRecord>(BoxKey)
     world.notify(noticeOf(structuredClone(Box1)))
     const item     = world.queryClient.getQueryData<BoxRecord>(BoxKey)
-    expect(item).to.deep.equal(boxHeldIn(world)).and.deep.equal(Box1)
+    expect(item).to.deep.equal(boxRecordIn(world)).and.deep.equal(Box1)
     expect(item?.whisper_sealed).to.eq(prior?.whisper_sealed)
     expect(observer.getCurrentResult().data).to.eq(selected).and.deep.equal({ labelpath: TH.BoxScope.labelpath })
     stop()
@@ -92,7 +99,7 @@ describe("VaultTSQ's writer, on each event the VaultMinder tells", () => {
     const world   = await worldWithBox()
     const read_tc = readTcNow()
     world.notify(noticeOf(Box1, read_tc))
-    expect(world.queryClient.getQueryData(BoxKey)).to.deep.equal(boxHeldIn(world)).and.deep.equal(Box1)
+    expect(world.queryClient.getQueryData(BoxKey)).to.deep.equal(boxRecordIn(world)).and.deep.equal(Box1)
     expect(itemQueryAt(world)?.state.dataUpdatedAt).to.eq(readAtOf(read_tc))
   })
 
@@ -118,11 +125,11 @@ describe("VaultTSQ's writer, on each event the VaultMinder tells", () => {
 
   it("marks an item invalidated, keeping its record, when a newer revision is known only sparse", async () => {
     const world = await worldWithBox()
-    const held  = boxHeldIn(world)
+    const ante  = boxRecordIn(world)
     const asked = vi.spyOn(world.vaultDB, 'tryGetThing')
     world.notify(noticeOf(TH.boxSparseOf(Box1)))
     expect(world.sorted.carAt(TH.BoxScope)?.agekind).to.eq('cold')
-    expect(itemQueryAt(world)?.state).to.deep.include({ data: held, isInvalidated: true })
+    expect(itemQueryAt(world)?.state).to.deep.include({ data: ante, isInvalidated: true })
     expect(asked).not.toHaveBeenCalled()
   })
 
@@ -141,7 +148,7 @@ describe("VaultTSQ's writer, on each event the VaultMinder tells", () => {
     expect(itemQueryAt(world)?.state).to.deep.include({ data: null, isInvalidated: true })
   })
 
-  it("makes no item, when a newer life is known only sparse, of a box whose item holds nothing", async () => {
+  it("makes no item, when a newer life is known only sparse, of a box whose item has nothing", async () => {
     const world = await worldWithBox()
     world.queryClient.removeQueries({ queryKey: BoxKey })
     world.notify(noticeOf(TH.boxSparseOf(Reborn)))
@@ -223,23 +230,23 @@ describe("VaultTSQ.connect and disconnect", () => {
 })
 
 describe("VaultTSQ's items", () => {
-  it("hold a record deeply equal to their Thing's, which getOnce resolves", async () => {
+  it("have a record deeply equal to their Thing's, which getOnce resolves", async () => {
     const world = await tsqWorldOf(new MemoryVaultDB())
     cheatPlant(world.vaultDB, Box0)
     const got = await world.vaultTSQ.getOnce(TH.BoxScope)
-    expect(got).to.deep.equal(boxHeldIn(world)).and.deep.equal(Box0)
+    expect(got).to.deep.equal(boxRecordIn(world)).and.deep.equal(Box0)
     expect(world.queryClient.getQueryData(BoxKey)).to.deep.equal(got)
   })
 
-  it("hold null for a tombstone or nothing stored", async () => {
+  it("are null for a tombstone or nothing stored", async () => {
     const world = await tsqWorldOf(new MemoryVaultDB())
     expect(await world.vaultTSQ.getOnce(TH.BoxScope)).to.be.null
     cheatPlant(world.vaultDB, TH.boxTombOf(Box0))
     expect(await world.vaultTSQ.getOnce(TH.BoxScope, { staleTime: 0 })).to.be.null
-    expect(Thing.isGone(boxHeldIn(world))).to.eq(true)
+    expect(Thing.isGone(boxRecordIn(world))).to.eq(true)
   })
 
-  it("show the refusal a newer record raises at the box's Thing as the item's error, its data kept", async () => {
+  it("show the refusal the box's Thing throws at a newer record as the item's error, its data kept", async () => {
     const world = await tsqWorldOf(new MemoryVaultDB(), (shell) => TH.RefusingThing.make(shell))
     const box2  = TH.nextOf(Box1)
     cheatPlant(world.vaultDB, box2)
@@ -282,10 +289,10 @@ describe("VaultTSQ's items", () => {
     expect(isObservedStale(world.queryClient, BoxKey)).to.eq(false)
   })
 
-  it("are stale while cold, after a get answers with the record held, with nothing invalidated", async () => {
+  it("are stale while cold, after a get answers with the cached record, with nothing invalidated", async () => {
     const world = await worldWithBox()
     world.notify(noticeOf(TH.boxSparseOf(Box1)))
-    expect(await world.vaultTSQ.getOnce(TH.BoxScope)).to.deep.equal(boxHeldIn(world))
+    expect(await world.vaultTSQ.getOnce(TH.BoxScope)).to.deep.equal(boxRecordIn(world))
     expect(world.sorted.carAt(TH.BoxScope)?.agekind).to.eq('cold')
     expect(itemQueryAt(world)?.state.isInvalidated).to.eq(false)
     expect(isObservedStale(world.queryClient, BoxKey)).to.eq(true)
@@ -298,13 +305,13 @@ describe("VaultTSQ's items", () => {
     cheatPlant(world.vaultDB, Reborn)
     world.notify(noticeOf(TH.boxSparseOf(Reborn)))
     expect(observer.getCurrentResult()).to.deep.include({ data: null, fetchStatus: 'fetching' })
-    await vi.waitFor(() => { expect(observer.getCurrentResult().data).to.deep.equal(boxHeldIn(world)).and.deep.equal(Reborn) })
+    await vi.waitFor(() => { expect(observer.getCurrentResult().data).to.deep.equal(boxRecordIn(world)).and.deep.equal(Reborn) })
     stop()
   })
 })
 
 describe("VaultTSQ.itemQueryOptions", () => {
-  it("seeds an item with the live record its Thing holds, as of when it was read", async () => {
+  it("seeds an item with the live record its Thing has, as of when it was read", async () => {
     const world = await worldWithBox()
     const car = world.sorted.carAt(TH.BoxScope)
     expect(world.vaultTSQ.itemQueryOptions(TH.BoxScope)).to.deep.equal({ queryKey: BoxKey, initialData: car?.thing.pickle(), initialDataUpdatedAt: readAtOf(car!.read_tc) })
@@ -323,7 +330,7 @@ describe("VaultTSQ.itemQueryOptions", () => {
     const world = await worldWithBox()
     world.notify(noticeOf(TH.boxSparseOf(Reborn)))
     expect(world.vaultTSQ.itemQueryOptions(TH.BoxScope)).to.deep.equal({ queryKey: BoxKey })
-    const otherScope = { ...TH.ThingBank, labelpath: 'box/anthropic' }
+    const otherScope = { ...TH.BoxScope, labelpath: 'box/anthropic' }
     expect(world.vaultTSQ.itemQueryOptions(otherScope)).to.deep.equal({ queryKey: VaultTSQ.itemQueryKeyOf(otherScope) })
   })
 
@@ -332,11 +339,11 @@ describe("VaultTSQ.itemQueryOptions", () => {
     world.queryClient.removeQueries({ queryKey: BoxKey })
     const observer = new QueryObserver(world.queryClient, world.vaultTSQ.itemQueryOptions(TH.BoxScope))
     const stop     = observer.subscribe(noop)
-    expect(observer.getCurrentResult().data).to.eq(boxHeldIn(world))
+    expect(observer.getCurrentResult().data).to.eq(boxRecordIn(world))
     cheatPlant(world.vaultDB, Reborn)
     world.notify(noticeOf(TH.boxSparseOf(Reborn)))
     expect(observer.getCurrentResult()).to.deep.include({ data: null, fetchStatus: 'fetching' })
-    await vi.waitFor(() => { expect(observer.getCurrentResult().data).to.deep.equal(boxHeldIn(world)).and.deep.equal(Reborn) })
+    await vi.waitFor(() => { expect(observer.getCurrentResult().data).to.deep.equal(boxRecordIn(world)).and.deep.equal(Reborn) })
     stop()
   })
 
@@ -346,7 +353,7 @@ describe("VaultTSQ.itemQueryOptions", () => {
     const asked    = vi.spyOn(world.vaultDB, 'tryGetThing')
     const observer = new QueryObserver(world.queryClient, world.vaultTSQ.itemQueryOptions(TH.BoxScope))
     const stop     = observer.subscribe(noop)
-    expect(observer.getCurrentResult().data).to.eq(boxHeldIn(world))
+    expect(observer.getCurrentResult().data).to.eq(boxRecordIn(world))
     await TH.aWhile()
     expect(asked).not.toHaveBeenCalled()
     stop()
@@ -357,7 +364,7 @@ describe("VaultTSQ, carrying over the old minder's promises", () => {
   it("has the record a putOnce wrote as the item before it resolves", async () => {
     const world  = await tsqWorldOf(new MemoryVaultDB())
     const actual = await world.sorted.putOnce({ record: Box0, cited: Shell.childCited(TH.Life0) })
-    expect(world.queryClient.getQueryData(BoxKey)).to.deep.equal(boxHeldIn(world)).and.deep.equal(actual)
+    expect(world.queryClient.getQueryData(BoxKey)).to.deep.equal(boxRecordIn(world)).and.deep.equal(actual)
   })
 
   it("has a refused put's actual record as the item before the refusal is thrown", async () => {
@@ -366,17 +373,17 @@ describe("VaultTSQ, carrying over the old minder's promises", () => {
     const mine = TH.nextOf(Box0, { revtok: TH.revtokOf('mine') })
     let item: unknown = 'untouched'
     try { await world.sorted.putOnce({ record: mine }) } catch { item = world.queryClient.getQueryData(BoxKey) }
-    expect(item).to.deep.equal(boxHeldIn(world)).and.deep.equal(Box1)
+    expect(item).to.deep.equal(boxRecordIn(world)).and.deep.equal(Box1)
   })
 
   it("keeps an item's object, and moves its time, for its revision seen again in a later span", async () => {
     const world   = await tsqWorldOf(new MemoryVaultDB())
     const read_tc = readTcNow()
     world.notify(noticeOf(Box0, read_tc))
-    const held  = world.queryClient.getQueryData(BoxKey)
+    const ante  = world.queryClient.getQueryData(BoxKey)
     const later = readTcSpanAfter(read_tc)
     world.notify(noticeOf(structuredClone(Box0), later))
-    expect(world.queryClient.getQueryData(BoxKey)).to.eq(held)
+    expect(world.queryClient.getQueryData(BoxKey)).to.eq(ante)
     expect(itemQueryAt(world)?.state.dataUpdatedAt).to.eq(readAtOf(later))
   })
 })
@@ -388,13 +395,13 @@ describe("VaultTSQ.getOnce and listOnce", () => {
     await TH.expectRefusal(vaultTSQ.getOnce(TH.RootScope))
     await TH.expectRefusal(vaultTSQ.getOnce(TH.BoxScope, { staleTime: -1 }))
     await TH.expectRefusal(vaultTSQ.listOnce('gate'))
-    expect(() => vaultTSQ.itemQueryOptions({ ...TH.ThingBank, labelpath: 'gate' })).to.throw('A vault TSQ keeps an item only for a box under the root box')
+    expect(() => vaultTSQ.itemQueryOptions(TH.GateScope)).to.throw('A vault TSQ keeps an item only for a box under the root box')
   })
 
   it("list each time asked, the listing replaced by each answer", async () => {
     const world = await tsqWorldOf(new MemoryVaultDB())
-    const before = await world.vaultTSQ.listOnce('box')
-    expect(Object.keys(before.items)).to.deep.equal([])
+    const ante = await world.vaultTSQ.listOnce('box')
+    expect(Object.keys(ante.items)).to.deep.equal([])
     cheatPlant(world.vaultDB, Box0)
     const kids = await world.vaultTSQ.listOnce('box')
     expect(Object.keys(kids.items)).to.deep.equal(['openai'])

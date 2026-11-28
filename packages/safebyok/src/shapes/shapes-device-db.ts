@@ -32,7 +32,7 @@ export const DeviceDBChecks = Object.freeze(Validator.Checkers('bad_record', ({ 
 
 // == [IndexedDB]: IdbDeviceDBOpts, idbDeviceDBOpts, LeaseScopepath, DevicetokScopepath
 
-/** What an IdbDeviceDB is made with. */
+/** Options for an IdbDeviceDB. */
 export interface IdbDeviceDBOpts {
   /** Scopes the database's name and its bell's: `safebyok-<dbName>:…`, or `safebyok:…` if left out. */
   dbName?: string | undefined
@@ -41,8 +41,8 @@ export interface IdbDeviceDBOpts {
 /** The check of an IdbDeviceDB's options, which `browserOpts` takes too. */
 export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_record')
 
-/** Where the lease database files a gate's lease record. */
-export type LeaseScopepath = [userid: Userid, banklabel: Banklabel, labelpath: LeaseLabelpath]
+/** Where the lease database files a gate's lease record: its scope, kind first. */
+export type LeaseScopepath = [modelkind: 'lease', userid: Userid, banklabel: Banklabel, labelpath: LeaseLabelpath]
 
 /** Where the lease database files a user's devicetok. */
 export type DevicetokScopepath = [userid: Userid, devicetok: 'devicetok']

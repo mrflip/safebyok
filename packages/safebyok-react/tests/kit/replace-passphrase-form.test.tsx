@@ -13,7 +13,7 @@ const WrongPassphrase = 'correct horse battery stable'
 
 /** The bank's stage as a line of text, beside the replace form, with the unlock form while it is locked. */
 function StageScreen({ world }: Readonly<{ world: TH.ProviderWorld }>) {
-  const stage = world.Bank.useWorld((snap) => snap.stage)
+  const stage = world.Bank.useBank((snap) => snap.stage)
   return (
     <>
       <p>{stage}</p>

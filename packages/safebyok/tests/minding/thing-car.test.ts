@@ -6,7 +6,7 @@ import { SX } from 'safebyok-big/internals'
 import { Box } from '../../src/models/box'
 import { Thing } from '../../src/models/thing'
 import { ThingCar } from '../../src/minding/thing-car'
-import type { CarWorld } from '../../src/shapes/shapes-vault-minder'
+import type { CarBank } from '../../src/shapes/shapes-vault-minder'
 import { type Lifepath, Lifeseq, Revseq, VoidLifeseq } from '../../src/shapes/primitives'
 import { Shell } from '../../src/shapes/shapes-thing'
 import { type Agekind, type Agerank, type Lifekind, type Liveness, type ReadTc, type SeenThing, type VaultEvent, type VaultItemEvent, VaultDBSourcelabel } from '../../src/shapes/shapes-vault-event'
@@ -19,8 +19,8 @@ const Revs = (() => {
   return { two, three: TH.nextOf(two) }
 })()
 
-/** A world that makes a {@link TH.RefusingThing} at each labelpath. */
-const RefusingWorld: CarWorld<TH.RefusingThing> = Object.freeze({ makeThing: (shell) => TH.RefusingThing.make(shell) })
+/** A bank that makes a {@link TH.RefusingThing} at each labelpath. */
+const RefusingCarBank: CarBank<TH.RefusingThing> = Object.freeze({ makeThing: (shell) => TH.RefusingThing.make(shell) })
 
 // == [Shorthand]: Life, Seen, Shorthand, FeedCase, the starts
 
@@ -516,7 +516,7 @@ const ReadTcChunk0 = readTcOf(0)
 /** The tcchunk an agerank spells for a read_tc in `chunk` */
 function tcchunkOf(chunk: Chunk): string { return chunk.toString(16).padStart(8, '0') }
 
-/** The item event of `record` read at `read_tc`, as a VaultMinder builds it, with no source or bank lifetok */
+/** The item event of `record` read at `read_tc`, as a VaultMinder builds it, with no source or bank banktok */
 function eventOf(record: SeenThing, read_tc: ReadTc = ReadTcChunk0): VaultItemEvent {
   return { ...TH.itemEventOf(record), read_tc }
 }
@@ -529,7 +529,7 @@ function readTcAt(millis: number): ReadTc {
 
 /** Hand `car`'s receive the event of `record` read at `read_tc`, a car of a plain Thing made at `record`'s shell where there is none yet, and return the car and the events it returns */
 function received(car: ThingCar | undefined, record: SeenThing, read_tc: ReadTc = ReadTcChunk0): readonly [ThingCar, readonly VaultEvent[]] {
-  const receiver = car ?? ThingCar.make(Thing.shellOf(record), { world: TH.PlainWorld })
+  const receiver = car ?? ThingCar.make(Thing.shellOf(record), { bank: TH.PlainCarBank })
   return [receiver, receiver.receive(eventOf(record, read_tc))]
 }
 
@@ -577,53 +577,53 @@ function shorthandOf(event: VaultEvent, record: SeenThing, chunk: Chunk = 0): Sh
 /** True when `event`'s agerank is above the one before it */
 function isNewer(event: VaultEvent): boolean { return event.agerank > event.agerankWas }
 
-/** What `car` holds of its refusal and its read_tc, as a plain object */
+/** The refusal and the read_tc of `car`, as a plain object */
 function carFieldsOf(car: ThingCar): Pick<ThingCar, 'thing' | 'lastErr' | 'erred_at' | 'read_tc'> {
   return { thing: car.thing, lastErr: car.lastErr, erred_at: car.erred_at, read_tc: car.read_tc }
 }
 // --
 
-describe("ThingCar.make(begun, { world })", () => {
+describe("ThingCar.make(begun, { bank })", () => {
   it("made from a Thing, carries that Thing, and has taken nothing", () => {
     const thing = TH.PlainThing.make(Thing.shellOf(TH.boxThingOf()))
-    const car   = ThingCar.make(thing, { world: TH.PlainWorld })
+    const car   = ThingCar.make(thing, { bank: TH.PlainCarBank })
     expect(car.thing).to.equal(thing)
     expect(carFieldsOf(car)).to.deep.equal({ thing, lastErr: null, erred_at: null, read_tc: VacantReadTc })
   })
 
-  it("made from the shell, carries the Thing its world makes there, which has received nothing", () => {
+  it("made from the shell, carries the Thing its bank makes there, which has received nothing", () => {
     const makeThing = vi.fn(TH.makePlainThing)
     const shell     = Thing.shellOf(TH.boxThingOf())
-    const car       = ThingCar.make(shell, { world: { makeThing } })
+    const car       = ThingCar.make(shell, { bank: { makeThing } })
     expect(makeThing.mock.calls).to.deep.equal([[shell]])
     expect(car.thing).to.equal(makeThing.mock.results[0]!.value)
     expect([car.agekind, car.read_tc]).to.deep.equal(['vacant', VacantReadTc])
   })
 
-  it("made from an item event, has the Thing its world makes at the record's shell receive it, and keeps when it was read", () => {
+  it("made from an item event, has the Thing its bank makes at the record's shell receive it, and keeps when it was read", () => {
     const makeThing = vi.fn(TH.makePlainThing)
     const event     = TH.thingEventOf(TH.boxThingOf())
-    const car       = ThingCar.make(event, { world: { makeThing } })
+    const car       = ThingCar.make(event, { bank: { makeThing } })
     expect(makeThing.mock.calls).to.deep.equal([[Thing.shellOf(event.val)]])
     expect(carFieldsOf(car)).to.deep.equal({ thing: car.thing, lastErr: null, erred_at: null, read_tc: event.read_tc })
     expect(car.thing.pickle()).to.equal(event.val)
   })
 
   it("made from an item event its Thing refuses, still answers the car, its Thing at the shell, keeping the refusal", () => {
-    const car = ThingCar.make(TH.thingEventOf(Revs.three), { world: RefusingWorld })
+    const car = ThingCar.make(TH.thingEventOf(Revs.three), { bank: RefusingCarBank })
     expect(car.thing.pickle()).to.deep.equal(Thing.shellOf(Revs.three))
     expect(car.lastErr?.refusalkind).to.eq('unexpected_error')
     expect(car.erred_at).to.be.a('number')
     expect(car.read_tc).to.eq(VacantReadTc)
   })
 
-  it("carries the Thing of its kind that a device's world makes", () => {
-    const car = ThingCar.make(Thing.shellOf(TH.boxThingOf()), { world: TH.makeDevice().world })
+  it("carries the Thing of its kind that a device's bank makes", () => {
+    const car = ThingCar.make(Thing.shellOf(TH.boxThingOf()), { bank: TH.makeDevice().bank })
     expect(car.thing).to.be.instanceOf(Box)
   })
 
-  it("throws where its world refuses to make the Thing, as a device's does a record of another bank", () => {
-    TH.expectSyncRefusal(() => ThingCar.make(TH.thingEventOf({ ...TH.boxThingOf(), userid: 'u2' }), { world: TH.makeDevice().world }), 'record_conflict')
+  it("throws where its bank refuses to make the Thing", () => {
+    TH.expectSyncRefusal(() => ThingCar.make(TH.thingEventOf({ ...TH.boxThingOf(), userid: 'u2' }), { bank: TH.makeDevice().bank }), 'record_conflict')
   })
 
   const RefusedBegun = [
@@ -631,19 +631,19 @@ describe("ThingCar.make(begun, { world })", () => {
     [42,                                                        'a number'],
     [TH.boxThingOf(),                                           'a whole record with no item event'],
     [{ ...TH.thingEventOf(TH.boxThingOf()), read_tc: undefined }, 'an item event read at no time'],
-    [{ ...TH.thingEventOf(TH.boxThingOf()), banktok: 'none' },    'an item event whose banktok is no lifetok'],
+    [{ ...TH.thingEventOf(TH.boxThingOf()), banktok: 'none' },    'an item event whose banktok is no banktok'],
   ] as const
 
   for (const [begun, blurb] of RefusedBegun) {
     it(`refuses ${blurb}`, () => {
-      TH.expectSyncRefusal(() => ThingCar.make(begun as never, { world: TH.PlainWorld }), 'bad_record')
+      TH.expectSyncRefusal(() => ThingCar.make(begun as never, { bank: TH.PlainCarBank }), 'bad_record')
     })
   }
 
   const RefusedOpts = [
     [undefined,                       'no options'],
-    [{},                              'no world'],
-    [{ world: { makeThing: 'plain' } }, 'a world whose makeThing is no function'],
+    [{},                              'no bank'],
+    [{ bank: { makeThing: 'plain' } }, 'a bank whose makeThing is no function'],
   ] as const
 
   for (const [opts, blurb] of RefusedOpts) {
@@ -653,7 +653,7 @@ describe("ThingCar.make(begun, { world })", () => {
   }
 
   it("is frozen, its Thing its one own field", () => {
-    const car = ThingCar.make(Thing.shellOf(TH.boxThingOf()), { world: TH.PlainWorld })
+    const car = ThingCar.make(Thing.shellOf(TH.boxThingOf()), { bank: TH.PlainCarBank })
     expect(Object.isFrozen(car)).to.eq(true)
     expect(Object.keys(car)).to.deep.equal(['thing'])
   })
@@ -661,7 +661,7 @@ describe("ThingCar.make(begun, { world })", () => {
 
 describe("car.receive(event)", () => {
   it("returns the events its Thing returns, and moves read_tc only for a record that is news", () => {
-    const car     = ThingCar.make(Thing.shellOf(Revs.two), { world: TH.PlainWorld })
+    const car     = ThingCar.make(Thing.shellOf(Revs.two), { bank: TH.PlainCarBank })
     const event   = TH.thingEventOf(Revs.two)
     const events  = car.receive(event)
     expect(events.map(({ eventkind }) => eventkind)).to.deep.equal(['item', 'life'])
@@ -672,7 +672,7 @@ describe("car.receive(event)", () => {
 
   it("has its Thing publish once the car is past the record: a subscriber finds its agekind, citable and read_tc moved", () => {
     const thing = TH.makePlainThing(Thing.shellOf(Revs.two))
-    const car   = ThingCar.make(thing, { world: TH.PlainWorld })
+    const car   = ThingCar.make(thing, { bank: TH.PlainCarBank })
     const event = TH.thingEventOf(Revs.two)
     const found: unknown[] = []
     thing.subscribe(() => { found.push([car.agekind, car.citable.revseq, car.read_tc]) })
@@ -681,7 +681,7 @@ describe("car.receive(event)", () => {
   })
 
   it("keeps and throws its Thing's refusal and when, then clears it at a record taken, keeping when", () => {
-    const car = ThingCar.make(TH.thingEventOf(Revs.two), { world: RefusingWorld })
+    const car = ThingCar.make(TH.thingEventOf(Revs.two), { bank: RefusingCarBank })
     TH.expectSyncRefusal(() => car.receive(TH.thingEventOf(Revs.three)), 'unexpected_error')
     const { lastErr, erred_at } = car
     expect(lastErr?.refusalkind).to.eq('unexpected_error')
@@ -690,8 +690,8 @@ describe("car.receive(event)", () => {
     expect([car.lastErr, car.erred_at]).to.deep.equal([null, erred_at])
   })
 
-  it("throws the refusal its Thing raised, as a refusal", () => {
-    const car = ThingCar.make(Thing.shellOf(Revs.two), { world: TH.PlainWorld })
+  it("throws the refusal its Thing threw", () => {
+    const car = ThingCar.make(Thing.shellOf(Revs.two), { bank: TH.PlainCarBank })
     const err = TH.expectSyncRefusal(() => car.receive({ ...TH.thingEventOf(Revs.two), labelpath: 'box/other' }), 'bad_record')
     expect(car.lastErr).to.equal(err)
   })
@@ -702,7 +702,7 @@ describe("car.read_at", () => {
     const shell = Thing.shellOf(TH.boxThingOf())
     const car   = carReceived(undefined, TH.boxThingOf(), readTcAt(500_000))
     expect(car.read_at).to.eq(500_000).and.eq(readAtOf(car.read_tc))
-    expect(ThingCar.make(shell, { world: TH.PlainWorld }).read_at).to.eq(0)
+    expect(ThingCar.make(shell, { bank: TH.PlainCarBank }).read_at).to.eq(0)
   })
 })
 
@@ -714,10 +714,10 @@ describe("car.read_tc", () => {
   })
 
   it("is when a read_tc minted now was read", () => {
-    const before  = Date.now()
+    const ante    = Date.now()
     const read_tc = readTcNow()
     const car     = carReceived(undefined, TH.boxThingOf(), read_tc)
-    expect(readAtOf(car.read_tc)).to.be.within(before, Date.now())
+    expect(readAtOf(car.read_tc)).to.be.within(ante, Date.now())
   })
 
   it("follows the newest revision: a newer one brings its own time, the same one the later, an older one none", () => {
@@ -730,7 +730,7 @@ describe("car.read_tc", () => {
     expect(readAtOf(car.read_tc), 'a newer revision').to.eq(300_000)
   })
 
-  it("moves for the newest revision seen again a chunk later, its Thing holding the record it held", () => {
+  it("moves for the newest revision seen again a chunk later, its Thing's record unchanged", () => {
     const record = TH.boxThingOf('openai', { sidecar: { account: 'work' } })
     const car    = carReceived(undefined, record, readTcAt(0))
     carReceived(car, structuredClone(record), readTcAt(70_000))
@@ -747,7 +747,7 @@ describe("car.read_tc", () => {
   })
 
   it("is left as it was by a record its Thing refuses, as is its citable", () => {
-    const car     = ThingCar.make({ ...TH.thingEventOf(Revs.two), read_tc: readTcAt(1000) }, { world: RefusingWorld })
+    const car     = ThingCar.make({ ...TH.thingEventOf(Revs.two), read_tc: readTcAt(1000) }, { bank: RefusingCarBank })
     const { citable } = car
     TH.expectSyncRefusal(() => car.receive({ ...TH.thingEventOf(Revs.three), read_tc: readTcAt(2000) }), 'unexpected_error')
     expect(car.read_tc).to.eq(readTcAt(1000))
@@ -756,12 +756,12 @@ describe("car.read_tc", () => {
 })
 
 describe("car.citable", () => {
-  it("made from a Thing, cites what the Thing holds: the shell, or a record", () => {
+  it("made from a Thing, cites what the Thing has: the shell, or a record", () => {
     const shell = Thing.shellOf(TH.boxThingOf())
-    expect(ThingCar.make(TH.PlainThing.make(shell), { world: TH.PlainWorld }).citable).to.deep.equal(Thing.sparseOf(shell))
+    expect(ThingCar.make(TH.PlainThing.make(shell), { bank: TH.PlainCarBank }).citable).to.deep.equal(Thing.sparseOf(shell))
     const record = TH.boxThingOf('openai', { revseq: 2 })
     const thing  = TH.PlainThing.make(TH.thingEventOf(record))
-    expect(ThingCar.make(thing, { world: TH.PlainWorld }).citable).to.deep.equal(Thing.sparseOf(record))
+    expect(ThingCar.make(thing, { bank: TH.PlainCarBank }).citable).to.deep.equal(Thing.sparseOf(record))
   })
 
   it("cites each record of a later life", () => {
@@ -775,7 +775,7 @@ describe("car.citable", () => {
     }
   })
 
-  it("moves on a newer soon, its Thing holding its record, then stays as the whole record that catches up is adopted", () => {
+  it("moves on a newer soon, its Thing's record unchanged, then stays as the whole record that catches up is adopted", () => {
     const whole2 = TH.boxThingOf('openai', { revseq: 2 })
     const whole4 = TH.boxThingOf('openai', { revseq: 4, revtok: TH.revtokOf('four') })
     const car = carReceived(undefined, whole2)
@@ -843,20 +843,20 @@ describe("car.receive, over the feed table", () => {
   }
 })
 
-describe("a car made from a Thing that holds a record", () => {
+describe("a car made from a Thing that has a record", () => {
   const whole2 = TH.boxThingOf('openai', { revseq: 2 })
 
   it("starts from that record, seen whole at the VacantReadTc, and from the vacant agerank over the shell", () => {
-    const held  = TH.PlainThing.make(eventOf(whole2, readTcOf(5)))
-    const car   = ThingCar.make(held, { world: TH.PlainWorld })
+    const thing = TH.PlainThing.make(eventOf(whole2, readTcOf(5)))
+    const car   = ThingCar.make(thing, { bank: TH.PlainCarBank })
     expect([car.agerank, car.agekind, car.read_tc]).to.deep.equal([agerankOf(0, 2, 2), 'here', VacantReadTc])
     const shell = TH.PlainThing.make(Thing.shellOf(whole2))
-    expect(ThingCar.make(shell, { world: TH.PlainWorld }).agerank).to.eq(VacantAgerank)
+    expect(ThingCar.make(shell, { bank: TH.PlainCarBank }).agerank).to.eq(VacantAgerank)
   })
 
   it("calls neither that record nor an older one news, and the same revision news a chunk later, which its Thing declines", () => {
     const thing  = TH.PlainThing.make(eventOf(whole2))
-    const car    = ThingCar.make(thing, { world: TH.PlainWorld })
+    const car    = ThingCar.make(thing, { bank: TH.PlainCarBank })
     const older  = eventOf(TH.boxThingOf('openai', { revseq: 1 }), readTcOf(1))
     const again  = eventOf(structuredClone(whole2), readTcOf(1))
     expect(car.receive(eventOf(whole2))).to.deep.equal([])
@@ -879,8 +879,8 @@ describe("car.receive", () => {
 
   it("keeps the sourcelabel, read_tc and banktok of the event it receives on every event", () => {
     const record = TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 3 }))
-    const stamp  = { sourcelabel: 'other_tab', read_tc: readTcNow(), banktok: TH.FirstLifetok }
-    const events = ThingCar.make(Thing.shellOf(record), { world: TH.PlainWorld }).receive({ ...eventOf(record), ...stamp })
+    const stamp  = { sourcelabel: 'other_tab', read_tc: readTcNow(), banktok: TH.FirstBanktok }
+    const events = ThingCar.make(Thing.shellOf(record), { bank: TH.PlainCarBank }).receive({ ...eventOf(record), ...stamp })
     expect(events).to.have.lengthOf(3)
     for (const event of events) { expect(event).to.include(stamp) }
   })
@@ -893,19 +893,19 @@ describe("car.receive", () => {
 
   it("returns no events, in a frozen list, and changes nothing, for a record that is not news", () => {
     const [car] = received(undefined, TH.boxThingOf('openai', { revseq: 2 }))
-    const before = [car.agerank, car.thing.pickle()]
+    const ante = [car.agerank, car.thing.pickle()]
     for (const record of [TH.boxThingOf('openai', { revseq: 2 }), TH.boxThingOf('openai', { revseq: 1 }), TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 1 }))]) {
       const events = car.receive(eventOf(record, readTcOf(0)))
       expect(events).to.deep.equal([])
       expect(Object.isFrozen(events)).to.eq(true)
     }
-    expect([car.agerank, car.thing.pickle()]).to.deep.equal(before)
+    expect([car.agerank, car.thing.pickle()]).to.deep.equal(ante)
   })
 
   it("returns no events for a life or aged event, and changes nothing", () => {
     const soon = TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 3 }))
     const [car, events] = received(undefined, soon)
-    const later = ThingCar.make(Thing.shellOf(soon), { world: TH.PlainWorld }).receive(eventOf(soon, readTcOf(2)))
+    const later = ThingCar.make(Thing.shellOf(soon), { bank: TH.PlainCarBank }).receive(eventOf(soon, readTcOf(2)))
     for (const event of [...events.slice(1), ...later.slice(1)]) {
       expect(car.receive(event)).to.deep.equal([])
     }
@@ -965,15 +965,15 @@ describe("car.agekind", () => {
   ] as const
   for (const [seens, expected, blurb] of AgekindCases) {
     it(blurb, () => {
-      const car = ThingCar.make(Thing.shellOf(seens[0] ?? whole2), { world: TH.PlainWorld })
+      const car = ThingCar.make(Thing.shellOf(seens[0] ?? whole2), { bank: TH.PlainCarBank })
       for (const seen of seens) { car.receive(eventOf(seen)) }
       expect(car.agekind).to.eq(expected)
     })
   }
 })
 
-describe("Thing's held record, the same object", () => {
-  it("stays the record held for an equal one seen again a chunk later, while the agerank moves", () => {
+describe("Thing's record, the same object", () => {
+  it("stays the Thing's record for an equal one seen again a chunk later, while the agerank moves", () => {
     const record  = TH.boxThingOf('openai', { sidecar: { account: 'work' } })
     const [car] = received(undefined, record)
     const events  = car.receive(eventOf(structuredClone(record), readTcOf(1)))

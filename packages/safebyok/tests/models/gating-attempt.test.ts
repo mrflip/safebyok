@@ -11,7 +11,7 @@ const NextPassphrase = 'a different passphrase, just as long'
 /** A username a form carries beside its secrets, an obvious fake. */
 const Username = 'hue@example.com'
 
-/** A `FormData` holding `texts`, by fieldname, as a form would hand its action. */
+/** A `FormData` with `texts`, by fieldname, as a form would hand its action. */
 function formOf(texts: Readonly<Record<string, string>>): FormData {
   const form = new FormData()
   for (const [fieldname, text] of Object.entries(texts)) { form.append(fieldname, text) }
@@ -70,7 +70,7 @@ describe("device.gatingBirthAttempt(params)", () => {
     const err = await TH.expectRefusal(device.gatingBirthAttempt(form), 'weak_passphrase')
     expect(fieldnamesOf(form)).to.deep.equal(['username'])
     expect(TH.thrownText(err)).to.not.include(TH.TestPassphrase)
-    expect(device.bank).to.be.null
+    expect(device.bank.areRootsLive).to.be.false
   })
 
   it("empties a form's secret fields even where it refuses before `signin` answers", () => {
@@ -132,9 +132,9 @@ describe("gate.gatingReplacePassphraseAttempt(params)", () => {
 
   it("refuses a wrong current passphrase from a dna as `replacePassphrase` does, writing nothing", async () => {
     const { bank } = await lockedBank()
-    const ante = bank.gate.pickle()
+    const prior = bank.gate.pickle()
     await TH.expectRefusal(bank.gate.gatingReplacePassphraseAttempt({ passphrase: 'not the passphrase', nextPassphrase: NextPassphrase }), 'wrong_passphrase')
-    expect(bank.gate.pickle()).to.equal(ante)
+    expect(bank.gate.pickle()).to.equal(prior)
   })
 })
 
@@ -182,7 +182,7 @@ describe("a refused form entrypoint", () => {
 })
 
 describe("the makers, handed a dna", () => {
-  it("make a gating that a second attempt refuses, as every gating does", async () => {
+  it("make a gating that a second attempt refuses", async () => {
     const { bank } = await lockedBank()
     const gating = bank.gate.unlockGating({ passphrase: TH.TestPassphrase })
     await gating.attempt()

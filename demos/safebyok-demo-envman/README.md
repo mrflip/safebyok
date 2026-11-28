@@ -14,7 +14,7 @@ pnpm demo:envman          # from the repo root: builds what the demo needs, then
 ## What it shows
 
 * `src/lib/sok.ts`: the giver and its bank, made once at module scope.
-* `src/components/EnvmanPage.tsx`: the page switched on `Envman.useWorld().stage`, one component for locked and
+* `src/components/EnvmanPage.tsx`: the page switched on `Envman.useBank().stage`, one component for locked and
   unlocked so a row waiting on the unlock dialog stays mounted, and the kit's `CreateVaultForm`, `UnlockForm` and
   `UnlockDialog`, each finding its bank through the provider.
 * `src/components/EnvList.tsx`: `Envman.useBoxList()`, a row each.

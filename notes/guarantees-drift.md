@@ -84,7 +84,7 @@ what differs from big, in a sentence or two.
   amended 2026-11-21 (gate_holds, #815): the makers and the private verbs they befriend are the `Gate`'s
   (`gate.unlockGating` and its siblings, static `Gate.birthGating`, `#unlockByProving`, `#putGate`, in
   `packages/safebyok/src/models/gate.ts`), and so is the one `Lease`, kept private in the gate's `#lease`: G9's "the
-  Bank keeps its one `Lease` private" reads "the Gate keeps it". A lease is granted to a `LeaseGate` and binds the
+  Bank keeps its one `Lease` private" reads "the Gate keeps it". A lease is granted to a `LeaseBank` and binds the
   bank's stamp as before. No public method accepts a proving, and G1 and G9 hold in substance.
 
 * 2026-11-22 (core_first thread 2, bank_minder), G3: **The main gate's record is cached in a BankMinder that outlives
@@ -136,6 +136,10 @@ what differs from big, in a sentence or two.
   record names itself by its own labelpath, `lease/<label>`, its label its gate's (`LeaseLabelpath.of`, which replaces
   `leaseLabelpathOf` and `leaseScopeOf`), and every peek and stow uses it. A live record's check no longer ties its
   labelpath to its `gate_labelpath`; a lease taken up still unlocks only where its stamp is its world's bank's.
+  amended 2026-11-27 (bank_fold thread 12, one_stamp): a live record cites its gate's life, not its bank's: `banktok`,
+  `gate_labelpath`, `gate_lifepath`, `gate_born_at` and `gate_revtok`; `bank_lifeseq`, `bank_lifetok` and
+  `gate_lifeseq` are gone. Its scope is `{ modelkind: 'lease', userid, banklabel, labelpath }`, kind first, and the
+  record states its `modelkind`. A softlock still keeps the keys and the wrap, which binds no revision of the lease's own.
 
 * 2026-11-25 (lease_shelf thread 1b, lease_shared), G4 and G9: **The lease is persisted and shared by every tab, and
   follows what is stored.** The world (`packages/safebyok/src/models/world.ts`) stows each lease it attaches by a grant,
@@ -167,3 +171,36 @@ what differs from big, in a sentence or two.
   banktok"): the deviceDB keeps one devicetok per user (`deviceDB.ensureDevicetok(userid)`, filed at `[userid,
   'devicetok']`), the same for every bank of that user in the browser, no longer one per bank scope. A devicetok filed
   per bank scope by an earlier build is never read: each user is minted a fresh one once. The ctx is unchanged.
+
+* 2026-11-26 (bank_fold thread 7, fold_docs), *The construction*'s "Only `BankDB.tryDelBank`, reached through the bank
+  listing, deletes the gate row, and with it every wayin.": **a gate's tombstone keeps its wayins.** The bank's
+  presence in storage is its gate's record, at its banklabel, and the gate record's check
+  (`packages/safebyok/src/shapes/shapes-thing.ts`, `PerKindChecks`) admits a tombstone, the bank's end, and requires
+  `wayins` of every gate record, live or not. So a `del` of the gate would leave each wayin's `bank_key_wayin_wrapped`
+  stored, where big's delete of the bank removed every wayin with the gate row. Nothing in the new core writes a gate's
+  tombstone. What a gate's tombstone keeps is before the Coach (`whiteboard/20261126-bank_fold/bank_fold-design.md`).
+  answered 2026-11-27 (bank_fold thread 9, gate_end; the Coach: "it is a tombstone -- am = x with an odd parity
+  lifeseq -- or it is live -- even parity lifeseq and a wayin->'main' and ..."): **a gate's tombstone keeps no wayin.**
+  Its `wayins` are `{ main: null, passkey0: null }`, and a live gate's `main` is a wayin: the gate record's check
+  (`gateGone` and `gateLive` in `PerKindChecks`) and Postgres's CHECK on `safebyok_gate_things` refuse anything else,
+  so a `del` of the gate stores no `bank_key_wayin_wrapped`, as big's delete stored none. It keeps its `lifetok`, which
+  is no secret. Nothing in the new core writes a gate's tombstone yet.
+  amended 2026-11-27 (bank_fold thread 12, one_stamp): the `lifetok` is named `banktok`, and is a field of every Thing.
+
+* 2026-11-27 (bank_fold thread 12, one_stamp), *The construction*'s "the bank's stamp ... in every ctx; beside it the
+  gate's ... for a wayin, the lease's own for a lease, and the vault's ... and the box's for a box's two ciphertexts":
+  **each ctx lists one stamp, and no bank stamp.** `Crypto.cipherCtx`, the purposes, the headers and the wrap helpers
+  are unchanged; what changed is which fields the one stamp holds (`packages/safebyok/src/shapes/shapes-stamps.ts`,
+  `models/wayin.ts`, `models/proving.ts`, `models/lease.ts`, `models/base-box.ts`). A box's stamp is its Thing fields
+  but `label` and `lifeseq` (the last segments of its labelpath and lifepath): `modelkind, userid, banklabel, labelpath,
+  banktok, fmt, am, lifepath, revtok, revseq, born_at, written_at`, its `banktok` its gate's when it was sealed, and a
+  gate's is the same rule. A wayin's stamp is `modelkind: 'wayin'`, its gate's `userid, banklabel, labelpath, lifepath,
+  born_at` and `banktok`, and its own `label`; its header, bound after the purpose, no longer carries the label. A
+  lease's stamp is `modelkind: 'lease', userid, banklabel, banktok, gate_labelpath, gate_lifepath, gate_born_at,
+  gate_revtok, fmt, born_at, proved_at, wayinkind`. What big's bank stamp bound is still bound where it varies: the
+  scope in every stamp, and the life by the `banktok`, minted at each birth, in every stamp; the bank's `born_at` is
+  bound only through the gate's, in a wayin's and a lease's stamp, and a box binds the `banktok` alone for its bank's
+  life. So a wrap or ciphertext moved to another bank, gate, life, wayin place, box or purpose, or a visible field
+  altered, still refuses (`packages/safebyok/tests/models/ctx-bytes.test.ts`, which also shows a box, a wayin and a
+  lease of one life opening nothing under the next life's stamps). A gate verb still rewraps no other wayin, since a
+  wayin's stamp holds no gate revision, and reseals no box.

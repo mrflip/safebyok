@@ -1,6 +1,6 @@
 # safebyok-postgres
 
-safebyok's vaultDB in [Postgres](https://www.postgresql.org): the SQL that makes three tables and the functions that
+safebyok's vaultDB in [Postgres](https://www.postgresql.org): the SQL that makes two tables and the functions that
 write to them, and **`PostgresVaultDB`**, which reads and writes a bank's Things there from your server. Your database has
 ciphertext and the few unencrypted fields a row is found by. It never sees a whisper, a passphrase, or any key that
 could decipher one.
@@ -80,9 +80,10 @@ attached: a `pg` error can carry the statement's parameters, and so a row.
 ## Hearing other writes
 
 Each write notifies on its user's channel, `thingsChannelOf(userid)`, which is `safebyok_things_` followed by the
-userid, as it commits: a JSON object with the Thing's scope under `at`, the Thing under `thing`, and its bank's row under
-`bank`. Postgres refuses a notification of 8,000 bytes or more; one that is too large drops the bank row first, then the
-Thing, and the watch fetches what it lacks. Any role that can connect to the database can `LISTEN` on a
+userid, as it commits: a JSON object with the Thing's scope (its `modelkind`, `userid`, `banklabel` and `labelpath`)
+under `at`, the Thing under `thing`, and its bank's part under `bank`: the `banktok`, `labelpath`, `lifepath`, `revseq`
+and `revtok` of the bank's gate, never its wayins. Postgres refuses a notification of 8,000 bytes or more; one that is
+too large drops the Thing and the bank's part, and the watch fetches them. Any role that can connect to the database can `LISTEN` on a
 channel, and so can read the Things a notification carries: the same ciphertext and wrapped keys the tables contain.
 
 `listen(channel, onNotify)` passes the text of each notification on that channel to `onNotify`, unchanged, and returns
@@ -130,8 +131,9 @@ userid of more than 47 bytes makes every write fail with `storage_issue`, its ca
 
 ## What is stored
 
-`safebyok_bank_things` has a row per bank, `safebyok_gate_things` a row per gate, and `safebyok_box_things` a row per
-box, each keyed by `userid`, `banklabel` and `labelpath`. Each field of a Thing is a column of its own; a field that is
+`safebyok_gate_things` has a row per bank, its gate, stored at the banklabel, and `safebyok_box_things` a row per
+box, each keyed by the rest of a Thing's scope, `userid`, `banklabel` and `labelpath`. Each field of a Thing is a column of its own, and a `CHECK`
+fixes each table's `modelkind` column to its kind; a field that is
 an object is a `jsonb` column. Every text column is `COLLATE "C"`, compared and sorted byte for byte, as safebyok
 compares names. Each time is a `bigint` in UTC epoch milliseconds. Your own SQL can read any of them, but leave the
 writing to `PostgresVaultDB`.

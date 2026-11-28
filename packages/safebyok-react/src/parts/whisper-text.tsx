@@ -12,7 +12,7 @@ import { PartsPhrases } from './phrases-parts'
 /** The props of a {@link WhisperText}. */
 export interface WhisperTextProps {
   /** The giver's bank, `SOK.bank(banklabel)`: the provider's, when left out. */
-  bank?:     Pick<BankGiver, 'useWorld' | 'withWhisper'> | undefined
+  bank?:     Pick<BankGiver, 'useBank' | 'withWhisper'> | undefined
   /** The box's labelpath, as the bank's other hooks take it. */
   labelpath: string
   /** The field of the box's whisper to show. */

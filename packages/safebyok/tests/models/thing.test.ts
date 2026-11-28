@@ -27,7 +27,7 @@ function readTcOf(chunk: number): ReadTc { return `${tcchunkOf(chunk)}-0000-7000
 /** The tcchunk a read_tc in `chunk` begins with */
 function tcchunkOf(chunk: number): string { return chunk.toString(16).padStart(8, '0') }
 
-/** The item event of `record` read at `read_tc`, as a VaultMinder builds it, with no source or bank lifetok */
+/** The item event of `record` read at `read_tc`, as a VaultMinder builds it, with no source or bank banktok */
 function eventOf(record: SeenThing, read_tc: ReadTc = readTcOf(0)): VaultItemEvent {
   return { ...TH.itemEventOf(record), read_tc }
 }
@@ -46,7 +46,7 @@ function propsOf(thing: TH.PlainThing): Record<string, unknown> { return { ...th
 describe("Thing.receive", () => {
   const whole2 = TH.boxThingOf('openai', { revseq: 2 })
 
-  it("adopts a whole record newer than the record held, and answers true", () => {
+  it("adopts a whole record newer than its record, and answers true", () => {
     const whole4 = TH.boxThingOf('openai', { revseq: 4, revtok: TH.revtokOf('four') })
     const [thing, adopted] = received(undefined, whole2)
     expect([adopted, thing.pickle()]).to.deep.equal([true, whole2])
@@ -64,7 +64,7 @@ describe("Thing.receive", () => {
     }
   })
 
-  it("answers false, and holds the very record it held, for the same revision again or an older one", () => {
+  it("answers false, and has the very record it had, for the same revision again or an older one", () => {
     const [thing] = received(undefined, whole2)
     for (const record of [structuredClone(whole2), TH.boxThingOf('openai', { revseq: 1 })]) {
       const event = eventOf(record, readTcOf(1))
@@ -73,7 +73,7 @@ describe("Thing.receive", () => {
     }
   })
 
-  it("answers false, and holds the shell, for a live box's sparse form, however new", () => {
+  it("answers false, and has the shell, for a live box's sparse form, however new", () => {
     const [thing, adopted] = received(undefined, TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 9 })))
     expect(adopted).to.eq(false)
     expect(thing.pickle()).to.deep.equal(Thing.shellOf(whole2))
@@ -81,7 +81,7 @@ describe("Thing.receive", () => {
 
   it("answers false for a life or aged event, and changes nothing", () => {
     const soon = TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 3 }))
-    const car  = ThingCar.make(Thing.shellOf(soon), { world: TH.PlainWorld })
+    const car  = ThingCar.make(Thing.shellOf(soon), { bank: TH.PlainCarBank })
     const [, life, aged] = car.receive(eventOf(soon))
     const [thing] = received(undefined, whole2)
     for (const event of [life, aged]) { expect(thing.receive(event as never)).to.eq(false) }
@@ -154,7 +154,7 @@ describe("Thing's props and record", () => {
     }
   })
 
-  it("holds its record on a newer soon, then adopts the whole record that catches up", () => {
+  it("has its record still on a newer soon, then adopts the whole record that catches up", () => {
     const whole2 = TH.boxThingOf('openai', { revseq: 2 })
     const whole4 = TH.boxThingOf('openai', { revseq: 4, revtok: TH.revtokOf('four') })
     const [thing] = received(undefined, whole2)
@@ -201,7 +201,7 @@ describe("Thing's props and record", () => {
       expect(propsOf(thing)).to.deep.equal(Thing.sparseOf(shell))
     })
 
-    it("holds the shell on a newer soon", () => {
+    it("stays at the shell on a newer soon", () => {
       const [thing] = received(undefined, soon4)
       const soon5 = TH.boxSparseOf(TH.boxThingOf('openai', { revseq: 5, revtok: TH.revtokOf('five') }))
       received(thing, soon5, readTcOf(3))
@@ -218,7 +218,7 @@ describe("Thing's props and record", () => {
     })
   })
 
-  it("made from an item event, holds its record, whole, a tombstone or the void sentinel, having received it", () => {
+  it("made from an item event, has its record, whole, a tombstone or the void sentinel, having received it", () => {
     const tomb = TH.boxThingOf('openai', { am: 'x', lifepath: lifepathOf(1, false), lifeseq: Lifeseq.ofLifenum(1), revseq: 0 })
     for (const record of [TH.boxThingOf(), tomb, Shell.of({ ...TH.BoxScope, lifepath: lifepathOf(0, true) })]) {
       const thing = TH.PlainThing.make(eventOf(record))
@@ -227,7 +227,7 @@ describe("Thing's props and record", () => {
     }
   })
 
-  it("made from the shell, holds it until it first adopts a record", () => {
+  it("made from the shell, has it until it first adopts a record", () => {
     const shell = Thing.shellOf(TH.boxThingOf())
     const thing = TH.PlainThing.make(shell)
     expect(thing.pickle()).to.eq(shell)
@@ -247,10 +247,10 @@ describe("Thing's props and record", () => {
     expect(Object.getOwnPropertyNames(thing)).to.have.members(Object.keys(Thing.sparseOf(record)))
   })
 
-  it("sets every Thing field non-writable, its scope fields non-configurable and the rest configurable", () => {
+  it("sets every Thing field non-writable, its scope fields and modelkind non-configurable and the rest configurable", () => {
     const record = TH.boxThingOf()
     const thing = TH.PlainThing.make(eventOf(record))
-    const scopeFieldnames = new Set(['userid', 'banklabel', 'labelpath'])
+    const scopeFieldnames = new Set(['userid', 'banklabel', 'labelpath', 'modelkind'])
     const thingFieldnames = Object.keys(Thing.sparseOf(record))
     for (const fieldname of thingFieldnames) {
       const configurable = ! scopeFieldnames.has(fieldname)
@@ -276,10 +276,10 @@ describe("Thing's props and record", () => {
   it("is left as it was by a receive whose adopt throws", () => {
     const live2 = TH.boxThingOf('openai', { revseq: 2 })
     const thing = TH.RefusingThing.make(eventOf(live2))
-    const before = [thing.pickle(), thing.revseq]
+    const ante = [thing.pickle(), thing.revseq]
     const refused = TH.boxThingOf('openai', { revseq: TH.RefusingThing.RefusedRevseq, revtok: TH.revtokOf('three') })
     expect(() => thing.receive(eventOf(refused, readTcOf(1)))).to.throw(TH.RefusingThing.Refusal)
-    expect([thing.pickle(), thing.revseq]).to.deep.equal(before)
+    expect([thing.pickle(), thing.revseq]).to.deep.equal(ante)
   })
 })
 
@@ -304,11 +304,11 @@ describe("Thing refusals", () => {
   ] as const
 
   for (const [val, blurb] of RefusedVals) {
-    it(`refuses an event whose val is ${blurb}, holding the record it held`, () => {
+    it(`refuses an event whose val is ${blurb}, its record unchanged`, () => {
       const [thing] = received(undefined, TH.boxThingOf('openai', { revseq: 1 }))
-      const held = thing.pickle()
+      const ante = thing.pickle()
       TH.expectSyncRefusal(() => thing.receive({ ...eventOf(live), val } as never), 'bad_record')
-      expect(thing.pickle()).to.eq(held)
+      expect(thing.pickle()).to.eq(ante)
     })
   }
 
@@ -323,11 +323,11 @@ describe("Thing refusals", () => {
   ] as const
 
   for (const [fields, blurb] of RefusedEvents) {
-    it(`refuses an event ${blurb}, holding the record it held`, () => {
+    it(`refuses an event ${blurb}, its record unchanged`, () => {
       const [thing] = received(undefined, TH.boxThingOf('openai', { revseq: 1 }))
-      const held = thing.pickle()
+      const ante = thing.pickle()
       TH.expectSyncRefusal(() => thing.receive({ ...eventOf(live), ...fields } as never), 'bad_record')
-      expect(thing.pickle()).to.eq(held)
+      expect(thing.pickle()).to.eq(ante)
     })
   }
 

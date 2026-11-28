@@ -10,7 +10,7 @@ import { cacheRowsNow, vaultRowsNow } from '../lib/stores'
 type Shown = Readonly<{ ckey: string, modelkind: string, val: unknown }>
 
 /** The groups every store's panel shows, in order, even when empty. */
-const Modelkinds = ['bank', 'gate', 'box'] as const
+const Modelkinds = ['gate', 'box'] as const
 
 /** The groups of the device's panel: the modelkinds of its bank TSQ and vault TSQ, and its lease. */
 const DeviceGroups = [...Modelkinds, 'lease'] as const
@@ -46,7 +46,7 @@ export function InspectTab({ isShown }: Readonly<{ isShown: boolean }>) {
       <h2 id="inspect-title">Inspect</h2>
       <Panel title="VaultDB: what the backend stores (IndexedDB, read directly)" groups={Modelkinds} rows={stored?.vault} />
       <Panel title="Root shelf: each bank's roots kept here between page loads (localStorage, read directly)" groups={Modelkinds} rows={stored?.cache} />
-      <Panel title={"TSQ: the device's bank TSQ (its bank, main gate and root box), its vault TSQ (its boxes and their listings), and its lease"} groups={DeviceGroups} rows={stored?.tsq}
+      <Panel title={"TSQ: the device's bank TSQ (its gate and root box), its vault TSQ (its boxes and their listings), and its lease"} groups={DeviceGroups} rows={stored?.tsq}
         note="Read through the library's back door, maskedView, for experimenting: the bank TSQ and the vault TSQ each cut every ciphertext to its last 2 characters and its length before it leaves the library, and the lease shows its loggable, never its keys." />
       <Panel title={"Mutations: the host's QueryClient"} groups={MutationGroups} rows={mutationRows} />
     </section>
@@ -130,36 +130,31 @@ function shownOfMutations(client: QueryClient): Shown[] {
   }))
 }
 
-/** A row of the vault database, filed at `[userid, banklabel, labelpath]`. */
+/** A row of the vault database, filed at `[modelkind, userid, banklabel, labelpath]`. */
 function shownOfThing([ckey, val]: StoredRow): Shown {
-  const labelpath = (ckey as [userid: string, banklabel: string, labelpath: string])[2]
-  return { ckey: JSON.stringify(ckey), modelkind: labelpath.split('/', 1)[0] ?? '', val }
+  const modelkind = (ckey as [modelkind: string, userid: string, banklabel: string, labelpath: string])[0]
+  return { ckey: JSON.stringify(ckey), modelkind, val }
 }
 
-/** Each root the root shelf keeps at `ckey`: the value is its version, then the bank's, the main gate's and the root box's records, each beside when it was read. */
+/** Each root the root shelf keeps at `ckey`: the value is its version, then the gate's and the root box's records, each beside when it was read. */
 function shownOfShelved([ckey, shelved]: ShelvedRow): Shown[] {
-  const [, ...roots] = JSON.parse(shelved) as [version: string, ...roots: { record: { labelpath: string }, read_tc: string }[]]
-  return roots.map((root) => ({ ckey: `${ckey} ${root.record.labelpath}`, modelkind: root.record.labelpath.split('/', 1)[0] ?? '', val: root }))
+  const [, ...roots] = JSON.parse(shelved) as [version: string, ...roots: { record: { labelpath: string, modelkind: string }, read_tc: string }[]]
+  return roots.map((root) => ({ ckey: `${ckey} ${root.record.labelpath}`, modelkind: root.record.modelkind, val: root }))
 }
 
+// A bank TSQ row is a root's record, masked, which states its kind. A vault TSQ item is a box's; its listings are `other`.
 /** Each row of the device's bank TSQ and vault TSQ, its ckey led by `bankTSQ` or `vaultTSQ`; then its lease. */
 function shownOfMaskedView({ bankTSQ, vaultTSQ, lease }: MaskedView): Shown[] {
-  const rows = Object.entries({ bankTSQ, vaultTSQ }).flatMap(([tsqlabel, maskedRows]) => maskedRows.map(({ queryKey, val }) => ({
-    ckey: `${tsqlabel} ${JSON.stringify(queryKey)}`, modelkind: modelkindOfQueryKey(queryKey), val,
-  })))
-  return [...rows, { ckey: 'lease', modelkind: 'lease', val: lease }]
-}
-
-/** The modelkind of a minder's item, from its key `['sok', userid, banklabel, 'item', modelkind, …]`; `other` for any other key. */
-function modelkindOfQueryKey(queryKey: readonly unknown[]): string {
-  return (queryKey[3] === 'item') ? String(queryKey[4]) : 'other'
+  const roots = bankTSQ.map(({ queryKey, val }) => ({ ckey: `bankTSQ ${JSON.stringify(queryKey)}`, modelkind: (val as { modelkind: string }).modelkind, val }))
+  const items = vaultTSQ.map(({ queryKey, val }) => ({ ckey: `vaultTSQ ${JSON.stringify(queryKey)}`, modelkind: (queryKey[4] === 'item') ? 'box' : 'other', val }))
+  return [...roots, ...items, { ckey: 'lease', modelkind: 'lease', val: lease }]
 }
 
 /** `modelkind`, capitalized, for a group's heading. */
 function titleOf(modelkind: string): string { return `${modelkind.charAt(0).toUpperCase()}${modelkind.slice(1)}` }
 
 /** The fields whose cells show a UUID cut short by `maskUuid`: tokens and a read time, too long whole for a column. */
-const UuidFieldnames: ReadonlySet<string> = new Set(['revtok', 'lifetok', 'read_tc'])
+const UuidFieldnames: ReadonlySet<string> = new Set(['revtok', 'banktok', 'read_tc'])
 
 /** The text of the cell for `fieldname`: a text of {@link UuidFieldnames} cut short, anything else as {@link shownText} gives it. */
 function cellTextOf(fieldname: string, inner: unknown): string {

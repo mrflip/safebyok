@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { thingNotificationOf, thingsChannelOf } from '../src/notifications'
 
 const Scope = { userid: 'u1', banklabel: 'main' }
-const At    = { userid: 'u1', banklabel: 'main', labelpath: 'box/openai' }
+const At    = { userid: 'u1', banklabel: 'main', modelkind: 'box', labelpath: 'box/openai' }
 
 describe("thingsChannelOf(userid)", () => {
   it("names the channel for the userid, as the write functions notify it", () => {
@@ -14,13 +14,15 @@ describe("thingsChannelOf(userid)", () => {
 
 const NotificationCases = [
   // notifications of this bank:
-  [{ at: At },                                             { labelpath: 'box/openai' },                                  'one that carries only its scope'],
-  [{ at: At, read_tc: 'tc', thing: { am: 'a' }, bank: 7 }, { labelpath: 'box/openai', read_tc: 'tc', thing: { am: 'a' }, bank: 7 }, 'one that carries its read_tc, Thing and bank row, unchecked'],
-  [{ at: At, other: 'field' },                             { labelpath: 'box/openai' },                                  'one with a field it does not know'],
+  [{ at: At },                                             { modelkind: 'box', labelpath: 'box/openai' },                'one that carries only its scope'],
+  [{ at: At, read_tc: 'tc', thing: { am: 'a' }, bank: { banktok: 7, labelpath: 'main', lifepath: '0000000000', revseq: 0, revtok: 'r1' } }, { modelkind: 'box', labelpath: 'box/openai', read_tc: 'tc', thing: { am: 'a' }, banktok: 7 }, "one that carries its read_tc, Thing and bank's part, unchecked, of which it reads the banktok, the Thing's labelpath kept"],
+  [{ at: At, other: 'field' },                             { modelkind: 'box', labelpath: 'box/openai' },                'one with a field it does not know'],
   // anything else:
   [{ at: { ...At, userid: 'u2' } },                        null,                                                         "another user's"],
   [{ at: { ...At, banklabel: 'other' } },                  null,                                                         "another bank's"],
   [{ at: { userid: 'u1', banklabel: 'main' } },            null,                                                         'one with no labelpath'],
+  [{ at: { ...At, modelkind: undefined } },                null,                                                         'one with no modelkind'],
+  [{ at: { ...At, modelkind: 'bank' } },                   null,                                                         'one of no kind of Thing'],
   [{ thing: { am: 'a' } },                                 null,                                                         'one with no scope'],
 ] as const
 
