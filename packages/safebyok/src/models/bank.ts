@@ -163,7 +163,7 @@ export class Bank {
 
   // A root's Thing is subscribed to before it receives its first record, so that this bank hears of that record too.
   /** Make the Thing at `begun`, of this bank: a {@link Gate} or a {@link Box}, by its modelkind. Nothing is fetched or stored.
-   * Made from the shell, it holds the shell; made from an item event, it receives the event after, and throws where it refuses its record.
+   * Made from the shell, it models the shell; made from an item event, it receives the event after, and throws where it refuses its record.
    * What its subscribers throw goes to the device's `onBadNews`.
    */
   makeThing(begun: VaultItemEvent<GateRecord>): Gate
@@ -185,7 +185,7 @@ export class Bank {
 
   // The roots are seeded from the shelf before the bank listens for them, so that seeding does not put each root it peeked straight back on the shelf.
   /** Give this bank `vaultMinder`, the VaultMinder of the signed-in user's bank; where `shelf` is given, seed it from the roots on `shelf` and put the roots there as they change. A second call does nothing.
-   * With no shelf, the roots are kept nowhere between page loads. The janitor starts, and where this bank is connected, the VaultMinder starts watching the vaultDB.
+   * With no shelf, the roots are stowed nowhere between page loads. The janitor starts, and where this bank is connected, the VaultMinder starts watching the vaultDB.
    */
   signin(vaultMinder: VaultMinder, shelf: RootShelf | null): void {
     Checks.signinArgs.parse({ vaultMinder, shelf })
@@ -543,7 +543,7 @@ export class Bank {
   /** True where the gate was last read more than the device's `gateStaleMillis` ago */
   #isGateStale(): boolean { return this.#isGateRead() && (Clock.nowMillis() - this.#rootCars().gate.read_at > this.#device.gateStaleMillis) }
 
-  /** Get the gate and the root box from the vaultDB, past anything kept here, telling the device's `onBadNews` of a refusal */
+  /** Get the gate and the root box from the vaultDB, past anything cached here, telling the device's `onBadNews` of a refusal */
   async #refreshRoots(): Promise<void> {
     try {
       const answer = await this.demandVaultMinder().tryGetBankOnce()
@@ -817,7 +817,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, lit, custom, union }) =>
     vaultMinder: custom<VaultMinder>(isVaultMinder, Phrases.VaultMinderExpected),
     shelf:       custom<RootShelf>(isRootShelf, Phrases.RootShelfExpected).nullable(),
   }),
-  // The shelf keeps the roots only while both are live, each whole.
+  // The shelf has the roots only while both are live, each whole.
   shelvedRoot: obj({ record: union([GateChecks.record, BoxChecks.record]), read_tc: SeenChecks.readTc }),
   shelvedGate: obj({ record: GateChecks.record }),
   // A birth is never over a live gate: its gating refuses that first.
