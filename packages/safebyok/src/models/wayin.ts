@@ -1,11 +1,10 @@
 import type * as Z from 'zod'
 import type { CX, EX } from 'safebyok-big/internals'
 import { Crypto, Helpers } from 'safebyok-big/internals'
-import type * as Stamps from '../shapes/shapes-stamps'
+import { type GateLife, StampChecks } from '../shapes/shapes-stamps'
 import { type WayinHeader, type WayinRecord, WayinChecks } from '../shapes/shapes-wayin'
 import type { Devicetok, EpochMillis } from '../shapes/primitives'
 import type { Modelkind } from '../shapes/shapes-thing'
-import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 
 // == [The ctx]: PurposeForWayinkind, wayinCtxOf
 
@@ -15,12 +14,13 @@ export const PurposeForWayinkind = Object.freeze({
   passkey:    'bank_key_passkey_wrapped',
 } as const satisfies Readonly<Record<EX.Wayinkind, string>>)
 
-/** The context a wayin's wrapped bankKey is bound to: the bank's stamp, the gate's stamp, the wayin's purpose and its header.
+/** The context a wayin's wrapped bankKey is bound to: the wayin's stamp, its gate's life `gateLife` with the header's label, then the wayin's purpose, then the rest of its header.
  * The bankKey unwraps only given the same context: any change, such as another `userid` or a forged `born_at`, prevents it.
  */
-export function wayinCtxOf(bankStamp: Stamps.BankStamp, gateStamp: Stamps.GateStamp, header: WayinHeader): Uint8Array {
-  const headerChecked = WayinChecks.wayinHeader.parse(header)
-  return Crypto.cipherCtx([BankChecks.stamp.parse(bankStamp), GateChecks.stamp.parse(gateStamp)], PurposeForWayinkind[headerChecked.wayinkind], headerChecked)
+export function wayinCtxOf(gateLife: GateLife, header: WayinHeader): Uint8Array {
+  const { label, ...bound } = WayinChecks.wayinHeader.parse(header)
+  const stamp = StampChecks.wayinStamp.parse({ ...gateLife, modelkind: 'wayin', label })
+  return Crypto.cipherCtx(stamp, PurposeForWayinkind[bound.wayinkind], bound)
 }
 // --
 

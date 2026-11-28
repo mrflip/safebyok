@@ -14,7 +14,7 @@ const elsewhere: { device: Promise<Device> | null } = { device: null }
 export async function putBoxElsewhere(userid: string, labelpath: string): Promise<void> {
   elsewhere.device ??= signedInElsewhere(userid)
   const { bank, vault } = await elsewhere.device
-  if ((bank === null) || (vault === null)) { throw new Error(`${userid} has no bank for another device to write a box in.`) }
+  if ((vault === null) || (! bank.areRootsLive)) { throw new Error(`${userid} has no bank for another device to write a box in.`) }
   if (! bank.isUnlocked) { await bank.gate.unlock({ passphraseCleartext: passphraseOf(userid) }) }
   await vault.putBoxOnce(`box/${labelpath}`, { sidecar: { username: 'written_elsewhere' } }, { whisper: { password: 'written elsewhere, meanwhile' } })
 }

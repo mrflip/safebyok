@@ -12,7 +12,7 @@ import { DeviceDB } from './device-db'
 // Zero-padded, so that a database name sorts as its version does. Its stem is not safebyok-big's `device`, whose
 // databases a shelf of the same stem at a newer version would delete.
 /** The layout version of the lease database, in three zero-padded parts. */
-export const LeaseDBVersion = '001-001-001'
+export const LeaseDBVersion = '002-001-001'
 
 /** The shelf of the lease database `safebyok-<dbName>:lease-v<version>`, or `safebyok:lease-v<version>` with no `dbName`. */
 function leaseShelfOf(dbName: string | undefined): UseStore {
@@ -25,10 +25,10 @@ export function leaseDatabasenameOf(dbName?: string): string { return `${dbprefi
 /** The name of the BroadcastChannel that tells every tab of the lease records stowed in the database of `dbName`. */
 export function leaseBellnameOf(dbName?: string): string { return `${dbprefixOf(dbName)}:lease` }
 
-/** Where the lease record at `scope` is filed: one for each gate. */
-export function scopepathOf({ userid, banklabel, labelpath }: LeaseScope): LeaseScopepath { return [userid, banklabel, labelpath] }
+/** Where the lease record at `scope` is filed, kind first: one for each gate. */
+export function scopepathOf({ modelkind, userid, banklabel, labelpath }: LeaseScope): LeaseScopepath { return [modelkind, userid, banklabel, labelpath] }
 
-// It never meets a lease record's scopepath, which has three parts.
+// It never meets a lease record's scopepath, which has four parts.
 /** Where the devicetok of the user `userid` is filed, in the same object store as the lease records: one for each user. */
 export function devicetokScopepathOf(userid: Userid): DevicetokScopepath { return [userid, 'devicetok'] }
 // --
@@ -68,9 +68,9 @@ export class IdbDeviceDB extends DeviceDB {
   }
 
   // A channel of its own for each ring, so that every channel listening on the bell, this tab's own among them, hears it.
-  protected doRing({ userid, banklabel, labelpath }: LeaseScope): void {
+  protected doRing({ modelkind, userid, banklabel, labelpath }: LeaseScope): void {
     const channel = new BroadcastChannel(this.#bellname)
-    channel.postMessage({ userid, banklabel, labelpath })
+    channel.postMessage({ modelkind, userid, banklabel, labelpath })
     channel.close()
   }
 

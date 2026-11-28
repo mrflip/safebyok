@@ -22,54 +22,35 @@
  "vault": [
   [
    [
-    "hero",
-    "dojo",
-    "bank"
-   ],
-   {
-    "userid": "hero",
-    "banklabel": "dojo",
-    "labelpath": "bank",
-    "label": "bank",
-    "am": "a",
-    "lifepath": "0000000000",
-    "lifeseq": "0000000000",
-    "revtok": "754667dc-2582-4fc7-8fad-bb1dd4eec92f",
-    "revseq": 0,
-    "written_at": 1795598083958,
-    "born_at": 1795598083958,
-    "fmt": "a010501",
-    "lifetok": "e895e9a8-db3d-4076-8281-b7ef4cd5873f"
-   }
-  ],
-  [
-   [
+    "box",
     "hero",
     "dojo",
     "box"
    ],
    {
+    "modelkind": "box",
     "userid": "hero",
     "banklabel": "dojo",
     "labelpath": "box",
     "label": "box",
+    "banktok": "9deea750-8bf4-4bb0-913a-a084b76bdb16",
     "am": "a",
     "lifepath": "0000000000",
     "lifeseq": "0000000000",
-    "revtok": "ac520a9c-408c-42c1-bd1d-061b33f14a6e",
+    "revtok": "fea553e7-b379-405c-86a8-3711479331b3",
     "revseq": 0,
-    "written_at": 1795598084010,
-    "born_at": 1795598084010,
-    "fmt": "a010501",
+    "written_at": 1795770245079,
+    "born_at": 1795770245079,
+    "fmt": "a010502",
     "sidecar": {},
     "whisper_sealed": {
      "key_wrapped": {
-      "cipher_iv_b64": "5iOORh5XkFTMvGVx",
-      "ciphertext_b64": "RhODE8O_TJYxnZ90ZLetU6iKeZCzmKG0vNyHODqn5J9UyHDgQVsECSjEIupovf0A"
+      "cipher_iv_b64": "yX-zTL_Def1KSBbx",
+      "ciphertext_b64": "W1ykDzFEF_iEaxELC61RFcFJrCVc7FsEV2DOcNNoZuE3jNyEj8fmqvZynC_snq4W"
      },
      "ciphered": {
-      "cipher_iv_b64": "yklnP3j3wzmyVpi1",
-      "ciphertext_b64": "lasiIrsMXoN7n0S-abLye_Wq"
+      "cipher_iv_b64": "SRPSQ9wYS3nOmFm3",
+      "ciphertext_b64": "6kvax_-9Di8lIg9LspRcdthZ"
      },
      "codectag": "json_v1",
      "schematag": "whisper_v1"
@@ -78,34 +59,37 @@
   ],
   [
    [
+    "box",
     "hero",
     "dojo",
     "box/github"
    ],
    {
+    "modelkind": "box",
     "userid": "hero",
     "banklabel": "dojo",
     "labelpath": "box/github",
     "label": "github",
+    "banktok": "9deea750-8bf4-4bb0-913a-a084b76bdb16",
     "am": "a",
     "lifepath": "0000000000/0000000000",
     "lifeseq": "0000000000",
-    "revtok": "d4051a59-ab3a-498c-9010-20af8ccf2794",
+    "revtok": "72624611-4efd-47fb-beb3-a41627d844de",
     "revseq": 0,
-    "written_at": 1795598084022,
-    "born_at": 1795598084022,
-    "fmt": "a010501",
+    "written_at": 1795770245089,
+    "born_at": 1795770245089,
+    "fmt": "a010502",
     "sidecar": {
      "username": "hero_at_github"
     },
     "whisper_sealed": {
      "key_wrapped": {
-      "cipher_iv_b64": "yZxXIdMuvMWTFtGc",
-      "ciphertext_b64": "TGy_8RLZVA-mpwqX5aq4Jh1jiKGOWQcmHCGLlqVYNSEtBGsrAjxMC023HR69JdDM"
+      "cipher_iv_b64": "yExlxWuJJcuPCy1P",
+      "ciphertext_b64": "OPXwtqAm3Tq5KJANcl6d8j-OH2GqvwHtqcUkhSC5vJ2qP_BKxyriU15AxUsTlPM5"
      },
      "ciphered": {
-      "cipher_iv_b64": "Nq6-fNzxsluiCcac",
-      "ciphertext_b64": "9KUJU_BRQsg6NWOWOz_NQNIA56yfN5PdrbXWOgAdggcJ09Mmlyhe9Xcl6IbaUGgXOtmDa3yGhbUYkvcR4uhhXRI"
+      "cipher_iv_b64": "KkrugQWBamXSjn2c",
+      "ciphertext_b64": "wSBZIZxO3XoyMxavBJRhknt0GNHpjkz55J-al0ro7xwaZF7f0ciK6tpP52c5q3rj1ZUSemcoLbkI-aPPdNOwspw"
      },
      "codectag": "json_v1",
      "schematag": "whisper_v1"
@@ -114,34 +98,113 @@
   ],
   [
    [
-    "hero",
+    "box",
+    "thierry",
     "dojo",
-    "gate"
+    "box"
    ],
    {
-    "userid": "hero",
+    "modelkind": "box",
+    "userid": "thierry",
     "banklabel": "dojo",
-    "labelpath": "gate",
-    "label": "gate",
+    "labelpath": "box",
+    "label": "box",
+    "banktok": "408574ba-c139-4686-b2bc-dbdc0e650806",
     "am": "a",
     "lifepath": "0000000000",
     "lifeseq": "0000000000",
-    "revtok": "1b75061f-65ee-4fc9-b6ca-fe59a47e13c9",
+    "revtok": "3193c4e2-e867-4f92-a2c1-92d4fe151c71",
     "revseq": 0,
-    "written_at": 1795598083958,
-    "born_at": 1795598083958,
-    "fmt": "a010501",
+    "written_at": 1795770245107,
+    "born_at": 1795770245107,
+    "fmt": "a010502",
+    "sidecar": {},
+    "whisper_sealed": {
+     "key_wrapped": {
+      "cipher_iv_b64": "2fwFj1d9B29cemhJ",
+      "ciphertext_b64": "pRHqqRjKIOYnr3_J34qQ35x7vN6foFjmNcezzfN1t0FHOgx1puKJvtpfNtpluw76"
+     },
+     "ciphered": {
+      "cipher_iv_b64": "nHYBxiwpA1m-Hfle",
+      "ciphertext_b64": "2fnqV3uZoE2WmwcT90xbW8u7"
+     },
+     "codectag": "json_v1",
+     "schematag": "whisper_v1"
+    }
+   }
+  ],
+  [
+   [
+    "box",
+    "thierry",
+    "dojo",
+    "box/gitlab"
+   ],
+   {
+    "modelkind": "box",
+    "userid": "thierry",
+    "banklabel": "dojo",
+    "labelpath": "box/gitlab",
+    "label": "gitlab",
+    "banktok": "408574ba-c139-4686-b2bc-dbdc0e650806",
+    "am": "a",
+    "lifepath": "0000000000/0000000000",
+    "lifeseq": "0000000000",
+    "revtok": "a6d5e307-a969-4b36-ae8a-3dc91dd37a22",
+    "revseq": 0,
+    "written_at": 1795770245110,
+    "born_at": 1795770245110,
+    "fmt": "a010502",
+    "sidecar": {
+     "username": "thierry_at_gitlab"
+    },
+    "whisper_sealed": {
+     "key_wrapped": {
+      "cipher_iv_b64": "jbZzaGCxYv9xyagP",
+      "ciphertext_b64": "Kl19J3E02OfsxkUj4IF0TCKdFFnU8E4ZT9agBk6OomeeH--0Z13YX9sYroyEif6x"
+     },
+     "ciphered": {
+      "cipher_iv_b64": "7SWqzrP2w5gvI-p7",
+      "ciphertext_b64": "lOGwk879gLYYRFxsqJvDmcohUQ49dlEaWcqGnmjBZ-kScW9AywHt-_h-ZJ0ITz8Ij1W-kKvMcZeZsI-czeM8ZOUXaus"
+     },
+     "codectag": "json_v1",
+     "schematag": "whisper_v1"
+    }
+   }
+  ],
+  [
+   [
+    "gate",
+    "hero",
+    "dojo",
+    "dojo"
+   ],
+   {
+    "modelkind": "gate",
+    "userid": "hero",
+    "banklabel": "dojo",
+    "labelpath": "dojo",
+    "label": "dojo",
+    "banktok": "9deea750-8bf4-4bb0-913a-a084b76bdb16",
+    "am": "a",
+    "lifepath": "0000000000",
+    "lifeseq": "0000000000",
+    "revtok": "42c0f80b-ed30-4b00-b451-2e2e4b3df9d8",
+    "revseq": 0,
+    "written_at": 1795770245031,
+    "born_at": 1795770245031,
+    "fmt": "a010502",
     "wayins": {
      "main": {
       "wayinkind": "passphrase",
       "label": "main",
       "key_deriver_label": "dojo_light",
-      "salt_b64": "5YMt-B9ZGvLq6rfR5bJfhg",
-      "devicetok": "75529953-b3ef-4656-a896-0022d1352619",
-      "born_at": 1795598083993,
+      "salt_b64": "CUb_UhGE_d0eu7yiiQDpUw",
+      "devicetok": "29e2e999-9a58-41c9-a0c9-8ec70ea9445a",
+      "born_at": 1795770245061,
       "bank_key_wayin_wrapped": {
-       "cipher_iv_b64": "4mvC6izNnCRzIL56",
-       "ciphertext_b64": "GS8CXeWHuyy8s9WHO2i2GqtNPCXNiYCskdd6hu5I65HcG1qKTxIhSMlrAFQNsKVw"
+       "cipher_iv_b64": "USQCPgqg-DB8gVXU",
+       "ciphertext_b64": "jYiKd_hNjOcf-A8mGg5PrzXG9CZ8MdMs8Voh27hM1eLtXWwhhtUXMENl295pB6g-"
       }
      },
      "passkey0": null
@@ -153,126 +216,37 @@
   ],
   [
    [
+    "gate",
     "thierry",
     "dojo",
-    "bank"
+    "dojo"
    ],
    {
+    "modelkind": "gate",
     "userid": "thierry",
     "banklabel": "dojo",
-    "labelpath": "bank",
-    "label": "bank",
+    "labelpath": "dojo",
+    "label": "dojo",
+    "banktok": "408574ba-c139-4686-b2bc-dbdc0e650806",
     "am": "a",
     "lifepath": "0000000000",
     "lifeseq": "0000000000",
-    "revtok": "4a121cba-8480-4a06-b465-7ca65bb554eb",
+    "revtok": "4b789a02-91c7-4bbd-b72a-ec3f00789fee",
     "revseq": 0,
-    "written_at": 1795598084024,
-    "born_at": 1795598084024,
-    "fmt": "a010501",
-    "lifetok": "2f70bfac-5889-49bd-846b-629783b1b498"
-   }
-  ],
-  [
-   [
-    "thierry",
-    "dojo",
-    "box"
-   ],
-   {
-    "userid": "thierry",
-    "banklabel": "dojo",
-    "labelpath": "box",
-    "label": "box",
-    "am": "a",
-    "lifepath": "0000000000",
-    "lifeseq": "0000000000",
-    "revtok": "75e07f4c-4981-46ed-98c0-2c975c24880a",
-    "revseq": 0,
-    "written_at": 1795598084047,
-    "born_at": 1795598084047,
-    "fmt": "a010501",
-    "sidecar": {},
-    "whisper_sealed": {
-     "key_wrapped": {
-      "cipher_iv_b64": "Gbjj6ecVnMAHnl4O",
-      "ciphertext_b64": "1yDS_PPb8QVERMFDatVCDU3GXIJe0fR0mUla1E0zwXDXJK54M5DWkD7NZjtO-8jc"
-     },
-     "ciphered": {
-      "cipher_iv_b64": "HkuAbYFMm5FTnvO6",
-      "ciphertext_b64": "zRULoh5ny2gUpOzsvsz6t4Ni"
-     },
-     "codectag": "json_v1",
-     "schematag": "whisper_v1"
-    }
-   }
-  ],
-  [
-   [
-    "thierry",
-    "dojo",
-    "box/gitlab"
-   ],
-   {
-    "userid": "thierry",
-    "banklabel": "dojo",
-    "labelpath": "box/gitlab",
-    "label": "gitlab",
-    "am": "a",
-    "lifepath": "0000000000/0000000000",
-    "lifeseq": "0000000000",
-    "revtok": "5b93d278-69d7-469e-9447-90c9cad2ff8c",
-    "revseq": 0,
-    "written_at": 1795598084050,
-    "born_at": 1795598084050,
-    "fmt": "a010501",
-    "sidecar": {
-     "username": "thierry_at_gitlab"
-    },
-    "whisper_sealed": {
-     "key_wrapped": {
-      "cipher_iv_b64": "KnWFDvIyopeTDptG",
-      "ciphertext_b64": "TeiUvTaxSHwy9Dd9MRA95c3I2MSX1dRsRZXxY_BTjBfry-n8ZBRJCIDLgWFAjMOU"
-     },
-     "ciphered": {
-      "cipher_iv_b64": "f7x_oJZQs6A98HFA",
-      "ciphertext_b64": "3OvO8MW9V1m7V2hhYj60GTwWdD0T_Xlt-y_d_n-1CVVfGAun5ci8IM-VroNgBYHJ24PtjCmjDOu3oG83eR1dmTmGY8A"
-     },
-     "codectag": "json_v1",
-     "schematag": "whisper_v1"
-    }
-   }
-  ],
-  [
-   [
-    "thierry",
-    "dojo",
-    "gate"
-   ],
-   {
-    "userid": "thierry",
-    "banklabel": "dojo",
-    "labelpath": "gate",
-    "label": "gate",
-    "am": "a",
-    "lifepath": "0000000000",
-    "lifeseq": "0000000000",
-    "revtok": "3b784ab5-86ad-43b9-97b8-e4471287f896",
-    "revseq": 0,
-    "written_at": 1795598084024,
-    "born_at": 1795598084024,
-    "fmt": "a010501",
+    "written_at": 1795770245092,
+    "born_at": 1795770245092,
+    "fmt": "a010502",
     "wayins": {
      "main": {
       "wayinkind": "passphrase",
       "label": "main",
       "key_deriver_label": "dojo_light",
-      "salt_b64": "xucgWYnVa_7rNyOmkr5dSA",
-      "devicetok": "e42f2157-13a1-4d75-b8cb-600d2de53505",
-      "born_at": 1795598084042,
+      "salt_b64": "TG5oeljZc8cCWjUPyUzv3A",
+      "devicetok": "ae253dc1-ce7d-41a9-b8b0-feaa54f1714e",
+      "born_at": 1795770245102,
       "bank_key_wayin_wrapped": {
-       "cipher_iv_b64": "Ap7HfMUCKIaV572Z",
-       "ciphertext_b64": "CQXOdWV3bPYsgDoUr3o-UBHuGACijQ7U1jDMMHE5jIe6hlMPQ3_gHndLshDjMMHB"
+       "cipher_iv_b64": "M89hkqaUfBm-gGKk",
+       "ciphertext_b64": "r5_YZ7FNuCxPG0o-c3IUTTNeRzSZ3NnOXzWdI_tS6lCEjz51m8u2zggg_0iEbsym"
       }
      },
      "passkey0": null
@@ -286,41 +260,44 @@
  "cache": [
   [
    "safebyok:roots:dojo:hero",
-   "[\"roots-tc-a010501\",{\"record\":{\"userid\":\"hero\",\"banklabel\":\"dojo\",\"labelpath\":\"bank\",\"label\":\"bank\",\"am\":\"a\",\"lifepath\":\"0000000000\",\"lifeseq\":\"0000000000\",\"revtok\":\"754667dc-2582-4fc7-8fad-bb1dd4eec92f\",\"revseq\":0,\"written_at\":1795598083958,\"born_at\":1795598083958,\"fmt\":\"a010501\",\"lifetok\":\"e895e9a8-db3d-4076-8281-b7ef4cd5873f\"},\"read_tc\":\"01a211fc-67b0-76ea-bcb5-e4849db71bb6\"},{\"record\":{\"userid\":\"hero\",\"banklabel\":\"dojo\",\"labelpath\":\"gate\",\"label\":\"gate\",\"am\":\"a\",\"lifepath\":\"0000000000\",\"lifeseq\":\"0000000000\",\"revtok\":\"1b75061f-65ee-4fc9-b6ca-fe59a47e13c9\",\"revseq\":0,\"written_at\":1795598083958,\"born_at\":1795598083958,\"fmt\":\"a010501\",\"wayins\":{\"main\":{\"wayinkind\":\"passphrase\",\"label\":\"main\",\"key_deriver_label\":\"dojo_light\",\"salt_b64\":\"5YMt-B9ZGvLq6rfR5bJfhg\",\"devicetok\":\"75529953-b3ef-4656-a896-0022d1352619\",\"born_at\":1795598083993,\"bank_key_wayin_wrapped\":{\"cipher_iv_b64\":\"4mvC6izNnCRzIL56\",\"ciphertext_b64\":\"GS8CXeWHuyy8s9WHO2i2GqtNPCXNiYCskdd6hu5I65HcG1qKTxIhSMlrAFQNsKVw\"}},\"passkey0\":null},\"auth\":{},\"sigs\":{},\"meta\":{}},\"read_tc\":\"01a211fc-67b0-76ea-bcb5-e4849db71bb6\"},{\"record\":{\"userid\":\"hero\",\"banklabel\":\"dojo\",\"labelpath\":\"box\",\"label\":\"box\",\"am\":\"a\",\"lifepath\":\"0000000000\",\"lifeseq\":\"0000000000\",\"revtok\":\"ac520a9c-408c-42c1-bd1d-061b33f14a6e\",\"revseq\":0,\"written_at\":1795598084010,\"born_at\":1795598084010,\"fmt\":\"a010501\",\"sidecar\":{},\"whisper_sealed\":{\"key_wrapped\":{\"cipher_iv_b64\":\"5iOORh5XkFTMvGVx\",\"ciphertext_b64\":\"RhODE8O_TJYxnZ90ZLetU6iKeZCzmKG0vNyHODqn5J9UyHDgQVsECSjEIupovf0A\"},\"ciphered\":{\"cipher_iv_b64\":\"yklnP3j3wzmyVpi1\",\"ciphertext_b64\":\"lasiIrsMXoN7n0S-abLye_Wq\"},\"codectag\":\"json_v1\",\"schematag\":\"whisper_v1\"}},\"read_tc\":\"01a211fc-67b0-76ea-bcb5-e4849db71bb6\"}]"
+   "[\"roots-tc-a010502\",{\"record\":{\"modelkind\":\"gate\",\"userid\":\"hero\",\"banklabel\":\"dojo\",\"labelpath\":\"dojo\",\"label\":\"dojo\",\"banktok\":\"9deea750-8bf4-4bb0-913a-a084b76bdb16\",\"am\":\"a\",\"lifepath\":\"0000000000\",\"lifeseq\":\"0000000000\",\"revtok\":\"42c0f80b-ed30-4b00-b451-2e2e4b3df9d8\",\"revseq\":0,\"written_at\":1795770245031,\"born_at\":1795770245031,\"fmt\":\"a010502\",\"wayins\":{\"main\":{\"wayinkind\":\"passphrase\",\"label\":\"main\",\"key_deriver_label\":\"dojo_light\",\"salt_b64\":\"CUb_UhGE_d0eu7yiiQDpUw\",\"devicetok\":\"29e2e999-9a58-41c9-a0c9-8ec70ea9445a\",\"born_at\":1795770245061,\"bank_key_wayin_wrapped\":{\"cipher_iv_b64\":\"USQCPgqg-DB8gVXU\",\"ciphertext_b64\":\"jYiKd_hNjOcf-A8mGg5PrzXG9CZ8MdMs8Voh27hM1eLtXWwhhtUXMENl295pB6g-\"}},\"passkey0\":null},\"auth\":{},\"sigs\":{},\"meta\":{}},\"read_tc\":\"01a21c3f-5fdb-7597-8018-069169c12c20\"},{\"record\":{\"modelkind\":\"box\",\"userid\":\"hero\",\"banklabel\":\"dojo\",\"labelpath\":\"box\",\"label\":\"box\",\"banktok\":\"9deea750-8bf4-4bb0-913a-a084b76bdb16\",\"am\":\"a\",\"lifepath\":\"0000000000\",\"lifeseq\":\"0000000000\",\"revtok\":\"fea553e7-b379-405c-86a8-3711479331b3\",\"revseq\":0,\"written_at\":1795770245079,\"born_at\":1795770245079,\"fmt\":\"a010502\",\"sidecar\":{},\"whisper_sealed\":{\"key_wrapped\":{\"cipher_iv_b64\":\"yX-zTL_Def1KSBbx\",\"ciphertext_b64\":\"W1ykDzFEF_iEaxELC61RFcFJrCVc7FsEV2DOcNNoZuE3jNyEj8fmqvZynC_snq4W\"},\"ciphered\":{\"cipher_iv_b64\":\"SRPSQ9wYS3nOmFm3\",\"ciphertext_b64\":\"6kvax_-9Di8lIg9LspRcdthZ\"},\"codectag\":\"json_v1\",\"schematag\":\"whisper_v1\"}},\"read_tc\":\"01a21c3f-5fdb-7597-8018-069169c12c20\"}]"
   ]
  ],
  "planted": {
   "hero": [
    [
     [
+     "box",
      "hero",
      "dojo",
      "box/login"
     ],
     {
+     "modelkind": "box",
      "userid": "hero",
      "banklabel": "dojo",
      "labelpath": "box/login",
      "label": "login",
+     "banktok": "9deea750-8bf4-4bb0-913a-a084b76bdb16",
      "am": "a",
      "lifepath": "0000000000/0000000000",
      "lifeseq": "0000000000",
-     "revtok": "249f3f5d-d8bb-4642-babd-45d38fad692a",
+     "revtok": "4c173f48-38d8-40cb-a366-e771205ae8f2",
      "revseq": 0,
-     "written_at": 1795598084052,
-     "born_at": 1795598084052,
-     "fmt": "a010501",
+     "written_at": 1795770245114,
+     "born_at": 1795770245114,
+     "fmt": "a010502",
      "sidecar": {
       "username": "hero_planted"
      },
      "whisper_sealed": {
       "key_wrapped": {
-       "cipher_iv_b64": "xwI5NzOaDhdZ9bF_",
-       "ciphertext_b64": "_GeOReHT6rmUE0mh44rhStHSKtrqN8R4QCjQXgbdSjXTSkGCdMh96wcpcC0hFXm9"
+       "cipher_iv_b64": "Yn4TaawSb1ISN3lD",
+       "ciphertext_b64": "kLPrIWgeBE0gk99hlvHjF9aosY3HjzFBtCV-JIBbCFMJyb6EBfI_FzSBftG4o1uj"
       },
       "ciphered": {
-       "cipher_iv_b64": "gkflY7kKeM0AWZiM",
-       "ciphertext_b64": "SkTJFmCl2RewSmQbEMWldM5Oc9_V7uZfMElxg503me_GmyyGlApttcAFXkNpfRs"
+       "cipher_iv_b64": "uShQ4vaihKPdJHyJ",
+       "ciphertext_b64": "3QXX6atKlQJPpkulM01p86z0Z8cL7dbYA1WyDfz2KvojKT4AQ9oDRvGKfbLuQHk"
       },
       "codectag": "json_v1",
       "schematag": "whisper_v1"
@@ -331,34 +308,37 @@
   "thierry": [
    [
     [
+     "box",
      "thierry",
      "dojo",
      "box/login"
     ],
     {
+     "modelkind": "box",
      "userid": "thierry",
      "banklabel": "dojo",
      "labelpath": "box/login",
      "label": "login",
+     "banktok": "408574ba-c139-4686-b2bc-dbdc0e650806",
      "am": "a",
      "lifepath": "0000000000/0000000000",
      "lifeseq": "0000000000",
-     "revtok": "7dae7bf3-81f6-4a19-a1a4-fb1f5fb13690",
+     "revtok": "42fd7ec8-a2f4-4657-9bd7-0b50ce621b1c",
      "revseq": 0,
-     "written_at": 1795598084055,
-     "born_at": 1795598084055,
-     "fmt": "a010501",
+     "written_at": 1795770245116,
+     "born_at": 1795770245116,
+     "fmt": "a010502",
      "sidecar": {
       "username": "thierry_planted"
      },
      "whisper_sealed": {
       "key_wrapped": {
-       "cipher_iv_b64": "3F1cd1rEMz1bLrSU",
-       "ciphertext_b64": "8sHHvaKW1HtFNP3RRhWKRWoIdJy_oPWq6nQkTz6u8RmS91c0INci--LQ4ikHt9aT"
+       "cipher_iv_b64": "RkLu9SXqkv87eqdB",
+       "ciphertext_b64": "mX46Bmsiptxi1KkydoIvsr5WAjEtIw3GWZcsEXrWeKz87IU7KUFu4vQFmfNtkDxz"
       },
       "ciphered": {
-       "cipher_iv_b64": "7I4weWMkV_PUnM1l",
-       "ciphertext_b64": "9zaFy2XDjJNRlyGy3uRYaAYa3IfQesjewW8mWcuPYG7rCiMlOj96vUCoG-E_iAA"
+       "cipher_iv_b64": "gKGwQBlW2ZBn0IRZ",
+       "ciphertext_b64": "iTET0uG_p7LOPrvpnIZaK4KIkhJDJutxViUhAEdjIFkM-QW7GjWbBJTK_mfYxDc"
       },
       "codectag": "json_v1",
       "schematag": "whisper_v1"
@@ -369,54 +349,35 @@
   "nolo": [
    [
     [
-     "nolo",
-     "dojo",
-     "bank"
-    ],
-    {
-     "userid": "nolo",
-     "banklabel": "dojo",
-     "labelpath": "bank",
-     "label": "bank",
-     "am": "a",
-     "lifepath": "0000000000",
-     "lifeseq": "0000000000",
-     "revtok": "6f0f255b-cf97-45ab-bfda-639bebe40f68",
-     "revseq": 0,
-     "written_at": 1795598084056,
-     "born_at": 1795598084056,
-     "fmt": "a010501",
-     "lifetok": "a255debb-2ae1-4f48-900b-36927b57db8b"
-    }
-   ],
-   [
-    [
+     "box",
      "nolo",
      "dojo",
      "box"
     ],
     {
+     "modelkind": "box",
      "userid": "nolo",
      "banklabel": "dojo",
      "labelpath": "box",
      "label": "box",
+     "banktok": "541962b5-e7ca-4b07-a3e5-fa2a0bf4ddab",
      "am": "a",
      "lifepath": "0000000000",
      "lifeseq": "0000000000",
-     "revtok": "ada1e3f9-85cf-4bd8-9634-635bc2c093e7",
+     "revtok": "ff1499f5-8ad4-4d58-a5da-18e6354d017d",
      "revseq": 0,
-     "written_at": 1795598084063,
-     "born_at": 1795598084063,
-     "fmt": "a010501",
+     "written_at": 1795770245123,
+     "born_at": 1795770245123,
+     "fmt": "a010502",
      "sidecar": {},
      "whisper_sealed": {
       "key_wrapped": {
-       "cipher_iv_b64": "GeLMJKj1or7InksL",
-       "ciphertext_b64": "XSlsxTO237qekPagIk2kA4ymPVM6YquCbvgSqLmgz2TUtZtorZA6eeMlYCOjWCXC"
+       "cipher_iv_b64": "UanCXyyv3FLzt9d5",
+       "ciphertext_b64": "lWvk4vFHKnTUIXyLiSsqWwxKI8mVTLl0Ew-BJ18oWdZSYToxiApvx7oKtj33Kg1H"
       },
       "ciphered": {
-       "cipher_iv_b64": "sYm_61DYk7tji9CV",
-       "ciphertext_b64": "lvUNcfAyc13prc6VsaL2lah4"
+       "cipher_iv_b64": "U2Cud_MC-DIMcQ1w",
+       "ciphertext_b64": "D84UQWI412wxx2zC8OOx67qr"
       },
       "codectag": "json_v1",
       "schematag": "whisper_v1"
@@ -425,34 +386,37 @@
    ],
    [
     [
+     "gate",
      "nolo",
      "dojo",
-     "gate"
+     "dojo"
     ],
     {
+     "modelkind": "gate",
      "userid": "nolo",
      "banklabel": "dojo",
-     "labelpath": "gate",
-     "label": "gate",
+     "labelpath": "dojo",
+     "label": "dojo",
+     "banktok": "541962b5-e7ca-4b07-a3e5-fa2a0bf4ddab",
      "am": "a",
      "lifepath": "0000000000",
      "lifeseq": "0000000000",
-     "revtok": "d409ec5a-9020-47a8-abd1-691b29dab33a",
+     "revtok": "442d978d-4601-411a-b26a-7dc622627d96",
      "revseq": 0,
-     "written_at": 1795598084056,
-     "born_at": 1795598084056,
-     "fmt": "a010501",
+     "written_at": 1795770245119,
+     "born_at": 1795770245119,
+     "fmt": "a010502",
      "wayins": {
       "main": {
        "wayinkind": "passphrase",
        "label": "main",
        "key_deriver_label": "dojo_light",
-       "salt_b64": "E6_HEeVejbFbw05pIdxvQQ",
-       "devicetok": "02e57f56-d378-4078-9b98-4579fcdf77aa",
-       "born_at": 1795598084058,
+       "salt_b64": "n4F75XU7DzVa4fM85FAXzg",
+       "devicetok": "468222b5-83ef-498a-bd58-a1763d874657",
+       "born_at": 1795770245120,
        "bank_key_wayin_wrapped": {
-        "cipher_iv_b64": "DTUPpL-c-x6G31Pw",
-        "ciphertext_b64": "jVapIL6sTxTNfRuwlypy9bB9bwWWK_LCXJz9KCoTtnlNIPuMle7ec_tJBX_8-1zK"
+        "cipher_iv_b64": "sRXLfcdL9wkuJupW",
+        "ciphertext_b64": "GoBWpO3IEKoZ_vCxHgAR3E10R4bCAW5pLPbnMSdGV71NI48MQIbmdiOCewfpkXTY"
        }
       },
       "passkey0": null

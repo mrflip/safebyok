@@ -13,23 +13,26 @@ check outside its owner. Each entry's reasoning names that cost. Where a new cas
 strictly as the case it names, amend that entry: widen its heading and steps, and say so in your report. Where it meets
 them only in part, and above all where its fix is cheap, it is a defect: fix it, or bring it to a Coach.
 
-### A birth over a deleted bank refuses `stale` when another device built the bank again first
+### A birth over a deleted bank refuses when another device built the bank again first
 
-* current outcome: `tryBirthBank` refuses `stale` and writes nothing. Until a birth cites the bank it found, as big's
-  does, every birth over a bank's tombstone refuses so, race or no race: rebirth waits on the coordinated delete.
+* current outcome: `tryBirthBank` writes nothing. Where the other device's bank is live, it answers `passed` with that
+  bank's gate, and the birth refuses `gate_made_elsewhere`; where that bank was deleted again, it refuses `stale`. A
+  birth's puts cite each root as the device found it, the shell or its tombstone, so a birth over a deleted bank writes
+  its next life; but where another device wrote either root since, what the birth cites is no longer stored.
 * alternatives:
   - retry for the customer: belongs to the customer or to orchestration we provide, never the low-level call.
   - make the new record server-side: the server cannot make a sealed record.
   - lock the bank across the prompt: keeps storage locked while a user types a passphrase, and a lock is a last resort.
-* workaround: the customer retries, or the user reloads the page.
+* workaround: on `gate_made_elsewhere`, the user unlocks the bank the other device built, by its passphrase; on
+  `stale`, the customer offers the birth again.
 
 Steps to reproduce: device A finds the bank deleted, and asks its user for a passphrase for a new one. Meanwhile device B
 builds the bank again, and may delete it again, each with its own user's passphrase. A's user then submits: A's birth
 cites the tombstone it found, which is no longer what is stored.
 
 Reasoning for wontfix: it needs three passphrase prompts on two devices racing, and leaves a refusal that writes
-nothing, which a retry clears. Mending it would put a retry or a lock in a primitive's critical path. Ruled by the
-Coach, 2026-11-15, box_ops thread 1.
+nothing: `gate_made_elsewhere`, whose remedy is to unlock the bank that is there. Mending it would put a retry or a
+lock in a primitive's critical path. Ruled by the Coach, 2026-11-15, box_ops thread 1.
 
 ### A get's late, older answer keeps the newer record, but marks it fresh
 
@@ -75,9 +78,9 @@ The answer to an ask that tracks a root that is missing or incompatible is unspe
 
 * current outcome: unspecified. As the code stands, an ask that tracks a root at another revision than the actual row is
   refused: `incompatible_row` where the row fails its checks, `storage_issue` where there is none. An ask that tracks the
-  incompatible row's own revision is told `'same'` for it, and the step's answer stands; where that row is the bank, the
-  answer's `banktok` is the void lifetok. No caller checks for either case, and none may: no guard, no null, no refusal
-  of its own, and no test of the value in `tracked`.
+  incompatible row's own revision is told `'same'` for it, and the step's answer stands; where that row is the gate, the
+  answer's `banktok` is the row's `banktok` where that is a banktok, else the void banktok. No caller checks for either
+  case, and none may: no guard, no null, no refusal of its own, and no test of the value in `tracked`.
 * alternatives:
   - a sentinel for either case (null, a refusal kind, a left-out key): it extends the contract, so every caller must
     then handle it, and the handling cascades into code that second-guesses the datastore.
@@ -85,7 +88,7 @@ The answer to an ask that tracks a root that is missing or incompatible is unspe
     for a case storage should never produce.
 * workaround: reload the page, or restart the system.
 
-Steps to reproduce: a device's ask carries `track` for the bank and its main gate, whose revisions it was sent, after
+Steps to reproduce: a device's ask carries `track` for the gate and the root box, whose revisions it was sent, after
 the datastore has lost or damaged either row.
 
 Reasoning for wontfix: the device was sent revisions of both rows, so either case means storage has gone wrong
@@ -323,7 +326,7 @@ feed_sorter (the redistribution design, section 12); narrowed to an item with no
   VaultMinder, and stops the VaultMinder's watch and the deviceDB's listener; it waits for nothing in flight. A get or a put already past its checks goes on: its answer lands
   in the VaultMinder and the vault TSQ's QueryClient as any answer does, and a put lands in storage. A notice the
   vaultDB delivers after its watch is stopped is told to whoever still listens to the VaultMinder, and the vault TSQ is
-  no longer among them. The disconnect stops the world's janitor, but a re-read of the roots its last tick began goes
+  no longer among them. The disconnect stops the bank's janitor, but a re-read of the roots its last tick began goes
   on, and its roots land in the VaultMinder as a get's answer does. A peek of the deviceDB that a connect, a root's news
   or a ring began goes on too, and where the lease stored is newer it is taken up: the disconnected tab holds it until a
   lock, a later disconnect or the janitor's autolock past its end. The take-up is announced to the host's `onLifecycle`
@@ -337,7 +340,7 @@ feed_sorter (the redistribution design, section 12); narrowed to an item with no
 * workaround: none needed: a disconnect leaves nothing stored inconsistent, and a connect fetches again.
 
 Steps to reproduce: hold a vaultDB's get, call `device.disconnect()`, then let the get answer: the box's item in
-`device.vaultTSQ` holds the answer. Or hold the vaultDB's getworld once a janitor tick has asked it, call
+`device.vaultTSQ` holds the answer. Or hold the vaultDB's get of the bank once a janitor tick has asked it, call
 `device.disconnect()`, then let it answer: the VaultMinder holds the roots.
 
 Reasoning for wontfix: a disconnect comes when a provider unmounts, and a get is in flight for milliseconds (CLAUDE.md,
@@ -384,7 +387,7 @@ device_db worker; the softlock and the tab whose record lost added by thread 1b,
   The new holder reads nothing again as it takes the lock: what it missed is caught by the janitor's re-read of a stale
   gate and by the next listing or get of each box.
 * alternatives:
-  - a refresh of the world, or a listing of every box, on taking the lock: a startup concern where freshness is the
+  - a refresh of the bank's roots, or a listing of every box, on taking the lock: a startup concern where freshness is the
     janitor's (the Coach: "All that matters is when it was read. This is not a startup concern, it's a janitorial
     concern"), and a read that every hand-over pays for a window of milliseconds.
   - the old holder keeping its watch until the new one reports it has started: a hand-shake between tabs, a new state
@@ -467,7 +470,7 @@ and `discard` has always emptied every input of the draft. Ruled by the Coach, 2
 
 ### A stage change that reveals a suspending subtree shows its fallback
 
-The bank's stage reaches React through `useSyncExternalStore` (`safebyok-react`, `useWorld`). React's manual: an
+The bank's stage reaches React through `useSyncExternalStore` (`safebyok-react`, `useBank`). React's manual: an
 update from an external store is never a transition. So when an unlock, or any other stage change, first renders a
 subtree that suspends on a record, React shows that subtree's `Suspense` fallback, and a host cannot have it wait
 behind the screen before by wrapping the change in `startTransition`.
@@ -564,7 +567,7 @@ Written by lease_shelf thread 4, 2026-11-25, awaiting a ruling.
 * alternatives:
   - have the tab that acted suppress the announcement: a flag through the softlock for a case the host knows it caused,
     and a branch on every gate verb.
-  - announce a gate change as a kind of its own: a second kind for the same softlock, with its own branch in the world.
+  - announce a gate change as a kind of its own: a second kind for the same softlock, with its own branch in the bank.
 * workaround: none needed: a host that called the verb knows it did, and a handler that cares compares the `softlocked`
   it hears with the verb it has under way.
 
@@ -626,7 +629,7 @@ bankDB, and nothing secret is held. Written by adapter_port thread G (postgres_l
 ### A write over a row that fails its kind's checks lands when the write predicate's clauses match
 
 * current outcome: a datastore checks no ante row against its kind. A write whose cited revision and the predicate's
-  equality clauses (`fmt`, `lifeseq`, the revision pins, `born_at`, `lifetok`) match the ante row overwrites it, and
+  equality clauses (`fmt`, `lifeseq`, the revision pins, `born_at`, `banktok`) match the ante row overwrites it, and
   answers `replaced`. A gate policy reads the raw ante wayins, so a `passkey0` that is a string of garbage reads as a
   passkey stored, and a write under `revoke_passkey` that cites the gate lands. Without a policy, safebyok-big
   overwrote such a row as well; under a policy, it refused `damaged_row`.
@@ -644,3 +647,22 @@ Reasoning for wontfix: an incompatible row is a broken state, which is reported 
 on the write path. Refusing the write would add a check outside its owner to every datastore's write. "A write over an
 incompatible row refuses" is not a guarantee of the new core. Ruled by the Coach, 2026-11-27, vault_manifest Closer
 Look E1.
+
+### A lease's `gate_labelpath` is not checked against its banklabel
+
+* current outcome: a lease record's check ties its labelpath to its `gate_labelpath` (`isOfItsGate`, in
+  `src/shapes/shapes-stamps.ts`), and checks `gate_labelpath` as a gate's labelpath, but not that it is the lease's
+  banklabel (`isGateAtBanklabel` is not among its refinements). A lease of banklabel `bob` with `gate_labelpath`
+  `alice` at `lease/alice` passes. It unlocks nothing: a lease is taken up only where its `gate_labelpath` is the
+  labelpath of the gate the bank holds (`stored.gate_labelpath === gate?.labelpath`, in `src/models/bank.ts`), and the
+  bank reads its lease at `lease/<banklabel>`.
+* alternatives:
+  - refine the lease's check with `isGateAtBanklabel`: a third place the check would run, for a record only our code
+    writes, and whose take-up already compares the gate.
+* workaround: none needed.
+
+Steps to reproduce: stow, through the deviceDB, a lease whose `gate_labelpath` is another bank's banklabel.
+
+Reasoning for wontfix: only our code writes a lease, from the gate it unlocked (`Lease`, `LeaseLabelpath.of`), and the
+take-up compares the lease with the gate it would unlock, so the record cannot unlock another bank. The deviceDB's
+check is of what our code wrote. Recorded by bank_fold thread 7 (fold_docs), 2026-11-26; not yet ruled by the Coach.

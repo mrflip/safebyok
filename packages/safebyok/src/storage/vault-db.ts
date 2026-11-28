@@ -1,8 +1,8 @@
 /** The `VaultDB` interface the models call. Its answers, and what a concrete adapter reports to `AdapterVaultDB`, are in shapes-answers. */
 
 import type { Errors } from 'safebyok-big/internals'
-import type { BirthBankAsk, GetAsk, GetWorldAsk, ListAsk, StatsAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
-import type { BirthBankAnswer, GetThingAnswer, GetWorldAnswer, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
+import type { BirthBankAsk, GetAsk, GetBankAsk, ListAsk, StatsAsk, ThingWatchScope, WriteAsk } from '../shapes/shapes-asks'
+import type { BirthBankAnswer, GetThingAnswer, GetBankAnswer, ListThingsAnswer, StatsAnswer, WriteThingAnswer } from '../shapes/shapes-answers'
 import type { VaultEvent } from '../shapes/shapes-vault-event'
 
 // == [The interface]: VaultDB, VaultDBMembernames, isVaultDB
@@ -25,10 +25,10 @@ export interface VaultDB {
   tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer>
   /** The children of the Thing at `ask`'s scope, read in one step. */
   tryListThings(ask: ListAsk): Promise<ListThingsAnswer>
-  /** Write a new bank's three roots (bank, main gate, root box), or answer the actual roots of a bank already live. */
+  /** Write a new bank's two roots (its gate, at its banklabel, and its root box), or answer the actual roots of a bank already live. */
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
-  /** A bank's three roots (bank, main gate, root box), read in one step: each live, a tombstone, or the shell where none is stored. */
-  tryGetWorld(ask: GetWorldAsk): Promise<GetWorldAnswer>
+  /** A bank's two roots (its gate and its root box), read in one step: each live, a tombstone, or the shell where none is stored. */
+  tryGetBank(ask: GetBankAsk): Promise<GetBankAnswer>
   /** A bank's storage stats, read in one step: how many boxes and gates it has, live and in all, their size in bytes, and the datastore's limits.
    * Nothing refuses a write for being over a limit. A datastore's limit is never `Infinity`: one with none reports `StoreLimitCap`.
    */
@@ -47,7 +47,7 @@ export interface VaultDB {
 
 /** The members of {@link VaultDB} that are functions. */
 const VaultDBMembernames = [
-  'tryGetThing', 'tryWriteThing', 'tryListThings', 'tryBirthBank', 'tryGetWorld', 'tryStats', 'watch',
+  'tryGetThing', 'tryWriteThing', 'tryListThings', 'tryBirthBank', 'tryGetBank', 'tryStats', 'watch',
 ] as const satisfies readonly (keyof VaultDB)[]
 
 /** True for an object with a function for each member of {@link VaultDB}. */

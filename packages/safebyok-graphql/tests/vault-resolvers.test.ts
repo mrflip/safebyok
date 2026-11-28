@@ -135,9 +135,9 @@ function signedInAsU1(): DB.Userid { return 'u1' }
 // Each verb's operation, an ask of it over the born test bank, whether the vaultDB answers it ok, and the vaultDB verb that answers it.
 const VerbCases = [
   ['getThing',          VaultOperations.getThing,   TH.getGateAskOf(),                 true,  (vaultDB: DB.VaultDB, ask: never) => vaultDB.tryGetThing(ask)],
-  ['getThing refused',  VaultOperations.getThing,   TH.getAskAt('box/openai', 'fail'), false, (vaultDB: DB.VaultDB, ask: never) => vaultDB.tryGetThing(ask)],
-  ['listThings',        VaultOperations.listThings, TH.listAskAt('box'),               true,  (vaultDB: DB.VaultDB, ask: never) => vaultDB.tryListThings(ask)],
-  ['getWorld',          VaultOperations.getWorld,   TH.getWorldAskOf(),                true,  (vaultDB: DB.VaultDB, ask: never) => vaultDB.tryGetWorld(ask)],
+  ['getThing refused',  VaultOperations.getThing,   TH.getAskAt('box', 'box/openai', 'fail'), false, (vaultDB: DB.VaultDB, ask: never) => vaultDB.tryGetThing(ask)],
+  ['listThings',        VaultOperations.listThings, TH.listAskAt('box', 'box'),               true,  (vaultDB: DB.VaultDB, ask: never) => vaultDB.tryListThings(ask)],
+  ['getBank',          VaultOperations.getBank,   TH.getBankAskOf(),                true,  (vaultDB: DB.VaultDB, ask: never) => vaultDB.tryGetBank(ask)],
   ['stats',             VaultOperations.stats,      TH.statsAskOf(),                   true,  (vaultDB: DB.VaultDB, ask: never) => vaultDB.tryStats(ask)],
   ['writeThing',        VaultOperations.writeThing, boxBirthAskOf(),                   true,  (vaultDB: DB.VaultDB, ask: never) => vaultDB.tryWriteThing(ask)],
   ['writeThing refused', VaultOperations.writeThing, TH.birthAskOf(TH.gateThingOf()),  false, (vaultDB: DB.VaultDB, ask: never) => vaultDB.tryWriteThing(ask)],
@@ -169,7 +169,7 @@ describe("vaultResolvers", () => {
       const schema = TH.schemaOver(served)
       for (const [label, document, ask] of VerbCases) {
         const answer = await runAsk(schema, document, ask, userid)
-        expect(answer, label).to.deep.include({ ok: false, act: 'unclassified_storing', tracked: 'unread', banktok: DB.VoidLifeTok })
+        expect(answer, label).to.deep.include({ ok: false, act: 'unclassified_storing', tracked: 'unread', banktok: DB.VoidBanktok })
         expect(answer, label).to.have.nested.property('err.refusalkind', 'identity_revoked')
       }
       await TH.expectGood(served.tryBirthBank(TH.birthBankAskOf()))

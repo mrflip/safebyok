@@ -70,7 +70,7 @@ describe("device.gatingBirthAttempt(params)", () => {
     const err = await TH.expectRefusal(device.gatingBirthAttempt(form), 'weak_passphrase')
     expect(fieldnamesOf(form)).to.deep.equal(['username'])
     expect(TH.thrownText(err)).to.not.include(TH.TestPassphrase)
-    expect(device.bank).to.be.null
+    expect(device.bank.areRootsLive).to.be.false
   })
 
   it("empties a form's secret fields even where it refuses before `signin` answers", () => {

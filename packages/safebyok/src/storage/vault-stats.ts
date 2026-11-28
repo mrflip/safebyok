@@ -1,25 +1,26 @@
 /** A bank's storage stats, measured from its raw rows, for a concrete adapter that measures in TypeScript. */
 
 import { CX } from 'safebyok-big/internals'
-import { Labelpath } from '../shapes/primitives'
-import { type FiledRaw, type StoreLimits, type VaultStats, storeLimitsOf } from '../shapes/shapes-vault-stats'
+import type { Thingkind } from '../shapes/shapes-thing'
+import { type FiledRaw, type StoreLimits, type ThingkindStats, type VaultStats, storeLimitsOf } from '../shapes/shapes-vault-stats'
 
-// == [Measuring]: vaultStatsOf, rowWeightOf
+// == [Measuring]: vaultStatsOf, kindStatsOf, rowWeightOf
 
 // A row is measured as stored, unchecked: an incompatible row takes space too, and counts as no live Thing.
-/** The stats of a bank's boxes and gates from each of its raw rows, with `limits` capped ({@link storeLimitsOf}). The bank's own row is not counted. */
-export function vaultStatsOf(filed: Iterable<FiledRaw>, limits: Partial<StoreLimits> = {}): VaultStats {
-  const box  = { count: 0, live_count: 0, size: 0 }
-  const gate = { count: 0, live_count: 0, size: 0 }
-  for (const { labelpath, raw } of filed) {
-    const modelkind = Labelpath.modelkindOf(labelpath)
-    if (modelkind === 'bank') { continue }
-    const stats = (modelkind === 'box') ? box : gate
+/** The stats of a bank's boxes and gates from each of its raw rows, by the kind of the table each was read from, with `limits` capped ({@link storeLimitsOf}). */
+export function vaultStatsOf(filed: Readonly<Record<Thingkind, Iterable<FiledRaw>>>, limits: Partial<StoreLimits> = {}): VaultStats {
+  return { box: kindStatsOf(filed.box), gate: kindStatsOf(filed.gate), max: storeLimitsOf(limits) }
+}
+
+/** The stats of one kind's raw rows. */
+function kindStatsOf(filed: Iterable<FiledRaw>): ThingkindStats {
+  const stats = { count: 0, live_count: 0, size: 0 }
+  for (const { raw } of filed) {
     stats.count      += 1
     stats.live_count += (CX.isPlainBag(raw) && (raw['am'] === 'a')) ? 1 : 0
     stats.size       += rowWeightOf(raw)
   }
-  return { box, gate, max: storeLimitsOf(limits) }
+  return stats
 }
 
 /** The weight of a raw row in bytes: the UTF-8 length of its JSON. */

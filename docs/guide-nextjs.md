@@ -67,7 +67,7 @@ export default function ChatPage() { return <><h1>Chat</h1><Chat /></> }
 'use client'
 export function Chat() {
   const vault = useVault()
-  const stage = useWorld((snap) => snap.stage)                  // 'starting' on the server and on the first render in the browser
+  const stage = useBank((snap) => snap.stage)                  // 'starting' on the server and on the first render in the browser
   // The request goes from the browser to the model's API: your server never sees the key.
   const ask = useMutation({ mutationFn: (prompt: string) => vault.withWhisper('openai', ({ apiKey }) => callOpenAI(apiKey, prompt)) })
   if (stage === 'starting') { return <Skeleton /> }

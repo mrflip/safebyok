@@ -1,14 +1,14 @@
 /** A vaultDB that keeps its Things in Postgres. */
 
 import {
-  type AnyAsk, type Awaitable, type BadAnswer, type BankObserved, type BirthBankAsk, type BirthManifest, type BirthPuts, type GetAsk, type GetManifest, type GetWorldAsk, type ListAsk, type ListManifest, type Received,
-  type StatsAsk, type StatsManifest, type ThingWatchScope, type VaultError, type WorldManifest, type WriteAsk, type WriteManifest, AdapterVaultDB, ManifestTags, VoidLifeTok, VoidTrack, getAskOf, isVaultError, objCheck,
+  type AnyAsk, type Awaitable, type BadAnswer, type BankObserved, type BirthBankAsk, type BirthManifest, type BirthPuts, type GetAsk, type GetManifest, type GetBankAsk, type ListAsk, type ListManifest, type Received,
+  type StatsAsk, type StatsManifest, type ThingWatchScope, type VaultError, type GetBankManifest, type WriteAsk, type WriteManifest, AdapterVaultDB, VoidBanktok, VoidTrack, getAskOf, isVaultError, objCheck,
   storeLimitsOf,
 } from 'safebyok/storage'
 import { type ThingNotification, thingNotificationOf, thingsChannelOf } from './notifications'
 import * as Phrases from './phrases'
 import { refusalOf } from './refusals'
-import { BirthRootsSql, GetThingSql, GetWorldSql, ListThingsSql, StatsSql, WriteThingSql } from './vault-queries'
+import { BirthRootsSql, GetThingSql, GetBankSql, ListThingsSql, StatsSql, WriteThingSql } from './vault-queries'
 
 // == [Options]: PostgresQueryable, PostgresListen, PostgresVaultDBOpts, isPostgresQueryable, postgresVaultDBOpts
 
@@ -80,7 +80,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
   }
   // --
 
-  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetWorld, doStats, doWatch
+  // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doGetBank, doStats, doWatch
 
   protected async doGetThing(ask: GetAsk): Promise<GetManifest> {
     const { userid, banklabel, labelpath, modelkind } = ask
@@ -97,12 +97,12 @@ export class PostgresVaultDB extends AdapterVaultDB {
   }
 
   protected async doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthManifest> {
-    return await this.#queryRow<BirthManifest>(BirthRootsSql, [...puts.map(({ record }) => JSON.stringify(record)), trackParam(ask)])
+    return await this.#queryRow<BirthManifest>(BirthRootsSql, [...puts.flatMap(({ record, cited }) => [JSON.stringify(record), JSON.stringify(cited)]), trackParam(ask)])
   }
 
-  protected async doGetWorld(ask: GetWorldAsk): Promise<WorldManifest> {
+  protected async doGetBank(ask: GetBankAsk): Promise<GetBankManifest> {
     const { userid, banklabel } = ask
-    return await this.#queryRow<WorldManifest>(GetWorldSql, [userid, banklabel, trackParam(ask)])
+    return await this.#queryRow<GetBankManifest>(GetBankSql, [userid, banklabel, trackParam(ask)])
   }
 
   // Postgres sets no limit of its own that a client can read, so each is the cap.
@@ -153,20 +153,20 @@ export class PostgresVaultDB extends AdapterVaultDB {
   /** Pass `receive` the Thing a notification tells of, fetched where the notification does not carry it, and nothing where none is stored.
    * A fetch that would fail the same way again ends the watch, through `end`.
    */
-  async #receiveNotified(scope: ThingWatchScope, { labelpath, read_tc, thing, bank }: ThingNotification, receive: (received: Received) => void, end: (why: VaultError) => void): Promise<void> {
-    if ((thing !== undefined) && (bank !== undefined)) {
-      receive({ record: thing, banktok: ManifestTags.banktokOf(bank), read_tc })
+  async #receiveNotified(scope: ThingWatchScope, { modelkind, labelpath, read_tc, thing, banktok }: ThingNotification, receive: (received: Received) => void, end: (why: VaultError) => void): Promise<void> {
+    if ((thing !== undefined) && (banktok !== undefined)) {
+      receive({ record: thing, modelkind, banktok, read_tc })
       return
     }
     let got: GetManifest
     try {
-      got = await this.doGetThing(getAskOf({ ...scope, labelpath, track: VoidTrack, banktok: VoidLifeTok }))
+      got = await this.doGetThing(getAskOf({ ...scope, modelkind, labelpath, track: VoidTrack, banktok: VoidBanktok }))
     } catch (err) {
       const refusal = refusalOf('getThing', err)
       if (! isVaultError(refusal, 'storage_unavailable')) { end(refusal) }
       return
     }
-    if (got.actual !== null) { receive({ record: got.actual, banktok: got.banktok, read_tc: got.read_tc }) }
+    if (got.actual !== null) { receive({ record: got.actual, modelkind, banktok: got.banktok, read_tc: got.read_tc }) }
   }
   // --
 }

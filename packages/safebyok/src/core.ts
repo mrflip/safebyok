@@ -1,14 +1,13 @@
-// safebyok/core: the device, its world, bank, gate, wayin and lease, the gate's form verbs and the methods that put its Things,
+// safebyok/core: the device, its bank, gate, wayin and lease, the gate's form verbs and the methods that put its Things,
 // and every type their signatures name; no caching, so neither the VaultTSQ nor TanStack Query. Private
 // while it is built. The proving classes are exported as types alone: a proving's `buildLease` is public, and a proving is
 // built only in a form verb's gating, which hands it to the gate's private verbs.
-export { Bank } from './models/bank'
+export { Bank, type SomeThing } from './models/bank'
 export { DefaultGateStaleMillis, DefaultJanitorMillis, DefaultLeaseMillis, DefaultOnBadNews, DefaultOnLifecycle, DefaultSoftlockMillis, Device, tellBadNewsTo } from './models/device'
 export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
 export { BaseBox } from './models/base-box'
 export { Box } from './models/box'
 export { Gate } from './models/gate'
-export { type SomeThing, World } from './models/world'
 export { type Adoptable, Thing } from './models/thing'
 export { Lease, withoutSecrets } from './models/lease'
 export type { Novel, PasskeyProving, PassphraseProving, Proving } from './models/proving'
@@ -17,37 +16,37 @@ export type {
   SealedOf, SealedPartsOf, Sealer, ShellOf, SparseOf, TombstoneOf, TombstonePublicProps, UnsealedOf,
 } from './shapes/shapes-sealers'
 export {
-  type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseLoggable, type LeaseRecord, type LeaseScope, type LeaseSparse, type LeaseStamp, type LeaseTombstone, type StampedGate,
+  type BankLife, type BankScope, type BoxStamp, type GateLife, type GateStamp, type LeaseLoggable, type LeaseRecord, type LeaseScope, type LeaseSparse, type LeaseStamp, type LeaseTombstone, type ProvableGate, type WayinStamp,
   LeaseFormat, LeaseLabelpath, LeaseLifeRoot, StampChecks, leaseLifepathOf,
 } from './shapes/shapes-stamps'
 export { Wayin } from './models/wayin'
 export { type PasskeyWayinHeader, type PasskeyWayinRecord, type PassphraseWayinHeader, type PassphraseWayinRecord, type WayinHeader, type WayinRecord, WayinChecks } from './shapes/shapes-wayin'
 export type { AddPasskeyGating, BirthGating, Gating, ReplacePassphraseGating, RevokePasskeyGating, UnlockGating } from './models/gating'
 export { vacateHanded } from './models/gating'
-export { type Banklabel, type BoxLabelpath, type Devicetok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
+export { type Banklabel, type BoxLabelpath, type Devicetok, type EpochMillis, type Lifenum, type Lifepath, type Banktok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
-  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type IncompatibleThing, type GetThingAnswer, type GetWorldAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside,
+  type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type IncompatibleThing, type GetThingAnswer, type GetBankAnswer, type GoodAnswer, type KidEntry, type Kids, type ListThingsAnswer, type ListedBeside,
   type WriteThingAnswer,
 } from './shapes/shapes-answers'
 export { type VaultDB, isVaultDB } from './storage/vault-db'
 export type { Agerank, ItemSeen, Liveness, ReadTc, VaultAgedEvent, VaultEvent, VaultEventOf, VaultEventkind, VaultItemEvent, VaultLifeEvent } from './shapes/shapes-vault-event'
 export {
   type BadNews, type BadNewsHandler, type BankAskDraft, type BankStage, type BoxUnsealed, type DeviceAnnouncement, type DeviceEvent, type DeviceJSON, type DeviceOpts, type DeviceRecord,
-  type HostedVault, type LeaseAnnouncement, type LifecycleHandler, type Lifecyclekind, type RefusalSnapshot, type RootShelf, type StageCrossing, type ThingMakeOpts, type WatchEnding, type WorldOpts, type WorldSnapshot,
-  BankishChecks, DefaultBanklabel, PendingWorld, SignedOutWorld, ThingMakeChecks, bankStageVals, isRootShelf, isWorld, leasekindVals, lifecyclekindVals,
+  type HostedVault, type LeaseAnnouncement, type LifecycleHandler, type Lifecyclekind, type RefusalSnapshot, type RootShelf, type StageCrossing, type ThingMakeOpts, type WatchEnding, type BankOpts, type BankSnapshot,
+  BankishChecks, DefaultBanklabel, PendingBank, SignedOutBank, ThingMakeChecks, bankStageVals, isRootShelf, isBank, leasekindVals, lifecyclekindVals,
 } from './shapes/shapes-bankish'
 export {
-  type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateGatingFriend, type GateRevisionedStamp, type GatingCleartexts, type GuardedKeyDeriver,
+  type AddPasskeyDna, type BirthCleartexts, type BirthDna, type BirthGatingFriend, type DnaCheck, type GateDna, type GateFound, type GateGatingFriend, type GatingCleartexts, type GuardedKeyDeriver,
   type GuardedStrengthChecker, type HandedCleartexts, type LeaseGate, type LeaseOpts, type LeaseShellScope, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type ProvedCleartexts, type ProvingDevice,
-  type ProvingOpts, type ProvingParts, type ReplacePassphraseDna, type RevokePasskeyDna, type SecretFieldname, type StrengthChecker, type UnlockCleartexts, type UnlockDna, type WorldGateFriend, CleartextChecks,
+  type ProvingOpts, type ProvingParts, type ReplacePassphraseDna, type RevokePasskeyDna, type SecretFieldname, type StrengthChecker, type UnlockCleartexts, type UnlockDna, type BankGateFriend, CleartextChecks,
   FormSecretFieldnames, GateishChecks, GatingChecks,
 } from './shapes/shapes-gateish'
 export {
-  type BankRoots, type BankWriteAsk, type BirthBankAsk, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAsk, type GetWorldAsk, type ListAsk, type LoggableAsk, type PutAskDraft, type WorldRoots,
+  type BankRoots, type BirthBankAsk, type BirthCited, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAsk, type GetBankAsk, type ListAsk, type LoggableAsk, type PutAskDraft, type ActualRoots,
   type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WriteAsk, type WriteAskFlags, AskChecks, VoidTrack,
 } from './shapes/shapes-asks'
 export {
-  type AnyThingRecord, type BankRecord, type BoxRecord, type BoxSparse, type GateRecord, type Modelkind, type Sparse, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind, type Tombstone,
+  type AnyThingRecord, type BoxRecord, type BoxSparse, type GateRecord, type Modelkind, type Sparse, type ThingCited, type ThingFieldname, type TableScope, type ThingRecord, type ThingScope, type ThingShaped, type Thingkind, type Tombstone,
   type BulletproofCallback, type VoidSentinel, type Wayins, Shell, ThingChecks, thingkindVals,
 } from './shapes/shapes-thing'
 export { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from './shapes/shapes-thingkinds'

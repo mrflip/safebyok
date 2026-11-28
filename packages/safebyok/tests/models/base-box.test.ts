@@ -206,12 +206,12 @@ describe("BaseBox.tombstoneOf(donor)", () => {
 })
 
 describe("BaseBox.stampOf(record)", () => {
-  it("is the box's Thing fields alone: no sidecar and no sealed whisper", () => {
+  it("is the box's Thing fields but its label and lifeseq, the last segments of its labelpath and lifepath: no sidecar and no sealed whisper", () => {
     const live = liveRevisionOf()
-    const { sidecar: _sidecar, ...thing } = live
+    const { sidecar: _sidecar, label: _label, lifeseq: _lifeseq, ...thing } = live
     const stamp = BaseBox.stampOf(live)
     expect(stamp).to.deep.equal(thing)
-    expect(Object.keys(stamp)).to.have.members(['userid', 'banklabel', 'labelpath', 'label', 'fmt', 'revtok', 'revseq', 'am', 'lifeseq', 'lifepath', 'born_at', 'written_at'])
+    expect(Object.keys(stamp)).to.have.members(['modelkind', 'userid', 'banklabel', 'labelpath', 'banktok', 'fmt', 'revtok', 'revseq', 'am', 'lifepath', 'born_at', 'written_at'])
   })
 
   it("is the same for a record and its next revision without its seal", () => {

@@ -27,6 +27,9 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp, Ado
 
   // == [Kind]: modelkind
 
+  /** Always `'box'`: its record's modelkind. */
+  declare readonly modelkind: 'box'
+
   /** A box's modelkind: the guards this class inherits answer for boxes alone. */
   static override readonly modelkind = 'box'
   // --

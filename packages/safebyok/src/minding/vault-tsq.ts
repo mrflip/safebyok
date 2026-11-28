@@ -5,7 +5,7 @@ import { noop } from 'es-toolkit'
 import { type Errors, Outcome } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
 import type { MaskedRow } from '../shapes/shapes-masked-view'
-import { type ThingRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
+import { type TableScope, type ThingRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetOnceOpts, type ItemQueryOptions, type VaultMutationOptions, type VaultTSQOpts, VaultTSQChecks } from '../shapes/shapes-vault-tsq'
 import type { VaultEvent } from '../shapes/shapes-vault-event'
@@ -15,7 +15,7 @@ import type { VaultMinder } from './vault-minder'
 import type { Kids } from '../shapes/shapes-answers'
 import * as Throwers from '../refusals/throwers'
 import { maskedOf } from '../helpers/mask-ciphertexts'
-import { bankKeyHeadOf, labelsOf } from './query-keys'
+import { labelsOf, tableKeyHeadOf } from './query-keys'
 
 // == [VaultTSQ]: VaultTSQ
 
@@ -47,9 +47,10 @@ export class VaultTSQ {
   // == [Construction]: make, constructor
 
   // TanStack Query merges every query default whose key is a prefix of a query's key, and a query's own options over
-  // them, so a host's options win and nothing outside the bank's key is touched.
+  // them, so a host's options win and nothing outside the key of the bank's boxes is touched. It sets no mutation
+  // defaults: a host's box write takes its options from {@link mutationOptionsOf}, and a form verb's from the giver.
   /** Keep the bank's boxes in `opts.queryClient` from what `opts.vaultMinder` tells once {@link connect}ed, telling `opts.onBadNews` of trouble.
-   * Its query and mutation defaults go under the bank's key, where a host's own options override them.
+   * Its query defaults go under the key of the bank's boxes, where a host's own options override them.
    */
   static make(opts: VaultTSQOpts): VaultTSQ { return new VaultTSQ(VaultTSQChecks.makeArgs.parse(opts)) }
 
@@ -58,16 +59,15 @@ export class VaultTSQ {
     this.#queryClient = queryClient
     this.#scope       = Object.freeze({ userid: scope.userid, banklabel: scope.banklabel })
     this.#onBadNews   = onBadNews
-    const bankHead    = VaultTSQ.bankQueryKeyOf(this.#scope)
-    queryClient.setQueryDefaults(bankHead, BankDefaults)
-    queryClient.setMutationDefaults(bankHead, BankDefaults)
-    queryClient.setQueryDefaults([...bankHead, Itemkind], {
+    const boxesHead   = this.#boxesKey
+    queryClient.setQueryDefaults(boxesHead, BankDefaults)
+    queryClient.setQueryDefaults([...boxesHead, Itemkind], {
       queryFn:   async ({ queryKey }) => await this.#itemOf(labelpathOfItemKey(queryKey)),
-      staleTime: ({ queryKey }) => ((this.#isMinded && (this.#vaultMinder.carAt(this.#scopeOf(labelpathOfItemKey(queryKey)))?.agekind === 'here')) ? Infinity : 0),
+      staleTime: ({ queryKey }) => ((this.#isMinded && (this.#vaultMinder.carAt(this.#boxScopeOf(labelpathOfItemKey(queryKey)))?.agekind === 'here')) ? Infinity : 0),
     })
     // A listing is kept nowhere but its query, so it stays while no one observes it.
-    queryClient.setQueryDefaults([...bankHead, Listkind], {
-      queryFn:   async ({ queryKey }) => await this.#vaultMinder.listOnce(labelpathOfListKey(queryKey)),
+    queryClient.setQueryDefaults([...boxesHead, Listkind], {
+      queryFn:   async ({ queryKey }) => await this.#vaultMinder.listOnce(this.#boxScopeOf(labelpathOfListKey(queryKey))),
       staleTime: () => (this.#isMinded ? Infinity : 0),
       gcTime:    Infinity,
     })
@@ -75,25 +75,25 @@ export class VaultTSQ {
   }
   // --
 
-  // == [Keys]: itemQueryKeyOf, listQueryKeyOf, bankQueryKeyOf
+  // == [Keys]: itemQueryKeyOf, listQueryKeyOf, tableQueryKeyOf
 
-  // A key is the bank's three segments, the kind of query ('item' or 'list'), the labelpath's labels with '/' between
-  // them, then a mark: '!' for the item, '#' and 'kids' for the listing. Without a mark the root box's item key would
-  // start every box's.
+  // A key is the table's four segments ('sok', the modelkind, the userid and the banklabel), the kind of query ('item' or
+  // 'list'), the labelpath's labels with '/' between them, then a mark: '!' for the item, '#' and 'kids' for the listing.
+  // Without a mark the root box's item key would start every box's.
   /** The query key of `scope`'s item. */
   static itemQueryKeyOf(scope: ThingScope): TSQ.QueryKey {
-    const { userid, banklabel, labelpath } = ThingChecks.thingScope.parse(scope)
-    return [...bankKeyHeadOf({ userid, banklabel }), Itemkind, ...labelsOf(labelpath), '!']
+    const { labelpath, ...table } = ThingChecks.thingScope.parse(scope)
+    return [...tableKeyHeadOf(table), Itemkind, ...labelsOf(labelpath), '!']
   }
 
   /** The query key of the listing of `scope`'s children. */
   static listQueryKeyOf(scope: ThingScope): TSQ.QueryKey {
-    const { userid, banklabel, labelpath } = ThingChecks.thingScope.parse(scope)
-    return [...bankKeyHeadOf({ userid, banklabel }), Listkind, ...labelsOf(labelpath), '#', 'kids']
+    const { labelpath, ...table } = ThingChecks.thingScope.parse(scope)
+    return [...tableKeyHeadOf(table), Listkind, ...labelsOf(labelpath), '#', 'kids']
   }
 
-  /** The key prefix of everything kept for `scope`'s bank. */
-  static bankQueryKeyOf(scope: BankScope): TSQ.QueryKey { return bankKeyHeadOf(ThingChecks.bankScope.parse(scope)) }
+  /** The key prefix of everything kept for the Things of `scope`'s kind in its bank: for a vault TSQ, whose Things are boxes, everything it keeps. */
+  static tableQueryKeyOf(scope: TableScope): TSQ.QueryKey { return tableKeyHeadOf(ThingChecks.tableScope.parse(scope)) }
   // --
 
   // == [Reading]: itemQueryOptions, getOnce, listOnce
@@ -120,7 +120,7 @@ export class VaultTSQ {
 
   /** List the children of the box at `labelpath` once, whatever its listing holds. */
   async listOnce(labelpath: Labelpath): Promise<Kids> {
-    const scope = VaultTSQChecks.listScope.parseConsistent({ ...this.#scope, labelpath }, this.#scope)
+    const scope = VaultTSQChecks.listScope.parseConsistent(this.#boxScopeOf(labelpath), this.#scope)
     return await this.#queryClient.query<Kids>({ queryKey: VaultTSQ.listQueryKeyOf(scope), staleTime: 0 })
   }
   // --
@@ -145,12 +145,12 @@ export class VaultTSQ {
     // Synchronous on purpose: the VaultMinder tells an answer's records before its verb resolves.
     this.#unlisten = this.#vaultMinder.listen({
       hear:      (event) => { this.#hear(event) },
-      onBadNews: (news, labelpath) => {
-        this.#hearRefused(labelpath)
+      onBadNews: (news, scope) => {
+        this.#hearRefused(scope)
         this.#onBadNews(news)
       },
     })
-    void this.#queryClient.invalidateQueries({ queryKey: [...VaultTSQ.bankQueryKeyOf(this.#scope), Listkind] }, { cancelRefetch: false })
+    void this.#queryClient.invalidateQueries({ queryKey: [...this.#boxesKey, Listkind] }, { cancelRefetch: false })
     return this
   }
 
@@ -168,11 +168,12 @@ export class VaultTSQ {
 
   // == [The writer]: #hear, #hearLife, #hearRefused
 
-  /** Bring the items up to date with `event`, and the listings with a `life` event. */
+  /** Bring the items up to date with `event`, and the listings with a `life` event. Only a box's event is heard. */
   #hear(event: VaultEvent): void {
+    if (event.modelkind !== 'box') { return }
     if (event.eventkind === 'life') { this.#hearLife(event.labelpath); return }
-    if (! isItemLabelpath(event.labelpath)) { return }
-    const scope    = this.#scopeOf(event.labelpath)
+    if (event.labelpath === Labelpath.RootBox) { return }
+    const scope    = this.#boxScopeOf(event.labelpath)
     const queryKey = VaultTSQ.itemQueryKeyOf(scope)
     const car      = this.#vaultMinder.carAt(scope)!
     if (event.eventkind === 'aged') {
@@ -195,41 +196,43 @@ export class VaultTSQ {
   }
 
   // Resetting, not removing, the box's own listing: a removal reaches the cache and not the observers.
-  /** Bring the listings up to date with a new life of the Thing at `labelpath`: its parent's is refetched, and its own reset. */
+  /** Bring the listings up to date with a new life of the box at `labelpath`: its parent's is refetched, and its own reset. */
   #hearLife(labelpath: Labelpath): void {
-    if (! Labelpath.isBox(labelpath)) { return }
-    if (isItemLabelpath(labelpath)) {
-      const parentKey = VaultTSQ.listQueryKeyOf(this.#scopeOf(Labelpath.parentOf(labelpath)))
+    if (labelpath !== Labelpath.RootBox) {
+      const parentKey = VaultTSQ.listQueryKeyOf(this.#boxScopeOf(Labelpath.parentOf(labelpath)))
       void this.#queryClient.invalidateQueries({ queryKey: parentKey, exact: true }, { cancelRefetch: false })
     }
-    void this.#queryClient.resetQueries({ queryKey: VaultTSQ.listQueryKeyOf(this.#scopeOf(labelpath)), exact: true })
+    void this.#queryClient.resetQueries({ queryKey: VaultTSQ.listQueryKeyOf(this.#boxScopeOf(labelpath)), exact: true })
   }
 
   // A refusal met by the item's own fetch lands while that fetch runs, so the refetch it asks for is that same fetch, and
   // nothing loops.
-  /** Refetch the item of the box at `labelpath`, a record of which its Thing refused, so that its query shows the refusal beside its data. */
-  #hearRefused(labelpath: Labelpath | null): void {
-    if ((labelpath === null) || ! isItemLabelpath(labelpath)) { return }
-    const queryKey = VaultTSQ.itemQueryKeyOf(this.#scopeOf(labelpath))
+  /** Refetch the item of the box at `scope`, a record of which its Thing refused, so that its query shows the refusal beside its data. */
+  #hearRefused(scope: ThingScope | null): void {
+    if ((scope === null) || ! isItemScope(scope)) { return }
+    const queryKey = VaultTSQ.itemQueryKeyOf(scope)
     void this.#queryClient.invalidateQueries({ queryKey, exact: true }, { cancelRefetch: false })
   }
   // --
 
-  // == [Helpers]: #itemOf, #scopeOf, #parseItemScope
+  // == [Helpers]: #itemOf, #boxScopeOf, #boxesKey, #parseItemScope
 
   /** The item of the box at `labelpath`, as its Thing holds it once a get of it answers. */
   async #itemOf(labelpath: Labelpath): Promise<ThingRecord | null> {
-    const record = await this.#vaultMinder.getOnce(this.#scopeOf(labelpath))
+    const record = await this.#vaultMinder.getOnce(this.#boxScopeOf(labelpath))
     return BaseThing.isTombstone(record) ? null : record
   }
 
-  /** The scope of `labelpath` in this bank */
-  #scopeOf(labelpath: Labelpath): ThingScope { return { ...this.#scope, labelpath } }
+  /** The scope of the box at `labelpath` in this bank */
+  #boxScopeOf(labelpath: Labelpath): ThingScope { return { modelkind: 'box', ...this.#scope, labelpath } }
+
+  /** The key prefix of every item and listing of this bank's boxes */
+  get #boxesKey(): TSQ.QueryKey { return VaultTSQ.tableQueryKeyOf({ ...this.#scope, modelkind: 'box' }) }
 
   /** `scope`, refused unless it is of a box under the root box in this bank */
   #parseItemScope(scope: ThingScope): ThingScope {
     const parsed = ThingChecks.thingScope.parseConsistent(scope, this.#scope)
-    if (! isItemLabelpath(parsed.labelpath)) { throw Throwers.notMinded() }
+    if (! isItemScope(parsed)) { throw Throwers.notMinded() }
     return parsed
   }
   // --
@@ -241,7 +244,7 @@ export class VaultTSQ {
    * For experimenting, never for an app's own logic: what it answers may change without notice.
    */
   inspectable(): MaskedRow[] {
-    return this.#queryClient.getQueryCache().findAll({ queryKey: VaultTSQ.bankQueryKeyOf(this.#scope) }).map((tsqQuery) => {
+    return this.#queryClient.getQueryCache().findAll({ queryKey: this.#boxesKey }).map((tsqQuery) => {
       const { status, fetchStatus, dataUpdatedAt, isInvalidated, error: err, data: val } = tsqQuery.state
       return {
         queryKey:        [...tsqQuery.queryKey],
@@ -258,22 +261,22 @@ export class VaultTSQ {
 }
 // --
 
-// == [Helpers]: Itemkind, Listkind, LabelsIdx, BankDefaults, isItemLabelpath, itemValOf, labelpathOfItemKey, labelpathOfListKey
+// == [Helpers]: Itemkind, Listkind, LabelsIdx, BankDefaults, isItemScope, itemValOf, labelpathOfItemKey, labelpathOfListKey
 
 /** The kind segment of an item's query key. */
 const Itemkind = 'item'
 /** The kind segment of a listing's query key. */
 const Listkind = 'list'
-/** Where a query key's labels begin: after the bank's three segments and the kind. */
-const LabelsIdx = 4
+/** Where a query key's labels begin: after the table's four segments and the kind of query. */
+const LabelsIdx = 5
 
 // Under TanStack's own networkMode, 'online', a get made while the browser reports itself offline waits, and so does
 // its caller. A retry would put a whizbang in the critical path of a primitive operation (CLAUDE.md).
-/** The query and mutation defaults under the bank's key. */
+/** The query defaults under the key of the bank's boxes, and the options {@link VaultTSQ.mutationOptionsOf} gives every mutation. */
 const BankDefaults = Object.freeze({ networkMode: 'always', retry: false } as const)
 
-/** True for the labelpath of a box under the root box: the Things an item is kept for. */
-function isItemLabelpath(labelpath: Labelpath): boolean { return Labelpath.isBox(labelpath) && (labelpath !== Labelpath.RootBox) }
+/** True for the scope of a box under the root box: the Things an item is kept for. */
+function isItemScope({ modelkind, labelpath }: ThingScope): boolean { return (modelkind === 'box') && (labelpath !== Labelpath.RootBox) }
 
 /** The item `car`'s Thing stands for: its live record, null for a tombstone or the shell, undefined where no whole record of its newest life is known */
 function itemValOf(car: ThingCar): ThingRecord | null | undefined {

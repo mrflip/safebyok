@@ -1,21 +1,21 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
+import { omit } from 'es-toolkit'
 import { BaseThing } from '../../src/models/base-thing'
 import { BaseBox } from '../../src/models/base-box'
-import { Bank } from '../../src/models/bank'
 import { Gate } from '../../src/models/gate'
 import { Thing } from '../../src/models/thing'
 import type { LiveOf, ShellOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
 import { type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type VoidSentinel, Shell } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
 
-/** A gate's sparse tombstone: no record check passes a deleted main gate, but the guards read only its Thing fields. */
-function gateTombOf(): Sparse<TombstoneOf<GateRecord>> {
+/** A gate's sparse tombstone: the guards read only its Thing fields. */
+function gateSparseTombOf(): Sparse<TombstoneOf<GateRecord>> {
   return { ...Thing.sparseOf(TH.gateThingOf()), am: 'x', revseq: 1, lifeseq: TH.lifepathPlus(TH.Life0, 1), lifepath: TH.lifepathPlus(TH.Life0, 1) }
 }
 
 describe("BaseThing.modelkind", () => {
   it("is null for any kind, and each kind's own on its class", () => {
-    expect([BaseThing.modelkind, Thing.modelkind, Bank.modelkind, Gate.modelkind, BaseBox.modelkind]).to.deep.equal([null, null, 'bank', 'gate', 'box'])
+    expect([BaseThing.modelkind, Thing.modelkind, Gate.modelkind, BaseBox.modelkind]).to.deep.equal([null, null, 'gate', 'box'])
   })
 })
 
@@ -38,19 +38,24 @@ describe("Thing.isVoidSentinel(val)", () => {
 describe("Thing.isWhole(record)", () => {
   it("is true of a whole record, live or tombstone, and of the void sentinel", () => {
     const box = TH.boxThingOf()
-    for (const record of [box, TH.boxTombOf(box), TH.gateThingOf(), TH.bankThingOf(), Shell.of(TH.BoxScope, TH.rootBoxOf()), Shell.of(TH.GateScope)]) { expect(Thing.isWhole(record)).to.be.true }
+    for (const record of [box, TH.boxTombOf(box), TH.gateThingOf(), TH.gateTombOf(TH.gateThingOf()), Shell.of(TH.BoxScope, TH.rootBoxOf()), Shell.of(TH.GateScope)]) { expect(Thing.isWhole(record)).to.be.true }
   })
 
   it("is false of a sparse record, live or tombstone", () => {
     const box = TH.boxThingOf()
     for (const record of [Thing.sparseOf(box), Thing.sparseOf(TH.boxTombOf(box))]) { expect(Thing.isWhole(record)).to.be.false }
   })
+
+  it("is false of a record that states no modelkind, or one that is no kind of Thing's", () => {
+    const unkinded = omit(TH.boxThingOf(), ['modelkind'])
+    for (const record of [unkinded, { ...unkinded, modelkind: 'bank' }, { ...unkinded, modelkind: 'toString' }]) { expect(Thing.isWhole(record as never)).to.be.false }
+  })
 })
 
 describe("Thing.isLive(val)", () => {
   it("is true of a live record, whole or sparse", () => {
     const box = TH.boxThingOf()
-    for (const record of [box, Thing.sparseOf(box), TH.gateThingOf(), TH.bankThingOf()]) { expect(Thing.isLive(record)).to.be.true }
+    for (const record of [box, Thing.sparseOf(box), TH.gateThingOf()]) { expect(Thing.isLive(record)).to.be.true }
   })
 
   it("is false of a tombstone, the void sentinel, or what is not a record", () => {
@@ -102,22 +107,20 @@ describe("a kind's guards", () => {
   const boxShell  = Shell.of(TH.BoxScope, TH.rootBoxOf())
   const gate      = TH.gateThingOf()
   const gateShell = Shell.of(TH.GateScope)
-  const bank      = TH.bankThingOf()
   const GuardCases = [
-    // what Bank, Gate and BaseBox answer, in that order:
-    [() => [Bank.isLive(box),                 Gate.isLive(box),                 BaseBox.isLive(box)],                 [false, false, true],  'isLive of a live box'],
-    [() => [Bank.isLive(gate),                Gate.isLive(gate),                BaseBox.isLive(gate)],                [false, true,  false], 'isLive of a live gate'],
-    [() => [Bank.isLive(bank),                Gate.isLive(bank),                BaseBox.isLive(bank)],                [true,  false, false], 'isLive of the bank'],
-    [() => [Bank.isTombstone(boxTomb),        Gate.isTombstone(boxTomb),        BaseBox.isTombstone(boxTomb)],        [false, false, true],  "isTombstone of a box's tombstone"],
-    [() => [Bank.isTombstone(gateTombOf()),   Gate.isTombstone(gateTombOf()),   BaseBox.isTombstone(gateTombOf())],   [false, true,  false], "isTombstone of a gate's sparse tombstone"],
-    [() => [Bank.isGone(boxTomb),             Gate.isGone(boxTomb),             BaseBox.isGone(boxTomb)],             [false, false, true],  "isGone of a box's tombstone"],
-    [() => [Bank.isGone(boxShell),            Gate.isGone(boxShell),            BaseBox.isGone(boxShell)],            [false, false, false], "isGone of a box's shell"],
-    [() => [Bank.isVoidSentinel(boxShell),    Gate.isVoidSentinel(boxShell),    BaseBox.isVoidSentinel(boxShell)],    [false, false, true],  "isVoidSentinel of a box's shell"],
-    [() => [Bank.isVoidSentinel(gateShell),   Gate.isVoidSentinel(gateShell),   BaseBox.isVoidSentinel(gateShell)],   [false, true,  false], "isVoidSentinel of a gate's shell"],
-    [() => [Bank.isWhole(box),                Gate.isWhole(box),                BaseBox.isWhole(box)],                [false, false, true],  'isWhole of a whole box'],
-    [() => [Bank.isWhole(boxShell),           Gate.isWhole(boxShell),           BaseBox.isWhole(boxShell)],           [false, false, true],  "isWhole of a box's shell"],
-    [() => [Bank.isWhole(gate),               Gate.isWhole(gate),               BaseBox.isWhole(gate)],               [false, true,  false], 'isWhole of a whole gate'],
-    [() => [Bank.isSparse(boxSparse),         Gate.isSparse(boxSparse),         BaseBox.isSparse(boxSparse)],         [false, false, true],  'isSparse of a sparse box'],
+    // what Gate and BaseBox answer, in that order:
+    [() => [Gate.isLive(box),                 BaseBox.isLive(box)], [false, true],  'isLive of a live box'],
+    [() => [Gate.isLive(gate),                BaseBox.isLive(gate)], [true,  false], 'isLive of a live gate'],
+    [() => [Gate.isTombstone(boxTomb),        BaseBox.isTombstone(boxTomb)], [false, true],  "isTombstone of a box's tombstone"],
+    [() => [Gate.isTombstone(gateSparseTombOf()),   BaseBox.isTombstone(gateSparseTombOf())], [true,  false], "isTombstone of a gate's sparse tombstone"],
+    [() => [Gate.isGone(boxTomb),             BaseBox.isGone(boxTomb)], [false, true],  "isGone of a box's tombstone"],
+    [() => [Gate.isGone(boxShell),            BaseBox.isGone(boxShell)], [false, false], "isGone of a box's shell"],
+    [() => [Gate.isVoidSentinel(boxShell),    BaseBox.isVoidSentinel(boxShell)], [false, true],  "isVoidSentinel of a box's shell"],
+    [() => [Gate.isVoidSentinel(gateShell),   BaseBox.isVoidSentinel(gateShell)], [true,  false], "isVoidSentinel of a gate's shell"],
+    [() => [Gate.isWhole(box),                BaseBox.isWhole(box)], [false, true],  'isWhole of a whole box'],
+    [() => [Gate.isWhole(boxShell),           BaseBox.isWhole(boxShell)], [false, true],  "isWhole of a box's shell"],
+    [() => [Gate.isWhole(gate),               BaseBox.isWhole(gate)], [true,  false], 'isWhole of a whole gate'],
+    [() => [Gate.isSparse(boxSparse),         BaseBox.isSparse(boxSparse)], [false, true],  'isSparse of a sparse box'],
   ] as const
 
   for (const [answersOf, expected, blurb] of GuardCases) {
@@ -125,7 +128,7 @@ describe("a kind's guards", () => {
   }
 
   it("serve as a callback through an arrow", () => {
-    expect([gateTombOf(), boxTomb, gate].filter((rec) => Gate.isTombstone(rec))).to.deep.equal([gateTombOf()])
+    expect([gateSparseTombOf(), boxTomb, gate].filter((rec) => Gate.isTombstone(rec))).to.deep.equal([gateSparseTombOf()])
   })
 })
 
@@ -149,10 +152,10 @@ describe("Thing.cmp(ante, post)", () => {
 })
 
 describe("Thing.haveSameScope(ante, post)", () => {
-  it("is true of two revisions at one labelpath of one bank, and false across labelpaths, banks or users", () => {
+  it("is true of two revisions at one labelpath of one bank, and false across labelpaths, banks, users or kinds", () => {
     const box = TH.boxThingOf()
     expect(Thing.haveSameScope(box, TH.nextOf(box))).to.be.true
-    for (const other of [TH.boxThingOf('anthropic'), { ...box, banklabel: 'other' }, { ...box, userid: 'u2' }]) { expect(Thing.haveSameScope(box, other)).to.be.false }
+    for (const other of [TH.boxThingOf('anthropic'), { ...box, banklabel: 'other' }, { ...box, userid: 'u2' }, { ...box, modelkind: 'gate' as const }]) { expect(Thing.haveSameScope(box, other)).to.be.false }
   })
 })
 

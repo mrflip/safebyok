@@ -25,7 +25,7 @@ export interface TSQWorld<VaultDBT extends MemoryVaultDB> {
  */
 export async function tsqWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT, makeThing: ThingMaker = TH.makePlainThing): Promise<TSQWorld<VaultDBT>> {
   const watching    = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
-  const sorted      = VaultMinder.make(TH.ThingBank, { vaultDB, world: { makeThing } }).connect()
+  const sorted      = VaultMinder.make(TH.ThingBank, { vaultDB, bank: { makeThing } }).connect()
   const queryClient = new QueryClient()
   const vaultTSQ    = VaultTSQ.make({ vaultMinder: sorted, queryClient, scope: TH.ThingBank }).connect()
   await TH.expectGood(sorted.tryBirthBank(TH.birthBankAskOf()))
@@ -47,7 +47,7 @@ export function readTcSpanAfter(read_tc: ReadTc): ReadTc {
 }
 
 /** Put `record` in `vaultDB`'s datastore as another device would, notifying no watcher. */
-export function cheatPlant(vaultDB: MemoryVaultDB, record: SeenThing): void { vaultDB._cheat_things(TH.ThingBank).set(record.labelpath, record) }
+export function cheatPlant(vaultDB: MemoryVaultDB, record: SeenThing): void { vaultDB._cheat_things(TH.ThingBank)[record.modelkind].set(record.labelpath, record) }
 
 /** The item query of the box at `scope`, `TH.BoxScope` by default, or undefined for none. */
 export function itemQueryAt({ queryClient }: TSQWorld<MemoryVaultDB>, scope: ThingScope = TH.BoxScope) {

@@ -38,7 +38,7 @@ export const CrossedChecks = Validator.Checkers('storage_issue', ({ obj, arr, st
     answered:          obj({ act: act.optional(), dbhas: ThingChecks.scopedCited.nullable().optional() }).strict(),
     kids:              obj({ modelkind: lit('kids'), parentpath: str, parentlife: str, items: custom<Kids['items']>(CX.isPlainBag), gones: custom<Kids['gones']>(CX.isPlainBag), read_tc: SeenChecks.readTc }).strict(),
     // An incompatible child's labelpath is the one it is stored under, which may fail the labelpath check.
-    incompatibleThing: ThingChecks.bankScope.extend({ labelpath: str, am: lit('d') }).strict(),
+    incompatibleThing: ThingChecks.tableScope.extend({ labelpath: str, am: lit('d') }).strict(),
   }
 })
 

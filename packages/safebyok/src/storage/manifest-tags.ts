@@ -4,9 +4,8 @@
  */
 
 import { CX, type EX, SX } from 'safebyok-big/internals'
-import { Labelpath } from '../shapes/primitives'
 import type { AnyAsk, BirthPuts, Track, WriteAsk } from '../shapes/shapes-asks'
-import type { AnteWayins, BirthTags, GetTags, PolicyVerdict, PolicyVerdicts, Presence, RevseqCmp, RevtokCmp, RootRows, RootTags, SameCmp, TrackedRows, WriteTags } from '../shapes/shapes-manifest'
+import type { AnteWayins, BirthTags, GetTags, PolicyVerdict, PolicyVerdicts, Presence, RevseqCmp, RevtokCmp, RootRows, RootTags, SameCmp, WriteTags } from '../shapes/shapes-manifest'
 import { GatePolicies } from './policies'
 
 // == [Fields]: fieldOf, banktokOf
@@ -15,12 +14,12 @@ import { GatePolicies } from './policies'
 /** The field `fieldname` of the raw `row`: undefined where the row has none, or is no object. */
 export function fieldOf(row: unknown, fieldname: string): unknown { return CX.isPlainBag(row) ? row[fieldname] : undefined }
 
-// Null, never undefined, for a bank row without a lifetok: a transport that drops undefined (Convex's, JSON) would drop the key with it.
-/** The lifetok of the raw bank row `bank`: the void lifetok where there is no bank row, null where the row has no lifetok. */
-export function banktokOf(bank: unknown): unknown { return (bank === null) ? SX.VoidLifeTok : (fieldOf(bank, 'lifetok') ?? null) }
+// Null, never undefined, for a gate row without a banktok: a transport that drops undefined (Convex's, JSON) would drop the key with it.
+/** The banktok of the bank's raw gate row `gate`: the void banktok where there is no gate row, null where the row has no banktok. */
+export function banktokOf(gate: unknown): unknown { return (gate === null) ? SX.VoidLifeTok : (fieldOf(gate, 'banktok') ?? null) }
 // --
 
-// == [Tags]: presenceOf, getTagsOf, writeTagsOf, writtenTagsOf, birthTagsOf, rootTagsOf, revtokCmpOf, revseqCmpOf, bornAtCmpOf, lifetokCmpOf, policiesOf, policyVerdictOf, anteWayinsOf
+// == [Tags]: presenceOf, getTagsOf, writeTagsOf, rootTagsOf, writtenTagsOf, birthTagsOf, writtenBirthTagsOf, revtokCmpOf, revseqCmpOf, bornAtCmpOf, banktokCmpOf, policiesOf, policyVerdictOf, anteWayinsOf
 
 /** The liveness of the raw `row`: `'void'` for null, `'live'` where its `am` is `'a'`, else `'gone'`. */
 export function presenceOf(row: unknown): Presence {
@@ -32,28 +31,30 @@ export function presenceOf(row: unknown): Presence {
 export function getTagsOf(actual: unknown): GetTags { return { presence: presenceOf(actual) } }
 
 /** The tags of a write `ask` judged against the raw `ante` row, null for none, beside whether the datastore wrote. */
-export function writeTagsOf(ask: WriteAsk, ante: unknown, isWritten: boolean): WriteTags {
+export function writeTagsOf(ask: WriteAsk, ante: unknown, isWritten: boolean): WriteTags { return { ...rootTagsOf(ask, ante), written: isWritten } }
+
+/** The comparisons of a write `ask` against the raw `ante` row, null for none: its tags, but for whether it was written. A birth's root's tags are these. */
+function rootTagsOf(ask: WriteAsk, ante: unknown): RootTags {
   return {
     presence:    presenceOf(ante),
     revtok_cmp:  revtokCmpOf(ask, ante),
     revseq_cmp:  revseqCmpOf(ask, ante),
     lifepath_eq: (ante === null) || (fieldOf(ante, 'lifepath') === ask.cited.lifepath),
     born_at_cmp: bornAtCmpOf(ask, ante),
-    lifetok_cmp: lifetokCmpOf(ask, ante),
+    banktok_cmp: banktokCmpOf(ask, ante),
     policies:    policiesOf(ask, ante),
-    written:     isWritten,
   }
 }
 
 // The write predicate pins the ante row's revtok, revseq, lifepath and liveness to the cited ones, or citing the shell finds no
-// row; holds its born_at and lifetok to the record's; and meets each storage policy. So the ask alone makes the tags.
+// row; holds its born_at and banktok to the record's; and meets each storage policy. So the ask alone makes the tags.
 /** The tags of a written write, made of its `ask` alone: those {@link writeTagsOf} makes of any ante row the write predicate lets through. */
 export function writtenTagsOf(ask: WriteAsk): WriteTags {
   const isLive = (ask.cited.am === 'a')
   const fixed  = {
     lifepath_eq: true,
     born_at_cmp: (isLive && (ask.record.am === 'a')) ? 'same' : 'moot',
-    lifetok_cmp: (isLive && (ask.modelkind === 'bank')) ? 'same' : 'moot',
+    banktok_cmp: (isLive && (ask.modelkind === 'gate')) ? 'same' : 'moot',
     policies:    Object.fromEntries((ask.options?.policies ?? []).map((policy) => [policy, { ok: true }])),
     written:     true,
   } as const
@@ -61,14 +62,18 @@ export function writtenTagsOf(ask: WriteAsk): WriteTags {
   return { presence: isLive ? 'live' : 'gone', revtok_cmp: 'eq', revseq_cmp: 'eq', ...fixed }
 }
 
-/** The tags of a birth by its three `puts`, each root's judged against its raw `ante` root, null for none, beside whether the datastore wrote. */
-export function birthTagsOf([bankPut, gatePut, rootPut]: BirthPuts, ante: RootRows, isWritten: boolean): BirthTags {
-  return { bank: rootTagsOf(bankPut, ante.bank), gate: rootTagsOf(gatePut, ante.gate), root: rootTagsOf(rootPut, ante.root), written: isWritten }
+/** The tags of a birth by its two `puts`, each root's judged against its raw `ante` root, null for none, as a write's are, beside whether the datastore wrote both. */
+export function birthTagsOf([gatePut, rootPut]: BirthPuts, ante: RootRows, isWritten: boolean): BirthTags {
+  return { gate: rootTagsOf(gatePut, ante.gate), root: rootTagsOf(rootPut, ante.root), written: isWritten }
 }
 
-// A birth's put cites the shell, so of the write tags its put table reads, only these two vary.
-/** The tags of one root's `put` over its raw `ante` root, null for none. */
-function rootTagsOf(put: WriteAsk, ante: unknown): RootTags { return { presence: presenceOf(ante), revtok_cmp: revtokCmpOf(put, ante) } }
+// A birth writes both puts only where the write predicate holds of each, so each root's tags are its written put's.
+/** The tags of a birth that wrote, made of its two `puts` alone: those {@link birthTagsOf} makes of any ante roots the birth predicate lets through. */
+export function writtenBirthTagsOf([gatePut, rootPut]: BirthPuts): BirthTags {
+  const { written: _gateWritten, ...gate } = writtenTagsOf(gatePut)
+  const { written: _rootWritten, ...root } = writtenTagsOf(rootPut)
+  return { gate, root, written: true }
+}
 
 /** The ante row's revtok against the ask's: see {@link RevtokCmp}. */
 function revtokCmpOf({ cited, record }: WriteAsk, ante: unknown): RevtokCmp {
@@ -92,10 +97,10 @@ function bornAtCmpOf({ record }: WriteAsk, ante: unknown): SameCmp {
   return (fieldOf(ante, 'born_at') === record.born_at) ? 'same' : 'changed'
 }
 
-/** Whether a write of the bank leaves a live ante bank's lifetok the same, `'moot'` for any other write. A write over a tombstone or none is a birth, and may carry any lifetok. */
-function lifetokCmpOf(ask: WriteAsk, ante: unknown): SameCmp {
-  if ((ask.modelkind !== 'bank') || (presenceOf(ante) !== 'live')) { return 'moot' }
-  return (fieldOf(ante, 'lifetok') === ask.record.lifetok) ? 'same' : 'changed'
+/** Whether a write of a gate leaves a live ante gate's banktok the same, `'moot'` for any other write. A write over a tombstone or none is a birth, and may carry any banktok. */
+function banktokCmpOf(ask: WriteAsk, ante: unknown): SameCmp {
+  if ((ask.modelkind !== 'gate') || (presenceOf(ante) !== 'live')) { return 'moot' }
+  return (fieldOf(ante, 'banktok') === ask.record.banktok) ? 'same' : 'changed'
 }
 
 /** A verdict for each storage policy `ask` names, over the raw `ante` row. */
@@ -123,19 +128,15 @@ function anteWayinsOf(ante: unknown): AnteWayins {
 // --
 
 // == [Tracked]: trackedOf, trackedRowOf
-// A datastore compares what an ask tracks with the bank, main gate and root box it read, in the step that read them.
+// A datastore compares what an ask tracks with the gate and root box it read, in the step that read them.
 
 /** A manifest's `tracked`: for each root `ask` tracks, `'same'` where its raw row has the revseq and lifepath tracked, else the raw row. */
-export function trackedOf({ track }: AnyAsk, rows: TrackedRows): TrackedRows {
-  return {
-    bank:                 trackedRowOf(track.bank, rows.bank),
-    [Labelpath.MainGate]: trackedRowOf(track[Labelpath.MainGate], rows[Labelpath.MainGate]),
-    [Labelpath.RootBox]:  trackedRowOf(track[Labelpath.RootBox], rows[Labelpath.RootBox]),
-  }
+export function trackedOf({ track }: AnyAsk, rows: RootRows): RootRows {
+  return { gate: trackedRowOf(track.gate, rows.gate), root: trackedRowOf(track.root, rows.root) }
 }
 
 /** `'same'` where `row` has the revseq and lifepath of `pair`, else `row`. */
-function trackedRowOf(pair: Track['bank'], row: unknown): unknown {
+function trackedRowOf(pair: Track['gate'], row: unknown): unknown {
   return ((fieldOf(row, 'revseq') === pair.revseq) && (fieldOf(row, 'lifepath') === pair.lifepath)) ? 'same' : row
 }
 // --

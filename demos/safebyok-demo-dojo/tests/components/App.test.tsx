@@ -12,7 +12,7 @@ describe('Reset', () => {
     TH.fill(login, { 'New passphrase': TH.passphraseOf('nolo'), 'Confirm passphrase': TH.passphraseOf('nolo') })
     await within(login).findByText('Strong enough')
     await TH.press(login, 'Sign In')
-    expect(await vaultRowsNow()).to.have.length(Fixture.vault.length + 3)
+    expect(await vaultRowsNow()).to.have.length(Fixture.vault.length + 2)
 
     const reload = vi.fn()
     vi.stubGlobal('location', { reload })
@@ -24,7 +24,7 @@ describe('Reset', () => {
     expect(cacheRowsNow()).to.have.deep.members(Fixture.cache)
     expect(screen.getByText('Nobody is signed in.')).to.exist
     const inspect = TH.showTab('Inspect', 'Inspect')
-    await within(inspect).findByText('-- Bank (2) --')
+    await within(inspect).findByText('-- Gate (2) --')
     expect(within(inspect).getAllByText('-- Box (4) --')).to.have.length(1)
   })
 })
@@ -35,8 +35,7 @@ describe("Inspect", () => {
     await TH.stageShown('locked')
     const inspect = TH.showTab('Inspect', 'Inspect')
     const tsq = await within(inspect).findByRole('table', { name: /^TSQ:/ })
-    await within(tsq).findByText('-- Bank (1) --')
-    expect(within(tsq).getByText('-- Gate (1) --')).to.exist
+    await within(tsq).findByText('-- Gate (1) --')
     expect(within(inspect).getByText(/library's back door/)).to.exist
   })
 
@@ -53,7 +52,7 @@ describe("Inspect", () => {
     await waitFor(() => { expect(within(tsq).queryByText('"passphrase"')).to.be.null }, { timeout: 3000 })
   })
 
-  it("shows each revtok, lifetok and read_tc cut short by maskUuid, and no UUID whole", async () => {
+  it("shows each revtok, banktok and read_tc cut short by maskUuid, and no UUID whole", async () => {
     await TH.loadPage('hero')
     await TH.stageShown('locked')
     const inspect = TH.showTab('Inspect', 'Inspect')

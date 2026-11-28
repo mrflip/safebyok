@@ -25,7 +25,7 @@ export class MemoryDeviceDB extends DeviceDB {
   _cheat_devicetoks(): Map<string, unknown> { return this.#devicetoks } // eslint-disable-line unicorn/prefer-private-class-fields
 
   /** The ckey of the lease record at `scope`, in {@link _cheat_leases}. */
-  static ckeyOf({ userid, banklabel, labelpath }: LeaseScope): string { return Helpers.ckeyOf(userid, banklabel, labelpath) }
+  static ckeyOf({ modelkind, userid, banklabel, labelpath }: LeaseScope): string { return Helpers.ckeyOf(modelkind, userid, banklabel, labelpath) }
 
   /** The ckey of the devicetok of the user `userid`. */
   static devicetokCkeyOf(userid: Userid): string { return Helpers.ckeyOf(userid, 'devicetok') }
@@ -43,8 +43,8 @@ export class MemoryDeviceDB extends DeviceDB {
   }
 
   // Each hearer is called on a later microtask, so nothing it does runs inside the stow that rang.
-  protected doRing({ userid, banklabel, labelpath }: LeaseScope): void {
-    for (const hear of this.#hearers) { queueMicrotask(() => { hear({ userid, banklabel, labelpath }) }) }
+  protected doRing({ modelkind, userid, banklabel, labelpath }: LeaseScope): void {
+    for (const hear of this.#hearers) { queueMicrotask(() => { hear({ modelkind, userid, banklabel, labelpath }) }) }
   }
 
   protected doListen(hear: (rung: unknown) => void): () => void {

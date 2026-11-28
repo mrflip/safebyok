@@ -11,7 +11,7 @@ describe("maskUuid(text)", () => {
     expect(maskUuid('0195A3F2-1C4B-7E21-9A3D-5B8C2D4E6F7C')).to.eq('0195A3F2-1…7C')
   })
 
-  it("masks a random UUID, as crypto.randomUUID makes a revtok or a lifetok, and the nil UUID, a void revtok", () => {
+  it("masks a random UUID, as crypto.randomUUID makes a revtok or a banktok, and the nil UUID, a void revtok", () => {
     const uuidText = crypto.randomUUID()
     expect(maskUuid(uuidText)).to.eq(`${uuidText.slice(0, 10)}…${uuidText.slice(-2)}`)
     expect(maskUuid('00000000-0000-0000-0000-000000000000')).to.eq('00000000-0…00')

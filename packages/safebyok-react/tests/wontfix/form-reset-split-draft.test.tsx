@@ -33,7 +33,7 @@ describe("wontfix: a draft with one input in a form and one outside it", () => {
     const device = await waitFor(() => world._cheat_device())
     await act(async () => {
       await device.signin(TH.ProviderUser)
-      await device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase })
+      await device.bank.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase })
     })
     const keyInput = await screen.findByLabelText<HTMLInputElement>('Key')
     const org = screen.getByLabelText<HTMLInputElement>('Org')

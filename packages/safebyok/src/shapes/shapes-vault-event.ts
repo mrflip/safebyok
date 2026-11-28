@@ -2,9 +2,9 @@
 
 import { Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { type Banklabel, type Lifetok, type Userid, Labelpath } from './primitives'
+import { type Banklabel, type Banktok, type Userid, Labelpath } from './primitives'
 import type { LiveOf, ShellOf, SparseOf } from './shapes-sealers'
-import { type ThingRecord, type Thingkind, type Tombstone, PerKindChecks, ThingChecks, isLifepathDeep, isParityRight } from './shapes-thing'
+import { type ThingRecord, type Thingkind, type Tombstone, PerKindChecks, ThingChecks, isLabelpathOfKind, isLifepathDeep, isParityRight } from './shapes-thing'
 import { BaseThing } from '../models/base-thing'
 import { itemSeenOf } from '../storage/agerank'
 
@@ -82,8 +82,8 @@ export type VaultEventOf<EventkindT extends VaultEventkind> = Readonly<{
   agerank:    Agerank
   /** The Thing's agerank before this event's record: the vacant agerank where it had received none, or where no ageranks are kept. */
   agerankWas: Agerank
-  /** The lifetok of the bank's life, where the event's source knew it: from a `VaultMinder`, the answer's `banktok`, or the one the notice or the event rung carried, else the bank's as last read. The void lifetok where none was known, as in a vaultDB's raw watch where the datastore did not hand over the bank. */
-  banktok:    Lifetok
+  /** The banktok of the bank's life, where the event's source knew it: from a `VaultMinder`, the answer's `banktok`, or the one the notice or the event rung carried, else the bank's as last read. The void banktok where none was known, as in a vaultDB's raw watch where the datastore did not hand over the bank. */
+  banktok:    Banktok
   /** Who dispatched this event's record: {@link VaultDBSourcelabel} for a vaultDB, wrapped by a `VaultMinder` or not, or the device database that rang what a `VaultMinder`'s `receive` was handed. */
   sourcelabel: string
   /** When this event's record was read, shared by every event of one dispatch. */
@@ -97,7 +97,7 @@ export type VaultItemEvent<RecordT extends ThingRecord = ThingRecord> = VaultEve
 
 /** The record of `RecordT`'s kind an `item` event saw, as `val`, beside its `liveness`. From a Thing's `receive`, `val` is the very object it was given.
  * - `full` -- a whole live record
- * - `soon` -- a live box's sparse form: a bank or a gate has none
+ * - `soon` -- a live box's sparse form: a gate has none
  * - `gone` -- a whole tombstone
  * - `void` -- the void sentinel, for nothing stored
  */
@@ -147,19 +147,19 @@ export const SeenChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom
     .refine(isParityRight, Phrases.LifeseqParity)
   /** Check a `read_tc`: a UUID version 7. */
   const readTc = custom<ReadTc>((val) => (typeof val === 'string') && ReadTcPattern.test(val), Phrases.ReadTcShape)
-  /** Check an `item` event's scope and modelkind, and its record, liveness and `read_tc`, each consistent with the others. */
+  /** Check an `item` event's scope, and its record, liveness and `read_tc`, each consistent with the others. */
   const item = obj({
     ...ThingChecks.thingScope.shape,
-    modelkind: ThingChecks.modelkind,
     liveness:  oneof(livenessVals),
     val:       seenCited,
     read_tc:   readTc,
   })
-    .refine(({ labelpath, modelkind }) => Labelpath.modelkindOf(labelpath) === modelkind, Phrases.EventModelkind)
+    .refine(({ val, modelkind }) => val.modelkind === modelkind, Phrases.EventModelkind)
+    .refine(isLabelpathOfKind, Phrases.LabelpathOfOtherKind)
     .refine(({ val, ...scope }) => BaseThing.haveSameScope(val, scope), Phrases.EventOfOtherThing)
     .refine(({ val }) => isSeenForm(val as SeenThing), Phrases.SeenFormUnknown)
     .refine(({ val, liveness }) => itemSeenOf(val as SeenThing).liveness === liveness, Phrases.EventLiveness)
-  /** Check an `item` event whole: as `item` does, and its kind, who dispatched it, its bank's lifetok and its ageranks. */
+  /** Check an `item` event whole: as `item` does, and its kind, who dispatched it, its bank's banktok and its ageranks. */
   const itemEvent = item.and(obj({
     eventkind:   lit('item'),
     sourcelabel: ThingChecks.label,
@@ -168,7 +168,7 @@ export const SeenChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom
     agerankWas:  str,
   }))
   /** Check the shell at a labelpath of any kind. */
-  const shell = union([PerKindChecks.bankShell, PerKindChecks.gateShell, PerKindChecks.boxShell])
+  const shell = union([PerKindChecks.gateShell, PerKindChecks.boxShell])
   return {
     seenCited,
     readTc,

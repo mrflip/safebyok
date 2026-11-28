@@ -160,11 +160,11 @@ export async function buildProviderWorld({ stored = 'none', isInConfig = false, 
     if (pauses.answer !== null) { await pauses.answer }
     return answering
   }
-  const tryGetWorld = vaultDB.tryGetWorld.bind(vaultDB)
-  vaultDB.tryGetWorld = async (ask) => {
+  const tryGetBank = vaultDB.tryGetBank.bind(vaultDB)
+  vaultDB.tryGetBank = async (ask) => {
     counts.gets += 1
     if (pauses.ask !== null) { await pauses.ask }
-    const answering = tryGetWorld(ask)
+    const answering = tryGetBank(ask)
     if (pauses.answer !== null) { await pauses.answer }
     return answering
   }
@@ -204,7 +204,7 @@ export async function buildProviderWorld({ stored = 'none', isInConfig = false, 
     _cheat_putJokesKey: async (passphraseCleartext) => {
       const device = makeDeviceUnspied({ banklabel: LeanTH.WorldScope.banklabel }, { keyDeriver: LeanTH.testDeriver, logger: LeanTH.quietLogger, vaultDB })
       await device.signin(ProviderUser)
-      await device.bank!.gate.unlock({ passphraseCleartext })
+      await device.bank.gate.unlock({ passphraseCleartext })
       await device.vault!.putBoxOnce(`box/${JokesPath}`, { sidecar: { service: 'jokes' } }, { whisper: LeanTH.Whisper })
     },
   }

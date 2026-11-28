@@ -10,7 +10,7 @@ import * as TH from '../test-helpers'
 const TypedKey = 'sk-test-typed-4242'
 
 /** The key the vault TSQ keeps the jokes box under, for the world's user. */
-const JokesItemKey = VaultTSQ.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: `box/${TH.JokesPath}` })
+const JokesItemKey = VaultTSQ.itemQueryKeyOf({ modelkind: 'box', ...LeanTH.WorldScope, labelpath: `box/${TH.JokesPath}` })
 
 /** What the draft editor last answered and its last put settled to, for a test to read. */
 interface DraftSeen {
@@ -61,7 +61,7 @@ async function renderDraftEditor({ putOpts, isLocked = false, isInForm = false }
   const device = await waitFor(() => world._cheat_device())
   await act(async () => {
     await device.signin(TH.ProviderUser)
-    if (! isLocked) { await device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }) }
+    if (! isLocked) { await device.bank.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }) }
   })
   await screen.findByText('Tier none')
   const input = screen.getByLabelText<HTMLInputElement>('Key')
@@ -145,9 +145,9 @@ describe("useDraft", () => {
   it("waits on a locked bank for the unlock form, read-only, and reveals the key once unlocked", async () => {
     const { device, input, seen } = await renderDraftEditor({ isLocked: true })
     act(() => { input.focus() })
-    await waitFor(() => { expect(device.world.getSnapshot().isUnlockWanted).to.eq(true) })
+    await waitFor(() => { expect(device.bank.getSnapshot().isUnlockWanted).to.eq(true) })
     expect(input.readOnly).to.eq(true)
-    await act(() => device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
+    await act(() => device.bank.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
     await waitFor(() => { expect([input.type, input.value, input.readOnly]).to.deep.equal(['text', TH.JokesKey, false]) })
     expect(seen.draft?.lastErr).to.be.null
   })
@@ -155,7 +155,7 @@ describe("useDraft", () => {
   it("leaves the field masked when the unlock form is dismissed, with the refusal as lastErr", async () => {
     const { world, device, input, seen } = await renderDraftEditor({ isLocked: true })
     act(() => { input.focus() })
-    await waitFor(() => { expect(device.world.getSnapshot().isUnlockWanted).to.eq(true) })
+    await waitFor(() => { expect(device.bank.getSnapshot().isUnlockWanted).to.eq(true) })
     act(() => { world.Bank.dismissUnlock() })
     await waitFor(() => { expect(isVaultError(seen.draft?.lastErr) && seen.draft.lastErr.refusalkind).to.eq('dismissed') })
     expect([input.type, input.value, input.readOnly]).to.deep.equal(['password', '', false])
@@ -244,12 +244,12 @@ describe("useDraft", () => {
     typeKeyInto(input)
     await screen.findByText('Dirty')
     act(() => { screen.getByText('Save').click() })
-    await waitFor(() => { expect(device.world.getSnapshot().isUnlockWanted).to.eq(true) })
+    await waitFor(() => { expect(device.bank.getSnapshot().isUnlockWanted).to.eq(true) })
     act(() => { world.Bank.dismissUnlock() })
     await waitFor(() => { expect(isVaultError(seen.putErr) && seen.putErr.refusalkind).to.eq('dismissed') })
     await screen.findByText('Clean')
     expect([input.value, seen.draft?.isWhisperDirty]).to.deep.equal(['', false])
-    await act(() => device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
+    await act(() => device.bank.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
     act(() => { screen.getByText('Save').click() })
     await waitFor(() => { expect(seen.puts).to.eq(1) })
     expect(await storedKeyOf(world)).to.eq(TH.JokesKey)
@@ -263,14 +263,14 @@ describe("useDraft", () => {
     typeKeyInto(input)
     await waitFor(() => { expect(seen.draft?.isWhisperDirty).to.eq(true) })
     act(() => { screen.getByText('Save').click() })
-    await waitFor(() => { expect(device.world.getSnapshot().isUnlockWanted).to.eq(true) })
+    await waitFor(() => { expect(device.bank.getSnapshot().isUnlockWanted).to.eq(true) })
     act(() => { world.Bank.dismissUnlock() })
     await waitFor(() => { expect(isVaultError(seen.putErr) && seen.putErr.refusalkind).to.eq('dismissed') })
     await waitFor(() => { expect(seen.draft?.isWhisperDirty).to.eq(false) })
     expect([input.value, input.type]).to.deep.equal(['', 'password'])
     expect([seen.draft?.isDirty, seen.draft?.isBehind, seen.draft?.base?.revseq, seen.draft?.sidecar]).to.deep.equal([true, false, baseRevseq, { service: 'jokes', tier: 'pro' }])
     expect(screen.getByText('Dirty')).to.exist
-    await act(() => device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
+    await act(() => device.bank.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
     act(() => { screen.getByText('Save').click() })
     await waitFor(() => { expect(seen.puts).to.eq(1) })
     await screen.findByText('Clean')
@@ -285,13 +285,13 @@ describe("useDraft", () => {
     const baseRevseq = seen.draft?.base?.revseq
     typeKeyInto(input)
     act(() => { screen.getByText('Save').click() })
-    await waitFor(() => { expect(device.world.getSnapshot().isUnlockWanted).to.eq(true) })
+    await waitFor(() => { expect(device.bank.getSnapshot().isUnlockWanted).to.eq(true) })
     act(() => { world.Bank.dismissUnlock() })
     await waitFor(() => { expect(seen.draft?.isWhisperDirty).to.eq(false) })
     await act(() => world._cheat_otherVault!.putBoxOnce(`box/${TH.JokesPath}`, { sidecar: { service: 'jokes', tier: 'max' } }, { whisper: LeanTH.Whisper }))
     await screen.findByText('Dirty and behind')
     expect([seen.draft?.base?.revseq, seen.draft?.sidecar]).to.deep.equal([baseRevseq, { service: 'jokes', tier: 'pro' }])
-    await act(() => device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
+    await act(() => device.bank.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
     act(() => { screen.getByText('Save').click() })
     await waitFor(() => { expect(isVaultError(seen.putErr) && seen.putErr.refusalkind).to.eq('stale_write') })
   })

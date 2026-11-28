@@ -81,7 +81,7 @@ export const VaultTSQChecks = Validator.Checkers('bad_record', ({ obj, custom, f
 })
 
 /** The members of a QueryClient a VaultTSQ calls. */
-const QueryClientMembernames = ['setQueryDefaults', 'setMutationDefaults', 'getQueryData', 'setQueryData', 'query', 'invalidateQueries', 'resetQueries'] as const
+const QueryClientMembernames = ['setQueryDefaults', 'getQueryData', 'setQueryData', 'query', 'invalidateQueries', 'resetQueries'] as const
 
 /** True for an object with a function for each member of a QueryClient a VaultTSQ calls. */
 export function isQueryClient(val: unknown): val is TSQ.QueryClient {
