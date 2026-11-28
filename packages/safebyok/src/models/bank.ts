@@ -738,9 +738,9 @@ export class Bank {
    * For experimenting, never for an app's own logic: what it answers may change without notice.
    */
   inspectable(): MaskedViewLease {
-    const { leaseLoggable, leaseEndsAt } = this
-    if ((leaseLoggable === null) || (leaseEndsAt === null) || ! this.areRootsLive) { return EmptyMaskedView.lease }
-    return { active: true, ...leaseLoggable, ends_at: leaseEndsAt }
+    const lease = this.#lease
+    if ((lease === null) || ! this.areRootsLive) { return EmptyMaskedView.lease }
+    return { active: true, ...lease.loggable, ends_at: lease.ends_at }
   }
   // --
 }
